@@ -92,3 +92,47 @@ CREATE TABLE IF NOT EXISTS cart_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON cart_items(cart_id);
+
+-- Orders from the custom guest checkout. Snapshots the cart + applied offers +
+-- totals at purchase time so the order is immutable even if the catalog changes.
+CREATE TABLE IF NOT EXISTS orders (
+  id                  TEXT PRIMARY KEY,       -- e.g. BL-1A2B3C4D
+  email               TEXT,
+  phone               TEXT,
+  name                TEXT,
+  address_line1       TEXT,
+  address_line2       TEXT,
+  city                TEXT,
+  state               TEXT,
+  pincode             TEXT,
+  country             TEXT,
+  subtotal            REAL,
+  discount_total      REAL,
+  total               REAL,
+  currency            TEXT,
+  coupon_code         TEXT,
+  applied_offers      TEXT,                   -- JSON snapshot
+  payment_method      TEXT,                   -- cod | razorpay
+  payment_status      TEXT,                   -- pending | paid | cod
+  status              TEXT,                   -- pending_payment | confirmed
+  razorpay_order_id   TEXT,
+  razorpay_payment_id TEXT,
+  created_at          TEXT
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  order_id      TEXT NOT NULL,
+  variant_id    TEXT,
+  product_id    TEXT,
+  title         TEXT,
+  variant_title TEXT,
+  image         TEXT,
+  unit_price    REAL,
+  quantity      INTEGER,
+  line_total    REAL,
+  line_discount REAL,
+  is_gift       INTEGER NOT NULL DEFAULT 0,
+  position      INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);

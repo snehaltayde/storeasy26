@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useCart, checkoutUrl } from "./CartContext";
+import Link from "next/link";
+import { useCart } from "./CartContext";
 import { formatMoney } from "@/lib/format";
 
 export default function CartDrawer() {
@@ -32,8 +33,6 @@ export default function CartDrawer() {
     if (open) document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, setOpen]);
-
-  const url = checkoutUrl(items);
 
   function applyCoupon(e) {
     e.preventDefault();
@@ -240,18 +239,13 @@ export default function CartDrawer() {
                 </p>
               )}
             </div>
-            {url ? (
-              <a
-                href={url}
-                className="block rounded-xl bg-zinc-900 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-zinc-800"
-              >
-                Checkout on Shopify →
-              </a>
-            ) : (
-              <p className="rounded-xl bg-zinc-100 px-4 py-3 text-center text-xs text-zinc-500">
-                Set <code className="font-mono">NEXT_PUBLIC_SHOPIFY_DOMAIN</code> to enable checkout.
-              </p>
-            )}
+            <Link
+              href="/checkout"
+              onClick={() => setOpen(false)}
+              className="block rounded-xl bg-zinc-900 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-zinc-800"
+            >
+              Checkout →
+            </Link>
             <p className="mt-2 text-center text-[11px] text-zinc-400">
               Taxes &amp; shipping calculated at checkout
             </p>
