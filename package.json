@@ -1,0 +1,32 @@
+{
+  "name": "storeasy26",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "migrate": "node --env-file=.env.local scripts/migrate.js",
+    "sync": "node --env-file=.env.local scripts/sync.js",
+    "sync:search": "node --env-file=.env.local scripts/sync.js --search-only",
+    "db:reset": "node --env-file=.env.local scripts/migrate.js --reset",
+    "seed:demo": "node --env-file=.env.local scripts/seed-demo.js",
+    "shopify:token": "node --env-file=.env.local scripts/shopify-mint-token.js",
+    "shopify:oauth": "node --env-file=.env.local scripts/shopify-oauth.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.4",
+    "@libsql/kysely-libsql": "^0.4.1",
+    "kysely": "^0.29.2",
+    "next": "16.2.9",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "sharp": "^0.35.2",
+    "typesense": "^3.0.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "tailwindcss": "^4"
+  }
+}

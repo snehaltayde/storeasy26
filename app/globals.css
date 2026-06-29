@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0a0a0b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #d9f99d; /* lime-200 */
+}
+
+/* Rich-text product descriptions (Shopify descriptionHtml) */
+.rte {
+  line-height: 1.7;
+  color: #3f3f46; /* zinc-700 */
+}
+.rte > * + * {
+  margin-top: 0.85rem;
+}
+.rte h1,
+.rte h2,
+.rte h3,
+.rte h4 {
+  font-weight: 700;
+  color: #18181b; /* zinc-900 */
+  line-height: 1.3;
+  margin-top: 1.4rem;
+}
+.rte h2 {
+  font-size: 1.15rem;
+}
+.rte h3 {
+  font-size: 1.02rem;
+}
+.rte ul,
+.rte ol {
+  padding-left: 1.25rem;
+}
+.rte ul {
+  list-style: disc;
+}
+.rte ol {
+  list-style: decimal;
+}
+.rte li + li {
+  margin-top: 0.3rem;
+}
+.rte a {
+  color: #4d7c0f; /* lime-700 */
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rte strong {
+  color: #18181b;
+  font-weight: 650;
+}
+.rte img {
+  border-radius: 0.5rem;
+}
+.rte table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.rte td,
+.rte th {
+  border: 1px solid #e4e4e7;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+/* Hide scrollbars on horizontal scrollers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
