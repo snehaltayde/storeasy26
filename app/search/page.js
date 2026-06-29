@@ -1,6 +1,6 @@
 import Link from "next/link";
 import ProductGrid from "@/components/ProductGrid";
-import { typesenseSearch } from "@/lib/typesense";
+import { typesenseSearch } from "@/lib/typesense-search";
 import { searchProductsInDb } from "@/lib/repo";
 
 export const dynamic = "force-dynamic";

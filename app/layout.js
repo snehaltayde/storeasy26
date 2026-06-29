@@ -10,6 +10,10 @@ import { getAllCollections } from "@/lib/repo";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
+// Render pages on the edge runtime — the libSQL client resolves to its
+// fetch-based `edge-light` build, and search uses edge-safe fetch.
+export const runtime = "edge";
+
 export const metadata = {
   title: {
     default: "BeastLife — Sports Nutrition, delivered fast",

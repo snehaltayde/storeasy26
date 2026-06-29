@@ -1,6 +1,7 @@
-import { typesenseSearch } from "@/lib/typesense";
+import { typesenseSearch } from "@/lib/typesense-search";
 import { searchProductsInDb } from "@/lib/repo";
 
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 // Search endpoint for the header search box. Prefers Typesense (typo tolerance,
