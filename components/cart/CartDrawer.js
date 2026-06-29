@@ -11,8 +11,9 @@ export default function CartDrawer() {
     subtotal,
     count,
     currency,
-    coupon,
+    couponStatus,
     appliedOffers,
+    gifts,
     discountTotal,
     total,
     open,
@@ -126,18 +127,46 @@ export default function CartDrawer() {
                 </button>
               </li>
             ))}
+
+            {gifts.map((g) => (
+              <li key={`gift-${g.variantId}`} className="flex gap-3 py-4">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+                  {g.image ? (
+                    <Image src={g.image} alt={g.title} fill sizes="80px" className="object-cover" />
+                  ) : null}
+                  <span className="absolute left-1 top-1 rounded bg-lime-400 px-1.5 py-0.5 text-[10px] font-bold text-zinc-900">
+                    FREE
+                  </span>
+                </div>
+                <div className="flex flex-1 flex-col justify-center">
+                  <p className="line-clamp-2 text-sm font-medium text-zinc-900">{g.title}</p>
+                  <p className="text-xs text-zinc-500">Free gift 🎁</p>
+                  <div className="mt-1 flex items-center gap-2 text-sm">
+                    <span className="font-semibold text-lime-700">FREE</span>
+                    {g.value ? (
+                      <span className="text-xs text-zinc-400 line-through">
+                        {formatMoney(g.value, currency)}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            ))}
           </ul>
         )}
 
         {items.length > 0 && (
           <footer className="border-t border-zinc-100 px-5 py-4">
-            {/* Coupon — wired to cart state; validation + discount land in Session 4 */}
+            {/* Coupon — validated by the engine (try BEAST10, FLAT200, SOLO25) */}
             <div className="mb-4">
-              {coupon ? (
+              {couponStatus?.valid ? (
                 <div className="flex items-center justify-between rounded-xl border border-lime-200 bg-lime-50 px-3 py-2.5">
                   <span className="text-sm">
                     <span className="text-zinc-500">Coupon</span>{" "}
-                    <span className="font-semibold text-lime-800">{coupon}</span>
+                    <span className="font-semibold text-lime-800">{couponStatus.code}</span>
+                    {couponStatus.applied ? (
+                      <span className="text-lime-700"> · −{formatMoney(couponStatus.applied, currency)}</span>
+                    ) : null}
                   </span>
                   <button
                     onClick={() => setCoupon(null)}
@@ -147,22 +176,37 @@ export default function CartDrawer() {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={applyCoupon} className="flex gap-2">
-                  <input
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder="Coupon code"
-                    aria-label="Coupon code"
-                    className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm uppercase outline-none placeholder:normal-case focus:border-zinc-400"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!code.trim() || pending}
-                    className="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 disabled:opacity-40"
-                  >
-                    Apply
-                  </button>
-                </form>
+                <>
+                  <form onSubmit={applyCoupon} className="flex gap-2">
+                    <input
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      placeholder="Coupon code"
+                      aria-label="Coupon code"
+                      className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm uppercase outline-none placeholder:normal-case focus:border-zinc-400"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!code.trim() || pending}
+                      className="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 disabled:opacity-40"
+                    >
+                      Apply
+                    </button>
+                  </form>
+                  {couponStatus && !couponStatus.valid && (
+                    <p className="mt-1.5 flex items-center justify-between gap-2 text-xs text-red-600">
+                      <span>
+                        “{couponStatus.code}” — {couponStatus.reason}
+                      </span>
+                      <button
+                        onClick={() => setCoupon(null)}
+                        className="shrink-0 font-medium text-zinc-400 hover:text-zinc-700"
+                      >
+                        clear
+                      </button>
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
@@ -171,7 +215,7 @@ export default function CartDrawer() {
                 <span className="text-zinc-500">Subtotal</span>
                 <span className="text-zinc-700">{formatMoney(subtotal, currency)}</span>
               </div>
-              {appliedOffers.map((o) => (
+              {appliedOffers.filter((o) => o.amount > 0).map((o) => (
                 <div
                   key={o.id}
                   className="flex items-start justify-between gap-3 text-sm text-lime-700"

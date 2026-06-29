@@ -12,8 +12,10 @@ const EMPTY = {
   coupon: null,
   currency: "INR",
   appliedOffers: [],
+  gifts: [],
   discountTotal: 0,
   total: 0,
+  couponStatus: null,
 };
 
 // DB-backed cart. State is seeded from the server (SSR-read cookie → Turso) so
@@ -61,8 +63,10 @@ export function CartProvider({ children, initialCart }) {
     currency: cart.currency,
     coupon: cart.coupon,
     appliedOffers: cart.appliedOffers || [],
+    gifts: cart.gifts || [],
     discountTotal: cart.discountTotal || 0,
     total: cart.total ?? cart.subtotal,
+    couponStatus: cart.couponStatus || null,
     open,
     setOpen,
     pending,
