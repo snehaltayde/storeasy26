@@ -53,16 +53,8 @@ export default function ProductPurchase({ product }) {
 
   function handleAdd() {
     if (!currentVariant || !available) return;
-    addItem({
-      variantId: currentVariant.id,
-      title,
-      variantTitle: currentVariant.title,
-      handle,
-      image: currentVariant.image_url || featured_image,
-      price: currentVariant.price,
-      currency: currentVariant.currency || currency,
-      qty,
-    });
+    // Server derives price/title/image from the catalog by variant GID.
+    addItem(currentVariant.id, qty);
     setAdded(true);
   }
 

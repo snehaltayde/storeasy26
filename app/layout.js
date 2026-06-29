@@ -5,7 +5,9 @@ import Footer from "@/components/Footer";
 import { CartProvider } from "@/components/cart/CartContext";
 import CartDrawer from "@/components/cart/CartDrawer";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import { cookies } from "next/headers";
 import { getAllCollections } from "@/lib/repo";
+import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -44,12 +46,21 @@ async function navCollections() {
   }
 }
 
+async function initialCart() {
+  try {
+    const id = (await cookies()).get(CART_COOKIE)?.value;
+    return id ? await getCart(id) : emptyCart();
+  } catch {
+    return emptyCart();
+  }
+}
+
 export default async function RootLayout({ children }) {
-  const collections = await navCollections();
+  const [collections, cart] = await Promise.all([navCollections(), initialCart()]);
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
       <body className="flex min-h-full flex-col bg-white text-zinc-900 antialiased">
-        <CartProvider>
+        <CartProvider initialCart={cart}>
           <Header collections={collections} />
           <main className="flex-1">{children}</main>
           <Footer collections={collections} />

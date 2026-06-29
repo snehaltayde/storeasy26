@@ -1,69 +1,65 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback } from "react";
+import { numericId } from "@/lib/ids";
 
 const CartContext = createContext(null);
-const STORAGE_KEY = "storeasy.cart.v1";
+const EMPTY = { id: null, items: [], subtotal: 0, count: 0, coupon: null, currency: "INR" };
 
-export function CartProvider({ children }) {
-  const [items, setItems] = useState([]);
+// DB-backed cart. State is seeded from the server (SSR-read cookie → Turso) so
+// the count is correct on first paint and survives refresh; every mutation hits
+// the edge /api/cart and replaces state with the server's authoritative cart.
+export function CartProvider({ children, initialCart }) {
+  const [cart, setCart] = useState(initialCart || EMPTY);
   const [open, setOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const [pending, setPending] = useState(false);
 
-  useEffect(() => {
+  const mutate = useCallback(async (body, { openDrawer = false } = {}) => {
+    if (openDrawer) setOpen(true);
+    setPending(true);
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setItems(JSON.parse(raw));
+      const res = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const next = await res.json();
+      setCart((prev) => ({ ...prev, ...next }));
     } catch {
-      /* ignore */
+      /* keep current state on network error */
+    } finally {
+      setPending(false);
     }
-    setHydrated(true);
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    } catch {
-      /* ignore */
-    }
-  }, [items, hydrated]);
-
-  const addItem = useCallback((item) => {
-    setItems((cur) => {
-      const idx = cur.findIndex((x) => x.variantId === item.variantId);
-      if (idx >= 0) {
-        const next = [...cur];
-        next[idx] = { ...next[idx], qty: next[idx].qty + (item.qty || 1) };
-        return next;
-      }
-      return [...cur, { ...item, qty: item.qty || 1 }];
-    });
-    setOpen(true);
-  }, []);
-
-  const removeItem = useCallback((variantId) => {
-    setItems((cur) => cur.filter((x) => x.variantId !== variantId));
-  }, []);
-
-  const setQty = useCallback((variantId, qty) => {
-    setItems((cur) =>
-      cur.map((x) => (x.variantId === variantId ? { ...x, qty: Math.max(1, qty) } : x)),
-    );
-  }, []);
-
-  const clear = useCallback(() => setItems([]), []);
-
-  const count = items.reduce((n, x) => n + x.qty, 0);
-  const subtotal = items.reduce((s, x) => s + Number(x.price || 0) * x.qty, 0);
-
-  return (
-    <CartContext.Provider
-      value={{ items, count, subtotal, addItem, removeItem, setQty, clear, open, setOpen, hydrated }}
-    >
-      {children}
-    </CartContext.Provider>
+  const addItem = useCallback(
+    (variantId, quantity = 1) => mutate({ action: "add", variantId, quantity }, { openDrawer: true }),
+    [mutate],
   );
+  const setQty = useCallback(
+    (variantId, quantity) => mutate({ action: "setQty", variantId, quantity }),
+    [mutate],
+  );
+  const removeItem = useCallback((variantId) => mutate({ action: "remove", variantId }), [mutate]);
+  const setCoupon = useCallback((coupon) => mutate({ action: "setCoupon", coupon }), [mutate]);
+  const clear = useCallback(() => mutate({ action: "clear" }), [mutate]);
+
+  const value = {
+    items: cart.items,
+    count: cart.count,
+    subtotal: cart.subtotal,
+    currency: cart.currency,
+    coupon: cart.coupon,
+    open,
+    setOpen,
+    pending,
+    addItem,
+    setQty,
+    removeItem,
+    setCoupon,
+    clear,
+  };
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export function useCart() {
@@ -72,12 +68,10 @@ export function useCart() {
   return ctx;
 }
 
-// Build a real Shopify checkout permalink: /cart/<variantNumericId>:<qty>,...
+// Shopify checkout permalink from cart items — numeric ids at the API boundary.
 export function checkoutUrl(items) {
   const domain = process.env.NEXT_PUBLIC_SHOPIFY_DOMAIN;
-  if (!domain || !items.length) return null;
-  const parts = items
-    .map((x) => `${String(x.variantId).split("/").pop()}:${x.qty}`)
-    .join(",");
+  if (!domain || !items?.length) return null;
+  const parts = items.map((i) => `${i.variantNumericId || numericId(i.variantId)}:${i.quantity}`).join(",");
   return `https://${domain}/cart/${parts}`;
 }

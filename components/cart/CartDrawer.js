@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useCart, checkoutUrl } from "./CartContext";
 import { formatMoney } from "@/lib/format";
 
 export default function CartDrawer() {
-  const { items, subtotal, open, setOpen, removeItem, setQty } = useCart();
+  const { items, subtotal, count, currency, coupon, open, setOpen, removeItem, setQty, setCoupon, pending } =
+    useCart();
+  const [code, setCode] = useState("");
 
   useEffect(() => {
     function onKey(e) {
@@ -16,8 +18,14 @@ export default function CartDrawer() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open, setOpen]);
 
-  const currency = items[0]?.currency || "INR";
   const url = checkoutUrl(items);
+
+  function applyCoupon(e) {
+    e.preventDefault();
+    const c = code.trim();
+    if (c) setCoupon(c);
+    setCode("");
+  }
 
   return (
     <>
@@ -37,7 +45,7 @@ export default function CartDrawer() {
       >
         <header className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
           <h2 className="text-lg font-bold">
-            Your cart {items.length > 0 && <span className="text-zinc-400">({items.length})</span>}
+            Your cart {count > 0 && <span className="text-zinc-400">({count})</span>}
           </h2>
           <button
             onClick={() => setOpen(false)}
@@ -72,30 +80,31 @@ export default function CartDrawer() {
                   <div className="mt-auto flex items-center justify-between pt-2">
                     <div className="inline-flex items-center rounded-lg border border-zinc-200">
                       <button
-                        onClick={() => setQty(it.variantId, it.qty - 1)}
-                        className="px-2.5 py-1 text-zinc-600 hover:text-zinc-900"
+                        onClick={() => setQty(it.variantId, it.quantity - 1)}
+                        disabled={pending}
+                        className="px-2.5 py-1 text-zinc-600 hover:text-zinc-900 disabled:opacity-50"
                         aria-label="Decrease quantity"
                       >
                         −
                       </button>
-                      <span className="min-w-7 text-center text-sm">{it.qty}</span>
+                      <span className="min-w-7 text-center text-sm">{it.quantity}</span>
                       <button
-                        onClick={() => setQty(it.variantId, it.qty + 1)}
-                        className="px-2.5 py-1 text-zinc-600 hover:text-zinc-900"
+                        onClick={() => setQty(it.variantId, it.quantity + 1)}
+                        disabled={pending}
+                        className="px-2.5 py-1 text-zinc-600 hover:text-zinc-900 disabled:opacity-50"
                         aria-label="Increase quantity"
                       >
                         +
                       </button>
                     </div>
-                    <span className="text-sm font-semibold">
-                      {formatMoney(Number(it.price) * it.qty, it.currency)}
-                    </span>
+                    <span className="text-sm font-semibold">{formatMoney(it.lineTotal, it.currency)}</span>
                   </div>
                 </div>
                 <button
                   onClick={() => removeItem(it.variantId)}
+                  disabled={pending}
                   aria-label="Remove item"
-                  className="self-start text-zinc-300 hover:text-zinc-600"
+                  className="self-start text-zinc-300 hover:text-zinc-600 disabled:opacity-50"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <path d="M18 6 6 18M6 6l12 12" />
@@ -108,6 +117,41 @@ export default function CartDrawer() {
 
         {items.length > 0 && (
           <footer className="border-t border-zinc-100 px-5 py-4">
+            {/* Coupon — wired to cart state; validation + discount land in Session 4 */}
+            <div className="mb-4">
+              {coupon ? (
+                <div className="flex items-center justify-between rounded-xl border border-lime-200 bg-lime-50 px-3 py-2.5">
+                  <span className="text-sm">
+                    <span className="text-zinc-500">Coupon</span>{" "}
+                    <span className="font-semibold text-lime-800">{coupon}</span>
+                  </span>
+                  <button
+                    onClick={() => setCoupon(null)}
+                    className="text-xs font-medium text-zinc-500 hover:text-zinc-800"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={applyCoupon} className="flex gap-2">
+                  <input
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="Coupon code"
+                    aria-label="Coupon code"
+                    className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm uppercase outline-none placeholder:normal-case focus:border-zinc-400"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!code.trim() || pending}
+                    className="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                </form>
+              )}
+            </div>
+
             <div className="mb-3 flex items-center justify-between text-sm">
               <span className="text-zinc-500">Subtotal</span>
               <span className="text-base font-bold">{formatMoney(subtotal, currency)}</span>
@@ -121,8 +165,7 @@ export default function CartDrawer() {
               </a>
             ) : (
               <p className="rounded-xl bg-zinc-100 px-4 py-3 text-center text-xs text-zinc-500">
-                Set <code className="font-mono">NEXT_PUBLIC_SHOPIFY_DOMAIN</code> to enable secure
-                Shopify checkout.
+                Set <code className="font-mono">NEXT_PUBLIC_SHOPIFY_DOMAIN</code> to enable checkout.
               </p>
             )}
             <p className="mt-2 text-center text-[11px] text-zinc-400">

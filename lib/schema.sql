@@ -71,3 +71,24 @@ CREATE INDEX IF NOT EXISTS idx_variants_product             ON variants(product_
 CREATE INDEX IF NOT EXISTS idx_collection_products_coll     ON collection_products(collection_id);
 CREATE INDEX IF NOT EXISTS idx_collection_products_product  ON collection_products(product_id);
 CREATE INDEX IF NOT EXISTS idx_products_type                ON products(product_type);
+
+-- DB-backed cart sessions (keyed by an httpOnly cookie). IDs are stored as FULL
+-- Shopify GIDs to match products.id / variants.id, so the offer engine
+-- (Session 4) can join cart items straight onto the catalog with no conversion.
+CREATE TABLE IF NOT EXISTS carts (
+  id          TEXT PRIMARY KEY,        -- session id (== cookie value)
+  coupon_code TEXT,
+  created_at  TEXT,
+  updated_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS cart_items (
+  cart_id    TEXT NOT NULL,
+  variant_id TEXT NOT NULL,            -- gid://shopify/ProductVariant/...
+  product_id TEXT NOT NULL,            -- gid://shopify/Product/...
+  quantity   INTEGER NOT NULL,
+  added_at   TEXT,
+  PRIMARY KEY (cart_id, variant_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON cart_items(cart_id);

@@ -25,7 +25,9 @@ try {
 
   const schema = await readFile(join(here, "../lib/schema.sql"), "utf8");
   await libsql.executeMultiple(schema);
-  console.log(`✓ schema applied → ${process.env.DATABASE_URL || "file:local.db"}`);
+  console.log(
+    `✓ schema applied → ${process.env.TURSO_DB_URL || process.env.DATABASE_URL || "file:local.db"}`,
+  );
   process.exit(0);
 } catch (err) {
   console.error("✗ migrate failed:", err.message);
