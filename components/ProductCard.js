@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import FadeImage from "./FadeImage";
 import { formatMoney, discountPercent } from "@/lib/format";
 
 export default function ProductCard({ product, priority = false }) {
@@ -24,13 +24,13 @@ export default function ProductCard({ product, priority = false }) {
     <Link href={`/products/${handle}`} className="group block">
       <div className="relative aspect-square overflow-hidden rounded-2xl bg-zinc-100">
         {featured_image ? (
-          <Image
+          <FadeImage
             src={featured_image}
             alt={featured_image_alt || title}
             fill
             priority={priority}
             sizes="(min-width:1024px) 25vw, (min-width:640px) 33vw, 50vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className="object-cover group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-zinc-400">

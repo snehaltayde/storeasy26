@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import FadeImage from "./FadeImage";
 
 export default function ProductGallery({ images = [], title }) {
   const [active, setActive] = useState(0);
@@ -19,7 +20,7 @@ export default function ProductGallery({ images = [], title }) {
   return (
     <div className="lg:sticky lg:top-28">
       <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-zinc-100">
-        <Image
+        <FadeImage
           src={main.url}
           alt={main.alt || title}
           fill

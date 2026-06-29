@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "./CartContext";
@@ -25,6 +25,14 @@ export default function CartDrawer() {
     pending,
   } = useCart();
   const [code, setCode] = useState("");
+
+  // Pop the "You save" figure whenever the total discount jumps up (an offer landed).
+  const [savePop, setSavePop] = useState(0);
+  const prevDiscount = useRef(0);
+  useEffect(() => {
+    if (discountTotal > prevDiscount.current) setSavePop((n) => n + 1);
+    prevDiscount.current = discountTotal;
+  }, [discountTotal]);
 
   useEffect(() => {
     function onKey(e) {
@@ -73,10 +81,27 @@ export default function CartDrawer() {
         </header>
 
         {items.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-zinc-500">
-            <p className="font-medium text-zinc-700">Your cart is empty</p>
-            <p className="text-sm">Add some gains and they’ll show up here.</p>
-          </div>
+          pending ? (
+            // First item lands here while the request is in flight — show a
+            // skeleton instead of flashing "your cart is empty".
+            <ul className="flex-1 space-y-4 px-5 py-4">
+              {[0, 1].map((i) => (
+                <li key={i} className="flex gap-3">
+                  <div className="h-20 w-20 shrink-0 animate-pulse rounded-lg bg-zinc-100" />
+                  <div className="flex-1 space-y-2 py-1">
+                    <div className="h-4 w-3/4 animate-pulse rounded bg-zinc-100" />
+                    <div className="h-3 w-1/3 animate-pulse rounded bg-zinc-100" />
+                    <div className="h-7 w-24 animate-pulse rounded bg-zinc-100" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-zinc-500">
+              <p className="font-medium text-zinc-700">Your cart is empty</p>
+              <p className="text-sm">Add some gains and they’ll show up here.</p>
+            </div>
+          )
         ) : (
           <ul className="flex-1 divide-y divide-zinc-100 overflow-y-auto px-5">
             {items.map((it) => (
@@ -128,7 +153,7 @@ export default function CartDrawer() {
             ))}
 
             {gifts.map((g) => (
-              <li key={`gift-${g.variantId}`} className="flex gap-3 py-4">
+              <li key={`gift-${g.variantId}`} className="animate-offer-in flex gap-3 py-4">
                 <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
                   {g.image ? (
                     <Image src={g.image} alt={g.title} fill sizes="80px" className="object-cover" />
@@ -217,7 +242,7 @@ export default function CartDrawer() {
               {appliedOffers.filter((o) => o.amount > 0).map((o) => (
                 <div
                   key={o.id}
-                  className="flex items-start justify-between gap-3 text-sm text-lime-700"
+                  className="animate-offer-in flex items-start justify-between gap-3 text-sm text-lime-700"
                 >
                   <span className="flex items-start gap-1.5">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
@@ -234,7 +259,10 @@ export default function CartDrawer() {
                 <span className="text-base font-bold">{formatMoney(total, currency)}</span>
               </div>
               {discountTotal > 0 && (
-                <p className="text-right text-xs font-semibold text-lime-700">
+                <p
+                  key={savePop}
+                  className="animate-save-pop origin-right text-right text-xs font-semibold text-lime-700"
+                >
                   You save {formatMoney(discountTotal, currency)}
                 </p>
               )}
