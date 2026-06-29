@@ -6,8 +6,22 @@ import { useCart, checkoutUrl } from "./CartContext";
 import { formatMoney } from "@/lib/format";
 
 export default function CartDrawer() {
-  const { items, subtotal, count, currency, coupon, open, setOpen, removeItem, setQty, setCoupon, pending } =
-    useCart();
+  const {
+    items,
+    subtotal,
+    count,
+    currency,
+    coupon,
+    appliedOffers,
+    discountTotal,
+    total,
+    open,
+    setOpen,
+    removeItem,
+    setQty,
+    setCoupon,
+    pending,
+  } = useCart();
   const [code, setCode] = useState("");
 
   useEffect(() => {
@@ -152,9 +166,35 @@ export default function CartDrawer() {
               )}
             </div>
 
-            <div className="mb-3 flex items-center justify-between text-sm">
-              <span className="text-zinc-500">Subtotal</span>
-              <span className="text-base font-bold">{formatMoney(subtotal, currency)}</span>
+            <div className="mb-3 space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-zinc-500">Subtotal</span>
+                <span className="text-zinc-700">{formatMoney(subtotal, currency)}</span>
+              </div>
+              {appliedOffers.map((o) => (
+                <div
+                  key={o.id}
+                  className="flex items-start justify-between gap-3 text-sm text-lime-700"
+                >
+                  <span className="flex items-start gap-1.5">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
+                      <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z" />
+                      <circle cx="7" cy="7" r="1.4" fill="currentColor" />
+                    </svg>
+                    <span className="leading-snug">{o.label}</span>
+                  </span>
+                  <span className="whitespace-nowrap font-medium">−{formatMoney(o.amount, currency)}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between border-t border-zinc-100 pt-2">
+                <span className="font-semibold">Total</span>
+                <span className="text-base font-bold">{formatMoney(total, currency)}</span>
+              </div>
+              {discountTotal > 0 && (
+                <p className="text-right text-xs font-semibold text-lime-700">
+                  You save {formatMoney(discountTotal, currency)}
+                </p>
+              )}
             </div>
             {url ? (
               <a

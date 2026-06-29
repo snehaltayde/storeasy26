@@ -4,7 +4,17 @@ import { createContext, useContext, useState, useCallback } from "react";
 import { numericId } from "@/lib/ids";
 
 const CartContext = createContext(null);
-const EMPTY = { id: null, items: [], subtotal: 0, count: 0, coupon: null, currency: "INR" };
+const EMPTY = {
+  id: null,
+  items: [],
+  subtotal: 0,
+  count: 0,
+  coupon: null,
+  currency: "INR",
+  appliedOffers: [],
+  discountTotal: 0,
+  total: 0,
+};
 
 // DB-backed cart. State is seeded from the server (SSR-read cookie → Turso) so
 // the count is correct on first paint and survives refresh; every mutation hits
@@ -50,6 +60,9 @@ export function CartProvider({ children, initialCart }) {
     subtotal: cart.subtotal,
     currency: cart.currency,
     coupon: cart.coupon,
+    appliedOffers: cart.appliedOffers || [],
+    discountTotal: cart.discountTotal || 0,
+    total: cart.total ?? cart.subtotal,
     open,
     setOpen,
     pending,
