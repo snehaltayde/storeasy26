@@ -106,6 +106,34 @@ no-ops (`already: true`); the audit trail records the winner
 secret → update `RAZORPAY_WEBHOOK_SECRET` (prod) · redeploy · keep the test webhook for
 staging/dev accounts if useful.
 
+## Shopify push — reliable, async, idempotent (Session 12)
+
+[`lib/shopify-push.js`](../lib/shopify-push.js) productionizes the Session-8 draft-order
+mechanism ([shopify-order-sync.md](./shopify-order-sync.md)), building the draft from the
+**immutable order snapshot**: normal-price lines · gift as a 100%-off line · ONE
+order-level `FIXED_AMOUNT` discount = engine `discountTotal` · custom shipping line ·
+Razorpay refs + `bl_order_id` as attributes · **tag = our order id** ·
+`draftOrderComplete(paymentPending)` ⇒ PAID (Razorpay) / **PENDING (COD)**.
+
+- **Async:** `paid`/`cod_pending` routes fire an immediate push via `next/server`
+  `after()` (response never waits). Stragglers are retried by the sweep: the Razorpay
+  webhook piggybacks a small sweep on every payment, a daily Vercel cron hits
+  `/api/jobs/sync-shopify` (`CRON_SECRET`-guarded; `POST {orderId}` = manual push;
+  `pnpm push:shopify [id]` = ops CLI).
+- **Retries:** bounded exponential backoff (`SHOPIFY_SYNC_BACKOFF_MS` · 2^attempt),
+  max `SHOPIFY_SYNC_MAX_ATTEMPTS` (5). Stale `syncing_shopify` rows from crashed
+  workers are reclaimed after `SHOPIFY_SYNC_STALE_MS`.
+- **Dead-letter:** after max attempts the order stays `sync_failed` with its full
+  snapshot — recoverable forever, reported by **every** sweep, and exactly one alert
+  fires ([`lib/alerts.js`](../lib/alerts.js) → `ALERT_WEBHOOK_URL`, Slack-compatible
+  JSON; always also `console.error`). A paid-but-unsynced order is caught, never lost.
+- **Idempotent:** the CAS `beginShopifySync` collapses concurrent pushes, and every
+  attempt searches Shopify by the order-id tag first — a retry after any crash point
+  **adopts** the existing order (or completes a leftover OPEN draft) instead of
+  creating a duplicate.
+- **Reconciled:** Shopify's total must equal the captured amount to the paisa before
+  `synced`; a mismatch fails loudly (`RECONCILE_MISMATCH` + alert, Shopify id recorded).
+
 ## Verified (2026-07-23, dev server + Turso + test-mode Razorpay)
 
 - 18/18 unit/integration tests (`pnpm test:orders`).
@@ -124,6 +152,19 @@ staging/dev accounts if useful.
   `TGzt7HHEfE8DjM`) → order `paid` (`pay_TGzsgctNK8K9nq`), audit
   `meta.source = "webhook"`, buyer's cart cleared server-side, prod confirmation page
   shows Paid.
+
+- **Shopify push (13 tests + live on beastlife-dev):** `pnpm test:shopify-push` covers
+  input shape, COD pending, dup no-ops, adoption (order + open draft), transient retry,
+  forced dead-letter with exactly one alert + intact snapshot, mismatch flag, stale
+  reclaim, backoff gating, sweep limits. Live: `OID664668BL` = BL-1201AD9E (PAID ₹444;
+  forced re-push **adopted** it — Shopify search shows one order for the tag) ·
+  `OID664669BL` = BL-7118E62E (COD **PENDING** ₹5,947; BXGY ₹499 order discount + shaker
+  gift line at ₹0; auto-pushed by the route's `after()`).
+- **Full production pipeline (deployed app):** hosted-checkout payment for
+  `BL-0F5426F8` (₹1,442) → real webhook `TH3APCqxglXqtC` marked it paid → prod
+  `after()` pushed → **`OID664670BL` PAID ₹1,442.0**, one attempt, chain
+  `pending_payment → paid → syncing_shopify → synced`, razorpay order+payment ids on
+  the Shopify order. Zero manual steps between "bank Success click" and "synced".
 
 ## Still open (later sessions)
 

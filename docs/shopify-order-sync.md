@@ -7,7 +7,12 @@ Shopify never silently re-adds tax and breaks the match.
 
 This was proven end-to-end against `beastlife-dev.myshopify.com` (Admin API `2025-10`).
 Spike harness: [`scripts/spike-order-push.js`](../scripts/spike-order-push.js).
-Wire this into checkout in **Session 12**.
+
+> **PRODUCTIONIZED in Session 12** → [`lib/shopify-push.js`](../lib/shopify-push.js), wired
+> into checkout/webhook via `after()`, with retry queue, dead-letter + alerts,
+> tag-based idempotent adoption, and a total==captured reconciliation guard.
+> See the "Shopify push" section of [orders.md](./orders.md). This doc remains the
+> mechanism reference (draft-order representation, GST decision tree, orderCreate fallback).
 
 ---
 
