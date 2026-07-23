@@ -19,6 +19,7 @@
     "order:cancel": "node --env-file=.env.local scripts/cancel-order.js",
     "test:events": "node scripts/test-events.js",
     "events:stats": "node --env-file=.env.local scripts/events-stats.js",
+    "search:report": "node --env-file=.env.local scripts/search-report.js",
     "shopify:token": "node --env-file=.env.local scripts/shopify-mint-token.js",
     "shopify:oauth": "node --env-file=.env.local scripts/shopify-oauth.js"
   },

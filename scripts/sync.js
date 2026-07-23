@@ -165,9 +165,7 @@ async function syncCatalog() {
       .filter((m) => productIds.has(m.product_id));
     await insertRows("collection_products", members);
 
-    if (c.products?.pageInfo?.hasNextPage) {
-      console.warn(`  ! collection "${c.handle}" has >250 products; indexed first 250`);
-    }
+    // (mega-collections are fully drained by fetchAllCollectionsAdmin since S16)
   }
   console.log(`  ✓ ${collections.length} collections written`);
 }

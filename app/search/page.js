@@ -1,6 +1,8 @@
 import Link from "next/link";
 import ProductGrid from "@/components/ProductGrid";
 import TrackEvent from "@/components/analytics/TrackEvent";
+import SearchResults from "@/components/analytics/SearchResults";
+import { numericId } from "@/lib/ids";
 import { typesenseSearch } from "@/lib/typesense-search";
 import { searchProductsInDb } from "@/lib/repo";
 
@@ -71,7 +73,18 @@ export default async function SearchPage({ searchParams }) {
             </Link>
           </div>
         ) : (
-          <ProductGrid products={products} priorityCount={4} />
+          <SearchResults
+            query={q}
+            items={products.map((p, i) => ({
+              handle: p.handle,
+              id: numericId(p.id) || p.handle,
+              title: p.title,
+              price: p.price_min,
+              position: i + 1,
+            }))}
+          >
+            <ProductGrid products={products} priorityCount={4} />
+          </SearchResults>
         )}
       </div>
     </div>

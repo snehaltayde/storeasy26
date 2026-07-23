@@ -5,18 +5,74 @@ import ProductPurchase from "@/components/ProductPurchase";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import { getProductByHandle } from "@/lib/repo";
 import { numericId } from "@/lib/ids";
+import { abs } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { handle } = await params;
   const p = await getProductByHandle(handle);
-  if (!p) return { title: "Product not found" };
+  // Thrown HERE (before streaming starts) so the response is a REAL 404 —
+  // inside the page body the loading.js boundary has already committed a 200.
+  if (!p) notFound();
   return {
     title: p.title,
     description: p.description ? p.description.slice(0, 160) : undefined,
-    openGraph: p.featured_image ? { images: [{ url: p.featured_image }] } : undefined,
+    alternates: { canonical: `/products/${handle}` },
+    openGraph: {
+      type: "website",
+      title: p.title,
+      description: p.description ? p.description.slice(0, 160) : undefined,
+      url: `/products/${handle}`,
+      ...(p.featured_image ? { images: [{ url: p.featured_image }] } : {}),
+    },
   };
+}
+
+// Product + BreadcrumbList structured data for rich results.
+function productJsonLd(product) {
+  const offers =
+    product.price_min === product.price_max
+      ? {
+          "@type": "Offer",
+          price: String(product.price_min ?? 0),
+          priceCurrency: product.currency || "INR",
+          availability: product.available
+            ? "https://schema.org/InStock"
+            : "https://schema.org/OutOfStock",
+          url: abs(`/products/${product.handle}`),
+        }
+      : {
+          "@type": "AggregateOffer",
+          lowPrice: String(product.price_min ?? 0),
+          highPrice: String(product.price_max ?? product.price_min ?? 0),
+          priceCurrency: product.currency || "INR",
+          availability: product.available
+            ? "https://schema.org/InStock"
+            : "https://schema.org/OutOfStock",
+          offerCount: String(product.variants?.length || 1),
+        };
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: product.title,
+      description: product.description || undefined,
+      image: (product.images || []).slice(0, 6).map((i) => i.url),
+      brand: { "@type": "Brand", name: product.vendor || "BeastLife" },
+      url: abs(`/products/${product.handle}`),
+      offers,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: abs("/") },
+        { "@type": "ListItem", position: 2, name: "Collections", item: abs("/collections") },
+        { "@type": "ListItem", position: 3, name: product.title, item: abs(`/products/${product.handle}`) },
+      ],
+    },
+  ];
 }
 
 export default async function ProductPage({ params }) {
@@ -26,6 +82,10 @@ export default async function ProductPage({ params }) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(product)) }}
+      />
       <TrackEvent
         name="view_item"
         data={{

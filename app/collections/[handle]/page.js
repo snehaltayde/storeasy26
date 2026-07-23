@@ -4,25 +4,39 @@ import ProductGrid from "@/components/ProductGrid";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import { getCollectionByHandle, getProductsInCollection } from "@/lib/repo";
 import { numericId } from "@/lib/ids";
+import { abs } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }) {
+const PAGE_SIZE = 48;
+const pageNum = (sp) => Math.max(1, Number(sp?.page) || 1);
+
+export async function generateMetadata({ params, searchParams }) {
   const { handle } = await params;
+  const page = pageNum(await searchParams);
   const c = await getCollectionByHandle(handle);
-  if (!c) return { title: "Collection not found" };
+  // Real 404 status must come from metadata — the loading boundary commits
+  // a 200 before the page body can call notFound().
+  if (!c) notFound();
   return {
-    title: c.title,
+    title: page > 1 ? `${c.title} — page ${page}` : c.title,
     description: c.description ? c.description.slice(0, 160) : undefined,
+    alternates: { canonical: page > 1 ? `/collections/${handle}?page=${page}` : `/collections/${handle}` },
   };
 }
 
-export default async function CollectionPage({ params }) {
+export default async function CollectionPage({ params, searchParams }) {
   const { handle } = await params;
+  const page = pageNum(await searchParams);
   const collection = await getCollectionByHandle(handle);
   if (!collection) notFound();
 
-  const { products, total } = await getProductsInCollection(handle, { limit: 48 });
+  const { products, total } = await getProductsInCollection(handle, {
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  });
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (page > totalPages) notFound();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
@@ -54,6 +68,7 @@ export default async function CollectionPage({ params }) {
       ) : null}
       <p className="mt-2 text-sm text-zinc-400">
         {total} {total === 1 ? "product" : "products"}
+        {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
       </p>
 
       <div className="mt-8">
@@ -63,6 +78,45 @@ export default async function CollectionPage({ params }) {
           <ProductGrid products={products} priorityCount={4} />
         )}
       </div>
+
+      {totalPages > 1 && (
+        <nav className="mt-10 flex items-center justify-center gap-2" aria-label="Pagination">
+          {page > 1 && (
+            <Link
+              href={page === 2 ? `/collections/${handle}` : `/collections/${handle}?page=${page - 1}`}
+              className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
+            >
+              ← Previous
+            </Link>
+          )}
+          <span className="px-2 text-sm text-zinc-500">
+            {page} / {totalPages}
+          </span>
+          {page < totalPages && (
+            <Link
+              href={`/collections/${handle}?page=${page + 1}`}
+              className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
+            >
+              Next →
+            </Link>
+          )}
+        </nav>
+      )}
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Home", item: abs("/") },
+              { "@type": "ListItem", position: 2, name: "Collections", item: abs("/collections") },
+              { "@type": "ListItem", position: 3, name: collection.title, item: abs(`/collections/${handle}`) },
+            ],
+          }),
+        }}
+      />
     </div>
   );
 }

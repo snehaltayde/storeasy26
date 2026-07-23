@@ -10,6 +10,7 @@ import Pixels from "@/components/analytics/Pixels";
 import { cookies } from "next/headers";
 import { getAllCollections } from "@/lib/repo";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
+import { SITE_URL } from "@/lib/site";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -19,6 +20,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const runtime = "edge";
 
 export const metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "BeastLife — Sports Nutrition, delivered fast",
     template: "%s · BeastLife",
