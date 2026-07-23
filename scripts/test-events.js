@@ -17,6 +17,7 @@ process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID = "G-TEST";
 process.env.GA4_API_SECRET = "test-secret";
 process.env.NEXT_PUBLIC_META_PIXEL_ID = "1234567890";
 process.env.META_CAPI_TOKEN = "test-token";
+process.env.GA4_MP_EVENTS = "all"; // queue tests exercise both destinations; the S15 default (purchase-only) has its own test
 
 const here = dirname(fileURLToPath(import.meta.url));
 await rm(join(here, "../.test-events.db"), { force: true });
@@ -277,6 +278,7 @@ await t("enqueuePurchaseEvent: inherits first-party identity via cart_id, hashes
     address: { line1: "14 Pipeline St", city: "Pune", state: "MH", pincode: "411001", country: "India" },
     paymentMethod: "cod",
     idempotencyKey: "events-join-1",
+    consent: "granted",
   });
   const r = await E.enqueuePurchaseEvent(o.id);
   ok(r.stored, "stored");
@@ -302,6 +304,72 @@ await t("enqueuePurchaseEvent: inherits first-party identity via cart_id, hashes
   await E.forwardEventById(o.id, { ga4Send: ga4, metaSend: meta });
   eq(ga4.calls[0].events[0].params.transaction_id, o.id, "GA4 transaction_id = order id");
   eq(meta.calls[0].data[0].event_id, o.id, "Meta event_id = order id");
+});
+
+// --- Session 15: GA4 scope, consent, match quality --------------------------
+await t("GA4_MP_EVENTS default: non-purchase skips GA4 MP (no double-count), purchase relays", async () => {
+  process.env.GA4_MP_EVENTS = "purchase";
+  await store({ eventId: "evt-scope-view" });
+  await E.storeEvent({ eventId: "BL-SCOPE1", name: "purchase", clientId: "1.2", payload: { value: 100, currency: "INR" } });
+  const ga4 = sender();
+  const meta = sender();
+  const r1 = await E.forwardEventById("evt-scope-view", { ga4Send: ga4, metaSend: meta });
+  ok(r1.ok && r1.forwarded, "view forwarded");
+  eq(ga4.calls.length, 0, "view_item NOT relayed to GA4 (browser gtag owns it)");
+  eq(meta.calls.length, 1, "meta still gets it");
+  const r2 = await E.forwardEventById("BL-SCOPE1", { ga4Send: ga4, metaSend: meta });
+  ok(r2.ok, "purchase forwarded");
+  eq(ga4.calls.length, 1, "purchase relayed to GA4 MP");
+  eq(ga4.calls[0].events[0].params.transaction_id, "BL-SCOPE1", "with transaction_id dedup key");
+  process.env.GA4_MP_EVENTS = "all";
+});
+
+await t("consent gate: purchase NOT enqueued without granted consent", async () => {
+  const o = await O.createOrder({
+    cartId: "cart-noconsent",
+    cart: { items: [{ variantId: "gid://shopify/ProductVariant/1", productId: "gid://shopify/Product/1", title: "X", variantTitle: null, image: null, price: 100, quantity: 1, lineTotal: 100, discount: 0 }], gifts: [], appliedOffers: [], couponStatus: null, subtotal: 100, discountTotal: 0, total: 100, currency: "INR" },
+    contact: { email: "test@beastlife.in", phone: "9000000015", name: "No Consent" },
+    address: { line1: "x", city: "Pune", state: "MH", pincode: "411001", country: "India" },
+    paymentMethod: "cod",
+    idempotencyKey: "events-noconsent-1",
+    // consent omitted → null
+  });
+  const r = await E.enqueuePurchaseEvent(o.id);
+  eq(r.skipped, "no_consent", "skipped");
+  eq(await row(o.id), undefined, "no event row stored");
+  const denied = await O.createOrder({
+    cartId: "cart-denied",
+    cart: { items: [{ variantId: "gid://shopify/ProductVariant/1", productId: "gid://shopify/Product/1", title: "X", variantTitle: null, image: null, price: 100, quantity: 1, lineTotal: 100, discount: 0 }], gifts: [], appliedOffers: [], couponStatus: null, subtotal: 100, discountTotal: 0, total: 100, currency: "INR" },
+    contact: { email: "test@beastlife.in", phone: "9000000015", name: "Denied Consent" },
+    address: { line1: "x", city: "Pune", state: "MH", pincode: "411001", country: "India" },
+    paymentMethod: "cod",
+    idempotencyKey: "events-denied-1",
+    consent: "denied",
+  });
+  eq((await E.enqueuePurchaseEvent(denied.id)).skipped, "no_consent", "denied also skipped");
+});
+
+await t("match quality: fn/ln/ct/st/zp/country/external_id hashed into user_data + Meta payload", async () => {
+  const e = await row((await db.selectFrom("events").select("event_id").where("name", "=", "purchase").where("order_id", "is not", null).orderBy("id", "desc").executeTakeFirst()).event_id);
+  const p = JSON.parse(e.payload);
+  eq(p.user_data.fn, T.hashName("Event"), "fn = sha256(normalized first name)");
+  eq(p.user_data.ln, T.hashName("Join"), "ln");
+  eq(p.user_data.ct, T.sha256("pune"), "ct = sha256('pune')");
+  eq(p.user_data.st, T.sha256("mh"), "st");
+  eq(p.user_data.zp, T.sha256("411001"), "zp");
+  eq(p.user_data.country, T.sha256("in"), "country = sha256('in')");
+  eq(p.user_data.external_id, T.hashExternalId("777.111"), "external_id = hashed client id");
+  const ga4 = sender();
+  const meta = sender();
+  await db.updateTable("events").set({ status: "pending", ga4_sent_at: null, meta_sent_at: null }).where("event_id", "=", e.event_id).execute();
+  await E.forwardEventById(e.event_id, { ga4Send: ga4, metaSend: meta });
+  const ud = meta.calls[0].data[0].user_data;
+  eq(ud.fn[0], p.user_data.fn, "Meta fn array");
+  eq(ud.ct[0], p.user_data.ct, "Meta ct");
+  eq(ud.zp[0], p.user_data.zp, "Meta zp");
+  eq(ud.country[0], p.user_data.country, "Meta country");
+  eq(ud.external_id[0], p.user_data.external_id, "Meta external_id");
+  ok(!JSON.stringify(meta.calls[0]).includes("Pune"), "raw city never leaves");
 });
 
 // --- id extraction ----------------------------------------------------------

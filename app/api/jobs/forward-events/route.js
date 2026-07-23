@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runEventSweep, forwardEventById } from "@/lib/events";
+import { runEventSweep, forwardEventById, eventStats } from "@/lib/events";
 
 // Event-forwarding janitor. GET = sweep pending events (Vercel cron daily; the
 // collector piggybacks a mini-sweep on every event, so this only mops up).
@@ -17,8 +17,12 @@ function authorized(request) {
 
 export async function GET(request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const limit = Number(request.nextUrl.searchParams.get("limit") || 25);
   try {
+    // ?stats=1 → forward-success monitoring instead of a sweep
+    if (request.nextUrl.searchParams.get("stats") === "1") {
+      return NextResponse.json({ ok: true, ...(await eventStats()) });
+    }
+    const limit = Number(request.nextUrl.searchParams.get("limit") || 25);
     const summary = await runEventSweep({ limit });
     return NextResponse.json({ ok: true, ...summary });
   } catch (e) {

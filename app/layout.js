@@ -5,6 +5,8 @@ import Footer from "@/components/Footer";
 import { CartProvider } from "@/components/cart/CartContext";
 import CartDrawer from "@/components/cart/CartDrawer";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import ConsentBanner from "@/components/analytics/ConsentBanner";
+import Pixels from "@/components/analytics/Pixels";
 import { cookies } from "next/headers";
 import { getAllCollections } from "@/lib/repo";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
@@ -67,6 +69,8 @@ export default async function RootLayout({ children }) {
           <CartDrawer />
         </CartProvider>
         <ServiceWorkerRegister />
+        <ConsentBanner />
+        <Pixels />
       </body>
     </html>
   );

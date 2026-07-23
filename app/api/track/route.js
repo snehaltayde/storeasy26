@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { CART_COOKIE } from "@/lib/cart";
+import { CONSENT_COOKIE, isConsentGranted } from "@/lib/track/names";
 import { storeEvent, enqueueForward, runEventSweep, isFunnelEvent } from "@/lib/events";
 import {
   ga4ClientId,
@@ -37,6 +38,13 @@ export async function POST(request) {
 
   const cookies = {};
   for (const c of request.cookies.getAll()) cookies[c.name] = c.value;
+
+  // DPDP consent gate (defense in depth — the client tracker already no-ops):
+  // without granted consent, nothing is stored and NO identity cookie is
+  // minted. 202 keeps well-behaved clients quiet.
+  if (!isConsentGranted(cookies[CONSENT_COOKIE])) {
+    return NextResponse.json({ ok: true, dropped: "no_consent" }, { status: 202 });
+  }
 
   // ---- first-party identity: read, else mint + persist ----
   let clientId = ga4ClientId(cookies);

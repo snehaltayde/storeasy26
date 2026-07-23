@@ -3,6 +3,7 @@ import { CART_COOKIE, getCart, clearCart } from "@/lib/cart";
 import { computeShipping } from "@/lib/shipping";
 import { enqueueShopifyPush } from "@/lib/shopify-push";
 import { enqueuePurchaseAndForward } from "@/lib/events";
+import { CONSENT_COOKIE } from "@/lib/track/names";
 import {
   createOrder,
   markOrderPaid,
@@ -112,6 +113,7 @@ export async function POST(request) {
         paymentMethod: "cod",
         idempotencyKey,
         shipping,
+        consent: request.cookies.get(CONSENT_COOKIE)?.value || null,
       });
       if (!order.deduped) {
         await clearCart(cartId);
@@ -165,6 +167,7 @@ export async function POST(request) {
         idempotencyKey,
         razorpayOrderId: rzOrder.id,
         shipping,
+        consent: request.cookies.get(CONSENT_COOKIE)?.value || null,
       });
       // Lost a same-key insert race: answer with the winner's Razorpay order
       // (this request's rzOrder is an orphan — never paid, expires unused).
