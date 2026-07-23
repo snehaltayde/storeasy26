@@ -30,6 +30,36 @@ retries via `/api/jobs/forward-events` (cron + per-event piggyback), dead-letter
   GA4/Meta; purchase E2E `BL-84063569` (identity joined, hashed PII, browser copy
   deduped; order cancelled after per test-hygiene); prod store-only smoke green.
 
+**Session 15 — pixels, dedup policy, consent, match quality, monitoring:**
+
+- **Pixels + CAPI together:** [`Pixels`](../components/analytics/Pixels.js) loads gtag +
+  fbq **only after consent**; `track()` co-fires collector beacon + gtag + fbq with ONE
+  `event_id`. **Dedup policy:** Meta receives every event on both paths (universal
+  `event_id`/`eventID` dedup); **GA4 MP relays purchase ONLY** by default
+  (`GA4_MP_EVENTS`, `transaction_id` dedup) — browser gtag owns the other names, so
+  nothing double-counts anywhere.
+- **Consent (DPDP, basic):** [`ConsentBanner`](../components/analytics/ConsentBanner.js)
+  sets `_consent` (1y). Three independent gates honor it: `track()` no-ops, the
+  collector drops + mints NO identity cookies, and the server purchase event checks the
+  consent snapshotted on the order at checkout (webhook-time firing has no cookies).
+  Order processing itself never depends on consent.
+- **Match quality:** purchase `user_data` adds hashed `fn/ln/ct/st/zp/country` (from
+  the order) + `external_id` (hashed first-party client id), normalized per Meta spec;
+  raw values are never stored or sent.
+- **Monitoring:** `GET /api/jobs/forward-events?stats=1` (CRON_SECRET) or
+  `pnpm events:stats` → status/name counts, per-destination deliveries, success rate,
+  recent errors; dead-letters still alert via `ALERT_WEBHOOK_URL`.
+- **Validated 2026-07-24** (test GA4 property + Meta test dataset): all 7 names →
+  GA4 `validationMessages []` + MP 204 · Meta `events_received:1` with correct
+  standard-event names · pixel-protocol + server copies delivered under shared ids
+  (`BL-S15DEDUP-…`) for platform dedup (browser-visible in DebugView / Test Events) ·
+  consent-granted vs -denied checkout orders behaved correctly (both cancelled after) ·
+  banner → Allow → gtag+fbq load live · prod consent gate + stats verified.
+- **BeastLife creds swap:** put their real `NEXT_PUBLIC_GA4_MEASUREMENT_ID` /
+  `GA4_API_SECRET` / `NEXT_PUBLIC_META_PIXEL_ID` / `META_CAPI_TOKEN` into Vercel prod
+  env (drop `META_TEST_EVENT_CODE` + `GA4_DEBUG_MODE`) — forwarding lights up; stored
+  store-only events remain backfillable.
+
 The original Session-9 spike notes below remain the reference for the relay formats,
 dedup mechanics, and hashing.
 
