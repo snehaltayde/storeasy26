@@ -106,6 +106,28 @@ no-ops (`already: true`); the audit trail records the winner
 secret → update `RAZORPAY_WEBHOOK_SECRET` (prod) · redeploy · keep the test webhook for
 staging/dev accounts if useful.
 
+## Shipping engine (Session 13)
+
+[`lib/shipping.js`](../lib/shipping.js) — pure, config-driven `computeShipping({subtotal,
+discountTotal, paymentMethod, pincode})`. ONE source of truth: the drawer shows its
+prepaid estimate (`cart.shipping` + `grandTotal` + add-₹X-for-free nudge), the checkout
+UI recomputes live per payment method/pincode, the **checkout API recomputes it
+server-side and that is what's charged** (order.total includes `shipping_total`; the
+Razorpay order is priced with it; the idempotency dedup compares goods+shipping), and
+the Shopify push titles the shipping line with the engine's label.
+
+⚠ **Rules are placeholders** (BeastLife's public policy states no amounts): net-basis
+free ≥ ₹999, flat ₹79 below, COD fee ₹49 (never waived; `codFeeWaivedAt` exists),
+pincode-prefix zones supported but empty. Swap `SHIPPING_CONFIG` when the real rules
+land — nothing else changes. `pnpm test:shipping` = 12 engine tests.
+
+Verified across the journey (dev + prod, orders under test@beastlife.in):
+`BL-94B2E788/OID664701BL` COD ₹444 goods → ₹572 charged, Shopify line "Standard
+shipping + COD fee ₹49" @ ₹128 · `BL-1AD70D71` Razorpay priced ₹523.00 exactly ·
+`BL-71BDA7A1/OID664702BL` ₹5,947 net + offers/gift → free base + ₹49 fee, line
+"Free shipping (₹999+) + COD fee ₹49" · prod E2E `BL-72A00F53/OID664705BL` ₹572 +
+`BL-10ECCFF7` 52,300 paise.
+
 ## Shopify push — reliable, async, idempotent (Session 12)
 
 [`lib/shopify-push.js`](../lib/shopify-push.js) productionizes the Session-8 draft-order
