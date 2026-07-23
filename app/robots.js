@@ -7,7 +7,7 @@ export default function robots() {
         userAgent: "*",
         allow: "/",
         // No value in indexing transactional/api surfaces.
-        disallow: ["/api/", "/checkout", "/checkout/"],
+        disallow: ["/api/", "/checkout", "/checkout/", "/orders/"],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

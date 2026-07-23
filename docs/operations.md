@@ -62,3 +62,7 @@ lazy (4 priority above the fold) · PDP 124ms · `/api/search` at full index
 (308 docs) **28–61ms** via Typesense. S6 CWV lab baseline (LCP 276ms home /
 ~1.2s PDP, CLS 0) still applies — the render path is unchanged; the consent
 banner is `position:fixed` (no CLS). Re-run Lighthouse after major UI changes.
+
+## Related runbooks
+
+[docs/refunds.md](./refunds.md) — manual refund/cancel flows (Razorpay + Shopify + ledger).

@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import TrackEvent from "@/components/analytics/TrackEvent";
-import { getOrder } from "@/lib/orders";
+import { getOrder, orderStatusPath } from "@/lib/orders";
 import { formatMoney } from "@/lib/format";
 import { numericId } from "@/lib/ids";
 
@@ -51,7 +51,11 @@ export default async function ConfirmationPage({ params }) {
         <p className="mt-4 text-sm text-zinc-600">
           Thanks {order.name ? order.name.split(" ")[0] : "there"}!{" "}
           {cod ? "You'll pay cash on delivery." : paid ? "Payment received." : "Payment is pending."} A
-          confirmation was sent to {order.email}.
+          confirmation was sent to {order.email}. Keep your{" "}
+          <Link href={await orderStatusPath(order.id)} className="font-semibold text-lime-700 underline">
+            order-status link
+          </Link>{" "}
+          to track it anytime.
         </p>
 
         <ul className="mt-6 divide-y divide-zinc-100 border-y border-zinc-100">
