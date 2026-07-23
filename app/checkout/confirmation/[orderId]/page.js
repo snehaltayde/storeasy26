@@ -64,6 +64,14 @@ export default async function ConfirmationPage({ params }) {
                 <span className="whitespace-nowrap">−{formatMoney(o.amount, order.currency)}</span>
               </div>
             ))}
+          <div className="flex justify-between">
+            <span className="text-zinc-500">{order.snapshot?.shipping?.label || "Shipping"}</span>
+            {(order.shipping_total || 0) === 0 ? (
+              <span className="font-semibold text-lime-700">FREE</span>
+            ) : (
+              <span>{formatMoney(order.shipping_total, order.currency)}</span>
+            )}
+          </div>
           <div className="flex justify-between border-t border-zinc-100 pt-2 text-base font-bold">
             <span>Total</span>
             <span>{formatMoney(order.total, order.currency)}</span>

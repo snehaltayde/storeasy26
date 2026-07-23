@@ -75,7 +75,7 @@ const CART = {
   total: 8911.89,
   currency: "INR",
 };
-const CONTACT = { email: "push@beastlife.in", phone: "9000000012", name: "Push Tester" };
+const CONTACT = { email: "test@beastlife.in", phone: "9000000012", name: "Push Tester" };
 const ADDRESS = { line1: "12 Sync St", line2: "", city: "Pune", state: "MH", pincode: "411001", country: "India" };
 
 let seq = 0;

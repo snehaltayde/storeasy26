@@ -66,6 +66,8 @@ export function CartProvider({ children, initialCart }) {
     gifts: cart.gifts || [],
     discountTotal: cart.discountTotal || 0,
     total: cart.total ?? cart.subtotal,
+    shipping: cart.shipping || null,
+    grandTotal: cart.grandTotal ?? cart.total ?? cart.subtotal,
     couponStatus: cart.couponStatus || null,
     open,
     setOpen,

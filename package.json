@@ -13,6 +13,7 @@
     "db:reset": "node --env-file=.env.local scripts/migrate.js --reset",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo.js",
     "test:orders": "node scripts/test-orders.js",
+    "test:shipping": "node scripts/test-shipping.js",
     "test:shopify-push": "node scripts/test-shopify-push.js",
     "push:shopify": "node --env-file=.env.local scripts/sync-shopify.js",
     "shopify:token": "node --env-file=.env.local scripts/shopify-mint-token.js",

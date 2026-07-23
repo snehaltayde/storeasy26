@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatMoney } from "@/lib/format";
+import { computeShipping } from "@/lib/shipping";
 
 const STEPS = ["Address", "Review", "Payment"];
 
@@ -72,6 +73,14 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
     pincode: form.pincode,
     country: "India",
   };
+
+  // Live shipping — same pure engine the drawer and the checkout API use, so
+  // what's shown here is what the server charges. Recomputes as the payment
+  // method / pincode change.
+  const shipInputs = { subtotal: cart.subtotal, discountTotal: cart.discountTotal, pincode: form.pincode || null };
+  const shipping = computeShipping({ ...shipInputs, paymentMethod: method === "cod" ? "cod" : "prepaid" });
+  const codPreview = computeShipping({ ...shipInputs, paymentMethod: "cod" });
+  const grandTotal = cart.total + shipping.total;
 
   function goConfirmation(orderId) {
     // Full nav so the layout re-reads the (now-cleared) cart.
@@ -288,7 +297,12 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
                 <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 ${method === "cod" ? "border-zinc-900 ring-1 ring-zinc-900" : "border-zinc-200"}`}>
                   <input type="radio" name="method" checked={method === "cod"} onChange={() => setMethod("cod")} className="mt-1" />
                   <div>
-                    <p className="text-sm font-semibold">Cash on Delivery</p>
+                    <p className="text-sm font-semibold">
+                      Cash on Delivery
+                      {codPreview.codFee > 0 && (
+                        <span className="font-normal text-zinc-400"> · +{formatMoney(codPreview.codFee, cart.currency)} COD fee</span>
+                      )}
+                    </p>
                     <p className="text-xs text-zinc-500">Pay in cash when your order arrives.</p>
                   </div>
                 </label>
@@ -330,8 +344,8 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
                   {placing
                     ? "Processing…"
                     : method === "cod"
-                      ? `Place order · ${formatMoney(cart.total, cart.currency)}`
-                      : `Pay ${formatMoney(cart.total, cart.currency)}`}
+                      ? `Place order · ${formatMoney(grandTotal, cart.currency)}`
+                      : `Pay ${formatMoney(grandTotal, cart.currency)}`}
                 </button>
               </div>
             </section>
@@ -360,10 +374,21 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
                 <span className="font-medium">FREE</span>
               </div>
             ))}
+            <div className="flex justify-between">
+              <span className="text-zinc-500">
+                Shipping
+                {shipping.codFee > 0 && <span className="text-xs"> (incl. COD fee)</span>}
+              </span>
+              {shipping.total === 0 ? (
+                <span className="font-semibold text-lime-700">FREE</span>
+              ) : (
+                <span>{formatMoney(shipping.total, cart.currency)}</span>
+              )}
+            </div>
           </div>
           <div className="flex items-center justify-between pt-3">
             <span className="font-semibold">Total</span>
-            <span className="text-lg font-bold">{formatMoney(cart.total, cart.currency)}</span>
+            <span className="text-lg font-bold">{formatMoney(grandTotal, cart.currency)}</span>
           </div>
           {cart.discountTotal > 0 && (
             <p className="mt-1 text-right text-xs font-semibold text-lime-700">

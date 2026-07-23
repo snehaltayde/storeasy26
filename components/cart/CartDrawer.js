@@ -17,6 +17,8 @@ export default function CartDrawer() {
     gifts,
     discountTotal,
     total,
+    shipping,
+    grandTotal,
     open,
     setOpen,
     removeItem,
@@ -254,9 +256,25 @@ export default function CartDrawer() {
                   <span className="whitespace-nowrap font-medium">−{formatMoney(o.amount, currency)}</span>
                 </div>
               ))}
+              {shipping && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-zinc-500">Shipping</span>
+                  {shipping.total === 0 ? (
+                    <span className="font-semibold text-lime-700">FREE</span>
+                  ) : (
+                    <span className="text-zinc-700">{formatMoney(shipping.total, currency)}</span>
+                  )}
+                </div>
+              )}
+              {shipping?.remainingForFree > 0 && (
+                <p className="text-right text-xs text-zinc-500">
+                  Add {formatMoney(shipping.remainingForFree, currency)} more for{" "}
+                  <span className="font-semibold text-lime-700">free shipping</span>
+                </p>
+              )}
               <div className="flex items-center justify-between border-t border-zinc-100 pt-2">
                 <span className="font-semibold">Total</span>
-                <span className="text-base font-bold">{formatMoney(total, currency)}</span>
+                <span className="text-base font-bold">{formatMoney(grandTotal ?? total, currency)}</span>
               </div>
               {discountTotal > 0 && (
                 <p
@@ -275,7 +293,7 @@ export default function CartDrawer() {
               Checkout →
             </Link>
             <p className="mt-2 text-center text-[11px] text-zinc-400">
-              Taxes &amp; shipping calculated at checkout
+              COD fee (if any) added at checkout · prices incl. GST
             </p>
           </footer>
         )}

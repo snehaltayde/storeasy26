@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { CART_COOKIE, getCart, clearCart } from "@/lib/cart";
+import { computeShipping } from "@/lib/shipping";
 import { enqueueShopifyPush } from "@/lib/shopify-push";
 import {
   createOrder,
@@ -33,13 +34,14 @@ const sameAmount = (a, b) => Math.abs(Number(a) - Number(b)) < 0.005;
 // If this idempotency key already produced an order, short-circuit BEFORE any
 // cart/validation checks — a retry after the first request cleared the cart
 // must still return that order, not "Cart is empty". Returns null (no dup),
-// a NextResponse to send, or throws nothing.
-async function dedupByKey(key, cart) {
+// a NextResponse to send, or throws nothing. `expectedTotal` is goods+shipping
+// for THIS submission (order.total includes shipping since Session 13).
+async function dedupByKey(key, cart, expectedTotal) {
   const existing = await findOrderByIdempotencyKey(key);
   if (!existing) return null;
   // Same key but a different (non-empty) cart ⇒ not a retry: the client must
   // rotate its key. 409 tells it to.
-  if (cart?.items?.length && !sameAmount(cart.total, existing.total)) {
+  if (cart?.items?.length && !sameAmount(expectedTotal, existing.total)) {
     return NextResponse.json(
       { error: "This checkout attempt no longer matches your cart. Please retry.", code: "IDEMPOTENCY_CONFLICT" },
       { status: 409 },
@@ -79,7 +81,16 @@ export async function POST(request) {
         return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
       const cart = cartId ? await getCart(cartId) : { items: [] };
 
-      const dup = await dedupByKey(idempotencyKey, cart);
+      // Authoritative shipping: same pure engine the drawer/checkout UI use,
+      // now with the real payment method + destination pincode.
+      const shipping = computeShipping({
+        subtotal: cart.subtotal || 0,
+        discountTotal: cart.discountTotal || 0,
+        paymentMethod: "cod",
+        pincode: address?.pincode,
+      });
+
+      const dup = await dedupByKey(idempotencyKey, cart, (cart.total || 0) + shipping.total);
       if (dup instanceof NextResponse) return dup;
       if (dup) {
         // Finish what the first request started if its cart clear didn't land.
@@ -99,6 +110,7 @@ export async function POST(request) {
         address,
         paymentMethod: "cod",
         idempotencyKey,
+        shipping,
       });
       if (!order.deduped) {
         await clearCart(cartId);
@@ -115,9 +127,16 @@ export async function POST(request) {
         return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
       const cart = cartId ? await getCart(cartId) : { items: [] };
 
+      const shipping = computeShipping({
+        subtotal: cart.subtotal || 0,
+        discountTotal: cart.discountTotal || 0,
+        paymentMethod: "prepaid",
+        pincode: address?.pincode,
+      });
+
       // Dedup BEFORE creating a Razorpay order, so a retry reopens the SAME
       // payment instead of minting a parallel one.
-      const dup = await dedupByKey(idempotencyKey, cart);
+      const dup = await dedupByKey(idempotencyKey, cart, (cart.total || 0) + shipping.total);
       if (dup instanceof NextResponse) return dup;
       if (dup) return razorpayResponse(dup, dup.razorpay_order_id, true);
 
@@ -126,9 +145,10 @@ export async function POST(request) {
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
 
-      // One getCart → consistent amount for both the Razorpay order and ours.
+      // One getCart + one shipping compute → the SAME amount for the Razorpay
+      // order, our order row, and (later) the Shopify shipping line.
       const rzOrder = await createRazorpayOrder({
-        amountPaise: Math.round(cart.total * 100),
+        amountPaise: Math.round((cart.total + shipping.total) * 100),
         receipt: `cart_${cartId.slice(0, 12)}`,
       });
       const order = await createOrder({
@@ -139,6 +159,7 @@ export async function POST(request) {
         paymentMethod: "razorpay",
         idempotencyKey,
         razorpayOrderId: rzOrder.id,
+        shipping,
       });
       // Lost a same-key insert race: answer with the winner's Razorpay order
       // (this request's rzOrder is an orphan — never paid, expires unused).
