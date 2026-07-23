@@ -4,6 +4,8 @@ import { computeShipping } from "@/lib/shipping";
 import { enqueueShopifyPush } from "@/lib/shopify-push";
 import { enqueuePurchaseAndForward } from "@/lib/events";
 import { CONSENT_COOKIE } from "@/lib/track/names";
+import { rateLimit } from "@/lib/rate-limit";
+import { slog } from "@/lib/log";
 import {
   createOrder,
   markOrderPaid,
@@ -73,6 +75,9 @@ function razorpayResponse(order, razorpayOrderId, deduped = false) {
 }
 
 export async function POST(request) {
+  const limited = rateLimit(request, { name: "checkout", limit: 10 });
+  if (limited) return limited;
+
   const cartId = cartIdFrom(request);
   const body = await request.json().catch(() => ({}));
   const { action, contact, address, idempotencyKey } = body;
@@ -114,6 +119,12 @@ export async function POST(request) {
         idempotencyKey,
         shipping,
         consent: request.cookies.get(CONSENT_COOKIE)?.value || null,
+      });
+      slog(order.deduped ? "order_deduped" : "order_created", {
+        order_id: order.id,
+        method: "cod",
+        total: order.total,
+        cart_id: cartId,
       });
       if (!order.deduped) {
         await clearCart(cartId);
@@ -169,6 +180,13 @@ export async function POST(request) {
         shipping,
         consent: request.cookies.get(CONSENT_COOKIE)?.value || null,
       });
+      slog(order.deduped ? "order_deduped" : "order_created", {
+        order_id: order.id,
+        method: "razorpay",
+        total: order.total,
+        cart_id: cartId,
+        razorpay_order_id: order.deduped ? order.razorpayOrderId : rzOrder.id,
+      });
       // Lost a same-key insert race: answer with the winner's Razorpay order
       // (this request's rzOrder is an orphan — never paid, expires unused).
       if (order.deduped) return razorpayResponse(order, order.razorpayOrderId, true);
@@ -190,6 +208,12 @@ export async function POST(request) {
       const paid = await markOrderPaid(orderId, {
         razorpayPaymentId: razorpay_payment_id,
         source: "browser_callback",
+      });
+      slog("payment_verified", {
+        order_id: orderId,
+        source: "browser_callback",
+        already: !!paid.already,
+        razorpay_payment_id: razorpay_payment_id,
       });
       if (cartId) await clearCart(cartId);
       if (!paid.already) {

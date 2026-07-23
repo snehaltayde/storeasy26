@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { CART_COOKIE } from "@/lib/cart";
 import { CONSENT_COOKIE, isConsentGranted } from "@/lib/track/names";
+import { rateLimit } from "@/lib/rate-limit";
 import { storeEvent, enqueueForward, runEventSweep, isFunnelEvent } from "@/lib/events";
 import {
   ga4ClientId,
@@ -30,7 +31,18 @@ const clientIp = (request) => {
 };
 
 export async function POST(request) {
-  const body = await request.json().catch(() => ({}));
+  const limited = rateLimit(request, { name: "track", limit: 60 });
+  if (limited) return limited;
+
+  const raw = await request.text();
+  if (raw.length > 16 * 1024)
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  let body = {};
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    body = {};
+  }
   const { name, event_id: eventId } = body;
   if (!name || !isFunnelEvent(name))
     return NextResponse.json({ error: `Unknown event name "${name}"` }, { status: 400 });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runEventSweep, forwardEventById, eventStats } from "@/lib/events";
+import { sendAlert } from "@/lib/alerts";
 
 // Event-forwarding janitor. GET = sweep pending events (Vercel cron daily; the
 // collector piggybacks a mini-sweep on every event, so this only mops up).
@@ -24,6 +25,11 @@ export async function GET(request) {
     }
     const limit = Number(request.nextUrl.searchParams.get("limit") || 25);
     const summary = await runEventSweep({ limit });
+    if (summary.dead?.length) {
+      await sendAlert(`Event forwarding dead-letter digest: ${summary.dead.length} event(s) still stuck`, {
+        count: summary.dead.length,
+      });
+    }
     return NextResponse.json({ ok: true, ...summary });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });

@@ -4,6 +4,7 @@ import { markOrderPaid, findOrderByRazorpayOrderId } from "@/lib/orders";
 import { webhookConfigured, verifyRazorpayWebhookSignature } from "@/lib/razorpay";
 import { enqueueShopifyPush, runSyncSweep } from "@/lib/shopify-push";
 import { enqueuePurchaseAndForward } from "@/lib/events";
+import { slog } from "@/lib/log";
 
 // Razorpay webhook — the AUTHORITATIVE "paid" signal (Session 11). The browser
 // callback is optimistic UX; a captured payment whose callback never lands
@@ -68,6 +69,13 @@ export async function POST(request) {
       razorpayPaymentId: paymentId,
       source: "webhook",
       webhookEventId: eventId,
+    });
+    slog("payment_verified", {
+      order_id: order.id,
+      source: "webhook",
+      already: !!paid.already,
+      razorpay_payment_id: paymentId,
+      webhook_event_id: eventId,
     });
     // Kill the lost-callback leftovers: the user's cart still holds the items.
     if (!paid.already && order.cart_id) await clearCart(order.cart_id);

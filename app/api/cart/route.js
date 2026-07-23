@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rate-limit";
 import {
   CART_COOKIE,
   emptyCart,
@@ -29,6 +30,8 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  const limited = rateLimit(request, { name: "cart", limit: 60 });
+  if (limited) return limited;
   let id = request.cookies.get(CART_COOKIE)?.value;
   const isNew = !id;
   if (isNew) {

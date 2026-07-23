@@ -1,5 +1,6 @@
 import { typesenseSearch } from "@/lib/typesense-search";
 import { searchProductsInDb } from "@/lib/repo";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 // ranking); transparently falls back to a SQL query over the local catalog so
 // search works even before Typesense is configured.
 export async function GET(request) {
+  const limited = rateLimit(request, { name: "search", limit: 30 });
+  if (limited) return limited;
+
   const q = (new URL(request.url).searchParams.get("q") || "").trim();
   if (q.length < 2) {
     return Response.json({ q, hits: [], source: "none" });

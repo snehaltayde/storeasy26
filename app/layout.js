@@ -7,6 +7,7 @@ import CartDrawer from "@/components/cart/CartDrawer";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import ConsentBanner from "@/components/analytics/ConsentBanner";
 import Pixels from "@/components/analytics/Pixels";
+import ErrorReporter from "@/components/analytics/ErrorReporter";
 import { cookies } from "next/headers";
 import { getAllCollections } from "@/lib/repo";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
@@ -73,6 +74,7 @@ export default async function RootLayout({ children }) {
         <ServiceWorkerRegister />
         <ConsentBanner />
         <Pixels />
+        <ErrorReporter />
       </body>
     </html>
   );

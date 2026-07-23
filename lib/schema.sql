@@ -197,6 +197,28 @@ CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
 CREATE INDEX IF NOT EXISTS idx_events_cart ON events(cart_id);
 CREATE INDEX IF NOT EXISTS idx_events_order ON events(order_id);
 
+-- First-party error tracking (Session 17). Errors are FINGERPRINTED (source +
+-- name + message + top frame) and upserted — one row per distinct error with a
+-- running count, so a repeating error is one alert (throttled hourly), not a
+-- flood. Swap in Sentry later by forwarding from lib/errors.js; the sink stays.
+CREATE TABLE IF NOT EXISTS app_errors (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  fingerprint     TEXT NOT NULL,
+  source          TEXT NOT NULL,          -- server | edge | client
+  name            TEXT,
+  message         TEXT,
+  stack           TEXT,                   -- first ~2KB
+  url             TEXT,
+  digest          TEXT,                   -- Next error digest (matches error.js UI)
+  count           INTEGER NOT NULL DEFAULT 1,
+  first_seen      TEXT NOT NULL,
+  last_seen       TEXT NOT NULL,
+  last_alerted_at TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_app_errors_fingerprint ON app_errors(fingerprint);
+CREATE INDEX IF NOT EXISTS idx_app_errors_last_seen ON app_errors(last_seen);
+
 -- Persisted status transitions — an append-only audit trail per order.
 -- from_status NULL = order creation.
 CREATE TABLE IF NOT EXISTS order_events (
