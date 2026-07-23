@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { CART_COOKIE, getCart, clearCart } from "@/lib/cart";
-import { createOrder, markOrderPaid, getOrderRazorpayId } from "@/lib/orders";
+import {
+  createOrder,
+  markOrderPaid,
+  getOrderRazorpayId,
+  findOrderByIdempotencyKey,
+  ORDER_STATUS,
+} from "@/lib/orders";
 import { razorpayConfigured, createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
 
 export const runtime = "nodejs";
@@ -21,17 +27,68 @@ function validate(contact, address) {
   return required.every((v) => v && String(v).trim());
 }
 
+const sameAmount = (a, b) => Math.abs(Number(a) - Number(b)) < 0.005;
+
+// If this idempotency key already produced an order, short-circuit BEFORE any
+// cart/validation checks — a retry after the first request cleared the cart
+// must still return that order, not "Cart is empty". Returns null (no dup),
+// a NextResponse to send, or throws nothing.
+async function dedupByKey(key, cart) {
+  const existing = await findOrderByIdempotencyKey(key);
+  if (!existing) return null;
+  // Same key but a different (non-empty) cart ⇒ not a retry: the client must
+  // rotate its key. 409 tells it to.
+  if (cart?.items?.length && !sameAmount(cart.total, existing.total)) {
+    return NextResponse.json(
+      { error: "This checkout attempt no longer matches your cart. Please retry.", code: "IDEMPOTENCY_CONFLICT" },
+      { status: 409 },
+    );
+  }
+  return existing;
+}
+
+const codResponse = (order, deduped = false) =>
+  NextResponse.json({ ok: true, orderId: order.id, ...(deduped ? { deduped: true } : {}) });
+
+function razorpayResponse(order, razorpayOrderId, deduped = false) {
+  // An order that already left pending_payment means the payment landed —
+  // don't reopen the modal; the client goes straight to confirmation.
+  if (order.status && order.status !== ORDER_STATUS.PENDING_PAYMENT) {
+    return NextResponse.json({ ok: true, orderId: order.id, status: order.status, alreadyPaid: true });
+  }
+  return NextResponse.json({
+    ok: true,
+    orderId: order.id,
+    razorpayOrderId,
+    amount: Math.round(order.total * 100),
+    currency: order.currency || "INR",
+    keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+    ...(deduped ? { deduped: true } : {}),
+  });
+}
+
 export async function POST(request) {
   const cartId = cartIdFrom(request);
   const body = await request.json().catch(() => ({}));
-  const { action, contact, address } = body;
+  const { action, contact, address, idempotencyKey } = body;
 
   try {
     if (action === "cod") {
+      if (!idempotencyKey)
+        return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
+      const cart = cartId ? await getCart(cartId) : { items: [] };
+
+      const dup = await dedupByKey(idempotencyKey, cart);
+      if (dup instanceof NextResponse) return dup;
+      if (dup) {
+        // Finish what the first request started if its cart clear didn't land.
+        if (cartId && cart.items.length) await clearCart(cartId);
+        return codResponse(dup, true);
+      }
+
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
-      const cart = await getCart(cartId);
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
 
       const order = await createOrder({
@@ -40,21 +97,28 @@ export async function POST(request) {
         contact,
         address,
         paymentMethod: "cod",
-        paymentStatus: "cod",
-        status: "confirmed",
+        idempotencyKey,
       });
-      await clearCart(cartId);
-      return NextResponse.json({ ok: true, orderId: order.id });
+      if (!order.deduped) await clearCart(cartId);
+      return codResponse(order, order.deduped);
     }
 
     if (action === "razorpay_create") {
       if (!razorpayConfigured())
         return NextResponse.json({ error: "Razorpay is not configured" }, { status: 400 });
+      if (!idempotencyKey)
+        return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
+      const cart = cartId ? await getCart(cartId) : { items: [] };
+
+      // Dedup BEFORE creating a Razorpay order, so a retry reopens the SAME
+      // payment instead of minting a parallel one.
+      const dup = await dedupByKey(idempotencyKey, cart);
+      if (dup instanceof NextResponse) return dup;
+      if (dup) return razorpayResponse(dup, dup.razorpay_order_id, true);
+
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
-
-      const cart = await getCart(cartId);
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
 
       // One getCart → consistent amount for both the Razorpay order and ours.
@@ -68,18 +132,13 @@ export async function POST(request) {
         contact,
         address,
         paymentMethod: "razorpay",
-        paymentStatus: "pending",
-        status: "pending_payment",
+        idempotencyKey,
         razorpayOrderId: rzOrder.id,
       });
-      return NextResponse.json({
-        ok: true,
-        orderId: order.id,
-        razorpayOrderId: rzOrder.id,
-        amount: rzOrder.amount,
-        currency: rzOrder.currency,
-        keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-      });
+      // Lost a same-key insert race: answer with the winner's Razorpay order
+      // (this request's rzOrder is an orphan — never paid, expires unused).
+      if (order.deduped) return razorpayResponse(order, order.razorpayOrderId, true);
+      return razorpayResponse(order, rzOrder.id);
     }
 
     if (action === "razorpay_verify") {
@@ -91,13 +150,18 @@ export async function POST(request) {
       if (!stored || stored.razorpay_order_id !== razorpay_order_id)
         return NextResponse.json({ error: "Order mismatch" }, { status: 400 });
 
-      await markOrderPaid(orderId, { razorpayPaymentId: razorpay_payment_id });
+      // Idempotent: a duplicate callback for the same payment is a no-op.
+      const paid = await markOrderPaid(orderId, { razorpayPaymentId: razorpay_payment_id });
       if (cartId) await clearCart(cartId);
-      return NextResponse.json({ ok: true, orderId });
+      return NextResponse.json({ ok: true, orderId, ...(paid.already ? { already: true } : {}) });
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e) }, { status: 400 });
+    const status = e?.code === "IDEMPOTENCY_CONFLICT" ? 409 : 400;
+    return NextResponse.json(
+      { error: String(e?.message || e), ...(e?.code ? { code: e.code } : {}) },
+      { status },
+    );
   }
 }

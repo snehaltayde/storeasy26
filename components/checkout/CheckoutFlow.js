@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatMoney } from "@/lib/format";
@@ -78,7 +78,21 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
     window.location.href = `/checkout/confirmation/${orderId}`;
   }
 
-  async function placeOrder() {
+  // One idempotency key per payment ATTEMPT — minted on first submit, reused by
+  // retries (double click, network retry, Razorpay modal reopen) so the server
+  // returns the SAME order instead of creating a second one. Rotated only when
+  // the server 409s (the key no longer matches the cart).
+  const intentKey = useRef(null);
+  function paymentKey(rotate = false) {
+    if (rotate || !intentKey.current) {
+      intentKey.current =
+        globalThis.crypto?.randomUUID?.() ||
+        `ik-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+    return intentKey.current;
+  }
+
+  async function placeOrder(isRetry = false) {
     setPlacing(true);
     setError("");
     try {
@@ -86,8 +100,12 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
         const res = await fetch("/api/checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "cod", contact, address }),
+          body: JSON.stringify({ action: "cod", contact, address, idempotencyKey: paymentKey() }),
         });
+        if (res.status === 409 && !isRetry) {
+          paymentKey(true); // stale intent (cart changed) — new key, one retry
+          return placeOrder(true);
+        }
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "Could not place order");
         goConfirmation(data.orderId);
@@ -98,10 +116,19 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "razorpay_create", contact, address }),
+        body: JSON.stringify({ action: "razorpay_create", contact, address, idempotencyKey: paymentKey() }),
       });
+      if (res.status === 409 && !isRetry) {
+        paymentKey(true);
+        return placeOrder(true);
+      }
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Could not start payment");
+      if (data.alreadyPaid) {
+        // This intent's payment already landed (duplicate submit after verify).
+        goConfirmation(data.orderId);
+        return;
+      }
 
       const ready = await loadRazorpay();
       if (!ready) throw new Error("Could not load Razorpay");
@@ -296,7 +323,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
                   Back
                 </button>
                 <button
-                  onClick={placeOrder}
+                  onClick={() => placeOrder()}
                   disabled={placing}
                   className="flex-1 rounded-xl bg-lime-400 px-6 py-3 text-sm font-bold text-zinc-950 transition hover:bg-lime-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >

@@ -93,10 +93,20 @@ CREATE TABLE IF NOT EXISTS cart_items (
 
 CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON cart_items(cart_id);
 
--- Orders from the custom guest checkout. Snapshots the cart + applied offers +
--- totals at purchase time so the order is immutable even if the catalog changes.
+-- Orders from the custom guest checkout (Session 10: first-class, durable,
+-- idempotent). One row per PAYMENT ATTEMPT, keyed by idempotency_key — a retry
+-- or duplicate callback re-reads the existing row instead of inserting twice.
+--
+--   status  = workflow position (state machine, see lib/orders.js):
+--             pending_payment | cod_pending → paid → syncing_shopify → synced
+--             (+ sync_failed retry loop, + cancelled)
+--   payment_status = money state shown to the user: pending | paid | cod
+--   snapshot = full JSON record (items, gifts, applied offers, coupon, totals,
+--              shipping, address, payment refs) so the Session-12 Shopify push
+--              can reproduce the exact discount representation.
 CREATE TABLE IF NOT EXISTS orders (
   id                  TEXT PRIMARY KEY,       -- e.g. BL-1A2B3C4D
+  idempotency_key     TEXT,                   -- one per checkout intent (UNIQUE below)
   email               TEXT,
   phone               TEXT,
   name                TEXT,
@@ -108,17 +118,28 @@ CREATE TABLE IF NOT EXISTS orders (
   country             TEXT,
   subtotal            REAL,
   discount_total      REAL,
+  shipping_total      REAL NOT NULL DEFAULT 0,
   total               REAL,
   currency            TEXT,
   coupon_code         TEXT,
-  applied_offers      TEXT,                   -- JSON snapshot
+  applied_offers      TEXT,                   -- JSON snapshot (also inside snapshot)
+  snapshot            TEXT,                   -- full JSON snapshot (see above)
   payment_method      TEXT,                   -- cod | razorpay
   payment_status      TEXT,                   -- pending | paid | cod
-  status              TEXT,                   -- pending_payment | confirmed
+  status              TEXT NOT NULL DEFAULT 'pending_payment',
   razorpay_order_id   TEXT,
   razorpay_payment_id TEXT,
-  created_at          TEXT
+  shopify_order_id    TEXT,                   -- set on synced (Session 12)
+  sync_attempts       INTEGER NOT NULL DEFAULT 0,
+  sync_error          TEXT,                   -- last sync failure (also in order_events)
+  created_at          TEXT,
+  updated_at          TEXT,
+  paid_at             TEXT,
+  synced_at           TEXT
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_idempotency ON orders(idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 
 CREATE TABLE IF NOT EXISTS order_items (
   order_id      TEXT NOT NULL,
@@ -136,3 +157,16 @@ CREATE TABLE IF NOT EXISTS order_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+
+-- Persisted status transitions — an append-only audit trail per order.
+-- from_status NULL = order creation.
+CREATE TABLE IF NOT EXISTS order_events (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id    TEXT NOT NULL,
+  from_status TEXT,
+  to_status   TEXT NOT NULL,
+  meta        TEXT,                           -- JSON: payment ids, sync attempt, errors
+  created_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_events_order ON order_events(order_id);
