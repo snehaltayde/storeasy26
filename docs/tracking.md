@@ -1,3 +1,40 @@
+# First-party event pipeline (Session 14) + S9 relay design
+
+**Session 14 productionized this.** The storefront fires the FULL funnel —
+`view_item`, `view_item_list`, `search`, `add_to_cart`, `begin_checkout`,
+`add_payment_info`, `purchase` — at our own `/api/track` collector
+([route](../app/api/track/route.js), [`lib/track/client.js`](../lib/track/client.js)
+sendBeacon tracker, [`TrackEvent`](../components/analytics/TrackEvent.js) for page
+mounts). **Store-then-forward** ([`lib/events.js`](../lib/events.js)): every event is
+persisted to the `events` table (event_id UNIQUE = dedup; hashed-PII-only payloads)
+BEFORE forwarding to GA4 MP + Meta CAPI — exactly-once per destination, bounded-backoff
+retries via `/api/jobs/forward-events` (cron + per-event piggyback), dead-letter after
+`EVENTS_MAX_ATTEMPTS` with one aggregated alert; dead rows stay replayable
+(`POST /api/jobs/forward-events {eventId}`). A downstream outage NEVER drops an event.
+
+- **Identity:** collector mints/persists `_fp_cid` (2y), `_fbp` (3y), `_fbc` (90d,
+  from `fbclid`), `_fp_gclid` (90d) — first-party, `Secure` in prod. Set
+  `COOKIE_DOMAIN=.beastlife.in` when the app runs on a BeastLife subdomain (Vercel →
+  add domain `shop.beastlife.in` + CNAME → set the env — nothing else changes; the
+  collector is same-origin so everything is first-party automatically).
+- **Purchase is server-fired** on paid/COD (checkout + webhook routes) with
+  `event_id = order id`; the confirmation-page browser copy carries the cookies and
+  MERGES into the same row (identity join via `cart_id`: the server copy inherits
+  `client_id`/`fbp`/`fbc`/`gclid` from the buyer's browsing events). PII is hashed
+  at enqueue (`em`/`ph`), raw values never stored.
+- **Store-only mode:** without GA4/Meta creds (prod today), events store + mark
+  `forwarded ("store-only")`. Swap BeastLife's real creds into Vercel env to light up
+  forwarding; stored payloads allow manual backfill.
+- Tests: `pnpm test:events` (13 — dedup/merge, outage→replay, dead-letter+alert,
+  identity join). Verified live 2026-07-24: full funnel stored+forwarded to the test
+  GA4/Meta; purchase E2E `BL-84063569` (identity joined, hashed PII, browser copy
+  deduped; order cancelled after per test-hygiene); prod store-only smoke green.
+
+The original Session-9 spike notes below remain the reference for the relay formats,
+dedup mechanics, and hashing.
+
+---
+
 # First-party server-side tracking — locked design (Session 9 spike)
 
 **Goal:** one purchase event flows **first-party** from the browser to our own endpoint,
