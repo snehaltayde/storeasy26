@@ -75,6 +75,37 @@ construction: creation dedups on the key, transitions are CAS.
 Legacy Phase-0 rows (`status='confirmed'`) were mapped by `pnpm migrate`:
 razorpay → `paid`, cod → `cod_pending`.
 
+## Webhook — the authoritative "paid" signal (Session 11)
+
+`POST /api/razorpay/webhook` ([route](../app/api/razorpay/webhook/route.js)) — Razorpay's
+`payment.captured` marks the order paid **independent of the browser**; the checkout
+callback is optimistic UX. Whichever lands first wins the CAS transition, the other
+no-ops (`already: true`); the audit trail records the winner
+(`meta.source: "webhook" | "browser_callback"` + the Razorpay `webhook_event_id`).
+
+- **Signature:** HMAC-SHA256 over the **raw body** with `RAZORPAY_WEBHOOK_SECRET` — a
+  separate secret chosen at webhook creation, env-driven like the keys (test now,
+  BeastLife live later). Invalid → 400.
+- **Idempotent:** duplicate deliveries hit `markOrderPaid` replay-safety → 200
+  `already: true`, no second `paid` event.
+- **Amount guard:** captured paise must equal `round(order.total*100)` or the delivery
+  is flagged (200, loud log) and the order is untouched.
+- **Cart healing:** the order's `cart_id` lets the webhook clear the buyer's cart, so a
+  dead browser doesn't strand items (Phase 0's leftover).
+- **Response contract:** 400 bad sig/malformed · 200 processed/duplicate/ignored/
+  unfixable-by-retry (logged `NEEDS ATTENTION`) · 5xx transient → Razorpay redelivers.
+  Non-`payment.captured` events and unknown orders are acknowledged + ignored.
+- **Registered webhook:** id `TGzmKzfHreuGsm` (test mode) →
+  `https://storeasy26.vercel.app/api/razorpay/webhook`, `payment.captured` only.
+  Note: all payments on this Razorpay account deliver here; orders the DB doesn't
+  know are ignored, and local-dev orders share the same Turso so they get healed too.
+
+**Go-live checklist (once BeastLife's KYC'd account exists):** swap
+`NEXT_PUBLIC_RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` in Vercel **prod** to the live keys
+(staging keeps test keys) · create a **live-mode** webhook to the same URL with a fresh
+secret → update `RAZORPAY_WEBHOOK_SECRET` (prod) · redeploy · keep the test webhook for
+staging/dev accounts if useful.
+
 ## Verified (2026-07-23, dev server + Turso + test-mode Razorpay)
 
 - 18/18 unit/integration tests (`pnpm test:orders`).
@@ -83,10 +114,20 @@ razorpay → `paid`, cod → `cod_pending`.
   `BL-D6C8963D`, both clients got the same `order_TGzXT62WQPvLCH`. Duplicate verify →
   one `paid` event, replay `already: true`; audit trail
   `∅→pending_payment, pending_payment→paid`.
+- **Webhook (local, crafted deliveries):** blocked callback → paid via webhook alone +
+  cart cleared · duplicate delivery → `already: true`, one paid event · tampered body →
+  400, order untouched · valid sig + wrong amount → flagged, not paid ·
+  `payment.authorized` → ignored · callback-first then webhook → reconciled, one event.
+- **Webhook (REAL end-to-end on prod):** deployed app + registered test-mode webhook;
+  hosted-checkout payment for `BL-1201AD9E` (₹444, Netbanking success) with the app's
+  verify callback never firing → Razorpay delivered `payment.captured` (event
+  `TGzt7HHEfE8DjM`) → order `paid` (`pay_TGzsgctNK8K9nq`), audit
+  `meta.source = "webhook"`, buyer's cart cleared server-side, prod confirmation page
+  shows Paid.
 
 ## Still open (later sessions)
 
-- Razorpay **webhook** backstop (captured payment whose client callback never lands) —
-  slots straight into `markOrderPaid`, already replay-safe.
 - Abandoned `pending_payment` / orphan-cart cleanup (cron) — `cancelled` exists for it.
 - COD collection (`cod_pending → paid`) when fulfilment becomes real.
+- Alerting for `NEEDS ATTENTION` webhook logs (amount mismatch / wrong-payment) beyond
+  Vercel function logs.
