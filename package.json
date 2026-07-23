@@ -16,6 +16,8 @@
     "test:shipping": "node scripts/test-shipping.js",
     "test:shopify-push": "node scripts/test-shopify-push.js",
     "push:shopify": "node --env-file=.env.local scripts/sync-shopify.js",
+    "order:cancel": "node --env-file=.env.local scripts/cancel-order.js",
+    "test:events": "node scripts/test-events.js",
     "shopify:token": "node --env-file=.env.local scripts/shopify-mint-token.js",
     "shopify:oauth": "node --env-file=.env.local scripts/shopify-oauth.js"
   },

@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductGallery from "@/components/ProductGallery";
 import ProductPurchase from "@/components/ProductPurchase";
+import TrackEvent from "@/components/analytics/TrackEvent";
 import { getProductByHandle } from "@/lib/repo";
+import { numericId } from "@/lib/ids";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,21 @@ export default async function ProductPage({ params }) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <TrackEvent
+        name="view_item"
+        data={{
+          value: product.price_min,
+          currency: product.currency || "INR",
+          items: [
+            {
+              id: numericId(product.id),
+              name: product.title,
+              price: product.price_min,
+              quantity: 1,
+            },
+          ],
+        }}
+      />
       <nav className="mb-5 text-sm text-zinc-400">
         <Link href="/" className="hover:text-zinc-600">
           Home

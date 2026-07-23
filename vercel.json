@@ -3,6 +3,10 @@
     {
       "path": "/api/jobs/sync-shopify",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/jobs/forward-events",
+      "schedule": "30 3 * * *"
     }
   ]
 }

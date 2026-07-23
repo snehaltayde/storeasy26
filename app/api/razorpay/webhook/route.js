@@ -3,6 +3,7 @@ import { clearCart } from "@/lib/cart";
 import { markOrderPaid, findOrderByRazorpayOrderId } from "@/lib/orders";
 import { webhookConfigured, verifyRazorpayWebhookSignature } from "@/lib/razorpay";
 import { enqueueShopifyPush, runSyncSweep } from "@/lib/shopify-push";
+import { enqueuePurchaseAndForward } from "@/lib/events";
 
 // Razorpay webhook — the AUTHORITATIVE "paid" signal (Session 11). The browser
 // callback is optimistic UX; a captured payment whose callback never lands
@@ -74,7 +75,11 @@ export async function POST(request) {
     // then a tiny sweep so failed pushes retry on payment traffic instead of
     // waiting for the daily cron.
     after(async () => {
-      if (!paid.already) await enqueueShopifyPush(order.id);
+      if (!paid.already) {
+        await enqueueShopifyPush(order.id);
+        // durable server-side purchase event — the browser may never come back
+        await enqueuePurchaseAndForward(order.id);
+      }
       await runSyncSweep({ limit: 2 }).catch((e) =>
         console.error(`[sync-sweep] ${e?.message || e}`),
       );

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ProductGrid from "@/components/ProductGrid";
+import TrackEvent from "@/components/analytics/TrackEvent";
 import { typesenseSearch } from "@/lib/typesense-search";
 import { searchProductsInDb } from "@/lib/repo";
 
@@ -38,6 +39,9 @@ export default async function SearchPage({ searchParams }) {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      {q ? (
+        <TrackEvent name="search" data={{ params: { search_term: q, results: products.length } }} />
+      ) : null}
       <h1 className="text-2xl font-bold tracking-tight">
         {q ? (
           <>

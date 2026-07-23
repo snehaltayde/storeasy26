@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback } from "react";
 import { numericId } from "@/lib/ids";
+import { track } from "@/lib/track/client";
 
 const CartContext = createContext(null);
 const EMPTY = {
@@ -37,15 +38,27 @@ export function CartProvider({ children, initialCart }) {
       });
       const next = await res.json();
       setCart((prev) => ({ ...prev, ...next }));
+      return next;
     } catch {
       /* keep current state on network error */
+      return null;
     } finally {
       setPending(false);
     }
   }, []);
 
   const addItem = useCallback(
-    (variantId, quantity = 1) => mutate({ action: "add", variantId, quantity }, { openDrawer: true }),
+    async (variantId, quantity = 1) => {
+      const next = await mutate({ action: "add", variantId, quantity }, { openDrawer: true });
+      const it = next?.items?.find((i) => i.variantId === variantId);
+      if (it) {
+        track("add_to_cart", {
+          value: it.price * quantity,
+          currency: it.currency || "INR",
+          items: [{ id: it.variantNumericId, name: it.title, price: it.price, quantity }],
+        });
+      }
+    },
     [mutate],
   );
   const setQty = useCallback(

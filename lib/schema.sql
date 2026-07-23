@@ -160,6 +160,43 @@ CREATE TABLE IF NOT EXISTS order_items (
 
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 
+-- First-party event pipeline (Session 14). Every funnel event is persisted
+-- HERE before any forwarding (store-then-forward): a GA4/Meta blip never drops
+-- an event — the sweep replays pending rows with bounded backoff. event_id is
+-- UNIQUE (client retries + server/client purchase copies collapse into one
+-- row); payload holds value/currency/items/params + HASHED user_data only —
+-- raw PII is never stored. cart_id links events to the buyer's cart so the
+-- server-side purchase inherits the browser's first-party identity.
+CREATE TABLE IF NOT EXISTS events (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id        TEXT NOT NULL,
+  name            TEXT NOT NULL,          -- GA4-style: view_item … purchase
+  client_id       TEXT,                   -- first-party _fp_cid (or _ga-derived)
+  fbp             TEXT,
+  fbc             TEXT,
+  gclid           TEXT,
+  ip              TEXT,
+  user_agent      TEXT,
+  url             TEXT,
+  referrer        TEXT,
+  cart_id         TEXT,
+  order_id        TEXT,
+  payload         TEXT NOT NULL,          -- JSON (hashed PII only)
+  status          TEXT NOT NULL DEFAULT 'pending',  -- pending | forwarded | dead
+  attempts        INTEGER NOT NULL DEFAULT 0,
+  last_error      TEXT,
+  last_attempt_at TEXT,
+  ga4_sent_at     TEXT,
+  meta_sent_at    TEXT,
+  created_at      TEXT NOT NULL,
+  forwarded_at    TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_events_event_id ON events(event_id);
+CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
+CREATE INDEX IF NOT EXISTS idx_events_cart ON events(cart_id);
+CREATE INDEX IF NOT EXISTS idx_events_order ON events(order_id);
+
 -- Persisted status transitions — an append-only audit trail per order.
 -- from_status NULL = order creation.
 CREATE TABLE IF NOT EXISTS order_events (

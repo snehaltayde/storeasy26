@@ -1,8 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import TrackEvent from "@/components/analytics/TrackEvent";
 import { getOrder } from "@/lib/orders";
 import { formatMoney } from "@/lib/format";
+import { numericId } from "@/lib/ids";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Order confirmed" };
@@ -17,6 +19,24 @@ export default async function ConfirmationPage({ params }) {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
+      {/* Browser copy of the purchase event: SAME event_id (= order id) as the
+          server-enqueued copy, so both collapse into one stored event — this
+          one contributes the browser's first-party cookies. */}
+      <TrackEvent
+        name="purchase"
+        data={{
+          event_id: order.id,
+          value: order.total,
+          currency: order.currency || "INR",
+          items: order.items.map((it) => ({
+            id: numericId(it.variant_id) || it.variant_id,
+            name: it.title,
+            price: it.unit_price,
+            quantity: it.quantity,
+          })),
+          params: { transaction_id: order.id, payment_type: order.payment_method },
+        }}
+      />
       <div className="rounded-2xl border border-zinc-200 p-6 sm:p-8">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-lime-100 text-lg font-bold text-lime-700">

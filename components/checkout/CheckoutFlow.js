@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatMoney } from "@/lib/format";
 import { computeShipping } from "@/lib/shipping";
+import { track } from "@/lib/track/client";
 
 const STEPS = ["Address", "Review", "Payment"];
 
@@ -82,6 +83,28 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
   const codPreview = computeShipping({ ...shipInputs, paymentMethod: "cod" });
   const grandTotal = cart.total + shipping.total;
 
+  const eventItems = () =>
+    cart.items.map((it) => ({
+      id: it.variantNumericId,
+      name: it.title,
+      price: it.price,
+      quantity: it.quantity,
+    }));
+
+  // begin_checkout — once per checkout visit
+  const beganRef = useRef(false);
+  useEffect(() => {
+    if (beganRef.current) return;
+    beganRef.current = true;
+    track("begin_checkout", {
+      value: cart.total,
+      currency: cart.currency,
+      items: eventItems(),
+      params: cart.couponStatus?.valid ? { coupon: cart.couponStatus.code } : undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function goConfirmation(orderId) {
     // Full nav so the layout re-reads the (now-cleared) cart.
     window.location.href = `/checkout/confirmation/${orderId}`;
@@ -104,6 +127,17 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
   async function placeOrder(isRetry = false) {
     setPlacing(true);
     setError("");
+    // add_payment_info — the user committed a payment method (fired once per
+    // attempt; the stable id makes an auto-retry after 409 a dedup no-op).
+    if (!isRetry) {
+      track("add_payment_info", {
+        event_id: `api-${paymentKey()}`,
+        value: grandTotal,
+        currency: cart.currency,
+        items: eventItems(),
+        params: { payment_type: method },
+      });
+    }
     try {
       if (method === "cod") {
         const res = await fetch("/api/checkout", {
