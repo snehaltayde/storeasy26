@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { CART_COOKIE, getCart, clearCart } from "@/lib/cart";
+import { enqueueShopifyPush } from "@/lib/shopify-push";
 import {
   createOrder,
   markOrderPaid,
@@ -99,7 +100,11 @@ export async function POST(request) {
         paymentMethod: "cod",
         idempotencyKey,
       });
-      if (!order.deduped) await clearCart(cartId);
+      if (!order.deduped) {
+        await clearCart(cartId);
+        // COD pushes to Shopify as payment-pending, async after the response.
+        after(() => enqueueShopifyPush(order.id));
+      }
       return codResponse(order, order.deduped);
     }
 
@@ -158,6 +163,7 @@ export async function POST(request) {
         source: "browser_callback",
       });
       if (cartId) await clearCart(cartId);
+      if (!paid.already) after(() => enqueueShopifyPush(orderId));
       return NextResponse.json({ ok: true, orderId, ...(paid.already ? { already: true } : {}) });
     }
 

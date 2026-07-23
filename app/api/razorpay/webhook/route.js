@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { clearCart } from "@/lib/cart";
 import { markOrderPaid, findOrderByRazorpayOrderId } from "@/lib/orders";
 import { webhookConfigured, verifyRazorpayWebhookSignature } from "@/lib/razorpay";
+import { enqueueShopifyPush, runSyncSweep } from "@/lib/shopify-push";
 
 // Razorpay webhook — the AUTHORITATIVE "paid" signal (Session 11). The browser
 // callback is optimistic UX; a captured payment whose callback never lands
@@ -69,6 +70,15 @@ export async function POST(request) {
     });
     // Kill the lost-callback leftovers: the user's cart still holds the items.
     if (!paid.already && order.cart_id) await clearCart(order.cart_id);
+    // Async Shopify push AFTER the response: immediate attempt for this order,
+    // then a tiny sweep so failed pushes retry on payment traffic instead of
+    // waiting for the daily cron.
+    after(async () => {
+      if (!paid.already) await enqueueShopifyPush(order.id);
+      await runSyncSweep({ limit: 2 }).catch((e) =>
+        console.error(`[sync-sweep] ${e?.message || e}`),
+      );
+    });
     return NextResponse.json({
       ok: true,
       orderId: order.id,
