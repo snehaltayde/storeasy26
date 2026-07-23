@@ -107,6 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON cart_items(cart_id);
 CREATE TABLE IF NOT EXISTS orders (
   id                  TEXT PRIMARY KEY,       -- e.g. BL-1A2B3C4D
   idempotency_key     TEXT,                   -- one per checkout intent (UNIQUE below)
+  cart_id             TEXT,                   -- source cart, so the webhook can clear it
   email               TEXT,
   phone               TEXT,
   name                TEXT,
@@ -140,6 +141,7 @@ CREATE TABLE IF NOT EXISTS orders (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_idempotency ON orders(idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_razorpay ON orders(razorpay_order_id);
 
 CREATE TABLE IF NOT EXISTS order_items (
   order_id      TEXT NOT NULL,

@@ -150,8 +150,13 @@ export async function POST(request) {
       if (!stored || stored.razorpay_order_id !== razorpay_order_id)
         return NextResponse.json({ error: "Order mismatch" }, { status: 400 });
 
-      // Idempotent: a duplicate callback for the same payment is a no-op.
-      const paid = await markOrderPaid(orderId, { razorpayPaymentId: razorpay_payment_id });
+      // Idempotent: a duplicate callback for the same payment is a no-op. The
+      // webhook (/api/razorpay/webhook) is the source of truth; this browser
+      // callback is optimistic UX — whichever lands first wins, the other no-ops.
+      const paid = await markOrderPaid(orderId, {
+        razorpayPaymentId: razorpay_payment_id,
+        source: "browser_callback",
+      });
       if (cartId) await clearCart(cartId);
       return NextResponse.json({ ok: true, orderId, ...(paid.already ? { already: true } : {}) });
     }

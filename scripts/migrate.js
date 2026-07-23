@@ -23,6 +23,7 @@ async function ensureOrderColumns() {
   const have = new Set(info.rows.map((r) => r.name));
   const wanted = [
     ["idempotency_key", "TEXT"],
+    ["cart_id", "TEXT"],
     ["shipping_total", "REAL NOT NULL DEFAULT 0"],
     ["snapshot", "TEXT"],
     ["shopify_order_id", "TEXT"],
