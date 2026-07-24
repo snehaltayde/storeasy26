@@ -197,6 +197,24 @@ CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
 CREATE INDEX IF NOT EXISTS idx_events_cart ON events(cart_id);
 CREATE INDEX IF NOT EXISTS idx_events_order ON events(order_id);
 
+-- Offer configuration (Session 19): BeastLife edits offers WITHOUT a deploy.
+-- `config` holds the full engine-shaped offer object (lib/offers/engine.js);
+-- enabled + schedule window are promoted columns so the cart's per-read query
+-- stays a simple indexed filter. Seeded once from lib/offers/config.js.
+CREATE TABLE IF NOT EXISTS offers (
+  id         TEXT PRIMARY KEY,         -- slug, e.g. "tiered-whey"
+  type       TEXT NOT NULL,            -- BXGY | TIERED_QTY | FREE_GIFT | COUPON
+  label      TEXT NOT NULL,            -- admin display (engine title lives in config)
+  enabled    INTEGER NOT NULL DEFAULT 1,
+  starts_at  TEXT,                     -- ISO; NULL = no lower bound
+  ends_at    TEXT,                     -- ISO; NULL = no upper bound
+  config     TEXT NOT NULL,            -- JSON engine offer object
+  created_at TEXT,
+  updated_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_offers_enabled ON offers(enabled);
+
 -- First-party error tracking (Session 17). Errors are FINGERPRINTED (source +
 -- name + message + top frame) and upserted — one row per distinct error with a
 -- running count, so a repeating error is one alert (throttled hourly), not a

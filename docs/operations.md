@@ -66,3 +66,12 @@ banner is `position:fixed` (no CLS). Re-run Lighthouse after major UI changes.
 ## Related runbooks
 
 [docs/refunds.md](./refunds.md) — manual refund/cancel flows (Razorpay + Shopify + ledger).
+
+## Offer admin (Session 19)
+
+`/admin` — single-operator console (ADMIN_PASSWORD env; sessions are an httpOnly
+cookie derived from it — rotate the password to revoke). CRUD + enable/disable +
+schedule for the 4 offer types; every save is live on the next cart read (the
+cart queries the offers table per evaluation — no cache, no deploy). Login is
+rate-limited (5/min/ip). Offers were seeded once from lib/offers/config.js;
+the DB is now the source of truth.

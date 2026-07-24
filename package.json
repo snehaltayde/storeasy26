@@ -19,6 +19,7 @@
     "order:cancel": "node --env-file=.env.local scripts/cancel-order.js",
     "order:trace": "node --env-file=.env.local scripts/trace-order.js",
     "test:hardening": "node scripts/test-hardening.js",
+    "test:offers-admin": "node scripts/test-offers-admin.js",
     "test:events": "node scripts/test-events.js",
     "events:stats": "node --env-file=.env.local scripts/events-stats.js",
     "search:report": "node --env-file=.env.local scripts/search-report.js",

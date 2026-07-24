@@ -66,6 +66,19 @@ try {
   await ensureOrderColumns();
   const schema = await readFile(join(here, "../lib/schema.sql"), "utf8");
   await libsql.executeMultiple(schema);
+
+  // Session 19: seed the offers table ONCE from the code config (INSERT OR
+  // IGNORE — admin edits are never overwritten by later migrations).
+  const { OFFERS } = await import("../lib/offers/config.js");
+  let seeded = 0;
+  for (const offer of OFFERS) {
+    const res = await libsql.execute({
+      sql: "INSERT OR IGNORE INTO offers (id, type, label, enabled, config, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?)",
+      args: [offer.id, offer.type, offer.title || offer.id, JSON.stringify(offer), new Date().toISOString(), new Date().toISOString()],
+    });
+    seeded += Number(res.rowsAffected || 0);
+  }
+  if (seeded) console.log(`• offers: seeded ${seeded} from lib/offers/config.js`);
   console.log(
     `✓ schema applied → ${process.env.TURSO_DB_URL || process.env.DATABASE_URL || "file:local.db"}`,
   );
