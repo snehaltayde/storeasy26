@@ -1,17 +1,29 @@
 import Link from "next/link";
 
-export default function Footer({ collections = [] }) {
+// Session 23: brand, support and the Shop column come from tenant config/CMS.
+// `nav` null = top-5 collections (pre-CMS behavior); an array replaces it.
+export default function Footer({
+  collections = [],
+  logo = { text1: "Store", text2: "" },
+  nav = null,
+  tagline = "",
+  support = {},
+  legalName = "",
+}) {
+  const shopItems = Array.isArray(nav)
+    ? nav.map((i) => ({ key: i.href + i.label, href: i.href, label: i.label }))
+    : collections.slice(0, 5).map((c) => ({ key: c.handle, href: `/collections/${c.handle}`, label: c.title }));
+
   return (
     <footer className="mt-20 border-t border-zinc-100 bg-zinc-50">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="text-xl font-extrabold">
-              BEAST<span className="text-lime-600">LIFE</span>
+              {logo.text1}
+              {logo.text2 ? <span className="text-lime-600">{logo.text2}</span> : null}
             </p>
-            <p className="mt-3 max-w-sm text-sm text-zinc-500">
-              Science-backed sports nutrition. Train harder. Recover stronger. Go Beast Mode.
-            </p>
+            {tagline ? <p className="mt-3 max-w-sm text-sm text-zinc-500">{tagline}</p> : null}
           </div>
 
           <div>
@@ -22,10 +34,10 @@ export default function Footer({ collections = [] }) {
                   All collections
                 </Link>
               </li>
-              {collections.slice(0, 5).map((c) => (
-                <li key={c.handle}>
-                  <Link href={`/collections/${c.handle}`} className="hover:text-zinc-900">
-                    {c.title}
+              {shopItems.map((i) => (
+                <li key={i.key}>
+                  <Link href={i.href} className="hover:text-zinc-900">
+                    {i.label}
                   </Link>
                 </li>
               ))}
@@ -71,22 +83,26 @@ export default function Footer({ collections = [] }) {
                   Returns &amp; refunds
                 </Link>
               </li>
-              <li>
-                <a href="mailto:care@beastlife.in" className="hover:text-zinc-900">
-                  care@beastlife.in
-                </a>
-              </li>
-              <li>
-                <a href="tel:+919599339358" className="hover:text-zinc-900">
-                  +91-9599339358
-                </a>
-              </li>
+              {support.email ? (
+                <li>
+                  <a href={`mailto:${support.email}`} className="hover:text-zinc-900">
+                    {support.email}
+                  </a>
+                </li>
+              ) : null}
+              {support.phone ? (
+                <li>
+                  <a href={`tel:${support.phone.replace(/[^+\d]/g, "")}`} className="hover:text-zinc-900">
+                    {support.phone}
+                  </a>
+                </li>
+              ) : null}
             </ul>
           </div>
         </div>
 
         <p className="mt-10 border-t border-zinc-200 pt-6 text-xs text-zinc-400">
-          © RAK Fitness Consumer Pvt. Ltd. · Catalog synced from the live Shopify store
+          © {legalName} · Catalog synced from the live Shopify store
         </p>
       </div>
     </footer>

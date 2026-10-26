@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
-import { POLICY_SLUGS } from "@/lib/content/pages";
+import { listContentPages } from "@/lib/cms/store";
 
 // Full-catalog sitemap (Session 16): every product + collection from Turso,
 // plus the content pages. Regenerated per request (catalog syncs mutate it).
@@ -19,7 +19,14 @@ async function buildSitemap() {
     db.selectFrom("collections").select(["handle", "updated_at"]).execute(),
   ]);
 
-  const statics = ["/", "/collections", "/search", "/about", "/contact", ...POLICY_SLUGS.map((s) => `/policies/${s}`)];
+  // Content pages per tenant (S23): defaults + merchant-added, enabled only.
+  const pages = (await listContentPages()).filter((p) => p.enabled);
+  const statics = [
+    "/",
+    "/collections",
+    "/search",
+    ...pages.map((p) => (p.slug === "about" || p.slug === "contact" ? `/${p.slug}` : `/policies/${p.slug}`)),
+  ];
 
   return [
     ...statics.map((path) => ({

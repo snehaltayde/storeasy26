@@ -2,12 +2,31 @@ import Link from "next/link";
 import SearchBox from "./SearchBox";
 import CartButton from "./cart/CartButton";
 
-export default function Header({ collections = [] }) {
+// Session 23: brand + nav come from tenant config/CMS. `nav` null = the
+// pre-CMS behavior (scroller of all collections); an array replaces it.
+export default function Header({ collections = [], logo = { text1: "Store", text2: "" }, nav = null, announcement = null }) {
+  const stripItems = Array.isArray(nav)
+    ? nav.map((i) => ({ key: i.href + i.label, href: i.href, label: i.label }))
+    : collections.map((c) => ({ key: c.handle, href: `/collections/${c.handle}`, label: c.title }));
+
   return (
     <header className="sticky top-0 z-30 bg-zinc-950 text-white">
+      {announcement?.enabled && announcement.text ? (
+        <div className="bg-lime-400 px-4 py-1.5 text-center text-xs font-semibold text-zinc-950">
+          {announcement.href ? (
+            <Link href={announcement.href} className="hover:underline">
+              {announcement.text}
+            </Link>
+          ) : (
+            announcement.text
+          )}
+        </div>
+      ) : null}
+
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
         <Link href="/" className="shrink-0 text-xl font-extrabold tracking-tight">
-          BEAST<span className="text-lime-400">LIFE</span>
+          {logo.text1}
+          {logo.text2 ? <span className="text-lime-400">{logo.text2}</span> : null}
         </Link>
 
         <div className="hidden flex-1 md:block">
@@ -28,16 +47,16 @@ export default function Header({ collections = [] }) {
         <SearchBox />
       </div>
 
-      {collections.length > 0 && (
+      {stripItems.length > 0 && (
         <nav className="border-t border-white/10">
           <div className="no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto px-3 sm:px-5">
-            {collections.map((c) => (
+            {stripItems.map((i) => (
               <Link
-                key={c.handle}
-                href={`/collections/${c.handle}`}
+                key={i.key}
+                href={i.href}
                 className="whitespace-nowrap rounded-full px-3 py-2 text-sm text-zinc-300 transition hover:text-white"
               >
-                {c.title}
+                {i.label}
               </Link>
             ))}
           </div>

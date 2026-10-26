@@ -1,24 +1,24 @@
 import { notFound } from "next/navigation";
 import ContentPage from "@/components/ContentPage";
-import { PAGES, POLICY_SLUGS } from "@/lib/content/pages";
+import { getContentPage } from "@/lib/cms/store";
+import { siteLegalName } from "@/lib/site";
+import { tfetch } from "@/lib/tenant-request";
 
-export function generateStaticParams() {
-  return POLICY_SLUGS.map((slug) => ({ slug }));
-}
+// Session 23: serves default policy templates AND merchant-added CMS pages —
+// any slug with content renders, everything else 404s. Dynamic per request
+// (slugs differ per tenant, and edits go live without a deploy).
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const page = POLICY_SLUGS.includes(slug) ? PAGES[slug] : null;
-  if (!page) return { title: "Policy not found" };
-  return {
-    title: page.title,
-    description: page.description,
-    alternates: { canonical: `/policies/${slug}` },
-  };
+  const page = await tfetch(() => getContentPage(slug));
+  if (!page) return { title: "Page not found" };
+  return { title: page.title, description: page.description, alternates: { canonical: `/policies/${slug}` } };
 }
 
 export default async function PolicyPage({ params }) {
   const { slug } = await params;
-  if (!POLICY_SLUGS.includes(slug)) notFound();
-  return <ContentPage page={PAGES[slug]} />;
+  const [page, legalName] = await tfetch(async () => [await getContentPage(slug), siteLegalName()]);
+  if (!page) notFound();
+  return <ContentPage page={page} legalName={legalName} />;
 }

@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductGallery from "@/components/ProductGallery";
 import ProductPurchase from "@/components/ProductPurchase";
+import ProductCard from "@/components/ProductCard";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import { getProductByHandle } from "@/lib/repo";
+import { getPdpPairs } from "@/lib/cms/placements";
 import { numericId } from "@/lib/ids";
-import { abs } from "@/lib/site";
+import { abs, siteName } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +33,7 @@ export async function generateMetadata({ params }) {
 }
 
 // Product + BreadcrumbList structured data for rich results.
-function productJsonLd(product) {
+function productJsonLd(product, brandName) {
   const offers =
     product.price_min === product.price_max
       ? {
@@ -60,7 +62,7 @@ function productJsonLd(product) {
       name: product.title,
       description: product.description || undefined,
       image: (product.images || []).slice(0, 6).map((i) => i.url),
-      brand: { "@type": "Brand", name: product.vendor || "BeastLife" },
+      brand: { "@type": "Brand", name: product.vendor || brandName },
       url: abs(`/products/${product.handle}`),
       offers,
     },
@@ -78,14 +80,20 @@ function productJsonLd(product) {
 
 export default async function ProductPage({ params }) {
   const { handle } = await params;
-  const product = await tfetch(() => getProductByHandle(handle));
+  const { product, pairs, brandName } = await tfetch(async () => {
+    const product = await getProductByHandle(handle);
+    if (!product) return { product: null };
+    // "Pairs well with" (S23): manual placement, else same-collection auto.
+    const pairs = await getPdpPairs(product.id, { limit: 4 });
+    return { product, pairs, brandName: siteName() };
+  });
   if (!product) notFound();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(product)) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd(product, brandName)) }}
       />
       <TrackEvent
         name="view_item"
@@ -140,6 +148,17 @@ export default async function ProductPage({ params }) {
           ) : null}
         </div>
       </div>
+
+      {pairs?.products?.length > 0 && (
+        <section className="mt-16 border-t border-zinc-100 pt-10">
+          <h2 className="mb-6 text-2xl font-bold tracking-tight">{pairs.title}</h2>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {pairs.products.map((p) => (
+              <ProductCard key={p.handle} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

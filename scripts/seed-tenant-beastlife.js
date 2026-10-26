@@ -31,7 +31,18 @@ const tenant = await upsertTenant({
     meta_test_event_code: process.env.META_TEST_EVENT_CODE || null,
     typesense_collection: process.env.TYPESENSE_COLLECTION || "products",
     site_url: process.env.NEXT_PUBLIC_SITE_URL || null,
-    site: { name: "BeastLife", support_email: "care@beastlife.in", support_phone: "+91-9599339358" },
+    site: {
+      name: "BeastLife",
+      support_email: "care@beastlife.in",
+      support_phone: "+91-9599339358",
+      // Session 23: the brand surface moved out of code — these strings keep
+      // BeastLife rendering exactly as before the CMS landed.
+      title: "BeastLife — Sports Nutrition, delivered fast",
+      tagline: "Browse BeastLife's catalog — protein, creatine, pre-workout and more. Fast storefront over the live Shopify catalog.",
+      footer_tagline: "Science-backed sports nutrition. Train harder. Recover stronger. Go Beast Mode.",
+      logo: { text1: "BEAST", text2: "LIFE" },
+      legal_name: "RAK Fitness Consumer Pvt. Ltd.",
+    },
   },
   secrets: {
     shopify_admin_token: process.env.SHOPIFY_ADMIN_TOKEN || null,

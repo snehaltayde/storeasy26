@@ -1,4 +1,4 @@
-# Storeasy platform — tenancy architecture (Sessions 20–22)
+# Storeasy platform — tenancy architecture (Sessions 20–23)
 
 storeasy26 is becoming **storeasy**: a tenant-based platform where a merchant
 connects their Shopify store and gets this storefront — own cart/discounts/
@@ -117,6 +117,45 @@ beastlife untouched, **demo storefront cart immediately charges ₹99 with
 "₹132 away from free"** ✓ · suspend → demo host falls back to default store →
 activate ✓ · login title is per-tenant ("Storeasy Demo admin") ✓.
 
+## Merchandising CMS + upsells (Session 23)
+
+The storefront's brand surface and merchandising are now per-tenant data:
+
+- **Brand strings** come from tenant `config.site` (name, title, tagline,
+  footer_tagline, logo {text1,text2}, legal_name, support_email/phone) via
+  [lib/site.js](../lib/site.js) accessors — layout metadata is
+  `generateMetadata()` per tenant; Header/Footer/consent/checkout/order-status
+  all read config. BeastLife's strings live in ITS tenant row (seed script);
+  code fallbacks derive from the store name.
+- **CMS blocks** (`cms_blocks`, [store](../lib/cms/store.js) +
+  [validate](../lib/cms/validate.js)): announcement bar, hero
+  (title/highlight/subtitle/CTAs/badge), home_sections (order/titles/limits),
+  nav_header / nav_footer (null = catalog-derived, the pre-CMS behavior).
+  Absent row = defaults → an untouched tenant renders exactly as before.
+  BeastLife's pre-CMS hero copy is seeded as real rows
+  (`pnpm tenant:seed-cms`, INSERT OR IGNORE).
+- **Content pages** (`cms_pages`): about/contact/policies default to
+  [lib/content/pages.js](../lib/content/pages.js) templates (the default
+  contact page injects the tenant's support details); overrides and
+  merchant-added pages serve at `/policies/<slug>`; sitemap lists per tenant.
+- **Upsells** (`placements`, [placements](../lib/cms/placements.js)):
+  `pdp_pairs` — per-product "Pairs well with" strip, manual targets first,
+  AUTO same-collection fallback otherwise (every PDP gets a strip);
+  `cart_upsell` — drawer slot shown ONLY when configured, lazy-fetched via
+  `/api/upsell`, one-tap add of each target's first available variant,
+  in-cart products excluded.
+- **Console**: `/admin/storefront` (blocks + pages editors, per-block
+  reset-to-default) and `/admin/upsells` (placements by product HANDLE).
+
+### Live proofs (2026-10-27, local)
+
+beastlife renders byte-identical from config+seeded CMS (hero/logo/footer/
+title/consent) ✓ · demo fully re-branded with ZERO code: announcement bar,
+custom hero + nav, custom page `/policies/bulk-orders`, manual PDP strip
+"Stack it with", cart slot "Complete the stack" with working one-tap add
+(slot auto-hides once its targets are in the cart) ✓ · beastlife PDPs show
+the auto same-collection strip ✓ · demo cart ships FREE ≥₹1499 (S22 rule) ✓.
+
 ## Operating it
 
 ```bash
@@ -128,6 +167,7 @@ pnpm webhooks:register <slug>  # register/repair webhook subscriptions
 pnpm test:tenancy              # S20 isolation suite (9 tests)
 pnpm test:platform-sync        # S21 onboarding/webhook suite (13 tests)
 pnpm test:admin-console        # S22 console suite (9 tests)
+pnpm test:cms                  # S23 CMS/upsell suite (10 tests)
 ```
 
 Local consoles: `/platform` (operator) and `/admin` per tenant host — in dev,

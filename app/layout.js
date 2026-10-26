@@ -11,7 +11,8 @@ import ErrorReporter from "@/components/analytics/ErrorReporter";
 import { cookies } from "next/headers";
 import { getAllCollections } from "@/lib/repo";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
-import { SITE_URL } from "@/lib/site";
+import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
+import { getAnnouncement, getNav } from "@/lib/cms/store";
 import { tfetch } from "@/lib/tenant-request";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -21,22 +22,22 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 // fetch-based `edge-light` build, and search uses edge-safe fetch.
 export const runtime = "edge";
 
-export const metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: "BeastLife — Sports Nutrition, delivered fast",
-    template: "%s · BeastLife",
-  },
-  description:
-    "Browse BeastLife's catalog — protein, creatine, pre-workout and more. Fast storefront over the live Shopify catalog.",
-  manifest: "/manifest.webmanifest",
-  applicationName: "BeastLife",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "BeastLife" },
-  icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/icons/icon-192.png" }],
-  },
-};
+// Session 23: metadata resolves per tenant (was a hardcoded BeastLife export).
+export async function generateMetadata() {
+  const [name, title, tagline, url] = await tfetch(async () => [siteName(), siteTitle(), siteTagline(), siteUrl()]);
+  return {
+    metadataBase: new URL(url),
+    title: { default: title, template: `%s · ${name}` },
+    description: tagline,
+    manifest: "/manifest.webmanifest",
+    applicationName: name,
+    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: name },
+    icons: {
+      icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+      apple: [{ url: "/icons/icon-192.png" }],
+    },
+  };
+}
 
 export const viewport = {
   themeColor: "#0a0a0b",
@@ -52,6 +53,36 @@ async function navCollections() {
   }
 }
 
+// One tenant-scoped pass for everything the chrome needs (brand + CMS).
+async function chromeData() {
+  try {
+    return await tfetch(async () => {
+      const [announcement, navHeader, navFooter] = await Promise.all([getAnnouncement(), getNav("header"), getNav("footer")]);
+      return {
+        name: siteName(),
+        logo: siteLogo(),
+        footerTagline: siteFooterTagline(),
+        support: siteSupport(),
+        legalName: siteLegalName(),
+        announcement,
+        navHeader,
+        navFooter,
+      };
+    });
+  } catch {
+    return {
+      name: "Store",
+      logo: { text1: "Store", text2: "" },
+      footerTagline: "",
+      support: {},
+      legalName: "Store",
+      announcement: { enabled: false },
+      navHeader: null,
+      navFooter: null,
+    };
+  }
+}
+
 async function initialCart() {
   try {
     const id = (await cookies()).get(CART_COOKIE)?.value;
@@ -62,18 +93,25 @@ async function initialCart() {
 }
 
 export default async function RootLayout({ children }) {
-  const [collections, cart] = await Promise.all([navCollections(), initialCart()]);
+  const [collections, cart, chrome] = await Promise.all([navCollections(), initialCart(), chromeData()]);
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
       <body className="flex min-h-full flex-col bg-white text-zinc-900 antialiased">
         <CartProvider initialCart={cart}>
-          <Header collections={collections} />
+          <Header collections={collections} logo={chrome.logo} nav={chrome.navHeader} announcement={chrome.announcement} />
           <main className="flex-1">{children}</main>
-          <Footer collections={collections} />
+          <Footer
+            collections={collections}
+            logo={chrome.logo}
+            nav={chrome.navFooter}
+            tagline={chrome.footerTagline}
+            support={chrome.support}
+            legalName={chrome.legalName}
+          />
           <CartDrawer />
         </CartProvider>
         <ServiceWorkerRegister />
-        <ConsentBanner />
+        <ConsentBanner storeName={chrome.name} />
         <Pixels />
         <ErrorReporter />
       </body>

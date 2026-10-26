@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getOrder, verifyOrderStatusToken, ORDER_STATUS } from "@/lib/orders";
 import { getShopifyOrderStatus } from "@/lib/shopify-order-status";
 import { formatMoney } from "@/lib/format";
+import { siteSupport } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
 
 // Guest order-status page (Session 18): reachable ONLY via the tokenized link
@@ -38,6 +39,7 @@ export default async function OrderStatusPage({ params, searchParams }) {
   const { t } = await searchParams;
   if (!(await tfetch(() => verifyOrderStatusToken(orderId, t)))) notFound();
   const order = await tfetch(() => getOrder(orderId));
+  const support = await tfetch(async () => siteSupport());
   if (!order) notFound();
 
   const shopify = await tfetch(() => getShopifyOrderStatus(order.shopify_order_id));
@@ -88,8 +90,8 @@ export default async function OrderStatusPage({ params, searchParams }) {
         {cancelled && (
           <p className="mt-4 text-sm text-zinc-600">
             This order was cancelled. If a payment was captured, the refund is processed back to
-            the original payment method — reach us at care@beastlife.in with your order id for
-            anything unclear.
+            the original payment method — reach us{support.email ? ` at ${support.email}` : ""} with
+            your order id for anything unclear.
           </p>
         )}
 
@@ -135,10 +137,22 @@ export default async function OrderStatusPage({ params, searchParams }) {
           <span className="text-base font-bold">{formatMoney(order.total, order.currency)}</span>
         </div>
 
-        <p className="mt-6 border-t border-zinc-100 pt-4 text-xs text-zinc-400">
-          Questions? <a href="mailto:care@beastlife.in" className="underline">care@beastlife.in</a> ·{" "}
-          <a href="tel:+919599339358" className="underline">+91-9599339358</a> (Mon–Sat, 10am–10pm)
-        </p>
+        {(support.email || support.phone) && (
+          <p className="mt-6 border-t border-zinc-100 pt-4 text-xs text-zinc-400">
+            Questions?{" "}
+            {support.email && (
+              <a href={`mailto:${support.email}`} className="underline">
+                {support.email}
+              </a>
+            )}
+            {support.email && support.phone ? " · " : ""}
+            {support.phone && (
+              <a href={`tel:${support.phone.replace(/[^+\d]/g, "")}`} className="underline">
+                {support.phone}
+              </a>
+            )}
+          </p>
+        )}
         <Link href="/" className="mt-4 inline-block rounded-full bg-zinc-900 px-6 py-3 text-sm font-semibold text-white hover:bg-zinc-800">
           Continue shopping
         </Link>

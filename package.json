@@ -27,12 +27,14 @@
     "shopify:oauth": "node --env-file=.env.local scripts/shopify-oauth.js",
     "platform:migrate": "node --env-file=.env.local scripts/platform-migrate.js",
     "tenant:seed-beastlife": "node --env-file=.env.local scripts/seed-tenant-beastlife.js",
+    "tenant:seed-cms": "node --env-file=.env.local scripts/seed-cms-beastlife.js",
     "tenant:sync": "node --env-file=.env.local scripts/tenant-sync.js",
     "tenant:provision": "node --env-file=.env.local scripts/provision-tenant.js",
     "webhooks:register": "node --env-file=.env.local scripts/register-webhooks.js",
     "test:tenancy": "node scripts/test-tenancy.js",
     "test:platform-sync": "node scripts/test-platform-sync.js",
-    "test:admin-console": "node scripts/test-admin-console.js"
+    "test:admin-console": "node scripts/test-admin-console.js",
+    "test:cms": "node scripts/test-cms.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

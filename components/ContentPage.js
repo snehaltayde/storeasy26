@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 // Shared renderer for store content/policy pages (lib/content/pages.js shape).
-export default function ContentPage({ page }) {
+export default function ContentPage({ page, legalName = "" }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <nav className="mb-6 text-sm text-zinc-400">
@@ -26,7 +26,7 @@ export default function ContentPage({ page }) {
         ))}
       </div>
       <p className="mt-12 border-t border-zinc-100 pt-6 text-xs text-zinc-400">
-        Operated by RAK Fitness Consumer Pvt. Ltd. · Questions?{" "}
+        {legalName ? `Operated by ${legalName} · ` : ""}Questions?{" "}
         <Link href="/contact" className="underline hover:text-zinc-600">
           Contact us
         </Link>

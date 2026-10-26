@@ -6,6 +6,58 @@ import Link from "next/link";
 import { useCart } from "./CartContext";
 import { formatMoney } from "@/lib/format";
 
+// Cart-drawer upsell slot (Session 23): shown only when the merchant has a
+// cart_upsell placement configured. Lazy-fetched on open, re-fetched when the
+// cart's product mix changes; one-tap add through the normal cart pipeline.
+function UpsellSlot({ open, items, addItem, pending, currency }) {
+  const [slot, setSlot] = useState(null);
+  const keyRef = useRef("");
+
+  useEffect(() => {
+    if (!open) return;
+    const key = items
+      .map((i) => i.productId)
+      .filter(Boolean)
+      .sort()
+      .join(",");
+    if (key === keyRef.current) return;
+    keyRef.current = key;
+    fetch(`/api/upsell?exclude=${encodeURIComponent(key)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setSlot(data?.products?.length ? data : null))
+      .catch(() => setSlot(null));
+  }, [open, items]);
+
+  if (!slot || items.length === 0) return null;
+  return (
+    <div className="border-t border-zinc-100 px-5 py-3">
+      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-500">{slot.title}</p>
+      <ul className="space-y-2">
+        {slot.products.map((p) => (
+          <li key={p.handle} className="flex items-center gap-3">
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+              {p.featured_image ? (
+                <Image src={p.featured_image} alt={p.title} fill sizes="48px" className="object-cover" />
+              ) : null}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="line-clamp-1 text-sm font-medium text-zinc-900">{p.title}</p>
+              <p className="text-xs text-zinc-500">{formatMoney(p.variant_price ?? p.price_min, p.currency || currency)}</p>
+            </div>
+            <button
+              onClick={() => addItem(p.variant_id)}
+              disabled={pending}
+              className="shrink-0 rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            >
+              Add
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function CartDrawer() {
   const {
     items,
@@ -21,6 +73,7 @@ export default function CartDrawer() {
     grandTotal,
     open,
     setOpen,
+    addItem,
     removeItem,
     setQty,
     setCoupon,
@@ -180,6 +233,8 @@ export default function CartDrawer() {
             ))}
           </ul>
         )}
+
+        <UpsellSlot open={open} items={items} addItem={addItem} pending={pending} currency={currency} />
 
         {items.length > 0 && (
           <footer className="border-t border-zinc-100 px-5 py-4">

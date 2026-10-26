@@ -42,7 +42,7 @@ const FIELDS = [
   { key: "pincode", label: "PIN code", required: true, half: true },
 ];
 
-export default function CheckoutFlow({ cart, razorpayEnabled }) {
+export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store" }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     email: "",
@@ -181,7 +181,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled }) {
         order_id: data.razorpayOrderId,
         amount: data.amount,
         currency: data.currency,
-        name: "BeastLife",
+        name: storeName,
         description: `Order ${data.orderId}`,
         prefill: { name: form.name, email: form.email, contact: form.phone },
         theme: { color: "#0a0a0b" },

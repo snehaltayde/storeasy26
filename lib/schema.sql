@@ -249,3 +249,42 @@ CREATE TABLE IF NOT EXISTS order_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_order_events_order ON order_events(order_id);
+
+-- ---- Session 23: merchandising CMS -----------------------------------------
+
+-- Keyed JSON blocks for storefront merchandising (announcement bar, hero,
+-- home section layout, header/footer nav, footer identity). One row per
+-- block; absent row = code defaults (lib/cms/defaults.js), so a fresh tenant
+-- renders sensibly before any editing.
+CREATE TABLE IF NOT EXISTS cms_blocks (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,                  -- JSON (shape depends on key)
+  updated_at TEXT
+);
+
+-- Content pages (about/contact/policies + merchant-added). Absent slug =
+-- default template from lib/content/pages.js.
+CREATE TABLE IF NOT EXISTS cms_pages (
+  slug        TEXT PRIMARY KEY,
+  title       TEXT NOT NULL,
+  description TEXT,
+  sections    TEXT NOT NULL,                 -- JSON [{heading, body: [para, …]}]
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  updated_at  TEXT
+);
+
+-- Upsell/cross-sell placements. kind 'pdp_pairs' (source product → targets,
+-- auto same-collection fallback when no row) or 'cart_upsell' (global slot,
+-- source NULL; shown only when configured).
+CREATE TABLE IF NOT EXISTS placements (
+  id                 TEXT PRIMARY KEY,
+  kind               TEXT NOT NULL,
+  source_product_id  TEXT,
+  target_product_ids TEXT NOT NULL,          -- JSON [product gid, …]
+  title              TEXT,
+  enabled            INTEGER NOT NULL DEFAULT 1,
+  position           INTEGER NOT NULL DEFAULT 0,
+  updated_at         TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_placements_kind ON placements(kind, enabled, position);

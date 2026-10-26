@@ -7,7 +7,7 @@ import { CONSENT_COOKIE, readConsentCookie } from "@/lib/track/names";
 // says yes. The choice persists a year, first-party. Declining hides the
 // banner and nothing non-essential ever fires (tracker, collector, and pixel
 // loader all check the same cookie).
-export default function ConsentBanner() {
+export default function ConsentBanner({ storeName = "this store" }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -26,8 +26,8 @@ export default function ConsentBanner() {
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-200 bg-white/95 px-4 py-4 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur sm:px-6">
       <div className="mx-auto flex max-w-5xl flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-zinc-600">
-          We use analytics and advertising cookies to understand shopping activity and improve
-          BeastLife. We only do this with your consent, and you can change your mind anytime.
+          We use analytics and advertising cookies to understand shopping activity and improve{" "}
+          {storeName}. We only do this with your consent, and you can change your mind anytime.
         </p>
         <div className="flex shrink-0 gap-2">
           <button
