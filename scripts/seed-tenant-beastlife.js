@@ -24,6 +24,7 @@ const tenant = await upsertTenant({
   config: {
     shopify_store_domain: process.env.SHOPIFY_STORE_DOMAIN,
     shopify_api_version: process.env.SHOPIFY_API_VERSION || "2025-10",
+    shopify_client_id: process.env.SHOPIFY_CLIENT_ID || null,
     razorpay_key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
     ga4_measurement_id: process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID || null,
     meta_pixel_id: process.env.NEXT_PUBLIC_META_PIXEL_ID || null,
@@ -34,6 +35,7 @@ const tenant = await upsertTenant({
   },
   secrets: {
     shopify_admin_token: process.env.SHOPIFY_ADMIN_TOKEN || null,
+    shopify_client_secret: process.env.SHOPIFY_CLIENT_SECRET || null,
     razorpay_key_secret: process.env.RAZORPAY_KEY_SECRET || null,
     razorpay_webhook_secret: process.env.RAZORPAY_WEBHOOK_SECRET || null,
     ga4_api_secret: process.env.GA4_API_SECRET || null,
