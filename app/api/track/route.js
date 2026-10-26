@@ -3,6 +3,7 @@ import { CART_COOKIE } from "@/lib/cart";
 import { CONSENT_COOKIE, isConsentGranted } from "@/lib/track/names";
 import { rateLimit } from "@/lib/rate-limit";
 import { storeEvent, enqueueForward, runEventSweep, isFunnelEvent } from "@/lib/events";
+import { tenantHandler } from "@/lib/tenant-request";
 import {
   ga4ClientId,
   newClientId,
@@ -30,7 +31,7 @@ const clientIp = (request) => {
   return xff ? xff.split(",")[0].trim() : request.headers.get("x-real-ip") || null;
 };
 
-export async function POST(request) {
+export const POST = tenantHandler(async (request) => {
   const limited = rateLimit(request, { name: "track", limit: 60 });
   if (limited) return limited;
 
@@ -116,4 +117,4 @@ export async function POST(request) {
   if (setFbc) res.cookies.set("_fbc", setFbc, { ...base, maxAge: DAY90 });
   if (setGclid) res.cookies.set("_fp_gclid", setGclid, { ...base, maxAge: DAY90 });
   return res;
-}
+});

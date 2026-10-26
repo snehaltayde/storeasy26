@@ -5,6 +5,7 @@ import TrackEvent from "@/components/analytics/TrackEvent";
 import { getCollectionByHandle, getProductsInCollection } from "@/lib/repo";
 import { numericId } from "@/lib/ids";
 import { abs } from "@/lib/site";
+import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ const pageNum = (sp) => Math.max(1, Number(sp?.page) || 1);
 export async function generateMetadata({ params, searchParams }) {
   const { handle } = await params;
   const page = pageNum(await searchParams);
-  const c = await getCollectionByHandle(handle);
+  const c = await tfetch(() => getCollectionByHandle(handle));
   // Real 404 status must come from metadata — the loading boundary commits
   // a 200 before the page body can call notFound().
   if (!c) notFound();
@@ -28,13 +29,12 @@ export async function generateMetadata({ params, searchParams }) {
 export default async function CollectionPage({ params, searchParams }) {
   const { handle } = await params;
   const page = pageNum(await searchParams);
-  const collection = await getCollectionByHandle(handle);
+  const collection = await tfetch(() => getCollectionByHandle(handle));
   if (!collection) notFound();
 
-  const { products, total } = await getProductsInCollection(handle, {
-    limit: PAGE_SIZE,
-    offset: (page - 1) * PAGE_SIZE,
-  });
+  const { products, total } = await tfetch(() =>
+    getProductsInCollection(handle, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
+  );
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   if (page > totalPages) notFound();
 

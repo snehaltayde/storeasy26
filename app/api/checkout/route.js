@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { CART_COOKIE, getCart, clearCart } from "@/lib/cart";
 import { computeShipping } from "@/lib/shipping";
+import { tenantShippingConfig } from "@/lib/tenant-context";
 import { enqueueShopifyPush } from "@/lib/shopify-push";
 import { enqueuePurchaseAndForward } from "@/lib/events";
 import { CONSENT_COOKIE } from "@/lib/track/names";
@@ -14,6 +15,7 @@ import {
   ORDER_STATUS,
 } from "@/lib/orders";
 import { razorpayConfigured, createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
+import { tenantHandler } from "@/lib/tenant-request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,7 +76,7 @@ function razorpayResponse(order, razorpayOrderId, deduped = false) {
   });
 }
 
-export async function POST(request) {
+export const POST = tenantHandler(async (request) => {
   const limited = rateLimit(request, { name: "checkout", limit: 10 });
   if (limited) return limited;
 
@@ -95,6 +97,7 @@ export async function POST(request) {
         discountTotal: cart.discountTotal || 0,
         paymentMethod: "cod",
         pincode: address?.pincode,
+        config: tenantShippingConfig(),
       });
 
       const dup = await dedupByKey(idempotencyKey, cart, (cart.total || 0) + shipping.total);
@@ -150,6 +153,7 @@ export async function POST(request) {
         discountTotal: cart.discountTotal || 0,
         paymentMethod: "prepaid",
         pincode: address?.pincode,
+        config: tenantShippingConfig(),
       });
 
       // Dedup BEFORE creating a Razorpay order, so a retry reopens the SAME
@@ -233,4 +237,4 @@ export async function POST(request) {
       { status },
     );
   }
-}
+});

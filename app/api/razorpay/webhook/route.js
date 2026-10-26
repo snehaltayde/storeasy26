@@ -5,6 +5,7 @@ import { webhookConfigured, verifyRazorpayWebhookSignature } from "@/lib/razorpa
 import { enqueueShopifyPush, runSyncSweep } from "@/lib/shopify-push";
 import { enqueuePurchaseAndForward } from "@/lib/events";
 import { slog } from "@/lib/log";
+import { tenantHandler } from "@/lib/tenant-request";
 
 // Razorpay webhook — the AUTHORITATIVE "paid" signal (Session 11). The browser
 // callback is optimistic UX; a captured payment whose callback never lands
@@ -21,7 +22,7 @@ import { slog } from "@/lib/log";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request) {
+export const POST = tenantHandler(async (request) => {
   if (!webhookConfigured())
     return NextResponse.json({ error: "Webhook secret not configured" }, { status: 503 });
 
@@ -109,4 +110,4 @@ export async function POST(request) {
     console.error(`[rz-webhook] transient failure ${order.id}: ${msg}`);
     return NextResponse.json({ error: "Temporary failure, please redeliver" }, { status: 500 });
   }
-}
+});

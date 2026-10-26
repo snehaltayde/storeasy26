@@ -2,16 +2,15 @@ import Link from "next/link";
 import ProductGrid from "@/components/ProductGrid";
 import CollectionCard from "@/components/CollectionCard";
 import { getFeaturedCollections, getNewestProducts, getCatalogStats } from "@/lib/repo";
+import { tfetch } from "@/lib/tenant-request";
 
 // Catalog reflects the latest sync — render per request (sub-ms SQLite reads).
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [collections, products, stats] = await Promise.all([
-    getFeaturedCollections(6),
-    getNewestProducts(8),
-    getCatalogStats(),
-  ]);
+  const [collections, products, stats] = await tfetch(() =>
+    Promise.all([getFeaturedCollections(6), getNewestProducts(8), getCatalogStats()]),
+  );
   const empty = stats.products === 0;
 
   return (

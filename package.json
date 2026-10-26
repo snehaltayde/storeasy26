@@ -24,7 +24,10 @@
     "events:stats": "node --env-file=.env.local scripts/events-stats.js",
     "search:report": "node --env-file=.env.local scripts/search-report.js",
     "shopify:token": "node --env-file=.env.local scripts/shopify-mint-token.js",
-    "shopify:oauth": "node --env-file=.env.local scripts/shopify-oauth.js"
+    "shopify:oauth": "node --env-file=.env.local scripts/shopify-oauth.js",
+    "platform:migrate": "node --env-file=.env.local scripts/platform-migrate.js",
+    "tenant:seed-beastlife": "node --env-file=.env.local scripts/seed-tenant-beastlife.js",
+    "test:tenancy": "node scripts/test-tenancy.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

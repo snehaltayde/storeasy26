@@ -6,12 +6,13 @@ import TrackEvent from "@/components/analytics/TrackEvent";
 import { getProductByHandle } from "@/lib/repo";
 import { numericId } from "@/lib/ids";
 import { abs } from "@/lib/site";
+import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { handle } = await params;
-  const p = await getProductByHandle(handle);
+  const p = await tfetch(() => getProductByHandle(handle));
   // Thrown HERE (before streaming starts) so the response is a REAL 404 —
   // inside the page body the loading.js boundary has already committed a 200.
   if (!p) notFound();
@@ -77,7 +78,7 @@ function productJsonLd(product) {
 
 export default async function ProductPage({ params }) {
   const { handle } = await params;
-  const product = await getProductByHandle(handle);
+  const product = await tfetch(() => getProductByHandle(handle));
   if (!product) notFound();
 
   return (

@@ -2,13 +2,14 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import CheckoutFlow from "@/components/checkout/CheckoutFlow";
+import { tfetch } from "@/lib/tenant-request";
 
 export const metadata = { title: "Checkout" };
 export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage() {
   const id = (await cookies()).get(CART_COOKIE)?.value;
-  const cart = id ? await getCart(id) : emptyCart();
+  const cart = id ? await tfetch(() => getCart(id)) : emptyCart();
 
   if (!cart.items.length) {
     return (

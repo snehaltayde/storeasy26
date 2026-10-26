@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getOrder, verifyOrderStatusToken, ORDER_STATUS } from "@/lib/orders";
 import { getShopifyOrderStatus } from "@/lib/shopify-order-status";
 import { formatMoney } from "@/lib/format";
+import { tfetch } from "@/lib/tenant-request";
 
 // Guest order-status page (Session 18): reachable ONLY via the tokenized link
 // (confirmation page + future comms). Merges our durable state machine with
@@ -35,11 +36,11 @@ function deriveSteps(order, shopify) {
 export default async function OrderStatusPage({ params, searchParams }) {
   const { orderId } = await params;
   const { t } = await searchParams;
-  if (!(await verifyOrderStatusToken(orderId, t))) notFound();
-  const order = await getOrder(orderId);
+  if (!(await tfetch(() => verifyOrderStatusToken(orderId, t)))) notFound();
+  const order = await tfetch(() => getOrder(orderId));
   if (!order) notFound();
 
-  const shopify = await getShopifyOrderStatus(order.shopify_order_id);
+  const shopify = await tfetch(() => getShopifyOrderStatus(order.shopify_order_id));
   const { cancelled, reached, current } = deriveSteps(order, shopify);
   const cod = order.payment_method === "cod";
 

@@ -2,21 +2,22 @@ import { NextResponse } from "next/server";
 import { verifyAdminToken, ADMIN_COOKIE } from "@/lib/admin-auth";
 import { getOfferRow, upsertOffer, setOfferEnabled, deleteOffer } from "@/lib/offers/store";
 import { slog } from "@/lib/log";
+import { tenantHandler } from "@/lib/tenant-request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-export async function GET(request, { params }) {
+export const GET = tenantHandler(async (request, { params }) => {
   if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value))) return unauthorized();
   const { id } = await params;
   const offer = await getOfferRow(id);
   if (!offer) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true, offer });
-}
+});
 
-export async function PUT(request, { params }) {
+export const PUT = tenantHandler(async (request, { params }) => {
   if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value))) return unauthorized();
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
@@ -45,12 +46,12 @@ export async function PUT(request, { params }) {
     const status = e?.code === "OFFER_INVALID" ? 422 : 400;
     return NextResponse.json({ error: String(e?.message || e), errors: e?.errors }, { status });
   }
-}
+});
 
-export async function DELETE(request, { params }) {
+export const DELETE = tenantHandler(async (request, { params }) => {
   if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value))) return unauthorized();
   const { id } = await params;
   await deleteOffer(id);
   slog("offer_deleted", { offer_id: id });
   return NextResponse.json({ ok: true, deleted: id });
-}
+});

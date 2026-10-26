@@ -12,6 +12,7 @@ import { cookies } from "next/headers";
 import { getAllCollections } from "@/lib/repo";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { SITE_URL } from "@/lib/site";
+import { tfetch } from "@/lib/tenant-request";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -45,7 +46,7 @@ export const viewport = {
 
 async function navCollections() {
   try {
-    return await getAllCollections();
+    return await tfetch(() => getAllCollections());
   } catch {
     return [];
   }
@@ -54,7 +55,7 @@ async function navCollections() {
 async function initialCart() {
   try {
     const id = (await cookies()).get(CART_COOKIE)?.value;
-    return id ? await getCart(id) : emptyCart();
+    return id ? await tfetch(() => getCart(id)) : emptyCart();
   } catch {
     return emptyCart();
   }

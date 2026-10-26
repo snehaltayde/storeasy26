@@ -1,4 +1,4 @@
-import { SITE_URL } from "@/lib/site";
+import { siteUrl } from "@/lib/site";
 
 export default function robots() {
   return {
@@ -10,6 +10,6 @@ export default function robots() {
         disallow: ["/api/", "/checkout", "/checkout/", "/orders/", "/admin", "/admin/"],
       },
     ],
-    sitemap: `${SITE_URL}/sitemap.xml`,
+    sitemap: `${siteUrl()}/sitemap.xml`,
   };
 }

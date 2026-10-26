@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { captureError } from "@/lib/errors";
 import { rateLimit } from "@/lib/rate-limit";
+import { tenantHandler } from "@/lib/tenant-request";
 
 // Client-side error intake (Session 17). Tightly limited + size-capped — an
 // error reporter must never become an abuse vector. Operational telemetry
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const MAX_BODY = 8 * 1024;
 
-export async function POST(request) {
+export const POST = tenantHandler(async (request) => {
   const limited = rateLimit(request, { name: "errors", limit: 10 });
   if (limited) return limited;
 
@@ -34,4 +35,4 @@ export async function POST(request) {
     digest: digest ? String(digest).slice(0, 100) : null,
   });
   return NextResponse.json({ ok: true, fingerprint: r.fingerprint }, { status: 202 });
-}
+});

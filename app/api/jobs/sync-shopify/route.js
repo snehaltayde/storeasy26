@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runSyncSweep, pushOrderToShopify } from "@/lib/shopify-push";
 import { sendAlert } from "@/lib/alerts";
+import { tenantHandler } from "@/lib/tenant-request";
 
 // Shopify sync janitor. GET = sweep (Vercel cron hits this daily; the webhook
 // also piggybacks a small sweep on every payment, so retries don't wait a day).
@@ -19,7 +20,7 @@ function authorized(request) {
   return header === `Bearer ${secret}` || request.nextUrl.searchParams.get("secret") === secret;
 }
 
-export async function GET(request) {
+export const GET = tenantHandler(async (request) => {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const limit = Number(request.nextUrl.searchParams.get("limit") || 10);
   try {
@@ -35,9 +36,9 @@ export async function GET(request) {
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
-}
+});
 
-export async function POST(request) {
+export const POST = tenantHandler(async (request) => {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   if (!body.orderId) return NextResponse.json({ error: "orderId required" }, { status: 400 });
@@ -47,4 +48,4 @@ export async function POST(request) {
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
-}
+});

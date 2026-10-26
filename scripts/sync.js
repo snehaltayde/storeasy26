@@ -28,7 +28,7 @@ import {
   getAdminClient,
   typesenseConfigured,
   productsCollectionSchema,
-  PRODUCTS_COLLECTION,
+  productsCollection,
 } from "../lib/typesense.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -179,11 +179,11 @@ async function indexTypesense() {
   const client = getAdminClient();
   console.log("→ (re)creating Typesense collection…");
   try {
-    await client.collections(PRODUCTS_COLLECTION).delete();
+    await client.collections(productsCollection()).delete();
   } catch {
     /* collection didn't exist yet */
   }
-  await client.collections().create(productsCollectionSchema);
+  await client.collections().create(productsCollectionSchema());
 
   const rows = await db
     .selectFrom("products")
@@ -229,7 +229,7 @@ async function indexTypesense() {
   }
 
   const results = await client
-    .collections(PRODUCTS_COLLECTION)
+    .collections(productsCollection())
     .documents()
     .import(docs, { action: "upsert" });
   const failed = results.filter((x) => x && x.success === false);

@@ -5,6 +5,7 @@ import SearchResults from "@/components/analytics/SearchResults";
 import { numericId } from "@/lib/ids";
 import { typesenseSearch } from "@/lib/typesense-search";
 import { searchProductsInDb } from "@/lib/repo";
+import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ async function runSearch(q) {
 export default async function SearchPage({ searchParams }) {
   const sp = await searchParams;
   const q = (sp?.q || "").trim();
-  const result = q.length >= 2 ? await runSearch(q) : { hits: [], found: 0, source: "none" };
+  const result = q.length >= 2 ? await tfetch(() => runSearch(q)) : { hits: [], found: 0, source: "none" };
 
   const products = result.hits.map((h) => ({
     handle: h.handle,

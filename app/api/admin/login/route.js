@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { checkAdminPassword, adminSessionToken, adminConfigured, ADMIN_COOKIE } from "@/lib/admin-auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
+import { tenantHandler } from "@/lib/tenant-request";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request) {
+export const POST = tenantHandler(async (request) => {
   // brute-force guard: 5 attempts/min/ip
   const limited = rateLimit(request, { name: "admin", limit: 5 });
   if (limited) return limited;
@@ -28,4 +29,4 @@ export async function POST(request) {
     maxAge: 60 * 60 * 24 * 7,
   });
   return res;
-}
+});

@@ -1,6 +1,7 @@
 import { typesenseSearch } from "@/lib/typesense-search";
 import { searchProductsInDb } from "@/lib/repo";
 import { rateLimit } from "@/lib/rate-limit";
+import { tenantHandler } from "@/lib/tenant-request";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 // Search endpoint for the header search box. Prefers Typesense (typo tolerance,
 // ranking); transparently falls back to a SQL query over the local catalog so
 // search works even before Typesense is configured.
-export async function GET(request) {
+export const GET = tenantHandler(async (request) => {
   const limited = rateLimit(request, { name: "search", limit: 30 });
   if (limited) return limited;
 
@@ -30,4 +31,4 @@ export async function GET(request) {
   } catch (e) {
     return Response.json({ q, hits: [], source: "error", error: String(e?.message || e) });
   }
-}
+});

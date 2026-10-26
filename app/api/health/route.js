@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { ga4Configured, metaConfigured } from "@/lib/tracking";
 import { razorpayConfigured, webhookConfigured } from "@/lib/razorpay";
 import { errorStats } from "@/lib/errors";
+import { tenantHandler } from "@/lib/tenant-request";
 
 // Health check (Session 17): dependency latencies + queue depths + config
 // flags in one place. 200 ok / 200 degraded (non-core issue) / 503 when the
@@ -23,7 +24,7 @@ async function timed(fn) {
   }
 }
 
-export async function GET() {
+export const GET = tenantHandler(async () => {
   const [turso, typesense, orderQueue, eventQueue, errors] = await Promise.all([
     timed(async () => {
       await db.selectFrom("products").select(({ fn }) => fn.countAll().as("n")).executeTakeFirst();
@@ -87,4 +88,4 @@ export async function GET() {
     },
     { status: core ? 200 : 503 },
   );
-}
+});

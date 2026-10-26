@@ -1,12 +1,13 @@
 import Link from "next/link";
 import CollectionCard from "@/components/CollectionCard";
 import { getAllCollections } from "@/lib/repo";
+import { tfetch } from "@/lib/tenant-request";
 
 export const metadata = { title: "All collections" };
 export const dynamic = "force-dynamic";
 
 export default async function CollectionsPage() {
-  const collections = await getAllCollections();
+  const collections = await tfetch(() => getAllCollections());
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">

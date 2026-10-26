@@ -5,13 +5,14 @@ import TrackEvent from "@/components/analytics/TrackEvent";
 import { getOrder, orderStatusPath } from "@/lib/orders";
 import { formatMoney } from "@/lib/format";
 import { numericId } from "@/lib/ids";
+import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Order confirmed" };
 
 export default async function ConfirmationPage({ params }) {
   const { orderId } = await params;
-  const order = await getOrder(orderId);
+  const order = await tfetch(() => getOrder(orderId));
   if (!order) notFound();
 
   const cod = order.payment_method === "cod";
@@ -52,7 +53,7 @@ export default async function ConfirmationPage({ params }) {
           Thanks {order.name ? order.name.split(" ")[0] : "there"}!{" "}
           {cod ? "You'll pay cash on delivery." : paid ? "Payment received." : "Payment is pending."} A
           confirmation was sent to {order.email}. Keep your{" "}
-          <Link href={await orderStatusPath(order.id)} className="font-semibold text-lime-700 underline">
+          <Link href={await tfetch(() => orderStatusPath(order.id))} className="font-semibold text-lime-700 underline">
             order-status link
           </Link>{" "}
           to track it anytime.

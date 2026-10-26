@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runEventSweep, forwardEventById, eventStats } from "@/lib/events";
 import { sendAlert } from "@/lib/alerts";
+import { tenantHandler } from "@/lib/tenant-request";
 
 // Event-forwarding janitor. GET = sweep pending events (Vercel cron daily; the
 // collector piggybacks a mini-sweep on every event, so this only mops up).
@@ -16,7 +17,7 @@ function authorized(request) {
   return header === `Bearer ${secret}` || request.nextUrl.searchParams.get("secret") === secret;
 }
 
-export async function GET(request) {
+export const GET = tenantHandler(async (request) => {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     // ?stats=1 → forward-success monitoring instead of a sweep
@@ -34,9 +35,9 @@ export async function GET(request) {
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
-}
+});
 
-export async function POST(request) {
+export const POST = tenantHandler(async (request) => {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   if (!body.eventId) return NextResponse.json({ error: "eventId required" }, { status: 400 });
@@ -45,4 +46,4 @@ export async function POST(request) {
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
-}
+});
