@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getTenant } from "@/lib/platform/control.js";
 import { signState, buildAuthorizeUrl } from "@/lib/platform/oauth.js";
+import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 
 // Start the per-tenant Shopify OAuth connect flow (Session 21).
 //   GET /api/connect/shopify/start?tenant=<slug>&secret=<CRON_SECRET>
@@ -11,7 +12,10 @@ import { signState, buildAuthorizeUrl } from "@/lib/platform/oauth.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function authorized(request) {
+// Operator-only: CRON_SECRET (header or ?secret=) OR a platform-console
+// session cookie (S22) — the console links here without leaking the secret.
+async function authorized(request) {
+  if (await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value)) return true;
   const secret = process.env.CRON_SECRET;
   if (!secret) return true; // local dev
   const header = request.headers.get("authorization") || "";
@@ -19,7 +23,7 @@ function authorized(request) {
 }
 
 export async function GET(request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await authorized(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const slug = request.nextUrl.searchParams.get("tenant");
   if (!slug) return NextResponse.json({ error: "tenant query param required" }, { status: 400 });

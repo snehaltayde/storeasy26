@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import OfferForm from "./OfferForm";
 
 // Single-store offer console (Session 19). List + enable/disable + schedule +
@@ -11,7 +10,6 @@ export default function OffersAdmin({ initialOffers }) {
   const [offers, setOffers] = useState(initialOffers);
   const [editing, setEditing] = useState(null); // offer row | "new"
   const [error, setError] = useState("");
-  const router = useRouter();
 
   async function refresh() {
     const data = await fetch("/api/admin/offers").then((r) => r.json());
@@ -33,12 +31,6 @@ export default function OffersAdmin({ initialOffers }) {
     if (!window.confirm(`Delete "${offer.label}"? This cannot be undone.`)) return;
     await fetch(`/api/admin/offers/${offer.id}`, { method: "DELETE" });
     await refresh();
-  }
-
-  async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.push("/admin/login");
-    router.refresh();
   }
 
   const summarize = (o) => {
@@ -77,7 +69,7 @@ export default function OffersAdmin({ initialOffers }) {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Offers</h1>
@@ -85,17 +77,12 @@ export default function OffersAdmin({ initialOffers }) {
             Changes are live on the next cart read — no deploy needed.
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setEditing("new")}
-            className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-lime-300"
-          >
-            + New offer
-          </button>
-          <button onClick={logout} className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50">
-            Sign out
-          </button>
-        </div>
+        <button
+          onClick={() => setEditing("new")}
+          className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-lime-300"
+        >
+          + New offer
+        </button>
       </div>
 
       {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}

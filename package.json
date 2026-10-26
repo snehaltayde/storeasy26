@@ -31,7 +31,8 @@
     "tenant:provision": "node --env-file=.env.local scripts/provision-tenant.js",
     "webhooks:register": "node --env-file=.env.local scripts/register-webhooks.js",
     "test:tenancy": "node scripts/test-tenancy.js",
-    "test:platform-sync": "node scripts/test-platform-sync.js"
+    "test:platform-sync": "node scripts/test-platform-sync.js",
+    "test:admin-console": "node scripts/test-admin-console.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

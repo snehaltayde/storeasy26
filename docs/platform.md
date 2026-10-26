@@ -1,4 +1,4 @@
-# Storeasy platform — tenancy architecture (Sessions 20–21)
+# Storeasy platform — tenancy architecture (Sessions 20–22)
 
 storeasy26 is becoming **storeasy**: a tenant-based platform where a merchant
 connects their Shopify store and gets this storefront — own cart/discounts/
@@ -83,6 +83,40 @@ beastlife-staging, demo]`, all three DBs re-synced in ~2s; tampered sig → 401;
 unknown shop → ignored ✓ · OAuth start 302 with signed state, 401 without
 operator secret ✓.
 
+## Merchant console + platform console (Session 22)
+
+- **Merchant console** `/admin` on each storefront host (per-tenant password,
+  sessions tenant-bound): **Offers** (S19) · **Orders** — list with status
+  tabs/search/keyset paging ([lib/admin/orders](../lib/admin/orders.js)),
+  detail with items/payment/sync/timeline, "Retry Shopify push" on
+  `sync_failed` · **Settings** ([lib/admin/settings](../lib/admin/settings.js)):
+  store identity, Razorpay keys, GA4/Meta creds, **shipping rules editor**
+  (writes `config.shipping_config` — the same engine prices drawer, checkout
+  and push), sync status + "Sync now", console-password rotation (old sessions
+  die; the saving browser gets a fresh cookie). Secret values NEVER leave the
+  server — presence flags only, fields are write-only (blank = keep). Saves go
+  through `PUT /api/admin/settings` → validated `buildSettingsPatch` →
+  `patchTenant` for the Host-resolved tenant only; the env-fallback default
+  tenant is read-only (no control-plane row).
+- **Platform console** `/platform` (operator password `PLATFORM_ADMIN_PASSWORD`
+  env; `_platform` cookie, also accepted by the OAuth connect start route):
+  tenant registry with per-tenant health queried from each tenant's own DB
+  (products, last sync, orders in flight, Shopify connected/uninstalled),
+  actions Sync / Connect Shopify / Suspend / Activate, and the **create
+  wizard** → `POST /api/platform/tenants` → S21 `provisionTenant` (generated
+  console password shown ONCE). Suspending a tenant drops its hosts to the
+  default-store fallback, never a 500.
+
+### Live proofs (2026-10-27, local)
+
+Operator console lists 3 tenants with live health (326/308/319 products) ✓ ·
+demo merchant console (`127.0.0.1:3007` host) logged in via UI, orders list +
+detail + timeline render demo's own data ✓ · settings edited in the UI (name,
+flat ₹99, free ≥₹1499, zone 79/78 @₹149) → persisted to the control plane,
+beastlife untouched, **demo storefront cart immediately charges ₹99 with
+"₹132 away from free"** ✓ · suspend → demo host falls back to default store →
+activate ✓ · login title is per-tenant ("Storeasy Demo admin") ✓.
+
 ## Operating it
 
 ```bash
@@ -93,7 +127,14 @@ pnpm tenant:sync <slug>        # full catalog sync for one tenant
 pnpm webhooks:register <slug>  # register/repair webhook subscriptions
 pnpm test:tenancy              # S20 isolation suite (9 tests)
 pnpm test:platform-sync        # S21 onboarding/webhook suite (13 tests)
+pnpm test:admin-console        # S22 console suite (9 tests)
 ```
+
+Local consoles: `/platform` (operator) and `/admin` per tenant host — in dev,
+`localhost:3007` is beastlife and `127.0.0.1:3007` is the demo tenant. The
+local operator password and the demo tenant's console password are THROWAWAY
+test values set during S22 — rotate both before any deploy (operator: edit
+`PLATFORM_ADMIN_PASSWORD` in env; demo: Settings → Console password).
 
 ## Known states & next steps
 
