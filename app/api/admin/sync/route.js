@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { verifyAdminToken, ADMIN_COOKIE } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin-auth";
+import { audit } from "@/lib/platform/audit";
 import { runCatalogSync } from "@/lib/sync.js";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
@@ -14,8 +15,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export const POST = tenantHandler(async (request) => {
-  if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value)))
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAdmin(request, "sync.run");
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const limited = rateLimit(request, { name: "admin-sync", limit: 2 });
   if (limited) return limited;
 
@@ -23,6 +24,7 @@ export const POST = tenantHandler(async (request) => {
   try {
     const res = await runCatalogSync({ searchOnly });
     slog("admin_sync", { products: res.products, collections: res.collections, search_indexed: res.search?.indexed ?? 0 });
+    await audit({ actor: auth.actor, action: "sync.run", diff: { products: res.products, collections: res.collections } });
     return NextResponse.json({
       ok: true,
       products: res.products,

@@ -40,7 +40,9 @@
     "test:identity": "node scripts/test-identity.js",
     "user:create": "node --env-file=.env.local scripts/user-create.js",
     "invite:create": "node --env-file=.env.local scripts/invite-create.js",
-    "operator:create": "node --env-file=.env.local scripts/operator-create.js"
+    "operator:create": "node --env-file=.env.local scripts/operator-create.js",
+    "member:set": "node --env-file=.env.local scripts/member-set.js",
+    "test:authz": "node scripts/test-authz.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

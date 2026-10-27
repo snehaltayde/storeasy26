@@ -79,3 +79,18 @@ CREATE TABLE IF NOT EXISTS login_limits (
   count    INTEGER NOT NULL DEFAULT 0,
   reset_at TEXT NOT NULL
 );
+
+-- Append-only audit log (Session 27 / BE16). INSERT + scoped SELECT only —
+-- no application code path updates or deletes rows.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id          TEXT PRIMARY KEY,   -- "a_" + 16 hex
+  at          TEXT NOT NULL,
+  actor       TEXT NOT NULL,      -- user id | "bootstrap" | "cli" | "system"
+  actor_kind  TEXT NOT NULL,      -- merchant | operator | bootstrap | cli | system
+  tenant_id   TEXT,               -- null = platform-scope action
+  action      TEXT NOT NULL,      -- e.g. offers.write, tenant.status, auth.login
+  resource    TEXT,               -- e.g. offer:summer10, order:BL-XXXXXXXX
+  request_id  TEXT,
+  diff        TEXT                -- REDACTED JSON (no secret/PII values), size-capped
+);
+CREATE INDEX IF NOT EXISTS idx_audit_tenant_at ON audit_log(tenant_id, at);

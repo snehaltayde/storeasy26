@@ -18,6 +18,7 @@ import {
 import { createSession, operatorsExist, OPERATOR_SESSION_TTL_MS } from "@/lib/platform/sessions";
 import { platformConfigured } from "@/lib/platform/control";
 import { sameOrigin } from "@/lib/origin-check";
+import { audit } from "@/lib/platform/audit";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 
@@ -97,6 +98,7 @@ export async function POST(request) {
       await confirmTotp(user.id);
       await clearThrottle(key);
       slog("platform_login", { user: user.id, enrolled: true });
+      await audit({ actor: { kind: "operator", id: user.id }, action: "auth.operator_login", tenantId: null, diff: { enrolled: true } });
       return sessionResponse(user, request);
     }
 
@@ -108,6 +110,7 @@ export async function POST(request) {
     }
     await clearThrottle(key);
     slog("platform_login", { user: user.id });
+    await audit({ actor: { kind: "operator", id: user.id }, action: "auth.operator_login", tenantId: null });
     return sessionResponse(user, request);
   }
 
@@ -124,6 +127,7 @@ export async function POST(request) {
     return fail(401, "Wrong password");
   }
   slog("platform_login", { method: "bootstrap" });
+  await audit({ actor: { kind: "bootstrap", id: "bootstrap" }, action: "auth.operator_login", tenantId: null, diff: { method: "bootstrap" } });
   const res = NextResponse.json({ ok: true, bootstrap: true });
   res.cookies.set(PLATFORM_COOKIE, await platformSessionToken(), {
     httpOnly: true,

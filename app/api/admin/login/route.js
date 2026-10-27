@@ -5,6 +5,7 @@ import { createSession, membershipRole, MERCHANT_SESSION_TTL_MS } from "@/lib/pl
 import { platformConfigured } from "@/lib/platform/control";
 import { currentTenant, tenantId } from "@/lib/tenant-context";
 import { sameOrigin } from "@/lib/origin-check";
+import { audit } from "@/lib/platform/audit";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
@@ -64,6 +65,7 @@ export const POST = tenantHandler(async (request) => {
     });
     for (const key of keys) await clearThrottle(key);
     slog("admin_login", { method: "session", user: user.id, role });
+    await audit({ actor: { kind: "merchant", id: user.id, role }, action: "auth.login", diff: { method: "session" } });
     const res = NextResponse.json({ ok: true });
     res.cookies.set(ADMIN_COOKIE, token, { ...COOKIE_OPTS, maxAge: MERCHANT_SESSION_TTL_MS / 1000 });
     return res;
@@ -80,6 +82,7 @@ export const POST = tenantHandler(async (request) => {
     return fail(401, "Wrong password");
   }
   slog("admin_login", { method: "bootstrap" });
+  await audit({ actor: { kind: "bootstrap", id: "bootstrap" }, action: "auth.login", diff: { method: "bootstrap" } });
   const res = NextResponse.json({ ok: true, bootstrap: true });
   res.cookies.set(ADMIN_COOKIE, await adminSessionToken(), { ...COOKIE_OPTS, maxAge: 60 * 60 * 24 * 7 });
   return res;

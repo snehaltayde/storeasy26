@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { verifyAdminToken, ADMIN_COOKIE } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin-auth";
+import { audit } from "@/lib/platform/audit";
 import { listPlacements, upsertPlacement, resolveHandles } from "@/lib/cms/placements";
 import { db } from "@/lib/db";
 import { slog } from "@/lib/log";
@@ -8,7 +9,6 @@ import { tenantHandler } from "@/lib/tenant-request";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
 // Console speaks HANDLES; storage speaks gids — translate both ways here.
 async function listWithHandles() {
@@ -27,12 +27,14 @@ async function listWithHandles() {
 }
 
 export const GET = tenantHandler(async (request) => {
-  if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value))) return unauthorized();
+  const auth = await requireAdmin(request, "upsells.read");
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   return NextResponse.json({ ok: true, placements: await listWithHandles() });
 });
 
 export const POST = tenantHandler(async (request) => {
-  if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value))) return unauthorized();
+  const auth = await requireAdmin(request, "upsells.write");
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
   try {
     const targets = await resolveHandles(body.targetHandles || []);
@@ -55,6 +57,7 @@ export const POST = tenantHandler(async (request) => {
       position: body.position || 0,
     });
     slog("placement_saved", { id, kind: body.kind });
+    await audit({ actor: auth.actor, action: "upsells.write", resource: `placement:${id}`, diff: { kind: body.kind } });
     return NextResponse.json({ ok: true, id, placements: await listWithHandles() });
   } catch (e) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 422 });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { verifyAdminToken, ADMIN_COOKIE } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/admin-auth";
+import { audit } from "@/lib/platform/audit";
 import { getBlock, setBlock, deleteBlock, getAnnouncement, getHero, getHomeSections, getNav, listContentPages, getContentPage, upsertContentPage, deleteContentPage } from "@/lib/cms/store";
 import { validateBlock } from "@/lib/cms/validate";
 import { BLOCK_KEYS } from "@/lib/cms/defaults";
@@ -15,7 +16,6 @@ import { tenantHandler } from "@/lib/tenant-request";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
 async function view() {
   const [announcement, hero, homeSections, navHeader, navFooter, pages] = await Promise.all([
@@ -36,31 +36,38 @@ async function view() {
 }
 
 export const GET = tenantHandler(async (request) => {
-  if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value))) return unauthorized();
+  const auth = await requireAdmin(request, "storefront.read");
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   return NextResponse.json({ ok: true, ...(await view()) });
 });
 
 export const PUT = tenantHandler(async (request) => {
-  if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value))) return unauthorized();
   const body = await request.json().catch(() => ({}));
+  // getPage is a read (editor prefill); everything else mutates
+  const auth = await requireAdmin(request, body.getPage ? "storefront.read" : "storefront.write");
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
     if (body.block) {
       if (body.reset) {
         await deleteBlock(body.block);
         slog("cms_block_reset", { block: body.block });
+        await audit({ actor: auth.actor, action: "storefront.write", resource: `block:${body.block}`, diff: { reset: true } });
       } else {
         const { ok, errors, value } = validateBlock(body.block, body.value);
         if (!ok) return NextResponse.json({ error: "Validation failed", errors }, { status: 422 });
         await setBlock(body.block, value);
         slog("cms_block_saved", { block: body.block });
+        await audit({ actor: auth.actor, action: "storefront.write", resource: `block:${body.block}` });
       }
     } else if (body.page) {
       await upsertContentPage(body.page);
       slog("cms_page_saved", { slug: body.page.slug });
+      await audit({ actor: auth.actor, action: "storefront.write", resource: `page:${body.page.slug}` });
     } else if (body.deletePage) {
       await deleteContentPage(body.deletePage);
       slog("cms_page_deleted", { slug: body.deletePage });
+      await audit({ actor: auth.actor, action: "storefront.write", resource: `page:${body.deletePage}`, diff: { deleted: true } });
     } else if (body.getPage) {
       // editor prefill: effective content for one slug (default or override)
       return NextResponse.json({ ok: true, page: await getContentPage(body.getPage) });

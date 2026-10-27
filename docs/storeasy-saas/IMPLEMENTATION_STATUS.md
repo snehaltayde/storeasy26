@@ -5,13 +5,13 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S26.
+- Created: 2026-10-28 (session S25). Last updated: S27.
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 6 of 116 records audited/implemented so far
-  (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26). The other 110 are
-  **not inspected** — the handoff's Fix/Extend/New labels for them remain
-  unverified documentation claims.
+- **Audit coverage honesty:** 8 of 116 records audited/implemented so far
+  (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27). The
+  other 108 are **not inspected** — the handoff's Fix/Extend/New labels for
+  them remain unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -154,6 +154,47 @@ are 12h, kind `operator` — a merchant session can never pass operator routes
 disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
 (`platform_login*`); durable audit rows come with BE16 (S27).
 
+### BE03 — Role authorization · **partial (core implemented & verified, S27)**
+
+- `lib/platform/authz.js`: owner ⊇ admin ⊇ staff ⊇ support permission sets over
+  `<area>.<verb>` actions (offers/orders/storefront/upsells/settings/sync/
+  audit/team). `requireAdmin(request, action)` in lib/admin-auth.js is called by
+  EVERY admin API route: authentication + role check + CSRF origin check for
+  writes, in one gate. 403 (role) vs 401 (unauthenticated) distinguished.
+- Tenant spoofing structurally denied: the tenant is always the host-resolved
+  context; URL/body tenant ids authorize nothing (verified: a tenant-A session
+  is 401 on tenant-B's host).
+- Final-owner protection in addMembership/removeMembership; `pnpm member:set`
+  CLI for role changes/removal; revocation is effective on the next request —
+  there is NO permission cache to invalidate (fresh membership lookup per
+  request), satisfying the invalidation requirement by construction.
+- Bootstrap/legacy cookies act as role owner (single-password mode).
+- Out of scope, scheduled: org/agency grants (BE28, W5), worker-action actor
+  attribution beyond CRON_SECRET (W2 jobs rework), role-aware PII field
+  filtering in order read models (BE10/MC16, S31), role-aware tab hiding in the
+  console UI (MC23, W4), merchant MFA for privileged actions (arrives with the
+  first money-path actions in W2).
+
+### BE16 — Audit and approval · **partial (audit core implemented & verified, S27)**
+
+- Control-plane `audit_log`: append-only by construction — the application
+  exposes INSERT (`audit()`) and scoped SELECT (`listAudit`) only; no update or
+  delete code path exists (test asserts the module surface). Rows: actor,
+  actor_kind, tenant, action, resource, request-id slot, timestamp, and a
+  REDACTED diff (keys matching password/secret/token/key/credential are
+  stripped; 2KB size cap). Audit failures never fail the mutation (best-effort,
+  slog'd).
+- Writers wired: admin + operator logins, password resets, invite created/
+  accepted, role set/removed, settings saves (key NAMES only), offer writes/
+  deletes, storefront block/page writes, upsell writes, order pushes, catalog
+  syncs, tenant provision/suspend/activate/sync.
+- Read API: `GET /api/admin/audit` (owner/admin, host-tenant-scoped).
+- Out of scope, scheduled: approvals bound to content hashes (BE09/S36),
+  operator-identity attribution on platform routes (currently actor "operator"
+  — individual operator ids attach when platform routes adopt a requireOperator
+  gate, W2/OP10), audit UI tab (MC26, W4), storage-level immutability policy
+  beyond app construction (documented; provider-level WORM is a W4 ops item).
+
 ## Baseline checks (S25, before changes)
 
 Commands: `pnpm test:orders|shipping|shopify-push|hardening|offers-admin|events|
@@ -276,3 +317,26 @@ at deploy checkpoint A). New optional env: `RESEND_API_KEY` + `MAIL_FROM`
 accounts — `USER_PASSWORD=… pnpm user:create -- --tenant beastlife --email you@…
 --role owner` per tenant and `pnpm operator:create -- --email you@…` (each
 switches that surface off its bootstrap password).
+
+## Verification state (S27, 2026-10-28)
+
+**Suites:** 14 aliased / **186 tests + 21 offers = 207 checks**, all green;
+`pnpm build` exit 0. New `pnpm test:authz` (13): role matrix, requireAdmin
+(owner write ok · support 403-on-write/ok-on-read · staff blocked from
+settings/push/sync · cross-origin write 403 while reads pass · no-cookie 401),
+spoofed-tenant denial (tenant-A session 401 on tenant-B host), instant
+revocation mid-session, final-owner demote+remove blocked until a second owner
+exists, audit scoping/default-tenant-context/redaction/size-cap/append-only
+surface/never-throws.
+
+**HTTP matrix (dev server; throwaway owner+support users on demo, DELETED
+after, bootstrap login verified restored 200):** support → offers GET 200,
+offers POST 403 "Your role (support) can't do that", settings GET 403, audit
+GET 403, sync POST 403; owner → offer write path reachable (422 on an invalid
+probe payload = authz passed, validation spoke), audited DELETE 200,
+cross-origin POST 403; `GET /api/admin/audit` returned the trail:
+offers.write[offer:s27-probe] · auth.login ×2 · team.role_set ×2 (cli).
+CLI final-owner guard: `member:set --remove`/demote on the lone owner both
+refused with the guard message. `pnpm platform:migrate` applied `audit_log`
+to the hosted dev control plane. Probe audit rows remain in the log by design
+(append-only; they record exactly what happened).

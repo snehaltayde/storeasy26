@@ -5,6 +5,7 @@
 // switches that tenant's console from the bootstrap password to account login.
 import { getTenant } from "../lib/platform/control.js";
 import { createUser, findUserByEmail, addMembership, setUserPassword } from "../lib/platform/identity.js";
+import { audit } from "../lib/platform/audit.js";
 
 function flag(name) {
   const i = process.argv.indexOf(`--${name}`);
@@ -51,6 +52,7 @@ if (!user) {
 }
 
 await addMembership(user.id, tenant.id, role);
+await audit({ actor: { kind: "cli", id: "cli" }, action: "team.role_set", tenantId: tenant.id, resource: `user:${user.id}`, diff: { role } });
 console.log(`✓ membership: ${user.email} → ${tenant.id} as ${role}`);
 console.log(`→ sign in at https://<${tenant.id} host>/admin/login with email + password.`);
 console.log("  NOTE: the tenant's bootstrap console password no longer works for this store.");

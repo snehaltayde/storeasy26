@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { verifyAdminToken, adminSessionTokenFor, adminBootstrapMode, ADMIN_COOKIE } from "@/lib/admin-auth";
-import { sameOrigin } from "@/lib/origin-check";
+import { requireAdmin, adminSessionTokenFor, adminBootstrapMode, ADMIN_COOKIE } from "@/lib/admin-auth";
+import { audit } from "@/lib/platform/audit";
 import { settingsView, buildSettingsPatch } from "@/lib/admin/settings";
 import { patchTenant } from "@/lib/platform/control.js";
 import { currentTenant, tenantId } from "@/lib/tenant-context.js";
@@ -15,7 +15,6 @@ import { tenantHandler } from "@/lib/tenant-request";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
 async function syncCounts() {
   try {
@@ -30,13 +29,15 @@ async function syncCounts() {
 }
 
 export const GET = tenantHandler(async (request) => {
-  if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value))) return unauthorized();
+  const auth = await requireAdmin(request, "settings.read");
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   return NextResponse.json({ ok: true, settings: settingsView(currentTenant(), { counts: await syncCounts() }) });
 });
 
 export const PUT = tenantHandler(async (request) => {
-  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
-  if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value))) return unauthorized();
+  // requireAdmin covers the CSRF origin check for write actions (S27)
+  const auth = await requireAdmin(request, "settings.write");
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const tenant = currentTenant();
   if (!tenant || tenant.id === "_default")
     return NextResponse.json(
@@ -53,6 +54,12 @@ export const PUT = tenantHandler(async (request) => {
     tenant: tenant.id,
     config_keys: Object.keys(patch.config),
     secret_keys: Object.keys(patch.secrets), // names only, never values
+  });
+  await audit({
+    actor: auth.actor,
+    action: "settings.write",
+    resource: "settings",
+    diff: { config_keys: Object.keys(patch.config), secret_keys: Object.keys(patch.secrets) },
   });
 
   const res = NextResponse.json({

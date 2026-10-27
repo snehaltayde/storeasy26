@@ -507,15 +507,17 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 13 aliased suites, **173 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 14 aliased suites, **186 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
   resolution, outage budget, overlapping-handle isolation, order-token scheme) ·
   identity 21 (S26: scrypt, revocable sessions, bootstrap/legacy fallbacks, TOTP
-  RFC vector, invites/resets, distributed throttle, origin guard).
+  RFC vector, invites/resets, distributed throttle, origin guard) · authz 13
+  (S27: role matrix, requireAdmin gating, spoofed-tenant denial, final-owner
+  protection, instant revocation, append-only redacted audit).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **194 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **207 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -874,6 +876,8 @@ ACTIVE tenant's rules live in `config.shipping_config` (edited in the console);
 |---|---|---|
 | Merchant console `/admin` (S26) | `_admin` httpOnly cookie = a random session token; the control plane stores its SHA-256 (`sessions` table) and the user↔tenant `membership` authorizes the store | Individual email+password accounts (scrypt), 7-day revocable sessions verified fresh per request (revocation holds across instances); distributed login throttle (`login_limits`); invitations + email password reset; CSRF origin check on login/logout/settings. BOOTSTRAP: a tenant with no member users still accepts the legacy derived token `sha256("storeasy-admin\|tenantId\|password")`; the first `pnpm user:create` switches it off. LEGACY mode (no control plane): derived token only |
 | Operator console `/platform` (S26) | `_platform` cookie = random session token (kind `operator`, 12h) | Individual operator users with MANDATORY TOTP (enrolled at first login); a merchant session can never pass; `pnpm operator:create` creates the first operator and disables the legacy `sha256("storeasy-platform\|PLATFORM_ADMIN_PASSWORD")` token |
+| Roles → actions (S27) | `requireAdmin(request, action)` on every admin API route ([lib/platform/authz.js](../lib/platform/authz.js)) | owner ⊇ admin (settings/secrets, orders.push, sync, team, audit.read) ⊇ staff (offers/storefront/upsells write, orders.read) ⊇ support (read-only). Tenant is ALWAYS the host-resolved context — URL/body tenant ids never authorize. Writes get the CSRF origin check. Bootstrap cookies act as owner. Final-owner can't be demoted/removed; membership removal cuts access on the next request (no permission cache) |
+| Audit log (S27) | `audit_log` in the control plane — INSERT + scoped SELECT only ([lib/platform/audit.js](../lib/platform/audit.js)) | Every privileged mutation + sign-in writes actor/action/tenant/resource + REDACTED size-capped diff (secret-ish keys stripped). Read: `GET /api/admin/audit` (owner/admin, host-scoped). Best-effort: an audit failure never fails the mutation |
 | Cron/ops endpoints | `CRON_SECRET` as `Authorization: Bearer` (Vercel cron sends it) or `?secret=` | Open in local dev when unset |
 | Guest order status | `?t=` token = first 20 hex of `sha256(orderId\|ORDER_LINK_SECRET)` | Falls back to razorpay secret chain; bad token → 404; noindex |
 | Shopify webhooks | Raw-body HMAC-SHA256 (base64) with the tenant app's client secret | Per-tenant apps → verification doubles as tenant-match proof |
@@ -1074,8 +1078,9 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | `pnpm events:stats` / `search:report [days]` | Forwarding stats / search CTR + zero-result report (env tenant) |
 | `pnpm shopify:token [--write]` / `shopify:oauth` | Legacy single-store token minting / local OAuth |
 | `pnpm seed:demo` | 3 fake products + 2 collections into the env DB |
-| `pnpm test:*` | 13 aliased suites, 173 tests (see §2E) |
+| `pnpm test:*` | 14 aliased suites, 186 tests (see §2E) |
 | `pnpm user:create` / `invite:create` / `operator:create` | S26 identity CLIs: first store user (disables bootstrap pw), teammate invitation links, platform operators (TOTP at first login) |
+| `pnpm member:set` | S27: change a member's role or `--remove` them (final-owner protected; takes effect on their next request) |
 | No alias | `scripts/test-offers.js` (21 pure engine assertions — the S4 suite), `scripts/spike-order-push.js` (S8 harness), `scripts/gen-icons.js` (sharp icon renders) |
 
 ### 4.9 Observability vocabulary

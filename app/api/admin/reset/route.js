@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { acceptReset } from "@/lib/platform/identity";
+import { audit } from "@/lib/platform/audit";
 import { sameOrigin } from "@/lib/origin-check";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
@@ -27,5 +28,6 @@ export const POST = tenantHandler(async (request) => {
     return NextResponse.json({ error: "This reset link is invalid, expired, or already used" }, { status: 400 });
   }
   slog("admin_reset_done", { user: user.id });
+  await audit({ actor: { kind: "merchant", id: user.id }, action: "auth.password_reset" });
   return NextResponse.json({ ok: true });
 });

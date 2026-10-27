@@ -4,6 +4,7 @@
 // provider is configured — the link prints here instead).
 import { getTenant } from "../lib/platform/control.js";
 import { createInvite } from "../lib/platform/identity.js";
+import { audit } from "../lib/platform/audit.js";
 import { sendMail } from "../lib/mail.js";
 
 function flag(name) {
@@ -37,6 +38,7 @@ const mail = await sendMail({
   text: `You've been invited to the ${tenant.name} store console as ${role}.\n\nAccept here (valid 7 days, single use):\n${link}\n`,
 });
 
+await audit({ actor: { kind: "cli", id: "cli" }, action: "team.invite_created", tenantId: tenant.id, diff: { role } });
 console.log(`✓ invitation created for ${email} → ${tenant.id} as ${role} (expires ${expiresAt})`);
 console.log(mail.mock ? "  (mail is MOCKED — the link above was printed, not sent)" : `  mail sent: ${mail.ok ? mail.id || "ok" : `FAILED: ${mail.error}`}`);
 process.exit(0);

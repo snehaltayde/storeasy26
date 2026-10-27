@@ -5,6 +5,7 @@ import { ADMIN_COOKIE } from "@/lib/admin-auth";
 import { platformConfigured } from "@/lib/platform/control";
 import { currentTenant, tenantId } from "@/lib/tenant-context";
 import { sameOrigin } from "@/lib/origin-check";
+import { audit } from "@/lib/platform/audit";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
@@ -47,6 +48,7 @@ export const POST = tenantHandler(async (request) => {
     ua: request.headers.get("user-agent"),
   });
   slog("admin_invite_accepted", { user: user.id });
+  await audit({ actor: { kind: "merchant", id: user.id }, action: "team.invite_accepted" });
   const res = NextResponse.json({ ok: true });
   res.cookies.set(ADMIN_COOKIE, session, {
     httpOnly: true,

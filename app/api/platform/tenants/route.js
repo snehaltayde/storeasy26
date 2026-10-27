@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 import { sameOrigin } from "@/lib/origin-check";
+import { audit } from "@/lib/platform/audit";
 import { listTenants, getTenant } from "@/lib/platform/control.js";
 import { provisionTenant } from "@/lib/platform/provision.js";
 import { withTenant } from "@/lib/tenant-context.js";
@@ -69,6 +70,7 @@ export async function POST(request) {
       dbToken: String(body.dbToken || "").trim() || null,
     });
     slog("tenant_provisioned", { tenant: tenant.id, via: "platform-console" });
+    await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.provision", tenantId: tenant.id });
     // generated.admin_password is shown ONCE to the operator, never stored
     // anywhere readable later.
     return NextResponse.json({ ok: true, tenant: { id: tenant.id, name: tenant.name, domains: tenant.domains, dbUrl: tenant.dbUrl }, generated });
