@@ -81,6 +81,7 @@ await t("oauth authorize url carries client id, redirect, state and scopes", asy
   ok(url.includes("client_id=cid") && url.includes("state=st"), "params present");
   ok(url.includes(encodeURIComponent("https://p.app/cb")), "redirect encoded");
   ok(url.includes(encodeURIComponent("write_draft_orders")), "scopes present");
+  ok(url.includes("%2Cwrite_orders%2C"), "write_orders scope present (orderCancel needs it)");
 });
 
 // --- webhook HMAC + gid builders -----------------------------------------------

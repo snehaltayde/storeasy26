@@ -509,17 +509,14 @@ An honest list of code-level mismatches found during the S24 documentation sweep
 none block the current single-real-tenant reality, but several matter before
 multi-tenant payments go live. Severity-ordered:
 
-1. **Checkout returns the ENV Razorpay key id** — `razorpay_create` responds with
-   `keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID` instead of the tenant accessor.
-   A tenant with its own keys would open the Razorpay modal under the WRONG key
-   (payment fails or lands in the wrong account). The S24 credential-scoping fix
-   covered the enable-gate but not this response field. *Fix before any second
-   tenant takes prepaid payments.*
-2. **Pixels load env ids client-side** — `Pixels.js` uses build-time
-   `NEXT_PUBLIC_GA4_MEASUREMENT_ID`/`NEXT_PUBLIC_META_PIXEL_ID`, so a consenting
-   visitor on ANY tenant loads the default store's browser pixels. Server-side
-   forwarding is correctly tenant-scoped (S24); the client side needs the tenant ids
-   passed from the layout.
+1. ~~**Checkout returns the ENV Razorpay key id**~~ — **FIXED** (post-guide commit):
+   `razorpay_create` now returns `keyId: razorpayKeyId()` (tenant-scoped), so the
+   modal always opens under the account that minted the Razorpay order. Verified
+   live on the beastlife host (probe order cancelled).
+2. ~~**Pixels load env ids client-side**~~ — **FIXED**: the layout's tenant-scoped
+   pass supplies `ga4Id`/`metaPixelId` props via `tenantOwnCfg`; a tenant without
+   ids loads no pixels. Verified: beastlife serializes its ids, demo serializes
+   empty strings.
 3. **CheckoutFlow's client shipping estimate uses code defaults** — the payment-step
    preview calls `computeShipping` without the tenant config (display-only drift;
    the server recompute is what's charged, and the drawer is correct).
@@ -546,10 +543,10 @@ multi-tenant payments go live. Severity-ordered:
     `footer_tagline`, `legal_name` (readable by the storefront, edited only via
     seed/patchTenant today); the platform wizard omits `supportEmail` though the
     API accepts it.
-13. **OAuth scope list lacks `write_orders`** — `order:cancel` calls `orderCancel`,
-    which the CURRENT (pre-platform) admin token can do, but a token minted through
-    the new connect flow's `OAUTH_SCOPES` would not. Add the scope before relying
-    on cancels for OAuth-connected tenants.
+13. ~~**OAuth scope list lacks `write_orders`**~~ — **FIXED**: `write_orders` added
+    to `OAUTH_SCOPES` (and the legacy script's list) with a suite assertion.
+    Tokens minted from now on carry it; tenants connected before this need a
+    re-auth through the connect flow to gain the scope.
 14. **New tenants are seeded with BeastLife's offers** — `applyTenantSchema` seeds
     the six `lib/offers/config.js` entries (BeastLife handles/tags/gift gid) into
     every fresh tenant DB. Harmless (targets won't match a different catalog) but

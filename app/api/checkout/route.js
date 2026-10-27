@@ -14,7 +14,7 @@ import {
   findOrderByIdempotencyKey,
   ORDER_STATUS,
 } from "@/lib/orders";
-import { razorpayConfigured, createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
+import { razorpayConfigured, razorpayKeyId, createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
 import { tenantHandler } from "@/lib/tenant-request";
 
 export const runtime = "nodejs";
@@ -71,7 +71,9 @@ function razorpayResponse(order, razorpayOrderId, deduped = false) {
     razorpayOrderId,
     amount: Math.round(order.total * 100),
     currency: order.currency || "INR",
-    keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+    // TENANT-scoped (S24 quirk fix): the modal must open under the SAME account
+    // that minted razorpayOrderId — never the env default's key.
+    keyId: razorpayKeyId(),
     ...(deduped ? { deduped: true } : {}),
   });
 }

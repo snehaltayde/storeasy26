@@ -12,6 +12,7 @@ import { cookies } from "next/headers";
 import { getAllCollections } from "@/lib/repo";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
+import { tenantOwnCfg } from "@/lib/tenant-context";
 import { getAnnouncement, getNav } from "@/lib/cms/store";
 import { tfetch } from "@/lib/tenant-request";
 
@@ -67,6 +68,10 @@ async function chromeData() {
         announcement,
         navHeader,
         navFooter,
+        // Browser pixel ids, TENANT-scoped (S24 quirk fix) — a tenant without
+        // its own ids loads no pixels, never the env default's.
+        ga4Id: tenantOwnCfg("ga4_measurement_id", "NEXT_PUBLIC_GA4_MEASUREMENT_ID", "") || "",
+        metaPixelId: tenantOwnCfg("meta_pixel_id", "NEXT_PUBLIC_META_PIXEL_ID", "") || "",
       };
     });
   } catch {
@@ -79,6 +84,8 @@ async function chromeData() {
       announcement: { enabled: false },
       navHeader: null,
       navFooter: null,
+      ga4Id: "",
+      metaPixelId: "",
     };
   }
 }
@@ -112,7 +119,7 @@ export default async function RootLayout({ children }) {
         </CartProvider>
         <ServiceWorkerRegister />
         <ConsentBanner storeName={chrome.name} />
-        <Pixels />
+        <Pixels ga4Id={chrome.ga4Id} metaPixelId={chrome.metaPixelId} />
         <ErrorReporter />
       </body>
     </html>

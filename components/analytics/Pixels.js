@@ -3,9 +3,6 @@
 import { useEffect, useRef } from "react";
 import { readConsentCookie, isConsentGranted } from "@/lib/track/names";
 
-const GA4_ID = process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID || "";
-const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "";
-
 function loadGtag(id) {
   if (!id || window.gtag) return;
   const s = document.createElement("script");
@@ -36,19 +33,22 @@ function loadFbq(id) {
 // Loads gtag + the Meta pixel ONLY after DPDP consent is granted (never before —
 // third-party tags are the definition of non-essential). Listens for the
 // banner's grant so pixels light up without a reload.
-export default function Pixels() {
+// S24 quirk fix: ids arrive as props from the layout's TENANT-scoped pass —
+// a visitor on tenant A must never load tenant B's (or the env default's)
+// pixels; a tenant without ids simply loads nothing.
+export default function Pixels({ ga4Id = "", metaPixelId = "" }) {
   const loaded = useRef(false);
   useEffect(() => {
     const maybeLoad = () => {
       if (loaded.current) return;
       if (!isConsentGranted(readConsentCookie())) return;
       loaded.current = true;
-      loadGtag(GA4_ID);
-      loadFbq(PIXEL_ID);
+      loadGtag(ga4Id);
+      loadFbq(metaPixelId);
     };
     maybeLoad();
     window.addEventListener("consent-granted", maybeLoad);
     return () => window.removeEventListener("consent-granted", maybeLoad);
-  }, []);
+  }, [ga4Id, metaPixelId]);
   return null;
 }

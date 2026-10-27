@@ -16,6 +16,7 @@ const REDIRECT = `http://localhost:${PORT}/callback`;
 const SCOPES = [
   "read_products",
   "read_orders",
+  "write_orders", // orderCancel (order:cancel CLI) needs it
   "write_draft_orders",
   "unauthenticated_read_product_listings",
   "unauthenticated_read_product_inventory",
