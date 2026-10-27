@@ -1404,4 +1404,4 @@ run the verify checklist.
 | S32 | 039079f | W2: commerce adapter capability gate, offer simulator + TZ-safe schedules, cart change acks (BE06+BE07+SF06+SF07+MC14+MC22) |
 | S33 | 1b93071 | W2: privacy lifecycle (redaction executes), purpose consent v2, event contract, expiring order proofs (BE18+SF24+BE20+SF08-full) |
 | S34 | e2b23b8 | W2 exit: integrations registry + tab, support grants (time-limited, read-only, banner), restore drill, security gate + threat model (BE24+MC20+BE27+BE34+OP10) |
-| S35 | (this session) | W3: content service (versioned schemas, CAS draft revisions, HTML sanitizer) + brand token system (accent ladder, WCAG gate, /admin/brand) (BE08+MC10) |
+| S35 | 6378a49 | W3: content service (versioned schemas, CAS draft revisions, HTML sanitizer) + brand token system (accent ladder, WCAG gate, /admin/brand) (BE08+MC10) |
