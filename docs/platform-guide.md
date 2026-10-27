@@ -507,7 +507,7 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 17 aliased suites, **221 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 18 aliased suites, **232 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -523,9 +523,11 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
   webhook inbox, the duplicate-payment-replay-changes-money-once acceptance) ·
   sync-generations 8 (S30: generation stamping, prune-after-complete-only,
   webhook-race survival, failed-partial safety, missed-delete repair, scope
-  check at token mint).
+  check at token mint) · order-projection 11 (S31: minor-unit money +
+  drift-free allocation, authoritative reconcile dedup/out-of-order watermark,
+  two-parcel fixture, support-role PII redaction, push-message mapping).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **242 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **253 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -558,8 +560,10 @@ multi-tenant payments go live. Severity-ordered:
 7. **A home section saved as hidden disappears from the editor** (reads filter
    disabled sections); only Reset-to-default recovers it. Same class: a content page
    saved as hidden can no longer be opened in the editor (only Remove).
-8. **RetryPushButton mislabels refusals** — push refusals return HTTP 200 with
-   `skipped/dead/inFlight/mismatch` keys, so the button shows "Push failed: 200".
+8. ~~**RetryPushButton mislabels refusals**~~ — **FIXED (S31 / MC16)**:
+   `pushResultMessage` (lib/admin/order-view.js) translates every refusal shape
+   into honest copy ("Not pushable from status …", "Refused: Shopify's total
+   didn't match…", "Dead-lettered after N attempts…").
 9. **robots.txt is prerendered at build time** — its sitemap line bakes the
    build-env origin (currently `localhost:3007` in local builds), and `/platform`
    isn't in the disallow list.
@@ -780,6 +784,23 @@ Key properties ([lib/sync.js](../lib/sync.js), [lib/shopify-admin-catalog.js](..
   onboarding), Storefront API if only that token exists.
 
 ### 3.5 Order lifecycle — state machine, paid-signal, push
+
+**S31 (BE10): three independent dimensions per order.** `status` below stays the
+payment-capture + push state machine; `financial_status` (paid / partially_refunded
+/ refunded / voided) and `fulfillment_status` are PROVIDER-MIRRORED projections —
+rebuilt by authoritative reconciliation ([lib/order-projection.js](../lib/order-projection.js)):
+a targeted Shopify order fetch replaces the `order_refunds` / `order_fulfillments`
+rows and the status columns, guarded by an `updatedAt` watermark, so duplicate or
+out-of-order webhook hints (new topics: refunds/create, fulfillments/create+update,
+orders/cancelled — re-run `pnpm webhooks:register` to subscribe) can never double
+revenue or regress status. Reads: the guest status page (per-parcel tracking with
+"updated …ago"; background refresh per view) and the console order detail
+(Shipments/Refunds panels + "Reconcile from Shopify"). Money arithmetic lives in
+[lib/money.js](../lib/money.js) (S31/BE36: minor-unit conversion per currency,
+`sameAmount`, largest-remainder `allocateProportional`) — every provider amount
+comparison (Razorpay paise, Shopify totals, checkout dedup) goes through it.
+Support-role consoles see order state and money but never customer PII
+(`redactOrderForRole`).
 
 ```mermaid
 stateDiagram-v2
@@ -1112,7 +1133,7 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | `pnpm events:stats` / `search:report [days]` | Forwarding stats / search CTR + zero-result report (env tenant) |
 | `pnpm shopify:token [--write]` / `shopify:oauth` | Legacy single-store token minting / local OAuth |
 | `pnpm seed:demo` | 3 fake products + 2 collections into the env DB |
-| `pnpm test:*` | 17 aliased suites, 221 tests (see §2E) |
+| `pnpm test:*` | 18 aliased suites, 232 tests (see §2E) |
 | `pnpm alert:test` | S29: alert-delivery self-test (sends a synthetic info alert to ALERT_WEBHOOK_URL, reports the real result) |
 | `pnpm user:create` / `invite:create` / `operator:create` | S26 identity CLIs: first store user (disables bootstrap pw), teammate invitation links, platform operators (TOTP at first login) |
 | `pnpm member:set` | S27: change a member's role or `--remove` them (final-owner protected; takes effect on their next request) |

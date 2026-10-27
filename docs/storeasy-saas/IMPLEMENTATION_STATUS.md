@@ -8,11 +8,12 @@ by a code audit or implementation in this repo — never by documentation alone.
 - Created: 2026-10-28 (session S25). Last updated: S29 (W2 underway; W1 complete).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 16 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 20 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
-  BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30). The
-  other 100 are **not inspected** — the handoff's Fix/Extend/New labels for
-  them remain unverified documentation claims.
+  BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
+  BE10, BE36, SF09, MC16 — S31). The other 96 are **not inspected** — the
+  handoff's Fix/Extend/New labels for them remain unverified documentation
+  claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -343,6 +344,73 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
 - **Pending external (needs the user's Shopify session):** a REAL
   uninstall→reinstall drill on the dev store, and the two-unrelated-shops
   install matrix (requires a second dev store — known W2-exit item).
+
+### BE10 — Order and refund projection · **partial (core implemented & verified, S31)**
+
+- Three independent per-order dimensions: the existing `status` machine
+  (capture + push) plus provider-mirrored `financial_status` /
+  `fulfillment_status` + `refunded_total` and `order_refunds` /
+  `order_fulfillments` rows (migration 0003_order_projection) — neither
+  derives from the other anymore.
+- Ingestion = authoritative reconciliation: order webhooks (NEW topics
+  refunds/create, fulfillments/create+update, orders/cancelled, routed through
+  the S29 inbox) are hints that trigger a targeted order refetch rebuilding the
+  whole projection under an `updatedAt` watermark. Suite-proven acceptance:
+  duplicate snapshot cannot double revenue; an older snapshot is refused (no
+  status regression); refunds sum exactly to the captured total.
+- LIVE: reconciled the cancelled S29 probe order against the real store →
+  financial `voided`, Shopify's ₹0 restock-refund record mirrored, status page
+  200 with correct copy.
+- Recorded design: Shopify-side cancellation only updates the projection
+  (financial voided); the LOCAL status machine is never driven from webhooks —
+  local cancellation stays the operator CLI's job. Net-sales rollups with
+  currency/cutoff rules are BE21 (S42) on top of refunded_total. PENDING
+  deploy item: `pnpm webhooks:register <slug>` per tenant for the new topics.
+
+### BE36 — Tax and money definitions · **partial (implemented & verified, S31)**
+
+- `lib/money.js`: explicit per-currency exponents (incl. 0- and 3-decimal
+  currencies), `toMinor`/`fromMinor`/`roundMoney`, minor-unit `sameAmount`,
+  and largest-remainder `allocateProportional` (drift-free partial-refund /
+  discount splitting — fixture-tested to the paisa).
+- Swept the provider compare sites: checkout dedup epsilon, Razorpay paise
+  amounts (route + webhook + replay worker), and the Shopify push reconcile
+  guard all go through minor units now. Semantics documented: cart figures are
+  estimates, the order row is our captured contract, providers stay
+  authoritative for charged/refunded money.
+- Remaining (scheduled): tax-inclusion metadata + invoice semantics arrive
+  with real tax surfaces (W4); UI estimate-labeling pass rides MC22/SF06 (S32).
+
+### SF09 — Order tracking · **partial (implemented & verified, S31)**
+
+- The tokenized status page now renders PER-PARCEL shipment cards from the
+  local projection (carrier, number, link, per-parcel "carrier status updated
+  …ago" — an outage shows as stale data, never a broken page) plus a refund
+  banner keyed on refunded amount. Every view of a pushed order refreshes the
+  projection in the background (after()); the page never waits on Shopify.
+- Two-parcel fixture suite-proven. Phone-lookup flow: not offered (recorded).
+
+### MC16 — Orders and order detail · **partial (extended & verified, S31)**
+
+- Detail page: financial/fulfillment badges, Shipments + Refunds panels,
+  existing timeline, and "Reconcile from Shopify" (audited `orders.reconcile`,
+  requested-vs-confirmed states on screen). The RetryPushButton quirk is FIXED:
+  `pushResultMessage` translates refusal shapes into honest copy.
+- Role-limited reads: the support role never receives customer PII (list +
+  detail APIs and the detail page all pass through `redactOrderForRole`;
+  client-safe `lib/admin/order-view.js`).
+- Remaining (scheduled): provider deep-links & refund-request actions (W2+,
+  with supported provider flows), list-page projection columns (W4 polish).
+
+## Verification state (S31, 2026-10-28)
+
+18 suites / **232 tests + 21 offers = 253 checks** green (new
+`test:order-projection`, 11); build clean. Hosted: 0003_order_projection
+applied to all 3 tenant DBs via the ledger; live reconcile of the cancelled
+probe order (voided + mirrored ₹0 restock refund); status page 200 showing
+CANCELLED without a spurious refund banner; admin orders page 200.
+`lib/shopify-order-status.js` (live-fetch helper) removed — the projection +
+background refresh replaced its only consumer.
 
 ## Verification state (S30, 2026-10-28)
 

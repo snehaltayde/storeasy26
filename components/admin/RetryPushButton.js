@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { pushResultMessage } from "@/lib/admin/order-view";
 
+// S31 (MC16): says what actually happened — push REFUSALS arrive as HTTP 200
+// with reason keys (skipped/inFlight/mismatch/dead), which used to render as
+// the nonsense "Push failed: 200".
 export default function RetryPushButton({ orderId }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -10,10 +14,14 @@ export default function RetryPushButton({ orderId }) {
 
   async function retry() {
     setBusy(true);
-    setMsg("");
-    const res = await fetch(`/api/admin/orders/${orderId}`, { method: "POST" });
+    setMsg("Requested…");
+    const res = await fetch(`/api/admin/orders/${orderId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "push" }),
+    });
     const data = await res.json().catch(() => ({}));
-    setMsg(data.ok === false || !res.ok ? `Push failed: ${data.error || data.reason || res.status}` : "Pushed ✓");
+    setMsg(pushResultMessage(data, res.status));
     setBusy(false);
     router.refresh();
   }

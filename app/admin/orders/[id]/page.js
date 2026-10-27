@@ -1,12 +1,15 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { verifyAdminToken, ADMIN_COOKIE } from "@/lib/admin-auth";
+import { verifyAdminToken, adminSessionUser, ADMIN_COOKIE } from "@/lib/admin-auth";
 import { getOrder } from "@/lib/orders";
+import { getOrderProjection } from "@/lib/order-projection";
+import { redactOrderForRole } from "@/lib/admin/order-view";
 import { siteName } from "@/lib/site";
 import AdminNav from "@/components/admin/AdminNav";
 import { StatusBadge } from "@/components/admin/OrdersAdmin";
 import RetryPushButton from "@/components/admin/RetryPushButton";
+import ReconcileButton from "@/components/admin/ReconcileButton";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +24,11 @@ export default async function AdminOrderDetail({ params }) {
   if (!authed) redirect("/admin/login");
 
   const { id } = await params;
-  const [order, name] = await tfetch(async () => [await getOrder(id), siteName()]);
-  if (!order) notFound();
+  // S31: the SUPPORT role sees order state and money, never customer PII
+  const role = (await tfetch(() => adminSessionUser(token)))?.role || "owner";
+  const [rawOrder, projection, name] = await tfetch(async () => [await getOrder(id), await getOrderProjection(id), siteName()]);
+  if (!rawOrder) notFound();
+  const order = redactOrderForRole(rawOrder, role);
 
   return (
     <>
@@ -35,12 +41,24 @@ export default async function AdminOrderDetail({ params }) {
           <h1 className="text-2xl font-bold">{order.id}</h1>
           <StatusBadge status={order.status} />
           <span className="text-sm text-zinc-500">{order.payment_method}</span>
+          {order.financial_status && (
+            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${order.refunded_total > 0 ? "bg-amber-100 text-amber-700" : "bg-zinc-100 text-zinc-600"}`}>
+              {order.financial_status}
+            </span>
+          )}
+          {order.fulfillment_status && (
+            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-600">{order.fulfillment_status}</span>
+          )}
           {order.status === "sync_failed" && <RetryPushButton orderId={order.id} />}
+          {order.shopify_order_id && role !== "support" && <ReconcileButton orderId={order.id} />}
         </div>
 
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <section className="rounded-2xl border border-zinc-200 p-5">
             <h2 className="text-sm font-bold">Customer</h2>
+            {order.pii_redacted && (
+              <p className="mt-2 text-xs text-zinc-400">Contact details are hidden for the support role.</p>
+            )}
             <dl className="mt-3 space-y-1 text-sm">
               <div><dt className="inline text-zinc-500">Name: </dt><dd className="inline">{order.name || "—"}</dd></div>
               <div><dt className="inline text-zinc-500">Email: </dt><dd className="inline">{order.email || "—"}</dd></div>
@@ -87,6 +105,50 @@ export default async function AdminOrderDetail({ params }) {
             <div className="flex justify-between text-base font-bold"><dt>Total</dt><dd>{inr(order.total)}</dd></div>
           </dl>
         </section>
+
+        {(projection.fulfillments.length > 0 || projection.refunds.length > 0) && (
+          <div className="mt-5 grid gap-5 sm:grid-cols-2">
+            <section className="rounded-2xl border border-zinc-200 p-5">
+              <h2 className="text-sm font-bold">Shipments ({projection.fulfillments.length})</h2>
+              <ul className="mt-3 space-y-2 text-sm">
+                {projection.fulfillments.map((f, i) => (
+                  <li key={f.id}>
+                    <span className="text-xs font-bold text-zinc-400">#{i + 1}</span>{" "}
+                    {f.tracking_company ? `${f.tracking_company} · ` : ""}
+                    {f.tracking_url ? (
+                      <a href={f.tracking_url} target="_blank" rel="noopener noreferrer" className="font-medium text-lime-700 underline">
+                        {f.tracking_number}
+                      </a>
+                    ) : (
+                      <span className="font-medium">{f.tracking_number || "no tracking yet"}</span>
+                    )}
+                    <span className="ml-2 text-xs text-zinc-400">
+                      {f.status || ""} {f.updated_at ? `· ${when(f.updated_at)}` : ""}
+                    </span>
+                  </li>
+                ))}
+                {projection.fulfillments.length === 0 && <li className="text-zinc-500">No shipments yet.</li>}
+              </ul>
+            </section>
+            <section className="rounded-2xl border border-zinc-200 p-5">
+              <h2 className="text-sm font-bold">
+                Refunds {order.refunded_total > 0 ? `· ${inr(order.refunded_total)} refunded` : ""}
+              </h2>
+              <ul className="mt-3 space-y-2 text-sm">
+                {projection.refunds.map((r) => (
+                  <li key={r.id} className="flex justify-between gap-3">
+                    <span className="text-zinc-600">
+                      {when(r.created_at)}
+                      {r.note ? <span className="ml-2 text-xs text-zinc-400">{r.note}</span> : null}
+                    </span>
+                    <span className="font-medium text-amber-700">−{inr(r.amount)}</span>
+                  </li>
+                ))}
+                {projection.refunds.length === 0 && <li className="text-zinc-500">No refunds recorded (Shopify is authoritative — Reconcile to refresh).</li>}
+              </ul>
+            </section>
+          </div>
+        )}
 
         <section className="mt-5 rounded-2xl border border-zinc-200 p-5">
           <h2 className="text-sm font-bold">Timeline</h2>

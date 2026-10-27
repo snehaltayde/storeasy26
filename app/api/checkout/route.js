@@ -16,6 +16,7 @@ import {
   ORDER_STATUS,
 } from "@/lib/orders";
 import { razorpayConfigured, razorpayKeyId, createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
+import { toMinor, sameAmount } from "@/lib/money";
 import { tenantHandler } from "@/lib/tenant-request";
 
 export const runtime = "nodejs";
@@ -36,7 +37,7 @@ function validate(contact, address) {
   return required.every((v) => v && String(v).trim());
 }
 
-const sameAmount = (a, b) => Math.abs(Number(a) - Number(b)) < 0.005;
+// S31 (BE36): amount comparisons happen at minor-unit precision via lib/money.
 
 // If this idempotency key already produced an order, short-circuit BEFORE any
 // cart/validation checks — a retry after the first request cleared the cart
@@ -84,7 +85,7 @@ async function razorpayResponse(order, razorpayOrderId, deduped = false) {
     ok: true,
     orderId: order.id,
     razorpayOrderId,
-    amount: Math.round(order.total * 100),
+    amount: toMinor(order.total, order.currency || "INR"),
     currency: order.currency || "INR",
     // TENANT-scoped (S24 quirk fix): the modal must open under the SAME account
     // that minted razorpayOrderId — never the env default's key.
@@ -187,7 +188,7 @@ export const POST = tenantHandler(async (request) => {
       // One getCart + one shipping compute → the SAME amount for the Razorpay
       // order, our order row, and (later) the Shopify shipping line.
       const rzOrder = await createRazorpayOrder({
-        amountPaise: Math.round((cart.total + shipping.total) * 100),
+        amountPaise: toMinor(cart.total + shipping.total, cart.currency || "INR"),
         receipt: `cart_${cartId.slice(0, 12)}`,
       });
       const order = await createOrder({

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { listOrders, orderStatusCounts } from "@/lib/admin/orders";
+import { redactOrderForRole } from "@/lib/admin/order-view";
 import { tenantHandler } from "@/lib/tenant-request";
 
 export const runtime = "nodejs";
@@ -14,5 +15,7 @@ export const GET = tenantHandler(async (request) => {
     listOrders({ status: p.get("status"), q: p.get("q"), before: p.get("before") }),
     orderStatusCounts(),
   ]);
-  return NextResponse.json({ ok: true, ...list, counts });
+  // S31: support never sees contact PII, in lists either
+  const orders = (list.orders || []).map((o) => redactOrderForRole(o, auth.actor.role));
+  return NextResponse.json({ ok: true, ...list, orders, counts });
 });

@@ -81,9 +81,11 @@ export const POST = tenantHandler(async (request) => {
   }
 
   // Defense in depth: the captured amount must match OUR order to the paisa.
-  if (Number(amount) !== Math.round(order.total * 100)) {
+  const { toMinor } = await import("@/lib/money");
+  const expectedMinor = toMinor(order.total, order.currency || "INR");
+  if (Number(amount) !== expectedMinor) {
     console.error(
-      `[rz-webhook] AMOUNT MISMATCH ${order.id}: captured ${amount}, expected ${Math.round(order.total * 100)} (payment ${paymentId})`,
+      `[rz-webhook] AMOUNT MISMATCH ${order.id}: captured ${amount}, expected ${expectedMinor} (payment ${paymentId})`,
     );
     if (inboxId) await markInbox(inboxId, "dead", { error: "amount_mismatch" }).catch(() => {});
     return NextResponse.json({ ok: true, flagged: "amount_mismatch", orderId: order.id });
