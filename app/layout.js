@@ -14,7 +14,8 @@ import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { getAnnouncement, getNav } from "@/lib/cms/store";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch, requestResolution } from "@/lib/tenant-request";
+import { isGated } from "@/lib/tenant-gate";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -24,7 +25,12 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const runtime = "edge";
 
 // Session 23: metadata resolves per tenant (was a hardcoded BeastLife export).
+// S25: gated hosts (unknown/suspended/control-plane-down in platform mode) get
+// neutral metadata — no siteName()/siteUrl() env fallback, no manifest, noindex.
 export async function generateMetadata() {
+  if (isGated(await requestResolution())) {
+    return { title: "Store", robots: { index: false } };
+  }
   const [name, title, tagline, url] = await tfetch(async () => [siteName(), siteTitle(), siteTagline(), siteUrl()]);
   return {
     metadataBase: new URL(url),
@@ -100,6 +106,19 @@ async function initialCart() {
 }
 
 export default async function RootLayout({ children }) {
+  // S25 fail-closed: gated hosts render a bare neutral shell — no tenant (or
+  // env-fallback) chrome, cart, pixels, consent banner or service worker. The
+  // page below still runs; its tfetch() calls notFound()/throw, which land in
+  // the neutral not-found / error surfaces inside this shell.
+  if (isGated(await requestResolution())) {
+    return (
+      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
+        <body className="flex min-h-full flex-col bg-white text-zinc-900 antialiased">
+          <main className="flex-1">{children}</main>
+        </body>
+      </html>
+    );
+  }
   const [collections, cart, chrome] = await Promise.all([navCollections(), initialCart(), chromeData()]);
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>

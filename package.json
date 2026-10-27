@@ -35,7 +35,8 @@
     "test:platform-sync": "node scripts/test-platform-sync.js",
     "test:admin-console": "node scripts/test-admin-console.js",
     "test:cms": "node scripts/test-cms.js",
-    "test:platform-ops": "node scripts/test-platform-ops.js"
+    "test:platform-ops": "node scripts/test-platform-ops.js",
+    "test:tenant-boundary": "node scripts/test-tenant-boundary.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

@@ -3,6 +3,8 @@ import { runEventSweep, forwardEventById, eventStats } from "@/lib/events";
 import { sendAlert } from "@/lib/alerts";
 import { forEachActiveTenant, runAsTenant } from "@/lib/platform/ops";
 import { tenantHandler } from "@/lib/tenant-request";
+import { platformConfigured } from "@/lib/platform/control";
+import { currentTenant } from "@/lib/tenant-context";
 
 // Event-forwarding janitor. GET = sweep pending events (Vercel cron daily; the
 // collector piggybacks a mini-sweep on every event, so this only mops up).
@@ -38,13 +40,21 @@ export async function GET(request) {
   return NextResponse.json({ ok: results.every((r) => r.ok), tenants: results });
 }
 
-export const POST = tenantHandler(async (request) => {
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const body = await request.json().catch(() => ({}));
-  if (!body.eventId) return NextResponse.json({ error: "eventId required" }, { status: 400 });
-  try {
-    return NextResponse.json(await runAsTenant(body.tenant || null, () => forwardEventById(body.eventId)));
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
-  }
-});
+// allowUnresolved + TENANT_REQUIRED guard: same fail-closed contract as the
+// sync-shopify POST — operator calls on the platform host must name a tenant.
+export const POST = tenantHandler(
+  async (request) => {
+    if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const body = await request.json().catch(() => ({}));
+    if (!body.eventId) return NextResponse.json({ error: "eventId required" }, { status: 400 });
+    if (platformConfigured() && !currentTenant() && !body.tenant) {
+      return NextResponse.json({ error: "tenant required on this host", code: "TENANT_REQUIRED" }, { status: 400 });
+    }
+    try {
+      return NextResponse.json(await runAsTenant(body.tenant || null, () => forwardEventById(body.eventId)));
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
+    }
+  },
+  { allowUnresolved: true },
+);

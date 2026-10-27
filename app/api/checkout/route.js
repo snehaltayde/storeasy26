@@ -12,6 +12,7 @@ import {
   markOrderPaid,
   getOrderRazorpayId,
   findOrderByIdempotencyKey,
+  orderConfirmationPath,
   ORDER_STATUS,
 } from "@/lib/orders";
 import { razorpayConfigured, razorpayKeyId, createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
@@ -56,14 +57,28 @@ async function dedupByKey(key, cart, expectedTotal) {
   return existing;
 }
 
-const codResponse = (order, deduped = false) =>
-  NextResponse.json({ ok: true, orderId: order.id, ...(deduped ? { deduped: true } : {}) });
+// S25 (SF08): every response the client navigates to confirmation from carries
+// a server-computed tokenized path — the confirmation page requires it. Minted
+// inside the tenantHandler context, so the right tenant's secret signs it.
+const codResponse = async (order, deduped = false) =>
+  NextResponse.json({
+    ok: true,
+    orderId: order.id,
+    confirmationPath: await orderConfirmationPath(order.id),
+    ...(deduped ? { deduped: true } : {}),
+  });
 
-function razorpayResponse(order, razorpayOrderId, deduped = false) {
+async function razorpayResponse(order, razorpayOrderId, deduped = false) {
   // An order that already left pending_payment means the payment landed —
   // don't reopen the modal; the client goes straight to confirmation.
   if (order.status && order.status !== ORDER_STATUS.PENDING_PAYMENT) {
-    return NextResponse.json({ ok: true, orderId: order.id, status: order.status, alreadyPaid: true });
+    return NextResponse.json({
+      ok: true,
+      orderId: order.id,
+      status: order.status,
+      alreadyPaid: true,
+      confirmationPath: await orderConfirmationPath(order.id),
+    });
   }
   return NextResponse.json({
     ok: true,
@@ -107,7 +122,7 @@ export const POST = tenantHandler(async (request) => {
       if (dup) {
         // Finish what the first request started if its cart clear didn't land.
         if (cartId && cart.items.length) await clearCart(cartId);
-        return codResponse(dup, true);
+        return await codResponse(dup, true);
       }
 
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
@@ -140,7 +155,7 @@ export const POST = tenantHandler(async (request) => {
           await enqueuePurchaseAndForward(order.id);
         });
       }
-      return codResponse(order, order.deduped);
+      return await codResponse(order, order.deduped);
     }
 
     if (action === "razorpay_create") {
@@ -162,7 +177,7 @@ export const POST = tenantHandler(async (request) => {
       // payment instead of minting a parallel one.
       const dup = await dedupByKey(idempotencyKey, cart, (cart.total || 0) + shipping.total);
       if (dup instanceof NextResponse) return dup;
-      if (dup) return razorpayResponse(dup, dup.razorpay_order_id, true);
+      if (dup) return await razorpayResponse(dup, dup.razorpay_order_id, true);
 
       if (!cartId) return NextResponse.json({ error: "No cart session" }, { status: 400 });
       if (!validate(contact, address))
@@ -195,8 +210,8 @@ export const POST = tenantHandler(async (request) => {
       });
       // Lost a same-key insert race: answer with the winner's Razorpay order
       // (this request's rzOrder is an orphan — never paid, expires unused).
-      if (order.deduped) return razorpayResponse(order, order.razorpayOrderId, true);
-      return razorpayResponse(order, rzOrder.id);
+      if (order.deduped) return await razorpayResponse(order, order.razorpayOrderId, true);
+      return await razorpayResponse(order, rzOrder.id);
     }
 
     if (action === "razorpay_verify") {
@@ -228,7 +243,12 @@ export const POST = tenantHandler(async (request) => {
           await enqueuePurchaseAndForward(orderId);
         });
       }
-      return NextResponse.json({ ok: true, orderId, ...(paid.already ? { already: true } : {}) });
+      return NextResponse.json({
+        ok: true,
+        orderId,
+        confirmationPath: await orderConfirmationPath(orderId),
+        ...(paid.already ? { already: true } : {}),
+      });
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });

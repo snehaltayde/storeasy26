@@ -47,12 +47,25 @@ const ok = (cond, label) => {
 };
 
 // --- loop primitive --------------------------------------------------------------
-await t("forEachActiveTenant: EMPTY registry → one run in the default/env context", async () => {
+// S25 fail-closed: with a CONFIGURED control plane an empty registry means [] —
+// the silent default run survives only in legacy (unconfigured) mode.
+await t("forEachActiveTenant: configured + EMPTY registry → no runs at all", async () => {
   const res = await forEachActiveTenant(async () => tenantId());
-  eq(res.length, 1);
-  eq(res[0].tenant, "_default");
-  eq(res[0].result, "_default", "ran without tenant context");
-  eq(res[0].ok, true);
+  eq(res.length, 0);
+});
+
+await t("forEachActiveTenant: LEGACY (unconfigured) → one run in the default/env context", async () => {
+  const saved = process.env.PLATFORM_DB_URL;
+  process.env.PLATFORM_DB_URL = "";
+  try {
+    const res = await forEachActiveTenant(async () => tenantId());
+    eq(res.length, 1);
+    eq(res[0].tenant, "_default");
+    eq(res[0].result, "_default", "ran without tenant context");
+    eq(res[0].ok, true);
+  } finally {
+    process.env.PLATFORM_DB_URL = saved;
+  }
 });
 
 await t("forEachActiveTenant: runs per ACTIVE tenant in its own context; suspended skipped", async () => {

@@ -105,9 +105,12 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function goConfirmation(orderId) {
-    // Full nav so the layout re-reads the (now-cleared) cart.
-    window.location.href = `/checkout/confirmation/${orderId}`;
+  function goConfirmation(data) {
+    // Full nav so the layout re-reads the (now-cleared) cart. The server hands
+    // back a tokenized confirmationPath (S25/SF08 — the confirmation page
+    // requires it). The tokenless fallback only fires on deploy skew (old
+    // server + new client) and lands on a neutral 404, never a PII leak.
+    window.location.href = data.confirmationPath || `/checkout/confirmation/${data.orderId}`;
   }
 
   // One idempotency key per payment ATTEMPT — minted on first submit, reused by
@@ -151,7 +154,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
         }
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "Could not place order");
-        goConfirmation(data.orderId);
+        goConfirmation(data);
         return;
       }
 
@@ -169,7 +172,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
       if (!data.ok) throw new Error(data.error || "Could not start payment");
       if (data.alreadyPaid) {
         // This intent's payment already landed (duplicate submit after verify).
-        goConfirmation(data.orderId);
+        goConfirmation(data);
         return;
       }
 
@@ -197,7 +200,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
               razorpay_signature: response.razorpay_signature,
             }),
           }).then((r) => r.json());
-          if (v.ok) goConfirmation(v.orderId);
+          if (v.ok) goConfirmation(v);
           else {
             setError(v.error || "Payment verification failed");
             setPlacing(false);

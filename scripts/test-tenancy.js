@@ -144,7 +144,7 @@ await t("control plane: upsert → host resolution → decrypted runtime", async
   eq(byHost.dbToken, "acme-db-token", "db token decrypted");
   eq(byHost.secrets.razorpay_key_secret, "rzp_secret_acme", "secrets decrypted");
   eq(byHost.config.shopify_store_domain, "acme.myshopify.com", "config");
-  eq(await C.getTenantByHost("unknown.example"), null, "unmapped host → null (env fallback)");
+  eq(await C.getTenantByHost("unknown.example"), null, "unmapped host → null (fail closed in platform mode)");
   const raw = await (await import("../lib/platform/control.js")).listTenants();
   ok(raw.some((r) => r.id === "acme"), "listed");
 });

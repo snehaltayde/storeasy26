@@ -10,8 +10,8 @@ export const maxDuration = 60;
 
 const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-// PATCH {status} — suspend/reactivate a tenant (suspended hosts fall back to
-// the default store rather than 500ing; see getTenantByHost).
+// PATCH {status} — suspend/reactivate a tenant. S25: suspended hosts FAIL
+// CLOSED (neutral "temporarily unavailable", 503 on APIs) — see resolveHost.
 export async function PATCH(request, { params }) {
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const { id } = await params;
@@ -33,6 +33,9 @@ export async function POST(request, { params }) {
   const { id } = await params;
   const tenant = await getTenant(id);
   if (!tenant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (tenant.status !== "active") {
+    return NextResponse.json({ ok: false, error: `tenant is ${tenant.status}` }, { status: 409 });
+  }
   try {
     const r = await syncTenantCatalog(tenant);
     slog("tenant_synced", { tenant: id, products: r.products, collections: r.collections, via: "platform-console" });

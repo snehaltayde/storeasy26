@@ -13,7 +13,9 @@ if (!orderId) {
   process.exit(1);
 }
 
-await runAsTenant(tenantSlug, main).catch((e) => {
+// allowSuspended: tracing a suspended tenant's orders is a legitimate operator
+// task (runAsTenant prints a warning when it happens).
+await runAsTenant(tenantSlug, main, { allowSuspended: true }).catch((e) => {
   console.error(`✗ ${e.message}`);
   process.exit(1);
 });

@@ -30,6 +30,9 @@ export async function GET(request) {
 
   const tenant = await getTenant(slug);
   if (!tenant) return NextResponse.json({ error: `unknown tenant "${slug}"` }, { status: 404 });
+  if (tenant.status !== "active") {
+    return NextResponse.json({ error: `tenant "${slug}" is ${tenant.status}`, code: "TENANT_SUSPENDED" }, { status: 409 });
+  }
 
   const shopDomain = tenant.config?.shopify_store_domain;
   const clientId = tenant.config?.shopify_client_id;

@@ -366,8 +366,9 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
   tenant's OWN database (products, last sync, orders in flight, Shopify
   connected/uninstalled), actions **Sync / Connect Shopify / Suspend / Activate**,
   and the **New tenant** provisioning wizard (generated console password shown once).
-- **Use**: `<any-host>/platform`, operator password. Suspending a tenant drops its
-  hosts to the default-store fallback (never a 500); Activate restores.
+- **Use**: `<any-host>/platform`, operator password. Suspending a tenant FAILS its
+  hosts CLOSED (S25): a neutral "temporarily unavailable" page, 503 + `TENANT_SUSPENDED`
+  on APIs — never another store's data. Activate restores.
 - **Setup**: `PLATFORM_ADMIN_PASSWORD` env (console disabled when unset) + the
   control-plane env trio.
 - **Files**: `app/platform/page.js`, `components/platform/PlatformAdmin.js` +
@@ -496,12 +497,13 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 11 aliased suites, **127 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 12 aliased suites, **152 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
-  admin-console 9 · cms 10 · platform-ops 8. Plus the standalone S4 engine suite
-  `node scripts/test-offers.js` (21 pure assertions — **148 checks in all**) and
-  `pnpm build` as the compile gate.
+  admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
+  resolution, outage budget, overlapping-handle isolation, order-token scheme).
+  Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
+  assertions — **173 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -520,8 +522,13 @@ multi-tenant payments go live. Severity-ordered:
 3. **CheckoutFlow's client shipping estimate uses code defaults** — the payment-step
    preview calls `computeShipping` without the tenant config (display-only drift;
    the server recompute is what's charged, and the drawer is correct).
-4. **Confirmation page is unauthenticated** — `/checkout/confirmation/<orderId>`
-   shows PII + the tokenized status link to anyone holding the order id.
+4. ~~**Confirmation page is unauthenticated**~~ — **FIXED (S25)**: the page now
+   requires the same `?t=` token as the status page, verified BEFORE any order
+   read (bad token and unknown id are both 404, so enumeration reveals nothing);
+   `/api/checkout` success responses carry a server-computed `confirmationPath`
+   and CheckoutFlow navigates to it. Residuals (scheduled S33): the token is
+   deterministic/non-expiring, travels in the query string (reaches pixels/CAPI
+   `event_source_url`/error-report URLs), and there's no `Referrer-Policy` header.
 5. **Offer schedule drifts on edit** — OfferForm round-trips UTC through
    `datetime-local` as local time; each edit shifts starts/ends by the UTC offset
    (IST: −5h30m). Re-pick the times when editing a scheduled offer.
@@ -627,11 +634,15 @@ context implicitly.
 
 ### 3.2 Request lifecycle (Host → tenant → data)
 
-1. **Resolution** — `getTenantByHost(host)` in [lib/platform/control.js](../lib/platform/control.js)
-   maps the request's Host header to a tenant row (exact `host:port` match first, then
-   bare host). A per-isolate index caches the mapping for `PLATFORM_CACHE_MS` (30s);
-   tenant rows are cached on the same TTL with secrets decrypted once per refresh.
-   Suspended tenants and unknown hosts resolve to `null`.
+1. **Resolution** — `resolveHost(host)` in [lib/platform/control.js](../lib/platform/control.js)
+   maps the request's Host header to an OUTCOME (exact `host:port` match first, then
+   bare host): `legacy` (no `PLATFORM_DB_URL` — single-tenant env mode) · `resolved`
+   (active tenant) · `unknown` · `suspended` · `unavailable` (control plane
+   unreachable past the stale budget). A per-isolate index caches the mapping for
+   `PLATFORM_CACHE_MS` (30s); tenant rows are cached on the same TTL with secrets
+   decrypted once per refresh; during an outage the last good snapshot serves for at
+   most `PLATFORM_STALE_MS` (5 min default). `getTenantByHost` remains as the compat
+   wrapper (`resolved ? tenant : null`).
 2. **Context entry** — two entry shapes establish the context
    ([lib/tenant-request.js](../lib/tenant-request.js)):
    - API routes: `export const POST = tenantHandler(async (request) => …)`
@@ -649,11 +660,22 @@ context implicitly.
    Kysely's `db.fn` is a callable-with-attached-methods and bind would strip them.
 4. **Config/secrets** — accessors read tenant-first with env fallback (§3.3).
 
-**The env fallback IS the default tenant.** With no control plane configured (prod
-today), or for an unmapped host, or if the control plane is unreachable, everything
-resolves from environment variables — the exact pre-platform behavior. This is why
-every pre-S20 script, test, and cron works unchanged, and why a control-plane outage
-degrades to serving the default store rather than 500ing.
+**The env fallback IS the default tenant — in LEGACY mode only (S25).** With no
+control plane configured (prod today), everything resolves from environment
+variables — the exact pre-platform behavior, which is why every pre-S20 script,
+test, and cron works unchanged. **In platform mode (`PLATFORM_DB_URL` set) the
+boundary FAILS CLOSED**: unknown hosts → neutral 404 (`TENANT_UNKNOWN` on APIs),
+suspended tenants → neutral "temporarily unavailable" (503 `TENANT_SUSPENDED` on
+APIs), and a control-plane outage serves the last good snapshot for at most
+`PLATFORM_STALE_MS` before failing 503 `CONTROL_PLANE_UNAVAILABLE` (pages: neutral
+error boundary) — never the default store. Gated hosts render a bare neutral shell
+(no tenant chrome, cart, pixels, consent banner or service worker); the outcome →
+HTTP mapping lives in [lib/tenant-gate.js](../lib/tenant-gate.js), and
+`tenantHandler(handler, { allowUnresolved: true })` opts platform-surface routes
+(health `?all=1`, operator job POSTs with explicit `body.tenant`) out of the gate.
+Cron loops: `forEachActiveTenant` returns a `_platform` failure row on control-plane
+errors (no silent env-default run) and `[]` for an empty registry; `runAsTenant`
+rejects suspended tenants unless the operator CLI passes `allowSuspended`.
 
 ### 3.3 Configuration & credential scoping
 
@@ -1040,7 +1062,7 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | `pnpm events:stats` / `search:report [days]` | Forwarding stats / search CTR + zero-result report (env tenant) |
 | `pnpm shopify:token [--write]` / `shopify:oauth` | Legacy single-store token minting / local OAuth |
 | `pnpm seed:demo` | 3 fake products + 2 collections into the env DB |
-| `pnpm test:*` | 11 aliased suites, 127 tests (see §2E) |
+| `pnpm test:*` | 12 aliased suites, 152 tests (see §2E) |
 | No alias | `scripts/test-offers.js` (21 pure engine assertions — the S4 suite), `scripts/spike-order-push.js` (S8 harness), `scripts/gen-icons.js` (sharp icon renders) |
 
 ### 4.9 Observability vocabulary

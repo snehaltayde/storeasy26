@@ -4,8 +4,9 @@ import { ga4Configured, metaConfigured } from "@/lib/tracking";
 import { razorpayConfigured, webhookConfigured } from "@/lib/razorpay";
 import { errorStats } from "@/lib/errors";
 import { forEachActiveTenant, aggregateHealth } from "@/lib/platform/ops";
-import { tenantOwnSecret } from "@/lib/tenant-context";
+import { tenantOwnSecret, currentTenant } from "@/lib/tenant-context";
 import { tenantHandler } from "@/lib/tenant-request";
+import { platformConfigured } from "@/lib/platform/control";
 
 // Health check (Session 17): dependency latencies + queue depths + config
 // flags in one place. 200 ok / 200 degraded (non-core issue) / 503 when the
@@ -100,16 +101,25 @@ function rollupAuthorized(request) {
   return header === `Bearer ${secret}` || request.nextUrl.searchParams.get("secret") === secret;
 }
 
-export const GET = tenantHandler(async (request) => {
-  if (request.nextUrl.searchParams.get("all") === "1") {
-    if (!rollupAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const results = await forEachActiveTenant(tenantHealth);
-    const rollup = aggregateHealth(results);
-    return NextResponse.json(
-      { ...rollup, at: new Date().toISOString() },
-      { status: rollup.status === "down" ? 503 : 200 },
-    );
-  }
-  const body = await tenantHealth();
-  return NextResponse.json(body, { status: body.status === "down" ? 503 : 200 });
-});
+// allowUnresolved: the ?all=1 rollup is called on the deployment/platform host
+// (not a tenant domain) by monitoring. The single-tenant check stays fail-closed
+// by hand: platform mode + no resolved tenant → 404 TENANT_UNKNOWN.
+export const GET = tenantHandler(
+  async (request) => {
+    if (request.nextUrl.searchParams.get("all") === "1") {
+      if (!rollupAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const results = await forEachActiveTenant(tenantHealth);
+      const rollup = aggregateHealth(results);
+      return NextResponse.json(
+        { ...rollup, at: new Date().toISOString() },
+        { status: rollup.status === "down" ? 503 : 200 },
+      );
+    }
+    if (platformConfigured() && !currentTenant()) {
+      return NextResponse.json({ error: "Store not found", code: "TENANT_UNKNOWN" }, { status: 404 });
+    }
+    const body = await tenantHealth();
+    return NextResponse.json(body, { status: body.status === "down" ? 503 : 200 });
+  },
+  { allowUnresolved: true },
+);

@@ -1,0 +1,31 @@
+You are working inside my existing Storeasy repository. Enhance it using the developer handoff in docs/storeasy-saas/ (or the attached package). Implement actual working features in small coherent slices.
+
+Read the repository's applicable AGENTS.md / CLAUDE.md and project conventions first. Then read Storeasy_Claude_Developer_Handoff.md and the index of Storeasy_Enhanced_Feature_List.md. Load the selected feature records from enhanced_feature_catalog.json and relevant reference files as needed; do not try to implement the whole roadmap at once.
+
+Treat the handoff as the target product and the repository as evidence of current behavior. Existing/Extend/Fix labels come from documentation, not a verified code audit. Preserve Next.js, JavaScript ESM, pnpm, Turso/libSQL and Kysely. Reuse working modules. Do not rewrite the framework, database or language merely to match your preferences. Keep one codebase with tenant configuration, not per-tenant forks.
+
+First:
+1. Inspect the source tree, package scripts, tenant resolution, authentication, database adapters, webhook/jobs, cart/order paths and existing tests. Do not expose credentials or copy them from the platform guide.
+2. Run the relevant existing baseline checks. Record actual commands and results.
+3. Create docs/storeasy-saas/IMPLEMENTATION_STATUS.md with feature ID, observed state, actual source paths, missing work, selected slice, verification state and blockers. Use not inspected, verified complete, partial, missing or blocked; do not claim all 116 features have been audited if they have not.
+4. Start with BE01 plus the minimum SF23 behavior: fail-closed tenant resolution for unknown/suspended/unresolved production hosts and safe error responses. Audit SF08 confirmation access at the same time and record or safely contain any confirmed order-data exposure.
+5. Implement the selected slice, add meaningful regression coverage, run relevant checks, and update the status file. If the first slice already passes with evidence, select the next unmet P0 slice rather than rewriting it. Continue necessary dependent work until the slice is complete; do not stop at a plan alone.
+
+Important constraints:
+- Tenant context must protect HTTP routes, database access, jobs, cache keys, search and assets. Use two unrelated tenant fixtures with overlapping handles and different data.
+- Unknown hosts must never fall back to another merchant. Shopper, merchant and operator authorization are separate.
+- Shopify remains authoritative for commerce totals, inventory, orders, payments and refunds. Local values are projections or estimates.
+- Confirm current official platform requirements and actual approval records before enabling checkout, public distribution, billing or protected customer-data features. Do not assume direct payment plus a draft-order API call is authorized. Do not abruptly change production checkout or abandon pending transactions.
+- Build template editing as typed, versioned configuration with preview, immutable releases and rollback. A draft must never change the live storefront implicitly.
+- Do not fabricate successful integrations, approvals, reviews, financial data or test results. Clearly label mocks and external checks not performed.
+- Do not publish/deploy, change DNS, create real charges, send customer messages or run destructive production migrations as part of this local implementation task.
+- Make routine reversible implementation decisions and record assumptions. If credentials or an external decision are missing, isolate the blocked integration and continue independent local work. Ask only when a missing answer materially prevents correct implementation.
+
+At the end of this slice, report:
+- Feature IDs completed and exact scope, distinguishing partial work.
+- Actual files changed and important behavior changes.
+- Migration/configuration requirements and rollback implications.
+- Exact checks run, results and external checks still pending.
+- Remaining risks/blockers and the next recommended slice.
+
+If you do not have repository access, say so clearly and request the repository or project files. Do not claim to have implemented this from the specification alone.

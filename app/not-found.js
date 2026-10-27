@@ -1,8 +1,39 @@
 import Link from "next/link";
+import { requestResolution } from "@/lib/tenant-request";
 
 export const metadata = { title: "Page not found" };
 
-export default function NotFound() {
+// Neutral surface for a gated host — no tenant data, no store links (every
+// storefront route on this host is itself gated).
+function GatedSurface({ code, title, body }) {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-24 text-center sm:px-6">
+      {code ? <p className="text-6xl font-extrabold tracking-tight text-zinc-200">{code}</p> : null}
+      <h1 className="mt-4 text-2xl font-bold">{title}</h1>
+      <p className="mt-2 text-zinc-500">{body}</p>
+    </div>
+  );
+}
+
+// S25 fail-closed: this page is outcome-aware. On a gated host it renders the
+// neutral platform response (inside the layout's bare shell); on a resolved or
+// legacy host it stays the store's regular 404.
+export default async function NotFound() {
+  const r = await requestResolution();
+  if (r.outcome === "suspended") {
+    // The display name comes from the control-plane tenants row only — safe:
+    // no tenant-DB read, no secret decryption.
+    return (
+      <GatedSurface
+        code=""
+        title={`${r.name || "This store"} is temporarily unavailable`}
+        body="Please check back soon."
+      />
+    );
+  }
+  if (r.outcome === "unknown" || r.outcome === "unavailable") {
+    return <GatedSurface code="404" title="Store not found" body="No store is configured for this address." />;
+  }
   return (
     <div className="mx-auto max-w-2xl px-4 py-24 text-center sm:px-6">
       <p className="text-6xl font-extrabold tracking-tight text-zinc-200">404</p>

@@ -2,16 +2,22 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import TrackEvent from "@/components/analytics/TrackEvent";
-import { getOrder, orderStatusPath } from "@/lib/orders";
+import { getOrder, orderStatusPath, verifyOrderStatusToken } from "@/lib/orders";
 import { formatMoney } from "@/lib/format";
 import { numericId } from "@/lib/ids";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Order confirmed" };
+export const metadata = { title: "Order confirmed", robots: { index: false, follow: false } };
 
-export default async function ConfirmationPage({ params }) {
+export default async function ConfirmationPage({ params, searchParams }) {
   const { orderId } = await params;
+  const { t } = await searchParams;
+  // S25 (SF08 containment): this page renders PII, so it requires the same
+  // tokenized proof as /orders/[orderId] — verified BEFORE any order read.
+  // Bad token and unknown order are indistinguishable (404 either way), so
+  // order-id enumeration reveals nothing.
+  if (!(await tfetch(() => verifyOrderStatusToken(orderId, t)))) notFound();
   const order = await tfetch(() => getOrder(orderId));
   if (!order) notFound();
 

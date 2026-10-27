@@ -3,6 +3,8 @@ import { runSyncSweep, pushOrderToShopify } from "@/lib/shopify-push";
 import { sendAlert } from "@/lib/alerts";
 import { forEachActiveTenant, runAsTenant } from "@/lib/platform/ops";
 import { tenantHandler } from "@/lib/tenant-request";
+import { platformConfigured } from "@/lib/platform/control";
+import { currentTenant } from "@/lib/tenant-context";
 
 // Shopify sync janitor. GET = sweep (Vercel cron daily; the webhook also
 // piggybacks a small sweep on every payment, so retries don't wait a day).
@@ -40,14 +42,23 @@ export async function GET(request) {
   return NextResponse.json({ ok: results.every((r) => r.ok), tenants: results });
 }
 
-export const POST = tenantHandler(async (request) => {
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const body = await request.json().catch(() => ({}));
-  if (!body.orderId) return NextResponse.json({ error: "orderId required" }, { status: 400 });
-  try {
-    const result = await runAsTenant(body.tenant || null, () => pushOrderToShopify(body.orderId));
-    return NextResponse.json(result);
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
-  }
-});
+// allowUnresolved: operators call this on the deployment/platform host with an
+// explicit body.tenant. S25 fail-closed: in platform mode a request that
+// resolves no tenant AND names none is rejected — no silent env-default push.
+export const POST = tenantHandler(
+  async (request) => {
+    if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const body = await request.json().catch(() => ({}));
+    if (!body.orderId) return NextResponse.json({ error: "orderId required" }, { status: 400 });
+    if (platformConfigured() && !currentTenant() && !body.tenant) {
+      return NextResponse.json({ error: "tenant required on this host", code: "TENANT_REQUIRED" }, { status: 400 });
+    }
+    try {
+      const result = await runAsTenant(body.tenant || null, () => pushOrderToShopify(body.orderId));
+      return NextResponse.json(result);
+    } catch (e) {
+      return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
+    }
+  },
+  { allowUnresolved: true },
+);

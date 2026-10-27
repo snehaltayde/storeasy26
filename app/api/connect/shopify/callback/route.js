@@ -32,6 +32,7 @@ export async function GET(request) {
 
   const tenant = await getTenant(state.tenantId);
   if (!tenant) return page("Authorization failed", `Unknown tenant "${state.tenantId}".`, false);
+  if (tenant.status !== "active") return page("Authorization failed", "This store is suspended.", false);
 
   const clientSecret = tenant.secrets?.shopify_client_secret;
   if (!clientSecret) return page("Authorization failed", "Tenant has no app client secret configured.", false);
