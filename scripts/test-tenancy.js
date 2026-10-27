@@ -51,10 +51,20 @@ const T1 = { id: "t1", name: "Tenant One", status: "active", dbUrl: "file:.test-
 const T2 = { id: "t2", name: "Tenant Two", status: "active", dbUrl: "file:.test-tenancy-t2.db", dbToken: null, config: {}, secrets: {} };
 
 // apply the commerce schema inside each tenant's context (proves libsql proxy
-// routes DDL too), and to the default env db
+// routes DDL too), and to the default env db. S32: the versioned migrations
+// run on top so fixture DBs match production shape (price_at_add etc.).
+const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+const tenantMigs = await loadMigrations("tenant");
 await libsql.executeMultiple(schema);
-await withTenant(T1, () => libsql.executeMultiple(schema));
-await withTenant(T2, () => libsql.executeMultiple(schema));
+await runMigrations(libsql, tenantMigs);
+await withTenant(T1, async () => {
+  await libsql.executeMultiple(schema);
+  await runMigrations(libsql, tenantMigs);
+});
+await withTenant(T2, async () => {
+  await libsql.executeMultiple(schema);
+  await runMigrations(libsql, tenantMigs);
+});
 
 // --- crypto -----------------------------------------------------------------
 await t("crypto: AES-GCM roundtrip + tamper rejection + null passthrough", async () => {

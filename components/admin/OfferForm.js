@@ -7,8 +7,9 @@ const TYPES = ["COUPON", "TIERED_QTY", "BXGY", "FREE_GIFT"];
 const TARGET_KINDS = ["tag", "handle", "productId", "variantId", "productType"];
 const SCOPE = { BXGY: "line", TIERED_QTY: "line", FREE_GIFT: "gift", COUPON: "order" };
 
-const toLocal = (iso) => (iso ? new Date(iso).toISOString().slice(0, 16) : "");
-const fromLocal = (v) => (v ? new Date(v).toISOString() : null);
+// S32 (MC14): proper local↔UTC conversion — an edit round-trip preserves the
+// intended instant (the old slice(0,16) version shifted it by the UTC offset).
+import { isoToLocalInput as toLocal, localInputToIso as fromLocal } from "@/lib/admin/schedule";
 
 export default function OfferForm({ existing, onDone, onCancel }) {
   const cfg = existing?.config || {};
@@ -53,6 +54,22 @@ export default function OfferForm({ existing, onDone, onCancel }) {
       ...(minSubtotal !== "" ? { minSubtotal: Number(minSubtotal) } : {}),
       combinable,
     };
+  }
+
+  const [sim, setSim] = useState(null);
+  const [simCart, setSimCart] = useState("medium");
+  const [simBusy, setSimBusy] = useState(false);
+
+  async function simulate() {
+    setSimBusy(true);
+    setSim(null);
+    const res = await fetch("/api/admin/offers/simulate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ offer: buildOffer(), enabled, cartKey: simCart }),
+    });
+    setSim(await res.json().catch(() => ({ ok: false, errors: ["Simulation failed"] })));
+    setSimBusy(false);
   }
 
   async function save(e) {
@@ -185,6 +202,51 @@ export default function OfferForm({ existing, onDone, onCancel }) {
         </label>
 
         {error && <pre className="whitespace-pre-wrap rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</pre>}
+
+        {/* S32 (BE07/MC14): prove the offer on a deterministic sample cart
+            BEFORE saving — alone and alongside the currently active offers. */}
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wide text-zinc-400">Test on a sample cart</span>
+            <select value={simCart} onChange={(e) => setSimCart(e.target.value)} className="rounded-lg border border-zinc-200 px-2 py-1 text-xs">
+              <option value="small">Small basket (₹499)</option>
+              <option value="medium">Medium basket (₹1,897)</option>
+              <option value="large">Large basket (₹4,296)</option>
+            </select>
+            <button
+              type="button"
+              onClick={simulate}
+              disabled={simBusy}
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-1 text-xs font-semibold hover:bg-zinc-100 disabled:opacity-50"
+            >
+              {simBusy ? "Running…" : "Run simulation"}
+            </button>
+          </div>
+          {sim && sim.ok === false && (
+            <pre className="mt-2 whitespace-pre-wrap text-xs text-red-600">{(sim.errors || []).join("\n")}</pre>
+          )}
+          {sim && sim.ok && (
+            <div className="mt-3 space-y-1 text-xs text-zinc-600">
+              <p>
+                <span className="font-semibold">{sim.applied.alone ? "✓ applies" : "✗ does not apply"}</span> on{" "}
+                {sim.cart.label}: subtotal ₹{sim.alone.subtotal.toLocaleString("en-IN")} → discount ₹
+                {sim.alone.discountTotal.toLocaleString("en-IN")} → total ₹{sim.alone.total.toLocaleString("en-IN")}
+                {sim.alone.gifts.length ? ` + gift: ${sim.alone.gifts.map((g) => g.title).join(", ")}` : ""}
+                {` · shipping est. ₹${sim.alone.shippingEstimate.toLocaleString("en-IN")}`}
+              </p>
+              {sim.activeOfferCount > 0 && (
+                <p>
+                  With the {sim.activeOfferCount} active offer(s):{" "}
+                  <span className="font-semibold">{sim.applied.combined ? "✓ still applies" : "✗ does NOT apply"}</span> — combined
+                  discount ₹{sim.combined.discountTotal.toLocaleString("en-IN")}, total ₹{sim.combined.total.toLocaleString("en-IN")}
+                </p>
+              )}
+              {sim.notes.map((n, i) => (
+                <p key={i} className="text-amber-700">• {n}</p>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="flex gap-3">
           <button type="submit" disabled={busy} className="rounded-xl bg-zinc-900 px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-50">

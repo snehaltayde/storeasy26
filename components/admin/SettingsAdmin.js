@@ -32,6 +32,7 @@ export default function SettingsAdmin({ initial }) {
   const ro = s.readOnly;
   const [identity, setIdentity] = useState(s.identity);
   const [payments, setPayments] = useState({ razorpay_key_id: s.payments.razorpay_key_id, razorpay_key_secret: "", razorpay_webhook_secret: "" });
+  const [commerce, setCommerce] = useState({ checkout_mode: s.commerce?.checkout_mode || "direct", timezone: s.commerce?.timezone || "Asia/Kolkata" });
   const [tracking, setTracking] = useState({
     ga4_measurement_id: s.tracking.ga4_measurement_id,
     ga4_api_secret: "",
@@ -59,6 +60,7 @@ export default function SettingsAdmin({ initial }) {
       body: JSON.stringify({
         identity,
         payments,
+        commerce,
         tracking,
         shipping,
         ...(adminPassword ? { admin_password: adminPassword } : {}),
@@ -140,6 +142,21 @@ export default function SettingsAdmin({ initial }) {
         </Field>
         <Field label="Shopify store" hint={s.shopify.connected ? `Connected${s.shopify.uninstalled_at ? " · APP UNINSTALLED — reconnect!" : ""}` : "Not connected — ask the operator"}>
           <input className={input} disabled value={s.shopify.store_domain} />
+        </Field>
+      </Section>
+
+      <Section title="Commerce" desc="Checkout capability and schedule timezone. Prices, stock, tax and final totals are Shopify-owned — edit them there.">
+        <Field label="Checkout mode" hint="Explicit per-store capability — never switched silently. 'Disabled' keeps browsing + cart up and refuses orders loudly.">
+          <select className={input} disabled={ro} value={commerce.checkout_mode} onChange={(e) => setCommerce({ ...commerce, checkout_mode: e.target.value })}>
+            <option value="direct">direct — first-party checkout (Razorpay + COD)</option>
+            <option value="disabled">disabled — checkout off</option>
+          </select>
+        </Field>
+        <Field label="Merchant timezone" hint="IANA name; offer schedules are edited in your local time and stored as exact instants.">
+          <input className={input} disabled={ro} value={commerce.timezone} onChange={(e) => setCommerce({ ...commerce, timezone: e.target.value })} placeholder="Asia/Kolkata" />
+        </Field>
+        <Field label="Shopper emails" hint={s.commerce?.shopper_emails || ""}>
+          <input className={input} disabled value="Shopify-native (no duplicates from Storeasy)" />
         </Field>
       </Section>
 

@@ -8,12 +8,12 @@ by a code audit or implementation in this repo — never by documentation alone.
 - Created: 2026-10-28 (session S25). Last updated: S29 (W2 underway; W1 complete).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 20 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 26 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
-  BE10, BE36, SF09, MC16 — S31). The other 96 are **not inspected** — the
-  handoff's Fix/Extend/New labels for them remain unverified documentation
-  claims.
+  BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32).
+  The other 90 are **not inspected** — the handoff's Fix/Extend/New labels for
+  them remain unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -401,6 +401,84 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   client-safe `lib/admin/order-view.js`).
 - Remaining (scheduled): provider deep-links & refund-request actions (W2+,
   with supported provider flows), list-page projection columns (W4 polish).
+
+### BE06 — Cart and checkout adapter · **partial (capability gate implemented & verified, S32)**
+
+- `lib/commerce/adapter.js`: explicit per-tenant `checkout_mode` — `direct`
+  (default: the existing first-party Razorpay+COD flow with its idempotency,
+  secure cart binding and state machine, all unchanged), `disabled` (checkout
+  API 503 `CHECKOUT_DISABLED`, page explains "cart is saved", browsing/cart
+  stay up), `shopify` (RESERVED: keeps checkout OFF instead of pretending —
+  the hosted-handoff adapter is a later wave behind this same gate). Unknown
+  values fail closed. Modes are merchant settings (audited), never silently
+  switched — the handoff's conditional-replacement rule is now enforceable
+  configuration. `checkoutCapability()` also scopes the prepaid flag to the
+  tenant's OWN Razorpay keys. LIVE round-trip on demo: disabled → API 503 +
+  page notice → restored.
+- Out of scope, scheduled: the actual Shopify-hosted checkout adapter + offer
+  compilation to provider discounts (gated on the external authorization
+  decision, per the locked S-roadmap choice).
+
+### BE07 — Promotion compiler · **partial (simulator + schedules verified, S32)**
+
+- Deterministic sample-cart SIMULATOR (`lib/offers/simulate.js` + POST
+  /api/admin/offers/simulate + the "Test on a sample cart" panel in the offer
+  form): validates the candidate, runs the pure engine alone AND combined with
+  the live offers on three canned baskets, and explains non-application and
+  combination conflicts (one-coupon-per-cart etc.) in plain notes.
+- Timezone-safe schedules: the UTC-drift quirk is dead — `lib/admin/schedule.js`
+  converts local wall time ↔ UTC instants properly (round-trip identity is
+  suite-proven, TZ-independent) and derives the lifecycle status
+  (draft/paused/scheduled/active/expired) shown as chips in the console.
+- Typed rules + validation existed (S19, `OFFER_INVALID` with named errors);
+  compilation TO PROVIDER discount functions is deferred with the shopify
+  checkout mode (recorded).
+
+### SF06 — Cart · **partial (fixes implemented & verified, S32)**
+
+- Price/stock changes are ACKNOWLEDGED: `cart_items.price_at_add` (migration
+  0004) remembers what the shopper saw; `getCart` returns `changes[]`
+  (price_changed from→to, unavailable) while totals always use the CURRENT
+  catalog price; the drawer shows an amber notice. Duplicate `setQty` submits
+  collapse to one state (suite-proven); gift eligibility recomputes on removal
+  (suite-proven); checkout failures never clear the cart (clear happens only
+  on success — unchanged, now stated in the UI copy).
+
+### SF07 — Checkout handoff · **partial (direct-adapter states verified, S32)**
+
+- Honest handoff states: `CHECKOUT_DISABLED` → "cart saved, nothing charged";
+  expired cart session → recovery hint; Razorpay modal dismiss/payment-failed
+  already reset cleanly (verified in code). The page itself gates on
+  capability before rendering the form. Provider-handoff (Shopify checkout)
+  states arrive with that adapter.
+
+### MC14 — Offers · **partial (fixed & extended, S32)**
+
+- TZ round-trip FIXED (quirk #5); lifecycle chips (draft/paused/scheduled/
+  active/expired) in the list; sample-cart simulator panel in the form
+  (alone + combined, explained). Draft→validated→active flow = validation on
+  save (existing) + chips + simulator; provider capability display arrives
+  with BE24/MC20 integration surfacing (S34 did connection state; discount
+  compilation display is deferred with the shopify mode).
+
+### MC22 — Commerce preferences · **partial (implemented, S32)**
+
+- Settings → Commerce: checkout mode (explicit select, validated server-side,
+  audited via the settings save), merchant timezone (IANA-validated), and a
+  shopper-emails note (Shopify-native — no duplicate senders). Source-owned
+  fields (prices/stock/tax/totals) labeled Shopify-owned. Currency remains
+  catalog-derived display (read-only by construction).
+
+## Verification state (S32, 2026-10-28)
+
+19 suites / **242 tests + 21 offers = 263 checks** green (new `test:commerce`,
+10; `test-tenancy` fixtures now run the migration ledger on top of the raw
+baseline — the new cart column broke its raw-schema DBs, which is exactly the
+drift the ledger exists to prevent); build clean. Hosted: 0004 applied to all
+3 tenant DBs; live gate round-trip on demo (API 503 CHECKOUT_DISABLED + page
+notice + restore); cart price_at_add verified stored on a real beastlife
+variant. Simulator case-sensitivity bug (uppercase offer types) caught by the
+suite and fixed before ship.
 
 ## Verification state (S31, 2026-10-28)
 

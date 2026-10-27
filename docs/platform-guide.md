@@ -507,7 +507,7 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 18 aliased suites, **232 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 19 aliased suites, **242 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -525,9 +525,13 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
   webhook-race survival, failed-partial safety, missed-delete repair, scope
   check at token mint) · order-projection 11 (S31: minor-unit money +
   drift-free allocation, authoritative reconcile dedup/out-of-order watermark,
-  two-parcel fixture, support-role PII redaction, push-message mapping).
+  two-parcel fixture, support-role PII redaction, push-message mapping) ·
+  commerce 10 (S32: checkout capability gate incl. fail-closed unknown modes,
+  TZ-safe schedule round-trips + lifecycle matrix, deterministic simulator +
+  combination preview, cart change acknowledgement, duplicate-mutation
+  idempotency, gift eligibility, commerce settings validation).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **253 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **263 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -553,9 +557,10 @@ multi-tenant payments go live. Severity-ordered:
    and CheckoutFlow navigates to it. Residuals (scheduled S33): the token is
    deterministic/non-expiring, travels in the query string (reaches pixels/CAPI
    `event_source_url`/error-report URLs), and there's no `Referrer-Policy` header.
-5. **Offer schedule drifts on edit** — OfferForm round-trips UTC through
-   `datetime-local` as local time; each edit shifts starts/ends by the UTC offset
-   (IST: −5h30m). Re-pick the times when editing a scheduled offer.
+5. ~~**Offer schedule drifts on edit**~~ — **FIXED (S32 / MC14)**: OfferForm now
+   converts properly between local wall time and UTC instants
+   (lib/admin/schedule.js); an edit round-trip preserves the intended instant
+   exactly (suite-proven, TZ-independent).
 6. **Editing an upsell placement re-enables it** (the form omits `enabled`).
 7. **A home section saved as hidden disappears from the editor** (reads filter
    disabled sections); only Reset-to-default recovers it. Same class: a content page
@@ -852,6 +857,19 @@ stateDiagram-v2
 - **Oversell v1 = accept + flag**: negative `inventoryQuantity` on pushed lines →
   alert + `oversell_flagged` log, order proceeds.
 
+**Commerce adapter gate (S32 / BE06).** [lib/commerce/adapter.js](../lib/commerce/adapter.js)
+is the per-tenant capability surface in front of cart/checkout: `checkout_mode`
+config = `direct` (default, the first-party Razorpay+COD flow) · `disabled`
+(checkout off: API answers 503 `CHECKOUT_DISABLED`, the page explains that the
+cart is saved, browsing stays up) · `shopify` (RESERVED — selecting it keeps
+checkout off rather than pretending). Unknown values fail closed. Modes are
+explicit merchant settings (Settings → Commerce, audited) — never switched
+silently. The offer SIMULATOR (S32 / BE07): `lib/offers/simulate.js` runs the
+pure engine on deterministic sample carts — alone and combined with the live
+offers — via `POST /api/admin/offers/simulate` and the "Test on a sample cart"
+panel in the offer form; unsupported combinations are explained in notes, not
+discovered in production.
+
 ### 3.6 Offers engine
 
 Pure, deterministic evaluation in [lib/offers/engine.js](../lib/offers/engine.js),
@@ -1133,7 +1151,7 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | `pnpm events:stats` / `search:report [days]` | Forwarding stats / search CTR + zero-result report (env tenant) |
 | `pnpm shopify:token [--write]` / `shopify:oauth` | Legacy single-store token minting / local OAuth |
 | `pnpm seed:demo` | 3 fake products + 2 collections into the env DB |
-| `pnpm test:*` | 18 aliased suites, 232 tests (see §2E) |
+| `pnpm test:*` | 19 aliased suites, 242 tests (see §2E) |
 | `pnpm alert:test` | S29: alert-delivery self-test (sends a synthetic info alert to ALERT_WEBHOOK_URL, reports the real result) |
 | `pnpm user:create` / `invite:create` / `operator:create` | S26 identity CLIs: first store user (disables bootstrap pw), teammate invitation links, platform operators (TOTP at first login) |
 | `pnpm member:set` | S27: change a member's role or `--remove` them (final-owner protected; takes effect on their next request) |

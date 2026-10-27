@@ -105,6 +105,18 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // S32 (SF07): honest handoff states — the cart is never lost on a failure,
+  // say so, and explain the recoverable cases instead of parroting codes.
+  function friendlyCheckoutError(status, data = {}) {
+    if (data.code === "CHECKOUT_DISABLED") {
+      return "Checkout is temporarily unavailable for this store — your cart is saved, nothing was charged. Please try again later.";
+    }
+    if (/cart is empty|no cart session/i.test(data.error || "")) {
+      return "Your cart session expired — your items may still be in the cart. Go back to the cart and try again.";
+    }
+    return data.error || `Could not continue (HTTP ${status}) — your cart is untouched, please retry.`;
+  }
+
   function goConfirmation(data) {
     // Full nav so the layout re-reads the (now-cleared) cart. The server hands
     // back a tokenized confirmationPath (S25/SF08 — the confirmation page
@@ -153,7 +165,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
           return placeOrder(true);
         }
         const data = await res.json();
-        if (!data.ok) throw new Error(data.error || "Could not place order");
+        if (!data.ok) throw new Error(friendlyCheckoutError(res.status, data));
         goConfirmation(data);
         return;
       }
@@ -169,7 +181,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
         return placeOrder(true);
       }
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Could not start payment");
+      if (!data.ok) throw new Error(friendlyCheckoutError(res.status, data));
       if (data.alreadyPaid) {
         // This intent's payment already landed (duplicate submit after verify).
         goConfirmation(data);

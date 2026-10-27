@@ -2,10 +2,25 @@
 
 import { useState } from "react";
 import OfferForm from "./OfferForm";
+import { offerScheduleStatus } from "@/lib/admin/schedule";
 
 // Single-store offer console (Session 19). List + enable/disable + schedule +
 // edit/create for the 4 engine offer types. Every save is live on the next
 // cart read — deliberately NOT a SaaS console (no tenants/theming/billing).
+// S32 (MC14): lifecycle chip — draft / paused / scheduled / active / expired
+// (derived in lib/admin/schedule.js, same logic the engine's window uses).
+function LifecycleChip({ offer }) {
+  const status = offerScheduleStatus(offer);
+  const styles = {
+    active: "bg-lime-100 text-lime-700",
+    scheduled: "bg-sky-100 text-sky-700",
+    expired: "bg-zinc-200 text-zinc-500",
+    paused: "bg-amber-100 text-amber-700",
+    draft: "bg-zinc-100 text-zinc-500",
+  };
+  return <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${styles[status]}`}>{status}</span>;
+}
+
 export default function OffersAdmin({ initialOffers }) {
   const [offers, setOffers] = useState(initialOffers);
   const [editing, setEditing] = useState(null); // offer row | "new"
@@ -103,6 +118,7 @@ export default function OffersAdmin({ initialOffers }) {
               <p className="truncate text-sm font-semibold">
                 {o.label}
                 <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">{o.type}</span>
+                <LifecycleChip offer={o} />
               </p>
               <p className="truncate text-xs text-zinc-500">
                 {summarize(o)} · <span className={o.starts_at || o.ends_at ? "text-amber-600" : ""}>{schedule(o)}</span>

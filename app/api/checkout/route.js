@@ -17,6 +17,7 @@ import {
 } from "@/lib/orders";
 import { razorpayConfigured, razorpayKeyId, createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
 import { toMinor, sameAmount } from "@/lib/money";
+import { checkoutCapability } from "@/lib/commerce/adapter";
 import { tenantHandler } from "@/lib/tenant-request";
 
 export const runtime = "nodejs";
@@ -95,6 +96,15 @@ async function razorpayResponse(order, razorpayOrderId, deduped = false) {
 }
 
 export const POST = tenantHandler(async (request) => {
+  // S32 (BE06): the per-tenant capability gate — checkout modes are explicit
+  // configuration, never silently switched. Browsing and the cart stay up.
+  const capability = checkoutCapability();
+  if (!capability.available) {
+    return NextResponse.json(
+      { error: capability.reason || "Checkout is disabled for this store", code: "CHECKOUT_DISABLED" },
+      { status: 503 },
+    );
+  }
   const limited = rateLimit(request, { name: "checkout", limit: 10 });
   if (limited) return limited;
 

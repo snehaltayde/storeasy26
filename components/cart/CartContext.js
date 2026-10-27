@@ -82,6 +82,7 @@ export function CartProvider({ children, initialCart }) {
     shipping: cart.shipping || null,
     grandTotal: cart.grandTotal ?? cart.total ?? cart.subtotal,
     couponStatus: cart.couponStatus || null,
+    changes: cart.changes || [], // S32 (SF06): price/availability change notices
     open,
     setOpen,
     pending,

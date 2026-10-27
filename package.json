@@ -50,7 +50,8 @@
     "alert:test": "node --env-file=.env.local scripts/alert-test.js",
     "rotate:secrets": "node --env-file=.env.local scripts/rotate-secrets.js",
     "tenant:migrate": "node --env-file=.env.local scripts/tenant-migrate.js",
-    "domain": "node --env-file=.env.local scripts/domain.js"
+    "domain": "node --env-file=.env.local scripts/domain.js",
+    "test:commerce": "node scripts/test-commerce.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
