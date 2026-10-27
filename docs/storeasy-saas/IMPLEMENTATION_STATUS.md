@@ -5,13 +5,13 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S27.
+- Created: 2026-10-28 (session S25). Last updated: S28 — **Wave W1 complete**.
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 8 of 116 records audited/implemented so far
-  (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27). The
-  other 108 are **not inspected** — the handoff's Fix/Extend/New labels for
-  them remain unverified documentation claims.
+- **Audit coverage honesty:** 11 of 116 records audited/implemented so far
+  (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
+  BE13, BE17, BE12 — S28). The other 105 are **not inspected** — the handoff's
+  Fix/Extend/New labels for them remain unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -194,6 +194,83 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   — individual operator ids attach when platform routes adopt a requireOperator
   gate, W2/OP10), audit UI tab (MC26, W4), storage-level immutability policy
   beyond app construction (documented; provider-level WORM is a W4 ops item).
+
+### BE13 — Secret management · **partial (rotation core implemented & verified, S28)**
+
+- Envelope v2 `k1:<keyfp>:<blob>` (key fingerprint = 8 hex of a keyed hash —
+  identifies the key, reveals nothing); legacy bare-base64 blobs stay readable.
+- Dual-read / single-write rotation: `PLATFORM_SECRET_NEXT` opens a rotation
+  (both keys decrypt; writes + OAuth-state signatures use NEXT, state
+  verification accepts both), `pnpm rotate:secrets` re-encrypts every stored
+  blob (tenants.db_token_enc / secrets_enc, users.totp_enc — audited,
+  re-runnable, counts-only output), then the keys swap. The "rotation orphans
+  ciphertext" defect is gone; the suite proves the stranded case exists ONLY
+  when the runbook is skipped. Live: dev control plane's blobs upgraded to k1
+  envelopes, all tenants decrypt, storefront unaffected.
+- Masked read models re-checked: settings view stays presence-only; audit
+  diffs redact secret-ish keys; rotate CLI prints fingerprints only.
+- Out of scope, scheduled: per-secret purpose/rotation metadata rows and
+  managed-KMS envelopes (post-W2 if needed); audited revoke flow per
+  integration (BE24, S34).
+
+### BE17 — Versioned migrations · **partial (ledger implemented & verified, S28)**
+
+- `lib/platform/migrate.js`: two tracks (tenant / platform), baseline = the
+  frozen schema files + `migrations/<track>/NNNN_*.sql`; every DB carries its
+  own `schema_migrations` (id, sha-256 checksum, applied_at). Applied files are
+  checksum-locked (editing one is a hard error telling you to write a new
+  migration); failures are not recorded, so retries re-run the file; adoption
+  on live DBs is a no-op re-run of the IF-NOT-EXISTS baseline.
+- Wired: `pnpm migrate`, `pnpm platform:migrate`, provisioning
+  (applyTenantSchema), new `pnpm tenant:migrate -- --all|--tenant` (failure-
+  isolated per tenant, suspended included, audited). Live: control plane
+  recorded baseline+0002_domains; all 3 tenant DBs recorded their baseline.
+- Discipline documented in migrations/README.md (expand → backfill → contract;
+  idempotent files because executeMultiple is not transactional).
+- Out of scope, scheduled: canary cohorts + fleet rollout UI (OP06, S42);
+  renderer dual-schema windows arrive with the release system (S35–36).
+
+### BE12 — Domains and certificates · **partial (registry core implemented & verified, S28)**
+
+- Control-plane `domains` table (host PRIMARY KEY = platform-wide uniqueness):
+  claim mints a `storeasy-verify=<hex>` TXT challenge; verify does a real DNS
+  TXT lookup (injectable for tests) and ACTIVATES the host into tenants.domains
+  (which the resolver reads, cache-invalidated); remove deactivates; any
+  re-claim mints a FRESH challenge, so a reclaimed domain can never ride a
+  previous owner's proof. `--pre-verified` = explicit, audited operator
+  assertion for dev hosts that can't carry TXT records. `primary` flags the
+  canonical host + mirrors `config.primary_host`.
+- Surfaces: `pnpm domain -- claim|verify|remove|primary|list` +
+  `GET/POST /api/platform/domains` (operator cookie + origin check).
+- Live round-trip: claimed `s28-probe.test` (pre-verified) → host SERVED the
+  demo store over HTTP → removed → 404 fail-closed again; real-domain claim
+  printed its TXT instructions; cross-tenant takeover refused; DNS verify
+  failed honestly on a nonexistent record (ENOTFOUND surfaced).
+- Deferred (recorded): the path-preserving primary-host HTTP redirect and the
+  DNS/TLS wizard (MC21/W4 — needs middleware or the domains UX; `is_primary` +
+  `config.primary_host` carry the data already); Vercel Domains API attachment
+  (deploy checkpoint A, needs the Vercel project context); TLS checks are
+  Vercel-managed and observed at MC21.
+
+## Wave W1 — EXIT (S25–S28, 2026-10-28)
+
+Handoff exit evidence for W1 ("fail-closed hosts, memberships, sessions,
+secrets and migrations; two-tenant negative tests; no default-store leak;
+revocation enforced"):
+- Two-tenant negative matrix: overlapping-handle isolation (S25 boundary
+  suite), cross-tenant session rejection + spoofed-tenant denial (S26/S27),
+  cross-tenant order-token rejection (S25), domain takeover block (S28).
+- No default-store leak: unknown/suspended/outage hosts fail closed at page +
+  API level (S25 curl matrix); cron/job env-default runs gated (S25).
+- Revocation enforced server-side: sessions (S26 HTTP), memberships mid-session
+  (S27), invitation single-use + no-burn-on-wrong-host (S26).
+- Secrets: key-versioned, rotation drill green end-to-end (S28).
+- Migrations: ledger live on the control plane + all tenant DBs (S28).
+- Checks: 15 suites / 201 tests + 21 engine = 222, build clean.
+STILL PENDING before deploy checkpoint A (user-gated): set PLATFORM_* env in
+Vercel, run platform+tenant migrations there, register webhooks, create real
+owner/operator accounts (bootstrap passwords retire per surface), rotate the
+S22 throwaway console passwords, HTTP-probe legacy + outage modes on staging.
 
 ## Baseline checks (S25, before changes)
 

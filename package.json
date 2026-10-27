@@ -42,7 +42,11 @@
     "invite:create": "node --env-file=.env.local scripts/invite-create.js",
     "operator:create": "node --env-file=.env.local scripts/operator-create.js",
     "member:set": "node --env-file=.env.local scripts/member-set.js",
-    "test:authz": "node scripts/test-authz.js"
+    "test:authz": "node scripts/test-authz.js",
+    "test:platform-core": "node scripts/test-platform-core.js",
+    "rotate:secrets": "node --env-file=.env.local scripts/rotate-secrets.js",
+    "tenant:migrate": "node --env-file=.env.local scripts/tenant-migrate.js",
+    "domain": "node --env-file=.env.local scripts/domain.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

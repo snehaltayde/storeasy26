@@ -507,7 +507,7 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 14 aliased suites, **186 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 15 aliased suites, **201 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -515,9 +515,12 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
   identity 21 (S26: scrypt, revocable sessions, bootstrap/legacy fallbacks, TOTP
   RFC vector, invites/resets, distributed throttle, origin guard) · authz 13
   (S27: role matrix, requireAdmin gating, spoofed-tenant denial, final-owner
-  protection, instant revocation, append-only redacted audit).
+  protection, instant revocation, append-only redacted audit) · platform-core 15
+  (S28: k1 envelopes + legacy dual-read + full rotation drill + OAuth-state
+  dual-verify, migration ledger checksums/retry/adoption, domain claim/takeover-
+  block/verify/re-proof/activation).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **207 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **222 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -710,7 +713,12 @@ crosses tenants.
 **Secrets at rest:** tenant secrets and DB tokens live in the control plane encrypted
 with **AES-256-GCM** ([lib/platform/crypto.js](../lib/platform/crypto.js)); the key is
 `SHA-256(PLATFORM_SECRET)`, `crypto.subtle` so it works on edge. Ciphertext format =
-base64(iv‖ct). Rotating `PLATFORM_SECRET` orphans stored secrets (re-seed tenants after).
+`k1:<keyfp>:base64(iv‖ct)` since S28 (pre-S28 bare-base64 blobs stay readable).
+**Rotation is first-class (S28 / BE13)** — nothing is orphaned: set
+`PLATFORM_SECRET_NEXT=<new>` + deploy (dual-read: both keys decrypt, writes use
+NEXT; OAuth states verify under both) → `pnpm rotate:secrets` (re-encrypts
+tenants.db_token_enc/secrets_enc + users.totp_enc under NEXT, audited, re-runnable)
+→ move NEXT into `PLATFORM_SECRET`, unset NEXT, deploy.
 `config` is plain JSON (non-secret); `secrets_enc` and `db_token_enc` are encrypted.
 
 ### 3.4 Catalog pipeline — one write path, two triggers
@@ -1052,7 +1060,7 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | Group | Variables |
 |---|---|
 | Default-tenant DB | `TURSO_DB_URL` + `TURSO_DB_AUTH_TOKEN` (first choice) · `DATABASE_URL` + `DATABASE_AUTH_TOKEN` (fallback; else `file:local.db`) |
-| Control plane | `PLATFORM_DB_URL` (presence = platformConfigured; else `file:platform.db`) · `PLATFORM_DB_TOKEN` · `PLATFORM_SECRET` (AES key + OAuth-state HMAC — rotating orphans stored secrets) · `PLATFORM_CACHE_MS` (30000) · `PLATFORM_ADMIN_PASSWORD` · `PLATFORM_URL` (webhook/callback base; must be https to register webhooks) · `TURSO_API_TOKEN` + `TURSO_ORG` (+`TURSO_GROUP`) switch provisioning to the HTTP API |
+| Control plane | `PLATFORM_DB_URL` (presence = platformConfigured; else `file:platform.db`) · `PLATFORM_DB_TOKEN` · `PLATFORM_SECRET` (AES key + OAuth-state HMAC) · `PLATFORM_SECRET_NEXT` (open rotation: dual-read, writes under NEXT — see §3 rotation runbook) · `PLATFORM_CACHE_MS` (30000) · `PLATFORM_ADMIN_PASSWORD` · `PLATFORM_URL` (webhook/callback base; must be https to register webhooks) · `TURSO_API_TOKEN` + `TURSO_ORG` (+`TURSO_GROUP`) switch provisioning to the HTTP API |
 | Shopify | `SHOPIFY_STORE_DOMAIN` (tenantOwn) · `SHOPIFY_API_VERSION` (2025-10) · `SHOPIFY_CLIENT_ID`/`SHOPIFY_CLIENT_SECRET` (tenantOwn) · `SHOPIFY_ADMIN_TOKEN` (tenantOwn) · `SHOPIFY_STOREFRONT_TOKEN`/`…_PRIVATE_TOKEN` (legacy storefront source) · **`NEXT_PUBLIC_SHOPIFY_DOMAIN`** (legacy permalink, unused) · `SHOPIFY_OAUTH_PORT` (3456) · `SHOPIFY_SYNC_MAX_ATTEMPTS` (5) / `…_BACKOFF_MS` (60000) / `…_STALE_MS` (600000) |
 | Razorpay | **`NEXT_PUBLIC_RAZORPAY_KEY_ID`** (tenantOwn server-side; see quirk #1) · `RAZORPAY_KEY_SECRET` (tenantOwn) · `RAZORPAY_WEBHOOK_SECRET` (tenantOwn) |
 | GA4/Meta/tracking | **`NEXT_PUBLIC_GA4_MEASUREMENT_ID`** / `GA4_API_SECRET` (tenantOwn) · `GA4_MP_EVENTS` ("purchase"; "all" for QA) · `GA4_DEBUG_MODE` · **`NEXT_PUBLIC_META_PIXEL_ID`** / `META_CAPI_TOKEN` (tenantOwn) · `META_TEST_EVENT_CODE` · `META_API_VERSION` (v21.0) · `COOKIE_DOMAIN` · `EVENTS_MAX_ATTEMPTS` (8) / `EVENTS_BACKOFF_MS` (60000) |
@@ -1064,21 +1072,24 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | Command | Does |
 |---|---|
 | `pnpm dev` / `build` / `start` | Next.js (dev on :3007 via launch.json) |
-| `pnpm migrate` / `db:reset` | Apply schema (+orders back-fill, offer seed) / also drop the 5 catalog tables (orders/events/offers/CMS are kept) |
+| `pnpm migrate` / `db:reset` | Run the VERSIONED tenant migrations on the env DB (S28 ledger: baseline=lib/schema.sql + migrations/tenant/NNNN_*.sql, checksum-locked in `schema_migrations`; +orders back-fill, offer seed) / also drop the 5 catalog tables |
+| `pnpm tenant:migrate -- --all \| --tenant <slug>` | S28: run tenant migrations on every registered tenant DB, failure-isolated per tenant (suspended included); applied files audited |
+| `pnpm rotate:secrets` | S28: re-encrypt all stored secret blobs under the current write key (step 2 of the rotation runbook); safe to re-run |
+| `pnpm domain -- claim\|verify\|remove\|primary\|list` | S28 domain registry: unique hosts, DNS-TXT ownership challenge (`--pre-verified` for operator-asserted dev hosts), activation into tenants.domains |
 | `pnpm sync` / `sync:search` | Full catalog sync (env tenant) / Typesense reindex only |
 | `pnpm tenant:sync <slug>` | Full sync for one tenant |
 | `pnpm tenant:provision <slug> --shop … [--name --domain… --client-id --client-secret --db-url --db-token --force]` | Provision a tenant end-to-end |
 | `pnpm tenant:seed-beastlife [--staging]` | Lift env into the beastlife(-staging) tenant row |
 | `pnpm tenant:seed-cms` | Seed beastlife's hero CMS rows (INSERT OR IGNORE) |
 | `pnpm webhooks:register <slug> [--url]` | Register/repair the 7 webhook subscriptions |
-| `pnpm platform:migrate` | Apply the control-plane schema |
+| `pnpm platform:migrate` | Run the versioned control-plane migrations (baseline=lib/platform/schema.sql + migrations/platform/NNNN_*.sql) |
 | `pnpm push:shopify [BL-X]` | Push one order / sweep 20 (env tenant) |
 | `pnpm order:trace BL-X [--tenant slug]` | Merged durable timeline |
 | `pnpm order:cancel BL-X [reason] [--refunded rfnd_X] [--tenant slug]` | Cancel both sides (refund id required for captured payments) |
 | `pnpm events:stats` / `search:report [days]` | Forwarding stats / search CTR + zero-result report (env tenant) |
 | `pnpm shopify:token [--write]` / `shopify:oauth` | Legacy single-store token minting / local OAuth |
 | `pnpm seed:demo` | 3 fake products + 2 collections into the env DB |
-| `pnpm test:*` | 14 aliased suites, 186 tests (see §2E) |
+| `pnpm test:*` | 15 aliased suites, 201 tests (see §2E) |
 | `pnpm user:create` / `invite:create` / `operator:create` | S26 identity CLIs: first store user (disables bootstrap pw), teammate invitation links, platform operators (TOTP at first login) |
 | `pnpm member:set` | S27: change a member's role or `--remove` them (final-owner protected; takes effect on their next request) |
 | No alias | `scripts/test-offers.js` (21 pure engine assertions — the S4 suite), `scripts/spike-order-push.js` (S8 harness), `scripts/gen-icons.js` (sharp icon renders) |

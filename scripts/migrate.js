@@ -1,12 +1,9 @@
 // Apply the catalog schema to the configured database.
-//   pnpm migrate            # create tables if missing
+//   pnpm migrate            # run the versioned tenant migrations (S28 ledger)
 //   pnpm db:reset           # drop + recreate (alias: migrate --reset)
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import { libsql } from "../lib/db.js";
+import { loadMigrations, runMigrations } from "../lib/platform/migrate.js";
 
-const here = dirname(fileURLToPath(import.meta.url));
 const reset = process.argv.includes("--reset");
 
 // Session 10: bring a pre-existing orders table up to the v2 shape (idempotency
@@ -64,8 +61,9 @@ try {
   }
 
   await ensureOrderColumns();
-  const schema = await readFile(join(here, "../lib/schema.sql"), "utf8");
-  await libsql.executeMultiple(schema);
+  const migrations = await loadMigrations("tenant");
+  const r = await runMigrations(libsql, migrations, { log: console.log });
+  if (r.skipped) console.log(`• ${r.skipped} migration(s) already recorded`);
 
   // Session 19: seed the offers table ONCE from the code config (INSERT OR
   // IGNORE — admin edits are never overwritten by later migrations).
