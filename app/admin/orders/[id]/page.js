@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { verifyAdminToken, adminSessionUser, ADMIN_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { getOrder } from "@/lib/orders";
 import { getOrderProjection } from "@/lib/order-projection";
 import { redactOrderForRole } from "@/lib/admin/order-view";
@@ -19,13 +19,15 @@ const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const when = (s) => (s ? new Date(s).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
 
 export default async function AdminOrderDetail({ params }) {
-  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
-  const authed = await tfetch(() => verifyAdminToken(token));
-  if (!authed) redirect("/admin/login");
+  const jar = await cookies();
+  // S34 (OP10): merchants sign in normally; an OPERATOR passes only under an
+  // active support grant (support role — read-only, PII-redacted).
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
+  if (!actor) redirect("/admin/login");
 
   const { id } = await params;
   // S31: the SUPPORT role sees order state and money, never customer PII
-  const role = (await tfetch(() => adminSessionUser(token)))?.role || "owner";
+  const role = actor.role;
   const [rawOrder, projection, name] = await tfetch(async () => [await getOrder(id), await getOrderProjection(id), siteName()]);
   if (!rawOrder) notFound();
   const order = redactOrderForRole(rawOrder, role);

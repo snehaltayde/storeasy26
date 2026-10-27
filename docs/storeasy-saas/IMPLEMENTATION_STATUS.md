@@ -5,16 +5,16 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S29 (W2 underway; W1 complete).
+- Created: 2026-10-28 (session S25). Last updated: S34 (**W2 complete**; W1 complete).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 29 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 34 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
-  BE18, SF24, BE20 — S33, with SF08 completed). The other 87 are **not
-  inspected** — the handoff's Fix/Extend/New labels for them remain unverified
-  documentation claims.
+  BE18, SF24, BE20 — S33, with SF08 completed; BE24, MC20, BE27, BE34,
+  OP10 — S34). The other 82 are **not inspected** — the handoff's
+  Fix/Extend/New labels for them remain unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -524,6 +524,132 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   shopify/webhooks` (they are not subscription-API topics).
 - Remaining: retention-policy table + request-tracking UI (MC25/OP11, W4);
   consent-version records per policy text revision (W3 content pass).
+
+### BE24 — Provider integration registry · **partial (implemented & verified, S34)**
+
+- `lib/integrations.js`: one registry over shopify/razorpay/ga4/meta/typesense/
+  mail — connection state from PRESENCE flags + metadata only (store domain,
+  scopes, key mode from prefix, checkout capability, last webhook via
+  `webhook_inbox`, last forward via event sent-stamps). Secret values never
+  serialize. `testIntegration` = side-effect-free live probes (Shopify `{shop}`
+  gql, Razorpay auth'd GET, Typesense `/health`, mail self-test to Resend's
+  sink; GA4/Meta honestly report that no safe test exists). `revokeIntegration`
+  nulls that provider's tenant keys via `patchTenant`, audited
+  (`integration.revoke`), refuses the env-fallback tenant.
+- LIVE (beastlife): registry GET rendered all six cards; shopify test →
+  "connected to Beastlife (beastlife-dev.myshopify.com)", razorpay →
+  "credentials valid (test mode)", typesense → honest "fetch failed" (cluster
+  dead, known), ga4 → honest no-test message.
+- Remaining: revoke should also pause queued jobs that use the provider
+  (today jobs fail cleanly and dead-letter — acceptable, noted); connect flows
+  stay in Settings/OAuth (MC20's connect buttons are hints, not flows).
+
+### MC20 — Integrations tab · **partial (implemented & verified, S34)**
+
+- `/admin/integrations` (new nav tab): provider cards with status dots,
+  LIVE/test chips, uninstall markers, Test/Revoke buttons (revoke = confirm
+  dialog + settings.write + audit; test = settings.read), per-provider
+  messages, honest empty/error states. Secrets presence-only by construction
+  (BE24 registry).
+- Remaining: last-event freshness per provider beyond webhooks/forwards
+  (needs BE21 coverage rollups, W4).
+
+### BE27 — Backup & restore drill · **partial (drill implemented & run, S34)**
+
+- `scripts/restore-drill.js` (`pnpm restore:drill -- --tenant <slug> |
+  --control-plane [--keep]`): logical restore of the HOSTED DB into an isolated
+  local file, then integrity verification — per-table row counts vs source,
+  migration-ledger ids+checksums, order money totals (Σtotal), secret-envelope
+  ciphertext lengths, PRAGMA foreign_key_check + integrity_check.
+- RUN 2026-10-28 (evidence): demo tenant — 21 tables / 13,579 rows restored in
+  1.4s, all checks green, ledger 0001–0005 intact, newest order timestamp
+  captured as RPO evidence. Control plane — 12 tables / 40 rows in 0.4s,
+  ledger 0001–0004 intact, tenant secret envelopes byte-length-identical.
+- RTO at current scale: seconds (logical). RPO: Turso continuous replication;
+  PITR clone (`turso db create <new> --from-db <db> --timestamp <iso>`) is the
+  production path — paid-plan feature, documented in platform-guide §5.3b, not
+  exercised against prod from sessions (user-gated).
+- Remaining: scheduled automatic drill (cron job post-deploy), PITR exercise
+  on a paid plan.
+
+### BE34 — Security release gate + threat model · **partial (implemented & verified, S34)**
+
+- `scripts/test-security.js` (13 tests, part of the pre-commit baseline):
+  static gates (live-credential literal scan over all tracked files; `.env*`/
+  `*.db` gitignore + tracked-file check; "use client" components can never
+  import server secret accessors; no API route serializes process.env) +
+  dynamic abuse (normalizeHost SSRF rejections, webhook-HMAC forge/tamper/
+  length-mismatch matrix, OAuth-state tamper/expiry/cross-secret,
+  support-grant TTL clamp + fresh expiry/revocation + read-only role matrix +
+  audit trail).
+- `docs/security-threat-model.md`: assets, trust boundaries → mitigations
+  mapped to modules/suites, residual risks stated honestly (top item: stored
+  XSS posture of `description_html`/CMS rich text — sanitization lands with
+  BE08/S35; CSP follows it).
+- Remaining: CSP headers (post-BE08), log-PII audit sweep automation,
+  dependency audit cadence.
+
+### OP10 — Operator support access grants · **partial (implemented & verified, S34)**
+
+- Control-plane `support_grants` (migration 0004, applied hosted): id, tenant,
+  operator, reason (min 5 chars enforced), created/expires/revoked. TTL
+  clamped 1–72h (default 4). Creation + revocation audited. `activeSupportGrant`
+  is a FRESH lookup per request — no cache window after revoke/expiry.
+- Entry path: `adminActor` in `lib/admin-auth.js` — merchant session first,
+  bootstrap second, then operator `_platform` cookie + active grant → actor
+  `{kind:"operator-support", role:"support"}`. Support is read-only
+  (`roleAllows` denies every write + settings.read) and PII-redacted (S31
+  order views). Merchant-visible amber banner on every `/admin` page
+  (`app/admin/layout.js`) with operator, reason, expiry.
+- Surfaces: `pnpm support -- grant|revoke|list` CLI +
+  `GET/POST /api/platform/support` (operator cookie + sameOrigin).
+- LIVE HTTP matrix (demo tenant, dev server): grant via CLI → operator cookie
+  read `/api/admin/orders` 200 with `"email":null …"pii_redacted":true`;
+  offers POST → 403 "Support access is read-only"; banner string rendered in
+  `/admin` HTML; same cookie on beastlife (no grant) → 401; support API GET
+  listed the grant, 401 without cookie; revoke via API → `{ok:true}` and the
+  very next demo request → 401; banner gone.
+- Remaining: /platform console UI panel for grants (CLI+API only today, W4
+  polish); real operator accounts replace the bootstrap token at cutover.
+
+## Verification state (S34, 2026-10-28)
+
+21 suites / **266 tests + 21 offers = 287 checks** green (new `test:security`,
+13 tests), `pnpm build` clean. Platform migration 0004 applied to the hosted
+control plane. Live: full OP10 grant lifecycle over HTTP (above), BE24 probes
+on beastlife, BE27 drills on demo + control plane.
+
+## Wave W2 — EXIT (S29–S34, 2026-10-28)
+
+Handoff exit evidence for W2 ("reliable commerce: provider reconciliation,
+failure/replay tests, documented approval status, restore evidence"):
+- Provider reconciliation: authoritative order projection with out-of-order/
+  dedup watermark (S31, live reconcile of a real cancelled order); money in
+  minor units with drift-free allocation (S31); catalog sync generations with
+  prune-after-complete-only, live ghost-prune on beastlife (S30).
+- Failure/replay: persist-before-ack inbox; atomic leases + crash recovery via
+  lease expiry; duplicate payment replay changes money exactly once (S29
+  acceptance test); audited replay from the queues console (OP05).
+- Documented approval status: per-store custom apps today; public-app
+  requirements + protected-customer-data position recorded (BE25, S30);
+  checkout stays direct Razorpay+COD behind the capability gate (BE06, locked
+  decision) — Shopify-hosted mode reserved, never silently switched.
+- Restore evidence: BE27 drills run against the HOSTED demo tenant and control
+  plane with integrity checks green (S34, numbers above).
+- Security: release gate suite + threat model in the baseline (BE34, S34);
+  operator access to tenant consoles is grant-bound, read-only, audited,
+  merchant-visible (OP10, verified live over HTTP).
+- Checks: 21 suites / 266 tests + 21 engine = 287, build clean.
+
+**Deploy checkpoint B (user-gated, NOT executed):** production cutover to
+platform mode. Pre-cutover list: everything from checkpoint A (PLATFORM_* env,
+hosted migrations via `pnpm platform:migrate` + `pnpm tenant:migrate -- --all`,
+`pnpm webhooks:register <slug>` for the S31 order topics, compliance webhook
+URLs in the Shopify Dev Dashboard, real owner/operator accounts, rotate S22
+throwaway passwords) plus: GH repo secrets TICK_URL+CRON_SECRET (jobs tick),
+optional RESEND_API_KEY, run `pnpm restore:drill` against prod DBs after
+cutover, reversible-cutover note (prod can fall back to the legacy S20 build by
+unsetting PLATFORM_DB_URL — legacy mode is tested every session).
 
 ## Verification state (S33, 2026-10-28)
 

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { verifyAdminToken, ADMIN_COOKIE } from "@/lib/admin-auth";
+import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { listPlacements } from "@/lib/cms/placements";
 import { db } from "@/lib/db";
 import { siteName } from "@/lib/site";
@@ -12,9 +12,11 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Upsells · Admin", robots: { index: false } };
 
 export default async function AdminUpsellsPage() {
-  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
-  const authed = await tfetch(() => verifyAdminToken(token));
-  if (!authed) redirect("/admin/login");
+  const jar = await cookies();
+  // S34 (OP10): merchants sign in normally; an OPERATOR passes only under an
+  // active support grant (support role — read-only, PII-redacted).
+  const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
+  if (!actor) redirect("/admin/login");
 
   const [placements, name] = await tfetch(async () => {
     const rows = await listPlacements();

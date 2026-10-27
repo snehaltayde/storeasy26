@@ -52,7 +52,10 @@
     "tenant:migrate": "node --env-file=.env.local scripts/tenant-migrate.js",
     "domain": "node --env-file=.env.local scripts/domain.js",
     "test:commerce": "node scripts/test-commerce.js",
-    "test:privacy": "node scripts/test-privacy.js"
+    "test:privacy": "node scripts/test-privacy.js",
+    "support": "node --env-file=.env.local scripts/support-grant.js",
+    "restore:drill": "node --env-file=.env.local scripts/restore-drill.js",
+    "test:security": "node scripts/test-security.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

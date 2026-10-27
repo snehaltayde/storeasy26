@@ -284,7 +284,7 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
 
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
-Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
+Navigation: **Offers · Orders · Storefront · Upsells · Integrations · Settings**.
 
 #### Login
 - **Use** (S26): `<tenant-host>/admin` → `/admin/login`; sign in with your EMAIL +
@@ -372,6 +372,37 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
   (rate-limited 2/min; big catalogs → `pnpm tenant:sync`).
 - **Files**: `app/admin/settings/page.js`, `components/admin/SettingsAdmin.js`,
   `app/api/admin/settings|sync/route.js`.
+
+#### Integrations tab
+- **What** (S34 / BE24+MC20): one card per provider — Shopify, Razorpay, GA4,
+  Meta, Typesense, Mail — showing connection state, store domain/scopes, key
+  mode (test/live from the key prefix), checkout capability, last webhook
+  received and last event forwarded. **Test** runs a side-effect-free live
+  probe (Shopify `{shop}` query, Razorpay auth check, Typesense `/health`,
+  mail self-test to Resend's sink; GA4/Meta honestly say no safe test exists).
+  **Revoke** (confirm dialog) clears that provider's tenant credentials via the
+  control plane and is audited; reconnect through Settings or the operator
+  connect flow. Secret values never reach the browser — presence flags only.
+- **Files**: [lib/integrations.js](../lib/integrations.js),
+  `app/admin/integrations/page.js`, `components/admin/IntegrationsAdmin.js`,
+  `app/api/admin/integrations/route.js` (GET=settings.read, revoke=settings.write).
+
+#### Support access (operator → merchant console)
+- **What** (S34 / OP10): an operator enters a tenant's `/admin` ONLY through an
+  active **support grant** — time-limited (1–72h, default 4), with a stated
+  reason (min 5 chars), audited at creation and revocation, and ALWAYS as the
+  read-only `support` role (writes 403, order PII redacted per S31). Every
+  console page shows the merchant-visible amber banner (operator, reason,
+  expiry) while a grant is live. Expiry/revocation is checked fresh on every
+  request — a revoked grant fails on the operator's very next call.
+- **Use**: `pnpm support -- grant --tenant <slug> --reason "…" [--hours N]`,
+  `… -- revoke --id sg_…`, `… -- list`; or `GET/POST /api/platform/support`
+  with the operator cookie. The operator then opens the tenant host's `/admin`
+  with their existing `_platform` session — no merchant password involved.
+- **Files**: [lib/platform/support.js](../lib/platform/support.js),
+  `lib/admin-auth.js` (`supportActor`/`adminActor`), `app/admin/layout.js`
+  (banner), `app/api/platform/support/route.js`, `scripts/support-grant.js`,
+  `migrations/platform/0004_support_grants.sql`.
 
 ### 2C. Platform operator
 
@@ -514,7 +545,7 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 20 aliased suites, **253 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 21 aliased suites, **266 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -539,9 +570,13 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
   idempotency, gift eligibility, commerce settings validation) · privacy 11
   (S33: expiring v2 proofs + legacy cutover, URL/PII scrubbing, purpose
   consent, per-destination forwarding gates, customer redaction, compliance
-  webhook router).
+  webhook router) · security 13 (S34 release gate: live-credential literal scan,
+  tracked env/db file gate, client-bundle server-import scan, normalizeHost SSRF
+  rejections, webhook-HMAC abuse matrix, OAuth-state tamper/expiry/cross-secret,
+  support-grant TTL clamp + fresh expiry/revocation + read-only role matrix +
+  audit trail).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **274 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **287 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -1257,6 +1292,21 @@ Install (token stored encrypted, webhooks registered, first sync kicked) → poi
 domain → hand the merchant `/admin` (first job: rotate password, add Razorpay keys) →
 run the verify checklist.
 
+### 5.3b Backup/restore drill & security gate (S34)
+
+- **Restore drill** (BE27): `pnpm restore:drill -- --tenant <slug>` (or
+  `--control-plane`) streams the hosted DB into an isolated local file and
+  verifies per-table row counts, migration-ledger ids+checksums, order money
+  totals, secret-envelope ciphertext lengths, FK + integrity_check; `--keep`
+  retains the file for inspection (never commit it). Measured 2026-10-28:
+  demo = 21 tables / 13,579 rows in 1.4s; control plane in 0.4s. Production
+  PITR path: `turso db create <new> --from-db <db> --timestamp <iso>` (paid
+  plan). Run the drill after every schema change and before every cutover.
+- **Security gate** (BE34): `pnpm test:security` is part of the pre-commit
+  baseline — static secret-exposure gates plus SSRF/HMAC/OAuth-state/support-
+  grant abuse tests. Threat model + residual risks:
+  [security-threat-model.md](./security-threat-model.md).
+
 ### 5.4 Known states & pending items
 
 - **Typesense cluster is GONE** (lapsed during an idle period). Search runs on the SQL
@@ -1318,3 +1368,14 @@ run the verify checklist.
 | S22 | 7da3167 | Merchant console (orders/settings/shipping editor) + platform operator console + provisioning wizard |
 | S23 | 4e36d51 | Merchandising CMS (blocks/pages/nav) + upsells (PDP pairs, cart slot); brand surface → tenant data |
 | S24 | 9f27dc7 | Platform ops: tenant-looping crons, health rollup, tagged observability, credential scoping fix, two-tenant E2E gate |
+| — | — | **SaaS roadmap begins** (docs/storeasy-saas handoff, waves W1–W6) |
+| S25 | de4e1a7 | W1: fail-closed tenancy (resolveHost outcomes, tenant gate, neutral shell) + confirmation token gate (BE01+SF23-core+SF08) |
+| S26 | 028e41a | W1: individual identity — users/sessions/memberships, scrypt, TOTP operators, invites, mail transport (BE02+MC01+OP01) |
+| S27 | 9103ea9 | W1: role lattice + requireAdmin action gating + append-only redacted audit log (BE03+BE16) |
+| S28 | 16fba5d | W1 exit: key rotation dual-read, versioned migration ledger, domain registry w/ TXT challenge (BE13+BE17+BE12) |
+| S29 | 490f06e | W2: durable jobs + webhook inbox (persist-before-ack, leases, dead-letter, audited replay), queue console (BE14+BE19+OP05) |
+| S30 | 7cf7cb2 | W2: catalog sync generations (prune-after-complete-only) + partner integration audit (BE04+BE25) |
+| S31 | 62ef95b | W2: order projection (refunds/fulfillments, authoritative reconcile), money lib, tracking UX, console panels (BE10+BE36+SF09+MC16) |
+| S32 | 039079f | W2: commerce adapter capability gate, offer simulator + TZ-safe schedules, cart change acks (BE06+BE07+SF06+SF07+MC14+MC22) |
+| S33 | 1b93071 | W2: privacy lifecycle (redaction executes), purpose consent v2, event contract, expiring order proofs (BE18+SF24+BE20+SF08-full) |
+| S34 | 095243f | W2 exit: integrations registry + tab, support grants (time-limited, read-only, banner), restore drill, security gate + threat model (BE24+MC20+BE27+BE34+OP10) |
