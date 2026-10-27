@@ -8,11 +8,11 @@ by a code audit or implementation in this repo — never by documentation alone.
 - Created: 2026-10-28 (session S25). Last updated: S29 (W2 underway; W1 complete).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 14 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 16 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
-  BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29). The other 102 are
-  **not inspected** — the handoff's Fix/Extend/New labels for them remain
-  unverified documentation claims.
+  BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30). The
+  other 100 are **not inspected** — the handoff's Fix/Extend/New labels for
+  them remain unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -296,6 +296,62 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   (audited `queue.replay`, idempotency proven by the acceptance test), and a
   "run due now" button. Provider/store binding visible per row (source, topic,
   shop, tenant).
+
+### BE04 — Catalog synchronization · **partial (generation model implemented & verified, S30)**
+
+- Every full sync is a recorded generation: tenant-DB `sync_runs` (id = the
+  generation, status running/complete/failed, page cursor, fetched/written/
+  pruned counts, error). Rows written by the run are stamped
+  (`products.sync_generation` / `collections.sync_generation`, migration
+  0002_sync_runs); webhook writes stay unstamped with a fresh `synced_at`.
+- **Prune ONLY after a COMPLETE run**: anything not stamped by the finished
+  generation AND untouched since the run's start watermark is deleted with its
+  children (variants/images/memberships). A FAILED partial run records the
+  failure and touches nothing (acceptance: failed partial sync never deletes
+  good rows — suite-proven). Missed deletions (webhook gaps) self-heal on the
+  next complete run; webhook-raced rows written mid-run survive via the
+  watermark (suite-proven).
+- Event persistence before async handling landed in S29 (webhook inbox); the
+  webhook incremental path is unchanged and shares the same reshape/write code.
+- LIVE: beastlife's first generation-tracked sync completed (319 products /
+  281 collections, cursor recorded) and pruned **7 ghost products + 4 ghost
+  collections** that upsert-only syncs had stranded; storefront healthy after.
+- Out of scope, scheduled: Typesense staleness is handled today by the full
+  delete-recreate-import rebuild; atomic rebuild-and-swap + health/lag
+  surfacing is BE05 (S38). Mid-run page-cursor RESUME is recorded diagnostics
+  only (a failed run re-fetches from scratch — catalogs are small).
+
+### BE25 — Shopify partner integration · **partial (audited + hardened, S30)**
+
+- **Install model (audited, documented):** one CUSTOM-DISTRIBUTION app per
+  store, created in the merchant's own Shopify Dev Dashboard; tokens via
+  client-credentials (same-org stores) or the authorization-code connect flow
+  (S21: HMAC-signed 10-min state, callback verifies state + Shopify param HMAC
+  + shop match). No public/listed app exists; nothing here claims Shopify
+  approval of anything (handoff rule).
+- **Hardening added (S30):** scope check at token mint — `missingScopes()`
+  compares the granted scopes to OAUTH_SCOPES; a partial grant warns on the
+  connect success page AND fires a warn-severity alert (suite-tested).
+  Reinstall handling verified in code: `app/uninstalled` sets the tenant flag +
+  alerts (S21), a successful reconnect clears it.
+- **Protected customer data position (recorded honestly):** customer PII enters
+  via OUR checkout, not Shopify customer APIs; we push draft orders/orders with
+  write_orders + write_draft_orders. Moving to a public app would require:
+  partner-org app, app review, protected-customer-data access request, current
+  checkout-integration rules re-verified at that time (tracked as an external
+  dependency, not code).
+- **Pending external (needs the user's Shopify session):** a REAL
+  uninstall→reinstall drill on the dev store, and the two-unrelated-shops
+  install matrix (requires a second dev store — known W2-exit item).
+
+## Verification state (S30, 2026-10-28)
+
+17 suites / **221 tests + 21 offers = 242 checks** green (new
+`test:sync-generations`, 8); build clean. Hosted: `tenant:migrate --all`
+applied 0002_sync_runs to all 3 tenant DBs via the ledger; live beastlife full
+sync pruned 7+4 ghosts (sync_runs row complete, cursor recorded); storefront
+200 and health unchanged after the prune. `pnpm sync`/`tenant:sync` now run
+the migration ledger instead of raw schema applies.
 
 ## Verification state (S29, 2026-10-28)
 

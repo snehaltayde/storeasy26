@@ -507,7 +507,7 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 16 aliased suites, **213 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 17 aliased suites, **221 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -520,9 +520,12 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
   dual-verify, migration ledger checksums/retry/adoption, domain claim/takeover-
   block/verify/re-proof/activation) · jobs 12 (S29: idempotent enqueue, atomic
   leases + crash recovery via lease expiry, backoff/dead-letter/replay-audited,
-  webhook inbox, the duplicate-payment-replay-changes-money-once acceptance).
+  webhook inbox, the duplicate-payment-replay-changes-money-once acceptance) ·
+  sync-generations 8 (S30: generation stamping, prune-after-complete-only,
+  webhook-race survival, failed-partial safety, missed-delete repair, scope
+  check at token mint).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **234 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **242 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -588,9 +591,13 @@ multi-tenant payments go live. Severity-ordered:
 17. **`GET /api/jobs/sync-catalog` requires a control plane** — it calls
     `listTenants()` directly (no `forEachActiveTenant` env fallback), unlike the
     two cron routes.
-18. **Full sync never prunes** — `runCatalogSync` upserts only; deletions reach the
-    DB via webhooks (or a single-entity refetch). A webhook gap can leave ghost
-    rows until manually removed.
+18. ~~**Full sync never prunes**~~ — **FIXED (S30 / BE04)**: every full sync is a
+    recorded generation (`sync_runs` table — id, cursor, counts, status); rows it
+    writes are stamped, and after a COMPLETE run anything unstamped-and-untouched
+    since the run started is pruned with its children (webhook-raced rows survive
+    via their fresh `synced_at`; a FAILED partial run prunes nothing). Missed
+    deletes self-heal on the next complete run. Verified live: beastlife's first
+    generation-tracked sync pruned 7 ghost products + 4 ghost collections.
 19. **Most CLIs are default-tenant only** — `push:shopify`, `events:stats`,
     `search:report`, `migrate`, `sync` have no `--tenant`; per-tenant equivalents
     are `tenant:sync`, the jobs routes with `{tenant}`, and
@@ -1105,7 +1112,7 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | `pnpm events:stats` / `search:report [days]` | Forwarding stats / search CTR + zero-result report (env tenant) |
 | `pnpm shopify:token [--write]` / `shopify:oauth` | Legacy single-store token minting / local OAuth |
 | `pnpm seed:demo` | 3 fake products + 2 collections into the env DB |
-| `pnpm test:*` | 16 aliased suites, 213 tests (see §2E) |
+| `pnpm test:*` | 17 aliased suites, 221 tests (see §2E) |
 | `pnpm alert:test` | S29: alert-delivery self-test (sends a synthetic info alert to ALERT_WEBHOOK_URL, reports the real result) |
 | `pnpm user:create` / `invite:create` / `operator:create` | S26 identity CLIs: first store user (disables bootstrap pw), teammate invitation links, platform operators (TOTP at first login) |
 | `pnpm member:set` | S27: change a member's role or `--remove` them (final-owner protected; takes effect on their next request) |

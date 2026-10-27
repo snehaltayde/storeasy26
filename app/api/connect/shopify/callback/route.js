@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { getTenant, patchTenant } from "@/lib/platform/control.js";
-import { verifyState, verifyOAuthCallbackHmac } from "@/lib/platform/oauth.js";
+import { verifyState, verifyOAuthCallbackHmac, missingScopes } from "@/lib/platform/oauth.js";
+import { sendAlert } from "@/lib/alerts";
 import { registerWebhooks } from "@/lib/platform/shopify-webhooks.js";
 import { exchangeCodeForToken } from "@/lib/shopify-admin.js";
 import { withTenant } from "@/lib/tenant-context.js";
@@ -60,6 +61,17 @@ export async function GET(request) {
     });
     slog("shopify_connected", { tenant: tenant.id, shop, scopes: tok.scope });
 
+    // S30 (BE25): scope check at mint time — a partial grant is a loud warning
+    // now instead of a mystery failure later (e.g. orderCancel sans write_orders).
+    const missing = missingScopes(tok.scope);
+    if (missing.length) {
+      await sendAlert(
+        `Shopify token for ${tenant.id} is missing scope(s): ${missing.join(", ")} — re-run the connect flow after fixing the app's scopes`,
+        { tenant: tenant.id, shop, missing },
+        { severity: "warn" },
+      );
+    }
+
     // Webhooks need a publicly reachable https URL — on localhost this fails
     // harmlessly (register later with `pnpm webhooks:register <slug>`).
     const platformUrl = process.env.PLATFORM_URL || request.nextUrl.origin;
@@ -85,7 +97,10 @@ export async function GET(request) {
 
     return page(
       "✓ Store connected",
-      `Admin token saved for tenant <b>${tenant.id}</b>. Webhooks: ${webhooks}. Initial catalog sync is running — close this tab.`,
+      `Admin token saved for tenant <b>${tenant.id}</b>. Webhooks: ${webhooks}. Initial catalog sync is running — close this tab.` +
+        (missing.length
+          ? `<br><br>⚠️ The token is MISSING scope(s): <b>${missing.join(", ")}</b> — some features will fail until the app's scopes are fixed and this flow is re-run.`
+          : ""),
     );
   } catch (e) {
     console.error(`[connect] ${tenant.id}: ${e?.message || e}`);
