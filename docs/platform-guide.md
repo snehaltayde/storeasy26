@@ -507,7 +507,7 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 15 aliased suites, **201 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 16 aliased suites, **213 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -518,9 +518,11 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
   protection, instant revocation, append-only redacted audit) · platform-core 15
   (S28: k1 envelopes + legacy dual-read + full rotation drill + OAuth-state
   dual-verify, migration ledger checksums/retry/adoption, domain claim/takeover-
-  block/verify/re-proof/activation).
+  block/verify/re-proof/activation) · jobs 12 (S29: idempotent enqueue, atomic
+  leases + crash recovery via lease expiry, backoff/dead-letter/replay-audited,
+  webhook inbox, the duplicate-payment-replay-changes-money-once acceptance).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **222 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **234 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -747,8 +749,22 @@ Key properties ([lib/sync.js](../lib/sync.js), [lib/shopify-admin-catalog.js](..
   `X-Shopify-Shop-Domain` header fans the delivery out to ALL active tenants tracking
   that store; the raw-body HMAC is verified against EACH tenant's own app client
   secret, so signature verification doubles as proof the delivery belongs to that
-  tenant's app registration. Work runs in `after()` (Shopify wants a fast 2xx; its
-  timeout is ~5s); the full-reconcile sync is the backstop for anything dropped.
+  tenant's app registration. **S29 (BE14): every verified delivery is persisted as a
+  `webhook_inbox` receipt + a durable `webhook_apply` job BEFORE the 2xx** (no durable
+  receipt → 500 → Shopify redelivers); `after()` runs the just-enqueued jobs
+  immediately (atomic per-job lease — the tick can never double-run them), a crash
+  after the ack re-leases on the next tick, and the full-reconcile sync stays the
+  final backstop. Durable queue mechanics: control-plane `jobs` table (idempotent
+  enqueue, atomic leasing, backoff with jitter, dead-letter alerts), drained by
+  `GET /api/jobs/tick?secret=` — wire a free external scheduler at ~1–5 min
+  (.github/workflows/jobs-tick.yml is ready: set TICK_URL + CRON_SECRET repo
+  secrets after pushing); the daily crons piggyback a small drain as insurance.
+  Checkout/webhook money paths also enqueue durable `shopify_push`/`forward_event`
+  backup jobs (handlers are idempotent — the fast path usually wins and the job
+  no-ops). Razorpay transient failures now ack `{queued:true}` with our own retry
+  job instead of leaning on provider redelivery. Inspector: the `/platform` console's
+  "Queues & webhooks" panel (stats, dead rows, audited replay — payloads never
+  serialized) over `GET/POST /api/platform/queues`.
 - A product that is deleted or no longer `ACTIVE` is **removed locally** (matching the
   full sync's `status:active` view); `collections/delete` removes memberships + row.
 - `app/uninstalled` flags `config.shopify_app_uninstalled_at` + alerts; the tenant
@@ -1089,7 +1105,8 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | `pnpm events:stats` / `search:report [days]` | Forwarding stats / search CTR + zero-result report (env tenant) |
 | `pnpm shopify:token [--write]` / `shopify:oauth` | Legacy single-store token minting / local OAuth |
 | `pnpm seed:demo` | 3 fake products + 2 collections into the env DB |
-| `pnpm test:*` | 15 aliased suites, 201 tests (see §2E) |
+| `pnpm test:*` | 16 aliased suites, 213 tests (see §2E) |
+| `pnpm alert:test` | S29: alert-delivery self-test (sends a synthetic info alert to ALERT_WEBHOOK_URL, reports the real result) |
 | `pnpm user:create` / `invite:create` / `operator:create` | S26 identity CLIs: first store user (disables bootstrap pw), teammate invitation links, platform operators (TOTP at first login) |
 | `pnpm member:set` | S27: change a member's role or `--remove` them (final-owner protected; takes effect on their next request) |
 | No alias | `scripts/test-offers.js` (21 pure engine assertions — the S4 suite), `scripts/spike-order-push.js` (S8 harness), `scripts/gen-icons.js` (sharp icon renders) |

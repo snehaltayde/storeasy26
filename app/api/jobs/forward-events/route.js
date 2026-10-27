@@ -25,6 +25,9 @@ function authorized(request) {
 
 export async function GET(request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // S29 insurance: drain a few due jobs on the daily cadence too.
+  const { runDueJobs } = await import("@/lib/platform/worker");
+  await runDueJobs({ limit: 10 }).catch(() => {});
   const stats = request.nextUrl.searchParams.get("stats") === "1";
   const limit = Number(request.nextUrl.searchParams.get("limit") || 25);
   const results = await forEachActiveTenant(async () => {

@@ -156,8 +156,9 @@ await t("sendAlert: [tenant] prefix + tenant field; no prefix for the default te
   } finally {
     console.error = orig;
   }
-  ok(errs[0].startsWith("[ALERT] something broke"), "default untagged");
-  ok(errs[1].startsWith("[ALERT] [ta] something broke"), "tenant tagged");
+  // S29: the console line carries the severity (default critical)
+  ok(errs[0].startsWith("[ALERT:critical] something broke"), "default untagged");
+  ok(errs[1].startsWith("[ALERT:critical] [ta] something broke"), "tenant tagged");
 });
 
 // --- credential scoping (the S24 dry-run finding) -----------------------------------

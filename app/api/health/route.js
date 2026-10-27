@@ -110,8 +110,18 @@ export const GET = tenantHandler(
       if (!rollupAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       const results = await forEachActiveTenant(tenantHealth);
       const rollup = aggregateHealth(results);
+      // S29 (BE19): platform queue health rides the rollup — dead letters or a
+      // stale pending backlog degrade the platform even when every tenant is ok.
+      let queue = null;
+      if (platformConfigured()) {
+        const { queueStats } = await import("@/lib/platform/jobs");
+        queue = await queueStats().catch(() => null);
+        if (queue && rollup.status === "ok" && (queue.jobs.dead > 0 || queue.inbox.dead > 0 || queue.jobs.oldest_pending_min > 60)) {
+          rollup.status = "degraded";
+        }
+      }
       return NextResponse.json(
-        { ...rollup, at: new Date().toISOString() },
+        { ...rollup, ...(queue ? { queue } : {}), at: new Date().toISOString() },
         { status: rollup.status === "down" ? 503 : 200 },
       );
     }

@@ -1,0 +1,23 @@
+# Queue tick scheduler (S29 / BE14) — free substitute for per-minute crons on
+# Vercel Hobby. INERT until this repo is pushed to GitHub AND two repository
+# secrets exist: TICK_URL (e.g. https://<deployment>/api/jobs/tick) and
+# CRON_SECRET (same value as the Vercel env var). GitHub cron minimum is ~5
+# minutes and best-effort; the after() fast paths do the immediate work, this
+# is the durability mop-up. Swap for Upstash QStash if tighter cadence matters.
+name: jobs-tick
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Tick the job queue
+        run: |
+          if [ -z "${{ secrets.TICK_URL }}" ]; then
+            echo "TICK_URL secret not set — skipping"; exit 0
+          fi
+          curl -sS --max-time 60 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ secrets.TICK_URL }}" | head -c 2000

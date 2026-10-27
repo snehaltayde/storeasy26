@@ -5,13 +5,14 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S28 — **Wave W1 complete**.
+- Created: 2026-10-28 (session S25). Last updated: S29 (W2 underway; W1 complete).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 11 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 14 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
-  BE13, BE17, BE12 — S28). The other 105 are **not inspected** — the handoff's
-  Fix/Extend/New labels for them remain unverified documentation claims.
+  BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29). The other 102 are
+  **not inspected** — the handoff's Fix/Extend/New labels for them remain
+  unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -251,6 +252,61 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   `config.primary_host` carry the data already); Vercel Domains API attachment
   (deploy checkpoint A, needs the Vercel project context); TLS checks are
   Vercel-managed and observed at MC21.
+
+### BE14 — Durable jobs and webhook inbox · **partial (core implemented & verified, S29)**
+
+- Control-plane `jobs` (idempotent enqueue via UNIQUE idempotency_key, atomic
+  lease UPDATE, attempts/backoff-with-jitter, dead-letter + critical alert,
+  audited replay) + `webhook_inbox` (raw body persisted for replay, sha-256,
+  per-tenant fan-out rows). Handlers run under `runAsTenant` and are
+  idempotent — at-least-once execution, money state changes once (acceptance
+  test green: a replayed payment.captured marks the order paid exactly once,
+  `paid_at` unchanged).
+- Receipts persist BEFORE acknowledgement: shopify webhooks answer 500 when
+  the receipt can't be written (provider redelivers); razorpay transient
+  failures now ack `{queued:true}` backed by our own retry job. Crash-after-ack
+  recovery = lease expiry (tested).
+- Dispatch: `after()` fast path via atomic single-job lease (`runJobById`) +
+  `GET /api/jobs/tick` drained by an external scheduler
+  (.github/workflows/jobs-tick.yml, inert until TICK_URL/CRON_SECRET repo
+  secrets are set — USER ACTION at deploy checkpoint A); daily crons piggyback
+  a small drain as insurance. Checkout paths enqueue durable
+  shopify_push/forward_event backups (fast path usually wins; jobs no-op).
+- Legacy mode (no control plane): original behavior preserved exactly
+  (sweeps + provider redelivery).
+- Out of scope, scheduled: catalog-sync generation/cursor model (BE04, S30);
+  migrating the ORDER-STATE retry sweeps themselves onto the queue (they stay
+  the money-truth owner; jobs guarantee attempt delivery — recorded design).
+
+### BE19 — Monitoring and service operations · **partial (extended, S29)**
+
+- `/api/health?all=1` now carries `queue` stats (pending/leased/dead/oldest-
+  pending-minutes + inbox) and degrades the rollup on dead letters or a >60min
+  pending backlog. `sendAlert` gains severity levels (critical/warn/info) +
+  optional runbook pointer; `pnpm alert:test` is the delivery self-test
+  (verified honest-failure locally where no ALERT_WEBHOOK_URL is set).
+- Still pending: synthetic journey checks and log-PII audit sweep (W2/S34 with
+  BE34), real alert destination (user config).
+
+### OP05 — Queue and webhook inspector · **partial (implemented & verified, S29)**
+
+- `/platform` console "Queues & webhooks" panel + `GET/POST
+  /api/platform/queues` (operator cookie + origin check): stats, non-done jobs
+  and inbox rows (METADATA ONLY — payloads never serialized), per-row replay
+  (audited `queue.replay`, idempotency proven by the acceptance test), and a
+  "run due now" button. Provider/store binding visible per row (source, topic,
+  shop, tenant).
+
+## Verification state (S29, 2026-10-28)
+
+16 suites / **213 tests + 21 offers = 234 checks** green (new `test:jobs`, 12;
+`test-platform-ops` alert assertion updated for severity prefixes); build
+clean. Hosted control plane migrated (0003_jobs — ledger correctly recorded it
+as the only new file). Live: tick endpoint drained a REAL COD probe order's
+durable jobs (`shopify_push` + `forward_event`, ran 2 / failed 0), health
+rollup showed the queue section, OP05 API listed the done jobs and ran an
+operator tick, alert self-test reported its honest no-webhook failure; probe
+order BL-29E6DDA5 cancelled on both sides afterwards.
 
 ## Wave W1 — EXIT (S25–S28, 2026-10-28)
 

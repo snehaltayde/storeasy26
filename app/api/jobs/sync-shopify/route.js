@@ -26,6 +26,10 @@ function authorized(request) {
 
 export async function GET(request) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // S29 insurance: drain a few due jobs even when no external tick scheduler
+  // is configured (daily cadence, but better than never).
+  const { runDueJobs } = await import("@/lib/platform/worker");
+  await runDueJobs({ limit: 10 }).catch(() => {});
   const limit = Number(request.nextUrl.searchParams.get("limit") || 10);
   const results = await forEachActiveTenant(async () => {
     const summary = await runSyncSweep({ limit });

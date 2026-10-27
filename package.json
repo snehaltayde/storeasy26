@@ -44,6 +44,8 @@
     "member:set": "node --env-file=.env.local scripts/member-set.js",
     "test:authz": "node scripts/test-authz.js",
     "test:platform-core": "node scripts/test-platform-core.js",
+    "test:jobs": "node scripts/test-jobs.js",
+    "alert:test": "node --env-file=.env.local scripts/alert-test.js",
     "rotate:secrets": "node --env-file=.env.local scripts/rotate-secrets.js",
     "tenant:migrate": "node --env-file=.env.local scripts/tenant-migrate.js",
     "domain": "node --env-file=.env.local scripts/domain.js"
