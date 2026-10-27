@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
+import { sameOrigin } from "@/lib/origin-check";
 import { patchTenant, getTenant } from "@/lib/platform/control.js";
 import { syncTenantCatalog } from "@/lib/sync.js";
 import { slog } from "@/lib/log";
@@ -13,6 +14,7 @@ const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status
 // PATCH {status} — suspend/reactivate a tenant. S25: suspended hosts FAIL
 // CLOSED (neutral "temporarily unavailable", 503 on APIs) — see resolveHost.
 export async function PATCH(request, { params }) {
+  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
@@ -29,6 +31,7 @@ export async function PATCH(request, { params }) {
 
 // POST — full catalog sync for this tenant (operator "sync now").
 export async function POST(request, { params }) {
+  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const { id } = await params;
   const tenant = await getTenant(id);

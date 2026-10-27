@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
+import { sameOrigin } from "@/lib/origin-check";
 import { listTenants, getTenant } from "@/lib/platform/control.js";
 import { provisionTenant } from "@/lib/platform/provision.js";
 import { withTenant } from "@/lib/tenant-context.js";
@@ -52,6 +53,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const body = await request.json().catch(() => ({}));
   try {

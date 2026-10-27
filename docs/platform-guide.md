@@ -280,13 +280,20 @@ tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
 Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 
 #### Login
-- **Use**: `<tenant-host>/admin` → redirects to `/admin/login`; sign in with the
-  tenant's console password. Local hosts table in §5.1.
-- **Setup**: the password is the tenant secret `admin_password` (generated at
-  provisioning, shown once; rotated in Settings). Env `ADMIN_PASSWORD` serves the
-  default/env tenant only.
-- **Files**: `app/admin/login/page.js`, `app/api/admin/login|logout/route.js`,
-  [lib/admin-auth.js](../lib/admin-auth.js).
+- **Use** (S26): `<tenant-host>/admin` → `/admin/login`; sign in with your EMAIL +
+  password (individual account). "Forgot password?" emails a 1-hour reset link;
+  teammates join via `pnpm invite:create` acceptance links. Until a tenant has its
+  first user, the email field can stay empty and the tenant's bootstrap console
+  password (secret `admin_password`) still works. Local hosts table in §5.1.
+- **Setup**: create the first user with
+  `USER_PASSWORD=… pnpm user:create -- --tenant <slug> --email you@… --role owner`
+  (this disables the bootstrap password for that store). Env `ADMIN_PASSWORD`
+  serves the default/env tenant in legacy mode only.
+- **Files**: `app/admin/login/page.js`, `app/admin/accept-invite|reset/page.js`,
+  `app/api/admin/login|logout|accept-invite|recover|reset/route.js`,
+  [lib/admin-auth.js](../lib/admin-auth.js),
+  [lib/platform/sessions.js](../lib/platform/sessions.js),
+  [lib/platform/identity.js](../lib/platform/identity.js).
 
 #### Offers tab
 - **What**: list/toggle/edit/create/delete the four offer types; schedule windows
@@ -369,8 +376,11 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - **Use**: `<any-host>/platform`, operator password. Suspending a tenant FAILS its
   hosts CLOSED (S25): a neutral "temporarily unavailable" page, 503 + `TENANT_SUSPENDED`
   on APIs — never another store's data. Activate restores.
-- **Setup**: `PLATFORM_ADMIN_PASSWORD` env (console disabled when unset) + the
-  control-plane env trio.
+- **Setup** (S26): create your operator with
+  `USER_PASSWORD=… pnpm operator:create -- --email you@…`; first `/platform`
+  sign-in enrolls your authenticator (TOTP, mandatory). Until an operator exists,
+  the bootstrap `PLATFORM_ADMIN_PASSWORD` env still signs in (console disabled
+  when it's unset too). Control-plane env trio required either way.
 - **Files**: `app/platform/page.js`, `components/platform/PlatformAdmin.js` +
   `PlatformLogin.js`, `app/api/platform/*`,
   [lib/platform/admin-auth.js](../lib/platform/admin-auth.js).
@@ -497,13 +507,15 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 12 aliased suites, **152 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 13 aliased suites, **173 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
-  resolution, outage budget, overlapping-handle isolation, order-token scheme).
+  resolution, outage budget, overlapping-handle isolation, order-token scheme) ·
+  identity 21 (S26: scrypt, revocable sessions, bootstrap/legacy fallbacks, TOTP
+  RFC vector, invites/resets, distributed throttle, origin guard).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **173 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **194 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -860,8 +872,8 @@ ACTIVE tenant's rules live in `config.shipping_config` (edited in the console);
 
 | Surface | Mechanism | Notes |
 |---|---|---|
-| Merchant console `/admin` | `_admin` httpOnly cookie = `sha256("storeasy-admin\|tenantId\|password")` | Tenant-bound: a cookie from one tenant can never authorize another; password rotation revokes sessions instantly; login rate-limited 5/min; edge-safe crypto.subtle |
-| Operator console `/platform` | `_platform` cookie = `sha256("storeasy-platform\|PLATFORM_ADMIN_PASSWORD")` | Env-only password; console disabled when unset; also authorizes the OAuth connect start route |
+| Merchant console `/admin` (S26) | `_admin` httpOnly cookie = a random session token; the control plane stores its SHA-256 (`sessions` table) and the user↔tenant `membership` authorizes the store | Individual email+password accounts (scrypt), 7-day revocable sessions verified fresh per request (revocation holds across instances); distributed login throttle (`login_limits`); invitations + email password reset; CSRF origin check on login/logout/settings. BOOTSTRAP: a tenant with no member users still accepts the legacy derived token `sha256("storeasy-admin\|tenantId\|password")`; the first `pnpm user:create` switches it off. LEGACY mode (no control plane): derived token only |
+| Operator console `/platform` (S26) | `_platform` cookie = random session token (kind `operator`, 12h) | Individual operator users with MANDATORY TOTP (enrolled at first login); a merchant session can never pass; `pnpm operator:create` creates the first operator and disables the legacy `sha256("storeasy-platform\|PLATFORM_ADMIN_PASSWORD")` token |
 | Cron/ops endpoints | `CRON_SECRET` as `Authorization: Bearer` (Vercel cron sends it) or `?secret=` | Open in local dev when unset |
 | Guest order status | `?t=` token = first 20 hex of `sha256(orderId\|ORDER_LINK_SECRET)` | Falls back to razorpay secret chain; bad token → 404; noindex |
 | Shopify webhooks | Raw-body HMAC-SHA256 (base64) with the tenant app's client secret | Per-tenant apps → verification doubles as tenant-match proof |
@@ -959,8 +971,8 @@ Runtime is **Node** unless marked edge. "tenant" = Host-resolved context via
 | Cookie | Set by | Life | Purpose |
 |---|---|---|---|
 | `cart_session` | POST /api/cart | 30d, httpOnly | Cart row id in the tenant DB |
-| `_admin` | admin login (re-issued on password rotation) | 7d, httpOnly | `sha256("storeasy-admin\|tenantId\|password")` |
-| `_platform` | platform login | 1d, httpOnly | `sha256("storeasy-platform\|password")` |
+| `_admin` | merchant login (S26) | 7d, httpOnly | random session token → control-plane `sessions` row (SHA-256 stored) + membership check; bootstrap/legacy fallback = `sha256("storeasy-admin\|tenantId\|password")` |
+| `_platform` | operator login (S26) | 12h, httpOnly | random session token (kind `operator`, TOTP-gated); bootstrap fallback = `sha256("storeasy-platform\|password")` until the first operator exists |
 | `_consent` | ConsentBanner (client) | 1y | `granted`/`denied` — gates all tracking |
 | `_fp_cid` / `_fbp` / `_fbc` / `_fp_gclid` | /api/track | 2y / 3y / 90d / 90d | First-party identity ids (`COOKIE_DOMAIN` widens scope); `_ga` read if present |
 
@@ -1062,7 +1074,8 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | `pnpm events:stats` / `search:report [days]` | Forwarding stats / search CTR + zero-result report (env tenant) |
 | `pnpm shopify:token [--write]` / `shopify:oauth` | Legacy single-store token minting / local OAuth |
 | `pnpm seed:demo` | 3 fake products + 2 collections into the env DB |
-| `pnpm test:*` | 12 aliased suites, 152 tests (see §2E) |
+| `pnpm test:*` | 13 aliased suites, 173 tests (see §2E) |
+| `pnpm user:create` / `invite:create` / `operator:create` | S26 identity CLIs: first store user (disables bootstrap pw), teammate invitation links, platform operators (TOTP at first login) |
 | No alias | `scripts/test-offers.js` (21 pure engine assertions — the S4 suite), `scripts/spike-order-push.js` (S8 harness), `scripts/gen-icons.js` (sharp icon renders) |
 
 ### 4.9 Observability vocabulary

@@ -5,12 +5,13 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25).
+- Created: 2026-10-28 (session S25). Last updated: S26.
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 3 of 116 records have been code-audited so far
-  (BE01, SF23, SF08). The other 113 are **not inspected** — the handoff's
-  Fix/Extend/New labels for them remain unverified documentation claims.
+- **Audit coverage honesty:** 6 of 116 records audited/implemented so far
+  (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26). The other 110 are
+  **not inspected** — the handoff's Fix/Extend/New labels for them remain
+  unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -111,6 +112,48 @@ Residual risks (recorded, scheduled):
   `provisionTenant` get a real `order_link_secret`; env deployments should set
   `ORDER_LINK_SECRET`. → hardening with S33.
 
+### BE02 — Identity and sessions · **partial (core implemented & verified, S26)**
+
+Replaced the shared password-derived tokens with individual identity:
+- Control plane gains `users` (scrypt `N=16384,r=8,p=1` hashes; TOTP secret
+  encrypted at rest), `sessions` (random 32-byte cookie token, SHA-256 stored,
+  expiry + revoked_at; verified FRESH per request so revocation holds across
+  instances), `memberships` (user↔tenant+role — stored now, fully enforced in
+  S27/BE03), `invitations` (single-use, tenant-bound, 7d; also `reset` kind, 1h),
+  `login_limits` (distributed throttle: 10/15min per email + per IP).
+- Edge-safe verification (`lib/platform/sessions.js`, web crypto + libsql HTTP);
+  Node-only credential work (`lib/platform/identity.js`). Password change/reset
+  revokes every session. CSRF origin checks on login/logout/settings/platform
+  mutations (full route sweep lands with S27's authorize()).
+- Bounded fallbacks (recorded design): LEGACY mode (no `PLATFORM_DB_URL`) keeps
+  the old derived token exactly; BOOTSTRAP (platform mode, zero member users /
+  zero operators) accepts the old shared password until the first account exists
+  — the migration path for existing tenants. A control-plane outage degrades
+  auth to the bootstrap check, but gated pages are unreachable then anyway.
+- Out of scope, scheduled: role enforcement per action (S27), session rotation
+  mid-life, merchant-side MFA for privileged actions (S27), audit_log rows for
+  sign-ins (slog only until S27), team management UI (W4/MC23).
+
+### MC01 — Merchant sign in · **partial (implemented & verified, S26)**
+
+`/admin/login` takes email+password (empty email = bootstrap password, only while
+the tenant has no users); "Forgot password?" → 1-hour emailed reset (generic
+response, no enumeration); invite acceptance page (`/admin/accept-invite`) creates
+account+membership and signs in; reset page (`/admin/reset`). Settings
+password-rotation now only re-issues the cookie in bootstrap mode. CLIs:
+`pnpm user:create`, `pnpm invite:create` (mock mail prints the link until
+`RESEND_API_KEY` is set — clearly labeled). MFA for merchant privileged actions:
+S27.
+
+### OP01 — Operator identity · **partial (implemented & verified, S26)**
+
+`/platform` sign-in = operator email + password + MANDATORY TOTP (first login
+returns the secret/otpauth once, first valid code confirms enrollment); sessions
+are 12h, kind `operator` — a merchant session can never pass operator routes
+(verified). `pnpm operator:create` creates/promotes operators; the first operator
+disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
+(`platform_login*`); durable audit rows come with BE16 (S27).
+
 ## Baseline checks (S25, before changes)
 
 Commands: `pnpm test:orders|shipping|shopify-push|hardening|offers-admin|events|
@@ -193,3 +236,43 @@ boundary suite's legacy tests + unchanged production build) and the
 control-plane-outage 500-page/503-API rendering (outcome + GATE mapping covered by
 the suite; `tenantHandler`/`tfetch` wiring is the same code path the other probes
 exercised). Recorded as pending HTTP-level verification at deploy checkpoint A.
+
+## Verification state (S26, 2026-10-28)
+
+**Suites:** 13 aliased / **173 tests + 21 offers = 194 checks**, all green;
+`pnpm build` exit 0. New `pnpm test:identity` (21): scrypt roundtrip + rejects,
+session create/verify/expire/revoke (fresh-lookup revocation), disabled-user
+kill, membership isolation (cookie from tenant A rejected on tenant B),
+bootstrap→account flip, legacy mode, operator bootstrap flip, merchant-session-
+on-operator-route rejection, TOTP RFC 6238 vector (T=59 → 94287082) + window +
+encrypted-at-rest, invite accept/single-use/wrong-tenant-does-NOT-burn-token/
+expired, reset (password set + all sessions revoked + single-use), distributed
+throttle (block/clear/window-reset), sameOrigin matrix.
+
+**Bug found & fixed during HTTP verification:** `consumeInvite` originally
+stamped `accepted_at` BEFORE the tenant check — a wrong-host acceptance attempt
+burned the invitation. The tenant check now lives inside the UPDATE's WHERE
+clause; regression test added, re-proven over HTTP.
+
+**HTTP matrix (dev server, hosted dev control plane; throwaway probe users
+created on the demo tenant and DELETED after, restoring both bootstrap logins —
+verified 200 post-cleanup):** email login 200 + cookie reaches settings; wrong
+password 401; legacy password refused with "Sign in with your email and
+password" once a user exists; beastlife (no users) still accepts its bootstrap
+password; cross-origin login 403 BAD_ORIGIN; logout → old cookie 401 (server
+revocation); recover → mock-mail reset link (dev-server log) → reset 200 →
+pre-reset session 401 + old password 401 + new password 200 + token replay 400;
+invite: wrong-tenant host 400 with token intact, right tenant 200 + auto
+sign-in + settings 200, replay 400; operator: legacy login 200 pre-operator →
+create operator → legacy 401 → first login returns enroll handshake (secret +
+otpauth) → TOTP-confirmed login 200 → operator cookie reads /api/platform/
+tenants 200 while a MERCHANT cookie gets 401 → passwordless/code-less login 401
+(MFA mandatory).
+
+**Migration/config:** `pnpm platform:migrate` applied the 5 new tables to the
+hosted dev control plane (idempotent CREATE IF NOT EXISTS; prod/staging get it
+at deploy checkpoint A). New optional env: `RESEND_API_KEY` + `MAIL_FROM`
+(mail is a labeled console mock until set). USER ACTION when ready: create real
+accounts — `USER_PASSWORD=… pnpm user:create -- --tenant beastlife --email you@…
+--role owner` per tenant and `pnpm operator:create -- --email you@…` (each
+switches that surface off its bootstrap password).

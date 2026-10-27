@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { verifyAdminToken, adminSessionTokenFor, ADMIN_COOKIE } from "@/lib/admin-auth";
+import { verifyAdminToken, adminSessionTokenFor, adminBootstrapMode, ADMIN_COOKIE } from "@/lib/admin-auth";
+import { sameOrigin } from "@/lib/origin-check";
 import { settingsView, buildSettingsPatch } from "@/lib/admin/settings";
 import { patchTenant } from "@/lib/platform/control.js";
 import { currentTenant, tenantId } from "@/lib/tenant-context.js";
@@ -34,6 +35,7 @@ export const GET = tenantHandler(async (request) => {
 });
 
 export const PUT = tenantHandler(async (request) => {
+  if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
   if (!(await verifyAdminToken(request.cookies.get(ADMIN_COOKIE)?.value))) return unauthorized();
   const tenant = currentTenant();
   if (!tenant || tenant.id === "_default")
@@ -58,9 +60,11 @@ export const PUT = tenantHandler(async (request) => {
     settings: settingsView(updated, { counts: await syncCounts() }),
     ...(patch.secrets.admin_password ? { passwordRotated: true } : {}),
   });
-  // A password rotation kills the old cookie token — re-issue so the merchant
-  // stays signed in on THIS browser; every other session is revoked.
-  if (patch.secrets.admin_password) {
+  // A BOOTSTRAP-password rotation kills the old derived cookie token — re-issue
+  // so the merchant stays signed in on THIS browser. In account mode (S26) the
+  // admin_password is only the dormant bootstrap credential and the signed-in
+  // session cookie must NOT be replaced by a legacy token.
+  if (patch.secrets.admin_password && (await adminBootstrapMode())) {
     res.cookies.set(ADMIN_COOKIE, await adminSessionTokenFor(tenantId(), patch.secrets.admin_password), {
       httpOnly: true,
       sameSite: "lax",
