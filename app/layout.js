@@ -13,6 +13,7 @@ import { getAllCollections } from "@/lib/repo";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
 import { tenantOwnCfg } from "@/lib/tenant-context";
+import { resolveBrand, brandCssVars } from "@/lib/brand";
 import { getAnnouncement, getNav } from "@/lib/cms/store";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
@@ -78,6 +79,9 @@ async function chromeData() {
         // its own ids loads no pixels, never the env default's.
         ga4Id: tenantOwnCfg("ga4_measurement_id", "NEXT_PUBLIC_GA4_MEASUREMENT_ID", "") || "",
         metaPixelId: tenantOwnCfg("meta_pixel_id", "NEXT_PUBLIC_META_PIXEL_ID", "") || "",
+        // S35 (MC10): tenant brand tokens → one CSS-variable block. Default
+        // brand emits nothing (globals.css already carries those values).
+        brandCss: tenantOwnCfg("brand", null, null) ? brandCssVars(resolveBrand(tenantOwnCfg("brand", null, null))) : "",
       };
     });
   } catch {
@@ -92,6 +96,7 @@ async function chromeData() {
       navFooter: null,
       ga4Id: "",
       metaPixelId: "",
+      brandCss: "",
     };
   }
 }
@@ -122,7 +127,10 @@ export default async function RootLayout({ children }) {
   const [collections, cart, chrome] = await Promise.all([navCollections(), initialCart(), chromeData()]);
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
-      <body className="flex min-h-full flex-col bg-white text-zinc-900 antialiased">
+      {/* Brand variables: values come from lib/brand.js (validated hex/enum
+          tokens only — nothing merchant-typed reaches this string raw). */}
+      {chrome.brandCss ? <style id="brand-vars">{chrome.brandCss}</style> : null}
+      <body className="flex min-h-full flex-col bg-background text-foreground antialiased">
         <CartProvider initialCart={cart}>
           <Header collections={collections} logo={chrome.logo} nav={chrome.navHeader} announcement={chrome.announcement} />
           <main className="flex-1">{children}</main>

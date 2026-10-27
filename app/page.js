@@ -17,7 +17,7 @@ function HeroTitle({ title, highlight }) {
   return (
     <>
       {title.slice(0, i)}
-      <span className="text-lime-400">{title.slice(i, i + highlight.length)}</span>
+      <span className="text-accent-400">{title.slice(i, i + highlight.length)}</span>
       {title.slice(i + highlight.length)}
     </>
   );
@@ -39,10 +39,10 @@ export default async function Home() {
     <div>
       {/* Hero */}
       <section className="relative overflow-hidden bg-zinc-950 text-white">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-lime-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-accent-500/20 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
-          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-xs font-medium text-lime-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-lime-400" />
+          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-xs font-medium text-accent-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />
             {empty ? "Storefront ready" : hero.badge || `${stats.products} products · ${stats.collections} collections`}
           </p>
           <h1 className="max-w-3xl text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
@@ -53,7 +53,7 @@ export default async function Home() {
             {hero.primary?.label ? (
               <Link
                 href={hero.primary.href || "/collections"}
-                className="rounded-full bg-lime-400 px-6 py-3 text-sm font-bold text-zinc-950 transition hover:bg-lime-300"
+                className="rounded-full bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition hover:bg-accent-300"
               >
                 {hero.primary.label}
               </Link>
@@ -80,7 +80,7 @@ export default async function Home() {
                 <section key={`${s.kind}-${s.title}`} className="py-14">
                   <div className="mb-6 flex items-end justify-between">
                     <h2 className="text-2xl font-bold tracking-tight">{s.title}</h2>
-                    <Link href="/collections" className="text-sm font-medium text-lime-700 hover:underline">
+                    <Link href="/collections" className="text-sm font-medium text-accent-700 hover:underline">
                       View all →
                     </Link>
                   </div>
@@ -118,7 +118,7 @@ function EmptyState() {
         <p className="mt-2 text-sm text-zinc-600">
           Connect the store&rsquo;s Shopify account, then pull the catalog:
         </p>
-        <pre className="mt-4 overflow-x-auto rounded-lg bg-zinc-900 px-4 py-3 text-left text-sm text-lime-300">
+        <pre className="mt-4 overflow-x-auto rounded-lg bg-zinc-900 px-4 py-3 text-left text-sm text-accent-300">
           <code>pnpm migrate{"\n"}pnpm sync</code>
         </pre>
         <p className="mt-4 text-xs text-zinc-500">

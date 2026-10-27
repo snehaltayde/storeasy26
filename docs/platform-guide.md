@@ -284,7 +284,7 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
 
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
-Navigation: **Offers · Orders · Storefront · Upsells · Integrations · Settings**.
+Navigation: **Offers · Orders · Storefront · Brand · Upsells · Integrations · Settings**.
 
 #### Login
 - **Use** (S26): `<tenant-host>/admin` → `/admin/login`; sign in with your EMAIL +
@@ -372,6 +372,28 @@ Navigation: **Offers · Orders · Storefront · Upsells · Integrations · Setti
   (rate-limited 2/min; big catalogs → `pnpm tenant:sync`).
 - **Files**: `app/admin/settings/page.js`, `components/admin/SettingsAdmin.js`,
   `app/api/admin/settings|sync/route.js`.
+
+#### Brand tab
+- **What** (S35 / MC10): design tokens for the storefront — ONE accent color
+  drives a derived 50–900 ladder (lightness interpolation anchored at the
+  picked color, hue/saturation kept — stays monotonic for extreme picks),
+  plus background/text colors, corner radius (sm–xl) and type scale
+  (compact/regular/large). Text contrast is WCAG-AA-gated: body text under
+  4.5:1 BLOCKS the save; low-contrast accents warn. Button labels use the
+  computed `accent-label` (black or white, whichever reads better on the
+  actual button surface). Reset-to-theme returns the platform default (the
+  original lime look).
+- **How**: tokens live in `config.brand`; the root layout emits ONE
+  `<style id="brand-vars">` block of CSS variables
+  ([lib/brand.js](../lib/brand.js) — validated hex/enum values only), and every
+  storefront component consumes `accent-*` Tailwind utilities mapped to those
+  variables (S35 swept all hardcoded lime classes). No tenant row → zero
+  override emitted, the defaults in globals.css apply. The ADMIN console keeps
+  platform styling (deliberately not re-skinned by tenant brand). Changes go
+  live within the 30s control-plane cache.
+- **Files**: [lib/brand.js](../lib/brand.js), `app/admin/brand/page.js`,
+  `components/admin/BrandAdmin.js`, `app/api/admin/brand/route.js`,
+  `app/globals.css` (token defaults + @theme mapping), `app/layout.js`.
 
 #### Integrations tab
 - **What** (S34 / BE24+MC20): one card per provider — Shopify, Razorpay, GA4,
@@ -545,7 +567,7 @@ Navigation: **Offers · Orders · Storefront · Upsells · Integrations · Setti
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 21 aliased suites, **266 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 22 aliased suites, **284 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -574,9 +596,12 @@ Navigation: **Offers · Orders · Storefront · Upsells · Integrations · Setti
   tracked env/db file gate, client-bundle server-import scan, normalizeHost SSRF
   rejections, webhook-HMAC abuse matrix, OAuth-state tamper/expiry/cross-secret,
   support-grant TTL clamp + fresh expiry/revocation + read-only role matrix +
-  audit trail).
+  audit trail) · content 18 (S35: HTML-sanitizer abuse matrix, CMS
+  draft-revision CAS conflicts with both versions preserved, versioned schema
+  stamping, brand-token validation incl. WCAG contrast gate + monotonic
+  accent-ladder property test, resolution-order fallbacks).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **287 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **305 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -1379,3 +1404,4 @@ run the verify checklist.
 | S32 | 039079f | W2: commerce adapter capability gate, offer simulator + TZ-safe schedules, cart change acks (BE06+BE07+SF06+SF07+MC14+MC22) |
 | S33 | 1b93071 | W2: privacy lifecycle (redaction executes), purpose consent v2, event contract, expiring order proofs (BE18+SF24+BE20+SF08-full) |
 | S34 | e2b23b8 | W2 exit: integrations registry + tab, support grants (time-limited, read-only, banner), restore drill, security gate + threat model (BE24+MC20+BE27+BE34+OP10) |
+| S35 | (this session) | W3: content service (versioned schemas, CAS draft revisions, HTML sanitizer) + brand token system (accent ladder, WCAG gate, /admin/brand) (BE08+MC10) |

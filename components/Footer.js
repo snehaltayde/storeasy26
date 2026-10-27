@@ -21,7 +21,7 @@ export default function Footer({
           <div>
             <p className="text-xl font-extrabold">
               {logo.text1}
-              {logo.text2 ? <span className="text-lime-600">{logo.text2}</span> : null}
+              {logo.text2 ? <span className="text-accent-600">{logo.text2}</span> : null}
             </p>
             {tagline ? <p className="mt-3 max-w-sm text-sm text-zinc-500">{tagline}</p> : null}
           </div>

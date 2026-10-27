@@ -214,7 +214,7 @@ export default function CartDrawer() {
                   {g.image ? (
                     <Image src={g.image} alt={g.title} fill sizes="80px" className="object-cover" />
                   ) : null}
-                  <span className="absolute left-1 top-1 rounded bg-lime-400 px-1.5 py-0.5 text-[10px] font-bold text-zinc-900">
+                  <span className="absolute left-1 top-1 rounded bg-accent-400 px-1.5 py-0.5 text-[10px] font-bold text-accent-label">
                     FREE
                   </span>
                 </div>
@@ -222,7 +222,7 @@ export default function CartDrawer() {
                   <p className="line-clamp-2 text-sm font-medium text-zinc-900">{g.title}</p>
                   <p className="text-xs text-zinc-500">Free gift 🎁</p>
                   <div className="mt-1 flex items-center gap-2 text-sm">
-                    <span className="font-semibold text-lime-700">FREE</span>
+                    <span className="font-semibold text-accent-700">FREE</span>
                     {g.value ? (
                       <span className="text-xs text-zinc-400 line-through">
                         {formatMoney(g.value, currency)}
@@ -256,12 +256,12 @@ export default function CartDrawer() {
             {/* Coupon — validated by the engine (try BEAST10, FLAT200, SOLO25) */}
             <div className="mb-4">
               {couponStatus?.valid ? (
-                <div className="flex items-center justify-between rounded-xl border border-lime-200 bg-lime-50 px-3 py-2.5">
+                <div className="flex items-center justify-between rounded-xl border border-accent-200 bg-accent-50 px-3 py-2.5">
                   <span className="text-sm">
                     <span className="text-zinc-500">Coupon</span>{" "}
-                    <span className="font-semibold text-lime-800">{couponStatus.code}</span>
+                    <span className="font-semibold text-accent-800">{couponStatus.code}</span>
                     {couponStatus.applied ? (
-                      <span className="text-lime-700"> · −{formatMoney(couponStatus.applied, currency)}</span>
+                      <span className="text-accent-700"> · −{formatMoney(couponStatus.applied, currency)}</span>
                     ) : null}
                   </span>
                   <button
@@ -314,7 +314,7 @@ export default function CartDrawer() {
               {appliedOffers.filter((o) => o.amount > 0).map((o) => (
                 <div
                   key={o.id}
-                  className="animate-offer-in flex items-start justify-between gap-3 text-sm text-lime-700"
+                  className="animate-offer-in flex items-start justify-between gap-3 text-sm text-accent-700"
                 >
                   <span className="flex items-start gap-1.5">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
@@ -330,7 +330,7 @@ export default function CartDrawer() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-zinc-500">Shipping</span>
                   {shipping.total === 0 ? (
-                    <span className="font-semibold text-lime-700">FREE</span>
+                    <span className="font-semibold text-accent-700">FREE</span>
                   ) : (
                     <span className="text-zinc-700">{formatMoney(shipping.total, currency)}</span>
                   )}
@@ -339,7 +339,7 @@ export default function CartDrawer() {
               {shipping?.remainingForFree > 0 && (
                 <p className="text-right text-xs text-zinc-500">
                   Add {formatMoney(shipping.remainingForFree, currency)} more for{" "}
-                  <span className="font-semibold text-lime-700">free shipping</span>
+                  <span className="font-semibold text-accent-700">free shipping</span>
                 </p>
               )}
               <div className="flex items-center justify-between border-t border-zinc-100 pt-2">
@@ -349,7 +349,7 @@ export default function CartDrawer() {
               {discountTotal > 0 && (
                 <p
                   key={savePop}
-                  className="animate-save-pop origin-right text-right text-xs font-semibold text-lime-700"
+                  className="animate-save-pop origin-right text-right text-xs font-semibold text-accent-700"
                 >
                   You save {formatMoney(discountTotal, currency)}
                 </p>

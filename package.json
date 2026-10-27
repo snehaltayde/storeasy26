@@ -55,7 +55,8 @@
     "test:privacy": "node scripts/test-privacy.js",
     "support": "node --env-file=.env.local scripts/support-grant.js",
     "restore:drill": "node --env-file=.env.local scripts/restore-drill.js",
-    "test:security": "node scripts/test-security.js"
+    "test:security": "node scripts/test-security.js",
+    "test:content": "node scripts/test-content.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

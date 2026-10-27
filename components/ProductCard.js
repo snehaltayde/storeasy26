@@ -44,7 +44,7 @@ export default function ProductCard({ product, priority = false }) {
           </span>
         )}
         {available && pct > 0 && (
-          <span className="absolute left-3 top-3 rounded-full bg-lime-400 px-2.5 py-1 text-[11px] font-bold text-zinc-900">
+          <span className="absolute left-3 top-3 rounded-full bg-accent-400 px-2.5 py-1 text-[11px] font-bold text-accent-label">
             -{pct}%
           </span>
         )}
@@ -56,7 +56,7 @@ export default function ProductCard({ product, priority = false }) {
             {product_type}
           </p>
         ) : null}
-        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-zinc-900 transition-colors group-hover:text-lime-700">
+        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-zinc-900 transition-colors group-hover:text-accent-700">
           {title}
         </h3>
         <p className="text-sm">

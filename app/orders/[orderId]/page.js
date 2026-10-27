@@ -76,7 +76,7 @@ export default async function OrderStatusPage({ params, searchParams }) {
           </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold ${
-              cancelled ? "bg-red-50 text-red-600" : "bg-lime-100 text-lime-800"
+              cancelled ? "bg-red-50 text-red-600" : "bg-accent-100 text-accent-800"
             }`}
           >
             {cancelled ? "CANCELLED" : STEPS.find((s) => s.key === current)?.label}
@@ -89,7 +89,7 @@ export default async function OrderStatusPage({ params, searchParams }) {
               <li key={s.key} className="flex items-center gap-3">
                 <span
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                    reached[s.key] ? "bg-lime-400 text-zinc-950" : "bg-zinc-100 text-zinc-400"
+                    reached[s.key] ? "bg-accent-400 text-accent-label" : "bg-zinc-100 text-zinc-400"
                   }`}
                 >
                   {reached[s.key] ? "✓" : i + 1}
@@ -123,7 +123,7 @@ export default async function OrderStatusPage({ params, searchParams }) {
                   {f.tracking_company ? `${f.tracking_company} · ` : ""}
                   {f.tracking_number ? (
                     f.tracking_url ? (
-                      <a href={f.tracking_url} className="font-semibold text-lime-700 underline" target="_blank" rel="noopener noreferrer">
+                      <a href={f.tracking_url} className="font-semibold text-accent-700 underline" target="_blank" rel="noopener noreferrer">
                         {f.tracking_number}
                       </a>
                     ) : (
@@ -162,7 +162,7 @@ export default async function OrderStatusPage({ params, searchParams }) {
                 <p className="truncate text-sm font-medium">{it.title}</p>
                 <p className="text-xs text-zinc-500">{it.is_gift ? "Free gift 🎁" : `Qty ${it.quantity}`}</p>
               </div>
-              <span className={`text-sm font-semibold ${it.is_gift ? "text-lime-700" : ""}`}>
+              <span className={`text-sm font-semibold ${it.is_gift ? "text-accent-700" : ""}`}>
                 {it.is_gift ? "FREE" : formatMoney(it.line_total, order.currency)}
               </span>
             </li>

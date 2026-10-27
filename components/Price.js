@@ -19,7 +19,7 @@ export default function Price({
         </span>
       )}
       {onSale && showSaving && pct > 0 && (
-        <span className="rounded bg-lime-100 px-1.5 py-0.5 text-xs font-semibold text-lime-800">
+        <span className="rounded bg-accent-100 px-1.5 py-0.5 text-xs font-semibold text-accent-800">
           Save {pct}%
         </span>
       )}

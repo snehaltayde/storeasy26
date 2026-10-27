@@ -17,7 +17,7 @@ export default function CartButton() {
         <path d="M16 10a4 4 0 0 1-8 0" />
       </svg>
       {count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-lime-400 px-1 text-[11px] font-bold text-zinc-900">
+        <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-400 px-1 text-[11px] font-bold text-accent-label">
           {count}
         </span>
       )}

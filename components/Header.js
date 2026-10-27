@@ -12,7 +12,7 @@ export default function Header({ collections = [], logo = { text1: "Store", text
   return (
     <header className="sticky top-0 z-30 bg-zinc-950 text-white">
       {announcement?.enabled && announcement.text ? (
-        <div className="bg-lime-400 px-4 py-1.5 text-center text-xs font-semibold text-zinc-950">
+        <div className="bg-accent-400 px-4 py-1.5 text-center text-xs font-semibold text-accent-label">
           {announcement.href ? (
             <Link href={announcement.href} className="hover:underline">
               {announcement.text}
@@ -26,7 +26,7 @@ export default function Header({ collections = [], logo = { text1: "Store", text
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
         <Link href="/" className="shrink-0 text-xl font-extrabold tracking-tight">
           {logo.text1}
-          {logo.text2 ? <span className="text-lime-400">{logo.text2}</span> : null}
+          {logo.text2 ? <span className="text-accent-400">{logo.text2}</span> : null}
         </Link>
 
         <div className="hidden flex-1 md:block">

@@ -25,9 +25,15 @@ const { validateBlock } = await import("../lib/cms/validate.js");
 const { PAGES } = await import("../lib/content/pages.js");
 
 const schema = await readFile(join(here, "../lib/schema.sql"), "utf8");
+const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+const migrations = await loadMigrations("tenant");
 await libsql.executeMultiple(schema);
+await runMigrations(libsql, migrations); // fixture rule: ledger on top of raw schema (S35 cms revisions)
 const T2 = { id: "t2", name: "T2", status: "active", dbUrl: "file:.test-cms-t2.db", dbToken: null, config: { site: { name: "Acme", support_email: "help@acme.in", support_phone: "+91-1" } }, secrets: {} };
-await withTenant(T2, () => libsql.executeMultiple(schema));
+await withTenant(T2, async () => {
+  await libsql.executeMultiple(schema);
+  await runMigrations(libsql, migrations);
+});
 
 let pass = 0;
 let fail = 0;

@@ -47,12 +47,13 @@ that proves it; residual risks are listed honestly at the end. Release gate:
 
 ## Residual risks (accepted / scheduled)
 
-1. **Stored XSS via rich content** — product `description_html` comes from
-   Shopify and is rendered with `dangerouslySetInnerHTML`; CMS rich text is
-   merchant-authored. Today's exposure requires a compromised Shopify store or
-   merchant account (same-tenant victim only — no cross-tenant blast radius).
-   **Sanitization lands with the content/template service (BE08, S35)** and a
-   CSP pass follows it. Until then this is the top open item.
+1. ~~**Stored XSS via rich content**~~ — **MITIGATED (S35)**: `lib/sanitize.js`
+   (edge-safe allowlist sanitizer — script/style/iframe dropped with content,
+   event handlers stripped, javascript:/data: URLs rejected including
+   entity-encoded forms) now wraps `description_html` at render on the PDP;
+   CMS page bodies render as plain text and brand tokens are validated
+   hex/enum values. Abuse matrix in `test:content`. Remaining from this item:
+   a CSP header pass (needs the pixel/CMS inventory; with releases, S36+).
 2. **In-memory rate limiters** are per-isolate; a distributed attacker spread
    across isolates gets N× the budget. Login limits are DB-backed (S26); the
    storefront ones are best-effort. Acceptable at current scale.

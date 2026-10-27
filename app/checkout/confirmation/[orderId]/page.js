@@ -46,7 +46,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
       />
       <div className="rounded-2xl border border-zinc-200 p-6 sm:p-8">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-lime-100 text-lg font-bold text-lime-700">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-100 text-lg font-bold text-accent-700">
             ✓
           </span>
           <div>
@@ -59,7 +59,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
           Thanks {order.name ? order.name.split(" ")[0] : "there"}!{" "}
           {cod ? "You'll pay cash on delivery." : paid ? "Payment received." : "Payment is pending."} A
           confirmation was sent to {order.email}. Keep your{" "}
-          <Link href={await tfetch(() => orderStatusPath(order.id))} className="font-semibold text-lime-700 underline">
+          <Link href={await tfetch(() => orderStatusPath(order.id))} className="font-semibold text-accent-700 underline">
             order-status link
           </Link>{" "}
           to track it anytime.
@@ -75,7 +75,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
                 <p className="truncate text-sm font-medium">{it.title}</p>
                 <p className="text-xs text-zinc-500">{it.is_gift ? "Free gift 🎁" : `Qty ${it.quantity}`}</p>
               </div>
-              <span className={`text-sm font-semibold ${it.is_gift ? "text-lime-700" : ""}`}>
+              <span className={`text-sm font-semibold ${it.is_gift ? "text-accent-700" : ""}`}>
                 {it.is_gift ? "FREE" : formatMoney(it.line_total, order.currency)}
               </span>
             </li>
@@ -90,7 +90,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
           {order.appliedOffers
             .filter((o) => o.amount > 0)
             .map((o) => (
-              <div key={o.id} className="flex justify-between gap-3 text-lime-700">
+              <div key={o.id} className="flex justify-between gap-3 text-accent-700">
                 <span className="leading-snug">{o.label}</span>
                 <span className="whitespace-nowrap">−{formatMoney(o.amount, order.currency)}</span>
               </div>
@@ -98,7 +98,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
           <div className="flex justify-between">
             <span className="text-zinc-500">{order.snapshot?.shipping?.label || "Shipping"}</span>
             {(order.shipping_total || 0) === 0 ? (
-              <span className="font-semibold text-lime-700">FREE</span>
+              <span className="font-semibold text-accent-700">FREE</span>
             ) : (
               <span>{formatMoney(order.shipping_total, order.currency)}</span>
             )}

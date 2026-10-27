@@ -67,14 +67,14 @@ export default function ProductPurchase({ product }) {
             <span className="text-lg text-zinc-400 line-through">
               {formatMoney(compareAt, currency)}
             </span>
-            <span className="rounded-md bg-lime-100 px-2 py-0.5 text-sm font-bold text-lime-800">
+            <span className="rounded-md bg-accent-100 px-2 py-0.5 text-sm font-bold text-accent-800">
               Save {pct}%
             </span>
           </>
         )}
       </div>
 
-      <p className={`mt-2 text-sm font-medium ${available ? "text-lime-700" : "text-zinc-400"}`}>
+      <p className={`mt-2 text-sm font-medium ${available ? "text-accent-700" : "text-zinc-400"}`}>
         {available ? "● In stock" : "● Sold out"}
       </p>
 
@@ -137,7 +137,7 @@ export default function ProductPurchase({ product }) {
           type="button"
           onClick={handleAdd}
           disabled={!available || !currentVariant}
-          className="flex-1 rounded-xl bg-lime-400 px-6 py-3.5 text-sm font-bold text-zinc-950 transition enabled:hover:bg-lime-300 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
+          className="flex-1 rounded-xl bg-accent-400 px-6 py-3.5 text-sm font-bold text-accent-label transition enabled:hover:bg-accent-300 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
         >
           {available ? (currentVariant ? "Add to cart" : "Select options") : "Sold out"}
         </button>

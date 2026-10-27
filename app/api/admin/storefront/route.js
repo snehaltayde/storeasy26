@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
-import { getBlock, setBlock, deleteBlock, getAnnouncement, getHero, getHomeSections, getNav, listContentPages, getContentPage, upsertContentPage, deleteContentPage } from "@/lib/cms/store";
+import { getBlockRow, setBlock, deleteBlock, getAnnouncement, getHero, getHomeSections, getNav, listContentPages, getContentPage, upsertContentPage, deleteContentPage, pageRevisions, CmsConflictError } from "@/lib/cms/store";
 import { validateBlock } from "@/lib/cms/validate";
 import { BLOCK_KEYS } from "@/lib/cms/defaults";
 import { slog } from "@/lib/log";
@@ -27,10 +27,17 @@ async function view() {
     listContentPages(),
   ]);
   const customized = {};
-  for (const key of BLOCK_KEYS) customized[key] = (await getBlock(key)) != null;
+  const revisions = {}; // S35: CAS tokens — the editor saves with the revision it loaded
+  for (const key of BLOCK_KEYS) {
+    const row = await getBlockRow(key);
+    customized[key] = row != null;
+    revisions[key] = row ? row.revision : null; // null = "I expect to create it"
+  }
   return {
     blocks: { announcement, hero, home_sections: homeSections, nav_header: navHeader, nav_footer: navFooter },
     customized,
+    revisions,
+    pageRevisions: await pageRevisions(),
     pages,
   };
 }
@@ -56,12 +63,14 @@ export const PUT = tenantHandler(async (request) => {
       } else {
         const { ok, errors, value } = validateBlock(body.block, body.value);
         if (!ok) return NextResponse.json({ error: "Validation failed", errors }, { status: 422 });
-        await setBlock(body.block, value);
+        // body.revision: the revision the editor loaded (null = creating);
+        // omitted entirely = no check (pre-S35 clients, scripts)
+        await setBlock(body.block, value, "revision" in body ? { expectedRevision: body.revision } : {});
         slog("cms_block_saved", { block: body.block });
         await audit({ actor: auth.actor, action: "storefront.write", resource: `block:${body.block}` });
       }
     } else if (body.page) {
-      await upsertContentPage(body.page);
+      await upsertContentPage(body.page, "revision" in body ? { expectedRevision: body.revision } : {});
       slog("cms_page_saved", { slug: body.page.slug });
       await audit({ actor: auth.actor, action: "storefront.write", resource: `page:${body.page.slug}` });
     } else if (body.deletePage) {
@@ -76,6 +85,11 @@ export const PUT = tenantHandler(async (request) => {
     }
     return NextResponse.json({ ok: true, ...(await view()) });
   } catch (e) {
+    if (e instanceof CmsConflictError) {
+      // 409: both versions preserved — the server's current row rides along,
+      // the editor's unsaved value stays in their form.
+      return NextResponse.json({ error: e.message, code: e.code, current: e.current }, { status: 409 });
+    }
     return NextResponse.json({ error: String(e?.message || e) }, { status: 422 });
   }
 });

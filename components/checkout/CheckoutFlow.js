@@ -235,7 +235,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-8 flex items-center justify-between">
         <Link href="/" className="text-xl font-extrabold tracking-tight">
-          BEAST<span className="text-lime-500">LIFE</span>
+          BEAST<span className="text-accent-500">LIFE</span>
         </Link>
         <ol className="flex items-center gap-2 text-sm">
           {STEPS.map((label, i) => (
@@ -298,7 +298,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
                 <p className="text-sm text-zinc-600">
                   {form.email} · {form.phone}
                 </p>
-                <button onClick={() => setStep(0)} className="mt-2 text-xs font-medium text-lime-700 hover:underline">
+                <button onClick={() => setStep(0)} className="mt-2 text-xs font-medium text-accent-700 hover:underline">
                   Edit
                 </button>
               </div>
@@ -324,7 +324,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
                       <p className="truncate text-sm font-medium">{g.title}</p>
                       <p className="text-xs text-zinc-500">Free gift 🎁</p>
                     </div>
-                    <span className="text-sm font-semibold text-lime-700">FREE</span>
+                    <span className="text-sm font-semibold text-accent-700">FREE</span>
                   </li>
                 ))}
               </ul>
@@ -388,7 +388,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
                 <button
                   onClick={() => placeOrder()}
                   disabled={placing}
-                  className="flex-1 rounded-xl bg-lime-400 px-6 py-3 text-sm font-bold text-zinc-950 transition hover:bg-lime-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 rounded-xl bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition hover:bg-accent-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {placing
                     ? "Processing…"
@@ -412,13 +412,13 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
             {cart.appliedOffers
               .filter((o) => o.amount > 0)
               .map((o) => (
-                <div key={o.id} className="flex justify-between gap-3 text-lime-700">
+                <div key={o.id} className="flex justify-between gap-3 text-accent-700">
                   <span className="leading-snug">{o.label}</span>
                   <span className="whitespace-nowrap font-medium">−{formatMoney(o.amount, cart.currency)}</span>
                 </div>
               ))}
             {cart.gifts.map((g) => (
-              <div key={`g-${g.variantId}`} className="flex justify-between text-lime-700">
+              <div key={`g-${g.variantId}`} className="flex justify-between text-accent-700">
                 <span>Free gift · {g.title}</span>
                 <span className="font-medium">FREE</span>
               </div>
@@ -429,7 +429,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
                 {shipping.codFee > 0 && <span className="text-xs"> (incl. COD fee)</span>}
               </span>
               {shipping.total === 0 ? (
-                <span className="font-semibold text-lime-700">FREE</span>
+                <span className="font-semibold text-accent-700">FREE</span>
               ) : (
                 <span>{formatMoney(shipping.total, cart.currency)}</span>
               )}
@@ -440,7 +440,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
             <span className="text-lg font-bold">{formatMoney(grandTotal, cart.currency)}</span>
           </div>
           {cart.discountTotal > 0 && (
-            <p className="mt-1 text-right text-xs font-semibold text-lime-700">
+            <p className="mt-1 text-right text-xs font-semibold text-accent-700">
               You save {formatMoney(cart.discountTotal, cart.currency)}
             </p>
           )}

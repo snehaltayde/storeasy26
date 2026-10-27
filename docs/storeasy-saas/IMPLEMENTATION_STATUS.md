@@ -5,16 +5,17 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S34 (**W2 complete**; W1 complete).
+- Created: 2026-10-28 (session S25). Last updated: S35 (W3 underway; W1+W2 complete).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 34 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 36 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
   BE18, SF24, BE20 — S33, with SF08 completed; BE24, MC20, BE27, BE34,
-  OP10 — S34). The other 82 are **not inspected** — the handoff's
-  Fix/Extend/New labels for them remain unverified documentation claims.
+  OP10 — S34; BE08, MC10 — S35). The other 80 are **not inspected** — the
+  handoff's Fix/Extend/New labels for them remain unverified documentation
+  claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -611,6 +612,60 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   very next demo request → 401; banner gone.
 - Remaining: /platform console UI panel for grants (CLI+API only today, W4
   polish); real operator accounts replace the bootstrap token at cutover.
+
+### BE08 — Content & template service · **partial (core implemented & verified, S35)**
+
+- Versioned component schemas: `lib/cms/schemas.js` registry (every block kind
+  + the page schema carry a version with a lazy `migrate` hook; writes stamp
+  `schema_version`, reads upgrade through `upgradeBlock`). Draft-revision
+  safety: migration tenant/0006 adds `revision` to cms_blocks/cms_pages;
+  writes are compare-and-swap on the revision the editor loaded —
+  `CmsConflictError` → HTTP 409 carrying the server's current row, BOTH
+  versions preserved (server keeps its row, editor keeps the unsaved form;
+  a deliberate second save overwrites). Content resolution order documented
+  and enforced: platform defaults → theme kit (S37) → tenant tokens →
+  template (S37/MC09) → tenant content rows.
+- **Sanitization (BE34 residual CLOSED):** `lib/sanitize.js` — edge-safe,
+  dependency-free allowlist sanitizer (script/style/iframe dropped WITH
+  content, event handlers stripped, javascript:/data: URLs rejected incl.
+  entity-encoded, target links get `rel=noopener`); applied at render to
+  Shopify `description_html` on the PDP. CMS page bodies render as plain
+  text (no sink).
+- LIVE (demo over HTTP): pre-S35 hero row at revision 0 → "expect to create"
+  rightly 409'd with the server version in the payload; create → rev 1,
+  save-with-rev → rev 2, stale save → 409; PDP renders sanitized markup.
+- Remaining: immutable releases + publish/rollback (BE09/S36), templates &
+  assignments (MC09/S37), rich-text CMS fields (sanitizer ready), CSP headers.
+
+### MC10 — Brand system · **partial (implemented & verified, S35)**
+
+- `/admin/brand` tab + `config.brand` tokens: ONE accent → derived 50–900
+  ladder (lightness interpolation anchored at the picked color; strictly
+  monotonic — property-tested across extreme picks), background/foreground,
+  radius sm–xl, type scale. WCAG AA gate: body-text contrast < 4.5:1 BLOCKS
+  the save (server-side); low-contrast accents warn; button label color
+  (`accent-label`) computed against the actual button surface. Reset-to-theme.
+- Delivery: root layout emits one `<style id="brand-vars">` CSS-variable
+  block (validated values only); ALL storefront components swept from
+  hardcoded lime classes to `accent-*` utilities mapped via Tailwind v4
+  @theme. No tenant row → no override emitted (defaults in globals.css =
+  byte-identical pre-S35 look). Admin console deliberately keeps platform
+  styling.
+- LIVE: contrast gate 422 with the computed ratio; demo saved navy
+  `#1e3a8a` → home serves the navy variable block and renders fully
+  re-skinned (white button labels — auto-flipped), beastlife unchanged lime
+  (zero brand-vars in its HTML) — tenant differentiation proven visually,
+  side by side.
+- Remaining: logo/favicon upload (needs BE15 media pipeline, S38), approved
+  font pairs (next/font loading lands with theme kits, S37).
+
+## Verification state (S35, 2026-10-28)
+
+22 suites / **284 tests + 21 offers = 305 checks** green (new `test:content`,
+18 tests; test-cms fixture now runs the migration ledger per the standing
+rule), `pnpm build` clean. Migration tenant/0006 applied to all 3 hosted
+tenant DBs. Live: CAS conflict matrix + navy rebrand on demo (kept — demo
+remains visibly differentiated), beastlife byte-identical.
 
 ## Verification state (S34, 2026-10-28)
 

@@ -39,7 +39,7 @@ export default function ProductGallery({ images = [], title }) {
               onClick={() => setActive(i)}
               aria-label={`View image ${i + 1}`}
               className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition ${
-                i === active ? "border-lime-500" : "border-transparent hover:border-zinc-300"
+                i === active ? "border-accent-500" : "border-transparent hover:border-zinc-300"
               }`}
             >
               <Image src={img.url} alt="" fill sizes="64px" className="object-cover" />

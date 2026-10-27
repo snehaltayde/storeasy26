@@ -145,6 +145,9 @@ export default function StorefrontAdmin({ initial }) {
   const [editingPage, setEditingPage] = useState(null); // page object | null
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  // S35: after a 409, remember WHAT conflicted so a deliberate re-save of that
+  // same thing overwrites (sends no revision) instead of looping on 409.
+  const [conflict, setConflict] = useState(null);
 
   async function put(body) {
     setBusy(true);
@@ -165,6 +168,18 @@ export default function StorefrontAdmin({ initial }) {
         setNavFooter(navToText(json.blocks.nav_footer));
       }
       setMsg({ ok: true, text: ["Saved — live on the next page load."] });
+    } else if (res.status === 409) {
+      // S35: someone else saved since this editor loaded. Their version is on
+      // the server, yours stays in the form — reload to see theirs, or save
+      // again to overwrite deliberately.
+      setMsg({
+        ok: false,
+        text: [
+          "Save blocked: this was edited by someone else since you loaded it.",
+          "Your changes are still in the form. Reload the page to see their version first, or press Save again to overwrite it.",
+        ],
+      });
+      setConflict(body); // next save of the same body skips the stale check
     } else {
       setMsg({ ok: false, text: json.errors || [json.error || `Save failed (${res.status})`] });
     }
@@ -184,7 +199,18 @@ export default function StorefrontAdmin({ initial }) {
     if (json.page) setEditingPage(json.page);
   }
 
-  const saveBlock = (block, value) => put({ block, value });
+  // Saves carry the revision loaded with the current view (CAS). After a 409
+  // on the same target, the retry omits the revision = deliberate overwrite.
+  const saveBlock = (block, value) => {
+    const overwrite = conflict?.block === block;
+    if (overwrite) setConflict(null);
+    return put({ block, value, ...(overwrite ? {} : { revision: data.revisions?.[block] ?? null }) });
+  };
+  const savePage = (page) => {
+    const overwrite = conflict?.page?.slug === page.slug;
+    if (overwrite) setConflict(null);
+    return put({ page, ...(overwrite ? {} : { revision: data.pageRevisions?.[page.slug] ?? null }) });
+  };
   const resetBlock = (block) => put({ block, reset: true });
   const swapSections = () => setSections((s) => [...s].reverse());
 
@@ -209,7 +235,7 @@ export default function StorefrontAdmin({ initial }) {
           busy={busy}
           onCancel={() => setEditingPage(null)}
           onSave={async (page) => {
-            const json = await put({ page });
+            const json = await savePage(page);
             if (json.ok) setEditingPage(null);
           }}
         />

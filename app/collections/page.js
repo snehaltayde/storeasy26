@@ -29,7 +29,7 @@ export default async function CollectionsPage() {
       )}
 
       <p className="mt-10">
-        <Link href="/" className="text-sm text-lime-700 hover:underline">
+        <Link href="/" className="text-sm text-accent-700 hover:underline">
           ← Back home
         </Link>
       </p>

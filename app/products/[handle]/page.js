@@ -8,6 +8,7 @@ import { getProductByHandle } from "@/lib/repo";
 import { getPdpPairs } from "@/lib/cms/placements";
 import { numericId } from "@/lib/ids";
 import { abs, siteName } from "@/lib/site";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
@@ -123,7 +124,7 @@ export default async function ProductPage({ params }) {
 
         <div>
           {product.vendor ? (
-            <p className="text-sm font-semibold uppercase tracking-wide text-lime-700">
+            <p className="text-sm font-semibold uppercase tracking-wide text-accent-700">
               {product.vendor}
             </p>
           ) : null}
@@ -134,10 +135,11 @@ export default async function ProductPage({ params }) {
           {product.description_html ? (
             <div className="mt-8 border-t border-zinc-100 pt-8">
               <h2 className="mb-3 text-lg font-bold">Details</h2>
-              {/* Merchant-authored HTML from the store's own Shopify catalog. */}
+              {/* Merchant-authored HTML from the store's own Shopify catalog —
+                  allowlist-sanitized (S35): a compromised catalog must not XSS shoppers. */}
               <div
                 className="rte"
-                dangerouslySetInnerHTML={{ __html: product.description_html }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description_html) }}
               />
             </div>
           ) : product.description ? (

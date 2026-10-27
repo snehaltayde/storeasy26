@@ -124,7 +124,7 @@ export default function SearchBox() {
               </ul>
               <button
                 onClick={submit}
-                className="block w-full border-t border-zinc-100 bg-zinc-50 px-4 py-2.5 text-center text-sm font-medium text-lime-700 hover:bg-zinc-100"
+                className="block w-full border-t border-zinc-100 bg-zinc-50 px-4 py-2.5 text-center text-sm font-medium text-accent-700 hover:bg-zinc-100"
               >
                 View all results for “{q.trim()}”
               </button>

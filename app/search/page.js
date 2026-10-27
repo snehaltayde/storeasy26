@@ -48,7 +48,7 @@ export default async function SearchPage({ searchParams }) {
       <h1 className="text-2xl font-bold tracking-tight">
         {q ? (
           <>
-            Results for “<span className="text-lime-700">{q}</span>”
+            Results for “<span className="text-accent-700">{q}</span>”
           </>
         ) : (
           "Search"
@@ -68,7 +68,7 @@ export default async function SearchPage({ searchParams }) {
             <p className="font-medium text-zinc-700">No products match “{q}”.</p>
             <Link
               href="/collections"
-              className="mt-3 inline-block text-sm text-lime-700 hover:underline"
+              className="mt-3 inline-block text-sm text-accent-700 hover:underline"
             >
               Browse all collections →
             </Link>
