@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { CART_COOKIE } from "@/lib/cart";
-import { CONSENT_COOKIE, isConsentGranted } from "@/lib/track/names";
+import { CONSENT_COOKIE, isConsentGranted, scrubPiiParams } from "@/lib/track/names";
 import { rateLimit } from "@/lib/rate-limit";
 import { storeEvent, enqueueForward, runEventSweep, isFunnelEvent } from "@/lib/events";
 import { tenantHandler } from "@/lib/tenant-request";
@@ -30,6 +30,7 @@ const clientIp = (request) => {
   const xff = request.headers.get("x-forwarded-for");
   return xff ? xff.split(",")[0].trim() : request.headers.get("x-real-ip") || null;
 };
+
 
 export const POST = tenantHandler(async (request) => {
   const limited = rateLimit(request, { name: "track", limit: 60 });
@@ -89,11 +90,12 @@ export const POST = tenantHandler(async (request) => {
     referrer: body.referrer || null,
     cartId: cookies[CART_COOKIE] || null,
     orderId: name === "purchase" ? body.params?.transaction_id || eventId : null,
+    consent: cookies[CONSENT_COOKIE] || null, // S33 (BE20): purposes snapshot at collection
     payload: {
       ...(body.value != null ? { value: Number(body.value) } : {}),
       ...(body.currency ? { currency: body.currency } : {}),
       ...(body.items ? { items: body.items } : {}),
-      ...(body.params ? { params: body.params } : {}),
+      ...(body.params ? { params: scrubPiiParams(body.params) } : {}),
       ...(Object.keys(userData).length ? { user_data: userData } : {}),
     },
   });

@@ -8,7 +8,7 @@ import { numericId } from "@/lib/ids";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Order confirmed", robots: { index: false, follow: false } };
+export const metadata = { title: "Order confirmed", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
 export default async function ConfirmationPage({ params, searchParams }) {
   const { orderId } = await params;

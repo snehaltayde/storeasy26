@@ -36,6 +36,12 @@ process.env.ALERT_WEBHOOK_URL = `http://127.0.0.1:${catcher.address().port}/aler
 
 const { libsql, db } = await import("../lib/db.js");
 await libsql.executeMultiple(await readFile(join(here, "../lib/schema.sql"), "utf8"));
+// S33: the versioned migrations run on top so the fixture DB matches
+// production shape (events.contract_version/consent etc.)
+{
+  const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+  await runMigrations(libsql, await loadMigrations("tenant"));
+}
 const E = await import("../lib/events.js");
 const O = await import("../lib/orders.js");
 const T = await import("../lib/tracking.js");

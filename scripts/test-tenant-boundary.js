@@ -274,9 +274,9 @@ await t("aggregateHealth ranks a _platform failure as down", async () => {
 });
 
 // --- E. SF08 order-token scheme ----------------------------------------------
-await t("orderConfirmationPath carries the 20-hex token", async () => {
+await t("orderConfirmationPath carries the v2 expiring proof (S33)", async () => {
   const p = await withTenant(ALPHA, () => orderConfirmationPath("BL-TEST1234"));
-  ok(/^\/checkout\/confirmation\/BL-TEST1234\?t=[0-9a-f]{20}$/.test(p), `path shape (${p})`);
+  ok(/^\/checkout\/confirmation\/BL-TEST1234\?t=2\.\d+\.[0-9a-f]{20}$/.test(p), `path shape (${p})`);
 });
 
 await t("token verifies under its tenant; wrong/missing/truncated fail", async () => {
@@ -284,7 +284,7 @@ await t("token verifies under its tenant; wrong/missing/truncated fail", async (
   eq(await withTenant(ALPHA, () => verifyOrderStatusToken("BL-TEST1234", tok)), true, "valid");
   eq(await withTenant(ALPHA, () => verifyOrderStatusToken("BL-TEST1234", "0".repeat(20))), false, "wrong");
   eq(await withTenant(ALPHA, () => verifyOrderStatusToken("BL-TEST1234", "")), false, "missing");
-  eq(await withTenant(ALPHA, () => verifyOrderStatusToken("BL-TEST1234", tok.slice(0, 19))), false, "truncated");
+  eq(await withTenant(ALPHA, () => verifyOrderStatusToken("BL-TEST1234", tok.slice(0, tok.length - 1))), false, "truncated");
 });
 
 await t("CROSS-TENANT rejection: alpha's token never unlocks beta's order id", async () => {

@@ -8,7 +8,7 @@ export async function onRequestError(err, request, context) {
   await captureError({
     source: context?.runtime === "edge" ? "edge" : "server",
     error: err,
-    url: request?.path || request?.url || null,
+    url: String(request?.path || request?.url || "").split("?")[0] || null, // S33: never record query strings (order proofs)
     digest: err?.digest || null,
     extra: {
       method: request?.method,

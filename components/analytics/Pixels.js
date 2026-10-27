@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { readConsentCookie, isConsentGranted } from "@/lib/track/names";
+import { readConsentCookie, parseConsent } from "@/lib/track/names";
 
 function loadGtag(id) {
   if (!id || window.gtag) return;
@@ -37,14 +37,22 @@ function loadFbq(id) {
 // a visitor on tenant A must never load tenant B's (or the env default's)
 // pixels; a tenant without ids simply loads nothing.
 export default function Pixels({ ga4Id = "", metaPixelId = "" }) {
-  const loaded = useRef(false);
+  const loadedGa = useRef(false);
+  const loadedMeta = useRef(false);
   useEffect(() => {
     const maybeLoad = () => {
-      if (loaded.current) return;
-      if (!isConsentGranted(readConsentCookie())) return;
-      loaded.current = true;
-      loadGtag(ga4Id);
-      loadFbq(metaPixelId);
+      // S33 (SF24): PER-PURPOSE loading — analytics consent gates gtag,
+      // marketing consent gates the Meta pixel. Withdrawal reloads the page
+      // (banner), so a revoked purpose's tag never comes back.
+      const c = parseConsent(readConsentCookie());
+      if (c.analytics && !loadedGa.current) {
+        loadedGa.current = true;
+        loadGtag(ga4Id);
+      }
+      if (c.marketing && !loadedMeta.current) {
+        loadedMeta.current = true;
+        loadFbq(metaPixelId);
+      }
     };
     maybeLoad();
     window.addEventListener("consent-granted", maybeLoad);

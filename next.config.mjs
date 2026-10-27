@@ -9,6 +9,16 @@ const nextConfig = {
       { protocol: "https", hostname: "cdn.shopify.com" },
     ],
   },
+  // S33 (SF08 residual): outbound navigation never carries our URLs' query
+  // strings (order proofs) to third parties; same-origin keeps full referrers.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

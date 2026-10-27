@@ -254,15 +254,22 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
   [lib/content/pages.js](../lib/content/pages.js) (default templates).
 
 #### Consent banner & pixels
-- **What**: DPDP-aware consent — analytics/ad pixels load ONLY after "Allow";
-  declining hides the banner for a year and nothing non-essential fires.
-- **Use**: automatic on first visit per tenant origin.
+- **What** (S33 / SF24): DPDP consent with PURPOSES — Analytics (GA4) and
+  Marketing (Meta) are separate choices; Allow all / No thanks / Settings with
+  per-purpose toggles, plus a persistent "Privacy" chip that reopens the panel
+  anytime. Essential processing (orders, cart) is labeled always-on.
+- **Use**: automatic on first visit per tenant origin; change anytime via the
+  Privacy chip — saving a change reloads so every tag re-evaluates (withdrawal
+  stops client tags immediately; server forwarding gates per purpose on the
+  consent stored WITH each event).
 - **Setup**: pixels need tenant GA4/Meta ids (Settings); the banner works regardless.
 - **Files**: [components/analytics/ConsentBanner.js](../components/analytics/ConsentBanner.js),
   [components/analytics/Pixels.js](../components/analytics/Pixels.js),
   [lib/track/names.js](../lib/track/names.js) (consent helpers, shared vocab).
-- **How**: `_consent` cookie gates three layers (§3.7); granting fires a
-  `consent-granted` event that lights pixels up without a reload.
+- **How**: `_consent` cookie, versioned JSON `{"v":2,"a":0|1,"m":0|1,"at":…}`
+  (legacy "granted"/"denied" still parse); gtag loads only with analytics, fbq
+  only with marketing; granting fires `consent-granted` so tags light up
+  without a reload.
 
 #### SEO surface
 - **What**: per-tenant metadata (title template, description), canonicals everywhere,
@@ -507,7 +514,7 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 19 aliased suites, **242 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 20 aliased suites, **253 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -529,9 +536,12 @@ Navigation: **Offers · Orders · Storefront · Upsells · Settings**.
   commerce 10 (S32: checkout capability gate incl. fail-closed unknown modes,
   TZ-safe schedule round-trips + lifecycle matrix, deterministic simulator +
   combination preview, cart change acknowledgement, duplicate-mutation
-  idempotency, gift eligibility, commerce settings validation).
+  idempotency, gift eligibility, commerce settings validation) · privacy 11
+  (S33: expiring v2 proofs + legacy cutover, URL/PII scrubbing, purpose
+  consent, per-destination forwarding gates, customer redaction, compliance
+  webhook router).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **263 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **274 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -554,9 +564,13 @@ multi-tenant payments go live. Severity-ordered:
    requires the same `?t=` token as the status page, verified BEFORE any order
    read (bad token and unknown id are both 404, so enumeration reveals nothing);
    `/api/checkout` success responses carry a server-computed `confirmationPath`
-   and CheckoutFlow navigates to it. Residuals (scheduled S33): the token is
-   deterministic/non-expiring, travels in the query string (reaches pixels/CAPI
-   `event_source_url`/error-report URLs), and there's no `Referrer-Policy` header.
+   and CheckoutFlow navigates to it. The S25 residuals are CLOSED (S33): the
+   proof is now v2 — a per-order HMAC that EXPIRES (`2.<exp>.<sig>`, default 30
+   days via `ORDER_LINK_TTL_DAYS`; legacy bare-hex links keep working until
+   2027-01-31, then die); tracker/error/CAPI URLs are scrubbed of `?t=` before
+   leaving first-party (`scrubTrackingUrl`), the order pages send no referrer,
+   and a global `Referrer-Policy: strict-origin-when-cross-origin` header ships
+   from next.config. (Still ~32-bit order ids — the token is the gate, not the id.)
 5. ~~**Offer schedule drifts on edit**~~ — **FIXED (S32 / MC14)**: OfferForm now
    converts properly between local wall time and UTC instants
    (lib/admin/schedule.js); an edit round-trip preserves the intended instant
@@ -918,10 +932,21 @@ server purchase ──┘    (202 fast)  table ──┤
 - **Dedup policy**: Meta receives every event on both paths (universal `event_id`
   dedup); **GA4 MP relays purchase only** by default (`GA4_MP_EVENTS`;
   `transaction_id` dedup) — the browser gtag owns the rest, so nothing double-counts.
-- **Consent** (`_consent` cookie, 1y, DPDP-aware) gates three layers: client `track()`
-  no-ops, the collector drops + mints no identity cookies, and the server purchase
-  checks consent **snapshotted on the order at checkout** (the webhook has no
-  cookies). Order processing itself is never gated.
+- **Consent** (`_consent` cookie, 1y; PURPOSES since S33) gates four layers: client
+  `track()` no-ops without any purpose, the collector drops + mints no identity
+  cookies, every stored event carries the purposes + contract version in force at
+  collection (BE20), and **forwarding gates per destination** — GA4 needs the
+  analytics purpose, Meta the marketing purpose, judged against the EVENT'S OWN
+  snapshot (a later withdrawal can't be undone by an old queued row). The server
+  purchase uses the consent **snapshotted on the order at checkout**. The collector
+  also strips raw-PII-looking param values (`scrubPiiParams`). Order processing
+  itself is never gated. Shopify's mandatory privacy webhooks
+  (customers/data_request, customers/redact, shop/redact — configured per app in
+  the Dev Dashboard) flow through the durable inbox into
+  [lib/privacy.js](../lib/privacy.js): data requests alert for manual fulfilment
+  (MC25/W4 automates), customer redaction EXECUTES (order PII scrubbed, money rows
+  retained — documented financial-records exception; matching event rows deleted),
+  shop redaction alerts critically for the deliberate offboarding runbook (BE29).
 - **PII**: only SHA-256 hashes are stored/sent (email normalized, phone digits with
   country prefix, Meta-normalized name/city/state/zip/country for match quality,
   `external_id` = hashed first-party cid). Raw PII never enters the events table.
@@ -949,7 +974,7 @@ ACTIVE tenant's rules live in `config.shipping_config` (edited in the console);
 | Roles → actions (S27) | `requireAdmin(request, action)` on every admin API route ([lib/platform/authz.js](../lib/platform/authz.js)) | owner ⊇ admin (settings/secrets, orders.push, sync, team, audit.read) ⊇ staff (offers/storefront/upsells write, orders.read) ⊇ support (read-only). Tenant is ALWAYS the host-resolved context — URL/body tenant ids never authorize. Writes get the CSRF origin check. Bootstrap cookies act as owner. Final-owner can't be demoted/removed; membership removal cuts access on the next request (no permission cache) |
 | Audit log (S27) | `audit_log` in the control plane — INSERT + scoped SELECT only ([lib/platform/audit.js](../lib/platform/audit.js)) | Every privileged mutation + sign-in writes actor/action/tenant/resource + REDACTED size-capped diff (secret-ish keys stripped). Read: `GET /api/admin/audit` (owner/admin, host-scoped). Best-effort: an audit failure never fails the mutation |
 | Cron/ops endpoints | `CRON_SECRET` as `Authorization: Bearer` (Vercel cron sends it) or `?secret=` | Open in local dev when unset |
-| Guest order status | `?t=` token = first 20 hex of `sha256(orderId\|ORDER_LINK_SECRET)` | Falls back to razorpay secret chain; bad token → 404; noindex |
+| Guest order status + confirmation | `?t=` v2 proof = `2.<expEpochSecs>.<hmac-sha256 hex20>` over `orderId\|exp`, keyed by `order_link_secret` (S33) | Expiring (ORDER_LINK_TTL_DAYS, default 30d), per-order, tenant-secret-bound; legacy bare-hex tokens accepted until 2027-01-31; bad/expired → 404; noindex + no-referrer; `?t=` scrubbed from every tracker/error/CAPI URL |
 | Shopify webhooks | Raw-body HMAC-SHA256 (base64) with the tenant app's client secret | Per-tenant apps → verification doubles as tenant-match proof |
 | Razorpay webhook | Raw-body HMAC with `razorpay_webhook_secret` | Separate from the key secret, chosen at webhook creation |
 | OAuth connect | Stateless state = HMAC(tenant, nonce, 10-min expiry) signed with PLATFORM_SECRET + Shopify's own param HMAC + shop-domain match | No session store needed |
@@ -1047,7 +1072,7 @@ Runtime is **Node** unless marked edge. "tenant" = Host-resolved context via
 | `cart_session` | POST /api/cart | 30d, httpOnly | Cart row id in the tenant DB |
 | `_admin` | merchant login (S26) | 7d, httpOnly | random session token → control-plane `sessions` row (SHA-256 stored) + membership check; bootstrap/legacy fallback = `sha256("storeasy-admin\|tenantId\|password")` |
 | `_platform` | operator login (S26) | 12h, httpOnly | random session token (kind `operator`, TOTP-gated); bootstrap fallback = `sha256("storeasy-platform\|password")` until the first operator exists |
-| `_consent` | ConsentBanner (client) | 1y | `granted`/`denied` — gates all tracking |
+| `_consent` | ConsentBanner (client) | 1y | versioned purposes JSON `{"v":2,"a","m","at"}` (legacy `granted`/`denied` parse) — gates all tracking per purpose |
 | `_fp_cid` / `_fbp` / `_fbc` / `_fp_gclid` | /api/track | 2y / 3y / 90d / 90d | First-party identity ids (`COOKIE_DOMAIN` widens scope); `_ga` read if present |
 
 ### 4.4 Components
@@ -1151,7 +1176,7 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | `pnpm events:stats` / `search:report [days]` | Forwarding stats / search CTR + zero-result report (env tenant) |
 | `pnpm shopify:token [--write]` / `shopify:oauth` | Legacy single-store token minting / local OAuth |
 | `pnpm seed:demo` | 3 fake products + 2 collections into the env DB |
-| `pnpm test:*` | 19 aliased suites, 242 tests (see §2E) |
+| `pnpm test:*` | 20 aliased suites, 253 tests (see §2E) |
 | `pnpm alert:test` | S29: alert-delivery self-test (sends a synthetic info alert to ALERT_WEBHOOK_URL, reports the real result) |
 | `pnpm user:create` / `invite:create` / `operator:create` | S26 identity CLIs: first store user (disables bootstrap pw), teammate invitation links, platform operators (TOTP at first login) |
 | `pnpm member:set` | S27: change a member's role or `--remove` them (final-owner protected; takes effect on their next request) |

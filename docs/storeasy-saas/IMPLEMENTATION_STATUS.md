@@ -8,12 +8,13 @@ by a code audit or implementation in this repo — never by documentation alone.
 - Created: 2026-10-28 (session S25). Last updated: S29 (W2 underway; W1 complete).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 26 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 29 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
-  BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32).
-  The other 90 are **not inspected** — the handoff's Fix/Extend/New labels for
-  them remain unverified documentation claims.
+  BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
+  BE18, SF24, BE20 — S33, with SF08 completed). The other 87 are **not
+  inspected** — the handoff's Fix/Extend/New labels for them remain unverified
+  documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -468,6 +469,71 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   shopper-emails note (Shopify-native — no duplicate senders). Source-owned
   fields (prices/stock/tax/totals) labeled Shopify-owned. Currency remains
   catalog-derived display (read-only by construction).
+
+### SF08 — Confirmation · **UPGRADED to "implemented" (S33: full fix on top of the S25 containment)**
+
+- Guest proof v2: `2.<expEpochSecs>.<hmac-sha256 hex20>` over `orderId|exp`,
+  keyed by the tenant's own link secret — scoped, EXPIRING (default 30d,
+  `ORDER_LINK_TTL_DAYS`), tenant-bound, constant-time compared. Legacy bare-hex
+  links keep working until 2027-01-31 (hard cutover constant), then die.
+- Token-leak residuals CLOSED: `scrubTrackingUrl` strips `?t=` from tracker
+  URLs/referrers, error reports, and CAPI `event_source_url` (defensively
+  server-side too); `instrumentation.js` records paths without query strings;
+  order/confirmation pages send `referrer: no-referrer`; a global
+  `Referrer-Policy: strict-origin-when-cross-origin` header ships from
+  next.config. LIVE: v2 link 200, legacy link 200 (grace), junk/expired 404,
+  header present. Remaining recorded fact: order ids stay ~32-bit — the proof,
+  not the id, is the gate.
+
+### SF24 — Consent settings · **partial (implemented & verified, S33)**
+
+- Purpose-granular consent: Analytics (GA4) and Marketing (Meta) as separate
+  choices; Allow all / No thanks / Settings toggles; essential labeled
+  always-on; persistent "Privacy" reopen chip; versioned cookie
+  (`{"v":2,"a","m","at"}`, legacy values parse). A saved CHANGE reloads so tags
+  re-evaluate — withdrawal stops client tags immediately and (via the stored
+  snapshots) server forwarding per purpose. gtag loads only with analytics,
+  fbq only with marketing.
+- Remaining: geo-sensitive banner variants + policy-page linkage copy (W3
+  content pass).
+
+### BE20 — Analytics event contract · **partial (implemented & verified, S33)**
+
+- Every stored event now carries `contract_version` + the consent purposes in
+  force at collection (migration 0005); forwarding gates per destination
+  against the EVENT'S snapshot (GA4⇠analytics, Meta⇠marketing; pre-v2 rows
+  grandfathered as both — they only ever stored under full grant). Collector
+  hardening: `scrubPiiParams` strips email/phone-looking param values; name
+  whitelist + event_id dedup already stood. LIVE: a collector probe with an
+  analytics-only cookie stored `{"v":2,"a":1,"m":0}` + contract 2.
+- Remaining: coverage measurement + distinct denominators (BE21/MC17, W4).
+
+### BE18 — Privacy lifecycle · **partial (core implemented & verified, S33)**
+
+- Shopify's mandatory compliance topics flow through the durable inbox into
+  `lib/privacy.js`, each recorded as a `privacy_requests` row (migration 0005):
+  data_request → recorded `manual` + warn alert (automated export lands with
+  MC25/W4); customers/redact → EXECUTED — order PII + snapshot contact/address
+  scrubbed with `redacted_at` set, money/order/sync fields retained (documented
+  financial-records retention exception), matching event rows deleted
+  (order+cart match, email case-insensitive, phone by last-10-digits),
+  idempotent on replay; shop/redact → recorded `manual` + CRITICAL alert
+  (tenant disposal stays a deliberate operator action, BE29).
+- USER ACTION (deploy checklist): set the three compliance webhook URLs for
+  each custom app in the Shopify Dev Dashboard → `https://<platform>/api/
+  shopify/webhooks` (they are not subscription-API topics).
+- Remaining: retention-policy table + request-tracking UI (MC25/OP11, W4);
+  consent-version records per policy text revision (W3 content pass).
+
+## Verification state (S33, 2026-10-28)
+
+20 suites / **253 tests + 21 offers = 274 checks** green (new `test:privacy`,
+11; `test-events` fixtures now run the migration ledger — the new event
+columns caught another raw-schema fixture, same class as S32's; boundary-suite
+token shapes updated to v2); build clean. Hosted: 0005 applied to all 3 tenant
+DBs. Live: v2/legacy/expired token matrix on the real cancelled order,
+Referrer-Policy header on every response, collector probe stored the purposes
+snapshot + contract version (cleaned up after).
 
 ## Verification state (S32, 2026-10-28)
 

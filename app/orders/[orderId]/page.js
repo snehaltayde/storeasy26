@@ -16,7 +16,7 @@ import { tfetch } from "@/lib/tenant-request";
 // next refresh is fresh. Needs the Admin API for that → Node runtime.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Order status", robots: { index: false } };
+export const metadata = { title: "Order status", robots: { index: false }, referrer: "no-referrer" };
 
 const STEPS = [
   { key: "placed", label: "Order placed" },

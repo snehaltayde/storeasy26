@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { scrubTrackingUrl } from "@/lib/track/names";
 
 // Client-side error tracking (Session 17): window errors + unhandled promise
 // rejections beacon to /api/errors. Session-deduped and capped so a render
@@ -18,7 +19,7 @@ export function reportClientError({ name, message, stack, digest }) {
     message: String(message).slice(0, 500),
     stack: String(stack || "").slice(0, 2048),
     digest,
-    url: window.location.href,
+    url: scrubTrackingUrl(window.location.href), // S33: no ?t= proofs in error reports
   });
   try {
     const ok = navigator.sendBeacon?.("/api/errors", new Blob([body], { type: "application/json" }));
