@@ -1,4 +1,4 @@
-# Storeasy platform — tenancy architecture (Sessions 20–23)
+# Storeasy platform — tenancy architecture (Sessions 20–24)
 
 storeasy26 is becoming **storeasy**: a tenant-based platform where a merchant
 connects their Shopify store and gets this storefront — own cart/discounts/
@@ -156,6 +156,49 @@ custom hero + nav, custom page `/policies/bulk-orders`, manual PDP strip
 (slot auto-hides once its targets are in the cart) ✓ · beastlife PDPs show
 the auto same-collection strip ✓ · demo cart ships FREE ≥₹1499 (S22 rule) ✓.
 
+## Platform ops (Session 24)
+
+- **Tenant-looping crons**: `/api/jobs/sync-shopify` and
+  `/api/jobs/forward-events` (GET) run per ACTIVE tenant via
+  [`forEachActiveTenant`](../lib/platform/ops.js) — one tenant's failure never
+  blocks another; without a control plane they degrade to the single
+  env-tenant pass (today's prod). POST accepts `{…, tenant}` for operator use.
+  Same cron schedule, same two Vercel slots.
+- **Health rollup**: `/api/health?all=1&secret=<CRON_SECRET>` runs the full
+  check set per tenant, worst-of status — point the uptime monitor here.
+- **Tenant-tagged observability**: every `slog` line carries `tenant:`, every
+  alert is prefixed `[tenant]` and carries a `tenant` field.
+- **CLIs**: `pnpm order:trace <id> --tenant <slug>` and
+  `pnpm order:cancel <id> [reason] --tenant <slug>`.
+- **CREDENTIAL SCOPING (dry-run finding, fixed)**: the generic env fallback
+  let a resolved tenant BORROW the default store's credentials — demo's browse
+  events forwarded on BeastLife's Meta creds, and demo checkout would have
+  offered Razorpay on BeastLife's keys. Credential reads (Razorpay, GA4/Meta,
+  Shopify, admin password, order-link secret) now use
+  `tenantOwnCfg`/`tenantOwnSecret`: tenant row ONLY for resolved tenants,
+  env fallback ONLY for the default/env context. A tenant with missing creds
+  degrades (COD-only checkout, store-only events), never cross-forwards.
+- **Onboarding runbook**: [docs/onboarding.md](./onboarding.md).
+
+### Two-tenant E2E (2026-10-27, local — the S24 gate)
+
+Same cart cookie on both hosts → 1 item on beastlife, 0 on demo ✓ · BEAST10
+disabled on demo only → invalid there, −₹300 on beastlife, restored after ✓ ·
+demo COD order BL-2E8A71EE (snehal@mediastic.in): priced by DEMO's shipping
+rules (₹99 flat + ₹49 COD), auto-pushed on attempt 1 with DEMO's credentials
+→ real Shopify order, absent from beastlife's DB (31 orders before = after) ✓
+· purchase event captured in demo's DB as "store-only: no destinations
+configured" (no cross-tenant forwarding) ✓ · `order:trace/--tenant` full
+timeline ✓ · cancelled BOTH sides per the test-order directive ✓ · cron
+loops + health rollup live across all 3 tenants ✓.
+
+**Queue hygiene note**: beastlife-staging still holds 7 SWEEPABLE stale June
+test orders (5 `cod_pending`, 2 `paid`, attempts 0) — the first post-deploy
+cron would push them to the dev store. Cancel before deploying:
+`pnpm order:cancel <id> "stale staging test order" --tenant beastlife-staging`
+(the two `paid` rows are cloned test-mode captures; cancel them directly with
+a transitionOrder script or pass `--refunded n/a-test-clone` consciously).
+
 ## Operating it
 
 ```bash
@@ -168,6 +211,7 @@ pnpm test:tenancy              # S20 isolation suite (9 tests)
 pnpm test:platform-sync        # S21 onboarding/webhook suite (13 tests)
 pnpm test:admin-console        # S22 console suite (9 tests)
 pnpm test:cms                  # S23 CMS/upsell suite (10 tests)
+pnpm test:platform-ops         # S24 ops suite (8 tests)
 ```
 
 Local consoles: `/platform` (operator) and `/admin` per tenant host — in dev,

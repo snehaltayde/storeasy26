@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
-import { tenantCfg } from "@/lib/tenant-context";
+import { tenantOwnCfg } from "@/lib/tenant-context";
 import { siteName } from "@/lib/site";
 import CheckoutFlow from "@/components/checkout/CheckoutFlow";
 import { tfetch } from "@/lib/tenant-request";
@@ -17,7 +17,7 @@ export default async function CheckoutPage() {
     // Key id is public; TENANT-aware presence gates the Razorpay option (a
     // tenant without keys checks out COD-only). Config accessor, not
     // lib/razorpay.js — that module is node-only and this page renders on edge.
-    razorpayEnabled: Boolean(tenantCfg("razorpay_key_id", "NEXT_PUBLIC_RAZORPAY_KEY_ID")),
+    razorpayEnabled: Boolean(tenantOwnCfg("razorpay_key_id", "NEXT_PUBLIC_RAZORPAY_KEY_ID")),
   }));
 
   if (!cart.items.length) {

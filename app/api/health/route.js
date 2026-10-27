@@ -3,13 +3,18 @@ import { db } from "@/lib/db";
 import { ga4Configured, metaConfigured } from "@/lib/tracking";
 import { razorpayConfigured, webhookConfigured } from "@/lib/razorpay";
 import { errorStats } from "@/lib/errors";
+import { forEachActiveTenant, aggregateHealth } from "@/lib/platform/ops";
+import { tenantOwnSecret } from "@/lib/tenant-context";
 import { tenantHandler } from "@/lib/tenant-request";
 
 // Health check (Session 17): dependency latencies + queue depths + config
 // flags in one place. 200 ok / 200 degraded (non-core issue) / 503 when the
 // core store is down — point an uptime monitor here.
+// Session 24: `?all=1&secret=<CRON_SECRET>` runs the SAME checks for every
+// active tenant and rolls them up worst-of — one probe watches the platform.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const withTimeout = (p, ms = 3000) =>
   Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(`timeout ${ms}ms`)), ms))]);
@@ -24,7 +29,8 @@ async function timed(fn) {
   }
 }
 
-export const GET = tenantHandler(async () => {
+// The full check set for the ACTIVE tenant context.
+async function tenantHealth() {
   const [turso, typesense, orderQueue, eventQueue, errors] = await Promise.all([
     timed(async () => {
       await db.selectFrom("products").select(({ fn }) => fn.countAll().as("n")).executeTakeFirst();
@@ -72,20 +78,38 @@ export const GET = tenantHandler(async () => {
     !typesense.ok || !orderQueue.ok || orderQueue.dead > 0 || (eventQueue.ok && eventQueue.dead > 0);
   const status = core ? (degraded ? "degraded" : "ok") : "down";
 
-  return NextResponse.json(
-    {
-      status,
-      at: new Date().toISOString(),
-      checks: { turso, typesense, order_queue: orderQueue, event_queue: eventQueue, errors },
-      configured: {
-        razorpay: razorpayConfigured(),
-        razorpay_webhook: webhookConfigured(),
-        shopify: Boolean(process.env.SHOPIFY_ADMIN_TOKEN),
-        ga4: ga4Configured(),
-        meta: metaConfigured(),
-        alerts: Boolean(process.env.ALERT_WEBHOOK_URL),
-      },
+  return {
+    status,
+    at: new Date().toISOString(),
+    checks: { turso, typesense, order_queue: orderQueue, event_queue: eventQueue, errors },
+    configured: {
+      razorpay: razorpayConfigured(),
+      razorpay_webhook: webhookConfigured(),
+      shopify: Boolean(tenantOwnSecret("shopify_admin_token", "SHOPIFY_ADMIN_TOKEN")),
+      ga4: ga4Configured(),
+      meta: metaConfigured(),
+      alerts: Boolean(process.env.ALERT_WEBHOOK_URL),
     },
-    { status: core ? 200 : 503 },
-  );
+  };
+}
+
+function rollupAuthorized(request) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return true;
+  const header = request.headers.get("authorization") || "";
+  return header === `Bearer ${secret}` || request.nextUrl.searchParams.get("secret") === secret;
+}
+
+export const GET = tenantHandler(async (request) => {
+  if (request.nextUrl.searchParams.get("all") === "1") {
+    if (!rollupAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const results = await forEachActiveTenant(tenantHealth);
+    const rollup = aggregateHealth(results);
+    return NextResponse.json(
+      { ...rollup, at: new Date().toISOString() },
+      { status: rollup.status === "down" ? 503 : 200 },
+    );
+  }
+  const body = await tenantHealth();
+  return NextResponse.json(body, { status: body.status === "down" ? 503 : 200 });
 });

@@ -1,27 +1,36 @@
 // Cancel ONE order on both sides (test-order hygiene / manual cancel flow):
-//   pnpm order:cancel BL-XXXXXXXX [reason]
+//   pnpm order:cancel BL-XXXXXXXX [reason] [--tenant slug]
 //   pnpm order:cancel BL-XXXXXXXX [reason] --refunded rfnd_XXXX
 // 1. If the order synced to Shopify → orderCancel there (restock, no refund,
 //    no customer email). 2. Transition our row → cancelled (audit-logged).
 // Orders whose money was CAPTURED require --refunded <razorpay_refund_id>:
 // do the Razorpay refund manually first (docs/refunds.md), then record it here.
+// Session 24: --tenant cancels in THAT tenant's database (and with its
+// Shopify credentials).
 import { db } from "../lib/db.js";
 import { transitionOrder, ORDER_STATUS } from "../lib/orders.js";
 import { adminGraphql } from "../lib/shopify-admin.js";
+import { parseTenantFlag, runAsTenant } from "../lib/platform/ops.js";
 
-const argv = process.argv.slice(2);
-const refundedIdx = argv.indexOf("--refunded");
-const refundId = refundedIdx >= 0 ? argv[refundedIdx + 1] : null;
-const positional = argv.filter(
+const { tenantSlug, rest } = parseTenantFlag(process.argv.slice(2));
+const refundedIdx = rest.indexOf("--refunded");
+const refundId = refundedIdx >= 0 ? rest[refundedIdx + 1] : null;
+const positional = rest.filter(
   (a, i) => a !== "--refunded" && (refundedIdx < 0 || i !== refundedIdx + 1),
 );
 const orderId = positional[0];
 const reason = positional[1] || "test order cleanup";
 if (!orderId || (refundedIdx >= 0 && !refundId)) {
-  console.error("usage: pnpm order:cancel BL-XXXXXXXX [reason] [--refunded rfnd_XXXX]");
+  console.error("usage: pnpm order:cancel BL-XXXXXXXX [reason] [--refunded rfnd_XXXX] [--tenant slug]");
   process.exit(1);
 }
 
+await runAsTenant(tenantSlug, main).catch((e) => {
+  console.error(`✗ ${e.message}`);
+  process.exit(1);
+});
+
+async function main() {
 const order = await db.selectFrom("orders").selectAll().where("id", "=", orderId).executeTakeFirst();
 if (!order) {
   console.error(`✗ ${orderId} not found`);
@@ -68,3 +77,4 @@ const r = await transitionOrder(orderId, ORDER_STATUS.CANCELLED, {
 });
 console.log(`✓ ${orderId}: ${order.status} → cancelled${r.already ? " (already)" : ""}`);
 process.exit(0);
+}

@@ -1,15 +1,24 @@
-// End-to-end order trace (Session 17):  pnpm order:trace BL-XXXXXXXX
+// End-to-end order trace (Session 17):  pnpm order:trace BL-XXXXXXXX [--tenant slug]
 // Merges the durable timelines — order_events (state machine), the purchase
 // event pipeline row, Shopify refs — into one chronological view. The same
 // order id is the grep key for Vercel's structured logs (slog lines).
+// Session 24: --tenant runs the trace against THAT tenant's database.
 import { db } from "../lib/db.js";
+import { parseTenantFlag, runAsTenant } from "../lib/platform/ops.js";
 
-const orderId = process.argv[2];
+const { tenantSlug, rest } = parseTenantFlag(process.argv.slice(2));
+const orderId = rest[0];
 if (!orderId) {
-  console.error("usage: pnpm order:trace BL-XXXXXXXX");
+  console.error("usage: pnpm order:trace BL-XXXXXXXX [--tenant slug]");
   process.exit(1);
 }
 
+await runAsTenant(tenantSlug, main).catch((e) => {
+  console.error(`✗ ${e.message}`);
+  process.exit(1);
+});
+
+async function main() {
 const order = await db.selectFrom("orders").selectAll().where("id", "=", orderId).executeTakeFirst();
 if (!order) {
   console.error(`✗ ${orderId} not found`);
@@ -61,3 +70,4 @@ if (!pipeline) {
 console.log(`\n— log trace —`);
 console.log(`  Vercel logs: search "${order.id}" (slog lines: order_created / payment_verified / shopify_push_*)`);
 process.exit(0);
+}
