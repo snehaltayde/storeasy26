@@ -1,8 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
-import { getBlock, getAnnouncement, getHero, getHomeSections, getNav, listContentPages } from "@/lib/cms/store";
-import { BLOCK_KEYS } from "@/lib/cms/defaults";
+import { storefrontView } from "@/lib/cms/view";
 import { siteName } from "@/lib/site";
 import AdminNav from "@/components/admin/AdminNav";
 import StorefrontAdmin from "@/components/admin/StorefrontAdmin";
@@ -18,22 +17,10 @@ export default async function AdminStorefrontPage() {
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
-  const [initial, name] = await tfetch(async () => {
-    const [announcement, hero, home_sections, nav_header, nav_footer, pages] = await Promise.all([
-      getAnnouncement(),
-      getHero(),
-      getHomeSections(),
-      getNav("header"),
-      getNav("footer"),
-      listContentPages(),
-    ]);
-    const customized = {};
-    for (const key of BLOCK_KEYS) customized[key] = (await getBlock(key)) != null;
-    return [
-      { blocks: { announcement, hero, home_sections, nav_header, nav_footer }, customized, pages },
-      siteName(),
-    ];
-  });
+  // S50 fix: the page now serves the SAME view the API returns — including
+  // the CAS revision tokens and the collections_index/pdp_extras blocks the
+  // old hand-rolled initial omitted (false first-save 409s; wipe risk).
+  const [initial, name] = await tfetch(async () => [await storefrontView(), siteName()]);
 
   return (
     <>

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
-import { getBlockRow, setBlock, deleteBlock, getAnnouncement, getHero, getHomeSections, getNav, getCollectionsIndex, getPdpExtras, listContentPages, getContentPage, upsertContentPage, deleteContentPage, pageRevisions, CmsConflictError } from "@/lib/cms/store";
+import { setBlock, deleteBlock, getContentPage, upsertContentPage, deleteContentPage, CmsConflictError } from "@/lib/cms/store";
+import { storefrontView } from "@/lib/cms/view";
 import { validateBlock } from "@/lib/cms/validate";
-import { BLOCK_KEYS } from "@/lib/cms/defaults";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
 
@@ -17,32 +17,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 
-async function view() {
-  const [announcement, hero, homeSections, navHeader, navFooter, collectionsIndex, pdpExtras, pages] = await Promise.all([
-    getAnnouncement(),
-    getHero(),
-    getHomeSections(),
-    getNav("header"),
-    getNav("footer"),
-    getCollectionsIndex(),
-    getPdpExtras(),
-    listContentPages(),
-  ]);
-  const customized = {};
-  const revisions = {}; // S35: CAS tokens — the editor saves with the revision it loaded
-  for (const key of BLOCK_KEYS) {
-    const row = await getBlockRow(key);
-    customized[key] = row != null;
-    revisions[key] = row ? row.revision : null; // null = "I expect to create it"
-  }
-  return {
-    blocks: { announcement, hero, home_sections: homeSections, nav_header: navHeader, nav_footer: navFooter, collections_index: collectionsIndex, pdp_extras: pdpExtras },
-    customized,
-    revisions,
-    pageRevisions: await pageRevisions(),
-    pages,
-  };
-}
+// S50: the view builder moved to lib/cms/view.js so the admin PAGE renders
+// the exact same shape (it used to hand-roll a subset without the CAS
+// revision tokens — the false-409 / block-wipe bug).
+const view = storefrontView;
 
 export const GET = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.read");
