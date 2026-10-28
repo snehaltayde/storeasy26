@@ -268,8 +268,11 @@ await C.platformDb().execute({
   args: [new Date().toISOString()],
 });
 const A = await import("../lib/platform/agency.js");
+const { createUser } = await import("../lib/platform/identity.js");
 const agency = await A.createAgency({ name: "Northwind Studio" });
 await A.setAgencyStatus(agency.id, { status: "verified", referral_eligible: true });
+const partner = await createUser({ email: "partner@design.test", name: "Design Partner", password: ADMIN_PW });
+await A.addAgencyMember(agency.id, partner.id, "owner");
 const inv = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@design.test", role: "staff" });
 await A.acceptGrant(inv.token, { tenantId: "design", actorEmail: "owner@design.test" });
 await A.createClientApproval({ agencyId: agency.id, tenantId: "design", note: "Homepage refresh for the winter drop" });
