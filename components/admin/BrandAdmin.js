@@ -57,7 +57,10 @@ export default function BrandAdmin({ initial }) {
       setShades(json.shades);
       setMsg({
         ok: true,
-        text: [body.reset ? "Reset to the default look." : "Saved — live storefront-wide within ~30s.", ...(json.warnings || [])],
+        text: [
+          body.reset ? "Reset to the default look." : "Saved as a draft. If this store has published a release, publish again from the Releases tab to take it live; before the first release it applies within ~30s.",
+          ...(json.warnings || []),
+        ],
       });
     } else {
       setMsg({ ok: false, text: json.errors || [json.error || `Save failed (${res.status})`] });

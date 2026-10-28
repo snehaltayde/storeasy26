@@ -5,7 +5,7 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S35 (W3 underway; W1+W2 complete).
+- Created: 2026-10-28 (session S25). Last updated: S36 (W3 underway; W1+W2 complete).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
 - **Audit coverage honesty:** 36 of 116 records audited/implemented so far
@@ -13,9 +13,9 @@ by a code audit or implementation in this repo — never by documentation alone.
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
   BE18, SF24, BE20 — S33, with SF08 completed; BE24, MC20, BE27, BE34,
-  OP10 — S34; BE08, MC10 — S35). The other 80 are **not inspected** — the
-  handoff's Fix/Extend/New labels for them remain unverified documentation
-  claims.
+  OP10 — S34; BE08, MC10 — S35; BE09, MC13 — S36, with SF23 completed). The
+  other 78 are **not inspected** — the handoff's Fix/Extend/New labels for
+  them remain unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -658,6 +658,68 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   side by side.
 - Remaining: logo/favicon upload (needs BE15 media pipeline, S38), approved
   font pairs (next/font loading lands with theme kits, S37).
+
+### BE09 — Immutable releases & publishing · **partial (core implemented & verified, S36)**
+
+- Releases = frozen snapshots of the content set (cms blocks + pages + brand
+  tokens), canonically serialized (sorted-key stringify) and sha256
+  content-hashed; `release_state` is the single live pointer — publish and
+  rollback are ONE atomic UPDATE and never touch drafts (migration
+  tenant/0007, applied hosted ×3). Storefront serves the live release via
+  `lib/content/resolve.js` (layout, home, content pages, sitemap, brand);
+  pre-first-publish stores serve drafts exactly as before.
+- Signed expiring previews: 1h tenant-bound HMAC token → `/api/preview` sets
+  an httpOnly cookie + 302 (purple "Draft preview" banner; preview content
+  never sits behind a shareable/cacheable URL). Scheduling: release created
+  and validated at schedule time, pointer flip runs as a durable
+  `publish_release` job at the merchant-local-converted UTC instant. Publish
+  validation blocks on: missing hero title, zero enabled home sections, brand
+  WCAG failure, internal links to catalog entries that don't exist; unknown
+  internal paths warn. Publish/schedule/rollback audited.
+- LIVE (demo over HTTP): first release published → draft hero edit did NOT
+  change the shopper page; preview cookie flow showed the draft (banner
+  included) while a cookieless request kept the release; second publish went
+  live and rollback restored release 1 instantly with drafts preserved.
+- Remaining: pinned theme/template deps in the snapshot (S37), content-hash
+  shown in MC26 audit UI (W4), CSP pass.
+
+### MC13 — Releases tab · **partial (implemented & verified, S36)**
+
+- `/admin/releases`: live-vs-draft state (hash comparison → "unpublished
+  changes" chip), blocking validation list, publish-now with note, schedule
+  (datetime-local converted in the BROWSER so the merchant's timezone decides
+  the instant), draft preview (opens in a new tab), history with per-release
+  hash prefix + LIVE chip + "Roll back to this" (confirm). Draft stores
+  without a release say so honestly. Storefront/Brand save messages now point
+  at the Releases tab.
+- Remaining: per-release content DIFF view (what changed between hashes), W4.
+
+### SF23 — Branded system pages · **complete for current scope (S36; core was S25)**
+
+- Per-tenant PWA surface: `app/manifest.webmanifest/route.js` (name,
+  short_name, tagline, theme/background colors from the LIVE release brand)
+  and `app/offline/route.js` (self-contained branded offline shell — inline
+  CSS, zero app chunks) replace the static BeastLife files; sw.js v2 uses
+  neutral `storeasy-*` cache names and precaches the dynamic routes, so each
+  tenant ORIGIN caches its own branding at install. 404 is tenant-branded
+  (store name + accent tokens); gated hosts keep the S25 neutral shell.
+- LIVE: beastlife manifest says BeastLife; demo manifest says "Storeasy Demo
+  Store" with navy theme `#0b1738`; demo /offline carries its name + navy;
+  404 renders "This page isn't on Storeasy Demo Store's shelves" vs
+  BeastLife's on the other host.
+- Deferred (recorded): shared icon set until BE15 media uploads (S38);
+  merchant-togglable MAINTENANCE mode → OP12 (W4) where incident/maintenance
+  states get their operator workflow (suspended hosts already show the
+  control-plane-named unavailable page, S25).
+
+## Verification state (S36, 2026-10-28)
+
+23 suites / **297 tests + 21 offers = 318 checks** green (new
+`test:releases`, 13 tests), `pnpm build` clean. Migration tenant/0007 applied
+to all 3 hosted tenant DBs. Live on demo: publish → no-leak → preview cookie
+flow → rollback; per-tenant manifest/offline/404 on both hosts. Demo left
+published (release 1 live, drafts in sync); beastlife remains
+pre-first-publish (drafts serve, unchanged behavior).
 
 ## Verification state (S35, 2026-10-28)
 

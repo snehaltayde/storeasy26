@@ -2,7 +2,7 @@ import Link from "next/link";
 import ProductGrid from "@/components/ProductGrid";
 import CollectionCard from "@/components/CollectionCard";
 import { getFeaturedCollections, getNewestProducts, getCatalogStats } from "@/lib/repo";
-import { getHero, getHomeSections } from "@/lib/cms/store";
+import { resolvedHero, resolvedHomeSections } from "@/lib/content/resolve";
 import { tfetch } from "@/lib/tenant-request";
 
 // Catalog reflects the latest sync — render per request (sub-ms SQLite reads).
@@ -25,7 +25,7 @@ function HeroTitle({ title, highlight }) {
 
 export default async function Home() {
   const { hero, sections, stats, data } = await tfetch(async () => {
-    const [hero, sections, stats] = await Promise.all([getHero(), getHomeSections(), getCatalogStats()]);
+    const [hero, sections, stats] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats()]);
     const data = {};
     for (const s of sections) {
       if (s.kind === "collections") data.collections = await getFeaturedCollections(s.limit || 6);

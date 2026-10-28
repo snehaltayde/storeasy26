@@ -14,7 +14,7 @@ import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { resolveBrand, brandCssVars } from "@/lib/brand";
-import { getAnnouncement, getNav } from "@/lib/cms/store";
+import { resolvedAnnouncement, resolvedNav, resolvedBrand, contentSource } from "@/lib/content/resolve";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
 
@@ -65,7 +65,13 @@ async function navCollections() {
 async function chromeData() {
   try {
     return await tfetch(async () => {
-      const [announcement, navHeader, navFooter] = await Promise.all([getAnnouncement(), getNav("header"), getNav("footer")]);
+      const [announcement, navHeader, navFooter, brand, src] = await Promise.all([
+        resolvedAnnouncement(),
+        resolvedNav("header"),
+        resolvedNav("footer"),
+        resolvedBrand(),
+        contentSource(),
+      ]);
       return {
         name: siteName(),
         logo: siteLogo(),
@@ -79,9 +85,12 @@ async function chromeData() {
         // its own ids loads no pixels, never the env default's.
         ga4Id: tenantOwnCfg("ga4_measurement_id", "NEXT_PUBLIC_GA4_MEASUREMENT_ID", "") || "",
         metaPixelId: tenantOwnCfg("meta_pixel_id", "NEXT_PUBLIC_META_PIXEL_ID", "") || "",
-        // S35 (MC10): tenant brand tokens → one CSS-variable block. Default
-        // brand emits nothing (globals.css already carries those values).
-        brandCss: tenantOwnCfg("brand", null, null) ? brandCssVars(resolveBrand(tenantOwnCfg("brand", null, null))) : "",
+        // S35 (MC10) + S36 (BE09): brand tokens come through the release
+        // resolver — published brand serves live, a brand edit stays draft
+        // (and previewable) until the next publish. Default brand emits
+        // nothing (globals.css already carries those values).
+        brandCss: brand ? brandCssVars(resolveBrand(brand)) : "",
+        preview: src.preview,
       };
     });
   } catch {
@@ -97,6 +106,7 @@ async function chromeData() {
       ga4Id: "",
       metaPixelId: "",
       brandCss: "",
+      preview: false,
     };
   }
 }
@@ -131,6 +141,14 @@ export default async function RootLayout({ children }) {
           tokens only — nothing merchant-typed reaches this string raw). */}
       {chrome.brandCss ? <style id="brand-vars">{chrome.brandCss}</style> : null}
       <body className="flex min-h-full flex-col bg-background text-foreground antialiased">
+        {chrome.preview && (
+          <div className="bg-purple-700 px-4 py-1.5 text-center text-xs font-semibold text-white">
+            Draft preview — this is NOT what shoppers see.{" "}
+            <a href="/api/preview?exit=1" className="underline">
+              Exit preview
+            </a>
+          </div>
+        )}
         <CartProvider initialCart={cart}>
           <Header collections={collections} logo={chrome.logo} nav={chrome.navHeader} announcement={chrome.announcement} />
           <main className="flex-1">{children}</main>

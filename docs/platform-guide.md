@@ -85,12 +85,14 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
   [components/ServiceWorkerRegister.js](../components/ServiceWorkerRegister.js),
   `app/icon.svg` (lime bolt on dark; served as `/icon.svg`).
 - **How**: the layout mounts `ServiceWorkerRegister` (production only) which registers
-  `sw.js`: precaches `offline.html` + manifest + the 192px icon; navigations are
-  network-first with the offline page as fallback; `/_next/static/*`, `/icons/*` and
-  `cdn.shopify.com` are stale-while-revalidate; APIs pass through uncached.
-  `generateMetadata` emits per-tenant `applicationName`/`appleWebApp` titles — but the
-  **static manifest, SW cache names, and offline page are still BeastLife-branded**
-  (see Known quirks, §2F).
+  `sw.js` (v2, neutral `storeasy-*` cache names since S36): precaches `/offline` +
+  `/manifest.webmanifest` + the 192px icon; navigations are network-first with the
+  offline shell as fallback; `/_next/static/*`, `/icons/*` and `cdn.shopify.com` are
+  stale-while-revalidate; APIs pass through uncached. **Manifest and offline page are
+  DYNAMIC per-tenant routes since S36** (`app/manifest.webmanifest/route.js`,
+  `app/offline/route.js`): name/colors come from the tenant's live release brand, so
+  each origin's SW caches its own branding at install. Icons remain the shared
+  platform set until the media pipeline (BE15, S38).
 
 #### Home page (CMS-driven)
 - **What**: hero (title with accent highlight, subtitle, badge, two CTAs) +
@@ -284,7 +286,7 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
 
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
-Navigation: **Offers · Orders · Storefront · Brand · Upsells · Integrations · Settings**.
+Navigation: **Offers · Orders · Storefront · Brand · Releases · Upsells · Integrations · Settings**.
 
 #### Login
 - **Use** (S26): `<tenant-host>/admin` → `/admin/login`; sign in with your EMAIL +
@@ -394,6 +396,35 @@ Navigation: **Offers · Orders · Storefront · Brand · Upsells · Integrations
 - **Files**: [lib/brand.js](../lib/brand.js), `app/admin/brand/page.js`,
   `components/admin/BrandAdmin.js`, `app/api/admin/brand/route.js`,
   `app/globals.css` (token defaults + @theme mapping), `app/layout.js`.
+
+#### Releases tab
+- **What** (S36 / BE09+MC13): publishing discipline. Content edits (storefront
+  blocks, pages, brand tokens) stay DRAFT until published as an immutable
+  release — a frozen, canonically-serialized, content-hashed snapshot. One
+  atomic live pointer (`release_state`) decides what shoppers see; publish and
+  rollback are one UPDATE of it and never touch drafts. Before a store's
+  FIRST release, drafts serve directly (pre-S36 behavior — zero migration
+  surprise). The tab shows live vs draft (hash comparison → "unpublished
+  changes"), validation results, publish-now / schedule / preview / rollback.
+- **Publish validation** (blocking): hero needs a title, ≥1 home section
+  enabled, brand re-passes the WCAG gate, internal links to
+  /collections/<handle> and /products/<handle> must exist in the catalog;
+  unknown internal paths warn.
+- **Scheduling**: "publish at" converts the merchant's local datetime in the
+  BROWSER (lib/admin/schedule.js) to a UTC instant; the release row is created
+  (and validated) immediately, the pointer flip runs as a durable
+  `publish_release` job (S29 queue) at that instant — what you reviewed is
+  what goes live.
+- **Preview**: mints a signed expiring token (1h, tenant-bound, HMAC) →
+  `/api/preview?token=…` sets an httpOnly cookie and 302s — THAT browser sees
+  drafts with a purple "Draft preview" banner; shoppers and caches never see a
+  preview URL with content behind it. Exit via the banner.
+- **Files**: [lib/releases.js](../lib/releases.js),
+  [lib/content/resolve.js](../lib/content/resolve.js) (release-aware
+  storefront getters: layout, home, content pages, sitemap, brand),
+  `app/admin/releases/page.js`, `components/admin/ReleasesAdmin.js`,
+  `app/api/admin/releases/route.js`, `app/api/preview/route.js`,
+  `migrations/tenant/0007_releases.sql`, worker handler `publish_release`.
 
 #### Integrations tab
 - **What** (S34 / BE24+MC20): one card per provider — Shopify, Razorpay, GA4,
@@ -567,7 +598,7 @@ Navigation: **Offers · Orders · Storefront · Brand · Upsells · Integrations
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 22 aliased suites, **284 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 23 aliased suites, **297 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -599,9 +630,13 @@ Navigation: **Offers · Orders · Storefront · Brand · Upsells · Integrations
   audit trail) · content 18 (S35: HTML-sanitizer abuse matrix, CMS
   draft-revision CAS conflicts with both versions preserved, versioned schema
   stamping, brand-token validation incl. WCAG contrast gate + monotonic
-  accent-ladder property test, resolution-order fallbacks).
+  accent-ladder property test, resolution-order fallbacks) · releases 13
+  (S36: snapshot determinism + content hashing, atomic publish, draft→live
+  no-leak, rollback preserving drafts, publish validation incl. dead catalog
+  links, scheduled publish through the real jobs queue, preview token
+  expiry/tamper/tenant-binding).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **305 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **318 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -646,9 +681,10 @@ multi-tenant payments go live. Severity-ordered:
 9. **robots.txt is prerendered at build time** — its sitemap line bakes the
    build-env origin (currently `localhost:3007` in local builds), and `/platform`
    isn't in the disallow list.
-10. **Static BeastLife branding remnants**: manifest name, SW cache names,
-    offline.html, the checkout wordmark, SearchBox placeholder, 404/500 copy, the
-    `BL-` order-id prefix, "(test mode)" on the Razorpay radio.
+10. **Static BeastLife branding remnants** — mostly FIXED (S36): manifest, SW cache
+    names, offline page and 404 copy are per-tenant now. Still platform-generic or
+    BeastLife-flavored: the shared icon set (BE15/S38), SearchBox placeholder, 500
+    copy, the `BL-` order-id prefix, "(test mode)" on the Razorpay radio.
 11. **Rate-limit override env names** for hyphenated limiters uppercase to
     `RATE_LIMIT_ADMIN-SYNC` / `RATE_LIMIT_PLATFORM-LOGIN` (awkward but functional).
 12. **Settings has no fields** for `site.logo`, `title`, `tagline`,
@@ -1405,3 +1441,4 @@ run the verify checklist.
 | S33 | 1b93071 | W2: privacy lifecycle (redaction executes), purpose consent v2, event contract, expiring order proofs (BE18+SF24+BE20+SF08-full) |
 | S34 | e2b23b8 | W2 exit: integrations registry + tab, support grants (time-limited, read-only, banner), restore drill, security gate + threat model (BE24+MC20+BE27+BE34+OP10) |
 | S35 | 6378a49 | W3: content service (versioned schemas, CAS draft revisions, HTML sanitizer) + brand token system (accent ladder, WCAG gate, /admin/brand) (BE08+MC10) |
+| S36 | (this session) | W3: immutable releases (atomic pointer, signed previews, scheduled publish, rollback) + releases tab + per-tenant manifest/offline/404 (BE09+MC13+SF23-full) |

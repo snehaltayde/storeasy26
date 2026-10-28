@@ -167,7 +167,7 @@ export default function StorefrontAdmin({ initial }) {
         setNavHeader(navToText(json.blocks.nav_header));
         setNavFooter(navToText(json.blocks.nav_footer));
       }
-      setMsg({ ok: true, text: ["Saved — live on the next page load."] });
+      setMsg({ ok: true, text: ["Saved as a draft. Publish from the Releases tab to take it live (before the first release, drafts serve directly)."] });
     } else if (res.status === 409) {
       // S35: someone else saved since this editor loaded. Their version is on
       // the server, yours stays in the form — reload to see theirs, or save

@@ -1,8 +1,10 @@
-/* BeastLife PWA service worker — app-shell + runtime caching. */
-const VERSION = "v1";
-const STATIC_CACHE = `beastlife-static-${VERSION}`;
-const RUNTIME_CACHE = `beastlife-runtime-${VERSION}`;
-const PRECACHE = ["/offline.html", "/manifest.webmanifest", "/icons/icon-192.png"];
+/* Storeasy PWA service worker — app-shell + runtime caching (S36: per-tenant
+   branded /offline + /manifest.webmanifest are DYNAMIC routes precached at
+   install, so each tenant origin caches its own branding). */
+const VERSION = "v2";
+const STATIC_CACHE = `storeasy-static-${VERSION}`;
+const RUNTIME_CACHE = `storeasy-runtime-${VERSION}`;
+const PRECACHE = ["/offline", "/manifest.webmanifest", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -36,7 +38,7 @@ self.addEventListener("fetch", (event) => {
 
   // Page navigations: network-first, fall back to a cached offline shell.
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(() => caches.match("/offline.html")));
+    event.respondWith(fetch(request).catch(() => caches.match("/offline")));
     return;
   }
 

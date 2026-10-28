@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import ContentPage from "@/components/ContentPage";
-import { getContentPage } from "@/lib/cms/store";
+import { resolvedContentPage } from "@/lib/content/resolve";
 import { siteLegalName } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
 
@@ -9,13 +9,13 @@ import { tfetch } from "@/lib/tenant-request";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  const page = await tfetch(() => getContentPage("contact"));
+  const page = await tfetch(() => resolvedContentPage("contact"));
   if (!page) return { title: "Contact" };
   return { title: page.title, description: page.description, alternates: { canonical: "/contact" } };
 }
 
 export default async function ContactPage() {
-  const [page, legalName] = await tfetch(async () => [await getContentPage("contact"), siteLegalName()]);
+  const [page, legalName] = await tfetch(async () => [await resolvedContentPage("contact"), siteLegalName()]);
   if (!page) notFound();
   return <ContentPage page={page} legalName={legalName} />;
 }

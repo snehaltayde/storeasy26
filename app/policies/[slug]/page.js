@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import ContentPage from "@/components/ContentPage";
-import { getContentPage } from "@/lib/cms/store";
+import { resolvedContentPage } from "@/lib/content/resolve";
 import { siteLegalName } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
 
@@ -11,14 +11,14 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const page = await tfetch(() => getContentPage(slug));
+  const page = await tfetch(() => resolvedContentPage(slug));
   if (!page) return { title: "Page not found" };
   return { title: page.title, description: page.description, alternates: { canonical: `/policies/${slug}` } };
 }
 
 export default async function PolicyPage({ params }) {
   const { slug } = await params;
-  const [page, legalName] = await tfetch(async () => [await getContentPage(slug), siteLegalName()]);
+  const [page, legalName] = await tfetch(async () => [await resolvedContentPage(slug), siteLegalName()]);
   if (!page) notFound();
   return <ContentPage page={page} legalName={legalName} />;
 }

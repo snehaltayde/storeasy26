@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
-import { listContentPages } from "@/lib/cms/store";
+import { resolvedContentPageList } from "@/lib/content/resolve";
 
 // Full-catalog sitemap (Session 16): every product + collection from Turso,
 // plus the content pages. Regenerated per request (catalog syncs mutate it).
@@ -20,7 +20,7 @@ async function buildSitemap() {
   ]);
 
   // Content pages per tenant (S23): defaults + merchant-added, enabled only.
-  const pages = (await listContentPages()).filter((p) => p.enabled);
+  const pages = (await resolvedContentPageList()).filter((p) => p.enabled);
   const statics = [
     "/",
     "/collections",

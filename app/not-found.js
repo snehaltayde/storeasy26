@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { requestResolution } from "@/lib/tenant-request";
+import { requestResolution, tfetch } from "@/lib/tenant-request";
+import { siteName } from "@/lib/site";
 
 export const metadata = { title: "Page not found" };
 
@@ -34,10 +35,18 @@ export default async function NotFound() {
   if (r.outcome === "unknown" || r.outcome === "unavailable") {
     return <GatedSurface code="404" title="Store not found" body="No store is configured for this address." />;
   }
+  // S36 (SF23): tenant-branded 404 — the store's own name, and the accent
+  // utilities already follow the tenant's brand variables.
+  let name = "";
+  try {
+    name = await tfetch(() => siteName());
+  } catch {
+    name = "";
+  }
   return (
     <div className="mx-auto max-w-2xl px-4 py-24 text-center sm:px-6">
-      <p className="text-6xl font-extrabold tracking-tight text-zinc-200">404</p>
-      <h1 className="mt-4 text-2xl font-bold">That page has left the gym</h1>
+      <p className="text-6xl font-extrabold tracking-tight text-accent-200">404</p>
+      <h1 className="mt-4 text-2xl font-bold">This page isn’t on {name ? `${name}’s` : "the"} shelves</h1>
       <p className="mt-2 text-zinc-500">
         The page you're looking for doesn't exist or may have moved.
       </p>
