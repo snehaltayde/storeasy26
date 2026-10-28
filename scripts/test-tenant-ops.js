@@ -96,7 +96,8 @@ await t("export tokens: expiring + tenant-bound + tamper-proof", async () => {
   const tok = await X.mintExportToken("ta");
   eq(await X.verifyExportToken("ta", tok), true);
   eq(await X.verifyExportToken("tb", tok), false, "cross-tenant rejected:");
-  eq(await X.verifyExportToken("ta", tok.replace(/.$/, "0")), false, "tampered rejected:");
+  const flipped = tok.slice(0, -1) + (tok.endsWith("0") ? "1" : "0"); // deterministic flip
+  eq(await X.verifyExportToken("ta", flipped), false, "tampered rejected:");
   const old = await X.mintExportToken("ta", { now: Date.now() - 2 * 60 * 60 * 1000 });
   eq(await X.verifyExportToken("ta", old), false, "expired rejected:");
 });

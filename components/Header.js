@@ -39,6 +39,14 @@ export default function Header({ collections = [], logo = { text1: "Store", text
           </Link>
         </nav>
 
+        {/* S45 (SF10): optional shopper account — guest checkout untouched */}
+        <Link href="/account" aria-label="Your account" className="shrink-0 p-1 text-header-muted transition hover:text-header-fg">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" />
+          </svg>
+        </Link>
+
         <CartButton />
       </div>
 

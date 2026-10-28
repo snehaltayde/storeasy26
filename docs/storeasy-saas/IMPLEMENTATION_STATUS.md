@@ -5,10 +5,10 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S44 (**W1–W4 complete**).
+- Created: 2026-10-28 (session S25). Last updated: S45 (W1–W4 complete; W5 underway).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 90 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 94 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
@@ -18,9 +18,10 @@ by a code audit or implementation in this repo — never by documentation alone.
   MC12 — S38; SF15, SF16, SF17, MC05, MC06, MC11, MC15, BE23 — S39;
   BE11, BE33, MC24, OP08 — S40; BE26, MC02, MC03, OP03, OP04 — S41;
   BE21, MC04, MC17, OP02, OP06, BE35 — S42; MC21, MC23, MC25, MC26, MC27,
-  OP11, OP12, BE29 — S43; MK01, MK02, MK03, MK04, MK05, MK07, MK08 — S44).
-  The other 26 are **not inspected** — the handoff's Fix/Extend/New labels
-  for them remain unverified documentation claims.
+  OP11, OP12, BE29 — S43; MK01, MK02, MK03, MK04, MK05, MK07, MK08 — S44;
+  BE30, SF10, SF11, SF12 — S45). The other 22 are **not inspected** — the
+  handoff's Fix/Extend/New labels for them remain unverified documentation
+  claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -1239,6 +1240,48 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   for counsel review (checkpoint-C item). MK06 (agency page) is S48 by
   roadmap.
 
+### BE30 — Customer identity · **verified complete (S45, self-managed scope)**
+
+- DELIBERATE DEVIATION, recorded: the handoff says "supported Shopify
+  customer-account flow"; this platform's checkout is direct (orders are
+  local-first, S32 locked decision), so shopper identity is SELF-MANAGED in
+  the tenant DB — consistent with the BE02 self-managed merchant identity
+  decision and with Shopify's new-customer-accounts API being built for
+  Shopify-hosted storefront sessions. A Shopify-account bridge would slot
+  behind the same session layer if ever needed.
+- Passwordless email OTP (6 digits, 10-min TTL, hashed with a
+  domain-separated tenant secret, 5-attempt lock, 3-active-codes/hour,
+  enumeration-safe responses, consumed codes can't replay), revocable
+  hashed-token sessions (30d), safe return-path validation. **Subject
+  binding**: orders claim to an account only after OTP verification of the
+  matching email, re-run each login (checkout's money path untouched —
+  recorded trade-off: an order placed mid-session binds at the next login).
+  **Cross-store same-email isolation is structural** (per-tenant DB) and
+  suite + live-proven in both directions. Redaction removes accounts,
+  sessions and codes.
+
+### SF10 — Account login · **verified complete (S45)**
+
+- /account two-step sign-in (email → code) with honest error states and
+  rate limits; header account icon on every storefront; guest purchase
+  fully preserved (accounts are optional everywhere).
+
+### SF11 — Orders & profile · **verified complete (S45)**
+
+- Dashboard: claimed orders with status/fulfilment labels and totals;
+  ownership-scoped detail page (fulfilment tracking + refund lines from the
+  S31 provider-mirrored projection); profile with validated default
+  address; server-side sign-out. Live on hosted demo: real historic test
+  orders claimed on first verification (claimedOrders: 2).
+
+### SF12 — Reorder · **verified complete (S45)**
+
+- buildReorder revalidates every line of an old order against TODAY's
+  catalog — ok / price_changed (was/now shown) / unavailable / missing —
+  before anything is added; adds go through the normal cart API so the
+  server re-derives current prices (an old snapshot can never set a price).
+  Suite covers the full matrix; live-verified on a real demo order.
+
 ## W4 EXIT (recorded S44, 2026-10-28)
 
 Exit evidence per the handoff ("independent merchants launch self-serve;
@@ -1295,6 +1338,25 @@ draft/live leakage; publish + rollback demonstrated"):
 - Deliberate scope notes carried into W4: catalog presentation overrides +
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S45, 2026-10-28)
+
+33 aliased suites / **388 tests + 10 perf budgets + 21 offers = 419 checks**
+green (new `test:customers`, 9; test-tenant-ops' token-tamper probe made
+deterministic — it flipped the last char to "0", which 1/16 of runs already
+was "0"), `pnpm build` clean. Migration tenant/0010 rolled out
+CANARY-FIRST (demo, then fleet) + env default. Live on hosted demo, full
+shopper journey over HTTP: request OTP → delivered via the jobs fast path
+(sent, DEV-MOCK-labeled; code read from the mock email body) → verify →
+account created and **both historic snehal@mediastic.in test orders
+claimed** → authed orders view + account page render → reorder on the real
+order revalidated (1 line "ok", shaker still in catalog; the empty-snapshot
+console order honestly yields 0 addable lines) → ownership probe 404 →
+**the demo session cookie is anonymous on the beastlife host** (and the
+account icon renders on both) → logout revoked server-side, verified dead.
+Test session revoked and cookie jars deleted after; the demo account
+itself (the user's own test identity, with its claimed orders) was left in
+place deliberately. No test orders were created this session.
 
 ## Verification state (S44, 2026-10-28)
 
@@ -1583,7 +1645,7 @@ shopify-push 13, hardening 11, offers-admin 8, events 16, tenancy 9, platform-sy
 
 ## Other records
 
-All remaining 26 records: **not inspected** (states will change only with code
+All remaining 22 records: **not inspected** (states will change only with code
 audits/implementation in their scheduled sessions; see roadmap phases S26–S49).
 Incidental observations made during the S25 audits, recorded WITHOUT claiming a full
 audit of those records:

@@ -261,6 +261,29 @@ too. -->
   apply until then.
 - **Files**: [lib/shipping.js](../lib/shipping.js) (§3.8).
 
+#### Customer accounts (S45 / BE30 + SF10–12)
+- **What**: optional, SELF-MANAGED shopper accounts per store — passwordless
+  (email OTP, 6 digits, 10-min expiry; codes and session tokens hashed at
+  rest, attempt + resend caps, enumeration-safe). Orders bind to an account
+  ONLY after the email is verified by OTP ("claiming", re-run each login) —
+  a typed-in checkout email proves nothing, so it binds nothing. Guest
+  purchase is completely untouched. Accounts live in the TENANT's own DB:
+  the same email on two stores is two unrelated identities, and a session
+  cookie from one store is nobody on another (live-verified both ways).
+- **Use**: the header account icon → `/account` (sign-in or dashboard:
+  orders with fulfilment/refund state, profile + default address, sign-out);
+  `/account/orders/<id>` (ownership-checked — someone else's id is a 404)
+  with **Reorder** (SF12): the old order is revalidated against TODAY's
+  catalog line by line (ok / price changed / sold out / gone, each labeled)
+  before anything is added; adds go through the normal cart API, so the
+  server re-derives today's prices. Post-login redirects accept same-origin
+  storefront paths only. Privacy: redaction removes the account, sessions
+  and codes along with order PII.
+- **Files**: [lib/customers.js](../lib/customers.js), migration
+  `migrations/tenant/0010_customers.sql`, `app/api/account/`,
+  `app/account/`, `components/account/*`; OTP mail rides the BE23
+  notification queue (dev-mock labeled until a mail key is set).
+
 #### Order status page (guest)
 - **What**: tokenized, no-login order tracking — Placed → Confirmed → Being prepared →
   Shipped steps from our state machine MERGED with live Shopify fulfillment +
@@ -914,7 +937,7 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 32 aliased suites, **379 tests + 10 perf budgets**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 33 aliased suites, **388 tests + 10 perf budgets**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -991,10 +1014,15 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   invite→accept→role flow + last-owner guards, privacy redact keeps money
   rows) · marketing 4 (S44: site-host matching never leaks a tenant,
   pricing-from-the-live-plan-catalog incl. version-bump visibility, honest
-  kit-gallery data, consent-aware lead storage) · perf 10 (S42 / BE35
-  budgets — see below).
+  kit-gallery data, consent-aware lead storage) · customers 9 (S45: OTP
+  hashing/expiry/attempt-and-resend caps + replay refusal, verified-email
+  order claiming, revocable sessions, CROSS-STORE same-email isolation both
+  directions, profile validation + ownership-scoped order reads, reorder
+  revalidation matrix ok/price_changed/unavailable/missing, safe return
+  paths, privacy redaction of accounts+sessions+codes) · perf 10 (S42 /
+  BE35 budgets — see below).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **410 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **419 checks in all**) and `pnpm build` as the compile gate.
 - **Perf budgets** (`pnpm test:perf`, BE35): 5,000-product fixture — PDP
   lookup ≤150ms, collection page (featured sort + facets, price+stock
   filters) ≤400ms, multi-term SQL search ≤400ms, home queries ≤400ms,
@@ -1819,3 +1847,4 @@ run the verify checklist.
 | S42 | 35d05d0 | W4: reporting & fleet ops — BE21 TZ-correct reconciled rollups + coverage + discrepancy queue, MC04 dashboard (honest unknowns, /admin lands here), MC17 analytics (consent-badged funnel/products/search/campaigns/devices, scoped CSV), OP02 fleet overview (explicit uncovered tenants), OP06 releases/migrations view + canary rollout flag, BE35 perf budgets suite; billing/provider modules made edge-bundle-safe (BE21+MC04+MC17+OP02+OP06+BE35) |
 | S43 | 75e6dec | W4: merchant ops completeness — Settings ops panels (team w/ last-owner guards, domain TXT wizard + per-tenant robots (quirk #9), privacy tracking, audit UI, PII-free diagnostics), OP12 branded maintenance mode (checkout 503, console reachable) + incidents (internal/public split), BE29 expiring tenant exports + staged conservative offboarding (MC21+MC23+MC25+MC26+MC27+OP11+OP12+BE29) |
 | S44 | d878967 | W4 EXIT: marketing website on designated platform hosts — homepage w/ substantiated claims, pricing from the LIVE plan catalog, honest template gallery, vertical pages, status-accurate integrations, deployed-controls-only trust page, consent-aware lead capture + SaaS legal drafts; tenant hosts 404 all of it (MK01–05+MK07+MK08) |
+| S45 | (this session) | W5: customer accounts — passwordless OTP (hashed, capped, enumeration-safe), verified-email order claiming, per-store identities with structural cross-store isolation, account dashboard + ownership-scoped order detail, reorder with live line-by-line revalidation, redaction covers accounts (BE30+SF10+SF11+SF12) |
