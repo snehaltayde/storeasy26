@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, LogOut, MoreHorizontal, Plus, Wrench } from "lucide-react";
+import { Download, LogOut, MoreHorizontal, Pencil, Plus, Wrench } from "lucide-react";
 import { Card, CardHeader } from "@/components/console/Card";
 import { Button } from "@/components/console/Button";
 import { Banner } from "@/components/console/Banner";
@@ -138,6 +138,114 @@ function NewTenantForm({ onDone }) {
 
 const when = (s) => (s ? new Date(s).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "never");
 
+// S51: tenants are editable after provisioning — until now the New-tenant
+// form was the only writer, so a store created with missing domains or app
+// credentials was stuck. client secret is write-only (blank = keep current).
+function EditTenantDialog({ id, onClose, onSaved }) {
+  const [loaded, setLoaded] = useState(null); // detail payload
+  const [loadErr, setLoadErr] = useState(null);
+  const [f, setF] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const data = await fetch(`/api/platform/tenants/${id}`).then((r) => r.json());
+        if (!alive) return;
+        if (!data.ok) return setLoadErr(data.error || "Couldn't load tenant");
+        setLoaded(data);
+        setF({
+          name: data.tenant.name || "",
+          domains: (data.tenant.domains || []).join(", "),
+          shopDomain: data.tenant.config?.shop_domain || "",
+          clientId: data.tenant.config?.client_id || "",
+          clientSecret: "",
+          supportEmail: data.tenant.config?.support_email || "",
+        });
+      } catch (e) {
+        if (alive) setLoadErr(String(e?.message || e));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  async function save(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const res = await fetch(`/api/platform/tenants/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        update: {
+          name: f.name,
+          domains: f.domains.split(",").map((s) => s.trim()).filter(Boolean),
+          ...(f.shopDomain.trim() ? { shop_domain: f.shopDomain } : {}),
+          client_id: f.clientId,
+          ...(f.clientSecret.trim() ? { client_secret: f.clientSecret } : {}),
+          support_email: f.supportEmail,
+        },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok || !data.ok) return setError(data.error || `Save failed (${res.status})`);
+    onSaved(data);
+    onClose();
+  }
+
+  const set = (k) => (e) => setF((v) => ({ ...v, [k]: e.target.value }));
+  const secretPresent = !!loaded?.tenant?.secretsPresent?.shopify_client_secret;
+
+  return (
+    <Dialog open onClose={busy ? undefined : onClose} title={`Edit tenant — ${id}`} size="lg">
+      {loadErr && <ErrorState title="Couldn't load tenant" detail={loadErr} />}
+      {!loadErr && !f && <SkeletonText lines={5} />}
+      {f && (
+        <form onSubmit={save} className="space-y-3 text-left">
+          <Field label="Display name" htmlFor="et-name" hint="Also updates the storefront site name unless the merchant customized it.">
+            <Input id="et-name" value={f.name} onChange={set("name")} required />
+          </Field>
+          <Field label="Storefront domains" htmlFor="et-domains" hint="Comma-separated hosts, e.g. pavos.in, pavos.localhost:3007 — exact match, ports count.">
+            <Input id="et-domains" mono value={f.domains} onChange={set("domains")} placeholder="pavos.in, pavos.localhost:3007" />
+          </Field>
+          <Field label="Shopify store domain" htmlFor="et-shop">
+            <Input id="et-shop" mono value={f.shopDomain} onChange={set("shopDomain")} placeholder="store.myshopify.com" />
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Shopify app client ID" htmlFor="et-cid">
+              <Input id="et-cid" mono value={f.clientId} onChange={set("clientId")} />
+            </Field>
+            <Field
+              label="Shopify app client secret"
+              htmlFor="et-csec"
+              hint={secretPresent ? "A secret is stored — leave blank to keep it." : "No secret stored yet."}
+            >
+              <Input id="et-csec" mono type="password" value={f.clientSecret} onChange={set("clientSecret")} placeholder={secretPresent ? "unchanged" : ""} />
+            </Field>
+          </div>
+          <Field label="Support email" htmlFor="et-support" hint="Merchant notifications (returns, contact form) go here.">
+            <Input id="et-support" type="email" value={f.supportEmail} onChange={set("supportEmail")} />
+          </Field>
+          {error && <Banner tone="danger">{error}</Banner>}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button onClick={onClose} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" busy={busy}>
+              Save changes
+            </Button>
+          </div>
+        </form>
+      )}
+    </Dialog>
+  );
+}
+
 export default function PlatformAdmin() {
   const [tenants, setTenants] = useState(null);
   const [loadErr, setLoadErr] = useState(null);
@@ -146,6 +254,7 @@ export default function PlatformAdmin() {
   const [detail, setDetail] = useState(null); // expanded tenant id (S41 / OP03)
   const [syncing, setSyncing] = useState({}); // id → true while sync in flight
   const [menuFor, setMenuFor] = useState(null); // tenant whose "More" menu is open
+  const [editing, setEditing] = useState(null); // tenant id being edited (S51)
   const [confirm, setConfirm] = useState(null); // { type, tenant } — suspend/activate/maintenance/offboard
   const [maintMsg, setMaintMsg] = useState("");
   const router = useRouter();
@@ -382,10 +491,25 @@ export default function PlatformAdmin() {
         <QueuesPanel />
       </main>
 
+      {/* Edit tenant details (S51) */}
+      {editing && (
+        <EditTenantDialog
+          id={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(data) => {
+            toast.success(`${data.tenant.id}: updated (${data.changed.join(", ")})`);
+            refresh();
+          }}
+        />
+      )}
+
       {/* "More" overflow menu — native dialog gives keyboard/focus handling */}
       <Dialog open={!!menuFor} onClose={() => setMenuFor(null)} title={menuFor ? `More actions — ${menuFor.id}` : ""} size="sm">
         {menuFor && (
           <div className="flex flex-col gap-2">
+            <Button icon={<Pencil size={13} aria-hidden />} onClick={() => openMenuAction(() => setEditing(menuFor.id))}>
+              Edit details…
+            </Button>
             <Button icon={<Download size={13} aria-hidden />} onClick={() => openMenuAction(() => exportTenant(menuFor.id))}>
               Export data
             </Button>

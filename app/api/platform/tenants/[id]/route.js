@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 import { sameOrigin } from "@/lib/origin-check";
-import { patchTenant, getTenant, platformDb } from "@/lib/platform/control.js";
+import { patchTenant, getTenant, listTenants, platformDb } from "@/lib/platform/control.js";
 import { audit } from "@/lib/platform/audit";
 import { syncTenantCatalog } from "@/lib/sync.js";
 import { withTenant } from "@/lib/tenant-context.js";
@@ -47,6 +47,7 @@ export async function GET(request, { params }) {
       domains: tenant.domains || [],
       config: {
         shop_domain: tenant.config?.shopify_store_domain || null,
+        client_id: tenant.config?.shopify_client_id || null,
         site_name: tenant.config?.site?.name || null,
         support_email: tenant.config?.site?.support_email || null,
         checkout_mode: tenant.config?.checkout_mode || "direct",
@@ -64,12 +65,88 @@ export async function GET(request, { params }) {
 // PATCH {status} — suspend/reactivate a tenant (S25: suspended hosts FAIL
 // CLOSED). PATCH {maintenance: {enabled, message?}} — S43 (OP12): branded
 // maintenance page for shoppers, console stays reachable, checkout closes.
+// PATCH {update: {name?, domains?, shop_domain?, client_id?, client_secret?,
+// support_email?}} — S51: edit tenant details after provisioning (the form
+// used to be the only writer). client_secret is write-only; values never
+// come back. Domains are validated and checked against every other tenant,
+// since resolveHost would otherwise serve one host from two stores.
+const HOST_RE = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{2,5})?$/;
+const bad = (error) => NextResponse.json({ ok: false, error }, { status: 400 });
+
+async function applyUpdate(id, u) {
+  const current = await getTenant(id);
+  if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const patch = {};
+  const config = {};
+  const secrets = {};
+  const changed = [];
+
+  if (u.name !== undefined) {
+    const name = String(u.name).trim().slice(0, 80);
+    if (!name) return bad("Name can't be empty");
+    patch.name = name;
+    // the storefront site name follows the registry name only while the
+    // merchant hasn't customized it away from the old registry name
+    const site = current.config?.site || {};
+    if (!site.name || site.name === current.name) config.site = { ...site, name };
+    changed.push("name");
+  }
+  if (u.domains !== undefined) {
+    if (!Array.isArray(u.domains)) return bad("domains must be a list of hosts");
+    const domains = [...new Set(u.domains.map((d) => String(d).trim().toLowerCase()).filter(Boolean))];
+    const invalid = domains.find((d) => !HOST_RE.test(d));
+    if (invalid) return bad(`"${invalid}" is not a valid host (e.g. pavos.in or pavos.localhost:3007)`);
+    const taken = new Map();
+    for (const t of await listTenants()) {
+      if (t.id === id) continue;
+      for (const d of t.domains || []) taken.set(String(d).toLowerCase(), t.id);
+    }
+    const clash = domains.find((d) => taken.has(d));
+    if (clash) return bad(`"${clash}" already belongs to tenant "${taken.get(clash)}"`);
+    patch.domains = domains;
+    const firstReal = domains.find((d) => !/^(localhost|127\.0\.0\.1|\[::1\])/.test(d));
+    config.site_url = firstReal ? `https://${firstReal.split(":")[0]}` : current.config?.site_url || null;
+    changed.push("domains");
+  }
+  if (u.shop_domain !== undefined) {
+    const sd = String(u.shop_domain).trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(sd)) return bad("Shopify store domain must look like x.myshopify.com");
+    config.shopify_store_domain = sd;
+    changed.push("shop_domain");
+  }
+  if (u.client_id !== undefined) {
+    config.shopify_client_id = String(u.client_id).trim() || null;
+    changed.push("client_id");
+  }
+  if (u.client_secret) {
+    secrets.shopify_client_secret = String(u.client_secret).trim();
+    changed.push("client_secret");
+  }
+  if (u.support_email !== undefined) {
+    const email = String(u.support_email).trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return bad("Support email doesn't look like an email address");
+    config.site = { ...(config.site || current.config?.site || {}), support_email: email || undefined };
+    changed.push("support_email");
+  }
+  if (!changed.length) return bad("Nothing to update");
+
+  const t = await patchTenant(id, {
+    ...patch,
+    ...(Object.keys(config).length ? { config } : {}),
+    ...(Object.keys(secrets).length ? { secrets } : {}),
+  });
+  slog("tenant_updated", { tenant: id, changed });
+  await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.update", tenantId: id, diff: { changed } });
+  return NextResponse.json({ ok: true, tenant: { id: t.id, name: t.name, domains: t.domains }, changed });
+}
+
 export async function PATCH(request, { params }) {
   if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
   try {
+    if (body.update && typeof body.update === "object") return await applyUpdate(id, body.update);
     if (body.maintenance !== undefined) {
       const m = body.maintenance;
       const maintenance = m?.enabled
