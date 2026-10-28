@@ -1441,4 +1441,4 @@ run the verify checklist.
 | S33 | 1b93071 | W2: privacy lifecycle (redaction executes), purpose consent v2, event contract, expiring order proofs (BE18+SF24+BE20+SF08-full) |
 | S34 | e2b23b8 | W2 exit: integrations registry + tab, support grants (time-limited, read-only, banner), restore drill, security gate + threat model (BE24+MC20+BE27+BE34+OP10) |
 | S35 | 6378a49 | W3: content service (versioned schemas, CAS draft revisions, HTML sanitizer) + brand token system (accent ladder, WCAG gate, /admin/brand) (BE08+MC10) |
-| S36 | (this session) | W3: immutable releases (atomic pointer, signed previews, scheduled publish, rollback) + releases tab + per-tenant manifest/offline/404 (BE09+MC13+SF23-full) |
+| S36 | 6f81cf8 | W3: immutable releases (atomic pointer, signed previews, scheduled publish, rollback) + releases tab + per-tenant manifest/offline/404 (BE09+MC13+SF23-full) |
