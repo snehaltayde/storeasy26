@@ -6,18 +6,45 @@ import Link from "next/link";
 import Image from "next/image";
 import { formatMoney } from "@/lib/format";
 
+// Header search (S38 / SF05): debounced suggestions with stale-response
+// cancellation (AbortController), per-session recent searches (sessionStorage
+// — a per-viewer convenience, never required for the box to work) and full
+// keyboard navigation (↑/↓/Enter/Escape over the visible rows).
+
+const RECENT_KEY = "storeasy_recent_searches";
+const readRecent = () => {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(RECENT_KEY) || "[]");
+    return Array.isArray(v) ? v.filter((s) => typeof s === "string").slice(0, 6) : [];
+  } catch {
+    return [];
+  }
+};
+const pushRecent = (term) => {
+  try {
+    const next = [term, ...readRecent().filter((t) => t !== term)].slice(0, 6);
+    sessionStorage.setItem(RECENT_KEY, JSON.stringify(next));
+    return next;
+  } catch {
+    return [];
+  }
+};
+
 export default function SearchBox() {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
+  const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1); // keyboard cursor over visible rows
   const boxRef = useRef(null);
   const abortRef = useRef(null);
 
-  // Debounced fetch against /api/search (Typesense, or DB fallback).
+  // Debounced fetch against /api/search; stale in-flight requests are aborted.
   useEffect(() => {
     const term = q.trim();
+    setActive(-1);
     if (term.length < 2) {
       setResults([]);
       setLoading(false);
@@ -51,15 +78,54 @@ export default function SearchBox() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  function submit(e) {
-    e.preventDefault();
-    const term = q.trim();
-    if (!term) return;
+  function go(term) {
+    const t = term.trim();
+    if (!t) return;
+    setRecent(pushRecent(t));
     setOpen(false);
-    router.push(`/search?q=${encodeURIComponent(term)}`);
+    router.push(`/search?q=${encodeURIComponent(t)}`);
   }
 
-  const showPanel = open && q.trim().length >= 2;
+  function openProduct(hit) {
+    setRecent(pushRecent(q.trim() || hit.title));
+    setOpen(false);
+    router.push(`/products/${hit.handle}`);
+  }
+
+  function submit(e) {
+    e.preventDefault();
+    go(q);
+  }
+
+  const term = q.trim();
+  const showRecent = open && term.length < 2 && recent.length > 0;
+  const showPanel = open && (term.length >= 2 || showRecent);
+  // the keyboard-navigable rows currently on screen
+  const rows = showRecent ? recent.map((t) => ({ type: "recent", term: t })) : results.map((r) => ({ type: "hit", hit: r }));
+
+  function onKeyDown(e) {
+    if (e.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (!showPanel || !rows.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((i) => (i + 1) % rows.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((i) => (i <= 0 ? rows.length - 1 : i - 1));
+    } else if (e.key === "Enter" && active >= 0 && rows[active]) {
+      e.preventDefault();
+      const row = rows[active];
+      if (row.type === "recent") {
+        setQ(row.term);
+        go(row.term);
+      } else openProduct(row.hit);
+    }
+  }
+
+  const activeCls = (i) => (i === active ? "bg-zinc-100" : "hover:bg-zinc-50");
 
   return (
     <div ref={boxRef} className="relative w-full">
@@ -76,31 +142,75 @@ export default function SearchBox() {
             setQ(e.target.value);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setRecent(readRecent());
+            setOpen(true);
+          }}
+          onKeyDown={onKeyDown}
           type="search"
-          placeholder="Search protein, creatine, shakers…"
+          placeholder="Search products…"
           aria-label="Search products"
+          aria-expanded={showPanel}
+          role="combobox"
+          aria-autocomplete="list"
           className="w-full rounded-full border border-zinc-200 bg-zinc-50 py-2.5 pl-11 pr-4 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:bg-white"
         />
       </form>
 
       {showPanel && (
         <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-xl">
-          {loading && results.length === 0 ? (
+          {showRecent ? (
+            <>
+              <p className="flex items-center justify-between px-4 pt-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                Recent searches
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      sessionStorage.removeItem(RECENT_KEY);
+                    } catch { /* blocked storage */ }
+                    setRecent([]);
+                  }}
+                  className="font-medium normal-case tracking-normal text-zinc-400 hover:text-zinc-600"
+                >
+                  Clear
+                </button>
+              </p>
+              <ul className="py-1">
+                {recent.map((t, i) => (
+                  <li key={t}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQ(t);
+                        go(t);
+                      }}
+                      className={`block w-full px-4 py-2 text-left text-sm text-zinc-700 ${activeCls(i)}`}
+                    >
+                      {t}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : loading && results.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-zinc-400">Searching…</p>
           ) : results.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-zinc-400">
-              No products match “{q.trim()}”.
+              No products match “{term}”.
             </p>
           ) : (
             <>
               <ul className="max-h-[60vh] divide-y divide-zinc-50 overflow-y-auto">
-                {results.map((r) => (
+                {results.map((r, i) => (
                   <li key={r.handle}>
                     <Link
                       href={`/products/${r.handle}`}
-                      onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50"
+                      onClick={() => {
+                        setRecent(pushRecent(term));
+                        setOpen(false);
+                      }}
+                      className={`flex items-center gap-3 px-3 py-2.5 ${activeCls(i)}`}
                     >
                       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
                         {r.image ? (
@@ -126,7 +236,7 @@ export default function SearchBox() {
                 onClick={submit}
                 className="block w-full border-t border-zinc-100 bg-zinc-50 px-4 py-2.5 text-center text-sm font-medium text-accent-700 hover:bg-zinc-100"
               >
-                View all results for “{q.trim()}”
+                View all results for “{term}”
               </button>
             </>
           )}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
-import { getBlockRow, setBlock, deleteBlock, getAnnouncement, getHero, getHomeSections, getNav, listContentPages, getContentPage, upsertContentPage, deleteContentPage, pageRevisions, CmsConflictError } from "@/lib/cms/store";
+import { getBlockRow, setBlock, deleteBlock, getAnnouncement, getHero, getHomeSections, getNav, getCollectionsIndex, getPdpExtras, listContentPages, getContentPage, upsertContentPage, deleteContentPage, pageRevisions, CmsConflictError } from "@/lib/cms/store";
 import { validateBlock } from "@/lib/cms/validate";
 import { BLOCK_KEYS } from "@/lib/cms/defaults";
 import { slog } from "@/lib/log";
@@ -18,12 +18,14 @@ export const dynamic = "force-dynamic";
 
 
 async function view() {
-  const [announcement, hero, homeSections, navHeader, navFooter, pages] = await Promise.all([
+  const [announcement, hero, homeSections, navHeader, navFooter, collectionsIndex, pdpExtras, pages] = await Promise.all([
     getAnnouncement(),
     getHero(),
     getHomeSections(),
     getNav("header"),
     getNav("footer"),
+    getCollectionsIndex(),
+    getPdpExtras(),
     listContentPages(),
   ]);
   const customized = {};
@@ -34,7 +36,7 @@ async function view() {
     revisions[key] = row ? row.revision : null; // null = "I expect to create it"
   }
   return {
-    blocks: { announcement, hero, home_sections: homeSections, nav_header: navHeader, nav_footer: navFooter },
+    blocks: { announcement, hero, home_sections: homeSections, nav_header: navHeader, nav_footer: navFooter, collections_index: collectionsIndex, pdp_extras: pdpExtras },
     customized,
     revisions,
     pageRevisions: await pageRevisions(),

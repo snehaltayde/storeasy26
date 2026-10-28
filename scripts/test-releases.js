@@ -131,7 +131,8 @@ await t("missing hero title blocks; dead catalog link blocks; unknown path warns
   if (!/doesn't exist in the catalog/.test(r.errors.join(" "))) throw new Error(`wrong error: ${r.errors}`);
   r = await inTenant(() => R.validateRelease({ ...base, blocks: { nav_header: [{ label: "Blog", href: "/blog" }] } }));
   eq(r.ok, true, "unknown path is a warning:");
-  eq(r.warnings.length, 1);
+  // S38 adds missing-policy-page warnings for plain tenants — count only the path one
+  eq(r.warnings.filter((w) => w.includes("isn't a storefront route")).length, 1);
 });
 
 await t("brand contrast failure blocks a publish even if it slipped into drafts", async () => {

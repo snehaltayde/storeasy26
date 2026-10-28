@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartContext";
 import { formatMoney, discountPercent } from "@/lib/format";
 
@@ -46,10 +46,36 @@ export default function ProductPurchase({ product }) {
   const showOptions =
     options.length > 0 && !(options.length === 1 && (options[0].values || []).length <= 1);
 
+  // S38 (SF04): invalid-variant feedback. For each option value, does ANY
+  // variant exist (and is any of them in stock) with that value plus the
+  // OTHER current selections? Non-existent combinations get struck through.
+  const valueState = useMemo(() => {
+    const state = {};
+    for (const opt of options) {
+      for (const val of opt.values || []) {
+        const want = { ...selected, [opt.name]: val };
+        const matches = variants.filter((v) => (v.selectedOptions || []).every((o) => want[o.name] === o.value));
+        state[`${opt.name}:${val}`] = matches.length === 0 ? "missing" : matches.some((v) => v.available) ? "ok" : "soldout";
+      }
+    }
+    return state;
+  }, [options, variants, selected]);
+
   function choose(name, value) {
     setSelected((s) => ({ ...s, [name]: value }));
     setAdded(false);
   }
+
+  // S38 (SF04): sticky mobile CTA — a bottom bar appears once the main add
+  // button scrolls out of view (small screens only).
+  const addRef = useRef(null);
+  const [showSticky, setShowSticky] = useState(false);
+  useEffect(() => {
+    if (!addRef.current || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver(([entry]) => setShowSticky(!entry.isIntersecting), { threshold: 0 });
+    obs.observe(addRef.current);
+    return () => obs.disconnect();
+  }, []);
 
   function handleAdd() {
     if (!currentVariant || !available) return;
@@ -91,15 +117,22 @@ export default function ProductPurchase({ product }) {
               <div className="flex flex-wrap gap-2">
                 {(opt.values || []).map((val) => {
                   const isSel = selected[opt.name] === val;
+                  const state = valueState[`${opt.name}:${val}`] || "ok";
                   return (
                     <button
                       key={val}
                       type="button"
                       onClick={() => choose(opt.name, val)}
+                      aria-pressed={isSel}
+                      title={state === "missing" ? "Not available with the current selection" : state === "soldout" ? "Sold out" : undefined}
                       className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition ${
                         isSel
                           ? "border-zinc-900 bg-zinc-900 text-white"
-                          : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
+                          : state === "missing"
+                            ? "border-dashed border-zinc-200 bg-white text-zinc-300 line-through hover:border-zinc-300"
+                            : state === "soldout"
+                              ? "border-zinc-200 bg-white text-zinc-400 line-through hover:border-zinc-400"
+                              : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
                       }`}
                     >
                       {val}
@@ -110,6 +143,12 @@ export default function ProductPurchase({ product }) {
             </div>
           ))}
         </div>
+      )}
+
+      {showOptions && !currentVariant && (
+        <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          This combination isn&rsquo;t available — struck-through values don&rsquo;t exist together. Pick a different option.
+        </p>
       )}
 
       <div className="mt-6 flex items-center gap-3">
@@ -134,6 +173,7 @@ export default function ProductPurchase({ product }) {
         </div>
 
         <button
+          ref={addRef}
           type="button"
           onClick={handleAdd}
           disabled={!available || !currentVariant}
@@ -151,6 +191,26 @@ export default function ProductPurchase({ product }) {
         >
           Added ✓ — View cart
         </button>
+      )}
+
+      {/* S38 (SF04): sticky mobile CTA — shows once the main button scrolls away */}
+      {showSticky && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden">
+          <div className="mx-auto flex max-w-7xl items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-zinc-900">{title}</p>
+              <p className="text-sm font-bold text-zinc-900">{formatMoney(price, currency)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={added ? () => setOpen(true) : handleAdd}
+              disabled={!added && (!available || !currentVariant)}
+              className="rounded-xl bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition enabled:hover:bg-accent-300 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
+            >
+              {added ? "View cart" : available ? (currentVariant ? "Add to cart" : "Select options") : "Sold out"}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

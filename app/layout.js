@@ -146,7 +146,9 @@ export default async function RootLayout({ children }) {
     <html lang="en" data-kit={chrome.kitAttr} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
       {/* Brand variables: values come from lib/brand.js (validated hex/enum
           tokens only — nothing merchant-typed reaches this string raw). */}
-      {chrome.brandCss ? <style id="brand-vars">{chrome.brandCss}</style> : null}
+      {/* precedence+href let React hoist this into <head> (without them React
+          19 warns and risks a hydration mismatch for styles under <html>) */}
+      {chrome.brandCss ? <style id="brand-vars" precedence="default" href="brand-vars">{chrome.brandCss}</style> : null}
       <body className="flex min-h-full flex-col bg-background text-foreground antialiased">
         {chrome.preview && (
           <div className="bg-purple-700 px-4 py-1.5 text-center text-xs font-semibold text-white">

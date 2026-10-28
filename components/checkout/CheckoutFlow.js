@@ -42,7 +42,7 @@ const FIELDS = [
   { key: "pincode", label: "PIN code", required: true, half: true },
 ];
 
-export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store" }) {
+export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store", policies = [] }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     email: "",
@@ -397,6 +397,22 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
                       : `Pay ${formatMoney(grandTotal, cart.currency)}`}
                 </button>
               </div>
+
+              {/* S38 (SF14): the store's own policies, right where the money moves */}
+              {policies.length > 0 && (
+                <p className="mt-3 text-center text-xs text-zinc-400">
+                  By placing this order you agree to our{" "}
+                  {policies.map((p, i) => (
+                    <span key={p.href}>
+                      {i > 0 && (i === policies.length - 1 ? " and " : ", ")}
+                      <a href={p.href} target="_blank" rel="noopener" className="underline hover:text-zinc-600">
+                        {p.label}
+                      </a>
+                    </span>
+                  ))}
+                  .
+                </p>
+              )}
             </section>
           )}
         </div>

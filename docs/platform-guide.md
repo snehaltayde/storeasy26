@@ -125,20 +125,38 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
   replaces it.
 
 #### Collections & browsing
-- **What**: all-collections index; collection pages with pagination (48/page,
-  prev/next, per-page canonicals, out-of-range → 404); collection cards with counts.
-- **Use**: `/collections`, `/collections/<handle>`, `/collections/<handle>?page=N`.
+- **What**: all-collections index with **merchant curation** (S38 / SF02:
+  featured-with-badge first, then an explicit order, hidden handles dropped;
+  the home Collections row uses the featured list too); collection pages with
+  **URL-backed sort + filters** (S38 / SF03: `?sort=featured|new|price-asc|
+  price-desc`, `?type=<product_type>` chips with counts, `?instock=1`, all
+  combinable with `?page=N` — back/forward/shared links restore the exact
+  view; zero-results shows a Clear-all action); pagination (48/page, prev/next,
+  per-page canonicals, out-of-range → 404).
+- **Use**: `/collections`, `/collections/<handle>?sort=…&type=…&instock=1`.
+  Curate in `/admin/storefront` → Collections index (release-governed like
+  every block; publish validation blocks handles that aren't in the catalog).
 - **Setup**: a synced catalog (full sync or webhooks).
-- **Files**: `app/collections/*`, [lib/repo.js](../lib/repo.js)
-  (`getAllCollections`, `getProductsInCollection` with limit/offset + total).
+- **Files**: `app/collections/*`, `components/CollectionControls.js`,
+  [lib/repo.js](../lib/repo.js) (`getAllCollections`,
+  `getCollectionsByHandles`, `getProductsInCollection` with
+  sort/inStock/type, `getCollectionTypeFacets`).
 - **How**: sub-millisecond SQLite reads from the tenant DB; membership rows
-  (`collection_products`) carry Shopify's ordering as `position`.
+  (`collection_products`) carry Shopify's ordering as `position` (= the
+  "featured" sort); filter chips are plain links so every state has a URL.
 
 #### Product page (PDP)
 - **What**: gallery with fade-in images, variant picker, price/compare-at with
   savings, availability, merchant HTML description, Product + BreadcrumbList JSON-LD,
-  breadcrumbs, and the **"Pairs well with"** strip (S23).
+  breadcrumbs, and the **"Pairs well with"** strip (S23). S38 (SF04):
+  **merchant accordions** under the description (`pdp_extras` block —
+  shipping/returns/lab-report panels, sanitized at save, release-governed),
+  a **sticky mobile CTA** bar (appears when the add button scrolls away;
+  title + price + add/view-cart), and **invalid-variant feedback** (values
+  that don't exist with the current selection render struck-through with a
+  "combination isn't available" notice; sold-out combinations are marked).
 - **Use**: `/products/<handle>`. Configure a manual pairs strip in `/admin/upsells`;
+  accordions in `/admin/storefront` → Product page extras;
   otherwise the strip auto-fills with same-collection products.
 - **Setup**: synced catalog; nothing else.
 - **Files**: `app/products/[handle]/page.js`,
@@ -151,14 +169,24 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
   the tenant's site name.
 
 #### Search
-- **What**: instant product search with images/prices; Typesense-powered with an
-  automatic SQL LIKE fallback so search always works; `select_item` click analytics.
+- **What**: instant product search with images/prices. **BE05 decision (S38):
+  SQL over the local catalog IS the supported engine** — upgraded to
+  multi-term AND matching with deterministic ranking (in-stock first, then
+  title-prefix, then title-substring, then the rest). Typesense remains an
+  optional env-configured upgrade (reviving the lapsed cluster is paid and
+  user-gated); when configured and reachable it serves, otherwise SQL does,
+  transparently. S38 (SF05) search box: debounce + stale-response abort,
+  **per-session recent searches** (sessionStorage, shown on focus, clearable)
+  and **full keyboard navigation** (↑/↓/Enter/Escape).
 - **Use**: the header search box on every page; `/search?q=…` for the full page.
-- **Setup**: works out of the box on SQL fallback. For Typesense: set
-  `TYPESENSE_HOST/PORT/PROTOCOL/API keys` + per-tenant `typesense_collection`, then
-  `pnpm sync:search` (or tenant sync) to index. *(The shared cluster is currently
-  lapsed — everything runs on the fallback; health says "degraded".)*
+  `/api/health` names the live engine (`search.engine`); a dead optional
+  Typesense no longer degrades health.
+- **Setup**: nothing — SQL works out of the box. For Typesense: set
+  `TYPESENSE_HOST/PORT/PROTOCOL/API keys` + per-tenant `typesense_collection`,
+  then `pnpm sync:search` to index. Index-rebuild-and-swap + synonyms are
+  Typesense-side features and land with a revival, if ever.
 - **Files**: `app/api/search/route.js` (edge),
+  [components/SearchBox.js](../components/SearchBox.js),
   [lib/typesense-search.js](../lib/typesense-search.js) (edge-safe fetch),
   [lib/typesense.js](../lib/typesense.js) (admin client + schema, Node sync only),
   `searchProductsInDb` in [lib/repo.js](../lib/repo.js).
@@ -246,13 +274,25 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
 #### Content pages
 - **What**: About, Contact, and policy pages (shipping/returns/terms/privacy) +
   merchant-added pages — per tenant, CMS-overridable, with a shared renderer.
+  S38 (SF13): sections are **typed** — text (heading + paragraphs), **rich
+  HTML** (allowlist-sanitized at save) and **image** (library `/api/media/…`
+  or https, alt required, optional caption); v1 rows normalize lazily (page
+  schema v2). S38 (SF14): optional **effective date** rendered under the
+  title; checkout links the store's own privacy/terms/refund/shipping pages
+  next to the pay button (enabled pages only); publish validation **warns**
+  when a non-BeastLife store has no privacy or terms/refund page.
 - **Use**: `/about`, `/contact`, `/policies/<slug>` (custom pages serve there too).
-  Edit in `/admin/storefront` → Content pages.
-- **Setup**: defaults render immediately (tenant #1's real content as templates);
-  the default contact page auto-injects the tenant's support email/phone.
+  Edit in `/admin/storefront` → Content pages ("Privacy policy" and
+  "Terms & refund" templates scaffold the legal pages).
+- **Setup / cross-tenant containment (S38)**: the default templates carry
+  **BeastLife's real copy** and serve ONLY the beastlife tenants + legacy env
+  mode (`brandDefaultsApply()`); every other tenant starts page-less and
+  creates its own (no cross-tenant legal text, ever). BeastLife's default
+  contact page still auto-injects the tenant's support email/phone.
 - **Files**: `app/about|contact|policies/[slug]/page.js`,
   [components/ContentPage.js](../components/ContentPage.js),
-  [lib/cms/store.js](../lib/cms/store.js) (`getContentPage`, `listContentPages`),
+  [lib/cms/store.js](../lib/cms/store.js) (`getContentPage`,
+  `validatePageSections`, `brandDefaultsApply`),
   [lib/content/pages.js](../lib/content/pages.js) (default templates).
 
 #### Consent banner & pixels
@@ -286,7 +326,7 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
 
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
-Navigation: **Offers · Orders · Storefront · Theme · Brand · Releases · Upsells · Integrations · Settings**.
+Navigation: **Offers · Orders · Storefront · Media · Theme · Brand · Releases · Upsells · Integrations · Settings**.
 
 #### Login
 - **Use** (S26): `<tenant-host>/admin` → `/admin/login`; sign in with your EMAIL +
@@ -432,6 +472,30 @@ Navigation: **Offers · Orders · Storefront · Theme · Brand · Releases · Up
 - **Files**: `components/admin/SectionsEditor.js`,
   `components/admin/PreviewPane.js`, banner/rich_text validation in
   [lib/cms/validate.js](../lib/cms/validate.js), renderers in `app/page.js`.
+
+#### Media tab (S38 / BE15 + MC12)
+- **What**: a per-tenant media library. Upload (multi-file), alt-text editing,
+  copy-URL, and **usage-guarded delete** (a referenced file 409s with the list
+  of blocks/pages/live-release spots using it; deleting anyway is a second,
+  explicit step — and the console warns that immutable past releases keep
+  their references). Paste a file's URL anywhere content takes an image
+  (rich-text sections, PDP accordions, page image sections).
+- **Pipeline** (BE15): uploads go through the admin session, so every byte is
+  **tenant-bound by construction** — blobs live in the tenant's own Turso DB
+  (no external bucket, no separate signing infrastructure; the admin-session +
+  tenant-DB pair IS the "signed, tenant-bound upload"). Validation: mime
+  allowlist (png/jpeg/webp/gif ≤1.5MB, svg ≤300KB), **magic-byte sniffing**
+  (declared type must match the bytes), **SVG sanitization** at write (scripts,
+  handlers, foreignObject, unsafe hrefs stripped) + a no-script CSP and
+  nosniff at serve. Content-hash (sha256) dedupe makes re-uploads free.
+  **Derivatives** are generated client-side (canvas → ≤480px webp "thumb"
+  variant rides the same request — no native image library exists on the
+  serverless runtime); `/api/media/<id>` serves immutable
+  (max-age=31536000) since content never changes under an id.
+- **Files**: [lib/media.js](../lib/media.js), `app/api/media/[id]/route.js`
+  (public, tenant-scoped), `app/api/admin/media/route.js`,
+  `components/admin/MediaAdmin.js`, migration
+  `migrations/tenant/0008_media_pages.sql`.
 
 #### Releases tab
 - **What** (S36 / BE09+MC13): publishing discipline. Content edits (storefront
@@ -634,7 +698,7 @@ Navigation: **Offers · Orders · Storefront · Theme · Brand · Releases · Up
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 24 aliased suites, **307 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 25 aliased suites, **322 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -674,9 +738,15 @@ Navigation: **Offers · Orders · Storefront · Theme · Brand · Releases · Up
   + release validation per kit, accessibility of accent labels; applyKit draft
   semantics incl. live-pointer no-touch and release-pinned theme; version
   pinning with no silent upgrades; banner/rich_text section validation with
-  sanitize-at-save; page templates).
+  sanitize-at-save; page templates) · storefront 15 (S38: media magic-byte
+  sniffing + SVG sanitizer + content-hash dedupe + variants + usage-guarded
+  delete; typed page sections sanitize-at-save + v1 normalization + effective
+  dates; BeastLife default pages serve ONLY BeastLife; collections_index
+  validation/order/release-gated handles; collection sort/filters/facets;
+  pdp_extras sanitize + disabled filtering; SQL search multi-term AND +
+  deterministic ranking; snapshot coverage of the new blocks).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **328 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **343 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -1483,3 +1553,4 @@ run the verify checklist.
 | S35 | 6378a49 | W3: content service (versioned schemas, CAS draft revisions, HTML sanitizer) + brand token system (accent ladder, WCAG gate, /admin/brand) (BE08+MC10) |
 | S36 | 6f81cf8 | W3: immutable releases (atomic pointer, signed previews, scheduled publish, rollback) + releases tab + per-tenant manifest/offline/404 (BE09+MC13+SF23-full) |
 | S37 | 7913508 | W3: theme kits Pulse+Glow (version-pinned, draft-apply), home section editor (banner/rich_text, undo/redo, autosave, preview pane), page templates, operator kit registry (MC07+MC08+MC09+OP07) |
+| S38 | (this session) | W3: media pipeline + library (tenant-DB blobs, magic-byte + SVG sanitize, dedupe, usage-guarded delete), typed/policy pages + BeastLife-defaults containment + checkout policy links, curated collections index, collection sort/filters, PDP extras + sticky CTA + invalid-variant states, SQL search decision + ranking + recents (BE15+MC12+SF13+SF14+SF01–05+BE05) |

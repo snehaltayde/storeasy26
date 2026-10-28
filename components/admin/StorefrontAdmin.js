@@ -61,16 +61,34 @@ const textToBody = (text) =>
     .map((p) => p.replace(/\s*\n\s*/g, " ").trim())
     .filter(Boolean);
 
+// S38 (SF13): sections are typed — text (heading + paragraphs), rich HTML
+// (sanitized at save) and image (library URL). SF14: optional effective date.
+const toEditSection = (s) => {
+  const kind = s.kind || "text";
+  if (kind === "rich") return { kind, heading: s.heading || "", html: s.html || "" };
+  if (kind === "image") return { kind, src: s.src || "", alt: s.alt || "", caption: s.caption || "" };
+  return { kind: "text", heading: s.heading || "", text: bodyToText(s.body) };
+};
+const fromEditSection = (s) => {
+  if (s.kind === "rich") return { kind: "rich", heading: s.heading, html: s.html };
+  if (s.kind === "image") return { kind: "image", src: s.src, alt: s.alt, caption: s.caption };
+  return { kind: "text", heading: s.heading, body: textToBody(s.text) };
+};
+const editSectionEmpty = (s) => (s.kind === "rich" ? !s.html.trim() : s.kind === "image" ? !s.src.trim() : !s.heading.trim());
+
 function PageEditor({ page, onSave, onCancel, busy }) {
   const [p, setP] = useState({
     slug: page.slug || "",
     title: page.title || "",
     description: page.description || "",
     enabled: page.enabled !== false,
-    sections: (page.sections || []).map((s) => ({ heading: s.heading, text: bodyToText(s.body) })),
+    effective_at: page.effective_at || "",
+    sections: (page.sections || []).map(toEditSection),
   });
   const isNew = !page.slug;
   const sec = (i, patch) => setP((prev) => ({ ...prev, sections: prev.sections.map((s, j) => (j === i ? { ...s, ...patch } : s)) }));
+  const addSection = (kind) =>
+    setP((prev) => ({ ...prev, sections: [...prev.sections, kind === "rich" ? { kind, heading: "", html: "" } : kind === "image" ? { kind, src: "", alt: "", caption: "" } : { kind: "text", heading: "", text: "" }] }));
 
   return (
     <section className="rounded-2xl border border-lime-300 p-5">
@@ -82,31 +100,54 @@ function PageEditor({ page, onSave, onCancel, busy }) {
         <Field label="Title">
           <input className={input} value={p.title} onChange={(e) => setP({ ...p, title: e.target.value })} />
         </Field>
-        <div className="sm:col-span-2">
-          <Field label="Meta description">
-            <input className={input} value={p.description} onChange={(e) => setP({ ...p, description: e.target.value })} />
-          </Field>
-        </div>
+        <Field label="Meta description">
+          <input className={input} value={p.description} onChange={(e) => setP({ ...p, description: e.target.value })} />
+        </Field>
+        <Field label="Effective date" hint="optional — shown under the title (policy pages)">
+          <input type="date" className={input} value={p.effective_at} onChange={(e) => setP({ ...p, effective_at: e.target.value })} />
+        </Field>
         {p.sections.map((s, i) => (
           <div key={i} className="sm:col-span-2 rounded-xl border border-zinc-100 p-3">
             <div className="flex items-center gap-2">
-              <input className={input + " mt-0"} placeholder="Section heading" value={s.heading} onChange={(e) => sec(i, { heading: e.target.value })} />
-              <button type="button" onClick={() => setP((prev) => ({ ...prev, sections: prev.sections.filter((_, j) => j !== i) }))} className="text-zinc-400 hover:text-red-600">
+              <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-500">{s.kind}</span>
+              {s.kind !== "image" && (
+                <input className={input + " mt-0"} placeholder={s.kind === "rich" ? "Heading (optional)" : "Section heading"} value={s.heading} onChange={(e) => sec(i, { heading: e.target.value })} />
+              )}
+              <button type="button" onClick={() => setP((prev) => ({ ...prev, sections: prev.sections.filter((_, j) => j !== i) }))} className="ml-auto text-zinc-400 hover:text-red-600">
                 ✕
               </button>
             </div>
-            <textarea
-              className={input + " min-h-24 font-normal"}
-              placeholder="Paragraphs — separate with a blank line"
-              value={s.text}
-              onChange={(e) => sec(i, { text: e.target.value })}
-            />
+            {s.kind === "text" && (
+              <textarea
+                className={input + " min-h-24 font-normal"}
+                placeholder="Paragraphs — separate with a blank line"
+                value={s.text}
+                onChange={(e) => sec(i, { text: e.target.value })}
+              />
+            )}
+            {s.kind === "rich" && (
+              <textarea
+                className={input + " min-h-24 font-mono text-xs"}
+                placeholder="<p>HTML — scripts and event handlers are stripped on save</p>"
+                value={s.html}
+                onChange={(e) => sec(i, { html: e.target.value })}
+              />
+            )}
+            {s.kind === "image" && (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <input className={input + " mt-0"} placeholder="/api/media/… or https://…" value={s.src} onChange={(e) => sec(i, { src: e.target.value })} />
+                <input className={input + " mt-0"} placeholder="Alt text (required)" value={s.alt} onChange={(e) => sec(i, { alt: e.target.value })} />
+                <input className={input + " mt-0 sm:col-span-2"} placeholder="Caption (optional)" value={s.caption} onChange={(e) => sec(i, { caption: e.target.value })} />
+              </div>
+            )}
           </div>
         ))}
         <div className="sm:col-span-2 flex items-center justify-between">
-          <button type="button" onClick={() => setP((prev) => ({ ...prev, sections: [...prev.sections, { heading: "", text: "" }] }))} className="text-sm font-medium text-lime-700 hover:underline">
-            + Add section
-          </button>
+          <span className="flex gap-3 text-sm font-medium text-lime-700">
+            <button type="button" onClick={() => addSection("text")} className="hover:underline">+ Text</button>
+            <button type="button" onClick={() => addSection("rich")} className="hover:underline">+ Rich HTML</button>
+            <button type="button" onClick={() => addSection("image")} className="hover:underline">+ Image</button>
+          </span>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={p.enabled} onChange={(e) => setP({ ...p, enabled: e.target.checked })} />
             Visible
@@ -123,7 +164,8 @@ function PageEditor({ page, onSave, onCancel, busy }) {
               title: p.title,
               description: p.description,
               enabled: p.enabled,
-              sections: p.sections.map((s) => ({ heading: s.heading, body: textToBody(s.text) })).filter((s) => s.heading),
+              effective_at: p.effective_at || null,
+              sections: p.sections.filter((s) => !editSectionEmpty(s)).map(fromEditSection),
             })
           }
           className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-lime-300 disabled:opacity-50"
@@ -145,6 +187,15 @@ export default function StorefrontAdmin({ initial }) {
   const [sections, setSections] = useState(initial.blocks.home_sections);
   const [navHeader, setNavHeader] = useState(navToText(initial.blocks.nav_header));
   const [navFooter, setNavFooter] = useState(navToText(initial.blocks.nav_footer));
+  // S38: curated collection index (handles, one per line) + PDP accordions
+  const ciToText = (list) => (Array.isArray(list) ? list.join("\n") : "");
+  const textToCi = (t) => t.split("\n").map((s) => s.trim()).filter(Boolean);
+  const [ci, setCi] = useState({
+    featured: ciToText(initial.blocks.collections_index?.featured),
+    order: ciToText(initial.blocks.collections_index?.order),
+    hide: ciToText(initial.blocks.collections_index?.hide),
+  });
+  const [extras, setExtras] = useState(Array.isArray(initial.blocks.pdp_extras) ? initial.blocks.pdp_extras : []);
   const [editingPage, setEditingPage] = useState(null); // page object | null
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -169,6 +220,12 @@ export default function StorefrontAdmin({ initial }) {
         setSections(json.blocks.home_sections);
         setNavHeader(navToText(json.blocks.nav_header));
         setNavFooter(navToText(json.blocks.nav_footer));
+        setCi({
+          featured: ciToText(json.blocks.collections_index?.featured),
+          order: ciToText(json.blocks.collections_index?.order),
+          hide: ciToText(json.blocks.collections_index?.hide),
+        });
+        setExtras(Array.isArray(json.blocks.pdp_extras) ? json.blocks.pdp_extras : []);
       }
       setMsg({ ok: true, text: ["Saved as a draft. Publish from the Releases tab to take it live (before the first release, drafts serve directly)."] });
     } else if (res.status === 409) {
@@ -318,6 +375,68 @@ export default function StorefrontAdmin({ initial }) {
           </section>
 
           <PreviewPane />
+
+          {/* S38 (SF02): curated collection index */}
+          <Section
+            title="Collections index"
+            desc="Curate /collections and the home collections row: featured handles get a badge and lead the list; hidden handles don't render. Empty = automatic."
+            customized={data.customized.collections_index}
+            busy={busy}
+            onSave={() =>
+              saveBlock(
+                "collections_index",
+                ci.featured.trim() || ci.order.trim() || ci.hide.trim() ? { featured: textToCi(ci.featured), order: textToCi(ci.order), hide: textToCi(ci.hide) } : null,
+              )
+            }
+            onReset={() => resetBlock("collections_index")}
+          >
+            <Field label="Featured" hint="collection handles, one per line (max 6) — shown first with a badge; also the home collections row">
+              <textarea className={input + " min-h-20 font-mono text-xs"} value={ci.featured} onChange={(e) => setCi({ ...ci, featured: e.target.value })} placeholder={"protein\nsale"} />
+            </Field>
+            <Field label="Then, in this order" hint="optional — remaining collections follow alphabetically">
+              <textarea className={input + " min-h-20 font-mono text-xs"} value={ci.order} onChange={(e) => setCi({ ...ci, order: e.target.value })} />
+            </Field>
+            <Field label="Hidden" hint="handles never shown on the index">
+              <textarea className={input + " min-h-20 font-mono text-xs"} value={ci.hide} onChange={(e) => setCi({ ...ci, hide: e.target.value })} />
+            </Field>
+          </Section>
+
+          {/* S38 (SF04): PDP accordions */}
+          <Section
+            title="Product page extras"
+            desc="Accordions under every product description — shipping, returns, lab reports. HTML is sanitized on save."
+            customized={data.customized.pdp_extras}
+            busy={busy}
+            onSave={() => saveBlock("pdp_extras", extras.length ? extras : null)}
+            onReset={() => resetBlock("pdp_extras")}
+          >
+            {extras.map((x, i) => (
+              <div key={i} className="sm:col-span-2 rounded-xl border border-zinc-100 p-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    className={input + " mt-0"}
+                    placeholder="Accordion title (e.g. Shipping & delivery)"
+                    value={x.title}
+                    onChange={(e) => setExtras(extras.map((y, j) => (j === i ? { ...y, title: e.target.value } : y)))}
+                  />
+                  <button type="button" onClick={() => setExtras(extras.filter((_, j) => j !== i))} className="text-zinc-400 hover:text-red-600">
+                    ✕
+                  </button>
+                </div>
+                <textarea
+                  className={input + " min-h-20 font-mono text-xs"}
+                  placeholder="<p>Content…</p>"
+                  value={x.html}
+                  onChange={(e) => setExtras(extras.map((y, j) => (j === i ? { ...y, html: e.target.value } : y)))}
+                />
+              </div>
+            ))}
+            <div className="sm:col-span-2">
+              <button type="button" onClick={() => setExtras([...extras, { title: "", html: "", enabled: true }])} className="text-sm font-medium text-lime-700 hover:underline">
+                + Add accordion
+              </button>
+            </div>
+          </Section>
 
           <Section title="Header navigation" desc='One per line: "Label | /path". Empty = all collections (automatic).' customized={data.customized.nav_header} busy={busy} onSave={() => saveBlock("nav_header", textToNav(navHeader))} onReset={() => resetBlock("nav_header")}>
             <div className="sm:col-span-2">

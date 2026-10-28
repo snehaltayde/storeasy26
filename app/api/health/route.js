@@ -75,13 +75,22 @@ async function tenantHealth() {
   ]);
 
   const core = turso.ok;
-  const degraded =
-    !typesense.ok || !orderQueue.ok || orderQueue.dead > 0 || (eventQueue.ok && eventQueue.dead > 0);
+  // S38 (BE05): an unreachable OPTIONAL Typesense no longer degrades health —
+  // /api/search transparently serves from SQL, which is the supported engine.
+  const degraded = !orderQueue.ok || orderQueue.dead > 0 || (eventQueue.ok && eventQueue.dead > 0);
   const status = core ? (degraded ? "degraded" : "ok") : "down";
 
   return {
     status,
     at: new Date().toISOString(),
+    // S38 (BE05 decision): SQL over the local catalog IS the supported search
+    // engine; Typesense is an optional env-configured upgrade. This names the
+    // engine actually serving /api/search right now.
+    search: {
+      engine: !typesense.skipped && typesense.ok ? "typesense" : "database",
+      typesense_configured: !typesense.skipped,
+      ...(typesense.skipped || typesense.ok ? {} : { note: "typesense configured but unreachable — SQL fallback serving" }),
+    },
     checks: { turso, typesense, order_queue: orderQueue, event_queue: eventQueue, errors },
     configured: {
       razorpay: razorpayConfigured(),

@@ -89,7 +89,7 @@ await t("home sections: default pair; disabled/unknown filtered; stored order wi
   await S.setBlock("home_sections", [
     { kind: "new", title: "Latest", limit: 4, enabled: true },
     { kind: "collections", title: "Browse", limit: 3, enabled: false },
-    { kind: "banner", title: "x" },
+    { kind: "bogus", title: "x" }, // banner/rich_text are real kinds since S37 — "bogus" stays unknown
   ]);
   const got = await S.getHomeSections();
   eq(got.length, 1, "disabled + unknown dropped");
@@ -117,8 +117,12 @@ await t("pages: default fallback, tenant override wins, disable hides, delete re
   ok(threw, "bad slug rejected");
 });
 
-await t("pages: default contact injects the TENANT's support details", async () => {
-  const page = await withTenant(T2, () => S.getContentPage("contact"));
+await t("pages: default contact injects the TENANT's support details (BeastLife family only, S38)", async () => {
+  // S38 (SF14): the default pages carry BeastLife's real copy — they serve
+  // ONLY the beastlife tenants + legacy mode, never another tenant's shoppers.
+  eq(await withTenant(T2, () => S.getContentPage("contact")), null, "plain tenant gets no BeastLife default");
+  const BL = { ...T2, id: "beastlife-staging", name: "BeastLife Staging" };
+  const page = await withTenant(BL, () => S.getContentPage("contact"));
   const care = page.sections.find((s) => s.heading === "Customer care");
   eq(care.body[0], "Email: help@acme.in", "tenant email injected");
   eq(care.body[1], "Phone: +91-1", "tenant phone injected");

@@ -6,6 +6,7 @@ import ProductCard from "@/components/ProductCard";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import { getProductByHandle } from "@/lib/repo";
 import { getPdpPairs } from "@/lib/cms/placements";
+import { resolvedPdpExtras } from "@/lib/content/resolve";
 import { numericId } from "@/lib/ids";
 import { abs, siteName } from "@/lib/site";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -81,12 +82,12 @@ function productJsonLd(product, brandName) {
 
 export default async function ProductPage({ params }) {
   const { handle } = await params;
-  const { product, pairs, brandName } = await tfetch(async () => {
+  const { product, pairs, brandName, extras } = await tfetch(async () => {
     const product = await getProductByHandle(handle);
     if (!product) return { product: null };
     // "Pairs well with" (S23): manual placement, else same-collection auto.
-    const pairs = await getPdpPairs(product.id, { limit: 4 });
-    return { product, pairs, brandName: siteName() };
+    const [pairs, extras] = await Promise.all([getPdpPairs(product.id, { limit: 4 }), resolvedPdpExtras()]);
+    return { product, pairs, brandName: siteName(), extras };
   });
   if (!product) notFound();
 
@@ -148,6 +149,22 @@ export default async function ProductPage({ params }) {
               <p className="whitespace-pre-line text-zinc-700">{product.description}</p>
             </div>
           ) : null}
+
+          {/* S38 (SF04): merchant-authored PDP accordions (pdp_extras block,
+              release-governed, html allowlist-sanitized at save) */}
+          {extras?.length > 0 && (
+            <div className="mt-6 divide-y divide-zinc-100 border-t border-zinc-100">
+              {extras.map((x) => (
+                <details key={x.title} className="group py-3">
+                  <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-zinc-800 [&::-webkit-details-marker]:hidden">
+                    {x.title}
+                    <span className="text-zinc-400 transition group-open:rotate-45">+</span>
+                  </summary>
+                  <div className="rte mt-2 text-sm text-zinc-600" dangerouslySetInnerHTML={{ __html: x.html }} />
+                </details>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import ProductGrid from "@/components/ProductGrid";
 import CollectionCard from "@/components/CollectionCard";
-import { getFeaturedCollections, getNewestProducts, getCatalogStats } from "@/lib/repo";
-import { resolvedHero, resolvedHomeSections } from "@/lib/content/resolve";
+import { getFeaturedCollections, getCollectionsByHandles, getNewestProducts, getCatalogStats } from "@/lib/repo";
+import { resolvedHero, resolvedHomeSections, resolvedCollectionsIndex } from "@/lib/content/resolve";
 import { tfetch } from "@/lib/tenant-request";
 
 // Catalog reflects the latest sync — render per request (sub-ms SQLite reads).
@@ -25,10 +25,14 @@ function HeroTitle({ title, highlight }) {
 
 export default async function Home() {
   const { hero, sections, stats, data } = await tfetch(async () => {
-    const [hero, sections, stats] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats()]);
+    const [hero, sections, stats, index] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats(), resolvedCollectionsIndex()]);
     const data = {};
     for (const s of sections) {
-      if (s.kind === "collections") data.collections = await getFeaturedCollections(s.limit || 6);
+      if (s.kind === "collections") {
+        // S38 (SF02): merchant-featured collections win over the size heuristic
+        const curated = index?.featured?.length ? await getCollectionsByHandles(index.featured) : [];
+        data.collections = curated.length ? curated.slice(0, s.limit || 6) : await getFeaturedCollections(s.limit || 6);
+      }
       if (s.kind === "new") data.products = await getNewestProducts(s.limit || 8);
     }
     return { hero, sections, stats, data };

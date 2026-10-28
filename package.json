@@ -58,7 +58,8 @@
     "test:security": "node scripts/test-security.js",
     "test:content": "node scripts/test-content.js",
     "test:releases": "node scripts/test-releases.js",
-    "test:themes": "node scripts/test-themes.js"
+    "test:themes": "node scripts/test-themes.js",
+    "test:storefront": "node scripts/test-storefront.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

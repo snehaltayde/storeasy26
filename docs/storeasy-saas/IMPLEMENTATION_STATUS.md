@@ -5,18 +5,18 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S37 (W3 underway; W1+W2 complete).
+- Created: 2026-10-28 (session S25). Last updated: S38 (W3 underway; W1+W2 complete).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 36 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 52 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
   BE18, SF24, BE20 — S33, with SF08 completed; BE24, MC20, BE27, BE34,
   OP10 — S34; BE08, MC10 — S35; BE09, MC13 — S36, with SF23 completed;
-  MC07, MC08, MC09, OP07 — S37). The other 74 are **not inspected** — the
-  handoff's Fix/Extend/New labels for them remain unverified documentation
-  claims.
+  MC07, MC08, MC09, OP07 — S37; SF01–05, SF13, SF14, BE05, BE15,
+  MC12 — S38). The other 64 are **not inspected** — the handoff's
+  Fix/Extend/New labels for them remain unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -757,6 +757,122 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
 - Remaining: collection/PDP template families + ranked-rule assignment —
   there is nothing to bind rules to until those page types have variants;
   deferred with W4's merchandising work, recorded as the larger half of MC09.
+- S38 addition: "Privacy policy" and "Terms & refund" templates joined the
+  set (SF14's scaffolds, since defaults never cross tenants).
+
+### SF01 — Home · **verified complete (S36–S38)**
+
+- Hero, announcement, nav and the composable section tree all render from the
+  release snapshot (drafts pre-first-publish); S38 adds the curated
+  collections row (featured handles win over the size heuristic). Live-proven
+  on demo (Glow) and beastlife (Pulse) through S36–S38 publishes.
+
+### SF02 — Collection index · **verified complete (S38)**
+
+- `collections_index` block ({featured ≤6, order, hide}; null = catalog-
+  derived): /collections renders featured-with-badge first, then the explicit
+  order, then the rest alphabetically; hidden handles never render; the home
+  Collections row uses the featured list. Release-governed; publish validation
+  blocks handles missing from the catalog. Admin: Storefront → Collections
+  index. Suite: validation (bad handle, featured∩hidden, dedupe), order
+  preservation, release gate. Live: demo publish showed the badge on
+  `3-kg-mass-gainer` only after the pointer flip.
+
+### SF03 — Collection detail · **verified complete (S38)**
+
+- URL-backed `?sort=featured|new|price-asc|price-desc`, `?type=` chips with
+  counts (facets computed unfiltered so siblings stay visible), `?instock=1`,
+  composable with pagination; back/forward/share restores the exact view
+  (filters are links; only the sort select is client-side). Zero-results
+  state carries Clear-all. Canonicals ignore filter params. Suite: sort
+  orders, in-stock totals, type filter, facet ranking. Live: price-asc +
+  in-stock verified ascending on demo.
+- Not built (recorded): price-range slider, variant-level filters — add if a
+  merchant asks; the URL contract extends cleanly.
+
+### SF04 — Product detail · **partial (S38: global modules, sticky CTA, variant states)**
+
+- `pdp_extras` block → sanitized accordions under every description;
+  sticky mobile CTA (IntersectionObserver on the main add button; fixed
+  bottom bar with title/price/add/view-cart, lg:hidden); invalid-variant
+  feedback (per-value existence/stock check against the current selection:
+  struck-through "missing" vs "soldout" styling + an explicit "combination
+  isn't available" notice replacing the old silent disabled button).
+- Remaining (recorded): PER-PRODUCT vertical modules (ingredients/usage/
+  specs) belong to MC05's catalog presentation overrides (S39) — a global
+  block cannot honestly carry per-product ingredient data.
+
+### SF05 — Search experience · **verified complete (S38)**
+
+- Debounce (200ms) + AbortController stale-response cancellation (pre-S38),
+  plus per-session recent searches (sessionStorage, shown on focus, Clear,
+  storage-failure-safe) and full keyboard navigation (↑/↓ wraps, Enter opens
+  the active row, Escape closes; combobox ARIA). Results dropdown = product
+  suggestions with image/price/type. Generic placeholder (was BeastLife-
+  flavored). /search page unchanged (grid + zero-results + analytics).
+
+### BE05 — Search service · **partial (decision recorded + SQL engine upgraded, S38)**
+
+- **Decision (no-spend default):** SQL over the tenant catalog IS the
+  supported engine. Typesense stays an optional env-configured upgrade; the
+  lapsed cluster's revival is a paid, USER-GATED call — nothing in the
+  platform assumes it. `searchProductsInDb` upgraded to earn the role:
+  multi-term AND across title/type/vendor/tags, deterministic ranking
+  (in-stock → title-prefix → title-substring → rest, then title A–Z),
+  term cap, like-escape. `/api/health` names the serving engine
+  (`search.engine` + a note when Typesense is configured-but-dead) and a dead
+  OPTIONAL Typesense no longer degrades health (the fallback is the engine).
+- Remaining (Typesense-side, lands only with a revival): tenant-scoped index
+  rebuild-into-new-collection + atomic swap, synonyms, lag surfacing to the
+  merchant console.
+
+### SF13 — Flexible pages · **verified complete (S38)**
+
+- Typed page sections (page schema v2): text (heading+paragraphs), rich
+  (allowlist-sanitized AT SAVE, 20k cap), image (https or `/api/media/…`,
+  alt required, caption). v1 rows normalize lazily at read
+  (`normalizePageSections`); slug/SEO-description/visibility already existed.
+  Editor: per-kind add buttons + fields. Suite: sanitize, src/alt refusals,
+  v1 normalization, snapshot round-trip.
+
+### SF14 — Policy pages · **verified complete (S38)**
+
+- Effective dates (`effective_at` column, YYYY-MM-DD validated, rendered
+  "Effective from …"); checkout links the store's OWN enabled
+  privacy/terms/refund/shipping pages beside the pay button; publish warns
+  (not blocks) when a non-BeastLife store has no privacy or terms/refund
+  page; legal templates scaffold them. **Cross-tenant legal text closed:**
+  `brandDefaultsApply()` restricts the BeastLife-sourced default pages (and
+  their sitemap/list entries) to beastlife/beastlife-staging/legacy-env —
+  live-verified: demo's /policies/shipping 404s and its sitemap lists only
+  its own pages while beastlife keeps serving all four.
+
+### BE15 — Media pipeline · **partial (core implemented & verified, S38)**
+
+- Tenant-bound by construction: admin-session-authed multipart upload →
+  blob in the TENANT's own Turso DB (migration 0008); no external bucket or
+  URL-signing infrastructure exists to misbind. Validation: mime allowlist +
+  size caps (raster 1.5MB, svg 300KB), magic-byte sniffing (declared type
+  must match bytes), SVG sanitizer at write (script/foreignObject/handlers/
+  unsafe hrefs stripped) + no-script CSP + nosniff + inline disposition at
+  serve. sha256 content dedupe (unique index per variant). Derivatives:
+  client-side canvas thumb (≤480px webp) as a variant row — honest about the
+  runtime (no native image codecs serverless); more sizes = same mechanism.
+  Usage references scanned across draft blocks, draft pages, and the LIVE
+  release; delete refuses while referenced (409 + list) unless forced, and
+  the console warns immutable old releases keep their references.
+- Remaining (recorded): video/document types, server-side derivative
+  generation if a native-capable runtime ever exists, storage quotas
+  (BE32/OP13 metering, W5), CDN offload if blob volume demands it.
+
+### MC12 — Content & media library · **verified complete (S38, library scope)**
+
+- `/admin/media` tab: multi-file upload with client-side thumb generation,
+  dedupe notice, alt-text editing (blur-save), copy-URL, usage-guarded
+  delete with the two-step force path, support-role read-only. The
+  "content" half of MC12 (page/section browsing) lives in the Storefront
+  tab (S37 editor + S38 typed pages) — recorded as satisfied across the two
+  tabs rather than duplicated.
 
 ### OP07 — Operator template registry · **partial (implemented & verified, S37)**
 
@@ -770,6 +886,35 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   accessibility).
 - Remaining: per-kit fixture SCREENSHOT diffs, a11y audit beyond contrast
   (focus order etc.) — W4 polish.
+
+## Verification state (S38, 2026-10-28)
+
+25 suites / **322 tests + 21 offers = 343 checks** green (new
+`test:storefront`, 15 tests; test-cms updated: "banner" is a real section
+kind since S37 so the unknown-kind probe uses "bogus", and the
+contact-injection test now also asserts a plain tenant gets NO BeastLife
+default; test-releases warning count scoped to the path warning), `pnpm
+build` clean. Migration tenant/0008 (media + cms_pages.effective_at) applied
+to all 3 hosted tenant DBs + the env-default DB. Live on demo (script-driven
+drafts — console auth untouched): media upload → served tenant-scoped
+(immutable cache on demo host, 404 on beastlife host for the same id) →
+drafts (pdp_extras, collections_index, privacy/terms pages with effective
+dates) did NOT leak pre-publish (PDP clean, policy 404, no badge) → publish
+rel_a784500fb4a36228 (zero warnings once the policy pages existed) → live:
+Glow PDP accordions open/close, featured badge on /collections, policy page
+with "Effective from 28 October 2026", sitemap lists only demo's own pages.
+Collection filters live: price-asc + in-stock ascending ₹735→₹2,104, Clear
+all + sort select rendered; sticky mobile CTA DOM-verified fixed to the
+viewport bottom at 375px after scroll (hidden-pane screenshots clip fixed
+elements — pane quirk, not a page bug). beastlife regression sweep: 7 key
+routes 200, policies/sitemap unchanged. Also fixed in passing: React 19
+hoisting warning on the S35 `<style id="brand-vars">` (precedence/href —
+now hoists into <head>). NOT verified this session: the authenticated
+console UI flows for the new Media tab / editors in a real browser session —
+demo has no user account and minting one for access was declined by policy;
+the UI is exercised by build + the API suite only. USER ACTION (2 min):
+log into demo `/admin/media`, upload one image, delete it, and skim the new
+Storefront panels.
 
 ## Verification state (S37, 2026-10-28)
 
@@ -920,7 +1065,7 @@ shopify-push 13, hardening 11, offers-admin 8, events 16, tenancy 9, platform-sy
 
 ## Other records
 
-All remaining 113 records: **not inspected** (states will change only with code
+All remaining 64 records: **not inspected** (states will change only with code
 audits/implementation in their scheduled sessions; see roadmap phases S26–S49).
 Incidental observations made during the S25 audits, recorded WITHOUT claiming a full
 audit of those records:
