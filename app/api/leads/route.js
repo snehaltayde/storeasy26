@@ -1,0 +1,52 @@
+import { NextResponse } from "next/server";
+import { isPlatformSiteHost } from "@/lib/platform-site";
+import { platformDb, platformConfigured } from "@/lib/platform/control";
+import { rateLimit } from "@/lib/rate-limit";
+import { slog } from "@/lib/log";
+
+// Marketing lead capture (S44 / MK08). Marketing-host only, rate-limited,
+// honeypot-guarded, CONSENT-AWARE: submitting the form is consent to be
+// contacted about the inquiry (that's its purpose); marketing updates are a
+// SEPARATE explicit opt-in stored with the lead. Leads land durably in the
+// control plane; a copy goes to the platform inbox when mail is configured
+// (honestly mocked otherwise).
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const ldId = () => "ld_" + Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(16).padStart(2, "0")).join("");
+
+export async function POST(request) {
+  if (!isPlatformSiteHost(request.headers.get("host"))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const limited = rateLimit(request, { name: "leads", limit: 5, windowMs: 60 * 60 * 1000 });
+  if (limited) return limited;
+  if (!platformConfigured()) return NextResponse.json({ error: "temporarily unavailable" }, { status: 503 });
+
+  const body = await request.json().catch(() => ({}));
+  if (String(body.website || "").trim()) return NextResponse.json({ ok: true, received: true }); // honeypot
+
+  const name = String(body.name || "").trim().slice(0, 120);
+  const email = String(body.email || "").trim().slice(0, 200);
+  const storeUrl = String(body.storeUrl || "").trim().slice(0, 300);
+  const message = String(body.message || "").trim().slice(0, 4000);
+  const errors = [];
+  if (!name) errors.push("Please tell us your name.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.push("That email doesn't look right.");
+  if (errors.length) return NextResponse.json({ error: errors.join(" "), errors }, { status: 422 });
+
+  const id = ldId();
+  await platformDb().execute({
+    sql: "INSERT INTO leads (id, name, email, store_url, message, marketing_consent, source, created_at) VALUES (?,?,?,?,?,?,?,?)",
+    args: [id, name, email, storeUrl || null, message || null, body.marketingConsent === true ? 1 : 0, String(body.source || "/contact").slice(0, 100), new Date().toISOString()],
+  });
+  slog("lead_captured", { id, marketing: body.marketingConsent === true });
+
+  // best-effort copy to the platform inbox — never blocks the lead
+  const to = process.env.PLATFORM_SUPPORT_EMAIL || "";
+  if (to) {
+    const { sendMail } = await import("@/lib/mail.js");
+    await sendMail({ to, subject: `[Storeasy] New lead: ${name}`, text: `${name} <${email}>${storeUrl ? `\nStore: ${storeUrl}` : ""}\n\n${message || "(no message)"}\n\nMarketing opt-in: ${body.marketingConsent === true ? "YES" : "no"}` }).catch(() => {});
+  }
+  return NextResponse.json({ ok: true, received: true });
+}

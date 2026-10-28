@@ -18,6 +18,10 @@ import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolv
 import { kitAttr } from "@/lib/themes/kits";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
+import { isPlatformSiteHost } from "@/lib/platform-site";
+import { headers } from "next/headers";
+import SiteNav from "@/components/site/SiteNav";
+import Link from "next/link";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -33,6 +37,13 @@ export const runtime = "edge";
 // S25: gated hosts (unknown/suspended/control-plane-down in platform mode) get
 // neutral metadata — no siteName()/siteUrl() env fallback, no manifest, noindex.
 export async function generateMetadata() {
+  // S44: marketing hosts get the PLATFORM's metadata, not a tenant's.
+  if (isPlatformSiteHost((await headers()).get("host"))) {
+    return {
+      title: { default: "Storeasy — fast, branded storefronts on your Shopify catalog", template: "%s · Storeasy" },
+      description: "Launch a fast, branded storefront on your existing Shopify catalog — themes, offers, releases and analytics included.",
+    };
+  }
   if (isGated(await requestResolution())) {
     return { title: "Store", robots: { index: false } };
   }
@@ -140,6 +151,33 @@ async function initialCart() {
 }
 
 export default async function RootLayout({ children }) {
+  // S44: the marketing website — same app, designated PLATFORM hosts
+  // (PLATFORM_SITE_HOSTS). Own chrome; no tenant storefront machinery.
+  if (isPlatformSiteHost((await headers()).get("host"))) {
+    return (
+      <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
+        <body className="flex min-h-full flex-col bg-white text-zinc-900 antialiased">
+          <SiteNav />
+          <main className="flex-1">{children}</main>
+          <footer className="border-t border-zinc-100 bg-zinc-50">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-8 text-xs text-zinc-500 sm:px-6">
+              <span className="font-bold text-zinc-800">Storeasy</span>
+              <Link href="/pricing" className="hover:text-zinc-900">Pricing</Link>
+              <Link href="/templates" className="hover:text-zinc-900">Templates</Link>
+              <Link href="/integrations" className="hover:text-zinc-900">Integrations</Link>
+              <Link href="/trust" className="hover:text-zinc-900">Trust & security</Link>
+              <Link href="/contact" className="hover:text-zinc-900">Contact</Link>
+              <span className="ml-auto flex gap-4">
+                <Link href="/legal/terms" className="hover:text-zinc-900">Terms</Link>
+                <Link href="/legal/privacy" className="hover:text-zinc-900">Privacy</Link>
+              </span>
+            </div>
+          </footer>
+        </body>
+      </html>
+    );
+  }
+
   // S25 fail-closed: gated hosts render a bare neutral shell — no tenant (or
   // env-fallback) chrome, cart, pixels, consent banner or service worker. The
   // page below still runs; its tfetch() calls notFound()/throw, which land in

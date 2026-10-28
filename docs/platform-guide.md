@@ -492,6 +492,29 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   `components/admin/PreviewPane.js`, banner/rich_text validation in
   [lib/cms/validate.js](../lib/cms/validate.js), renderers in `app/page.js`.
 
+#### Marketing website (S44 / MK01–05 + MK07 + MK08)
+- **What**: the Storeasy SaaS website, rendered by THIS app on designated
+  platform hosts (`PLATFORM_SITE_HOSTS`, comma-separated — e.g.
+  `storeasy.app,www.storeasy.app`; dev: `www.storeasy.test,site.
+  localhost:3007`). Unknown hosts keep failing closed — a marketing host is
+  an explicit allowlist entry, never a fallback. Routes: `/` (homepage,
+  substantiated claims only), `/pricing` (reads the LIVE billing plan
+  catalog — shown price can't drift from charged price by construction),
+  `/templates` (the real kit registry; planned kits labeled "planned" and
+  nothing more), `/verticals/nutrition|beauty`, `/integrations`
+  (status-accurate: live vs optional), `/trust` (deployed controls only,
+  limits stated), `/contact` (lead form: durable control-plane storage,
+  honeypot, rate-limited, SEPARATE unchecked-by-default marketing opt-in,
+  best-effort copy to `PLATFORM_SUPPORT_EMAIL`), `/legal/terms` +
+  `/legal/privacy` (plain-language drafts, flagged for counsel review).
+  Tenant hosts 404 every marketing route; the marketing host runs no cart,
+  pixels, consent banner or service worker.
+- **Files**: [lib/platform-site.js](../lib/platform-site.js),
+  `components/site/*`, `app/pricing|templates|integrations|trust/page.js`,
+  `app/verticals/[vertical]/`, `app/legal/[doc]/`, `app/api/leads/`,
+  marketing branches in `app/layout.js` / `app/page.js` /
+  `app/contact/page.js` / `app/robots.js`, platform migration 0008 (leads).
+
 #### Settings ops panels (S43 / MC21 + MC23 + MC25 + MC26 + MC27)
 - **What**: five panels under Settings —
   **Team** (MC23): invite by email+role (link shown once, token hashed at
@@ -891,7 +914,7 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 31 aliased suites, **375 tests + 10 perf budgets**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 32 aliased suites, **379 tests + 10 perf budgets**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -966,9 +989,12 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   maintenance closes checkout honestly, incident visibility scoping incl.
   internal-note never-serialized, merchant domain TXT verify matrix,
   invite→accept→role flow + last-owner guards, privacy redact keeps money
-  rows) · perf 10 (S42 / BE35 budgets — see below).
+  rows) · marketing 4 (S44: site-host matching never leaks a tenant,
+  pricing-from-the-live-plan-catalog incl. version-bump visibility, honest
+  kit-gallery data, consent-aware lead storage) · perf 10 (S42 / BE35
+  budgets — see below).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **406 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **410 checks in all**) and `pnpm build` as the compile gate.
 - **Perf budgets** (`pnpm test:perf`, BE35): 5,000-product fixture — PDP
   lookup ≤150ms, collection page (featured sort + facets, price+stock
   filters) ≤400ms, multi-term SQL search ≤400ms, home queries ≤400ms,
@@ -1792,3 +1818,4 @@ run the verify checklist.
 | S41 | dcf5f65 | W4: provisioning as recorded/resumable/idempotent steps w/ conservative compensation + NEUTRAL seeds (quirk #14 closed; new tenants start on Free), Setup tab onboarding checklist (derived + server-gated launch), store switcher (verified memberships), operator tenant detail (presence-only creds) + provisioning-runs panel (BE26+MC02+MC03+OP03+OP04) |
 | S42 | 35d05d0 | W4: reporting & fleet ops — BE21 TZ-correct reconciled rollups + coverage + discrepancy queue, MC04 dashboard (honest unknowns, /admin lands here), MC17 analytics (consent-badged funnel/products/search/campaigns/devices, scoped CSV), OP02 fleet overview (explicit uncovered tenants), OP06 releases/migrations view + canary rollout flag, BE35 perf budgets suite; billing/provider modules made edge-bundle-safe (BE21+MC04+MC17+OP02+OP06+BE35) |
 | S43 | 75e6dec | W4: merchant ops completeness — Settings ops panels (team w/ last-owner guards, domain TXT wizard + per-tenant robots (quirk #9), privacy tracking, audit UI, PII-free diagnostics), OP12 branded maintenance mode (checkout 503, console reachable) + incidents (internal/public split), BE29 expiring tenant exports + staged conservative offboarding (MC21+MC23+MC25+MC26+MC27+OP11+OP12+BE29) |
+| S44 | (this session) | W4 EXIT: marketing website on designated platform hosts — homepage w/ substantiated claims, pricing from the LIVE plan catalog, honest template gallery, vertical pages, status-accurate integrations, deployed-controls-only trust page, consent-aware lead capture + SaaS legal drafts; tenant hosts 404 all of it (MK01–05+MK07+MK08) |

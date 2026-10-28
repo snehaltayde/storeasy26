@@ -65,6 +65,7 @@
     "test:provision": "node scripts/test-provision.js",
     "test:reporting": "node scripts/test-reporting.js",
     "test:tenant-ops": "node scripts/test-tenant-ops.js",
+    "test:marketing": "node scripts/test-marketing.js",
     "test:perf": "node scripts/perf-report.js"
   },
   "dependencies": {

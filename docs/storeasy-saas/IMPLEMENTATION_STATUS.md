@@ -5,10 +5,10 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S43 (W1+W2+W3 complete; W4 underway).
+- Created: 2026-10-28 (session S25). Last updated: S44 (**W1–W4 complete**).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 83 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 90 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
@@ -18,9 +18,9 @@ by a code audit or implementation in this repo — never by documentation alone.
   MC12 — S38; SF15, SF16, SF17, MC05, MC06, MC11, MC15, BE23 — S39;
   BE11, BE33, MC24, OP08 — S40; BE26, MC02, MC03, OP03, OP04 — S41;
   BE21, MC04, MC17, OP02, OP06, BE35 — S42; MC21, MC23, MC25, MC26, MC27,
-  OP11, OP12, BE29 — S43). The other 33 are **not inspected** — the
-  handoff's Fix/Extend/New labels for them remain unverified documentation
-  claims.
+  OP11, OP12, BE29 — S43; MK01, MK02, MK03, MK04, MK05, MK07, MK08 — S44).
+  The other 26 are **not inspected** — the handoff's Fix/Extend/New labels
+  for them remain unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -1217,6 +1217,64 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   still works after. Live: demo export downloaded (19 populated tables,
   attachment headers, bad token 401). Final DB deletion stays manual.
 
+### MK01–MK05, MK07, MK08 — Marketing website · **verified complete (S44)**
+
+- One record block for the seven MK records (one surface, one session):
+  the SaaS site renders from THIS app on `PLATFORM_SITE_HOSTS` (explicit
+  allowlist — unknown hosts keep failing closed; tenant hosts 404 every
+  marketing route, live-verified both ways).
+  MK01 homepage: substantiated claims only (every feature named is shipped
+  + suite-verified). MK02 pricing: reads the LIVE billing plan catalog —
+  price shown ≡ price charged by construction (suite: a version bump shows
+  immediately). MK03 templates: the real kit registry; Pulse + Glow
+  "available · v1", planned kits say "planned" and nothing more.
+  MK04 verticals: nutrition + beauty pages tied to the kits that exist.
+  MK05 integrations: status-accurate live/optional, no roadmap decoration.
+  MK07 trust: deployed-controls-only (each item maps to shipped, tested
+  behavior) + plainly stated limits (no SOC2/ISO, infra compliance is
+  Vercel/Turso's). MK08: lead form → durable control-plane `leads` rows
+  (migration 0008) with a SEPARATE unchecked-by-default marketing opt-in,
+  honeypot, 5/h rate limit, best-effort copy to PLATFORM_SUPPORT_EMAIL;
+  /legal/terms + /legal/privacy plain-language drafts explicitly flagged
+  for counsel review (checkpoint-C item). MK06 (agency page) is S48 by
+  roadmap.
+
+## W4 EXIT (recorded S44, 2026-10-28)
+
+Exit evidence per the handoff ("independent merchants launch self-serve;
+billing matches entitlements; offboarding works"):
+- **Billing ⇄ entitlements**: provider events are the only status source,
+  snapshot-pushed to tenants; grace → degraded live-proven (S40: checkout
+  503 while browsing stayed up, recovery on resume); pricing page reads the
+  charging catalog (S44).
+- **Self-serve path**: recorded resumable provisioning with neutral seeds →
+  Setup checklist (derived + gated launch) → releases/publish — the
+  merchant-facing chain exists end-to-end (S41); the remaining self-serve
+  gap is deliberate: tenant creation + domain claiming stay operator-gated
+  until real signups justify opening them.
+- **Offboarding works**: staged, conservative, export-preserving — suite +
+  S43 live export.
+- **Ops completeness**: dashboards/analytics/fleet views with honest
+  coverage (S42), team/domains/privacy/audit/help (S43), maintenance +
+  incidents (S43), perf budgets (S42).
+
+**Deploy checkpoint C (USER-GATED) — public launch readiness, all yours:**
+1. Domains: register the real marketing + platform hosts, set
+   `PLATFORM_SITE_HOSTS`, claim/verify tenant domains, Vercel DNS/TLS.
+2. Billing: create the platform Razorpay account, set `PLATFORM_RAZORPAY_*`,
+   register the billing webhook URL, run one real authorize/charge/refund.
+3. Mail: set `RESEND_API_KEY` + `MAIL_FROM` + `PLATFORM_SUPPORT_EMAIL`
+   (notifications/leads stop being labeled DEV MOCK).
+4. Legal: counsel review of /legal/terms + /legal/privacy and each store's
+   policy templates.
+5. The standing checkpoint-B items (PLATFORM_* env in Vercel, webhook
+   registration, real accounts + password rotation, TICK_URL + CRON_SECRET,
+   reversible-cutover note) — see the S34 list.
+6. Alerts self-test + a fresh restore drill on production data; HTTP-level
+   load check (the BE35 residual).
+7. The authenticated console walkthrough (the standing user action since
+   S38).
+
 ## W3 EXIT (recorded S39, 2026-10-28)
 
 Exit evidence per the handoff ("tenant-specific pages from releases; no
@@ -1237,6 +1295,23 @@ draft/live leakage; publish + rollback demonstrated"):
 - Deliberate scope notes carried into W4: catalog presentation overrides +
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S44, 2026-10-28)
+
+32 aliased suites / **379 tests + 10 perf budgets + 21 offers = 410 checks**
+green (new `test:marketing`, 4), `pnpm build` clean. Platform migration 0008
+(leads) applied hosted. Live matrix on the dev server: all 10 marketing
+routes 200 on the marketing host (`www.storeasy.test`) with live hosted
+pricing (Free/₹999/₹2,999) and honest "planned" labels; beastlife host:
+/pricing + /trust 404, storefront + tenant contact unchanged; lead POST on
+the marketing host stored durably in the hosted control plane
+(marketing_consent 0 by default), 404 on a tenant host; probe lead deleted
+after. Browser render of the marketing homepage on site.localhost:3007
+confirmed. **W4 EXIT recorded** with the checkpoint-C launch list (all
+user-gated). Session also included: the stray Almari feedback PDF (a
+different project, added by mistake) was fully scrubbed — commits rebuilt
+without it (S43 hash is 75e6dec), extracted notes deleted, no code changes
+were ever based on it.
 
 ## Verification state (S43, 2026-10-28)
 
@@ -1508,7 +1583,7 @@ shopify-push 13, hardening 11, offers-admin 8, events 16, tenancy 9, platform-sy
 
 ## Other records
 
-All remaining 33 records: **not inspected** (states will change only with code
+All remaining 26 records: **not inspected** (states will change only with code
 audits/implementation in their scheduled sessions; see roadmap phases S26–S49).
 Incidental observations made during the S25 audits, recorded WITHOUT claiming a full
 audit of those records:

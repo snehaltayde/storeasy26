@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import ProductGrid from "@/components/ProductGrid";
 import CollectionCard from "@/components/CollectionCard";
+import MarketingHome from "@/components/site/MarketingHome";
+import { isPlatformSiteHost } from "@/lib/platform-site";
 import { getFeaturedCollections, getCollectionsByHandles, getNewestProducts, getCatalogStats } from "@/lib/repo";
 import { resolvedHero, resolvedHomeSections, resolvedCollectionsIndex } from "@/lib/content/resolve";
 import { tfetch } from "@/lib/tenant-request";
@@ -24,6 +27,9 @@ function HeroTitle({ title, highlight }) {
 }
 
 export default async function Home() {
+  // S44: on a designated PLATFORM host, "/" is the marketing homepage.
+  if (isPlatformSiteHost((await headers()).get("host"))) return <MarketingHome />;
+
   const { hero, sections, stats, data } = await tfetch(async () => {
     const [hero, sections, stats, index] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats(), resolvedCollectionsIndex()]);
     const data = {};
