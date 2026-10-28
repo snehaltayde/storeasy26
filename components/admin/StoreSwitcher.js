@@ -25,7 +25,7 @@ export default function StoreSwitcher() {
         const target = stores.find((s) => s.id === e.target.value);
         if (target && !target.current) window.location.href = target.url;
       }}
-      className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700"
+      className="w-full rounded-ctl border border-edge bg-surface px-2 py-1.5 text-xs font-medium text-fg-muted focus-ring"
     >
       {stores.map((s) => (
         <option key={s.id} value={s.id}>
