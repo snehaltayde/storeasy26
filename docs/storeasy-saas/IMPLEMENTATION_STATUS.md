@@ -5,10 +5,10 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S47 (W1–W4 complete; W5 underway).
+- Created: 2026-10-28 (session S25). Last updated: S48 (W1–W5 complete; only optional W6 remains).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 105 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 114 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
@@ -20,10 +20,11 @@ by a code audit or implementation in this repo — never by documentation alone.
   BE21, MC04, MC17, OP02, OP06, BE35 — S42; MC21, MC23, MC25, MC26, MC27,
   OP11, OP12, BE29 — S43; MK01, MK02, MK03, MK04, MK05, MK07, MK08 — S44;
   BE30, SF10, SF11, SF12 — S45; BE31 (partial — selling plans not built),
-  SF18, SF19, SF20, SF21 — S46; BE22, MC18, BE32, MC19, OP09, OP13 — S47).
-  The other 11 are **not inspected** — the
-  handoff's Fix/Extend/New labels for them remain unverified documentation
-  claims.
+  SF18, SF19, SF20, SF21 — S46; BE22, MC18, BE32, MC19, OP09, OP13 — S47;
+  BE28, AG01, AG02, AG03, AG04, AG05, AG06, OP14, MK06 — S48).
+  The remaining 2 — SF22 (wishlist) and MC28 (automations) — are the
+  handoff's own OPTIONAL W6 pair ("only if a customer need justifies
+  them"); they stay **not inspected** until that need exists.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -1436,6 +1437,111 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   browsing stayed 200 → restore → a real order went through. Fail-open by
   design (a control-plane outage never closes checkout), documented.
 
+### BE28 — Agency access and economics · **verified complete (S48; ownership transfer + payouts deliberately not built)**
+
+- Agencies = control-plane orgs with their own session kind ("agency" —
+  cross-kind session checks fail structurally). COMMERCIAL state (verified /
+  referral-eligible / commission bps) is independent of access: access
+  exists only through grants the CLIENT accepted, per store, roles
+  support|staff|admin — owner is never grantable. Every agency operation
+  re-reads the grant: revocation (by client, agency or operator) fails the
+  very next call (suite + live). Kit copying is privacy-safe by scrubbing +
+  a hard scanner gate; approvals are revision-bound (content hash);
+  commissions derive 1:1 from billing events (UNIQUE event id — collected
+  revenue, never counted twice, refunds reversed exactly once).
+- Deliberately NOT built, stated in UI copy: bilateral ownership transfer
+  (grants never escalate; refusing beats a half-built transfer flow) and
+  payout execution (the statement is the reconciliation artifact; money
+  moves outside the ledger).
+
+### AG01 — Portfolio · **verified complete (S48)**
+
+- /partners lists ONLY granted stores with role, live health (available
+  products, 30d orders, open returns), pending reviews, and each client's
+  own currency + timezone. Revocation empties it immediately; the rival-
+  agency negative test sees nothing. No cross-client search exists at all.
+
+### AG02 — Client invitation · **verified complete (S48)**
+
+- Invitation codes bind to the CLIENT'S EMAIL and expire (7d); acceptance
+  happens in the client's own console (Settings → Agency access) by a
+  team-managing actor whose email matches — wrong-recipient and expired
+  acceptances create NOTHING (suite + live wrong-recipient probe). Pending/
+  accepted/expired/revoked all tracked and visible on both sides. Bootstrap
+  (shared-password) sessions can't accept — invitations bind to a person.
+  Ownership transfer: deliberately refused (see BE28).
+
+### AG03 — Reusable private kits · **verified complete (S48)**
+
+- Export captures structure + generic settings (hero text, section layout,
+  announcement, brand tokens); the scrubber drops media URLs, absolute
+  URLs, emails, catalog handles/ids and domains, and a scanner HARD-REFUSES
+  the export if any source marker survives (suite scans for handles, CDN
+  hosts, emails, gid://; live export against demo: zero leaks). Applying
+  requires a staff+ grant on the DESTINATION and writes CMS DRAFTS only —
+  the live pointer is proven untouched; brand tokens return as a
+  suggestion, never auto-applied.
+
+### AG04 — Client approvals · **verified complete (S48)**
+
+- `/approve/<code>` on the client's store host: signed single-use link,
+  expiring, bound to one immutable draft hash, opening the existing signed
+  preview-cookie flow. Decisions record the approver's typed identity +
+  comment; deciding without a name is refused; replay is refused; an
+  expired link can't decide; and if the draft changed, deciding is BLOCKED
+  (409) — an approval never authorizes a hash it wasn't shown. Approved
+  work ships through the client's normal Releases permission; later draft
+  changes mark the approval visibly stale in the agency console. Live on
+  demo over HTTP end-to-end.
+
+### AG05 — Referrals and earnings · **verified complete (S48; payouts out of ledger, stated)**
+
+- Operator-attributed referrals (one agency per store; re-pointing refused
+  — disputes are explicit voids). recomputeCommissions derives the ledger
+  idempotently from billing_events: earned on positive (collected) amounts,
+  reversed once on refunds, UNIQUE billing_event_id so re-runs insert zero;
+  eligibility and voids gate computation. Monthly statements reconcile
+  earned/reversed/net and say plainly that they are calculated commissions,
+  not payments.
+
+### AG06 — Client reporting · **verified complete (S48)**
+
+- Reports run inside the granted tenant's scope (structural isolation) with
+  its currency/timezone and the agency's name; the suite generates two
+  clients' reports concurrently and proves neither contains the other's
+  products or totals. No grant → refused; revoked → refused immediately.
+
+### OP14 — Partner administration · **verified complete (S48)**
+
+- /platform Partners panel: create/verify/suspend agencies, referral
+  eligibility + commission bps, member invites (join codes), fleet-wide
+  grant overview with operator revoke, referral attribution + dispute
+  voids, commission recompute + per-agency statements. The acceptance held
+  live: a VERIFIED agency's portfolio stayed empty until a client grant
+  existed, and the UNIQUE-event ledger can't double-count revenue.
+  Operators administer partners without inheriting client access.
+
+### MK06 — Case studies · **verified complete (S48; first real study pending a consenting merchant)**
+
+- /customers (+ detail) on the marketing host only. Publication is GATED:
+  consent_ref + period + method + measured before/after results +
+  limitations + confounders, enforced in setCaseStudyPublished (suite both
+  ways; live probe against the hosted platform refused an evidence-free
+  lift claim). The page keeps measured results beside their method and
+  caveats, and quotes carry "used with permission". Honest empty state
+  until a real consented study exists — that's the recorded external
+  pending item.
+
+## W5 EXIT (recorded S48, 2026-10-28)
+
+W5's records (S45 customer accounts, S46 commerce expansion, S47 growth
+ops, S48 agency platform) are all audited/implemented with their deviations
+recorded (self-managed shopper identity; selling plans not built; live AI
+provider call pending a key; ownership transfer + payouts not built). Every
+item was gated on its prerequisites passing, per the plan. What remains of
+the 116 is exactly the OPTIONAL W6 pair (SF22 wishlist, MC28 automations),
+which the handoff itself defers until a customer need justifies them.
+
 ## W4 EXIT (recorded S44, 2026-10-28)
 
 Exit evidence per the handoff ("independent merchants launch self-serve;
@@ -1492,6 +1598,36 @@ draft/live leakage; publish + rollback demonstrated"):
 - Deliberate scope notes carried into W4: catalog presentation overrides +
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S48, 2026-10-28)
+
+36 aliased suites / **443 tests + 10 perf budgets + 27 offers = 480 checks**
+green (new `test:agency`, 16), `pnpm build` clean. Platform migration 0010
+(agencies, members, grants, kits, approvals, referrals, commissions, case
+studies) applied hosted; no tenant migration (all agency state is
+platform-side). Live against the HOSTED platform + demo tenant, lib-level
+(the S38-established rule applied again: the auto-mode classifier denies
+creating login accounts for verification, so the authed /partners UI
+walkthrough is a standing USER ACTION; every gate was exercised through the
+same lib functions the routes call, plus the unauthenticated HTTP
+surfaces): verified agency "Studio North (demo)" → portfolio 0 stores
+(commercial ≠ access) → wrong-recipient acceptance refused with the grant
+left pending → email-bound accept bound the grant to demo (staff) →
+portfolio showed demo with real health (205 live products) and its
+currency/TZ → kit export against demo's real CMS scrubbed clean (zero
+leaks of tenant id, hosts, media paths, shopify ids) → client approval
+created (hash-bound) and the PUBLIC flow ran over HTTP on the demo host:
+/approve/<code> 200 with the hash + preview button, nameless decision
+refused, identity-recorded approve, replay refused → report over the real
+tenant scope (orders30=0 is honest: demo's recent orders are cancelled
+test orders, which salesRollup rightly excludes) → case-study gate refused
+an evidence-free lift claim on the hosted platform (probe deleted) →
+/customers shows the honest empty state on the marketing host and 404s on
+tenant hosts → grant revoked: activeGrant null, portfolio empty, report
+refused IMMEDIATELY. Demo keeps the verified, grant-less agency row and
+the decided approval as demo data; no orders were created this session.
+User actions standing: /partners + OP14 panel walkthrough (invite yourself
+a member via the panel's join code), and a real consented case study.
 
 ## Verification state (S47, 2026-10-28)
 

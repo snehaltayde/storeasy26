@@ -69,6 +69,7 @@
     "test:customers": "node scripts/test-customers.js",
     "test:commerce-exp": "node scripts/test-commerce-exp.js",
     "test:growth": "node scripts/test-growth.js",
+    "test:agency": "node scripts/test-agency.js",
     "test:perf": "node scripts/perf-report.js"
   },
   "dependencies": {

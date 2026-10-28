@@ -993,6 +993,59 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   `components/platform/GrowthOpsPanels.js`, platform migration
   `migrations/platform/0009_flags_costs.sql`.
 
+#### Agency platform (S48 / BE28 + AG01–06, `/partners` + OP14 panel)
+- **Access model (BE28)**: agencies are control-plane orgs with their own
+  session kind ("agency" — never passes merchant or operator checks).
+  Commercial status (verified / referral-eligible / commission bps, set in
+  the OP14 panel) is INDEPENDENT of access: a store appears in an agency's
+  world only after the CLIENT accepts a grant in their own console
+  (Settings → Agency access), and every agency operation re-reads the grant
+  — revocation (client, agency, or operator) cuts access on the next call.
+  Grant invites bind to the client's email and expire; a wrong recipient or
+  stale code creates nothing. Roles: support/staff/admin — owner is never
+  grantable, and ownership transfer is deliberately NOT built.
+- **Portfolio (AG01)**: granted stores only, each with role, health
+  (products/orders/open returns), pending reviews, and the client's own
+  currency + timezone retained.
+- **Kits (AG03)**: exporting a client's look captures SCRUBBED structure
+  (hero text, section layout, announcement, brand tokens) — media URLs,
+  absolute URLs, emails, catalog handles, domains and shopify ids are
+  stripped, and a scanner HARD-REFUSES the export if any source identifier
+  survives. Applying writes CMS DRAFTS on the destination (staff+ grant);
+  brand tokens come back as a suggestion, never auto-applied.
+- **Approvals (AG04)**: a review link (`/approve/<code>` on the client's
+  store host) is signed, expiring, and bound to one immutable content hash;
+  it opens the existing signed draft preview, records the approver's typed
+  identity, decides once, and REFUSES to decide if the draft changed —
+  approved work still publishes through the client's normal Releases flow,
+  and a later draft change marks the approval visibly stale.
+- **Referrals (AG05)**: operator-attributed (one agency per store, disputes
+  = explicit void, never silent re-pointing); commissions derive 1:1 from
+  the billing-event ledger (UNIQUE event id — revenue never counts twice),
+  earned on collected charges, reversed exactly once on refunds; statements
+  reconcile by month, and payouts are explicitly NOT in this ledger.
+- **Reports (AG06)**: per-client reports run inside that tenant's scope
+  (structural isolation) with its currency/TZ and the agency's name on top.
+- **Files**: [lib/platform/agency.js](../lib/platform/agency.js),
+  `app/partners/`, `app/api/partners/`, `app/approve/[token]/`,
+  `app/api/approve/`, `app/api/admin/agency-grants/` + the Agency access
+  panel in Settings, `app/api/platform/partners/`,
+  `components/partners/*`, `components/platform/PartnersPanel.js`,
+  platform migration `migrations/platform/0010_agency.sql`.
+
+#### Case studies (S48 / MK06, marketing site)
+- `/customers` + `/customers/<slug>` on the marketing host only. The
+  publication gate is the feature: publishing REQUIRES documented merchant
+  consent (consent_ref), a measurement record (period + method + before/
+  after results), and stated limitations + confounders — a lift claim
+  without its measurement record cannot publish (operator panel shows the
+  exact blocks). The page renders measured results as a table with the
+  method next to it, caveats as a first-class section, and quotes marked
+  "used with permission". Until a real consented study exists, the index
+  shows an honest empty state. Files:
+  [lib/platform/case-studies.js](../lib/platform/case-studies.js), authored
+  in the OP14 panel.
+
 ### 2D. Data & tracking
 
 #### First-party event pipeline
@@ -1056,7 +1109,7 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 35 aliased suites, **427 tests + 10 perf budgets**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 36 aliased suites, **443 tests + 10 perf budgets**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -1159,11 +1212,22 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   validation, proportional allocation w/ zero-driver buckets and 'other'
   staying unallocated, allocated+unallocated=total, budget alerts +
   unmeasured-tenant visibility) ·
+  agency 16 (S48: verified-without-grants sees zero stores, agency session
+  kind isolation, owner-role + bad-email invite refusals, wrong-recipient/
+  expired acceptance creates nothing, case-insensitive email-bound accept,
+  granted-only portfolio w/ currency+TZ, immediate revocation across
+  portfolio/reports/kits, kit scrub scanner (media/URLs/emails/handles/
+  domains) + generic-link survival + support-role apply refusal + drafts-
+  only apply w/ untouched live pointer, hash-bound approvals w/ identity +
+  staleness on draft change + single decision + expiry, commission ledger
+  earned/reversed-once/idempotent-recompute/eligibility+void gates +
+  no-silent-re-attribution, concurrent report isolation, case-study
+  publication gate both ways) ·
   perf 10 (S42 / BE35 budgets — see below).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (27 pure
   assertions incl. the S46 BUNDLE matrix: complete-set saving, exact
   proportional allocation, multiples, incomplete sets, claimed-line
-  exclusivity vs TIERED, coupons on the net — **464 checks in all**) and
+  exclusivity vs TIERED, coupons on the net — **480 checks in all**) and
   `pnpm build` as the compile gate.
 - **Perf budgets** (`pnpm test:perf`, BE35): 5,000-product fixture — PDP
   lookup ≤150ms, collection page (featured sort + facets, price+stock
@@ -1992,3 +2056,4 @@ run the verify checklist.
 | S45 | c9f7429 | W5: customer accounts — passwordless OTP (hashed, capped, enumeration-safe), verified-email order claiming, per-store identities with structural cross-store isolation, account dashboard + ownership-scoped order detail, reorder with live line-by-line revalidation, redaction covers accounts (BE30+SF10+SF11+SF12) |
 | S46 | e0a1d1d | W5: commerce expansion — bundles AS offers (compatibility-gated BUNDLE line offers, zero new money paths, honest sold-out states), deterministic product-finder quiz (tags tally, no AI), editorial journal (scheduled publish, slug-rename 308 redirects), returns request flow (state machine, APPROVAL ≠ REFUND, money columns proven untouched); selling plans recorded as not built (BE31 partial+SF18+SF19+SF20+SF21) |
 | S47 | 3c6f6cd | W5: growth ops — experiments w/ frozen plans, pure-hash assignment, SRM + no-peeking + sufficiency gates and adoption-as-draft; AI insights from tenant-only PII-guarded facts w/ untrusted-output validation, token budgets and honest unconfigured state; server-evaluated ff_* flags w/ uncached critical checkout kill-switch; tenant unit costs w/ stated allocation methods and a visible unallocated remainder (BE22+MC18+BE32+MC19+OP09+OP13) |
+| S48 | _(recorded post-commit)_ | W5: agency platform — client-accepted email-bound grants (never owner, instantly revocable), granted-only portfolio, scrubbed private kits applying as drafts, hash-bound expiring client approvals, operator-attributed referrals w/ an idempotent refund-reversing commission ledger, per-client isolated reports, OP14 partner admin, consent-and-measurement-gated case studies; ownership transfer + payouts deliberately not built (BE28+AG01–06+OP14+MK06) |
