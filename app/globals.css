@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./console.css"; /* S50: console-scoped tokens ([data-console] only) */
 
 /* S35 (MC10) brand tokens — defaults = the pre-S35 lime look. A branded
    tenant's layout overrides these via one server-rendered <style> tag
