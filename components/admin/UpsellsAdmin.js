@@ -140,7 +140,19 @@ export default function UpsellsAdmin({ initial }) {
               </p>
               <p className="truncate text-xs text-zinc-500">
                 {p.kind === "pdp_pairs" ? `on ${p.source_handle} → ` : "→ "}
-                {p.target_handles.join(", ")}
+                {/* S39 (MC15): availability-aware preview — struck-through
+                    targets won't render on the storefront */}
+                {(p.targets || p.target_handles.map((h) => ({ handle: h, state: "ok" }))).map((t, i) => (
+                  <span key={i}>
+                    {i > 0 && ", "}
+                    <span
+                      className={t.state === "ok" ? "" : "text-zinc-300 line-through"}
+                      title={t.state === "missing" ? "deleted from the catalog" : t.state === "soldout" ? "sold out — skipped on the storefront" : undefined}
+                    >
+                      {t.handle}
+                    </span>
+                  </span>
+                ))}
               </p>
             </div>
             <button

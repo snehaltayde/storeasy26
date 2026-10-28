@@ -5,18 +5,19 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S38 (W3 underway; W1+W2 complete).
+- Created: 2026-10-28 (session S25). Last updated: S39 (**W1+W2+W3 complete**).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 52 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 60 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
   BE18, SF24, BE20 — S33, with SF08 completed; BE24, MC20, BE27, BE34,
   OP10 — S34; BE08, MC10 — S35; BE09, MC13 — S36, with SF23 completed;
   MC07, MC08, MC09, OP07 — S37; SF01–05, SF13, SF14, BE05, BE15,
-  MC12 — S38). The other 64 are **not inspected** — the handoff's
-  Fix/Extend/New labels for them remain unverified documentation claims.
+  MC12 — S38; SF15, SF16, SF17, MC05, MC06, MC11, MC15, BE23 — S39).
+  The other 56 are **not inspected** — the handoff's Fix/Extend/New labels
+  for them remain unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -874,6 +875,95 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   tab (S37 editor + S38 typed pages) — recorded as satisfied across the two
   tabs rather than duplicated.
 
+### BE23 — Notification service · **partial (core implemented & verified, S39)**
+
+- lib/notifications.js is THE send path for tenant messages: durable intent
+  rows (migration 0009), delivery via the jobs queue (`send_notification`,
+  after() fast path, backoff retries), honest states queued|sent|failed with
+  provider errors recorded and the unset-provider mock explicitly labeled
+  DEV MOCK; idempotency-key dedupe; missing recipient = FAILED intent with
+  an actionable error, never a silent drop. Consent separation at the
+  schema: marketing class REFUSED without a consent reference. One owner per
+  transactional message type (contact_message today). Recorded split:
+  control-plane identity mail (invites/resets) stays on lib/mail.js —
+  platform-scoped, no tenant DB for intents.
+- Remaining: bounce/delivery webhooks from the provider (needs a real
+  RESEND key + webhook endpoint — provider unconfigured by design until the
+  user sets it), order-lifecycle messages (confirmation/shipped) migrate
+  onto this service when the merchant asks for them, marketing sends (no
+  marketing surface exists yet — the guard is ready).
+
+### SF15 — Contact · **verified complete (S39)**
+
+- Accessible form (labels, aria-describedby error list, honest idle→sending→
+  received states), server validation (name/email/message with exact field
+  errors), honeypot (bots get a bland 200, nothing stored), 5/hour per-IP
+  rate limit. EVERY store gets a working contact page (renders with or
+  without a content page — non-BeastLife tenants start page-less).
+  Messages: stored in the tenant inbox + merchant copy through BE23 with the
+  delivery state attached. Live on demo: valid stored+sent(mock), honeypot
+  stored nothing, invalid 422 with field errors.
+
+### SF16 — FAQ · **verified complete (S39)**
+
+- `faq` section kind (questions + sanitized answers, validated at save) on
+  any content page; native details/summary accordions (keyboard + SR for
+  free), stable `#q-<slug>` anchors that auto-open and scroll on load and
+  hashchange, ¶ copy-link per question. Reusable groups = FAQ sections are
+  ordinary page sections (clone/template machinery applies). FAQ template
+  upgraded to the new kind. Live: demo /policies/faq with working anchors.
+
+### SF17 — Campaign landing · **verified complete (S39)**
+
+- `family='campaign'` pages at `/campaigns/<slug>`: served ONLY inside their
+  UTC visibility window (console edits in merchant-local wall time,
+  converted to instants client-side — same TZ discipline as offers/release
+  scheduling); noindex + excluded from the sitemap (paid/social
+  destinations); internal links carry the visitor's utm_* params forward
+  (strict utm_ allowlist; external links untouched); `view_campaign` joined
+  the versioned event registry; campaign slugs never serve at /policies/.
+  Release-governed (publish-with-dependencies = the release snapshot).
+  Live: glow-days 200-with-utm-rewrite inside window, expired bye-days 404.
+
+### MC05 — Catalog browser · **verified complete (S39)**
+
+- /admin/catalog: search, Shopify-owned fields labeled read-only + deep link
+  to Shopify admin; per-product presentation = PDP modules (the per-product
+  ingredients/usage/specs SF04 deferred here; sanitized at save, ≤6) +
+  badge (≤30 chars). Deleted-product guard: orphaned overrides flagged in
+  the console, unknown products refused at write. Overrides are LIVE-ON-SAVE
+  (catalog-adjacent like placements, deliberately outside releases —
+  recorded). Live: badge + two modules on a demo PDP immediately after save.
+
+### MC06 — Collection merchandising · **verified complete (S39, pinning scope)**
+
+- Per-collection pinned products lead the "Featured" sort (CASE ordering in
+  getProductsInCollection); pins are ownership-validated (must be members of
+  the collection); empty pins restore Shopify's order exactly. Live: demo's
+  performance-protein collection led by the pinned product over Shopify's
+  first. Template assignment deferred with the template families (W4,
+  recorded in MC09).
+
+### MC11 — Menus & footer · **verified complete (S39)**
+
+- Header nav: ONE level of nesting (validated — unsafe child URLs refused,
+  two-level refused, ≤8 children), rendered as native details dropdowns
+  (keyboard/SR-friendly, no client JS); console editor speaks indentation.
+  Footer: flattens nested items and links ONLY to pages that exist on the
+  store (the hardcoded /policies/* list 404'd on new tenants); about link
+  hidden when no about page. Release validation checks child links. Live:
+  demo dropdown DOM-verified (3 links), footer lists its 4 real pages.
+- Not built (recorded): drag-drop tree editing — the indent syntax covers
+  the one-level model; revisit if merchants ask for deeper trees.
+
+### MC15 — Upsell manager · **verified complete (S39)**
+
+- Quirk #6 closed: editing a disabled placement keeps it disabled (the API
+  preserves stored state when the form omits `enabled`; suite round-trip).
+  Availability-aware targets: the console strikes through sold-out/deleted
+  targets with tooltips — an honest preview of exactly what the storefront
+  renders (it skips them). Placement preview = that annotated target list.
+
 ### OP07 — Operator template registry · **partial (implemented & verified, S37)**
 
 - `/api/platform/themes` + ThemesPanel in the platform console: kit catalog
@@ -886,6 +976,45 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   accessibility).
 - Remaining: per-kit fixture SCREENSHOT diffs, a11y audit beyond contrast
   (focus order etc.) — W4 polish.
+
+## W3 EXIT (recorded S39, 2026-10-28)
+
+Exit evidence per the handoff ("tenant-specific pages from releases; no
+draft/live leakage; publish + rollback demonstrated"):
+- **Two tenants, two kits, one codebase**: demo = published Glow (cream/rose/
+  Fraunces, screenshot-verified S37), beastlife = implicit Pulse, byte-
+  identical through S35–S39 regression sweeps.
+- **Everything shopper-visible rides releases**: hero, sections, nav (now
+  nested), brand, theme kit, collections index, PDP extras, content/policy/
+  FAQ/campaign pages — proven draft-until-publish live in S36 (publish/
+  preview/rollback), S37 (kit switch), S38 (policy pages, curation), S39
+  (campaigns, FAQ, nav): every pre-publish probe 404'd/stayed-stale, every
+  post-publish probe flipped.
+- **No draft/live leakage**: suite-proven (releases 13 + storefront 15 +
+  surfaces 15) and live-probed before every publish, five sessions running.
+- **Rollback**: demonstrated live in S36 (pointer back to release A, drafts
+  untouched) and re-proven by suite at every commit since.
+- Deliberate scope notes carried into W4: catalog presentation overrides +
+  upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
+  maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S39, 2026-10-28)
+
+26 suites / **337 tests + 21 offers = 358 checks** green (new
+`test:surfaces`, 15), `pnpm build` clean. Migration tenant/0009
+(notifications, contact_messages, product/collection overrides,
+cms_pages.family+window) applied to all 3 hosted tenant DBs + env default.
+Live on demo: contact probe stored + delivered through the jobs fast path
+(sent, honestly labeled DEV MOCK — RESEND unset by design), honeypot stored
+nothing, invalid 422 field errors; product override (badge + 2 modules) and
+collection pin live-on-save immediately; FAQ/campaign/nav drafts did NOT
+leak pre-publish → publish rel_fc5b03531bf5de23 → campaign 200 inside
+window with utm carried into internal links, expired campaign 404, campaign
+slug 404 at /policies/, FAQ anchors live, header dropdown DOM-verified,
+footer lists only the store's real pages, sitemap excludes campaigns.
+beastlife regression: 6 routes 200, contact page gained the form alongside
+its BeastLife content. Console UI walkthrough for the new tabs remains the
+same USER ACTION as S38 (no demo account; creation-for-access declined).
 
 ## Verification state (S38, 2026-10-28)
 
@@ -1065,7 +1194,7 @@ shopify-push 13, hardening 11, offers-admin 8, events 16, tenancy 9, platform-sy
 
 ## Other records
 
-All remaining 64 records: **not inspected** (states will change only with code
+All remaining 56 records: **not inspected** (states will change only with code
 audits/implementation in their scheduled sessions; see roadmap phases S26–S49).
 Incidental observations made during the S25 audits, recorded WITHOUT claiming a full
 audit of those records:

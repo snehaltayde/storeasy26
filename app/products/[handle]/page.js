@@ -7,6 +7,7 @@ import TrackEvent from "@/components/analytics/TrackEvent";
 import { getProductByHandle } from "@/lib/repo";
 import { getPdpPairs } from "@/lib/cms/placements";
 import { resolvedPdpExtras } from "@/lib/content/resolve";
+import { getProductOverride } from "@/lib/catalog-overrides";
 import { numericId } from "@/lib/ids";
 import { abs, siteName } from "@/lib/site";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -82,12 +83,17 @@ function productJsonLd(product, brandName) {
 
 export default async function ProductPage({ params }) {
   const { handle } = await params;
-  const { product, pairs, brandName, extras } = await tfetch(async () => {
+  const { product, pairs, brandName, extras, override } = await tfetch(async () => {
     const product = await getProductByHandle(handle);
     if (!product) return { product: null };
     // "Pairs well with" (S23): manual placement, else same-collection auto.
-    const [pairs, extras] = await Promise.all([getPdpPairs(product.id, { limit: 4 }), resolvedPdpExtras()]);
-    return { product, pairs, brandName: siteName(), extras };
+    // S39 (MC05): per-product presentation override — modules + badge.
+    const [pairs, extras, override] = await Promise.all([
+      getPdpPairs(product.id, { limit: 4 }),
+      resolvedPdpExtras(),
+      getProductOverride(product.id),
+    ]);
+    return { product, pairs, brandName: siteName(), extras, override };
   });
   if (!product) notFound();
 
@@ -124,9 +130,14 @@ export default async function ProductPage({ params }) {
         <ProductGallery images={product.images} title={product.title} />
 
         <div>
-          {product.vendor ? (
-            <p className="text-sm font-semibold uppercase tracking-wide text-accent-700">
+          {product.vendor || override?.badge ? (
+            <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-accent-700">
               {product.vendor}
+              {override?.badge ? (
+                <span className="rounded-full bg-accent-100 px-2.5 py-0.5 text-[11px] font-bold normal-case tracking-normal text-accent-800">
+                  {override.badge}
+                </span>
+              ) : null}
             </p>
           ) : null}
           <h1 className="mt-1 text-3xl font-extrabold tracking-tight">{product.title}</h1>
@@ -150,11 +161,11 @@ export default async function ProductPage({ params }) {
             </div>
           ) : null}
 
-          {/* S38 (SF04): merchant-authored PDP accordions (pdp_extras block,
-              release-governed, html allowlist-sanitized at save) */}
-          {extras?.length > 0 && (
+          {/* S39 (MC05): per-product modules (ingredients/usage/specs) lead;
+              S38 (SF04): store-wide pdp_extras follow. Both sanitized at save. */}
+          {(override?.modules?.length > 0 || extras?.length > 0) && (
             <div className="mt-6 divide-y divide-zinc-100 border-t border-zinc-100">
-              {extras.map((x) => (
+              {[...(override?.modules || []), ...(extras || [])].map((x) => (
                 <details key={x.title} className="group py-3">
                   <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-zinc-800 [&::-webkit-details-marker]:hidden">
                     {x.title}

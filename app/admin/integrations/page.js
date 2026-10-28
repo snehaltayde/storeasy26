@@ -2,9 +2,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { integrationStatus } from "@/lib/integrations";
+import { listNotifications, listContactMessages } from "@/lib/notifications";
 import { siteName } from "@/lib/site";
 import AdminNav from "@/components/admin/AdminNav";
 import IntegrationsAdmin from "@/components/admin/IntegrationsAdmin";
+import MessagesPanel from "@/components/admin/MessagesPanel";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +19,14 @@ export default async function AdminIntegrationsPage() {
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
-  const [integrations, name] = await tfetch(async () => [await integrationStatus(), siteName()]);
+  const [integrations, name, messages, notifications] = await tfetch(async () => [
+    await integrationStatus(),
+    siteName(),
+    await listContactMessages({ limit: 20 }),
+    await listNotifications({ limit: 20 }),
+  ]);
+  // S34: the support role is PII-redacted — shopper emails/messages stay hidden
+  const redacted = actor.role === "support";
 
   return (
     <>
@@ -31,6 +40,14 @@ export default async function AdminIntegrationsPage() {
         <div className="mt-5">
           <IntegrationsAdmin initial={integrations} />
         </div>
+        {/* S39 (BE23 + SF15): contact inbox + notification delivery log */}
+        {redacted ? (
+          <p className="mt-8 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-500">
+            Contact messages are hidden for the support role (shopper PII).
+          </p>
+        ) : (
+          <MessagesPanel messages={messages} notifications={notifications} />
+        )}
       </div>
     </>
   );

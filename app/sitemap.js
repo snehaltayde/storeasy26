@@ -20,7 +20,9 @@ async function buildSitemap() {
   ]);
 
   // Content pages per tenant (S23): defaults + merchant-added, enabled only.
-  const pages = (await resolvedContentPageList()).filter((p) => p.enabled);
+  // S39: campaign pages are EXCLUDED — they're noindex paid/social landing
+  // pages with visibility windows (a sitemap entry would contradict both).
+  const pages = (await resolvedContentPageList()).filter((p) => p.enabled && (p.family || "page") !== "campaign");
   const statics = [
     "/",
     "/collections",

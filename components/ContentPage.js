@@ -1,10 +1,12 @@
 import Link from "next/link";
+import FaqSection from "./FaqSection";
 
 // Shared renderer for store content/policy pages. S38 (SF13): sections are
 // typed — text (heading + paragraphs), rich (html, allowlist-sanitized at
 // save) and image (library/https src). Legacy sections without a kind render
-// as text. SF14: an effective date renders under the title.
-export default function ContentPage({ page, legalName = "" }) {
+// as text. SF14: an effective date renders under the title. S39: faq sections
+// (keyboard accordions + deep links) and `children` (e.g. the contact form).
+export default function ContentPage({ page, legalName = "", children = null }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <nav className="mb-6 text-sm text-zinc-400">
@@ -31,6 +33,9 @@ export default function ContentPage({ page, legalName = "" }) {
               </section>
             );
           }
+          if (kind === "faq") {
+            return <FaqSection key={idx} heading={s.heading} items={s.items || []} />;
+          }
           if (kind === "image") {
             return (
               <figure key={idx}>
@@ -54,6 +59,7 @@ export default function ContentPage({ page, legalName = "" }) {
           );
         })}
       </div>
+      {children}
       <p className="mt-12 border-t border-zinc-100 pt-6 text-xs text-zinc-400">
         {legalName ? `Operated by ${legalName} · ` : ""}Questions?{" "}
         <Link href="/contact" className="underline hover:text-zinc-600">

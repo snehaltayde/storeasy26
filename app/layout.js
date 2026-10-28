@@ -14,7 +14,7 @@ import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { resolveBrand, brandCssVars } from "@/lib/brand";
-import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, contentSource } from "@/lib/content/resolve";
+import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolvedContentPageList, contentSource } from "@/lib/content/resolve";
 import { kitAttr } from "@/lib/themes/kits";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
@@ -69,14 +69,24 @@ async function navCollections() {
 async function chromeData() {
   try {
     return await tfetch(async () => {
-      const [announcement, navHeader, navFooter, brand, theme, src] = await Promise.all([
+      const [announcement, navHeader, navFooter, brand, theme, src, pageList] = await Promise.all([
         resolvedAnnouncement(),
         resolvedNav("header"),
         resolvedNav("footer"),
         resolvedBrand(),
         resolvedTheme(),
         contentSource(),
+        resolvedContentPageList().catch(() => []),
       ]);
+      // S39 (MC11): footer links only to pages that EXIST on this store.
+      const enabledPages = pageList.filter((p) => p.enabled && (p.family || "page") === "page");
+      const footerPages = {
+        about: enabledPages.some((p) => p.slug === "about"),
+        policies: enabledPages
+          .filter((p) => p.slug !== "about" && p.slug !== "contact")
+          .slice(0, 6)
+          .map((p) => ({ label: p.title, href: `/policies/${p.slug}` })),
+      };
       return {
         name: siteName(),
         logo: siteLogo(),
@@ -97,6 +107,7 @@ async function chromeData() {
         brandCss: brand ? brandCssVars(resolveBrand(brand)) : "",
         kitAttr: kitAttr(theme),
         preview: src.preview,
+        footerPages,
       };
     });
   } catch {
@@ -114,6 +125,7 @@ async function chromeData() {
       brandCss: "",
       kitAttr: "pulse-1",
       preview: false,
+      footerPages: { about: false, policies: [] },
     };
   }
 }
@@ -168,6 +180,7 @@ export default async function RootLayout({ children }) {
             tagline={chrome.footerTagline}
             support={chrome.support}
             legalName={chrome.legalName}
+            pages={chrome.footerPages}
           />
           <CartDrawer />
         </CartProvider>

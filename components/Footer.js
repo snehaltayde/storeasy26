@@ -9,9 +9,16 @@ export default function Footer({
   tagline = "",
   support = {},
   legalName = "",
+  // S39 (MC11): links to pages that actually EXIST on this store — the old
+  // hardcoded /policies/* list 404'd on tenants without those pages.
+  pages = { about: true, policies: [] },
 }) {
+  // nested nav items flatten here (dropdowns are a header affordance)
   const shopItems = Array.isArray(nav)
-    ? nav.map((i) => ({ key: i.href + i.label, href: i.href, label: i.label }))
+    ? nav.flatMap((i) => [
+        { key: i.href + i.label, href: i.href, label: i.label },
+        ...(i.children || []).map((c) => ({ key: i.href + c.href + c.label, href: c.href, label: `· ${c.label}` })),
+      ])
     : collections.slice(0, 5).map((c) => ({ key: c.handle, href: `/collections/${c.handle}`, label: c.title }));
 
   return (
@@ -47,42 +54,31 @@ export default function Footer({
           <div>
             <p className="mb-3 text-sm font-semibold text-zinc-900">Company</p>
             <ul className="space-y-2 text-sm text-zinc-500">
-              <li>
-                <Link href="/about" className="hover:text-zinc-900">
-                  About us
-                </Link>
-              </li>
+              {pages.about && (
+                <li>
+                  <Link href="/about" className="hover:text-zinc-900">
+                    About us
+                  </Link>
+                </li>
+              )}
               <li>
                 <Link href="/contact" className="hover:text-zinc-900">
                   Contact
                 </Link>
               </li>
-              <li>
-                <Link href="/policies/terms" className="hover:text-zinc-900">
-                  Terms of service
-                </Link>
-              </li>
-              <li>
-                <Link href="/policies/privacy" className="hover:text-zinc-900">
-                  Privacy policy
-                </Link>
-              </li>
+              {pages.policies.map((p) => (
+                <li key={p.href}>
+                  <Link href={p.href} className="hover:text-zinc-900">
+                    {p.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
           <div>
             <p className="mb-3 text-sm font-semibold text-zinc-900">Support</p>
             <ul className="space-y-2 text-sm text-zinc-500">
-              <li>
-                <Link href="/policies/shipping" className="hover:text-zinc-900">
-                  Shipping policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/policies/returns" className="hover:text-zinc-900">
-                  Returns &amp; refunds
-                </Link>
-              </li>
               {support.email ? (
                 <li>
                   <a href={`mailto:${support.email}`} className="hover:text-zinc-900">

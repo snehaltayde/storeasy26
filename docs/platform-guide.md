@@ -108,6 +108,12 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
   section data (`getFeaturedCollections`, `getNewestProducts`) is fetched only for
   enabled sections.
 
+<!-- S39 (MC11): header nav supports ONE level of nesting — indent lines in
+the console editor; items with children render as native <details> dropdowns
+(keyboard/screen-reader friendly, zero client JS). The footer links only to
+pages that actually exist on the store (the old hardcoded /policies/* list
+404'd on tenants without those pages); release validation checks child links
+too. -->
 #### Header, footer, announcement bar
 - **What**: brand wordmark (two-part accent split), search box, cart button,
   collection scroller or custom nav; footer with shop/company/support columns,
@@ -289,10 +295,23 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
   mode (`brandDefaultsApply()`); every other tenant starts page-less and
   creates its own (no cross-tenant legal text, ever). BeastLife's default
   contact page still auto-injects the tenant's support email/phone.
-- **Files**: `app/about|contact|policies/[slug]/page.js`,
+- **S39 additions**: **faq** section kind (SF16 — native `<details>` keyboard
+  accordions, stable `#q-…` deep-link anchors that auto-open + scroll, ¶
+  copy-link buttons); **campaign pages** (SF17 — `family='campaign'` rows
+  served at `/campaigns/<slug>` ONLY inside their UTC visibility window
+  (edited in merchant-local time, stored as instants), noindex, excluded from
+  the sitemap, and internal links keep the visitor's `utm_*` params); the
+  **contact page always works** (SF15 — accessible form with server
+  validation, honeypot, 5/hour rate limit; renders with or without a content
+  page) and messages flow through the notification service into the console
+  inbox.
+- **Files**: `app/about|contact|policies|campaigns/[slug]/page.js`,
   [components/ContentPage.js](../components/ContentPage.js),
+  [components/FaqSection.js](../components/FaqSection.js),
+  [components/ContactForm.js](../components/ContactForm.js),
+  [lib/content/utm.js](../lib/content/utm.js),
   [lib/cms/store.js](../lib/cms/store.js) (`getContentPage`,
-  `validatePageSections`, `brandDefaultsApply`),
+  `validatePageSections`, `campaignVisible`, `brandDefaultsApply`),
   [lib/content/pages.js](../lib/content/pages.js) (default templates).
 
 #### Consent banner & pixels
@@ -326,7 +345,7 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
 
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
-Navigation: **Offers · Orders · Storefront · Media · Theme · Brand · Releases · Upsells · Integrations · Settings**.
+Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Brand · Releases · Upsells · Integrations · Settings**.
 
 #### Login
 - **Use** (S26): `<tenant-host>/admin` → `/admin/login`; sign in with your EMAIL +
@@ -472,6 +491,44 @@ Navigation: **Offers · Orders · Storefront · Media · Theme · Brand · Relea
 - **Files**: `components/admin/SectionsEditor.js`,
   `components/admin/PreviewPane.js`, banner/rich_text validation in
   [lib/cms/validate.js](../lib/cms/validate.js), renderers in `app/page.js`.
+
+#### Catalog tab (S39 / MC05 + MC06)
+- **What**: the catalog browser. Shopify-owned VALUES (title, type, price,
+  stock) are read-only, labeled, and deep-linked to Shopify admin; the
+  console edits per-tenant PRESENTATION only: per-product **PDP modules**
+  (ingredients / usage / specs accordions — the per-product half SF04
+  deferred here; sanitized at save) and a short **badge**, plus
+  **collection merchandising** — pinned products lead a collection's
+  "Featured" order (ownership-validated: a pin must belong to the
+  collection), everything else keeps Shopify's order. Overrides whose
+  product was deleted from the catalog are flagged **ORPHANED**, never
+  silently rendered or dropped. Live-on-save (catalog-adjacent, like
+  placements — not release content; recorded in MC05).
+- **Files**: [lib/catalog-overrides.js](../lib/catalog-overrides.js),
+  `app/admin/catalog/page.js`, `app/api/admin/catalog/route.js`,
+  `components/admin/CatalogAdmin.js`; pinned ordering in
+  `getProductsInCollection` ([lib/repo.js](../lib/repo.js)).
+
+#### Notifications & contact inbox (S39 / BE23 + SF15)
+- **What**: THE send path for tenant-scoped messages
+  ([lib/notifications.js](../lib/notifications.js)): every message is a
+  durable intent row first (`queued`), delivered by the jobs queue
+  (`send_notification`, with `after()` fast path), retried with backoff, and
+  always honest — `queued | sent | failed`, provider errors recorded, the
+  dev mock explicitly labeled **DEV MOCK** (nothing actually sends until
+  `RESEND_API_KEY` is set). Idempotency keys dedupe replayed triggers; a
+  missing recipient records a FAILED intent with the fix in the error text.
+  **Consent separation**: `consent_class='marketing'` is schema-level and
+  REFUSED without a consent reference — transactional mail never mixes with
+  it. Control-plane identity mail (invites/resets) stays on lib/mail.js
+  directly (platform-scoped, no tenant DB — recorded in BE23).
+- **Console**: Integrations tab → **Contact inbox** (shopper messages with
+  each merchant-notify delivery state; hidden from the support role — PII)
+  and the **Notification log**.
+- **Files**: [lib/notifications.js](../lib/notifications.js),
+  `app/api/contact/route.js`, `components/admin/MessagesPanel.js`,
+  worker handler in [lib/platform/worker.js](../lib/platform/worker.js),
+  migration `migrations/tenant/0009_s39_surfaces.sql`.
 
 #### Media tab (S38 / BE15 + MC12)
 - **What**: a per-tenant media library. Upload (multi-file), alt-text editing,
@@ -698,7 +755,7 @@ Navigation: **Offers · Orders · Storefront · Media · Theme · Brand · Relea
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 25 aliased suites, **322 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 26 aliased suites, **337 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -744,9 +801,16 @@ Navigation: **Offers · Orders · Storefront · Media · Theme · Brand · Relea
   dates; BeastLife default pages serve ONLY BeastLife; collections_index
   validation/order/release-gated handles; collection sort/filters/facets;
   pdp_extras sanitize + disabled filtering; SQL search multi-term AND +
-  deterministic ranking; snapshot coverage of the new blocks).
+  deterministic ranking; snapshot coverage of the new blocks) · surfaces 15
+  (S39: durable notification intents — idempotent dedupe, queue delivery with
+  honest DEV MOCK labeling, failed-no-recipient, marketing-requires-consent;
+  contact validation + inbox w/ delivery state; faq sections sanitize +
+  refusals; campaign family/window validation + visibility + snapshot; utm
+  propagation rules; product-override sanitize + deleted-product guard;
+  collection-pin ownership + featured ordering; nested-nav validation +
+  release child-link checks; upsell enabled-state round-trip).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **343 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **358 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -780,7 +844,10 @@ multi-tenant payments go live. Severity-ordered:
    converts properly between local wall time and UTC instants
    (lib/admin/schedule.js); an edit round-trip preserves the intended instant
    exactly (suite-proven, TZ-independent).
-6. **Editing an upsell placement re-enables it** (the form omits `enabled`).
+6. ~~**Editing an upsell placement re-enables it**~~ — **FIXED (S39 / MC15)**: an
+   edit without an explicit `enabled` keeps the placement's stored state; the
+   console also previews targets availability-aware (sold-out/deleted targets
+   struck through — those are skipped on the storefront).
 7. **A home section saved as hidden disappears from the editor** (reads filter
    disabled sections); only Reset-to-default recovers it. Same class: a content page
    saved as hidden can no longer be opened in the editor (only Remove).
@@ -793,7 +860,7 @@ multi-tenant payments go live. Severity-ordered:
    isn't in the disallow list.
 10. **Static BeastLife branding remnants** — mostly FIXED (S36): manifest, SW cache
     names, offline page and 404 copy are per-tenant now. Still platform-generic or
-    BeastLife-flavored: the shared icon set (BE15/S38), SearchBox placeholder, 500
+    BeastLife-flavored: the shared icon set (per-tenant icons still pending), 500
     copy, the `BL-` order-id prefix, "(test mode)" on the Razorpay radio.
 11. **Rate-limit override env names** for hyphenated limiters uppercase to
     `RATE_LIMIT_ADMIN-SYNC` / `RATE_LIMIT_PLATFORM-LOGIN` (awkward but functional).
@@ -1554,3 +1621,4 @@ run the verify checklist.
 | S36 | 6f81cf8 | W3: immutable releases (atomic pointer, signed previews, scheduled publish, rollback) + releases tab + per-tenant manifest/offline/404 (BE09+MC13+SF23-full) |
 | S37 | 7913508 | W3: theme kits Pulse+Glow (version-pinned, draft-apply), home section editor (banner/rich_text, undo/redo, autosave, preview pane), page templates, operator kit registry (MC07+MC08+MC09+OP07) |
 | S38 | 389a0d1 | W3: media pipeline + library (tenant-DB blobs, magic-byte + SVG sanitize, dedupe, usage-guarded delete), typed/policy pages + BeastLife-defaults containment + checkout policy links, curated collections index, collection sort/filters, PDP extras + sticky CTA + invalid-variant states, SQL search decision + ranking + recents (BE15+MC12+SF13+SF14+SF01–05+BE05) |
+| S39 | (this session) | W3 EXIT: BE23 notification service (durable intents, honest states, consent separation) + contact form/inbox, FAQ accordions w/ deep links, campaign landing pages (UTC windows, utm retention), catalog browser w/ per-product modules + pinned collections, nested nav + real footer links, upsell quirk fix (SF15–17+MC05+MC06+MC11+MC15+BE23) |

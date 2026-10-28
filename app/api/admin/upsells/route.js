@@ -11,18 +11,26 @@ export const dynamic = "force-dynamic";
 
 
 // Console speaks HANDLES; storage speaks gids — translate both ways here.
+// S39 (MC15): targets carry availability so the console PREVIEWS what will
+// actually render (sold-out/deleted targets are skipped on the storefront).
 async function listWithHandles() {
   const rows = await listPlacements();
   const ids = [...new Set(rows.flatMap((r) => [r.source_product_id, ...r.target_product_ids]).filter(Boolean))];
-  const handles = new Map();
+  const products = new Map();
   if (ids.length) {
-    const prods = await db.selectFrom("products").select(["id", "handle"]).where("id", "in", ids).execute();
-    for (const p of prods) handles.set(p.id, p.handle);
+    const prods = await db.selectFrom("products").select(["id", "handle", "available"]).where("id", "in", ids).execute();
+    for (const p of prods) products.set(p.id, { handle: p.handle, available: !!p.available });
   }
+  const info = (id) => {
+    const p = products.get(id);
+    if (!p) return { handle: "(missing)", state: "missing" };
+    return { handle: p.handle, state: p.available ? "ok" : "soldout" };
+  };
   return rows.map((r) => ({
     ...r,
-    source_handle: r.source_product_id ? handles.get(r.source_product_id) || "(missing)" : null,
-    target_handles: r.target_product_ids.map((id) => handles.get(id) || "(missing)"),
+    source_handle: r.source_product_id ? info(r.source_product_id).handle : null,
+    target_handles: r.target_product_ids.map((id) => info(id).handle),
+    targets: r.target_product_ids.map(info),
   }));
 }
 
@@ -47,13 +55,21 @@ export const POST = tenantHandler(async (request) => {
         return NextResponse.json({ error: `Unknown source handle "${body.sourceHandle || ""}"` }, { status: 422 });
       sourceProductId = src.ids[0];
     }
+    // S39 (MC15, quirk #6): an EDIT keeps the placement's current enabled
+    // state unless the request says otherwise — saving a disabled placement
+    // no longer silently re-enables it.
+    let enabled = body.enabled !== false;
+    if (body.id && !("enabled" in body)) {
+      const existing = (await listPlacements()).find((p) => p.id === body.id);
+      if (existing) enabled = existing.enabled;
+    }
     const id = await upsertPlacement({
       id: body.id || undefined,
       kind: body.kind,
       sourceProductId,
       targetProductIds: targets.ids,
       title: body.title,
-      enabled: body.enabled !== false,
+      enabled,
       position: body.position || 0,
     });
     slog("placement_saved", { id, kind: body.kind });

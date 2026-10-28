@@ -6,7 +6,7 @@ import CartButton from "./cart/CartButton";
 // pre-CMS behavior (scroller of all collections); an array replaces it.
 export default function Header({ collections = [], logo = { text1: "Store", text2: "" }, nav = null, announcement = null }) {
   const stripItems = Array.isArray(nav)
-    ? nav.map((i) => ({ key: i.href + i.label, href: i.href, label: i.label }))
+    ? nav.map((i) => ({ key: i.href + i.label, href: i.href, label: i.label, children: i.children || null }))
     : collections.map((c) => ({ key: c.handle, href: `/collections/${c.handle}`, label: c.title }));
 
   return (
@@ -50,15 +50,38 @@ export default function Header({ collections = [], logo = { text1: "Store", text
       {stripItems.length > 0 && (
         <nav className="border-t border-header-fg/10">
           <div className="no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto px-3 sm:px-5">
-            {stripItems.map((i) => (
-              <Link
-                key={i.key}
-                href={i.href}
-                className="whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg"
-              >
-                {i.label}
-              </Link>
-            ))}
+            {stripItems.map((i) =>
+              i.children?.length ? (
+                // S39 (MC11): one-level dropdown — native <details> keeps it
+                // keyboard- and screen-reader-friendly with zero client JS.
+                <details key={i.key} className="group relative">
+                  <summary className="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg [&::-webkit-details-marker]:hidden">
+                    {i.label}
+                    <span aria-hidden="true" className="text-xs transition group-open:rotate-180">
+                      ▾
+                    </span>
+                  </summary>
+                  <div className="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-xl border border-zinc-200 bg-white py-1 shadow-xl">
+                    <Link href={i.href} className="block px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50">
+                      {i.label}
+                    </Link>
+                    {i.children.map((c) => (
+                      <Link key={c.href + c.label} href={c.href} className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900">
+                        {c.label}
+                      </Link>
+                    ))}
+                  </div>
+                </details>
+              ) : (
+                <Link
+                  key={i.key}
+                  href={i.href}
+                  className="whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg"
+                >
+                  {i.label}
+                </Link>
+              ),
+            )}
           </div>
         </nav>
       )}

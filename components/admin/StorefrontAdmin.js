@@ -4,6 +4,7 @@ import { useState } from "react";
 import SectionsEditor from "./SectionsEditor";
 import PreviewPane from "./PreviewPane";
 import { PAGE_TEMPLATES } from "@/lib/content/templates";
+import { isoToLocalInput, localInputToIso } from "@/lib/admin/schedule";
 
 // Storefront CMS console (Session 23): announcement bar, hero, home section
 // layout, header/footer nav, content pages. Every save is live on the next
@@ -45,14 +46,30 @@ const Section = ({ title, desc, customized, onReset, onSave, busy, children }) =
   </section>
 );
 
-const navToText = (nav) => (Array.isArray(nav) ? nav.map((i) => `${i.label} | ${i.href}`).join("\n") : "");
+// S39 (MC11): one level of nesting — indent a line (spaces or "-") to make it
+// a sub-item of the item above; the header renders those as a dropdown.
+const navToText = (nav) =>
+  Array.isArray(nav)
+    ? nav
+        .flatMap((i) => [`${i.label} | ${i.href}`, ...(i.children || []).map((c) => `  ${c.label} | ${c.href}`)])
+        .join("\n")
+    : "";
 const textToNav = (text) => {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = text.split("\n").filter((l) => l.trim());
   if (!lines.length) return null; // empty = back to catalog-derived
-  return lines.map((l) => {
-    const [label, href] = l.split("|").map((s) => s.trim());
-    return { label: label || "", href: href || "" };
-  });
+  const items = [];
+  for (const raw of lines) {
+    const isChild = /^(\s+|-\s)/.test(raw);
+    const [label, href] = raw.replace(/^[\s-]+/, "").split("|").map((s) => s.trim());
+    const item = { label: label || "", href: href || "" };
+    if (isChild && items.length) {
+      const parent = items[items.length - 1];
+      parent.children = [...(parent.children || []), item];
+    } else {
+      items.push(item);
+    }
+  }
+  return items;
 };
 const bodyToText = (body) => (body || []).join("\n\n");
 const textToBody = (text) =>
@@ -67,14 +84,17 @@ const toEditSection = (s) => {
   const kind = s.kind || "text";
   if (kind === "rich") return { kind, heading: s.heading || "", html: s.html || "" };
   if (kind === "image") return { kind, src: s.src || "", alt: s.alt || "", caption: s.caption || "" };
+  if (kind === "faq") return { kind, heading: s.heading || "", items: (s.items || []).map((it) => ({ q: it.q || "", a: it.a || "" })) };
   return { kind: "text", heading: s.heading || "", text: bodyToText(s.body) };
 };
 const fromEditSection = (s) => {
   if (s.kind === "rich") return { kind: "rich", heading: s.heading, html: s.html };
   if (s.kind === "image") return { kind: "image", src: s.src, alt: s.alt, caption: s.caption };
+  if (s.kind === "faq") return { kind: "faq", heading: s.heading, items: s.items.filter((it) => it.q.trim()) };
   return { kind: "text", heading: s.heading, body: textToBody(s.text) };
 };
-const editSectionEmpty = (s) => (s.kind === "rich" ? !s.html.trim() : s.kind === "image" ? !s.src.trim() : !s.heading.trim());
+const editSectionEmpty = (s) =>
+  s.kind === "rich" ? !s.html.trim() : s.kind === "image" ? !s.src.trim() : s.kind === "faq" ? !s.items.some((it) => it.q.trim()) : !s.heading.trim();
 
 function PageEditor({ page, onSave, onCancel, busy }) {
   const [p, setP] = useState({
@@ -83,12 +103,29 @@ function PageEditor({ page, onSave, onCancel, busy }) {
     description: page.description || "",
     enabled: page.enabled !== false,
     effective_at: page.effective_at || "",
+    // S39 (SF17): campaign family + visibility window (edited in LOCAL wall
+    // time; converted to UTC instants on save — merchant TZ decides)
+    family: page.family || "page",
+    windowStart: isoToLocalInput(page.window_start),
+    windowEnd: isoToLocalInput(page.window_end),
     sections: (page.sections || []).map(toEditSection),
   });
   const isNew = !page.slug;
   const sec = (i, patch) => setP((prev) => ({ ...prev, sections: prev.sections.map((s, j) => (j === i ? { ...s, ...patch } : s)) }));
   const addSection = (kind) =>
-    setP((prev) => ({ ...prev, sections: [...prev.sections, kind === "rich" ? { kind, heading: "", html: "" } : kind === "image" ? { kind, src: "", alt: "", caption: "" } : { kind: "text", heading: "", text: "" }] }));
+    setP((prev) => ({
+      ...prev,
+      sections: [
+        ...prev.sections,
+        kind === "rich"
+          ? { kind, heading: "", html: "" }
+          : kind === "image"
+            ? { kind, src: "", alt: "", caption: "" }
+            : kind === "faq"
+              ? { kind, heading: "", items: [{ q: "", a: "" }] }
+              : { kind: "text", heading: "", text: "" },
+      ],
+    }));
 
   return (
     <section className="rounded-2xl border border-lime-300 p-5">
@@ -106,6 +143,22 @@ function PageEditor({ page, onSave, onCancel, busy }) {
         <Field label="Effective date" hint="optional — shown under the title (policy pages)">
           <input type="date" className={input} value={p.effective_at} onChange={(e) => setP({ ...p, effective_at: e.target.value })} />
         </Field>
+        <Field label="Family" hint={p.family === "campaign" ? "served at /campaigns/<slug>, noindex, keeps utm params" : "served at /policies/<slug> (or /about, /contact)"}>
+          <select className={input} value={p.family} onChange={(e) => setP({ ...p, family: e.target.value })}>
+            <option value="page">Content / policy page</option>
+            <option value="campaign">Campaign landing</option>
+          </select>
+        </Field>
+        {p.family === "campaign" && (
+          <>
+            <Field label="Visible from" hint="your local time — blank = immediately">
+              <input type="datetime-local" className={input} value={p.windowStart} onChange={(e) => setP({ ...p, windowStart: e.target.value })} />
+            </Field>
+            <Field label="Visible until" hint="your local time — blank = no end">
+              <input type="datetime-local" className={input} value={p.windowEnd} onChange={(e) => setP({ ...p, windowEnd: e.target.value })} />
+            </Field>
+          </>
+        )}
         {p.sections.map((s, i) => (
           <div key={i} className="sm:col-span-2 rounded-xl border border-zinc-100 p-3">
             <div className="flex items-center gap-2">
@@ -140,6 +193,34 @@ function PageEditor({ page, onSave, onCancel, busy }) {
                 <input className={input + " mt-0 sm:col-span-2"} placeholder="Caption (optional)" value={s.caption} onChange={(e) => sec(i, { caption: e.target.value })} />
               </div>
             )}
+            {s.kind === "faq" && (
+              <div className="mt-2 space-y-2">
+                {s.items.map((it, j) => (
+                  <div key={j} className="rounded-lg border border-zinc-100 p-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        className={input + " mt-0"}
+                        placeholder="Question"
+                        value={it.q}
+                        onChange={(e) => sec(i, { items: s.items.map((y, k) => (k === j ? { ...y, q: e.target.value } : y)) })}
+                      />
+                      <button type="button" onClick={() => sec(i, { items: s.items.filter((_, k) => k !== j) })} className="text-zinc-400 hover:text-red-600">
+                        ✕
+                      </button>
+                    </div>
+                    <textarea
+                      className={input + " min-h-16 font-mono text-xs"}
+                      placeholder="<p>Answer — HTML, sanitized on save</p>"
+                      value={it.a}
+                      onChange={(e) => sec(i, { items: s.items.map((y, k) => (k === j ? { ...y, a: e.target.value } : y)) })}
+                    />
+                  </div>
+                ))}
+                <button type="button" onClick={() => sec(i, { items: [...s.items, { q: "", a: "" }] })} className="text-xs font-medium text-lime-700 hover:underline">
+                  + Add question
+                </button>
+              </div>
+            )}
           </div>
         ))}
         <div className="sm:col-span-2 flex items-center justify-between">
@@ -147,6 +228,7 @@ function PageEditor({ page, onSave, onCancel, busy }) {
             <button type="button" onClick={() => addSection("text")} className="hover:underline">+ Text</button>
             <button type="button" onClick={() => addSection("rich")} className="hover:underline">+ Rich HTML</button>
             <button type="button" onClick={() => addSection("image")} className="hover:underline">+ Image</button>
+            <button type="button" onClick={() => addSection("faq")} className="hover:underline">+ FAQ</button>
           </span>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={p.enabled} onChange={(e) => setP({ ...p, enabled: e.target.checked })} />
@@ -165,6 +247,9 @@ function PageEditor({ page, onSave, onCancel, busy }) {
               description: p.description,
               enabled: p.enabled,
               effective_at: p.effective_at || null,
+              family: p.family,
+              window_start: p.family === "campaign" ? localInputToIso(p.windowStart) : null,
+              window_end: p.family === "campaign" ? localInputToIso(p.windowEnd) : null,
               sections: p.sections.filter((s) => !editSectionEmpty(s)).map(fromEditSection),
             })
           }
@@ -438,9 +523,9 @@ export default function StorefrontAdmin({ initial }) {
             </div>
           </Section>
 
-          <Section title="Header navigation" desc='One per line: "Label | /path". Empty = all collections (automatic).' customized={data.customized.nav_header} busy={busy} onSave={() => saveBlock("nav_header", textToNav(navHeader))} onReset={() => resetBlock("nav_header")}>
+          <Section title="Header navigation" desc='One per line: "Label | /path". Indent a line to nest it under the item above (renders as a dropdown). Empty = all collections (automatic).' customized={data.customized.nav_header} busy={busy} onSave={() => saveBlock("nav_header", textToNav(navHeader))} onReset={() => resetBlock("nav_header")}>
             <div className="sm:col-span-2">
-              <textarea className={input + " min-h-24 font-mono text-xs"} value={navHeader} onChange={(e) => setNavHeader(e.target.value)} placeholder={"Proteins | /collections/protein\nSale | /collections/sale"} />
+              <textarea className={input + " min-h-24 font-mono text-xs"} value={navHeader} onChange={(e) => setNavHeader(e.target.value)} placeholder={"Proteins | /collections/protein\n  Whey | /collections/whey\n  Isolate | /collections/isolate\nSale | /collections/sale"} />
             </div>
           </Section>
 
@@ -480,7 +565,9 @@ export default function StorefrontAdmin({ initial }) {
                 <li key={p.slug} className="flex items-center gap-3 py-2.5 text-sm">
                   <span className="min-w-0 flex-1 truncate">
                     <span className="font-medium">{p.title}</span>
-                    <span className="ml-2 font-mono text-xs text-zinc-400">/{p.slug === "about" || p.slug === "contact" ? p.slug : `policies/${p.slug}`}</span>
+                    <span className="ml-2 font-mono text-xs text-zinc-400">
+                      /{p.slug === "about" || p.slug === "contact" ? p.slug : p.family === "campaign" ? `campaigns/${p.slug}` : `policies/${p.slug}`}
+                    </span>
                     <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold ${p.source === "custom" ? "bg-lime-100 text-lime-700" : "bg-zinc-100 text-zinc-500"}`}>
                       {p.source === "custom" ? "CUSTOMIZED" : "DEFAULT"}
                     </span>
