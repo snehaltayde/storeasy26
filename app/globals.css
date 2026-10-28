@@ -19,6 +19,29 @@
   --accent-label: #0a0a0b; /* readable text color on a solid accent */
   --brand-radius: 0.75rem;
   --type-scale: 1;
+
+  /* S37 (MC07) kit surface tokens — defaults = the PULSE kit (dark header &
+     hero, sans display). Other kits override them via [data-kit] below. */
+  --display-font: var(--font-geist-sans), system-ui, sans-serif;
+  --header-bg: #09090b;
+  --header-fg: #ffffff;
+  --header-muted: #d4d4d8;
+  --hero-bg: #09090b;
+  --hero-fg: #ffffff;
+  --hero-muted: #d4d4d8;
+}
+
+/* GLOW v1 (beauty / self-care): airy light surfaces, serif display type.
+   Version-keyed selector — a future glow v2 ships as a NEW block and tenants
+   pinned to v1 keep this one (OP07: no silent restyle). */
+[data-kit="glow-1"] {
+  --display-font: var(--font-fraunces), Georgia, serif;
+  --header-bg: #fffbf7;
+  --header-fg: #1c1917;
+  --header-muted: #78716c;
+  --hero-bg: #fff1ee;
+  --hero-fg: #1c1917;
+  --hero-muted: #57534e;
 }
 
 @theme inline {
@@ -35,9 +58,16 @@
   --color-accent-800: var(--accent-800);
   --color-accent-900: var(--accent-900);
   --color-accent-label: var(--accent-label);
+  --color-header: var(--header-bg);
+  --color-header-fg: var(--header-fg);
+  --color-header-muted: var(--header-muted);
+  --color-hero: var(--hero-bg);
+  --color-hero-fg: var(--hero-fg);
+  --color-hero-muted: var(--hero-muted);
   --radius-brand: var(--brand-radius);
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
+  --font-display: var(--display-font);
 }
 
 html {

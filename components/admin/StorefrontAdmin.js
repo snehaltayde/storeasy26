@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import SectionsEditor from "./SectionsEditor";
+import PreviewPane from "./PreviewPane";
+import { PAGE_TEMPLATES } from "@/lib/content/templates";
 
 // Storefront CMS console (Session 23): announcement bar, hero, home section
 // layout, header/footer nav, content pages. Every save is live on the next
@@ -212,7 +215,18 @@ export default function StorefrontAdmin({ initial }) {
     return put({ page, ...(overwrite ? {} : { revision: data.pageRevisions?.[page.slug] ?? null }) });
   };
   const resetBlock = (block) => put({ block, reset: true });
-  const swapSections = () => setSections((s) => [...s].reverse());
+  // S37 (MC09): clone = open the editor prefilled with a copy under a new slug
+  async function clonePage(slug) {
+    setBusy(true);
+    const res = await fetch("/api/admin/storefront", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ getPage: slug }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (json.page) setEditingPage({ ...json.page, slug: `${json.page.slug}-copy`, title: `${json.page.title} (copy)` });
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 px-4 py-4 sm:px-6">
@@ -284,29 +298,26 @@ export default function StorefrontAdmin({ initial }) {
             </Field>
           </Section>
 
-          <Section title="Home sections" desc="Order, titles and sizes of the home-page sections." customized={data.customized.home_sections} busy={busy} onSave={() => saveBlock("home_sections", sections)} onReset={() => resetBlock("home_sections")}>
-            {sections.map((s, i) => (
-              <div key={s.kind} className="rounded-xl border border-zinc-100 p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
-                  {i + 1}. {s.kind === "collections" ? "Collections grid" : "Newest products"}
-                </p>
-                <input className={input} value={s.title} onChange={(e) => setSections(sections.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} />
-                <div className="mt-2 flex items-center gap-3 text-sm">
-                  <label className="flex items-center gap-1.5">
-                    Show
-                    <input type="checkbox" checked={s.enabled !== false} onChange={(e) => setSections(sections.map((x, j) => (j === i ? { ...x, enabled: e.target.checked } : x)))} />
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    Items
-                    <input className="w-16 rounded-lg border border-zinc-200 px-2 py-1" value={s.limit} onChange={(e) => setSections(sections.map((x, j) => (j === i ? { ...x, limit: e.target.value } : x)))} />
-                  </label>
-                </div>
-              </div>
-            ))}
-            <button type="button" onClick={swapSections} className="justify-self-start text-sm font-medium text-lime-700 hover:underline">
-              ⇅ Swap order
-            </button>
-          </Section>
+          {/* S37 (MC08): section-tree editor — autosaves its own drafts */}
+          <section className="rounded-2xl border border-zinc-200 p-5">
+            <div className="mb-3">
+              <h2 className="text-sm font-bold">
+                Home sections{" "}
+                {data.customized.home_sections && <span className="ml-1 rounded bg-lime-100 px-1.5 py-0.5 text-[10px] font-bold text-lime-700">CUSTOMIZED</span>}
+              </h2>
+              <p className="mt-0.5 text-xs text-zinc-500">Compose the home page: reorder, hide, duplicate; banner and rich-text sections included. Changes autosave as drafts.</p>
+            </div>
+            <SectionsEditor
+              key={data.revisions?.home_sections ?? "fresh"}
+              initial={sections}
+              revision={data.revisions?.home_sections ?? null}
+              customized={data.customized.home_sections}
+              onReset={() => resetBlock("home_sections")}
+              busy={busy}
+            />
+          </section>
+
+          <PreviewPane />
 
           <Section title="Header navigation" desc='One per line: "Label | /path". Empty = all collections (automatic).' customized={data.customized.nav_header} busy={busy} onSave={() => saveBlock("nav_header", textToNav(navHeader))} onReset={() => resetBlock("nav_header")}>
             <div className="sm:col-span-2">
@@ -326,9 +337,24 @@ export default function StorefrontAdmin({ initial }) {
                 <h2 className="text-sm font-bold">Content pages</h2>
                 <p className="mt-0.5 text-xs text-zinc-500">About, contact and policies — defaults until you customize them.</p>
               </div>
-              <button type="button" onClick={() => setEditingPage({ sections: [] })} className="rounded-lg bg-zinc-900 px-3 py-1 text-xs font-semibold text-white hover:bg-zinc-800">
-                + New page
-              </button>
+              {/* S37 (MC09): named templates for the content-page family */}
+              <select
+                value=""
+                onChange={(e) => {
+                  const t = PAGE_TEMPLATES.find((x) => x.id === e.target.value);
+                  if (t) setEditingPage(JSON.parse(JSON.stringify(t.page)));
+                }}
+                className="rounded-lg border border-zinc-300 bg-zinc-900 px-3 py-1 text-xs font-semibold text-white"
+              >
+                <option value="" disabled>
+                  + New page from template…
+                </option>
+                {PAGE_TEMPLATES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <ul className="mt-3 divide-y divide-zinc-100">
               {data.pages.map((p) => (
@@ -343,6 +369,9 @@ export default function StorefrontAdmin({ initial }) {
                   </span>
                   <button type="button" onClick={() => openPage(p.slug)} className="font-medium text-lime-700 hover:underline">
                     Edit
+                  </button>
+                  <button type="button" onClick={() => clonePage(p.slug)} className="text-zinc-400 hover:text-zinc-700">
+                    Clone
                   </button>
                   {p.source === "custom" && (
                     <button type="button" onClick={() => window.confirm(`Remove the customized "${p.slug}" page? Default content (if any) returns.`) && put({ deletePage: p.slug })} className="text-zinc-400 hover:text-red-600">

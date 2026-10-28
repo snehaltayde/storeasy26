@@ -5,7 +5,7 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S36 (W3 underway; W1+W2 complete).
+- Created: 2026-10-28 (session S25). Last updated: S37 (W3 underway; W1+W2 complete).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
 - **Audit coverage honesty:** 36 of 116 records audited/implemented so far
@@ -13,9 +13,10 @@ by a code audit or implementation in this repo — never by documentation alone.
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
   BE18, SF24, BE20 — S33, with SF08 completed; BE24, MC20, BE27, BE34,
-  OP10 — S34; BE08, MC10 — S35; BE09, MC13 — S36, with SF23 completed). The
-  other 78 are **not inspected** — the handoff's Fix/Extend/New labels for
-  them remain unverified documentation claims.
+  OP10 — S34; BE08, MC10 — S35; BE09, MC13 — S36, with SF23 completed;
+  MC07, MC08, MC09, OP07 — S37). The other 74 are **not inspected** — the
+  handoff's Fix/Extend/New labels for them remain unverified documentation
+  claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -711,6 +712,73 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   merchant-togglable MAINTENANCE mode → OP12 (W4) where incident/maintenance
   states get their operator workflow (suspended hosts already show the
   control-plane-named unavailable page, S25).
+
+### MC07 — Theme kits · **partial (implemented & verified, S37)**
+
+- `lib/themes/kits.js`: versioned kit registry — **Pulse** v1 (the original
+  dark/lime nutrition look, implicit default) and **Glow** v1 (beauty: light
+  surfaces `#fffbf7/#fff1ee`, Fraunces serif display, rose `#e11d48`, xl
+  radius). Kit = brand defaults + display font + surface CSS
+  (`[data-kit="<id>-<version>"]` blocks) + hero preset. `applyKit` pins
+  `config.theme`, seeds brand + hero as DRAFTS, never touches the live
+  pointer; the pin rides the release snapshot (kit switches are
+  draft-until-publish, previewable, rollback-safe). `/admin/theme` library
+  tab with per-kit preview card.
+- LIVE (demo): applied Glow → live home stayed `pulse-1` ("Demo picks");
+  preview cookie showed `glow-1` + "Your glow, daily."; published → shopper
+  home now full Glow (cream header, rose accent, serif hero — screenshot
+  verified) while beastlife renders Pulse untouched. Two kits, two verticals,
+  one codebase.
+- Remaining: more surface coverage per kit (footer, PDP accents beyond
+  tokens), kit thumbnails from real screenshots, a third kit when a real
+  vertical needs it.
+
+### MC08 — Visual editor · **partial (section editor implemented & verified, S37)**
+
+- Home page is now a composable section TREE: collections grid / newest
+  products / **banner** (accent CTA panel) / **rich_text**
+  (allowlist-sanitized at save — same sanitizer as PDP). Editor
+  (`components/admin/SectionsEditor.js`): add/duplicate/hide/remove,
+  keyboard-reachable reorder, undo/redo (30-step history), debounced
+  AUTOSAVE with honest indicator, 409 conflict surface with
+  reload-or-overwrite. **Draft preview pane** iframes the real storefront
+  through the S36 preview cookie at 375/768/full widths — real catalog, cart
+  and offer bindings, not a mock.
+- Remaining (recorded honestly): drag-drop reordering, per-section live
+  highlight in the preview, section kinds beyond these four, PDP/collection
+  layout editing (needs their template families, W4+).
+
+### MC09 — Templates & assignment · **partial (content-page family, S37)**
+
+- `lib/content/templates.js` (pure data): blank / FAQ / brand story /
+  how-to-use — "New page from template" prefills the page editor; Clone
+  copies any page to `<slug>-copy`. Suite proves every template passes
+  upsert validation.
+- Remaining: collection/PDP template families + ranked-rule assignment —
+  there is nothing to bind rules to until those page types have variants;
+  deferred with W4's merchandising work, recorded as the larger half of MC09.
+
+### OP07 — Operator template registry · **partial (implemented & verified, S37)**
+
+- `/api/platform/themes` + ThemesPanel in the platform console: kit catalog
+  (id, version, vertical, supported schema range) and every tenant's pin
+  (explicit vs implicit default, applied_at, upgrade-available flag).
+  READ-ONLY by design — pins change only in the tenant's own console, so
+  "pinned versions never silently overwritten" holds structurally; version-
+  keyed CSS selectors extend that to styling. Kit fixtures are validated in
+  `test:themes` (WCAG, preset validation, release validation, accent-label
+  accessibility).
+- Remaining: per-kit fixture SCREENSHOT diffs, a11y audit beyond contrast
+  (focus order etc.) — W4 polish.
+
+## Verification state (S37, 2026-10-28)
+
+24 suites / **307 tests + 21 offers = 328 checks** green (new `test:themes`,
+10 tests), `pnpm build` clean. No new migrations (theme pin lives in tenant
+config → release snapshots). Live on demo: apply-Glow → no-leak → preview →
+publish → full visual transformation (screenshots); operator registry 401
+without cookie, lists pins with one. Demo left on Glow v1 (published) as the
+standing two-vertical showcase; beastlife untouched on implicit Pulse.
 
 ## Verification state (S36, 2026-10-28)
 

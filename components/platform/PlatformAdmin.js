@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import QueuesPanel from "./QueuesPanel";
+import ThemesPanel from "./ThemesPanel";
 
 // Operator console (Session 22): tenant table + health, suspend/activate,
 // per-tenant sync, Shopify connect links, and the provisioning wizard.
@@ -218,6 +219,7 @@ export default function PlatformAdmin() {
           );
         })}
       </ul>
+      <ThemesPanel />
       <QueuesPanel />
     </div>
   );

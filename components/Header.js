@@ -10,7 +10,7 @@ export default function Header({ collections = [], logo = { text1: "Store", text
     : collections.map((c) => ({ key: c.handle, href: `/collections/${c.handle}`, label: c.title }));
 
   return (
-    <header className="sticky top-0 z-30 bg-zinc-950 text-white">
+    <header className="sticky top-0 z-30 bg-header text-header-fg">
       {announcement?.enabled && announcement.text ? (
         <div className="bg-accent-400 px-4 py-1.5 text-center text-xs font-semibold text-accent-label">
           {announcement.href ? (
@@ -34,7 +34,7 @@ export default function Header({ collections = [], logo = { text1: "Store", text
         </div>
 
         <nav className="ml-auto hidden items-center gap-6 text-sm font-medium md:flex">
-          <Link href="/collections" className="text-zinc-300 transition hover:text-white">
+          <Link href="/collections" className="text-header-muted transition hover:text-header-fg">
             Shop all
           </Link>
         </nav>
@@ -48,13 +48,13 @@ export default function Header({ collections = [], logo = { text1: "Store", text
       </div>
 
       {stripItems.length > 0 && (
-        <nav className="border-t border-white/10">
+        <nav className="border-t border-header-fg/10">
           <div className="no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto px-3 sm:px-5">
             {stripItems.map((i) => (
               <Link
                 key={i.key}
                 href={i.href}
-                className="whitespace-nowrap rounded-full px-3 py-2 text-sm text-zinc-300 transition hover:text-white"
+                className="whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg"
               >
                 {i.label}
               </Link>

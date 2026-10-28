@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -14,12 +14,16 @@ import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { resolveBrand, brandCssVars } from "@/lib/brand";
-import { resolvedAnnouncement, resolvedNav, resolvedBrand, contentSource } from "@/lib/content/resolve";
+import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, contentSource } from "@/lib/content/resolve";
+import { kitAttr } from "@/lib/themes/kits";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+// S37: display serif for kits that ask for one (Glow). Loaded once; kits pick
+// it up through the --display-font token.
+const fraunces = Fraunces({ variable: "--font-fraunces", subsets: ["latin"], weight: ["400", "600", "700"] });
 
 // Render pages on the edge runtime — the libSQL client resolves to its
 // fetch-based `edge-light` build, and search uses edge-safe fetch.
@@ -65,11 +69,12 @@ async function navCollections() {
 async function chromeData() {
   try {
     return await tfetch(async () => {
-      const [announcement, navHeader, navFooter, brand, src] = await Promise.all([
+      const [announcement, navHeader, navFooter, brand, theme, src] = await Promise.all([
         resolvedAnnouncement(),
         resolvedNav("header"),
         resolvedNav("footer"),
         resolvedBrand(),
+        resolvedTheme(),
         contentSource(),
       ]);
       return {
@@ -90,6 +95,7 @@ async function chromeData() {
         // (and previewable) until the next publish. Default brand emits
         // nothing (globals.css already carries those values).
         brandCss: brand ? brandCssVars(resolveBrand(brand)) : "",
+        kitAttr: kitAttr(theme),
         preview: src.preview,
       };
     });
@@ -106,6 +112,7 @@ async function chromeData() {
       ga4Id: "",
       metaPixelId: "",
       brandCss: "",
+      kitAttr: "pulse-1",
       preview: false,
     };
   }
@@ -136,7 +143,7 @@ export default async function RootLayout({ children }) {
   }
   const [collections, cart, chrome] = await Promise.all([navCollections(), initialCart(), chromeData()]);
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
+    <html lang="en" data-kit={chrome.kitAttr} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
       {/* Brand variables: values come from lib/brand.js (validated hex/enum
           tokens only — nothing merchant-typed reaches this string raw). */}
       {chrome.brandCss ? <style id="brand-vars">{chrome.brandCss}</style> : null}

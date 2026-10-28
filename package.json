@@ -57,7 +57,8 @@
     "restore:drill": "node --env-file=.env.local scripts/restore-drill.js",
     "test:security": "node scripts/test-security.js",
     "test:content": "node scripts/test-content.js",
-    "test:releases": "node scripts/test-releases.js"
+    "test:releases": "node scripts/test-releases.js",
+    "test:themes": "node scripts/test-themes.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

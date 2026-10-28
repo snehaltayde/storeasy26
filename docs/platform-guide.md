@@ -286,7 +286,7 @@ exact URLs/clicks/commands · **Setup** — what must exist for it to work · **
 
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
-Navigation: **Offers · Orders · Storefront · Brand · Releases · Upsells · Integrations · Settings**.
+Navigation: **Offers · Orders · Storefront · Theme · Brand · Releases · Upsells · Integrations · Settings**.
 
 #### Login
 - **Use** (S26): `<tenant-host>/admin` → `/admin/login`; sign in with your EMAIL +
@@ -396,6 +396,42 @@ Navigation: **Offers · Orders · Storefront · Brand · Releases · Upsells · 
 - **Files**: [lib/brand.js](../lib/brand.js), `app/admin/brand/page.js`,
   `components/admin/BrandAdmin.js`, `app/api/admin/brand/route.js`,
   `app/globals.css` (token defaults + @theme mapping), `app/layout.js`.
+
+#### Theme tab
+- **What** (S37 / MC07): kit library. A kit is a complete, versioned look for
+  a vertical — surface colors (header/hero via `[data-kit="<id>-<version>"]`
+  CSS blocks), display font, brand-token defaults, starter hero copy. Two
+  kits ship: **Pulse** (nutrition/performance — the original dark+lime look,
+  also the implicit default) and **Glow** (beauty/self-care — airy light
+  surfaces, Fraunces serif display, rose accent, xl corners). Applying pins
+  `config.theme = {kit, version}` and seeds brand + hero presets as DRAFTS —
+  live changes only at the next publish, rollback always works.
+- **Pinning** (OP07): version-keyed CSS selectors mean a future kit version
+  ships as a NEW block; pinned tenants keep rendering theirs until they
+  explicitly apply the upgrade. Within one version, CSS bugfixes apply (it's
+  code). The kit pin rides the release snapshot like brand does.
+- **Files**: [lib/themes/kits.js](../lib/themes/kits.js) (registry + applyKit),
+  `app/admin/theme/page.js`, `components/admin/ThemeAdmin.js`,
+  `app/api/admin/theme/route.js`, kit CSS in `app/globals.css`, surface
+  tokens consumed by Header + the home hero, `/api/platform/themes` +
+  `components/platform/ThemesPanel.js` (operator registry, read-only).
+
+#### Storefront tab — section editor & draft preview (S37 / MC08)
+- **What**: the home page is a composable section tree — Collections grid,
+  Newest products, **Banner/CTA** (accent panel) and **Rich text**
+  (allowlist-sanitized HTML, same sanitizer as PDP descriptions). Reorder
+  (keyboard-reachable ↑/↓), hide, duplicate, remove, add; undo/redo;
+  **autosave** (1.2s debounce) with an honest indicator (Unsaved → Saving →
+  Saved-as-draft); the S35 conflict surface offers reload-or-overwrite.
+  The **Draft preview pane** mints an S36 preview token and iframes the real
+  storefront with real bindings at mobile/tablet/desktop widths.
+- **Templates** (MC09): "New page from template" (FAQ, brand story,
+  how-to-use, blank — [lib/content/templates.js](../lib/content/templates.js))
+  prefills the page editor; Clone copies any existing page to a new slug.
+  Collection/PDP template families arrive with their own variant systems (W4+).
+- **Files**: `components/admin/SectionsEditor.js`,
+  `components/admin/PreviewPane.js`, banner/rich_text validation in
+  [lib/cms/validate.js](../lib/cms/validate.js), renderers in `app/page.js`.
 
 #### Releases tab
 - **What** (S36 / BE09+MC13): publishing discipline. Content edits (storefront
@@ -598,7 +634,7 @@ Navigation: **Offers · Orders · Storefront · Brand · Releases · Upsells · 
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 23 aliased suites, **297 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 24 aliased suites, **307 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -634,9 +670,13 @@ Navigation: **Offers · Orders · Storefront · Brand · Releases · Upsells · 
   (S36: snapshot determinism + content hashing, atomic publish, draft→live
   no-leak, rollback preserving drafts, publish validation incl. dead catalog
   links, scheduled publish through the real jobs queue, preview token
-  expiry/tamper/tenant-binding).
+  expiry/tamper/tenant-binding) · themes 10 (S37: kit fixtures — WCAG + preset
+  + release validation per kit, accessibility of accent labels; applyKit draft
+  semantics incl. live-pointer no-touch and release-pinned theme; version
+  pinning with no silent upgrades; banner/rich_text section validation with
+  sanitize-at-save; page templates).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **318 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **328 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -1442,3 +1482,4 @@ run the verify checklist.
 | S34 | e2b23b8 | W2 exit: integrations registry + tab, support grants (time-limited, read-only, banner), restore drill, security gate + threat model (BE24+MC20+BE27+BE34+OP10) |
 | S35 | 6378a49 | W3: content service (versioned schemas, CAS draft revisions, HTML sanitizer) + brand token system (accent ladder, WCAG gate, /admin/brand) (BE08+MC10) |
 | S36 | 6f81cf8 | W3: immutable releases (atomic pointer, signed previews, scheduled publish, rollback) + releases tab + per-tenant manifest/offline/404 (BE09+MC13+SF23-full) |
+| S37 | (this session) | W3: theme kits Pulse+Glow (version-pinned, draft-apply), home section editor (banner/rich_text, undo/redo, autosave, preview pane), page templates, operator kit registry (MC07+MC08+MC09+OP07) |
