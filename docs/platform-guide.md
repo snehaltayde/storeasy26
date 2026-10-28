@@ -345,7 +345,7 @@ too. -->
 
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
-Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Brand · Releases · Upsells · Integrations · Settings**.
+Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Brand · Releases · Upsells · Integrations · Billing · Settings**.
 
 #### Login
 - **Use** (S26): `<tenant-host>/admin` → `/admin/login`; sign in with your EMAIL +
@@ -491,6 +491,40 @@ Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Bra
 - **Files**: `components/admin/SectionsEditor.js`,
   `components/admin/PreviewPane.js`, banner/rich_text validation in
   [lib/cms/validate.js](../lib/cms/validate.js), renderers in `app/page.js`.
+
+#### Billing tab (S40 / BE11 + MC24)
+- **What**: the merchant's plan, subscription state, usage and charges. The
+  PLATFORM bills merchants from its own Razorpay account
+  (`PLATFORM_RAZORPAY_KEY_ID/KEY_SECRET/WEBHOOK_SECRET` — fully separate from
+  tenant checkout keys). Versioned plan catalog (free ₹0 / starter ₹999 /
+  growth ₹2999 per month; a price/quota change = a NEW version, existing
+  subscribers stay pinned at the version they bought). Free plans activate
+  locally; paid plans create a provider subscription and show the Razorpay
+  authorization link — status then moves ONLY via webhooks
+  (`/api/platform/billing/webhook`, HMAC fail-closed, inbox-persisted,
+  jobs-applied, event-id-deduped, out-of-order-safe, terminal-state-
+  protected). **Grace → degraded** (BE33): payment trouble starts a grace
+  clock (`PLATFORM_BILLING_GRACE_DAYS`, default 7) with full service +
+  warnings; past grace, CHECKOUT pauses with honest copy while browsing,
+  content and order lookups stay fully live — a published store is never
+  hard-shut-down. Quotas meter with an 80% pre-limit warning (the orders
+  metric counts the tenant's real orders table); going over warns, never
+  blocks a sale. The storefront reads a SNAPSHOT (`config.billing`, pushed
+  on every applied event) — zero control-plane calls on the hot path.
+- **Files**: [lib/platform/billing.js](../lib/platform/billing.js) (core),
+  [lib/platform/razorpay-billing.js](../lib/platform/razorpay-billing.js)
+  (provider client), [lib/billing-state.js](../lib/billing-state.js)
+  (edge-safe grace/degraded/quota derivation),
+  [lib/admin/billing-view.js](../lib/admin/billing-view.js),
+  `app/admin/billing/`, `app/api/admin/billing/`,
+  `app/api/platform/billing/webhook/`, migration
+  `migrations/platform/0005_billing.sql`; degraded gate in
+  `checkoutCapability` ([lib/commerce/adapter.js](../lib/commerce/adapter.js)).
+- **Operator (OP08)**: /platform → Billing & revenue — MRR, gross/refunds/net
+  by month (sums over the deduped signed-amount ledger), per-tenant
+  subscription states, the exception queue (payment trouble, past-grace,
+  orphan events), and time-limited reasoned entitlement overrides (audited;
+  they win per-field over plan features).
 
 #### Catalog tab (S39 / MC05 + MC06)
 - **What**: the catalog browser. Shopify-owned VALUES (title, type, price,
@@ -755,7 +789,7 @@ Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Bra
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 26 aliased suites, **337 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 27 aliased suites, **351 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -808,9 +842,15 @@ Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Bra
   refusals; campaign family/window validation + visibility + snapshot; utm
   propagation rules; product-override sanitize + deleted-product guard;
   collection-pin ownership + featured ordering; nested-nav validation +
-  release child-link checks; upsell enabled-state round-trip).
+  release child-link checks; upsell enabled-state round-trip) · billing 14
+  (S40: versioned plan catalog immutability, free-local vs paid-needs-provider,
+  charged→ledger, event-id dedupe, refund matching to net, out-of-order
+  watermark, grace→degraded clocks + recovery, terminal-state protection,
+  orphan-event exceptions, pinned-version entitlements, override
+  precedence/expiry, degraded-pauses-checkout-only, idempotent usage + 80%
+  quota warnings, MRR).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **358 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **372 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -1622,3 +1662,4 @@ run the verify checklist.
 | S37 | 7913508 | W3: theme kits Pulse+Glow (version-pinned, draft-apply), home section editor (banner/rich_text, undo/redo, autosave, preview pane), page templates, operator kit registry (MC07+MC08+MC09+OP07) |
 | S38 | 389a0d1 | W3: media pipeline + library (tenant-DB blobs, magic-byte + SVG sanitize, dedupe, usage-guarded delete), typed/policy pages + BeastLife-defaults containment + checkout policy links, curated collections index, collection sort/filters, PDP extras + sticky CTA + invalid-variant states, SQL search decision + ranking + recents (BE15+MC12+SF13+SF14+SF01–05+BE05) |
 | S39 | ed34439 | W3 EXIT: BE23 notification service (durable intents, honest states, consent separation) + contact form/inbox, FAQ accordions w/ deep links, campaign landing pages (UTC windows, utm retention), catalog browser w/ per-product modules + pinned collections, nested nav + real footer links, upsell quirk fix (SF15–17+MC05+MC06+MC11+MC15+BE23) |
+| S40 | (this session) | W4 opens: billing & entitlements — versioned plan catalog, Razorpay Subscriptions lifecycle (HMAC webhook → inbox → jobs; dedupe, out-of-order watermark, terminal protection), signed-amount ledger, grace→degraded (checkout pauses, store never dies), quotas w/ 80% warnings, MC24 billing tab, OP08 operator reconciliation + overrides (BE11+BE33+MC24+OP08) |

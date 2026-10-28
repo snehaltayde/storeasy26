@@ -5,19 +5,20 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S39 (**W1+W2+W3 complete**).
+- Created: 2026-10-28 (session S25). Last updated: S40 (W1+W2+W3 complete; W4 underway).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 60 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 64 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
   BE18, SF24, BE20 — S33, with SF08 completed; BE24, MC20, BE27, BE34,
   OP10 — S34; BE08, MC10 — S35; BE09, MC13 — S36, with SF23 completed;
   MC07, MC08, MC09, OP07 — S37; SF01–05, SF13, SF14, BE05, BE15,
-  MC12 — S38; SF15, SF16, SF17, MC05, MC06, MC11, MC15, BE23 — S39).
-  The other 56 are **not inspected** — the handoff's Fix/Extend/New labels
-  for them remain unverified documentation claims.
+  MC12 — S38; SF15, SF16, SF17, MC05, MC06, MC11, MC15, BE23 — S39;
+  BE11, BE33, MC24, OP08 — S40). The other 52 are **not inspected** — the
+  handoff's Fix/Extend/New labels for them remain unverified documentation
+  claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -977,6 +978,61 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
 - Remaining: per-kit fixture SCREENSHOT diffs, a11y audit beyond contrast
   (focus order etc.) — W4 polish.
 
+### BE11 — Billing (Razorpay Subscriptions) · **partial (core implemented & verified, S40)**
+
+- Platform migration 0005: versioned `plans` (a change = version+1, old rows
+  immutable for pinned subscribers), `subscriptions` (provider id, status,
+  period, grace watermark), append-only `billing_events` ledger (signed
+  amounts, provider-event-id dedupe), `entitlement_overrides`, `usage_events`.
+  The platform bills from ITS OWN Razorpay account (PLATFORM_RAZORPAY_* env,
+  separate from tenant checkout keys). Free plans activate locally; paid
+  plans mirror into the provider lazily and return the authorization
+  short_url; an unconfigured provider is an honest 503, never a mock.
+  Webhook: HMAC fail-closed (401 live-verified) → inbox persist → jobs apply
+  (billing_apply handler), with out-of-order watermark + terminal-state
+  protection and refunds matched to charges by payment id.
+- Pending external (tracked, not claimed): a real PLATFORM Razorpay account +
+  webhook registration + one real authorize/charge/refund cycle — USER-GATED
+  (money). Subscription CANCELLATION from the console is deliberately absent
+  until then (provider action); plan changes today are free-plan switches.
+
+### BE33 — Entitlements enforcement · **partial (core implemented & verified, S40)**
+
+- Entitlements = pinned plan features ← time-limited reasoned operator
+  override (per-field; expired overrides ignored). Every applied event
+  pushes a SNAPSHOT into tenants.config.billing; lib/billing-state.js
+  (edge-safe, pure) derives grace/degraded/quota states from it — zero
+  control-plane calls on the shopper hot path. **Degraded = checkout pauses
+  with honest copy; browsing/content/order-lookup stay live** (live-proven
+  on demo: /api/checkout 503 with the copy while home/collections/search
+  stayed 200; recovery within the resolver's 30s config cache). Grace
+  default 7 days (PLATFORM_BILLING_GRACE_DAYS). Quotas: 80% pre-limit
+  warning, over = warn-never-block (the orders metric counts the tenant's
+  real orders table; usage_events carries other metrics idempotently).
+- Deliberately NOT YET enforced (recorded): per-feature gating beyond the
+  degraded-checkout rule (e.g. blocking campaigns on free) — lands with W4's
+  onboarding work once plans are actually sold.
+
+### MC24 — Billing tab · **verified complete (S40, current provider scope)**
+
+- /admin/billing (settings-domain roles): status chip (incl. grace countdown
+  + degraded explainer that names exactly what paused), plan cards from the
+  versioned catalog, authorization link for pending provider subs, quota
+  bars with warnings, charge/refund history from the ledger, operator-
+  adjustment visibility. Shared view assembler (lib/admin/billing-view.js)
+  keeps page and API identical. Legacy/env tenants get an honest
+  "needs the control plane" state.
+
+### OP08 — Revenue reconciliation · **verified complete (S40, subscription scope)**
+
+- /platform → Billing & revenue: MRR (active subs at monthly-ized price),
+  gross/refunds/net by month (straight SUMs over the deduped signed ledger),
+  per-tenant subscription states (past-grace flagged degraded), exception
+  queue (payment trouble, past grace, orphan events — orphans land in the
+  ledger, never dropped), and entitlement overrides (set/clear, reasoned,
+  audited, optional expiry). Merchant-order revenue reconciliation (the
+  storefront side) is BE21/S42 — this view is the SUBSCRIPTION ledger.
+
 ## W3 EXIT (recorded S39, 2026-10-28)
 
 Exit evidence per the handoff ("tenant-specific pages from releases; no
@@ -997,6 +1053,27 @@ draft/live leakage; publish + rollback demonstrated"):
 - Deliberate scope notes carried into W4: catalog presentation overrides +
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S40, 2026-10-28)
+
+27 suites / **351 tests + 21 offers = 372 checks** green (new `test:billing`,
+14), `pnpm build` clean. Platform migration 0005 applied to the hosted
+control plane. Live (hosted control plane + dev server): default plans
+seeded; demo subscribed to FREE (local activation, snapshot pushed,
+entitlements resolve); synthetic payment-trouble drill on a throwaway
+provider sub — activated → charged (₹999 in the ledger) → halted with an
+already-expired grace → **checkout paused with the honest copy (API 503
+CHECKOUT_DISABLED) while home/collections/search stayed 200** → resumed →
+checkout back (within the resolver's 30s config cache) → drill rows deleted,
+demo left clean on Free (overview: MRR 0, demo:free:active). Webhook
+endpoint fail-closed 401 without a valid signature (no secret set = always
+refuse). GOTCHA logged: SQLite `datetime('now')` (space format) sorts before
+ISO timestamps — the drill's first snapshot picked the wrong "latest"
+subscription until the row got a proper ISO created_at (lib code always
+writes ISO; hand-written SQL in drills must too). NOT verified: real
+provider flows (account, webhook registration, authorize/charge/refund) —
+USER-GATED; the authenticated console walkthrough remains the standing user
+action.
 
 ## Verification state (S39, 2026-10-28)
 
@@ -1194,7 +1271,7 @@ shopify-push 13, hardening 11, offers-admin 8, events 16, tenancy 9, platform-sy
 
 ## Other records
 
-All remaining 56 records: **not inspected** (states will change only with code
+All remaining 52 records: **not inspected** (states will change only with code
 audits/implementation in their scheduled sessions; see roadmap phases S26–S49).
 Incidental observations made during the S25 audits, recorded WITHOUT claiming a full
 audit of those records:
