@@ -105,6 +105,19 @@ export const POST = tenantHandler(async (request) => {
       { status: 503 },
     );
   }
+  // S47 (OP13): the operator kill-switch — ff_checkout is CRITICAL, so this
+  // read is uncached: an emergency disable stops the very next request on
+  // every instance. Fail-open: a control-plane outage never closes checkout.
+  {
+    const { flagEnabled } = await import("@/lib/platform/flags");
+    const { currentTenant } = await import("@/lib/tenant-context");
+    if (!(await flagEnabled("ff_checkout", currentTenant()?.id || null, { fallback: true }))) {
+      return NextResponse.json(
+        { error: "Checkout is briefly paused by the platform — nothing was charged. Please try again shortly.", code: "CHECKOUT_DISABLED" },
+        { status: 503 },
+      );
+    }
+  }
   const limited = rateLimit(request, { name: "checkout", limit: 10 });
   if (limited) return limited;
 
@@ -161,9 +174,14 @@ export const POST = tenantHandler(async (request) => {
         await clearCart(cartId);
         // Async after the response: Shopify push (payment-pending) + the
         // server-side purchase event (durable, browser-independent).
+        // S47 (BE22): experiment conversion join — best-effort, AFTER the
+        // money committed, idempotent per (experiment, order).
+        const expUnit = request.cookies.get("_unit")?.value || null;
         after(async () => {
           await enqueueShopifyPush(order.id);
           await enqueuePurchaseAndForward(order.id);
+          const { recordConversions } = await import("@/lib/experiments");
+          await recordConversions(expUnit, order.id, order.total).catch(() => {});
         });
       }
       return await codResponse(order, order.deduped);
@@ -249,9 +267,14 @@ export const POST = tenantHandler(async (request) => {
       });
       if (cartId) await clearCart(cartId);
       if (!paid.already) {
+        const expUnit = request.cookies.get("_unit")?.value || null;
         after(async () => {
           await enqueueShopifyPush(orderId);
           await enqueuePurchaseAndForward(orderId);
+          const { recordConversions } = await import("@/lib/experiments");
+          const { db } = await import("@/lib/db");
+          const row = await db.selectFrom("orders").select("total").where("id", "=", orderId).executeTakeFirst().catch(() => null);
+          await recordConversions(expUnit, orderId, row?.total ?? 0).catch(() => {});
         });
       }
       return NextResponse.json({

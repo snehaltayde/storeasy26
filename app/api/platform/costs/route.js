@@ -1,0 +1,47 @@
+import { NextResponse } from "next/server";
+import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
+import { costReport, setCostInputs } from "@/lib/platform/costs";
+import { patchTenant, getTenant } from "@/lib/platform/control";
+import { audit } from "@/lib/platform/audit";
+
+// Operator unit costs (S47 / OP09). The operator enters the real monthly
+// provider totals; allocation uses MEASURED drivers with the method stated,
+// and the unallocated remainder stays visible. Budgets alert — they never
+// silently charge a merchant anything.
+//   GET ?month=YYYY-MM          → report (defaults to this month)
+//   POST {inputs:{month, totals, note}}
+//   POST {budget:{tenant, amount|null}}   → per-tenant monthly alert budget
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const authed = async (request) => verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value);
+
+export async function GET(request) {
+  if (!(await authed(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const month = new URL(request.url).searchParams.get("month") || undefined;
+  return NextResponse.json({ ok: true, report: await costReport(month) });
+}
+
+export async function POST(request) {
+  if (!(await authed(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const body = await request.json().catch(() => ({}));
+  try {
+    if (body.inputs) {
+      const r = await setCostInputs(String(body.inputs.month || ""), body.inputs.totals, body.inputs.note);
+      await audit({ actor: "operator", action: "costs.inputs", resource: `costs:${r.month}`, diff: r.totals });
+      return NextResponse.json({ ok: true, ...r });
+    }
+    if (body.budget) {
+      const t = await getTenant(String(body.budget.tenant || ""));
+      if (!t) return NextResponse.json({ error: "unknown tenant" }, { status: 404 });
+      const amount = body.budget.amount == null ? null : Number(body.budget.amount);
+      if (amount != null && (!Number.isFinite(amount) || amount <= 0)) return NextResponse.json({ error: "budget must be a positive number (or null to clear)" }, { status: 422 });
+      await patchTenant(t.id, { config: { ...t.config, cost_budget: amount } });
+      await audit({ actor: "operator", action: "costs.budget", tenantId: t.id, diff: { cost_budget: amount } });
+      return NextResponse.json({ ok: true, tenant: t.id, cost_budget: amount });
+    }
+    return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
+  } catch (e) {
+    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
+  }
+}

@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import ProductGrid from "@/components/ProductGrid";
 import CollectionCard from "@/components/CollectionCard";
+import ExperimentPing from "@/components/ExperimentPing";
 import MarketingHome from "@/components/site/MarketingHome";
+import { runningExperimentFor, heroVariantFor, UNIT_COOKIE } from "@/lib/experiments";
 import { isPlatformSiteHost } from "@/lib/platform-site";
 import { getFeaturedCollections, getCollectionsByHandles, getNewestProducts, getCatalogStats } from "@/lib/repo";
 import { resolvedHero, resolvedHomeSections, resolvedCollectionsIndex } from "@/lib/content/resolve";
@@ -30,8 +32,16 @@ export default async function Home() {
   // S44: on a designated PLATFORM host, "/" is the marketing homepage.
   if (isPlatformSiteHost((await headers()).get("host"))) return <MarketingHome />;
 
-  const { hero, sections, stats, data } = await tfetch(async () => {
-    const [hero, sections, stats, index] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats(), resolvedCollectionsIndex()]);
+  // S47 (BE22): a running hero experiment overlays the assigned variant.
+  // The unit cookie is functional (like the cart cookie); a first-time
+  // visitor gets an id the ping component persists — the pure-hash
+  // assignment makes this render and every later one agree on the variant.
+  const unitId = (await cookies()).get(UNIT_COOKIE)?.value || crypto.randomUUID();
+
+  const { hero, sections, stats, data, assignment } = await tfetch(async () => {
+    const [liveHero, sections, stats, index] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats(), resolvedCollectionsIndex()]);
+    const heroExp = await runningExperimentFor("hero");
+    const { hero, assignment } = heroVariantFor(heroExp, liveHero, unitId);
     const data = {};
     for (const s of sections) {
       if (s.kind === "collections") {
@@ -41,12 +51,13 @@ export default async function Home() {
       }
       if (s.kind === "new") data.products = await getNewestProducts(s.limit || 8);
     }
-    return { hero, sections, stats, data };
+    return { hero, sections, stats, data, assignment };
   });
   const empty = stats.products === 0;
 
   return (
     <div>
+      {assignment && <ExperimentPing slug={assignment.slug} unit={unitId} />}
       {/* Hero */}
       <section className="relative overflow-hidden bg-hero text-hero-fg">
         <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-accent-500/20 blur-3xl" />

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import QueuesPanel from "./QueuesPanel";
+import { FlagsPanel, CostsPanel } from "./GrowthOpsPanels";
 import ThemesPanel from "./ThemesPanel";
 import BillingPanel from "./BillingPanel";
 import ProvisionRunsPanel from "./ProvisionRunsPanel";
@@ -281,6 +282,8 @@ export default function PlatformAdmin() {
       <ProvisionRunsPanel />
       <ThemesPanel />
       <BillingPanel />
+      <FlagsPanel />
+      <CostsPanel />
       <QueuesPanel />
     </div>
   );

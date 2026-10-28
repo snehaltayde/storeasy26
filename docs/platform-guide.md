@@ -689,6 +689,51 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   orphan events), and time-limited reasoned entitlement overrides (audited;
   they win per-field over plan features).
 
+#### Experiments tab (S47 / BE22 + MC18)
+- **What**: A/B tests on the home hero, with the honesty rules in the engine,
+  not the copy. Assignment is a pure hash of (salt | slug | unit-cookie) —
+  stable, server-evaluated, reproducible; the client never picks a variant
+  (`/api/exp` re-derives it from the cookie). The analysis plan (hypothesis,
+  allocation, minimum sample, salt) FREEZES at start; a running experiment
+  refuses edits. One running experiment per surface.
+- **No false winners**: winner interpretation is blocked — with the reasons
+  shown — while running (no peeking), while any variant is under its minimum
+  sample, or when a chi-square sample-ratio check (α=0.001) says exposure
+  logging is broken. When allowed, a two-proportion z-test either names a
+  winner at 95% confidence or says "no significant difference" (A/A tests
+  come out as that honest null). Exposures: first-per-unit wins (INSERT OR
+  IGNORE); conversions join exposures by unit, one row per (experiment,
+  order), written best-effort AFTER the money path.
+- **Adoption**: writes the variant as the hero DRAFT through the normal CMS
+  store — publishing it is still the Releases tab and its permission.
+- **Files**: [lib/experiments.js](../lib/experiments.js), `app/api/exp/`,
+  `app/api/admin/experiments/`, `app/admin/experiments/`,
+  `components/admin/ExperimentsAdmin.js`,
+  [components/ExperimentPing.js](../components/ExperimentPing.js), hooks in
+  `app/page.js` + `app/api/checkout/route.js`, migration
+  `migrations/tenant/0012_experiments_ai.sql`.
+
+#### Insights tab (S47 / BE32 + MC19)
+- **What**: AI-assisted suggestions from AUTHORIZED tenant facts only —
+  catalog stats, top sellers from order snapshots, zero-result searches, the
+  current hero — gathered inside the tenant scope (no path to another
+  store's data) with a PII guard that refuses to call the model if an email
+  or phone ever reaches the facts. No API key = the honest "not configured"
+  state (`ANTHROPIC_API_KEY`), never a mock.
+- **Untrusted output**: the model's reply must parse into the proposal
+  schema, target only allowlisted components (hero, announcement, none) and
+  cite only real fact ids — invented evidence or foreign components are
+  rejected and NOTHING is stored. Facts are declared data-not-instructions
+  in the prompt, and the validator is the actual boundary.
+- **Budgets + permissions**: a monthly token budget (config
+  `ai_budget_tokens`, default 200k) metered on the platform usage ledger
+  gates every call; applying a proposal's draft writes through the normal
+  CMS store (draft only — the AI cannot publish, refund or change prices,
+  structurally: no such code path exists).
+- **Files**: [lib/ai/insights.js](../lib/ai/insights.js),
+  `app/api/admin/insights/`, `app/admin/insights/`,
+  `components/admin/InsightsAdmin.js`.
+
 #### Catalog tab (S39 / MC05 + MC06)
 - **What**: the catalog browser. Shopify-owned VALUES (title, type, price,
   stock) are read-only, labeled, and deep-linked to Shopify admin; the
@@ -923,6 +968,31 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   add the domain to the project. A wildcard platform domain is a pending purchase —
   until then every hostname is explicitly mapped.
 
+#### Feature flags & unit costs (S47 / OP13 + OP09, platform console)
+- **Flags (OP13)**: server-evaluated rollout/kill switches in the control
+  plane, namespaced `ff_*` and DELIBERATELY separate from billing
+  entitlements (the namespace is enforced; billing never reads this table).
+  Per-tenant cohorts, expiry (expired = off for everyone), audited writes,
+  one-click emergency disable. CRITICAL flags (the `ff_checkout`
+  kill-switch, wired into `/api/checkout`) are re-read UNCACHED on every
+  evaluation — an emergency disable stops the next request on every
+  instance; non-critical flags cache 30s per process. Fail-open by design: a
+  control-plane outage never closes checkout. Files:
+  [lib/platform/flags.js](../lib/platform/flags.js), `app/api/platform/flags/`.
+- **Costs (OP09)**: the operator enters the REAL monthly provider totals
+  (compute/db/mail/ai/other, INR); each bucket is allocated to tenants by a
+  MEASURED driver with the method stated next to the numbers (compute ∝
+  orders+jobs, db ∝ media bytes + product-row proxy, mail ∝ notification
+  intents, ai ∝ metered tokens). Whatever no driver covers — including the
+  whole "other" bucket and the stated gaps (bandwidth, build minutes) —
+  stays a VISIBLE unallocated remainder. Unreachable tenants are listed as
+  unmeasured, never silently zero. Per-tenant budgets (tenant config
+  `cost_budget`) ALERT — nothing is ever auto-charged. Files:
+  [lib/platform/costs.js](../lib/platform/costs.js),
+  `app/api/platform/costs/`, panels in
+  `components/platform/GrowthOpsPanels.js`, platform migration
+  `migrations/platform/0009_flags_costs.sql`.
+
 ### 2D. Data & tracking
 
 #### First-party event pipeline
@@ -986,7 +1056,7 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 34 aliased suites, **406 tests + 10 perf budgets**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 35 aliased suites, **427 tests + 10 perf budgets**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -1077,11 +1147,23 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   journal scheduled publish + redirect_from incl. self-redirect refusal and
   live-page-beats-stale-redirect; returns eligibility matrix + ownership-as-
   404 + one-open-per-order + state machine + APPROVAL-MOVES-NO-MONEY proof) ·
+  growth 21 (S47: experiment validation/control-first, deterministic
+  weighted assignment, plan-freeze + hypothesis-required + one-per-target,
+  server-derived exposures + idempotent conversions, NO-PEEKING block,
+  SRM chi-square guard, winner-only-when-earned + A/A honest null,
+  adoption-as-draft w/ live release untouched; AI facts PII guard,
+  invented-evidence/foreign-component rejection, hostile-output stores
+  nothing, metered tokens + budget refusal + honest unconfigured; flag
+  namespace separation, cohort/expiry/fallback, UNCACHED critical reads
+  seeing another instance's flip, audited emergency disable; cost input
+  validation, proportional allocation w/ zero-driver buckets and 'other'
+  staying unallocated, allocated+unallocated=total, budget alerts +
+  unmeasured-tenant visibility) ·
   perf 10 (S42 / BE35 budgets — see below).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (27 pure
   assertions incl. the S46 BUNDLE matrix: complete-set saving, exact
   proportional allocation, multiples, incomplete sets, claimed-line
-  exclusivity vs TIERED, coupons on the net — **443 checks in all**) and
+  exclusivity vs TIERED, coupons on the net — **464 checks in all**) and
   `pnpm build` as the compile gate.
 - **Perf budgets** (`pnpm test:perf`, BE35): 5,000-product fixture — PDP
   lookup ≤150ms, collection page (featured sort + facets, price+stock
@@ -1909,3 +1991,4 @@ run the verify checklist.
 | S44 | d878967 | W4 EXIT: marketing website on designated platform hosts — homepage w/ substantiated claims, pricing from the LIVE plan catalog, honest template gallery, vertical pages, status-accurate integrations, deployed-controls-only trust page, consent-aware lead capture + SaaS legal drafts; tenant hosts 404 all of it (MK01–05+MK07+MK08) |
 | S45 | c9f7429 | W5: customer accounts — passwordless OTP (hashed, capped, enumeration-safe), verified-email order claiming, per-store identities with structural cross-store isolation, account dashboard + ownership-scoped order detail, reorder with live line-by-line revalidation, redaction covers accounts (BE30+SF10+SF11+SF12) |
 | S46 | e0a1d1d | W5: commerce expansion — bundles AS offers (compatibility-gated BUNDLE line offers, zero new money paths, honest sold-out states), deterministic product-finder quiz (tags tally, no AI), editorial journal (scheduled publish, slug-rename 308 redirects), returns request flow (state machine, APPROVAL ≠ REFUND, money columns proven untouched); selling plans recorded as not built (BE31 partial+SF18+SF19+SF20+SF21) |
+| S47 | _(recorded post-commit)_ | W5: growth ops — experiments w/ frozen plans, pure-hash assignment, SRM + no-peeking + sufficiency gates and adoption-as-draft; AI insights from tenant-only PII-guarded facts w/ untrusted-output validation, token budgets and honest unconfigured state; server-evaluated ff_* flags w/ uncached critical checkout kill-switch; tenant unit costs w/ stated allocation methods and a visible unallocated remainder (BE22+MC18+BE32+MC19+OP09+OP13) |

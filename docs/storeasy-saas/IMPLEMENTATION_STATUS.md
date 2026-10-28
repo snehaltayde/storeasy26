@@ -5,10 +5,10 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S46 (W1–W4 complete; W5 underway).
+- Created: 2026-10-28 (session S25). Last updated: S47 (W1–W4 complete; W5 underway).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 99 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 105 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
@@ -20,7 +20,8 @@ by a code audit or implementation in this repo — never by documentation alone.
   BE21, MC04, MC17, OP02, OP06, BE35 — S42; MC21, MC23, MC25, MC26, MC27,
   OP11, OP12, BE29 — S43; MK01, MK02, MK03, MK04, MK05, MK07, MK08 — S44;
   BE30, SF10, SF11, SF12 — S45; BE31 (partial — selling plans not built),
-  SF18, SF19, SF20, SF21 — S46). The other 17 are **not inspected** — the
+  SF18, SF19, SF20, SF21 — S46; BE22, MC18, BE32, MC19, OP09, OP13 — S47).
+  The other 11 are **not inspected** — the
   handoff's Fix/Extend/New labels for them remain unverified documentation
   claims.
 
@@ -1352,6 +1353,89 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   demo over HTTP (request → duplicate refused → approve → complete), then
   the probe order was cancelled per test-order hygiene.
 
+### BE22 — Experimentation · **verified complete (S47)**
+
+- Stable assignment = pure FNV-1a hash of (salt | slug | unit cookie) over
+  cumulative weights — deterministic, server-evaluated, reproducible; the
+  client never picks (the exposure API re-derives the variant from the
+  cookie). The analysis plan (hypothesis required, allocation, min sample,
+  salt) FREEZES at start; running experiments refuse edits; one running
+  experiment per surface. Exposures: first-per-unit (INSERT OR IGNORE);
+  conversions join exposures by unit, one row per (experiment, order),
+  recorded best-effort AFTER the money committed — reproducible joins, both
+  tables keep raw keys.
+- **Acceptance held in code**: winner interpretation is blocked with stated
+  reasons while running (no peeking), under min_sample, or on chi-square
+  sample-ratio mismatch (α=0.001); when allowed, a two-proportion z-test
+  names a winner at 95% or returns the honest "no significant difference"
+  (A/A ⇒ null result). Adoption routes through the normal CMS draft →
+  release publish path; suite proves the live release stays untouched.
+- Live on demo: variant hero served stably per unit, exposure recorded over
+  HTTP, a real COD order joined as a conversion (then cancelled), analysis
+  blocked honestly at n=1, completion stopped serving.
+
+### MC18 — Experiments tab · **verified complete (S47)**
+
+- /admin/experiments: create (control-first variants, weights, hypothesis,
+  min sample), start/pause/resume/complete, results table with sufficiency
+  per variant, SRM state, the block reasons VERBATIM instead of a winner,
+  and adopt buttons only on completed experiments ("saved as a draft —
+  publish a release to take it live"). Writes need storefront.write;
+  publishing keeps its own permission (Releases).
+
+### BE32 — AI assistance · **verified complete (S47; live model call pending external key)**
+
+- Facts are gathered ONLY inside the tenant scope (no cross-store code
+  path) and carry no PII — a guard refuses the model call outright if an
+  email/phone pattern ever reaches the facts. Model output is UNTRUSTED:
+  schema-validated, components allowlisted (hero/announcement/none),
+  evidence must cite real fact ids — the injection suite proves hostile
+  output stores NOTHING. Monthly token budget per tenant
+  (ai_budget_tokens, default 200k) metered on the platform usage ledger;
+  spent budget = refusal with the numbers. Every write the AI can cause is
+  a CMS DRAFT through the normal store — publish/refund/price paths don't
+  exist for it.
+- **Pending external**: ANTHROPIC_API_KEY is not set, so the live provider
+  call hasn't run — the configured state was verified as the honest 503
+  ("not configured — nothing is mocked"). The provider adapter is
+  `anthropicCall` in lib/ai/insights.js; tests exercise the full pipeline
+  with injected mock calls.
+
+### MC19 — AI recommendations · **verified complete (S47, same external note)**
+
+- /admin/insights: budget + model + configured state up front, proposals
+  with expandable evidence (the actual fact text), dismiss/restore, "apply
+  as draft" per proposal, and the boundary stated in the UI: the assistant
+  proposes, the merchant reviews, nothing goes live without a release.
+
+### OP09 — Tenant unit costs · **verified complete (S47)**
+
+- Operator enters the real monthly provider totals; allocation by measured
+  drivers with the method PRINTED next to the numbers (compute ∝
+  orders+jobs, db ∝ media bytes + product-row proxy, mail ∝ notification
+  intents, ai ∝ metered tokens). The acceptance's core: the unallocated
+  remainder (the whole "other" bucket, zero-driver buckets, stated
+  measurement gaps) stays VISIBLE — suite asserts allocated + unallocated =
+  total exactly, and that a zero-driver bucket allocates nothing rather
+  than splitting evenly. Unreachable tenants are listed as unmeasured.
+  Per-tenant budgets (config cost_budget) raise alerts linking to
+  quota/flag actions — nothing is auto-charged. Live report ran over the
+  hosted 3-tenant fleet.
+
+### OP13 — Feature flags and quotas · **verified complete (S47)**
+
+- Server-evaluated flags in the control plane, namespaced ff_* — the
+  namespace is ENFORCED, separating release flags from purchased
+  entitlements (billing never reads this table). Cohorts per tenant,
+  expiry = off for everyone, audited writes, emergency disable (default
+  off + cohorts cleared). CRITICAL flags are re-read uncached on every
+  evaluation: the suite proves a raw DB flip from "another instance" is
+  seen immediately while non-critical flags ride the 30s cache. Wired
+  consumer: `ff_checkout` in /api/checkout — live drill on demo:
+  emergency disable → next checkout request 503 with honest copy while
+  browsing stayed 200 → restore → a real order went through. Fail-open by
+  design (a control-plane outage never closes checkout), documented.
+
 ## W4 EXIT (recorded S44, 2026-10-28)
 
 Exit evidence per the handoff ("independent merchants launch self-serve;
@@ -1408,6 +1492,35 @@ draft/live leakage; publish + rollback demonstrated"):
 - Deliberate scope notes carried into W4: catalog presentation overrides +
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S47, 2026-10-28)
+
+35 aliased suites / **427 tests + 10 perf budgets + 27 offers = 464 checks**
+green (new `test:growth`, 21), `pnpm build` clean (known NFT warning).
+Platform migration 0009 (feature_flags, cost_inputs) + tenant migration
+0012 (experiments, exposures, conversions, ai_insights) applied hosted —
+tenant canary-first (demo → fleet) + env default. Live on hosted demo:
+experiment "hero-promise" seeded from a real hypothesis and STARTED → the
+probe unit assigned to variant b saw the variant hero over HTTP, the
+control unit saw the live hero, the same unit got the same hero twice
+(stable assignment), beastlife was untouched → exposure POST recorded →
+kill-switch drill: `ff_checkout` emergency-disabled from a SEPARATE
+process → the dev server's very next checkout POST returned the 503
+platform copy (uncached critical read across instances) while browsing
+stayed 200 → flag restored → a real COD order (snehal@mediastic.in,
+₹20,047) went through and JOINED the experiment as a conversion (unit →
+order, reproducible) → analysis honestly blocked (running + insufficient,
+verdict null) → experiment completed (stops serving) → probe order
+CANCELLED both sides. Costs: placeholder provider totals entered with an
+honest note → report over the hosted fleet allocated ₹3,700.01 of ₹4,500
+with ₹799.99 visibly unallocated (allocated+unallocated=total exactly;
+per-tenant drivers measured live). AI: no ANTHROPIC_API_KEY on this
+machine, so the live state verified is the honest "not configured" 503 —
+the full pipeline (facts→PII guard→validation→budget→storage→draft) is
+suite-proven with injected mock calls; a real provider call is the
+recorded external pending item. Demo keeps the completed experiment and
+the standing critical `ff_checkout` flag (ON); cost inputs kept with the
+placeholder note.
 
 ## Verification state (S46, 2026-10-28)
 
