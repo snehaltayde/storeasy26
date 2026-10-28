@@ -18,6 +18,7 @@ const TABS = [
   { href: "/admin/releases", label: "Releases" },
   { href: "/admin/upsells", label: "Upsells" },
   { href: "/admin/experiments", label: "Experiments" },
+  { href: "/admin/automations", label: "Automations" },
   { href: "/admin/insights", label: "Insights" },
   { href: "/admin/integrations", label: "Integrations" },
   { href: "/admin/billing", label: "Billing" },

@@ -39,6 +39,12 @@ export default function Header({ collections = [], logo = { text1: "Store", text
           </Link>
         </nav>
 
+        {/* S49 (SF22): local-first wishlist */}
+        <Link href="/wishlist" aria-label="Wishlist" className="shrink-0 p-1 text-header-muted transition hover:text-header-fg">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" />
+          </svg>
+        </Link>
         {/* S45 (SF10): optional shopper account — guest checkout untouched */}
         <Link href="/account" aria-label="Your account" className="shrink-0 p-1 text-header-muted transition hover:text-header-fg">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

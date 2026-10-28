@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductGallery from "@/components/ProductGallery";
 import ProductPurchase from "@/components/ProductPurchase";
+import WishlistButton from "@/components/WishlistButton";
 import ProductCard from "@/components/ProductCard";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import { getProductByHandle } from "@/lib/repo";
@@ -143,6 +144,9 @@ export default async function ProductPage({ params }) {
           <h1 className="mt-1 text-3xl font-extrabold tracking-tight">{product.title}</h1>
 
           <ProductPurchase product={product} />
+          <div className="mt-3">
+            <WishlistButton handle={product.handle} />
+          </div>
 
           {product.description_html ? (
             <div className="mt-8 border-t border-zinc-100 pt-8">

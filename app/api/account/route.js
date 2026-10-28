@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { requestOtp, verifyOtp, customerFromToken, revokeCustomerSession, updateCustomerProfile, customerOrders, buildReorder, validEmail, CUSTOMER_COOKIE } from "@/lib/customers";
 import { requestReturn } from "@/lib/returns";
+import { mergeWishlist, accountWishlist, removeWishlistItem } from "@/lib/wishlist";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
@@ -28,6 +29,7 @@ export const GET = tenantHandler(async (request) => {
   const url = new URL(request.url);
   const view = url.searchParams.get("view") || "me";
   if (view === "orders") return NextResponse.json({ ok: true, authenticated: true, customer, orders: await customerOrders(customer.id) });
+  if (view === "wishlist") return NextResponse.json({ ok: true, authenticated: true, items: await accountWishlist(customer.id) });
   if (view === "reorder") {
     const r = await buildReorder(customer.id, String(url.searchParams.get("order") || ""));
     if (!r) return NextResponse.json({ error: "order not found" }, { status: 404 });
@@ -79,6 +81,20 @@ export const POST = tenantHandler(async (request) => {
         await runDueJobs({ limit: 5 }).catch(() => {});
       });
       return NextResponse.json({ ok: true, request: r });
+    }
+    if (body.action === "wishlist_merge") {
+      // SF22: the EXPLICIT merge — the only way local items reach the account
+      const customer = await me(request);
+      if (!customer) return NextResponse.json({ error: "sign in first" }, { status: 401 });
+      const r = await mergeWishlist(customer.id, body.items);
+      slog("wishlist_merged", { added: r.added, deduped: r.deduped });
+      return NextResponse.json({ ok: true, ...r, items: await accountWishlist(customer.id) });
+    }
+    if (body.action === "wishlist_remove") {
+      const customer = await me(request);
+      if (!customer) return NextResponse.json({ error: "sign in first" }, { status: 401 });
+      await removeWishlistItem(customer.id, body.handle);
+      return NextResponse.json({ ok: true, items: await accountWishlist(customer.id) });
     }
     if (body.action === "profile") {
       const customer = await me(request);

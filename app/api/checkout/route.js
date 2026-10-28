@@ -182,6 +182,11 @@ export const POST = tenantHandler(async (request) => {
           await enqueuePurchaseAndForward(order.id);
           const { recordConversions } = await import("@/lib/experiments");
           await recordConversions(expUnit, order.id, order.total).catch(() => {});
+          // S49 (MC28): bounded merchant automations — post-money, best-effort
+          const { runAutomationsFor } = await import("@/lib/automations");
+          const { db } = await import("@/lib/db");
+          const row = await db.selectFrom("orders").selectAll().where("id", "=", order.id).executeTakeFirst().catch(() => null);
+          await runAutomationsFor("order_placed", { key: `order_placed:${order.id}`, order: row }).catch(() => {});
         });
       }
       return await codResponse(order, order.deduped);
@@ -273,8 +278,10 @@ export const POST = tenantHandler(async (request) => {
           await enqueuePurchaseAndForward(orderId);
           const { recordConversions } = await import("@/lib/experiments");
           const { db } = await import("@/lib/db");
-          const row = await db.selectFrom("orders").select("total").where("id", "=", orderId).executeTakeFirst().catch(() => null);
+          const row = await db.selectFrom("orders").selectAll().where("id", "=", orderId).executeTakeFirst().catch(() => null);
           await recordConversions(expUnit, orderId, row?.total ?? 0).catch(() => {});
+          const { runAutomationsFor } = await import("@/lib/automations");
+          await runAutomationsFor("order_placed", { key: `order_placed:${orderId}`, order: row }).catch(() => {});
         });
       }
       return NextResponse.json({

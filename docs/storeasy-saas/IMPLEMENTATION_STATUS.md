@@ -5,10 +5,10 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S48 (W1–W5 complete; only optional W6 remains).
+- Created: 2026-10-28 (session S25). Last updated: S49 — **all 116 records audited/implemented** (W1–W6). What remains is operational, not code: the Checkpoint C launch list and the recorded external pendings.
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 114 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 116 of 116 records audited/implemented
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
@@ -21,10 +21,12 @@ by a code audit or implementation in this repo — never by documentation alone.
   OP11, OP12, BE29 — S43; MK01, MK02, MK03, MK04, MK05, MK07, MK08 — S44;
   BE30, SF10, SF11, SF12 — S45; BE31 (partial — selling plans not built),
   SF18, SF19, SF20, SF21 — S46; BE22, MC18, BE32, MC19, OP09, OP13 — S47;
-  BE28, AG01, AG02, AG03, AG04, AG05, AG06, OP14, MK06 — S48).
-  The remaining 2 — SF22 (wishlist) and MC28 (automations) — are the
-  handoff's own OPTIONAL W6 pair ("only if a customer need justifies
-  them"); they stay **not inspected** until that need exists.
+  BE28, AG01, AG02, AG03, AG04, AG05, AG06, OP14, MK06 — S48;
+  SF22, MC28 — S49, built at the user's request as the optional W6 pair).
+  Partial/deviation flags that remain true: BE31 selling plans not built;
+  BE32/MC19 live provider call pending a key; BE28 ownership transfer +
+  payout execution deliberately not built; BE30 self-managed identity
+  deviation recorded; MK06 first real study pending a consenting merchant.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -1532,6 +1534,50 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   until a real consented study exists — that's the recorded external
   pending item.
 
+### SF22 — Wishlist · **verified complete (S49)**
+
+- LOCAL-FIRST: the anonymous list is browser storage per store origin
+  (structurally incapable of crossing tenants or devices); the server's
+  anonymous involvement is resolution only — /wishlist labels every item
+  ok / sold out / gone against TODAY's catalog instead of hiding it.
+  Remove/clear/empty states all present; PDP save button + header link.
+- **No implicit identity joining**: the ONLY bridge to an account is the
+  explicit merge button shown to signed-in customers, deduplicating by
+  product identity per store. The cross-store verification case is suite-
+  proven both directions (same email, overlapping handles, two tenants —
+  lists never meet). Account wishlists are deleted by privacy redaction.
+
+### MC28 — Automations · **verified complete (S49)**
+
+- Bounded by construction: triggers (order_placed, return_requested) and
+  actions (notify_merchant, email_customer) are enumerated; actions ride
+  the BE23 notification queue; hooks run best-effort AFTER money commits.
+- **The acceptance list, each engine-enforced with a recorded reason**:
+  CONSENT — a shopper email sends only when the triggering order carried
+  marketing consent, recorded with an order-bound consent ref (live-proven
+  on a real consented order; a consent-less order skips); FREQUENCY CAPS —
+  completed sends per 24h per rule; QUIET HOURS — merchant-local, wrap-
+  midnight safe, skipped and stated; DISABLE-ALL — one switch halts every
+  rule, and (verification case) a replayed event acts zero times while an
+  event consumed during the halt never fires later either (atomic
+  (rule, event) dedupe). Dry runs evaluate everything and send/consume
+  nothing; run history + failed-run retry (exactly once) in the tab.
+  Live on hosted demo: both rule kinds fired once on a real consented COD
+  order, the replay was fully deduped, disable-all stopped a fresh event;
+  the probe order was cancelled both sides and the demo rules left paused.
+
+## HANDOFF COMPLETE (recorded S49, 2026-10-28)
+
+All 116 records of `Storeasy_Enhanced_Feature_List.md` are now
+audited/implemented across S25–S49, including the optional W6 pair (built
+at the user's request). 37 suites / 459 tests + 10 perf budgets + 27 offer
+assertions = 496 checks green with `pnpm build` as the compile gate.
+Remaining work is OPERATIONAL, tracked above: the user-gated Checkpoint C
+launch list (real domains, platform Razorpay + one real charge cycle, mail
+keys, counsel review of legal drafts, alerts/restore/load checks, authed
+console walkthroughs) and the recorded external pendings (AI provider key,
+first consented case study, Shopify public-app distribution status).
+
 ## W5 EXIT (recorded S48, 2026-10-28)
 
 W5's records (S45 customer accounts, S46 commerce expansion, S47 growth
@@ -1598,6 +1644,28 @@ draft/live leakage; publish + rollback demonstrated"):
 - Deliberate scope notes carried into W4: catalog presentation overrides +
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S49, 2026-10-28)
+
+37 aliased suites / **459 tests + 10 perf budgets + 27 offers = 496 checks**
+green (new `test:w6`, 16 — first fully-green run), `pnpm build` clean.
+Migration tenant/0013 (customer_wishlists, automations, automation_runs,
+automation_flags) applied canary-first (demo → fleet) + env default. Live
+on hosted demo: /wishlist 200 + header heart on the storefront; the resolve
+API answered a REAL catalog handle as "ok" with live price and an invented
+one as "gone". Automations: two rules seeded (notify_merchant +
+email_customer) → a real COD order placed WITH the v2 marketing-consent
+cookie (snehal@mediastic.in) → both rules fired exactly once post-money —
+the shopper email classed MARKETING with consent_ref
+"order:BL-F3782605:consent@checkout", the merchant ping transactional →
+the MC28 verification case ran verbatim: replaying the same event acted
+zero times (both rules deduped), disable-all then stopped a fresh event
+with the reason recorded → probe order CANCELLED on both sides, demo rules
+left PAUSED (no automated mail from demo until the user enables them).
+Regression sweep beastlife/marketing/unknown hosts unchanged. The
+anonymous wishlist's browser-storage behavior (save button, local list,
+merge banner) renders server-side correctly; clicking through it in a
+browser is part of the standing authed/manual walkthrough.
 
 ## Verification state (S48, 2026-10-28)
 

@@ -70,6 +70,7 @@
     "test:commerce-exp": "node scripts/test-commerce-exp.js",
     "test:growth": "node scripts/test-growth.js",
     "test:agency": "node scripts/test-agency.js",
+    "test:w6": "node scripts/test-w6.js",
     "test:perf": "node scripts/perf-report.js"
   },
   "dependencies": {

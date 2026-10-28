@@ -333,6 +333,25 @@ too. -->
   `components/account/ReturnRequest.js`. New authz action `returns.decide`
   (staff+).
 
+#### Wishlist (S49 / SF22)
+- **Local-first**: the anonymous wishlist lives in the browser (`_wl_v1`
+  localStorage, per store origin — lists can never cross tenant
+  boundaries), written by the PDP "Save for later" button and the header
+  heart. The server's only anonymous involvement is `/api/wishlist`, which
+  answers "what are these handles TODAY" so `/wishlist` can label items
+  ok / sold-out / gone honestly instead of hiding them.
+- **Explicit merge, never implicit**: a signed-in customer sees a merge
+  button on /wishlist — that is the ONLY bridge between device and account
+  lists (deduped by product handle per store). Account wishlists live in
+  the tenant DB (`customer_wishlists`), are removable per item, and are
+  deleted by privacy redaction along with the rest of the account.
+- **Files**: [lib/wishlist.js](../lib/wishlist.js),
+  [components/WishlistButton.js](../components/WishlistButton.js),
+  [components/WishlistPage.js](../components/WishlistPage.js),
+  `app/wishlist/`, `app/api/wishlist/`, account actions in
+  `app/api/account/route.js`, migration
+  `migrations/tenant/0013_wishlist_automations.sql`.
+
 #### Order status page (guest)
 - **What**: tokenized, no-login order tracking — Placed → Confirmed → Being prepared →
   Shipped steps from our state machine MERGED with live Shopify fulfillment +
@@ -734,6 +753,31 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   `app/api/admin/insights/`, `app/admin/insights/`,
   `components/admin/InsightsAdmin.js`.
 
+#### Automations tab (S49 / MC28)
+- **What**: bounded trigger → condition → action rules — triggers and
+  actions are ENUMERATED in [lib/automations.js](../lib/automations.js)
+  (order_placed / return_requested → notify_merchant / email_customer); no
+  scripts, no outbound webhooks, no money paths. Actions ride the BE23
+  notification queue.
+- **The guards, in engine order, each with a recorded reason**: disable-all
+  → per-rule pause → DEDUPE (unique (rule, event) row claimed atomically —
+  a replayed event can never act twice, and an event consumed while
+  disabled never fires later) → conditions (min total, payment method) →
+  CONSENT (a shopper email sends only when the triggering order carried
+  marketing consent, and the notification records the order-bound consent
+  ref) → quiet hours (merchant-local HH:MM, wrap-midnight safe; skipped,
+  stated, never silently deferred) → frequency cap (completed sends/24h).
+- **Operations**: dry runs evaluate everything against a real recent order
+  and send NOTHING (nor consume the event); full run history with reasons;
+  failed runs retry exactly once; rules save paused and the tab carries the
+  one-click disable-all. Writes need settings.write (admin+). Hooks fire
+  best-effort AFTER the money committed (checkout + returns) — a broken
+  rule can never break an order.
+- **Files**: [lib/automations.js](../lib/automations.js),
+  `app/admin/automations/`, `app/api/admin/automations/`,
+  `components/admin/AutomationsAdmin.js`, hooks in
+  `app/api/checkout/route.js` + [lib/returns.js](../lib/returns.js).
+
 #### Catalog tab (S39 / MC05 + MC06)
 - **What**: the catalog browser. Shopify-owned VALUES (title, type, price,
   stock) are read-only, labeled, and deep-linked to Shopify admin; the
@@ -1109,7 +1153,7 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 36 aliased suites, **443 tests + 10 perf budgets**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 37 aliased suites, **459 tests + 10 perf budgets**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -1223,11 +1267,19 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   earned/reversed-once/idempotent-recompute/eligibility+void gates +
   no-silent-re-attribution, concurrent report isolation, case-study
   publication gate both ways) ·
+  w6 16 (S49: wishlist input hygiene + ok/unavailable/gone resolution +
+  explicit-merge dedupe + CROSS-STORE isolation + redaction; automation
+  validation incl. consent-impossible combos, quiet-hour math w/
+  wrap-midnight, condition gates, replay DEDUPE w/ single notification,
+  consent-gated shopper emails w/ order-bound consent ref, frequency cap,
+  quiet-hour skip, disable-all incl. no-subsequent-action after re-enable,
+  per-rule pause, dry-run sends-and-consumes-nothing, failed-run retry
+  exactly once) ·
   perf 10 (S42 / BE35 budgets — see below).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (27 pure
   assertions incl. the S46 BUNDLE matrix: complete-set saving, exact
   proportional allocation, multiples, incomplete sets, claimed-line
-  exclusivity vs TIERED, coupons on the net — **480 checks in all**) and
+  exclusivity vs TIERED, coupons on the net — **496 checks in all**) and
   `pnpm build` as the compile gate.
 - **Perf budgets** (`pnpm test:perf`, BE35): 5,000-product fixture — PDP
   lookup ≤150ms, collection page (featured sort + facets, price+stock
@@ -2057,3 +2109,4 @@ run the verify checklist.
 | S46 | e0a1d1d | W5: commerce expansion — bundles AS offers (compatibility-gated BUNDLE line offers, zero new money paths, honest sold-out states), deterministic product-finder quiz (tags tally, no AI), editorial journal (scheduled publish, slug-rename 308 redirects), returns request flow (state machine, APPROVAL ≠ REFUND, money columns proven untouched); selling plans recorded as not built (BE31 partial+SF18+SF19+SF20+SF21) |
 | S47 | 3c6f6cd | W5: growth ops — experiments w/ frozen plans, pure-hash assignment, SRM + no-peeking + sufficiency gates and adoption-as-draft; AI insights from tenant-only PII-guarded facts w/ untrusted-output validation, token budgets and honest unconfigured state; server-evaluated ff_* flags w/ uncached critical checkout kill-switch; tenant unit costs w/ stated allocation methods and a visible unallocated remainder (BE22+MC18+BE32+MC19+OP09+OP13) |
 | S48 | a77ba27 | W5: agency platform — client-accepted email-bound grants (never owner, instantly revocable), granted-only portfolio, scrubbed private kits applying as drafts, hash-bound expiring client approvals, operator-attributed referrals w/ an idempotent refund-reversing commission ledger, per-client isolated reports, OP14 partner admin, consent-and-measurement-gated case studies; ownership transfer + payouts deliberately not built (BE28+AG01–06+OP14+MK06) |
+| S49 | _(recorded post-commit)_ | W6 (optional pair) — ALL 116 HANDOFF RECORDS BUILT: local-first wishlist (per-origin browser storage, explicit merge only, honest ok/sold-out/gone states, redaction-covered) + bounded merchant automations (enumerated triggers/actions on the notification queue; consent-gated shopper emails, frequency caps, merchant-local quiet hours, atomic event dedupe, dry runs, disable-all, retry diagnostics) (SF22+MC28) |
