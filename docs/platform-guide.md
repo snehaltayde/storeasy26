@@ -434,6 +434,61 @@ too. -->
 
 ### 2B. Merchant console (`/admin`)
 
+#### Console design system (S50 redesign — applies to /admin, /platform, /partners, /approve)
+- **Architecture**: route groups split the app into two root layouts —
+  `app/(storefront)/` (the original tenant layout: chrome, brand variables,
+  maintenance/gated branches, edge runtime, plus a catch-all 404) and
+  `app/(console)/` (Node runtime — matching the console's own APIs — with
+  `[data-console]` scoped tokens, Geist, a ToastProvider, its own
+  error/not-found pages, and NO storefront header/cart/pixels/consent/SW;
+  tenant brand variables structurally cannot re-skin the console).
+  Deliberate behavior change: /admin/login stays reachable during
+  maintenance mode. URLs unchanged everywhere.
+- **Tokens** (`app/console.css`): light-only semantic system — surfaces,
+  borders, three-step text ramp, near-black primary (lime is NEVER a button
+  or a status), emerald success / amber warning / red danger / sky info
+  triples, `caccent` as the sparing lime brand touch, 6px/10px radius
+  scale, two shadows, and one shared `focus-ring` utility on every
+  interactive element (the consoles previously had NO focus-visible styles).
+- **Primitives** (`components/console/`, README has the house rules):
+  Button/IconButton, one Input/Select/Textarea/Field, Card, Badge +
+  StatusBadge over ONE status→tone map (`status.js`, replacing 12+ local
+  chip maps; humanized labels, raw status kept on title), Banner, Table
+  (overflow-safe, right-aligned tabular numerics, skeleton + empty rows),
+  Tabs (arrow-key tablist), Switch (role=switch + pending), native-<dialog>
+  Dialog/ConfirmDialog/DangerDialog (typed confirmation for offboard-grade
+  acts) + Drawer, toasts (transient results) vs Banners (persistent),
+  Skeleton/EmptyState/ErrorState/PermissionNote/KeyValue/Stat, PageHeader,
+  SecretReveal + CopyButton for one-time codes, plain-SVG Bars/Sparkline.
+  lucide-react (exact-pinned) is the one icon family; `return null` while
+  loading/on error is banned.
+- **Shell**: the merchant console mounts ONE role-aware sidebar
+  (`(authed)/layout.js` → ConsoleShell): 18 tabs grouped into
+  Overview/Orders/Catalog/Storefront/Growth/Store, support & staff never
+  see admin-only entries (server-side denials unchanged), Setup progress +
+  open-returns badges, pinned store context + StoreSwitcher (mounts once —
+  the per-page re-mount flicker is gone), role chip + sign-out, collapse to
+  icons (persisted) and a mobile drawer. Auth pages render in a centered
+  card shell; login lands on the Dashboard. Route-level loading skeletons +
+  error boundaries (console errors no longer hit the storefront 500 page).
+- **Honesty fixes shipped with the redesign**: storefront editor false-409/
+  block-wipe bug (shared `lib/cms/view.js`), dashboard "Today" = today in
+  the merchant TZ + TZ-correct 7-day cut + dense chart (quiet days are real
+  gaps) + 7/30/90d ranges, analytics top-products currency, experiments
+  adopt-success rendered in the error slot, orders fetch errors were
+  silent, platform Flags/Costs/Partners/Queues panels returned null while
+  loading AND on error, partners' 5-call fetch waterfall + vanishing empty
+  sections. Every destructive action is dialog-confirmed (14
+  window.confirm/prompt sites converted; 8+ actions that had NO
+  confirmation gained one); one-time passwords/codes render in shown-once
+  SecretReveals.
+- **Design-preview harness**: `pnpm seed:design` + `pnpm dev:design`
+  (launch.json "storeasy-design", port 3017) — local file-DB tenant
+  "design" with every status seeded (orders in all 7 states, returns,
+  offers, experiments, automations, incident, agency + grant + approval),
+  generated test credentials in gitignored `.design-env`. For reviewing
+  console changes with real-shaped data; touches nothing hosted.
+
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
 Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront · Catalog · Media · Theme · Brand · Releases · Upsells · Integrations · Billing · Settings** (horizontally scrollable; + the store switcher for multi-store users). `/admin` lands on the Dashboard.
@@ -2110,3 +2165,4 @@ run the verify checklist.
 | S47 | 3c6f6cd | W5: growth ops — experiments w/ frozen plans, pure-hash assignment, SRM + no-peeking + sufficiency gates and adoption-as-draft; AI insights from tenant-only PII-guarded facts w/ untrusted-output validation, token budgets and honest unconfigured state; server-evaluated ff_* flags w/ uncached critical checkout kill-switch; tenant unit costs w/ stated allocation methods and a visible unallocated remainder (BE22+MC18+BE32+MC19+OP09+OP13) |
 | S48 | a77ba27 | W5: agency platform — client-accepted email-bound grants (never owner, instantly revocable), granted-only portfolio, scrubbed private kits applying as drafts, hash-bound expiring client approvals, operator-attributed referrals w/ an idempotent refund-reversing commission ledger, per-client isolated reports, OP14 partner admin, consent-and-measurement-gated case studies; ownership transfer + payouts deliberately not built (BE28+AG01–06+OP14+MK06) |
 | S49 | c0a855f | W6 (optional pair) — ALL 116 HANDOFF RECORDS BUILT: local-first wishlist (per-origin browser storage, explicit merge only, honest ok/sold-out/gone states, redaction-covered) + bounded merchant automations (enumerated triggers/actions on the notification queue; consent-gated shopper emails, frequency caps, merchant-local quiet hours, atomic event dedupe, dry runs, disable-all, retry diagnostics) (SF22+MC28) |
+| S50 | _(recorded post-commit)_ | Console redesign: route-group split (consoles leave the storefront chrome + brand vars; own Node root layout), [data-console] token system + primitives library + one status map + lucide icons, role-aware grouped sidebar w/ mobile drawer, every screen of /admin + /platform + /partners + /approve rebuilt with complete loading/empty/error/permission states, all destructive actions dialog-confirmed, one-time secrets in shown-once reveals; honesty fixes (CMS false-409/wipe, dashboard Today/7d TZ, analytics currency, experiments success-slot, silent fetch errors, null panels, partners waterfall); design-preview harness (file DBs, port 3017) |

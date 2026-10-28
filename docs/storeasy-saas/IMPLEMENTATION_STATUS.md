@@ -1645,6 +1645,33 @@ draft/live leakage; publish + rollback demonstrated"):
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
 
+## Verification state (S50, 2026-10-28) — console redesign
+
+Full 37-suite baseline (**459 + 10 perf + 27 offers = 496 checks**) green,
+`pnpm build` clean, test:security green on every intermediate commit. No
+schema changes, no hosted writes — purely presentation/interaction plus
+the honesty fixes listed in the guide (the CMS view()/revisions fix is
+functional and suite-covered by test:cms). Verified in the browser on the
+NEW design-preview harness (local file DBs, seeded tenant with every
+status): merchant console signed in via the generated bootstrap test
+password — dashboard (real "Today so far", discrepancy queue linking the
+seeded sync_failed orders, dense chart), orders (humanized tabs + counts,
+table, Returns view), storefront editor (per-section dirty badges, draft
+toasts), platform console signed in as operator (tenant row + More menu,
+fleet stats, seeded incident, Queue-clear/empty states), partners console
+signed in as the seeded agency member (portfolio health, kits EmptyState,
+pending review), mobile 375px (drawer opens, Escape closes, zero
+horizontal scroll), storefront regression on the real dev server
+(chrome/search/cart intact, marketing + unknown hosts unchanged, consoles
+chrome-free). Honest limitations: screenshots came from the local harness
+(not the hosted demo tenant — the hosted authed walkthrough remains the
+standing user action); the harness storefront 500s by design (edge
+runtime + file DBs) so in-iframe previews were verified on the real dev
+server only; keyboard/focus verified via the shared focus-ring utility +
+native-dialog Escape behavior spot-checks, not an exhaustive per-screen
+audit; 1440px layouts verified structurally (DOM/text) since the hidden
+browser pane scales wide screenshots.
+
 ## Verification state (S49, 2026-10-28)
 
 37 aliased suites / **459 tests + 10 perf budgets + 27 offers = 496 checks**
