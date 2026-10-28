@@ -4,14 +4,30 @@
     {
       "name": "storeasy",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev", "--port", "3007"],
+      "runtimeArgs": [
+        "dev",
+        "--port",
+        "3007"
+      ],
       "port": 3007
     },
     {
       "name": "storeasy-prod",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["start", "--port", "3008"],
+      "runtimeArgs": [
+        "start",
+        "--port",
+        "3008"
+      ],
       "port": 3008
+    },
+    {
+      "name": "storeasy-design",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev:design"
+      ],
+      "port": 3017
     }
   ]
 }

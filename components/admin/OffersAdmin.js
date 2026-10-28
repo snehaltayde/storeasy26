@@ -1,50 +1,80 @@
 "use client";
 
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import OfferForm from "./OfferForm";
 import { offerScheduleStatus } from "@/lib/admin/schedule";
+import { PageHeader } from "@/components/console/PageHeader";
+import { Card } from "@/components/console/Card";
+import { Badge, StatusBadge } from "@/components/console/Badge";
+import { Banner } from "@/components/console/Banner";
+import { Button } from "@/components/console/Button";
+import { Switch } from "@/components/console/Switch";
+import { ConfirmDialog } from "@/components/console/Dialog";
+import { EmptyState, Skeleton } from "@/components/console/bits";
+import { useToast } from "@/components/console/Toast";
 
-// Single-store offer console (Session 19). List + enable/disable + schedule +
-// edit/create for the 4 engine offer types. Every save is live on the next
-// cart read — deliberately NOT a SaaS console (no tenants/theming/billing).
-// S32 (MC14): lifecycle chip — draft / paused / scheduled / active / expired
-// (derived in lib/admin/schedule.js, same logic the engine's window uses).
-function LifecycleChip({ offer }) {
-  const status = offerScheduleStatus(offer);
-  const styles = {
-    active: "bg-lime-100 text-lime-700",
-    scheduled: "bg-sky-100 text-sky-700",
-    expired: "bg-zinc-200 text-zinc-500",
-    paused: "bg-amber-100 text-amber-700",
-    draft: "bg-zinc-100 text-zinc-500",
-  };
-  return <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${styles[status]}`}>{status}</span>;
-}
+// Single-store offer console (Session 19, redesigned S50). List +
+// enable/disable + schedule + edit/create for the 4 engine offer types.
+// Every save is live on the next cart read — deliberately NOT a SaaS console
+// (no tenants/theming/billing).
+// S32 (MC14): lifecycle — draft / paused / scheduled / active / expired
+// (derived in lib/admin/schedule.js, same logic the engine's window uses);
+// S50 renders it through the one StatusBadge map instead of a local chip.
 
 export default function OffersAdmin({ initialOffers }) {
+  const toast = useToast();
   const [offers, setOffers] = useState(initialOffers);
   const [editing, setEditing] = useState(null); // offer row | "new"
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [togglingId, setTogglingId] = useState(null);
+  const [deleting, setDeleting] = useState(null); // offer row | null
 
-  async function refresh() {
-    const data = await fetch("/api/admin/offers").then((r) => r.json());
-    if (data.offers) setOffers(data.offers);
+  // silent=true keeps the rows on screen (the toggling Switch already shows
+  // pending); the skeleton pass is for refetches after save/delete.
+  async function refresh({ silent = false } = {}) {
+    if (!silent) setRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/offers");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.offers) throw new Error(data.error || `Couldn't load offers (${res.status})`);
+      setOffers(data.offers);
+    } catch (e) {
+      setError(String(e.message || e));
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   async function toggle(offer) {
-    setError("");
-    const res = await fetch(`/api/admin/offers/${offer.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled: !offer.enabled }),
-    });
-    if (!res.ok) setError((await res.json()).error || "Toggle failed");
-    await refresh();
+    setError(null);
+    setTogglingId(offer.id);
+    try {
+      const res = await fetch(`/api/admin/offers/${offer.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !offer.enabled }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Toggle failed (${res.status})`);
+      }
+      await refresh({ silent: true });
+    } catch (e) {
+      setError(String(e.message || e));
+    } finally {
+      setTogglingId(null);
+    }
   }
 
   async function remove(offer) {
-    if (!window.confirm(`Delete "${offer.label}"? This cannot be undone.`)) return;
-    await fetch(`/api/admin/offers/${offer.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/offers/${offer.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Delete failed (${res.status})`);
+    }
+    toast.success(`Deleted “${offer.label}”`);
     await refresh();
   }
 
@@ -83,57 +113,86 @@ export default function OffersAdmin({ initialOffers }) {
     );
   }
 
+  const newOfferButton = (
+    <Button variant="primary" icon={<Plus size={15} aria-hidden />} onClick={() => setEditing("new")}>
+      New offer
+    </Button>
+  );
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Offers</h1>
-          <p className="text-sm text-zinc-500">
-            Changes are live on the next cart read — no deploy needed.
-          </p>
-        </div>
-        <button
-          onClick={() => setEditing("new")}
-          className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-lime-300"
-        >
-          + New offer
-        </button>
-      </div>
+    <div>
+      <PageHeader
+        title="Offers"
+        description="Changes are live on the next cart read — no deploy needed."
+        actions={newOfferButton}
+      />
 
-      {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+      {error && (
+        <Banner tone="danger" className="mb-4" actions={<Button size="sm" onClick={() => { setError(null); refresh(); }}>Retry</Button>}>
+          {error}
+        </Banner>
+      )}
 
-      <ul className="mt-6 divide-y divide-zinc-100 rounded-2xl border border-zinc-200">
-        {offers.map((o) => (
-          <li key={o.id} className="flex items-center gap-4 px-4 py-4">
-            <button
-              onClick={() => toggle(o)}
-              aria-label={o.enabled ? "Disable" : "Enable"}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition ${o.enabled ? "bg-lime-400" : "bg-zinc-200"}`}
-            >
-              <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${o.enabled ? "left-[22px]" : "left-0.5"}`}
-              />
-            </button>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">
-                {o.label}
-                <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">{o.type}</span>
-                <LifecycleChip offer={o} />
-              </p>
-              <p className="truncate text-xs text-zinc-500">
-                {summarize(o)} · <span className={o.starts_at || o.ends_at ? "text-amber-600" : ""}>{schedule(o)}</span>
-              </p>
-            </div>
-            <button onClick={() => setEditing(o)} className="text-sm font-medium text-lime-700 hover:underline">
-              Edit
-            </button>
-            <button onClick={() => remove(o)} className="text-sm text-zinc-400 hover:text-red-600">
-              Delete
-            </button>
-          </li>
-        ))}
-        {offers.length === 0 && <li className="px-4 py-8 text-center text-sm text-zinc-500">No offers yet.</li>}
-      </ul>
+      <Card padded={false}>
+        {refreshing ? (
+          <ul className="divide-y divide-edge" aria-hidden>
+            {Array.from({ length: Math.max(offers.length, 3) }, (_, i) => (
+              <li key={i} className="flex items-center gap-4 px-4 py-4">
+                <Skeleton className="h-5 w-10 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-3.5 w-1/2" />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : offers.length === 0 ? (
+          <EmptyState
+            title="No offers yet"
+            body="Coupons, bundles, tiered discounts and free gifts all start here."
+            action={newOfferButton}
+          />
+        ) : (
+          <ul className="divide-y divide-edge">
+            {offers.map((o) => (
+              <li key={o.id} className="flex items-center gap-4 px-4 py-4">
+                <Switch
+                  checked={!!o.enabled}
+                  pending={togglingId === o.id}
+                  label={`${o.enabled ? "Disable" : "Enable"} ${o.label}`}
+                  onChange={() => toggle(o)}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-fg">
+                    <span className="truncate">{o.label}</span>
+                    <Badge>{o.type}</Badge>
+                    <StatusBadge status={offerScheduleStatus(o)} />
+                  </p>
+                  <p className="truncate text-xs text-fg-muted">
+                    {summarize(o)} · <span className={o.starts_at || o.ends_at ? "text-warning" : ""}>{schedule(o)}</span>
+                  </p>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(o)}>
+                  Edit
+                </Button>
+                <Button size="sm" variant="dangerOutline" onClick={() => setDeleting(o)}>
+                  Delete
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        title="Delete offer"
+        tone="danger"
+        confirmLabel="Delete offer"
+        body={deleting ? `Delete “${deleting.label}”? Shoppers lose it on the next cart read — this cannot be undone.` : null}
+        onConfirm={() => remove(deleting)}
+      />
     </div>
   );
 }

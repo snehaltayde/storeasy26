@@ -2,96 +2,122 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Circle, CircleCheck } from "lucide-react";
+import { Card } from "@/components/console/Card";
+import { Badge } from "@/components/console/Badge";
+import { Banner } from "@/components/console/Banner";
+import { Button } from "@/components/console/Button";
+import { useToast } from "@/components/console/Toast";
+import { cx } from "@/components/console/cx";
 
-// Onboarding checklist (S41 / MC02). Auto items derive from real state and
-// just link where the work happens; manual items (preview, test order,
-// launch) are explicit check-offs — launch stays gated until everything
-// above it is done (server-enforced too).
+// Onboarding checklist (S41 / MC02, redesigned S50). Auto items derive from
+// real state and just link where the work happens; manual items (preview,
+// test order, launch) are explicit check-offs — launch stays gated until
+// everything above it is done (server-enforced too). Errors are persistent
+// Banners; check-offs are toasts; the launched state is a success Banner.
+const launchedOn = (iso) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null);
+
 export default function SetupAdmin({ initial }) {
+  const toast = useToast();
   const [data, setData] = useState(initial);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null);
+  const [busyStep, setBusyStep] = useState(null);
+  const [error, setError] = useState(null);
 
   if (!data.supported) {
-    return <p className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6 text-sm text-zinc-500">{data.reason}</p>;
+    return <Banner tone="neutral">{data.reason}</Banner>;
   }
 
   async function mark(step, done) {
-    setBusy(true);
-    setMsg(null);
-    const res = await fetch("/api/admin/setup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ step, done }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (res.ok && json.ok) {
-      setData(json);
-      if (step === "launch" && done) setMsg({ ok: true, text: "🎉 Launched — congratulations! Publish releases any time; this checklist stays here for reference." });
-    } else {
-      setMsg({ ok: false, text: json.error || `Failed (${res.status})` });
+    setBusyStep(step);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step, done }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.ok) {
+        setData(json);
+        toast.success(step === "launch" && done ? "Launched — congratulations!" : done ? "Marked done." : "Undone.");
+      } else {
+        setError(json.error || `Failed (${res.status})`);
+      }
+    } finally {
+      setBusyStep(null);
     }
-    setBusy(false);
   }
 
   const pct = Math.round((data.doneCount / data.total) * 100);
+  const busy = busyStep !== null;
 
   return (
     <div className="space-y-4">
-      {msg && <div className={`rounded-xl px-4 py-3 text-sm ${msg.ok ? "bg-lime-50 text-lime-700" : "bg-red-50 text-red-600"}`}>{msg.text}</div>}
+      {error && <Banner tone="danger">{error}</Banner>}
+      {data.launched && (
+        <Banner tone="success" title="Launched">
+          {launchedOn(data.launchedAt) ? `Launched on ${launchedOn(data.launchedAt)}. ` : ""}
+          Publish releases any time; this checklist stays here for reference.
+        </Banner>
+      )}
 
-      <div className="rounded-2xl border border-zinc-200 p-5">
+      <Card className="p-4">
         <div className="flex items-center justify-between text-sm">
-          <span className="font-bold">{data.launched ? "Launched ✓" : "Getting your store live"}</span>
-          <span className="text-zinc-400">
+          <span className="font-semibold text-fg">{data.launched ? "Launched" : "Getting your store live"}</span>
+          <span className="text-xs tabular-nums text-fg-muted">
             {data.doneCount}/{data.total}
           </span>
         </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
-          <div className="h-full bg-lime-400 transition-all" style={{ width: `${pct}%` }} />
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-sunken" role="progressbar" aria-valuenow={data.doneCount} aria-valuemin={0} aria-valuemax={data.total} aria-label="Setup progress">
+          <div className="h-full rounded-full bg-primary motion-safe:transition-all" style={{ width: `${pct}%` }} />
         </div>
-      </div>
+      </Card>
 
       <ol className="space-y-2">
-        {data.items.map((item, i) => (
-          <li key={item.id} className={`flex items-start gap-3 rounded-2xl border p-4 ${item.done ? "border-zinc-100 bg-zinc-50/50" : item.gated ? "border-zinc-100 opacity-60" : "border-zinc-200"}`}>
-            <span
-              aria-hidden="true"
-              className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.done ? "bg-lime-400 text-zinc-950" : "bg-zinc-100 text-zinc-400"}`}
-            >
-              {item.done ? "✓" : i + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className={`text-sm font-semibold ${item.done ? "text-zinc-500" : "text-zinc-900"}`}>
-                {item.label}
-                {item.kind === "manual" && <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-400">YOU CONFIRM</span>}
-              </p>
-              <p className="mt-0.5 text-xs text-zinc-500">{item.hint}</p>
-            </div>
-            <span className="flex shrink-0 items-center gap-2">
-              {!item.done && !item.gated && (
-                <Link href={item.href} className="rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-50">
-                  Open
-                </Link>
+        {data.items.map((item) => (
+          <li key={item.id}>
+            <Card as="div" padded={false} className={cx("flex items-start gap-3 p-4", item.done && "bg-surface-sunken", item.gated && "opacity-60")}>
+              {item.done ? (
+                <CircleCheck size={16} className="mt-0.5 shrink-0 text-success" aria-hidden />
+              ) : (
+                <Circle size={16} className="mt-0.5 shrink-0 text-fg-subtle" aria-hidden />
               )}
-              {item.kind === "manual" &&
-                (item.done ? (
-                  item.id !== "launch" && (
-                    <button type="button" disabled={busy} onClick={() => mark(item.id, false)} className="text-xs text-zinc-400 hover:text-zinc-600">
-                      undo
-                    </button>
-                  )
-                ) : (
-                  <button
-                    type="button"
-                    disabled={busy || item.gated}
-                    onClick={() => mark(item.id, true)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold ${item.id === "launch" ? "bg-lime-400 text-zinc-950 hover:bg-lime-300" : "bg-zinc-900 text-white hover:bg-zinc-800"} disabled:cursor-not-allowed disabled:opacity-40`}
+              <div className="min-w-0 flex-1">
+                <p className={cx("flex items-center gap-2 text-sm font-semibold", item.done ? "text-fg-muted" : "text-fg")}>
+                  {item.label}
+                  <Badge tone={item.kind === "manual" ? "info" : "neutral"}>{item.kind === "manual" ? "You confirm" : "Auto"}</Badge>
+                </p>
+                <p className="mt-0.5 text-xs text-fg-muted">{item.hint}</p>
+              </div>
+              <span className="flex shrink-0 items-center gap-2">
+                {!item.done && !item.gated && (
+                  <Link
+                    href={item.href}
+                    className="inline-flex items-center justify-center rounded-ctl border border-edge-strong bg-surface px-2.5 py-1.5 text-xs font-medium text-fg focus-ring hover:bg-surface-muted motion-safe:transition-colors"
                   >
-                    {item.id === "launch" ? "Launch 🚀" : "Mark done"}
-                  </button>
-                ))}
-            </span>
+                    Open
+                  </Link>
+                )}
+                {item.kind === "manual" &&
+                  (item.done ? (
+                    item.id !== "launch" && (
+                      <Button size="sm" variant="ghost" busy={busyStep === item.id} disabled={busy && busyStep !== item.id} onClick={() => mark(item.id, false)}>
+                        Undo
+                      </Button>
+                    )
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      busy={busyStep === item.id}
+                      disabled={item.gated || (busy && busyStep !== item.id)}
+                      onClick={() => mark(item.id, true)}
+                    >
+                      {item.id === "launch" ? "Launch" : "Mark done"}
+                    </Button>
+                  ))}
+              </span>
+            </Card>
           </li>
         ))}
       </ol>

@@ -1,78 +1,139 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Card, CardHeader } from "@/components/console/Card";
+import { Banner } from "@/components/console/Banner";
+import { Button } from "@/components/console/Button";
+import { StatusBadge } from "@/components/console/Badge";
+import { Field, Input } from "@/components/console/fields";
+import { ConfirmDialog } from "@/components/console/Dialog";
+import { SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
+import { useToast } from "@/components/console/Toast";
 
-// Incidents panel (S43 / OP12): open/update/resolve with INTERNAL notes kept
-// apart from the PUBLIC message merchants see in their console banner.
-const input = "rounded-lg border border-zinc-200 px-2 py-1.5 text-xs";
-
+// Incidents panel (S43 / OP12, redesigned S50): open/update/resolve with
+// INTERNAL notes kept apart from the PUBLIC message merchants see in their
+// console banner.
 export default function IncidentsPanel() {
   const [data, setData] = useState(null);
-  const [err, setErr] = useState(null);
+  const [err, setErr] = useState(null); // load failure → ErrorState
+  const [actErr, setActErr] = useState(null); // action failure → Banner
   const [f, setF] = useState({ title: "", tenant: "", publicMessage: "", internalNote: "" });
   const [busy, setBusy] = useState(false);
+  const [resolving, setResolving] = useState(null); // incident to resolve
+  const toast = useToast();
 
-  const load = () =>
-    fetch("/api/platform/incidents")
+  const load = useCallback(() => {
+    setErr(null);
+    return fetch("/api/platform/incidents")
       .then((r) => r.json())
       .then((j) => (j.ok ? setData(j) : setErr(j.error || "failed")))
       .catch((e) => setErr(String(e)));
+  }, []);
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   async function post(body) {
-    setBusy(true);
-    setErr(null);
-    const res = await fetch("/api/platform/incidents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const res = await fetch("/api/platform/incidents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
     const json = await res.json().catch(() => ({}));
     if (res.ok && json.ok) {
       setData(json);
+      return json;
+    }
+    throw new Error(json.error || `failed (${res.status})`);
+  }
+
+  async function openIncident() {
+    setBusy(true);
+    setActErr(null);
+    try {
+      await post({ action: "open", title: f.title, tenant: f.tenant.trim() || null, publicMessage: f.publicMessage, internalNote: f.internalNote });
       setF({ title: "", tenant: "", publicMessage: "", internalNote: "" });
-    } else setErr(json.error || `failed (${res.status})`);
+      toast.success("Incident opened");
+    } catch (e) {
+      setActErr(String(e?.message || e));
+    }
     setBusy(false);
   }
 
   return (
-    <section className="mt-8 rounded-2xl border border-zinc-200 p-5">
-      <h2 className="text-sm font-bold">Incidents</h2>
-      <p className="mt-0.5 text-xs text-zinc-500">Public message shows in affected merchant consoles while open; internal notes never leave this page.</p>
-      {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
-      <div className="mt-3 grid gap-2 sm:grid-cols-4">
-        <input className={input} placeholder="title (required)" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
-        <input className={input} placeholder="tenant (blank = platform-wide)" value={f.tenant} onChange={(e) => setF({ ...f, tenant: e.target.value })} />
-        <input className={input} placeholder="public message (merchants see this)" value={f.publicMessage} onChange={(e) => setF({ ...f, publicMessage: e.target.value })} />
-        <div className="flex gap-2">
-          <input className={input + " min-w-0 flex-1"} placeholder="internal note" value={f.internalNote} onChange={(e) => setF({ ...f, internalNote: e.target.value })} />
-          <button
-            type="button"
-            disabled={busy || !f.title.trim()}
-            onClick={() => post({ action: "open", title: f.title, tenant: f.tenant.trim() || null, publicMessage: f.publicMessage, internalNote: f.internalNote })}
-            className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-40"
-          >
-            Open
-          </button>
-        </div>
-      </div>
-      <ul className="mt-3 space-y-2">
-        {data?.incidents?.map((i) => (
-          <li key={i.id} className={`rounded-xl border p-3 text-sm ${i.status === "open" ? "border-amber-200 bg-amber-50/50" : "border-zinc-100 opacity-60"}`}>
-            <p className="flex flex-wrap items-center gap-2">
-              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${i.status === "open" ? "bg-amber-100 text-amber-700" : "bg-zinc-100 text-zinc-500"}`}>{i.status}</span>
-              <span className="font-semibold">{i.title}</span>
-              <span className="text-xs text-zinc-400">{i.tenant_id || "platform-wide"} · {new Date(i.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-              {i.status === "open" && (
-                <button type="button" disabled={busy} onClick={() => post({ action: "resolve", id: i.id })} className="ml-auto rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-50">
-                  Resolve
-                </button>
-              )}
-            </p>
-            {i.public_message && <p className="mt-1 text-xs text-sky-700">public: {i.public_message}</p>}
-            {i.internal_note && <p className="mt-0.5 text-xs text-zinc-500">internal: {i.internal_note}</p>}
-          </li>
-        ))}
-        {data && data.incidents.length === 0 && <li className="py-2 text-sm text-zinc-400">No incidents recorded.</li>}
-      </ul>
-    </section>
+    <Card id="incidents">
+      <CardHeader
+        title="Incidents"
+        description="Public message shows in affected merchant consoles while open; internal notes never leave this page."
+      />
+      {err && <ErrorState title="Couldn't load incidents" detail={err} onRetry={load} />}
+      {!data && !err && <SkeletonText lines={4} />}
+      {data && (
+        <>
+          {actErr && (
+            <Banner tone="danger" className="mb-3">
+              {actErr}
+            </Banner>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Title" htmlFor="inc-title" required>
+              <Input id="inc-title" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
+            </Field>
+            <Field label="Tenant" htmlFor="inc-tenant" hint="Blank = platform-wide.">
+              <Input id="inc-tenant" mono value={f.tenant} onChange={(e) => setF({ ...f, tenant: e.target.value })} />
+            </Field>
+            <Field label="Public message" htmlFor="inc-public" hint="Merchants see this.">
+              <Input id="inc-public" value={f.publicMessage} onChange={(e) => setF({ ...f, publicMessage: e.target.value })} />
+            </Field>
+            <Field label="Internal note" htmlFor="inc-internal">
+              <Input id="inc-internal" value={f.internalNote} onChange={(e) => setF({ ...f, internalNote: e.target.value })} />
+            </Field>
+          </div>
+          <div className="mt-3">
+            <Button variant="primary" size="sm" busy={busy} disabled={!f.title.trim()} onClick={openIncident}>
+              Open incident
+            </Button>
+          </div>
+
+          {data.incidents.length === 0 ? (
+            <EmptyState title="No incidents recorded" body="Open one above when a tenant or the platform is degraded." />
+          ) : (
+            <ul className="mt-4 space-y-2">
+              {data.incidents.map((i) => (
+                <li key={i.id} className={`rounded-ctl border p-3 text-sm ${i.status === "open" ? "border-warning-edge bg-warning-bg/30" : "border-edge opacity-70"}`}>
+                  <p className="flex flex-wrap items-center gap-2">
+                    <StatusBadge status={i.status} />
+                    <span className="font-semibold text-fg">{i.title}</span>
+                    <span className="text-xs text-fg-subtle">
+                      {i.tenant_id || "platform-wide"} ·{" "}
+                      {new Date(i.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    {i.status === "open" && (
+                      <Button size="sm" className="ml-auto" onClick={() => setResolving(i)}>
+                        Resolve
+                      </Button>
+                    )}
+                  </p>
+                  {i.public_message && <p className="mt-1 text-xs text-info">public: {i.public_message}</p>}
+                  {i.internal_note && <p className="mt-0.5 text-xs text-fg-muted">internal: {i.internal_note}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      <ConfirmDialog
+        open={!!resolving}
+        onClose={() => setResolving(null)}
+        title={`Resolve “${resolving?.title}”?`}
+        confirmLabel="Resolve"
+        body="The public message disappears from affected merchant consoles."
+        onConfirm={async () => {
+          await post({ action: "resolve", id: resolving.id });
+          toast.success("Incident resolved");
+        }}
+      />
+    </Card>
   );
 }

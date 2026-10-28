@@ -1,74 +1,111 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Check, Rocket } from "lucide-react";
+import { Badge } from "@/components/console/Badge";
+import { KeyValue, SkeletonText, ErrorState } from "@/components/console/bits";
 
-// Tenant detail (S41 / OP03): lifecycle, config summary, secrets as a
-// PRESENCE map (values never leave the encrypted envelope), billing
-// snapshot, onboarding progress, provisioning history — inline under the
-// registry row.
+// Tenant detail (S41 / OP03, redesigned S50): lifecycle, config summary,
+// secrets as a PRESENCE map (values never leave the encrypted envelope),
+// billing snapshot, onboarding progress, provisioning history — inline
+// under the registry row.
 export default function TenantDetail({ id }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setErr(null);
     fetch(`/api/platform/tenants/${id}`)
       .then((r) => r.json())
       .then((j) => (j.ok ? setData(j) : setErr(j.error || "failed")))
       .catch((e) => setErr(String(e)));
   }, [id]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  if (err) return <p className="mt-2 text-xs text-red-600">{err}</p>;
-  if (!data) return <p className="mt-2 text-xs text-zinc-400">Loading detail…</p>;
+  if (err) {
+    return (
+      <div className="mt-3 rounded-ctl bg-surface-sunken p-3">
+        <ErrorState title="Couldn't load tenant detail" detail={err} onRetry={load} className="py-4" />
+      </div>
+    );
+  }
+  if (!data) {
+    return (
+      <div className="mt-3 rounded-ctl bg-surface-sunken p-3" aria-busy="true" aria-label="Loading tenant detail">
+        <SkeletonText lines={3} />
+      </div>
+    );
+  }
 
   const t = data.tenant;
   const billing = t.config.billing;
 
   return (
-    <div className="mt-3 grid gap-3 rounded-xl bg-zinc-50 p-3 text-xs sm:grid-cols-2">
+    <div className="mt-3 grid gap-4 rounded-ctl bg-surface-sunken p-4 text-xs sm:grid-cols-2">
       <div>
-        <p className="font-bold text-zinc-600">Config</p>
-        <p className="mt-1 text-zinc-500">
-          shop: {t.config.shop_domain || "—"} · site: {t.config.site_name || "—"} · checkout: {t.config.checkout_mode}
-          {t.config.theme ? ` · kit: ${t.config.theme.kit} v${t.config.theme.version}` : ""}
-        </p>
-        <p className="mt-2 font-bold text-zinc-600">Credentials (presence only)</p>
-        <p className="mt-1 flex flex-wrap gap-1">
-          {Object.keys(t.secretsPresent).length === 0 && <span className="text-zinc-400">none</span>}
+        <p className="text-xs font-semibold text-fg">Config</p>
+        <KeyValue
+          className="mt-1.5 text-xs"
+          items={[
+            { key: "Shop", value: t.config.shop_domain || "—", mono: true },
+            { key: "Site", value: t.config.site_name || "—" },
+            { key: "Checkout", value: t.config.checkout_mode },
+            t.config.theme && { key: "Kit", value: `${t.config.theme.kit} v${t.config.theme.version}`, mono: true },
+          ]}
+        />
+        <p className="mt-3 text-xs font-semibold text-fg">Credentials (presence only)</p>
+        <p className="mt-1.5 flex flex-wrap gap-1">
+          {Object.keys(t.secretsPresent).length === 0 && <span className="text-fg-subtle">none</span>}
           {Object.keys(t.secretsPresent).map((k) => (
-            <span key={k} className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-600">
-              {k} ✓
-            </span>
+            <Badge key={k} tone="success" className="font-mono">
+              <Check size={11} aria-hidden />
+              {k}
+            </Badge>
           ))}
         </p>
       </div>
       <div>
-        <p className="font-bold text-zinc-600">Billing</p>
-        <p className="mt-1 text-zinc-500">
-          {billing ? `${billing.plan} v${billing.plan_version} · ${billing.status}${billing.grace_until ? ` · grace until ${new Date(billing.grace_until).toLocaleDateString("en-IN")}` : ""}` : "no subscription (free limits)"}
+        <p className="text-xs font-semibold text-fg">Billing</p>
+        <p className="mt-1.5 text-fg-muted">
+          {billing
+            ? `${billing.plan} v${billing.plan_version} · ${billing.status}${billing.grace_until ? ` · grace until ${new Date(billing.grace_until).toLocaleDateString("en-IN")}` : ""}`
+            : "no subscription (free limits)"}
         </p>
-        <p className="mt-2 font-bold text-zinc-600">Onboarding</p>
+        <p className="mt-3 text-xs font-semibold text-fg">Onboarding</p>
         {data.onboarding ? (
-          <p className="mt-1 text-zinc-500">
-            {data.onboarding.doneCount}/{data.onboarding.total} {data.onboarding.launched ? "· LAUNCHED 🚀" : ""}
-            <span className="mt-1 flex flex-wrap gap-1">
+          <div className="mt-1.5 text-fg-muted">
+            <span className="inline-flex items-center gap-2">
+              {data.onboarding.doneCount}/{data.onboarding.total}
+              {data.onboarding.launched && (
+                <Badge tone="success">
+                  <Rocket size={11} aria-hidden />
+                  Launched
+                </Badge>
+              )}
+            </span>
+            <span className="mt-1.5 flex flex-wrap gap-1">
               {data.onboarding.items.map((i) => (
-                <span key={i.id} className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${i.done ? "bg-lime-100 text-lime-700" : "bg-white text-zinc-400"}`}>
+                <Badge key={i.id} tone={i.done ? "success" : "neutral"} title={i.done ? `${i.id}: done` : `${i.id}: pending`}>
+                  {i.done && <Check size={11} aria-hidden />}
                   {i.id}
-                </span>
+                </Badge>
               ))}
             </span>
-          </p>
+          </div>
         ) : (
-          <p className="mt-1 text-zinc-400">unavailable (tenant DB unreachable)</p>
+          <p className="mt-1.5 text-fg-subtle">unavailable (tenant DB unreachable)</p>
         )}
       </div>
       {data.runs.length > 0 && (
         <div className="sm:col-span-2">
-          <p className="font-bold text-zinc-600">Provisioning history</p>
+          <p className="text-xs font-semibold text-fg">Provisioning history</p>
           {data.runs.map((r) => (
-            <p key={r.id} className="mt-1 text-zinc-500">
-              <span className="font-mono text-[10px]">{r.id}</span> · {r.status} · {r.steps.filter((s) => s.status === "done").length}/{r.steps.length} steps
-              {r.error ? <span className="text-red-500"> · {r.error}</span> : ""}
+            <p key={r.id} className="mt-1.5 text-fg-muted">
+              <span className="font-mono text-[11px]">{r.id}</span> · {r.status} · {r.steps.filter((s) => s.status === "done").length}/
+              {r.steps.length} steps
+              {r.error ? <span className="text-danger"> · {r.error}</span> : ""}
             </p>
           ))}
         </div>

@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/console/Button";
+import { Field, Input } from "@/components/console/fields";
+import { Banner } from "@/components/console/Banner";
 
 export default function AcceptInviteForm({ token, storeName }) {
   const [name, setName] = useState("");
@@ -23,7 +26,7 @@ export default function AcceptInviteForm({ token, storeName }) {
       body: JSON.stringify({ token, name, password }),
     });
     if (res.ok) {
-      router.push("/admin/offers");
+      router.push("/admin/dashboard");
       router.refresh();
       return;
     }
@@ -33,42 +36,23 @@ export default function AcceptInviteForm({ token, storeName }) {
   }
 
   return (
-    <div className="mx-auto max-w-sm px-4 py-24">
-      <h1 className="text-xl font-bold">Join {storeName}</h1>
-      <p className="mt-1 text-sm text-zinc-500">Set up your console account to accept the invitation.</p>
-      <form onSubmit={submit} className="mt-6 space-y-3">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Your name"
-          autoFocus
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password (min 8 characters)"
-          autoComplete="new-password"
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-        />
-        <input
-          type="password"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          placeholder="Confirm password"
-          autoComplete="new-password"
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={busy || !password}
-          className="w-full rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {busy ? "Creating account…" : "Accept invitation"}
-        </button>
+    <div>
+      <h1 className="text-base font-semibold text-fg">Join {storeName}</h1>
+      <p className="mt-0.5 text-xs text-fg-muted">Set up your console account to accept the invitation.</p>
+      <form onSubmit={submit} className="mt-5 space-y-4">
+        <Field label="Your name" htmlFor="inv-name">
+          <Input id="inv-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </Field>
+        <Field label="Password" htmlFor="inv-pw" hint="At least 8 characters.">
+          <Input id="inv-pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
+        </Field>
+        <Field label="Confirm password" htmlFor="inv-pw2">
+          <Input id="inv-pw2" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
+        </Field>
+        {error && <Banner tone="danger">{error}</Banner>}
+        <Button type="submit" variant="primary" busy={busy} disabled={!password} className="w-full">
+          Accept invitation
+        </Button>
       </form>
     </div>
   );

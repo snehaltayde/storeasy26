@@ -6,9 +6,12 @@ import "../globals.css";
 // /partners and /approve render HERE — no storefront Header/Footer/cart,
 // no consent banner, no analytics pixels, no service worker, and no tenant
 // brand variables (the [data-console] token scope is structurally isolated
-// from brandCssVars). Edge runtime is EXPLICIT: admin pages inherited edge
-// from the old root layout and must keep it (libsql edge build).
-export const runtime = "edge";
+// from brandCssVars). Runtime is NODE, deliberately: every /api/admin,
+// /api/platform and /api/partners route already runs on Node, console
+// pages gain nothing from edge, and Node's libsql build also supports the
+// file: DBs the local design-preview harness uses. (The storefront stays
+// edge, unchanged.)
+export const runtime = "nodejs";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });

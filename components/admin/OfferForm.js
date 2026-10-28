@@ -1,6 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { CircleAlert, CircleCheck, Plus, TriangleAlert, X } from "lucide-react";
+import { PageHeader } from "@/components/console/PageHeader";
+import { Card, CardHeader } from "@/components/console/Card";
+import { Banner } from "@/components/console/Banner";
+import { Button, IconButton } from "@/components/console/Button";
+import { Switch } from "@/components/console/Switch";
+import { Field, Input, Select } from "@/components/console/fields";
+import { cx } from "@/components/console/cx";
 
 // One form, four offer types — fields mirror lib/offers/validate.js exactly.
 const TYPES = ["COUPON", "TIERED_QTY", "BXGY", "FREE_GIFT"];
@@ -10,6 +18,8 @@ const SCOPE = { BXGY: "line", TIERED_QTY: "line", FREE_GIFT: "gift", COUPON: "or
 // S32 (MC14): proper local↔UTC conversion — an edit round-trip preserves the
 // intended instant (the old slice(0,16) version shifted it by the UTC offset).
 import { isoToLocalInput as toLocal, localInputToIso as fromLocal } from "@/lib/admin/schedule";
+
+const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
 export default function OfferForm({ existing, onDone, onCancel }) {
   const cfg = existing?.config || {};
@@ -32,7 +42,7 @@ export default function OfferForm({ existing, onDone, onCancel }) {
   const [discValue, setDiscValue] = useState(cfg.discount?.value ?? 10);
   const [minSubtotal, setMinSubtotal] = useState(cfg.minSubtotal ?? "");
   const [combinable, setCombinable] = useState(cfg.combinable !== false);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState(null); // string[] | null
   const [busy, setBusy] = useState(false);
 
   function buildOffer() {
@@ -63,198 +73,305 @@ export default function OfferForm({ existing, onDone, onCancel }) {
   async function simulate() {
     setSimBusy(true);
     setSim(null);
-    const res = await fetch("/api/admin/offers/simulate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ offer: buildOffer(), enabled, cartKey: simCart }),
-    });
-    setSim(await res.json().catch(() => ({ ok: false, errors: ["Simulation failed"] })));
-    setSimBusy(false);
+    try {
+      const res = await fetch("/api/admin/offers/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offer: buildOffer(), enabled, cartKey: simCart }),
+      });
+      setSim(await res.json().catch(() => ({ ok: false, errors: ["Simulation failed"] })));
+    } catch {
+      setSim({ ok: false, errors: ["Simulation request failed — check your connection and try again"] });
+    } finally {
+      setSimBusy(false);
+    }
   }
 
   async function save(e) {
     e.preventDefault();
     setBusy(true);
-    setError("");
+    setErrors(null);
     const offer = buildOffer();
     const body = JSON.stringify({ offer, enabled, startsAt: fromLocal(startsAt), endsAt: fromLocal(endsAt) });
-    const res = existing
-      ? await fetch(`/api/admin/offers/${existing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body })
-      : await fetch("/api/admin/offers", { method: "POST", headers: { "Content-Type": "application/json" }, body });
-    if (res.ok) return onDone();
-    const data = await res.json().catch(() => ({}));
-    setError(data.errors?.join("\n") || data.error || `Save failed (${res.status})`);
+    try {
+      const res = existing
+        ? await fetch(`/api/admin/offers/${existing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body })
+        : await fetch("/api/admin/offers", { method: "POST", headers: { "Content-Type": "application/json" }, body });
+      if (res.ok) return onDone();
+      const data = await res.json().catch(() => ({}));
+      setErrors(data.errors?.length ? data.errors : [data.error || `Save failed (${res.status})`]);
+    } catch (err) {
+      setErrors([String(err?.message || err)]);
+    }
     setBusy(false);
   }
 
-  const input = "w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400";
-  const label = "mb-1 block text-xs font-medium text-zinc-500";
-
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold">{existing ? `Edit · ${existing.label}` : "New offer"}</h1>
-      <form onSubmit={save} className="mt-6 space-y-5">
-        {!existing && (
-          <div>
-            <span className={label}>Type</span>
-            <div className="flex flex-wrap gap-2">
-              {TYPES.map((t) => (
-                <button type="button" key={t} onClick={() => setType(t)}
-                  className={`rounded-xl border px-3 py-1.5 text-sm font-semibold ${type === t ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300"}`}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+    <div>
+      <PageHeader
+        breadcrumb={[
+          {
+            // the form swaps the view on the SAME route, so the crumb is a
+            // real control (back to the list) rather than a same-URL link
+            label: (
+              <button type="button" onClick={onCancel} className="rounded text-fg-muted focus-ring hover:text-fg hover:underline">
+                Offers
+              </button>
+            ),
+          },
+          { label: existing ? "Edit" : "New" },
+        ]}
+        title={existing ? `Edit · ${existing.label}` : "New offer"}
+        description={existing ? undefined : "Pick a type, set the rules, prove it on a sample cart, then save."}
+      />
 
-        <div>
-          <span className={label}>Customer-facing title</span>
-          <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. FESTIVE20 · 20% off" />
-        </div>
-
-        {(type === "BXGY" || type === "TIERED_QTY") && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <span className={label}>Target by</span>
-              <select className={input} value={targetKind} onChange={(e) => setTargetKind(e.target.value)}>
-                {TARGET_KINDS.map((k) => <option key={k}>{k}</option>)}
-              </select>
-            </div>
-            <div>
-              <span className={label}>Target value</span>
-              <input className={input} value={targetValue} onChange={(e) => setTargetValue(e.target.value)} placeholder='e.g. "Whey" or a handle' />
-            </div>
-          </div>
-        )}
-
-        {type === "BXGY" && (
-          <div className="grid grid-cols-2 gap-3">
-            <div><span className={label}>Buy quantity</span><input type="number" min="1" className={input} value={buy} onChange={(e) => setBuy(e.target.value)} /></div>
-            <div><span className={label}>Get free</span><input type="number" min="1" className={input} value={free} onChange={(e) => setFree(e.target.value)} /></div>
-          </div>
-        )}
-
-        {type === "TIERED_QTY" && (
-          <div>
-            <span className={label}>Tiers (min quantity → % off)</span>
-            {tiers.map((t, i) => (
-              <div key={i} className="mb-2 flex items-center gap-2">
-                <input type="number" min="1" className={input} value={t.minQty} onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, minQty: e.target.value } : x)))} />
-                <span className="text-zinc-400">→</span>
-                <input type="number" min="1" max="90" className={input} value={t.percent} onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, percent: e.target.value } : x)))} />
-                <span className="text-sm text-zinc-500">%</span>
-                {tiers.length > 1 && (
-                  <button type="button" onClick={() => setTiers(tiers.filter((_, j) => j !== i))} className="text-zinc-400 hover:text-red-600">✕</button>
-                )}
-              </div>
-            ))}
-            <button type="button" onClick={() => setTiers([...tiers, { minQty: 2, percent: 5 }])} className="text-sm font-medium text-lime-700 hover:underline">
-              + Add tier
-            </button>
-          </div>
-        )}
-
-        {type === "FREE_GIFT" && (
-          <>
-            <div><span className={label}>Subtotal threshold (₹, pre-discount)</span><input type="number" min="1" className={input} value={threshold} onChange={(e) => setThreshold(e.target.value)} /></div>
-            <div><span className={label}>Gift variant GID</span><input className={input} value={gift.variantId} onChange={(e) => setGift({ ...gift, variantId: e.target.value })} placeholder="gid://shopify/ProductVariant/…" /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><span className={label}>Gift title</span><input className={input} value={gift.title} onChange={(e) => setGift({ ...gift, title: e.target.value })} /></div>
-              <div><span className={label}>Gift value (₹, for strikethrough)</span><input type="number" className={input} value={gift.value} onChange={(e) => setGift({ ...gift, value: e.target.value })} /></div>
-            </div>
-            <div><span className={label}>Gift image URL (optional)</span><input className={input} value={gift.image || ""} onChange={(e) => setGift({ ...gift, image: e.target.value })} /></div>
-          </>
-        )}
-
-        {type === "COUPON" && (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <div><span className={label}>Code</span><input className={input} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="FESTIVE20" /></div>
+      <form onSubmit={save} className="space-y-4">
+        <Card>
+          <CardHeader title="Basics" description="What the offer is and what shoppers see." />
+          <div className="space-y-4">
+            {!existing && (
               <div>
-                <span className={label}>Discount</span>
-                <div className="flex gap-2">
-                  <select className={input} value={discKind} onChange={(e) => setDiscKind(e.target.value)}>
-                    <option value="percent">% off</option>
-                    <option value="fixed">₹ off</option>
-                  </select>
-                  <input type="number" min="1" className={input} value={discValue} onChange={(e) => setDiscValue(e.target.value)} />
+                <span className="mb-1 block text-xs font-medium text-fg-muted">Type</span>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Offer type">
+                  {TYPES.map((t) => (
+                    <button
+                      type="button"
+                      key={t}
+                      onClick={() => setType(t)}
+                      aria-pressed={type === t}
+                      className={cx(
+                        "rounded-ctl border px-3 py-1.5 text-sm font-medium focus-ring motion-safe:transition-colors",
+                        type === t ? "border-primary bg-primary text-primary-fg" : "border-edge-strong bg-surface text-fg hover:bg-surface-muted"
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><span className={label}>Min subtotal (₹, optional)</span><input type="number" min="0" className={input} value={minSubtotal} onChange={(e) => setMinSubtotal(e.target.value)} /></div>
-              <label className="flex items-end gap-2 pb-2 text-sm">
-                <input type="checkbox" checked={combinable} onChange={(e) => setCombinable(e.target.checked)} />
-                Combinable with other offers
-              </label>
-            </div>
-          </>
+            )}
+            <Field label="Customer-facing title" htmlFor="offer-title">
+              <Input id="offer-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. FESTIVE20 · 20% off" />
+            </Field>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="Rules" description="Fields mirror the engine's validation exactly." />
+          <div className="space-y-4">
+            {(type === "BXGY" || type === "TIERED_QTY") && (
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Target by" htmlFor="offer-target-kind">
+                  <Select id="offer-target-kind" value={targetKind} onChange={(e) => setTargetKind(e.target.value)}>
+                    {TARGET_KINDS.map((k) => <option key={k}>{k}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Target value" htmlFor="offer-target-value">
+                  <Input id="offer-target-value" value={targetValue} onChange={(e) => setTargetValue(e.target.value)} placeholder='e.g. "Whey" or a handle' />
+                </Field>
+              </div>
+            )}
+
+            {type === "BXGY" && (
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Buy quantity" htmlFor="offer-buy">
+                  <Input id="offer-buy" type="number" min="1" value={buy} onChange={(e) => setBuy(e.target.value)} />
+                </Field>
+                <Field label="Get free" htmlFor="offer-free">
+                  <Input id="offer-free" type="number" min="1" value={free} onChange={(e) => setFree(e.target.value)} />
+                </Field>
+              </div>
+            )}
+
+            {type === "TIERED_QTY" && (
+              <div>
+                <span className="mb-1 block text-xs font-medium text-fg-muted">Tiers (min quantity → % off)</span>
+                {tiers.map((t, i) => (
+                  <div key={i} className="mb-2 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="1"
+                      aria-label={`Tier ${i + 1} minimum quantity`}
+                      value={t.minQty}
+                      onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, minQty: e.target.value } : x)))}
+                    />
+                    <span className="text-fg-subtle" aria-hidden>→</span>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="90"
+                      aria-label={`Tier ${i + 1} percent off`}
+                      value={t.percent}
+                      onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, percent: e.target.value } : x)))}
+                    />
+                    <span className="text-sm text-fg-muted" aria-hidden>%</span>
+                    {tiers.length > 1 && (
+                      <IconButton
+                        label={`Remove tier ${i + 1}`}
+                        icon={<X size={14} aria-hidden />}
+                        onClick={() => setTiers(tiers.filter((_, j) => j !== i))}
+                      />
+                    )}
+                  </div>
+                ))}
+                <Button size="sm" variant="ghost" icon={<Plus size={13} aria-hidden />} onClick={() => setTiers([...tiers, { minQty: 2, percent: 5 }])}>
+                  Add tier
+                </Button>
+              </div>
+            )}
+
+            {type === "FREE_GIFT" && (
+              <>
+                <Field label="Subtotal threshold (₹, pre-discount)" htmlFor="offer-threshold">
+                  <Input id="offer-threshold" type="number" min="1" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
+                </Field>
+                <Field label="Gift variant GID" htmlFor="offer-gift-gid">
+                  <Input id="offer-gift-gid" mono value={gift.variantId} onChange={(e) => setGift({ ...gift, variantId: e.target.value })} placeholder="gid://shopify/ProductVariant/…" />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Gift title" htmlFor="offer-gift-title">
+                    <Input id="offer-gift-title" value={gift.title} onChange={(e) => setGift({ ...gift, title: e.target.value })} />
+                  </Field>
+                  <Field label="Gift value (₹, for strikethrough)" htmlFor="offer-gift-value">
+                    <Input id="offer-gift-value" type="number" value={gift.value} onChange={(e) => setGift({ ...gift, value: e.target.value })} />
+                  </Field>
+                </div>
+                <Field label="Gift image URL (optional)" htmlFor="offer-gift-image">
+                  <Input id="offer-gift-image" value={gift.image || ""} onChange={(e) => setGift({ ...gift, image: e.target.value })} />
+                </Field>
+              </>
+            )}
+
+            {type === "COUPON" && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Code" htmlFor="offer-code">
+                    <Input id="offer-code" mono value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="FESTIVE20" />
+                  </Field>
+                  <Field label="Discount" htmlFor="offer-disc-value">
+                    <div className="flex gap-2">
+                      <Select aria-label="Discount kind" value={discKind} onChange={(e) => setDiscKind(e.target.value)}>
+                        <option value="percent">% off</option>
+                        <option value="fixed">₹ off</option>
+                      </Select>
+                      <Input id="offer-disc-value" type="number" min="1" value={discValue} onChange={(e) => setDiscValue(e.target.value)} />
+                    </div>
+                  </Field>
+                </div>
+                <div className="grid grid-cols-2 items-end gap-3">
+                  <Field label="Min subtotal (₹, optional)" htmlFor="offer-min-subtotal">
+                    <Input id="offer-min-subtotal" type="number" min="0" value={minSubtotal} onChange={(e) => setMinSubtotal(e.target.value)} />
+                  </Field>
+                  <div className="flex items-center gap-2 pb-2">
+                    <Switch checked={combinable} onChange={setCombinable} label="Combinable with other offers" />
+                    <span className="text-sm text-fg">Combinable with other offers</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="Schedule" description="Leave both blank to run the offer whenever it's enabled." />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Starts (optional)" htmlFor="offer-starts">
+              <Input id="offer-starts" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+            </Field>
+            <Field label="Ends (optional)" htmlFor="offer-ends">
+              <Input id="offer-ends" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+            </Field>
+          </div>
+          <div className="mt-4 flex items-center gap-2">
+            <Switch checked={enabled} onChange={setEnabled} label="Enabled" />
+            <span className="text-sm text-fg">Enabled</span>
+          </div>
+        </Card>
+
+        {errors && (
+          <Banner tone="danger" title="The offer didn't save">
+            <ul className={cx(errors.length > 1 && "list-disc pl-4", "space-y-0.5")}>
+              {errors.map((e, i) => (
+                <li key={i}>{e}</li>
+              ))}
+            </ul>
+          </Banner>
         )}
-
-        <div className="grid grid-cols-2 gap-3 border-t border-zinc-100 pt-4">
-          <div><span className={label}>Starts (optional)</span><input type="datetime-local" className={input} value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></div>
-          <div><span className={label}>Ends (optional)</span><input type="datetime-local" className={input} value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></div>
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-          Enabled
-        </label>
-
-        {error && <pre className="whitespace-pre-wrap rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</pre>}
 
         {/* S32 (BE07/MC14): prove the offer on a deterministic sample cart
             BEFORE saving — alone and alongside the currently active offers. */}
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-zinc-400">Test on a sample cart</span>
-            <select value={simCart} onChange={(e) => setSimCart(e.target.value)} className="rounded-lg border border-zinc-200 px-2 py-1 text-xs">
-              <option value="small">Small basket (₹499)</option>
-              <option value="medium">Medium basket (₹1,897)</option>
-              <option value="large">Large basket (₹4,296)</option>
-            </select>
-            <button
-              type="button"
-              onClick={simulate}
-              disabled={simBusy}
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-1 text-xs font-semibold hover:bg-zinc-100 disabled:opacity-50"
-            >
-              {simBusy ? "Running…" : "Run simulation"}
-            </button>
-          </div>
+        <Card>
+          <CardHeader
+            title="Test on a sample cart"
+            description="Runs the real engine on a deterministic basket — nothing is saved."
+            actions={
+              <>
+                <Select aria-label="Sample cart" value={simCart} onChange={(e) => setSimCart(e.target.value)} className="w-auto py-1.5 text-xs">
+                  <option value="small">Small basket (₹499)</option>
+                  <option value="medium">Medium basket (₹1,897)</option>
+                  <option value="large">Large basket (₹4,296)</option>
+                </Select>
+                <Button size="sm" busy={simBusy} onClick={simulate}>
+                  Run simulation
+                </Button>
+              </>
+            }
+          />
           {sim && sim.ok === false && (
-            <pre className="mt-2 whitespace-pre-wrap text-xs text-red-600">{(sim.errors || []).join("\n")}</pre>
+            <Banner tone="danger" title="Simulation failed">
+              <ul className={cx((sim.errors || []).length > 1 && "list-disc pl-4", "space-y-0.5")}>
+                {(sim.errors || []).map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            </Banner>
           )}
           {sim && sim.ok && (
-            <div className="mt-3 space-y-1 text-xs text-zinc-600">
-              <p>
-                <span className="font-semibold">{sim.applied.alone ? "✓ applies" : "✗ does not apply"}</span> on{" "}
-                {sim.cart.label}: subtotal ₹{sim.alone.subtotal.toLocaleString("en-IN")} → discount ₹
-                {sim.alone.discountTotal.toLocaleString("en-IN")} → total ₹{sim.alone.total.toLocaleString("en-IN")}
-                {sim.alone.gifts.length ? ` + gift: ${sim.alone.gifts.map((g) => g.title).join(", ")}` : ""}
-                {` · shipping est. ₹${sim.alone.shippingEstimate.toLocaleString("en-IN")}`}
-              </p>
+            <ul className="space-y-1.5 text-xs text-fg-muted">
+              <li className="flex items-start gap-2">
+                {sim.applied.alone ? (
+                  <CircleCheck size={14} className="mt-0.5 shrink-0 text-success" aria-hidden />
+                ) : (
+                  <CircleAlert size={14} className="mt-0.5 shrink-0 text-danger" aria-hidden />
+                )}
+                <span>
+                  <span className="font-semibold text-fg">{sim.applied.alone ? "Applies" : "Does not apply"}</span> on {sim.cart.label}: subtotal{" "}
+                  {inr(sim.alone.subtotal)} → discount {inr(sim.alone.discountTotal)} → total {inr(sim.alone.total)}
+                  {sim.alone.gifts.length ? ` + gift: ${sim.alone.gifts.map((g) => g.title).join(", ")}` : ""}
+                  {` · shipping est. ${inr(sim.alone.shippingEstimate)}`}
+                </span>
+              </li>
               {sim.activeOfferCount > 0 && (
-                <p>
-                  With the {sim.activeOfferCount} active offer(s):{" "}
-                  <span className="font-semibold">{sim.applied.combined ? "✓ still applies" : "✗ does NOT apply"}</span> — combined
-                  discount ₹{sim.combined.discountTotal.toLocaleString("en-IN")}, total ₹{sim.combined.total.toLocaleString("en-IN")}
-                </p>
+                <li className="flex items-start gap-2">
+                  {sim.applied.combined ? (
+                    <CircleCheck size={14} className="mt-0.5 shrink-0 text-success" aria-hidden />
+                  ) : (
+                    <CircleAlert size={14} className="mt-0.5 shrink-0 text-danger" aria-hidden />
+                  )}
+                  <span>
+                    With the {sim.activeOfferCount} active offer(s):{" "}
+                    <span className="font-semibold text-fg">{sim.applied.combined ? "still applies" : "does NOT apply"}</span> — combined discount{" "}
+                    {inr(sim.combined.discountTotal)}, total {inr(sim.combined.total)}
+                  </span>
+                </li>
               )}
               {sim.notes.map((n, i) => (
-                <p key={i} className="text-amber-700">• {n}</p>
+                <li key={i} className="flex items-start gap-2 text-warning">
+                  <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
+                  <span>{n}</span>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-        </div>
+        </Card>
 
-        <div className="flex gap-3">
-          <button type="submit" disabled={busy} className="rounded-xl bg-zinc-900 px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
-            {busy ? "Saving…" : "Save offer"}
-          </button>
-          <button type="button" onClick={onCancel} className="rounded-xl border border-zinc-300 px-6 py-2.5 text-sm font-semibold hover:bg-zinc-50">
+        <div className="flex justify-end gap-2">
+          <Button onClick={onCancel} disabled={busy}>
             Cancel
-          </button>
+          </Button>
+          <Button type="submit" variant="primary" busy={busy}>
+            Save offer
+          </Button>
         </div>
       </form>
     </div>

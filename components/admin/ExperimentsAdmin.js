@@ -1,20 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { PageHeader } from "@/components/console/PageHeader";
+import { Card, CardFooter, CardHeader } from "@/components/console/Card";
+import { Button } from "@/components/console/Button";
+import { Badge, StatusBadge } from "@/components/console/Badge";
+import { Banner } from "@/components/console/Banner";
+import { Table } from "@/components/console/Table";
+import { Field, Input, Textarea } from "@/components/console/fields";
+import { ConfirmDialog } from "@/components/console/Dialog";
+import { EmptyState } from "@/components/console/bits";
+import { useToast } from "@/components/console/Toast";
 
-// Experiments console (S47 / MC18). The UI repeats what the engine
-// enforces: the plan freezes at start, no winner talk while running or
-// under-sampled or SRM-flagged, adoption = a DRAFT the Releases tab ships.
-const btn = "rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-50 disabled:opacity-40";
-const btnDark = "rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-40";
-const input = "w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm outline-none focus:border-zinc-400";
-
-const STATUS_CHIP = {
-  draft: "bg-zinc-100 text-zinc-500",
-  running: "bg-lime-100 text-lime-700",
-  paused: "bg-amber-100 text-amber-700",
-  completed: "bg-sky-100 text-sky-700",
-};
+// Experiments console (S47 / MC18, redesigned S50). The UI repeats what the
+// engine enforces: the plan freezes at start (now confirmed in a dialog),
+// no winner talk while running or under-sampled or SRM-flagged, adoption =
+// a DRAFT the Releases tab ships. S50 FIX: a successful adopt used to pipe
+// its success note into the ERROR slot (setErr(r.note)) — it's a toast now.
 
 const EMPTY = {
   slug: "",
@@ -28,12 +31,22 @@ const EMPTY = {
   ],
 };
 
+const RESULT_COLUMNS = [
+  { key: "key", header: "Variant" },
+  { key: "exposed", header: "Exposed", align: "right" },
+  { key: "conversions", header: "Orders", align: "right" },
+  { key: "rate", header: "Rate", align: "right" },
+  { key: "sample", header: "Sample", align: "right" },
+];
+
 export default function ExperimentsAdmin({ initial }) {
+  const toast = useToast();
   const [experiments, setExperiments] = useState(initial || []);
   const [form, setForm] = useState(null);
   const [analysis, setAnalysis] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState(null); // one action key at a time
   const [err, setErr] = useState(null);
+  const [confirm, setConfirm] = useState(null); // {kind: start|complete|adopt, slug, variant?}
 
   async function refresh() {
     const data = await fetch("/api/admin/experiments").then((r) => r.json()).catch(() => null);
@@ -41,189 +54,315 @@ export default function ExperimentsAdmin({ initial }) {
   }
 
   async function post(body) {
-    setBusy(true);
-    setErr(null);
     const res = await fetch("/api/admin/experiments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const json = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) {
-      setErr(json.error || "Request failed");
-      return null;
-    }
+    if (!res.ok) throw new Error(json.error || "Request failed");
     return json;
   }
 
+  // non-dialog actions: busy on the button, failures land in the banner
+  async function act(key, body) {
+    setPending(key);
+    setErr(null);
+    try {
+      await post(body);
+      await refresh();
+    } catch (e) {
+      setErr(String(e.message || e));
+    } finally {
+      setPending(null);
+    }
+  }
+
   async function analyze(slug) {
-    const data = await fetch(`/api/admin/experiments?analyze=${encodeURIComponent(slug)}`).then((r) => r.json()).catch(() => null);
-    if (data?.ok) setAnalysis(data.analysis);
+    setPending(`results:${slug}`);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/admin/experiments?analyze=${encodeURIComponent(slug)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || "Couldn't load results");
+      setAnalysis(data.analysis);
+    } catch (e) {
+      setErr(String(e.message || e));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function saveDraft() {
+    setPending("save");
+    setErr(null);
+    try {
+      await post({ experiment: form });
+      setForm(null);
+      toast.success("Draft saved");
+      await refresh();
+    } catch (e) {
+      setErr(String(e.message || e));
+    } finally {
+      setPending(null);
+    }
   }
 
   const setVariant = (i, patch) => setForm({ ...form, variants: form.variants.map((v, j) => (j === i ? { ...v, ...patch } : v)) });
 
-  return (
-    <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Experiments</h1>
-        <button type="button" className={btn} onClick={() => { setForm(EMPTY); setErr(null); }}>
-          New experiment
-        </button>
-      </div>
-      <p className="mt-1 text-sm text-zinc-500">
-        A/B tests on the home hero. The plan (hypothesis, allocation, minimum sample) freezes when you start;
-        winner talk is blocked while running, under-sampled, or when exposure ratios look broken. Adopting a
-        variant saves a <strong>draft</strong> — it goes live through Releases, like any edit.
-      </p>
+  const openForm = (f) => {
+    setForm(f);
+    setErr(null);
+  };
 
-      {experiments.length === 0 && !form && <p className="mt-6 text-sm text-zinc-400">No experiments yet.</p>}
-      <ul className="mt-5 space-y-2">
+  return (
+    <>
+      <PageHeader
+        title="Experiments"
+        description={
+          <>
+            A/B tests on the home hero. The plan (hypothesis, allocation, minimum sample) freezes when you start; winner talk is blocked while
+            running, under-sampled, or when exposure ratios look broken. Adopting a variant saves a <strong>draft</strong> — it goes live through
+            Releases, like any edit.
+          </>
+        }
+        actions={
+          <Button icon={<Plus size={14} aria-hidden />} onClick={() => openForm(EMPTY)}>
+            New experiment
+          </Button>
+        }
+      />
+
+      {err && (
+        <Banner tone="danger" className="mb-4">
+          {err}
+        </Banner>
+      )}
+
+      {experiments.length === 0 && !form && (
+        <Card>
+          <EmptyState
+            title="No experiments yet"
+            body="Draft one, start it, and the storefront splits hero exposure by the frozen allocation."
+            action={<Button size="sm" onClick={() => openForm(EMPTY)}>New experiment</Button>}
+          />
+        </Card>
+      )}
+
+      <ul className="space-y-3">
         {experiments.map((e) => (
-          <li key={e.id} className="rounded-xl border border-zinc-200 p-3 text-sm">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${STATUS_CHIP[e.status]}`}>{e.status}</span>
-              <span className="font-semibold">{e.name}</span>
-              <span className="text-xs text-zinc-400">{e.slug} · {e.target_kind} · {e.variants.map((v) => `${v.key} ${v.weight}%`).join(" / ")}</span>
-              {e.adopted_variant && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">adopted: {e.adopted_variant}</span>}
-              <span className="ml-auto flex gap-2">
+          <Card as="li" key={e.id}>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <StatusBadge status={e.status} />
+              <span className="font-semibold text-fg">{e.name}</span>
+              <span className="text-xs text-fg-subtle">
+                {e.slug} · {e.target_kind} · {e.variants.map((v) => `${v.key} ${v.weight}%`).join(" / ")}
+              </span>
+              {e.adopted_variant && <Badge tone="info">adopted: {e.adopted_variant}</Badge>}
+              <span className="ml-auto flex flex-wrap items-center gap-1.5">
                 {e.status === "draft" && (
                   <>
-                    <button type="button" className={btn} onClick={() => { setForm({ slug: e.slug, name: e.name, hypothesis: e.hypothesis || "", target_kind: e.target_kind, min_sample: e.min_sample, variants: e.variants }); setErr(null); }}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        openForm({ slug: e.slug, name: e.name, hypothesis: e.hypothesis || "", target_kind: e.target_kind, min_sample: e.min_sample, variants: e.variants })
+                      }
+                    >
                       Edit
-                    </button>
-                    <button type="button" className={btnDark} disabled={busy} onClick={async () => (await post({ start: { slug: e.slug } })) && refresh()}>
+                    </Button>
+                    <Button size="sm" variant="primary" onClick={() => setConfirm({ kind: "start", slug: e.slug })}>
                       Start
-                    </button>
+                    </Button>
                   </>
                 )}
                 {e.status === "running" && (
-                  <button type="button" className={btn} disabled={busy} onClick={async () => (await post({ pause: { slug: e.slug } })) && refresh()}>
+                  <Button size="sm" busy={pending === `pause:${e.slug}`} onClick={() => act(`pause:${e.slug}`, { pause: { slug: e.slug } })}>
                     Pause
-                  </button>
+                  </Button>
                 )}
                 {e.status === "paused" && (
-                  <button type="button" className={btn} disabled={busy} onClick={async () => (await post({ start: { slug: e.slug } })) && refresh()}>
+                  <Button size="sm" busy={pending === `resume:${e.slug}`} onClick={() => act(`resume:${e.slug}`, { start: { slug: e.slug } })}>
                     Resume
-                  </button>
+                  </Button>
                 )}
                 {["running", "paused"].includes(e.status) && (
-                  <button type="button" className={btn} disabled={busy} onClick={async () => (await post({ complete: { slug: e.slug } })) && refresh()}>
+                  <Button size="sm" onClick={() => setConfirm({ kind: "complete", slug: e.slug })}>
                     Complete
-                  </button>
+                  </Button>
                 )}
-                <button type="button" className={btn} onClick={() => analyze(e.slug)}>
+                <Button size="sm" busy={pending === `results:${e.slug}`} onClick={() => analyze(e.slug)}>
                   Results
-                </button>
+                </Button>
               </span>
             </div>
-            {e.hypothesis && <p className="mt-1 text-xs text-zinc-500">Hypothesis: {e.hypothesis}</p>}
+            {e.hypothesis && <p className="mt-1.5 text-xs text-fg-muted">Hypothesis: {e.hypothesis}</p>}
 
             {analysis?.slug === e.slug && (
-              <div className="mt-3 rounded-lg bg-zinc-50 p-3">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-left text-zinc-400">
-                      <th className="py-1 font-medium">variant</th>
-                      <th className="font-medium">exposed</th>
-                      <th className="font-medium">orders</th>
-                      <th className="font-medium">rate</th>
-                      <th className="font-medium">sample</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {analysis.cells.map((c) => (
-                      <tr key={c.key} className="border-t border-zinc-100">
-                        <td className="py-1 font-semibold">{c.key}</td>
-                        <td>{c.exposed}</td>
-                        <td>{c.conversions}</td>
-                        <td>{(c.rate * 100).toFixed(2)}%</td>
-                        <td className={c.exposed >= analysis.min_sample ? "text-lime-600" : "text-amber-600"}>
-                          {c.exposed >= analysis.min_sample ? "✓" : `${c.exposed}/${analysis.min_sample}`}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="mt-2 text-xs text-zinc-500">
-                  Exposure ratio check: {analysis.srm.ok ? `passing (χ²=${analysis.srm.chi2})` : `FAILING (χ²=${analysis.srm.chi2})`}
+              <div className="mt-3 rounded-ctl border border-edge bg-surface-sunken p-3">
+                <Table
+                  dense
+                  columns={RESULT_COLUMNS}
+                  rows={analysis.cells}
+                  rowKey={(c) => c.key}
+                  renderCell={(c, col) => {
+                    switch (col.key) {
+                      case "key":
+                        return <span className="font-mono text-xs font-medium text-fg">{c.key}</span>;
+                      case "rate":
+                        return `${(c.rate * 100).toFixed(2)}%`;
+                      case "sample":
+                        return c.exposed >= analysis.min_sample ? (
+                          <span className="font-medium text-success">met</span>
+                        ) : (
+                          <span className="text-warning">
+                            {c.exposed}/{analysis.min_sample}
+                          </span>
+                        );
+                      default:
+                        return c[col.key];
+                    }
+                  }}
+                />
+                <p className="mt-2 text-xs text-fg-muted">
+                  Exposure ratio check: {analysis.srm.ok ? `passing (χ²=${analysis.srm.chi2})` : `failing (χ²=${analysis.srm.chi2})`}
                 </p>
                 {analysis.interpretationBlocked.length > 0 ? (
-                  <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    <p className="font-semibold">No winner interpretation:</p>
-                    <ul className="mt-0.5 list-disc pl-4">
+                  <Banner tone="warning" title="No winner interpretation" className="mt-2">
+                    <ul className="list-disc pl-4">
                       {analysis.interpretationBlocked.map((b, i) => (
                         <li key={i}>{b}</li>
                       ))}
                     </ul>
-                  </div>
+                  </Banner>
                 ) : (
-                  <p className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">{analysis.verdict.note}</p>
+                  analysis.verdict && (
+                    <Banner tone={analysis.verdict.winner ? "success" : "info"} className="mt-2">
+                      {analysis.verdict.note}
+                    </Banner>
+                  )
                 )}
                 {e.status === "completed" && !e.adopted_variant && (
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
                     {analysis.cells.map((c) => (
-                      <button key={c.key} type="button" className={btn} disabled={busy} onClick={async () => { const r = await post({ adopt: { slug: e.slug, variant: c.key } }); if (r) { setErr(r.note); await refresh(); } }}>
+                      <Button key={c.key} size="sm" onClick={() => setConfirm({ kind: "adopt", slug: e.slug, variant: c.key })}>
                         Adopt {c.key}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
               </div>
             )}
-          </li>
+          </Card>
         ))}
       </ul>
 
       {form && (
-        <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <input className={input} placeholder="slug (e.g. hero-urgency)" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
-            <input className={input} placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <textarea className={`${input} min-h-16 sm:col-span-2`} placeholder="Hypothesis — required before start (the plan freezes with it)" value={form.hypothesis} onChange={(e) => setForm({ ...form, hypothesis: e.target.value })} />
-            <label className="text-xs text-zinc-600">
-              Min sample per variant
-              <input className={input} type="number" min="50" value={form.min_sample} onChange={(e) => setForm({ ...form, min_sample: Number(e.target.value) || 200 })} />
-            </label>
+        <Card className="mt-5">
+          <CardHeader title="Experiment draft" description="Everything here is editable until you start — then the plan freezes." />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Slug" htmlFor="exp-slug" hint="e.g. hero-urgency">
+              <Input id="exp-slug" mono value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
+            </Field>
+            <Field label="Name" htmlFor="exp-name">
+              <Input id="exp-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </Field>
+            <Field label="Hypothesis" htmlFor="exp-hypothesis" hint="Required before start — the plan freezes with it" className="sm:col-span-2">
+              <Textarea id="exp-hypothesis" value={form.hypothesis} onChange={(e) => setForm({ ...form, hypothesis: e.target.value })} />
+            </Field>
+            <Field label="Min sample per variant" htmlFor="exp-min-sample">
+              <Input id="exp-min-sample" type="number" min="50" value={form.min_sample} onChange={(e) => setForm({ ...form, min_sample: Number(e.target.value) || 200 })} />
+            </Field>
           </div>
+
           {form.variants.map((v, i) => (
-            <div key={i} className="mt-3 rounded-lg border border-zinc-200 bg-white p-2.5">
-              <div className="flex items-center gap-2">
-                <input className={`${input} w-28`} disabled={i === 0} value={v.key} onChange={(e) => setVariant(i, { key: e.target.value })} />
-                <label className="flex items-center gap-1 text-xs text-zinc-500">
-                  weight
-                  <input className={`${input} w-16`} type="number" min="1" value={v.weight} onChange={(e) => setVariant(i, { weight: Number(e.target.value) || 1 })} />
-                  %
-                </label>
-                {i === 0 ? <span className="text-xs text-zinc-400">serves the live hero unchanged</span> : form.variants.length > 2 && (
-                  <button type="button" className={btn} onClick={() => setForm({ ...form, variants: form.variants.filter((_, j) => j !== i) })}>
-                    ✕
-                  </button>
+            <div key={i} className="mt-3 rounded-ctl border border-edge bg-surface-sunken p-3">
+              <div className="flex flex-wrap items-end gap-2">
+                <Field label="Variant key" htmlFor={`exp-v${i}-key`} className="w-32">
+                  <Input id={`exp-v${i}-key`} mono disabled={i === 0} value={v.key} onChange={(e) => setVariant(i, { key: e.target.value })} />
+                </Field>
+                <Field label="Weight %" htmlFor={`exp-v${i}-weight`} className="w-24">
+                  <Input id={`exp-v${i}-weight`} type="number" min="1" value={v.weight} onChange={(e) => setVariant(i, { weight: Number(e.target.value) || 1 })} />
+                </Field>
+                {i === 0 ? (
+                  <p className="pb-2.5 text-xs text-fg-subtle">serves the live hero unchanged</p>
+                ) : (
+                  form.variants.length > 2 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<Trash2 size={13} aria-hidden />}
+                      className="mb-0.5 text-danger"
+                      onClick={() => setForm({ ...form, variants: form.variants.filter((_, j) => j !== i) })}
+                    >
+                      Remove
+                    </Button>
+                  )
                 )}
               </div>
               {i > 0 && (
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <input className={input} placeholder="Hero title" value={v.payload?.title || ""} onChange={(e) => setVariant(i, { payload: { ...v.payload, title: e.target.value } })} />
-                  <input className={input} placeholder="Highlight (substring of the title)" value={v.payload?.highlight || ""} onChange={(e) => setVariant(i, { payload: { ...v.payload, highlight: e.target.value } })} />
-                  <input className={`${input} sm:col-span-2`} placeholder="Subtitle" value={v.payload?.subtitle || ""} onChange={(e) => setVariant(i, { payload: { ...v.payload, subtitle: e.target.value } })} />
+                  <Field label="Hero title" htmlFor={`exp-v${i}-title`}>
+                    <Input id={`exp-v${i}-title`} value={v.payload?.title || ""} onChange={(e) => setVariant(i, { payload: { ...v.payload, title: e.target.value } })} />
+                  </Field>
+                  <Field label="Highlight" htmlFor={`exp-v${i}-highlight`} hint="substring of the title">
+                    <Input id={`exp-v${i}-highlight`} value={v.payload?.highlight || ""} onChange={(e) => setVariant(i, { payload: { ...v.payload, highlight: e.target.value } })} />
+                  </Field>
+                  <Field label="Subtitle" htmlFor={`exp-v${i}-subtitle`} className="sm:col-span-2">
+                    <Input id={`exp-v${i}-subtitle`} value={v.payload?.subtitle || ""} onChange={(e) => setVariant(i, { payload: { ...v.payload, subtitle: e.target.value } })} />
+                  </Field>
                 </div>
               )}
             </div>
           ))}
           {form.variants.length < 6 && (
-            <button type="button" className={`${btn} mt-2`} onClick={() => setForm({ ...form, variants: [...form.variants, { key: `v${form.variants.length}`, weight: 10, payload: { title: "", highlight: "", subtitle: "" } }] })}>
-              + variant
-            </button>
+            <Button
+              size="sm"
+              icon={<Plus size={13} aria-hidden />}
+              className="mt-3"
+              onClick={() => setForm({ ...form, variants: [...form.variants, { key: `v${form.variants.length}`, weight: 10, payload: { title: "", highlight: "", subtitle: "" } }] })}
+            >
+              Add variant
+            </Button>
           )}
-          {err && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{err}</p>}
-          <div className="mt-3 flex gap-2">
-            <button type="button" className={btnDark} disabled={busy} onClick={async () => { const r = await post({ experiment: form }); if (r) { setForm(null); await refresh(); } }}>
+          <CardFooter>
+            <Button variant="primary" busy={pending === "save"} onClick={saveDraft}>
               Save draft
-            </button>
-            <button type="button" className={btn} onClick={() => { setForm(null); setErr(null); }}>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setForm(null);
+                setErr(null);
+              }}
+            >
               Cancel
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardFooter>
+        </Card>
       )}
-      {!form && err && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{err}</p>}
-    </div>
+
+      <ConfirmDialog
+        open={!!confirm}
+        onClose={() => setConfirm(null)}
+        tone="primary"
+        title={confirm?.kind === "start" ? "Start the experiment?" : confirm?.kind === "complete" ? "Complete the experiment?" : `Adopt "${confirm?.variant}"?`}
+        confirmLabel={confirm?.kind === "start" ? "Start" : confirm?.kind === "complete" ? "Complete" : `Adopt ${confirm?.variant}`}
+        body={
+          confirm?.kind === "start"
+            ? "The plan — hypothesis, allocation, minimum sample — freezes now."
+            : confirm?.kind === "complete"
+              ? "Completing stops serving the variant and finalizes the stats."
+              : "Adopting a variant saves a draft — it goes live through Releases, like any edit."
+        }
+        onConfirm={async () => {
+          if (confirm.kind === "adopt") {
+            const r = await post({ adopt: { slug: confirm.slug, variant: confirm.variant } });
+            toast.success(r.note); // S50 fix: this success note used to land in the error slot
+          } else if (confirm.kind === "start") {
+            await post({ start: { slug: confirm.slug } });
+          } else {
+            await post({ complete: { slug: confirm.slug } });
+          }
+          await refresh();
+        }}
+      />
+    </>
   );
 }

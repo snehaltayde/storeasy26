@@ -2,11 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Banner } from "@/components/console/Banner";
+import { Button } from "@/components/console/Button";
+import { Field, Input } from "@/components/console/fields";
+import { CopyButton, SecretReveal } from "@/components/console/Copy";
 
-// S26 (OP01): operator email+password with MANDATORY TOTP. First sign-in
-// returns the enrollment secret once; the first valid code confirms it.
-// Leaving email empty uses the legacy platform password — accepted only while
-// no operator user exists (bootstrap).
+// S26 (OP01, redesigned S50): operator email+password with MANDATORY TOTP.
+// First sign-in returns the enrollment secret once; the first valid code
+// confirms it. Leaving email empty uses the legacy platform password —
+// accepted only while no operator user exists (bootstrap). Rendered as the
+// same centered auth card the merchant console uses (implemented locally —
+// /platform has no (auth) route group).
 export default function PlatformLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,60 +47,68 @@ export default function PlatformLogin() {
   }
 
   return (
-    <div className="mx-auto max-w-sm px-4 py-24">
-      <h1 className="text-xl font-bold">Storeasy platform</h1>
-      <p className="mt-1 text-sm text-zinc-500">Operator console — tenants, onboarding, health.</p>
-      {enroll && (
-        <div className="mt-6 rounded-xl border border-lime-300 bg-lime-50 p-4 text-sm">
-          <p className="font-semibold">Set up your authenticator</p>
-          <p className="mt-1 text-zinc-600">
-            Add this secret to your authenticator app (shown once), then enter the current 6-digit code
-            below and sign in again:
-          </p>
-          <code className="mt-2 block break-all rounded bg-white px-2 py-1 font-mono text-xs">{enroll.secret}</code>
-          <p className="mt-2 break-all text-xs text-zinc-500">{enroll.otpauth}</p>
-        </div>
-      )}
-      <form onSubmit={submit} className="mt-6 space-y-3">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Operator email"
-          autoFocus
-          autoComplete="username"
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          autoComplete="current-password"
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-        />
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="\d{6}"
-          value={totp}
-          onChange={(e) => setTotp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          placeholder="Authenticator code (6 digits)"
-          autoComplete="one-time-code"
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={busy || !password}
-          className="w-full rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
-        <p className="text-xs text-zinc-400">
-          First platform setup? Leave email empty to use the bootstrap operator password.
-        </p>
-      </form>
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
+      <div className="mb-6 text-center">
+        <p className="text-lg font-semibold tracking-tight text-fg">Storeasy platform</p>
+        <p className="text-xs text-fg-subtle">Operator console · tenants, onboarding, health</p>
+      </div>
+      <div className="w-full max-w-sm rounded-card border border-edge bg-surface p-6 shadow-card">
+        {enroll && (
+          <div className="mb-5">
+            <p className="text-sm font-semibold text-fg">Set up your authenticator</p>
+            <p className="mt-1 text-xs text-fg-muted">
+              Add this secret to your authenticator app, then enter the current 6-digit code below and sign in again. No QR needed — scan
+              apps accept manual entry.
+            </p>
+            <div className="mt-2">
+              <SecretReveal label="TOTP secret" value={enroll.secret} note="Shown once — add it to your app now; it can't be retrieved later." />
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <code className="min-w-0 flex-1 break-all rounded bg-surface-sunken px-2.5 py-1.5 font-mono text-[11px] text-fg-muted">{enroll.otpauth}</code>
+              <CopyButton value={enroll.otpauth} label="Copy otpauth URL" />
+            </div>
+          </div>
+        )}
+        <form onSubmit={submit} className="space-y-3">
+          <Field label="Operator email" htmlFor="pl-email" hint="First platform setup? Leave empty to use the bootstrap operator password.">
+            <Input
+              id="pl-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@storeasy.dev"
+              autoFocus
+              autoComplete="username"
+            />
+          </Field>
+          <Field label="Password" htmlFor="pl-password" required>
+            <Input
+              id="pl-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </Field>
+          <Field label="Authenticator code" htmlFor="pl-totp" hint="6 digits from your authenticator app.">
+            <Input
+              id="pl-totp"
+              type="text"
+              inputMode="numeric"
+              pattern="\d{6}"
+              mono
+              value={totp}
+              onChange={(e) => setTotp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="000000"
+              autoComplete="one-time-code"
+            />
+          </Field>
+          {error && <Banner tone="danger">{error}</Banner>}
+          <Button type="submit" variant="primary" busy={busy} disabled={!password} className="w-full">
+            Sign in
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }

@@ -10,9 +10,9 @@ export default async function AcceptInvitePage({ searchParams }) {
   const storeName = await tfetch(() => siteName());
   if (!token) {
     return (
-      <div className="mx-auto max-w-sm px-4 py-24">
-        <h1 className="text-xl font-bold">Invitation link incomplete</h1>
-        <p className="mt-2 text-sm text-zinc-500">
+      <div>
+        <h1 className="text-base font-semibold text-fg">Invitation link incomplete</h1>
+        <p className="mt-2 text-sm text-fg-muted">
           This page needs the invitation token from your email link. Ask for a new invitation if the link
           was cut off.
         </p>

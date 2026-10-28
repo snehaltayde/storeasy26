@@ -1,7 +1,10 @@
 "use client";
 
-// Scoped CSV export (S42 / MC17): downloads exactly the AGGREGATED rows shown
-// on screen — never raw events or shopper PII.
+import { Download } from "lucide-react";
+import { Button } from "@/components/console/Button";
+
+// Scoped CSV export (S42 / MC17, restyled S50): downloads exactly the
+// AGGREGATED rows shown on screen — never raw events or shopper PII.
 export default function ExportCsv({ rows, columns, filename }) {
   function download() {
     const esc = (v) => {
@@ -18,8 +21,8 @@ export default function ExportCsv({ rows, columns, filename }) {
   }
   if (!rows?.length) return null;
   return (
-    <button type="button" onClick={download} className="text-xs font-medium text-lime-700 hover:underline">
+    <Button size="sm" icon={<Download size={13} aria-hidden />} onClick={download}>
       Export CSV
-    </button>
+    </Button>
   );
 }

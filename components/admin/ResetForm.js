@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/console/Button";
+import { Field, Input } from "@/components/console/fields";
+import { Banner } from "@/components/console/Banner";
 
 export default function ResetForm({ token }) {
   const [password, setPassword] = useState("");
@@ -34,44 +37,27 @@ export default function ResetForm({ token }) {
 
   if (done) {
     return (
-      <div className="mx-auto max-w-sm px-4 py-24">
-        <h1 className="text-xl font-bold">Password updated</h1>
-        <p className="mt-2 text-sm text-zinc-500">
-          All previous sessions are signed out. Taking you to the login…
-        </p>
+      <div>
+        <h1 className="text-base font-semibold text-fg">Password updated</h1>
+        <p className="mt-2 text-sm text-fg-muted">All previous sessions are signed out. Taking you to the login…</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-sm px-4 py-24">
-      <h1 className="text-xl font-bold">Choose a new password</h1>
-      <form onSubmit={submit} className="mt-6 space-y-3">
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="New password (min 8 characters)"
-          autoFocus
-          autoComplete="new-password"
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-        />
-        <input
-          type="password"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          placeholder="Confirm password"
-          autoComplete="new-password"
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={busy || !password}
-          className="w-full rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {busy ? "Updating…" : "Set new password"}
-        </button>
+    <div>
+      <h1 className="text-base font-semibold text-fg">Choose a new password</h1>
+      <form onSubmit={submit} className="mt-5 space-y-4">
+        <Field label="New password" htmlFor="reset-pw" hint="At least 8 characters.">
+          <Input id="reset-pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus autoComplete="new-password" required />
+        </Field>
+        <Field label="Confirm password" htmlFor="reset-pw2">
+          <Input id="reset-pw2" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
+        </Field>
+        {error && <Banner tone="danger">{error}</Banner>}
+        <Button type="submit" variant="primary" busy={busy} className="w-full">
+          Set password
+        </Button>
       </form>
     </div>
   );

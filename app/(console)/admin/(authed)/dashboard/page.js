@@ -1,20 +1,29 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { ArrowRight } from "lucide-react";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
-import { salesRollup, freshness, coverage, discrepancies } from "@/lib/reporting";
+import { salesRollup, freshness, coverage, discrepancies, dayInTz } from "@/lib/reporting";
 import { listContactMessages } from "@/lib/notifications";
 import { buildChecklist } from "@/lib/admin/onboarding";
 import { formatMoney } from "@/lib/format";
-import { siteName } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
+import { PageHeader } from "@/components/console/PageHeader";
+import { Card, CardHeader } from "@/components/console/Card";
+import { Stat, EmptyState } from "@/components/console/bits";
+import { Badge } from "@/components/console/Badge";
+import { Bars } from "@/components/console/charts";
+import { cx } from "@/components/console/cx";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard · Admin", robots: { index: false } };
 
-// Merchant dashboard (S42 / MC04): reconciled numbers with their freshness
-// and coverage on the same screen, an action queue, and honest unknowns —
-// a metric we can't compute says so instead of rendering 0.
+// Merchant dashboard (S42 / MC04, redesigned S50): reconciled numbers with
+// freshness and coverage on one screen, an action queue, honest unknowns —
+// and two honesty FIXES: "Today" now really means today in the merchant's
+// timezone (it used to show the last ACTIVE day), and the 7-day window cuts
+// on merchant-TZ day keys (it used to mix UTC into TZ buckets). The chart
+// is a dense series — quiet days render as real gaps, not missing bars.
 const ago = (iso) => {
   if (!iso) return null;
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -24,128 +33,126 @@ const ago = (iso) => {
   return `${Math.round(mins / 1440)}d ago`;
 };
 
-function Stat({ label, value, sub }) {
-  return (
-    <div className="rounded-2xl border border-zinc-200 p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{label}</p>
-      <p className="mt-1 text-2xl font-extrabold text-zinc-900">{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-zinc-400">{sub}</p>}
-    </div>
-  );
-}
+const RANGES = [7, 30, 90];
 
-export default async function AdminDashboardPage() {
+export default async function AdminDashboardPage({ searchParams }) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
-  const [name, rollup, fresh, cov, issues, inbox, checklist] = await tfetch(async () =>
+  const sp = await searchParams;
+  const days = RANGES.includes(Number(sp?.days)) ? Number(sp.days) : 30;
+
+  const [rollup, fresh, cov, issues, inbox, checklist] = await tfetch(async () =>
     Promise.all([
-      siteName(),
-      salesRollup({ days: 30 }),
+      salesRollup({ days }),
       freshness(),
-      coverage({ days: 30 }),
+      coverage({ days }),
       discrepancies(),
       listContactMessages({ limit: 50 }),
       buildChecklist().catch(() => ({ supported: false })),
     ]),
   );
 
-  const window = (days) => {
-    const cut = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-    const rows = rollup.series.filter((d) => d.day >= cut);
-    const orders = rows.reduce((s, d) => s + d.orders, 0);
-    const net = rows.reduce((s, d) => s + d.net, 0);
-    return { orders, net };
-  };
-  const today = rollup.series.at(-1);
-  const w7 = window(7);
-  const cur = rollup.currency;
-  const money = (v) => formatMoney(v, cur);
+  const byDay = new Map(rollup.series.map((d) => [d.day, d]));
+  const dayKey = (msAgo) => dayInTz(new Date(Date.now() - msAgo).toISOString(), rollup.tz);
+  // dense series: every day in the window, zeros included — truthful x-axis
+  const dense = Array.from({ length: days }, (_, i) => {
+    const key = dayKey((days - 1 - i) * 86400000);
+    const d = byDay.get(key);
+    return { label: key.slice(5), value: d?.net || 0, title: d ? `${d.orders} order${d.orders === 1 ? "" : "s"}` : "no sales" };
+  });
+  const today = byDay.get(dayKey(0));
+  const last7Keys = new Set(Array.from({ length: 7 }, (_, i) => dayKey(i * 86400000)));
+  const w7 = rollup.series.filter((d) => last7Keys.has(d.day)).reduce((acc, d) => ({ orders: acc.orders + d.orders, net: acc.net + d.net }), { orders: 0, net: 0 });
+  const money = (v) => formatMoney(v, rollup.currency);
 
   const actions = [
-    ...issues.map((i) => ({ label: `${i.order}: ${i.detail}`, hint: i.action, href: "/admin/orders", tone: "red" })),
+    ...issues.map((i) => ({ label: `${i.order}: ${i.detail}`, hint: i.action, href: `/admin/orders/${i.order}`, tone: "danger" })),
     ...(inbox.filter((m) => m.notify_status === "failed").length
-      ? [{ label: `${inbox.filter((m) => m.notify_status === "failed").length} contact message(s) failed to reach your inbox email`, hint: "set a support email in Settings", href: "/admin/integrations", tone: "amber" }]
+      ? [{ label: `${inbox.filter((m) => m.notify_status === "failed").length} contact message(s) failed to reach your inbox email`, hint: "Set a support email in Settings", href: "/admin/integrations", tone: "warning" }]
       : []),
     ...(checklist.supported && !checklist.launched
-      ? [{ label: `Setup: ${checklist.doneCount}/${checklist.total} done — not launched yet`, hint: "finish the checklist", href: "/admin/setup", tone: "zinc" }]
+      ? [{ label: `Setup: ${checklist.doneCount}/${checklist.total} done — not launched yet`, hint: "Finish the checklist", href: "/admin/setup", tone: "neutral" }]
       : []),
   ];
 
   return (
     <>
-      <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Sales from your orders ledger (refunds provider-mirrored); behavioural numbers cover consented
-          sessions only. Shopify stays authoritative.
-        </p>
-
-        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Stat label="Today" value={today ? money(today.net) : "—"} sub={today ? `${today.orders} order${today.orders === 1 ? "" : "s"}` : "no sales yet today"} />
-          <Stat label="7 days" value={money(w7.net)} sub={`${w7.orders} orders`} />
-          <Stat label="30 days" value={money(rollup.net)} sub={`${rollup.orders} orders · ${rollup.refunds ? `${money(rollup.refunds)} refunded` : "no refunds"}`} />
-          <Stat label="Avg order (30d)" value={rollup.aov != null ? money(Math.round(rollup.aov)) : "unknown"} sub={rollup.aov == null ? "needs at least one order" : `${rollup.tz} days`} />
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2 text-xs">
-          <span className={`rounded-full px-3 py-1 ${fresh.catalog_synced_at ? "bg-zinc-100 text-zinc-600" : "bg-amber-100 text-amber-700"}`}>
-            catalog {fresh.catalog_synced_at ? `synced ${ago(fresh.catalog_synced_at)}` : "never synced"}
-          </span>
-          <span className="rounded-full bg-zinc-100 px-3 py-1 text-zinc-600">last order {fresh.last_order_at ? ago(fresh.last_order_at) : "— none yet"}</span>
-          <span className={`rounded-full px-3 py-1 ${cov.push_pct === 100 ? "bg-lime-100 text-lime-700" : cov.push_pct == null ? "bg-zinc-100 text-zinc-500" : "bg-amber-100 text-amber-700"}`}>
-            {cov.push_pct == null ? "Shopify push: no sales in window" : `${cov.push_pct}% of sales pushed to Shopify`}
-          </span>
-          <span className="rounded-full bg-zinc-100 px-3 py-1 text-zinc-600">
-            {cov.event_coverage_pct == null ? "event coverage unknown (no sales)" : `analytics sees ~${cov.event_coverage_pct}% of sales (consent)`}
-          </span>
-        </div>
-
-        <section className="mt-6 rounded-2xl border border-zinc-200 p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold">Needs attention</h2>
-            <Link href="/admin/analytics" className="text-xs font-medium text-lime-700 hover:underline">
-              Analytics →
-            </Link>
+      <PageHeader
+        title="Dashboard"
+        description="Sales from your orders ledger (refunds provider-mirrored); behavioural numbers cover consented sessions only. Shopify stays authoritative."
+        actions={
+          <div className="flex rounded-ctl border border-edge bg-surface p-0.5" role="group" aria-label="Date range">
+            {RANGES.map((r) => (
+              <Link
+                key={r}
+                href={r === 30 ? "/admin/dashboard" : `/admin/dashboard?days=${r}`}
+                aria-current={days === r ? "true" : undefined}
+                className={cx("rounded px-2.5 py-1 text-xs font-medium focus-ring", days === r ? "bg-primary text-primary-fg" : "text-fg-muted hover:text-fg")}
+              >
+                {r}d
+              </Link>
+            ))}
           </div>
-          {actions.length === 0 ? (
-            <p className="mt-3 text-sm text-zinc-400">Nothing — queues clear, pushes healthy.</p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {actions.map((a, i) => (
-                <li key={i}>
-                  <Link href={a.href} className={`block rounded-xl px-4 py-2.5 text-sm ${a.tone === "red" ? "bg-red-50 text-red-700" : a.tone === "amber" ? "bg-amber-50 text-amber-800" : "bg-zinc-50 text-zinc-600"} hover:opacity-90`}>
-                    {a.label}
-                    <span className="mt-0.5 block text-xs opacity-70">{a.hint}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        }
+      />
 
-        <section className="mt-5 rounded-2xl border border-zinc-200 p-5">
-          <h2 className="text-sm font-bold">Last 30 days</h2>
-          {rollup.series.length === 0 ? (
-            <p className="mt-3 text-sm text-zinc-400">No sales in this window yet — numbers appear with the first order.</p>
-          ) : (
-            <div className="mt-4 flex h-28 items-end gap-1" role="img" aria-label="Daily net revenue, last 30 days">
-              {rollup.series.map((d) => {
-                const max = Math.max(...rollup.series.map((x) => x.net), 1);
-                return (
-                  <div key={d.day} className="group relative flex-1">
-                    <div className="w-full rounded-t bg-lime-400 transition group-hover:bg-lime-500" style={{ height: `${Math.max(3, Math.round((d.net / max) * 100))}%` }} />
-                    <span className="pointer-events-none absolute -top-8 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-zinc-900 px-2 py-0.5 text-[10px] text-white group-hover:block">
-                      {d.day}: {money(d.net)} · {d.orders} orders
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="Today so far" value={money(today?.net || 0)} sub={today ? `${today.orders} order${today.orders === 1 ? "" : "s"}` : "no sales yet today"} tone={today ? undefined : "muted"} />
+        <Stat label="7 days" value={money(w7.net)} sub={`${w7.orders} orders`} />
+        <Stat label={`${days} days`} value={money(rollup.net)} sub={`${rollup.orders} orders · ${rollup.refunds ? `${money(rollup.refunds)} refunded` : "no refunds"}`} />
+        <Stat label={`Avg order (${days}d)`} value={rollup.aov != null ? money(Math.round(rollup.aov)) : "unknown"} sub={rollup.aov == null ? "needs at least one order" : `days in ${rollup.tz}`} tone={rollup.aov == null ? "muted" : undefined} />
       </div>
+
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        <Badge tone={fresh.catalog_synced_at ? "neutral" : "warning"}>catalog {fresh.catalog_synced_at ? `synced ${ago(fresh.catalog_synced_at)}` : "never synced"}</Badge>
+        <Badge tone="neutral">last order {fresh.last_order_at ? ago(fresh.last_order_at) : "— none yet"}</Badge>
+        <Badge tone={cov.push_pct === 100 ? "success" : cov.push_pct == null ? "neutral" : "warning"}>
+          {cov.push_pct == null ? "Shopify push: no sales in window" : `${cov.push_pct}% of sales pushed to Shopify`}
+        </Badge>
+        <Badge tone="neutral">{cov.event_coverage_pct == null ? "event coverage unknown (no sales)" : `analytics sees ~${cov.event_coverage_pct}% of sales (consent)`}</Badge>
+      </div>
+
+      <Card className="mt-6">
+        <CardHeader
+          title="Needs attention"
+          actions={
+            <Link href="/admin/analytics" className="inline-flex items-center gap-1 rounded text-xs font-medium text-fg-muted focus-ring hover:text-fg hover:underline">
+              Analytics <ArrowRight size={12} aria-hidden />
+            </Link>
+          }
+        />
+        {actions.length === 0 ? (
+          <EmptyState title="Nothing needs attention" body="Queues clear, pushes healthy." className="py-6" />
+        ) : (
+          <ul className="space-y-2">
+            {actions.map((a, i) => (
+              <li key={i}>
+                <Link
+                  href={a.href}
+                  className={cx(
+                    "block rounded-ctl border px-4 py-2.5 text-sm focus-ring motion-safe:transition-colors",
+                    a.tone === "danger" ? "border-danger-edge bg-danger-bg text-danger hover:opacity-90" : a.tone === "warning" ? "border-warning-edge bg-warning-bg text-warning hover:opacity-90" : "border-edge bg-surface-sunken text-fg-muted hover:text-fg"
+                  )}
+                >
+                  {a.label}
+                  <span className="mt-0.5 block text-xs opacity-75">{a.hint}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader title={`Net revenue — last ${days} days`} description={`Daily buckets in ${rollup.tz}; refunds already netted out.`} />
+        {rollup.series.length === 0 ? (
+          <EmptyState title="No sales in this window yet" body="The chart appears with the first order." className="py-6" />
+        ) : (
+          <Bars series={dense} height={130} ariaLabel={`Daily net revenue, last ${days} days`} formatValue={(v) => money(v)} />
+        )}
+      </Card>
     </>
   );
 }

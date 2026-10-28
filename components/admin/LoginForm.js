@@ -2,11 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/console/Button";
+import { Field, Input } from "@/components/console/fields";
+import { Banner } from "@/components/console/Banner";
 
 // S26 (MC01): individual email+password sign-in. Leaving email empty falls
 // back to the store's bootstrap/legacy shared password — the server only
 // accepts that while the tenant has no member users (or in legacy mode).
-export default function LoginForm({ storeName }) {
+// S50: renders inside the (auth) card shell; lands on the Dashboard.
+export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -25,7 +29,7 @@ export default function LoginForm({ storeName }) {
       body: JSON.stringify(email ? { email, password } : { password }),
     });
     if (res.ok) {
-      router.push("/admin/offers");
+      router.push("/admin/dashboard");
       router.refresh();
       return;
     }
@@ -52,41 +56,25 @@ export default function LoginForm({ storeName }) {
   }
 
   return (
-    <div className="mx-auto max-w-sm px-4 py-24">
-      <h1 className="text-xl font-bold">{storeName} admin</h1>
-      <p className="mt-1 text-sm text-zinc-500">Store console — offers, orders, settings.</p>
-      <form onSubmit={submit} className="mt-6 space-y-3">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          autoFocus
-          autoComplete="username"
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          autoComplete="current-password"
-          className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {notice && <p className="text-sm text-zinc-600">{notice}</p>}
-        <button
-          type="submit"
-          disabled={busy || !password}
-          className="w-full rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
-        <div className="flex items-center justify-between text-xs text-zinc-400">
-          <button type="button" onClick={forgot} disabled={busy} className="underline hover:text-zinc-600">
+    <div>
+      <h1 className="text-base font-semibold text-fg">Sign in</h1>
+      <p className="mt-0.5 text-xs text-fg-muted">Offers, orders, storefront and settings.</p>
+      <form onSubmit={submit} className="mt-5 space-y-4">
+        <Field label="Email" htmlFor="login-email" hint="No account email yet? Leave it empty to use the setup password.">
+          <Input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus autoComplete="username" />
+        </Field>
+        <Field label="Password" htmlFor="login-password">
+          <Input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+        </Field>
+        {error && <Banner tone="danger">{error}</Banner>}
+        {notice && <Banner tone="info">{notice}</Banner>}
+        <Button type="submit" variant="primary" busy={busy} disabled={!password} className="w-full">
+          Sign in
+        </Button>
+        <div className="text-center">
+          <button type="button" onClick={forgot} disabled={busy} className="rounded text-xs text-fg-muted underline-offset-2 focus-ring hover:text-fg hover:underline">
             Forgot password?
           </button>
-          <span>No email yet? Leave it empty to use the setup password.</span>
         </div>
       </form>
     </div>

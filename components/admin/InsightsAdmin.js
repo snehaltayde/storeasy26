@@ -1,19 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import { Sparkles } from "lucide-react";
+import { PageHeader } from "@/components/console/PageHeader";
+import { Card } from "@/components/console/Card";
+import { Button } from "@/components/console/Button";
+import { Badge } from "@/components/console/Badge";
+import { Banner } from "@/components/console/Banner";
+import { EmptyState } from "@/components/console/bits";
+import { useToast } from "@/components/console/Toast";
+import { humanizeStatus } from "@/components/console/status";
 
-// AI insights console (S47 / MC19). Honest everywhere: unconfigured says
-// so (no mock), the budget is visible, every proposal shows the facts it
-// cites, and "apply" makes a DRAFT the Releases tab ships — the AI cannot
-// publish, refund or touch prices.
-const btn = "rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-50 disabled:opacity-40";
-const btnDark = "rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-40";
+// AI insights console (S47 / MC19, redesigned S50). Honest everywhere:
+// unconfigured says so (no mock), the budget is visible, every proposal
+// shows the facts it cites, and "apply" makes a DRAFT the Releases tab
+// ships — the AI cannot publish, refund or touch prices.
+
+// Insight lifecycle chips (new/applied/dismissed) aren't in the shared
+// status vocabulary (status.js isn't this slice's file to grow), so the
+// tone is computed inline; raw status stays on title like StatusBadge.
+const insightTone = (s) => (s === "applied" ? "success" : s === "dismissed" ? "neutral" : "info");
 
 export default function InsightsAdmin({ initial }) {
+  const toast = useToast();
   const [data, setData] = useState(initial);
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState(null); // one action key at a time
   const [err, setErr] = useState(null);
-  const [note, setNote] = useState(null);
 
   async function refresh() {
     const r = await fetch("/api/admin/insights").then((r) => r.json()).catch(() => null);
@@ -21,106 +33,136 @@ export default function InsightsAdmin({ initial }) {
   }
 
   async function post(body) {
-    setBusy(true);
-    setErr(null);
-    setNote(null);
     const res = await fetch("/api/admin/insights", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const json = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) {
-      setErr(json.error || "Request failed");
-      return null;
-    }
+    if (!res.ok) throw new Error(json.error || "Request failed");
     return json;
+  }
+
+  async function act(key, body, note = null) {
+    setPending(key);
+    setErr(null);
+    try {
+      const r = await post(body);
+      if (note) toast.success(typeof note === "function" ? note(r) : note);
+      await refresh();
+    } catch (e) {
+      setErr(String(e.message || e));
+    } finally {
+      setPending(null);
+    }
   }
 
   const { configured, model, budget, insights } = data;
   const factById = (ins) => Object.fromEntries((ins.facts || []).map((f) => [f.id, f.text]));
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Insights</h1>
-        <button type="button" className={btnDark} disabled={busy || !configured} onClick={async () => (await post({ generate: true })) && refresh()}>
-          {busy ? "Thinking…" : "Generate insights"}
-        </button>
+    <>
+      <PageHeader
+        title="Insights"
+        description={
+          <>
+            Evidence-linked suggestions from this store&rsquo;s own numbers (catalog, sales, zero-result searches — never another store&rsquo;s,
+            never shopper PII). The assistant proposes; <strong>you</strong> review, and anything applied is a draft until you publish a release. It
+            cannot publish, refund or change prices.
+          </>
+        }
+        actions={
+          <Button
+            variant="primary"
+            icon={<Sparkles size={14} aria-hidden />}
+            busy={pending === "generate"}
+            disabled={!configured}
+            onClick={() => act("generate", { generate: true }, "New insights generated.")}
+          >
+            {pending === "generate" ? "Thinking…" : "Generate insights"}
+          </Button>
+        }
+      />
+
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
+        {configured && <Badge tone="neutral">model: {model}</Badge>}
+        <Badge tone="neutral">
+          {budget.metered
+            ? `budget: ${budget.spent.toLocaleString("en-IN")} / ${budget.budget.toLocaleString("en-IN")} tokens this month`
+            : `budget: ${budget.budget.toLocaleString("en-IN")} tokens (unmetered in legacy mode)`}
+        </Badge>
       </div>
-      <p className="mt-1 text-sm text-zinc-500">
-        Evidence-linked suggestions from this store&rsquo;s own numbers (catalog, sales, zero-result searches — never
-        another store&rsquo;s, never shopper PII). The assistant proposes; <strong>you</strong> review, and anything applied is a
-        draft until you publish a release. It cannot publish, refund or change prices.
-      </p>
 
-      <div className="mt-4 flex flex-wrap gap-3 text-xs">
-        <span className={`rounded-lg px-3 py-2 ${configured ? "bg-lime-50 text-lime-800" : "bg-amber-50 text-amber-800"}`}>
-          {configured ? `model: ${model}` : "Not configured — set ANTHROPIC_API_KEY. Nothing here is mocked."}
-        </span>
-        <span className="rounded-lg bg-zinc-100 px-3 py-2 text-zinc-600">
-          {budget.metered ? `budget: ${budget.spent.toLocaleString("en-IN")} / ${budget.budget.toLocaleString("en-IN")} tokens this month` : `budget: ${budget.budget.toLocaleString("en-IN")} tokens (unmetered in legacy mode)`}
-        </span>
-      </div>
+      {!configured && (
+        <Banner tone="warning" className="mb-4">
+          Not configured — set <code className="font-mono text-xs">ANTHROPIC_API_KEY</code>. Nothing here is mocked.
+        </Banner>
+      )}
+      {err && (
+        <Banner tone="danger" className="mb-4">
+          {err}
+        </Banner>
+      )}
 
-      {err && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</p>}
-      {note && <p className="mt-3 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-800">{note}</p>}
+      {insights.length === 0 && (
+        <Card>
+          <EmptyState
+            title="No insights yet"
+            body={configured ? "Generate the first batch — each one cites the store facts it reasoned from." : "Configure the API key, then generate the first batch."}
+          />
+        </Card>
+      )}
 
-      {insights.length === 0 && <p className="mt-6 text-sm text-zinc-400">No insights yet{configured ? " — generate the first batch." : "."}</p>}
-      <ul className="mt-5 space-y-3">
+      <ul className="space-y-3">
         {insights.map((ins) => (
-          <li key={ins.id} className={`rounded-2xl border p-4 ${ins.status === "dismissed" ? "border-zinc-100 opacity-60" : "border-zinc-200"}`}>
-            <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <Card as="li" key={ins.id} className={ins.status === "dismissed" ? "opacity-60" : ""}>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-fg-subtle">
+              <Badge tone={insightTone(ins.status)} title={String(ins.status)}>
+                {humanizeStatus(ins.status)}
+              </Badge>
               <span>{new Date(ins.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</span>
-              <span>· {ins.model} · {ins.tokens_in + ins.tokens_out} tokens</span>
-              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${ins.status === "applied" ? "bg-lime-100 text-lime-700" : ins.status === "dismissed" ? "bg-zinc-100 text-zinc-400" : "bg-sky-100 text-sky-700"}`}>{ins.status}</span>
+              <span>
+                · {ins.model} · {ins.tokens_in + ins.tokens_out} tokens
+              </span>
               <span className="ml-auto">
                 {ins.status !== "dismissed" ? (
-                  <button type="button" className={btn} disabled={busy} onClick={async () => (await post({ dismiss: { id: ins.id } })) && refresh()}>
+                  <Button size="sm" variant="ghost" busy={pending === `dismiss:${ins.id}`} onClick={() => act(`dismiss:${ins.id}`, { dismiss: { id: ins.id } })}>
                     Dismiss
-                  </button>
+                  </Button>
                 ) : (
-                  <button type="button" className={btn} disabled={busy} onClick={async () => (await post({ restore: { id: ins.id } })) && refresh()}>
+                  <Button size="sm" variant="ghost" busy={pending === `restore:${ins.id}`} onClick={() => act(`restore:${ins.id}`, { restore: { id: ins.id } })}>
                     Restore
-                  </button>
+                  </Button>
                 )}
               </span>
             </div>
-            <ul className="mt-2 space-y-3">
+            <ul className="mt-3 space-y-3">
               {ins.proposals.map((p, i) => (
-                <li key={i} className="rounded-xl bg-zinc-50 p-3 text-sm">
-                  <p className="font-semibold">{p.title}</p>
-                  <p className="mt-0.5 text-zinc-600">{p.mechanism}</p>
-                  <details className="mt-1">
-                    <summary className="cursor-pointer text-xs text-zinc-400">Evidence ({p.evidence.length})</summary>
-                    <ul className="mt-1 space-y-0.5 text-xs text-zinc-500">
+                <li key={i} className="rounded-ctl bg-surface-sunken p-3 text-sm">
+                  <p className="font-semibold text-fg">{p.title}</p>
+                  <p className="mt-0.5 text-fg-muted">{p.mechanism}</p>
+                  <details className="mt-1.5">
+                    <summary className="cursor-pointer rounded text-xs text-fg-subtle focus-ring hover:text-fg">Evidence ({p.evidence.length})</summary>
+                    <ul className="mt-1.5 space-y-1 border-l-2 border-edge pl-3 text-xs text-fg-muted">
                       {p.evidence.map((e) => (
-                        <li key={e}>· {factById(ins)[e] || e}</li>
+                        <li key={e}>{factById(ins)[e] || e}</li>
                       ))}
                     </ul>
                   </details>
                   {p.draft && ins.status !== "dismissed" && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="text-xs text-zinc-400">draft → {p.component}</span>
-                      <button
-                        type="button"
-                        className={btn}
-                        disabled={busy}
-                        onClick={async () => {
-                          const r = await post({ apply: { id: ins.id, index: i } });
-                          if (r) {
-                            setNote(r.note);
-                            await refresh();
-                          }
-                        }}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-fg-subtle">draft → {p.component}</span>
+                      <Button
+                        size="sm"
+                        busy={pending === `apply:${ins.id}:${i}`}
+                        onClick={() => act(`apply:${ins.id}:${i}`, { apply: { id: ins.id, index: i } }, (r) => r.note)}
                       >
                         Apply as draft
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </li>
               ))}
             </ul>
-          </li>
+          </Card>
         ))}
       </ul>
-    </div>
+    </>
   );
 }

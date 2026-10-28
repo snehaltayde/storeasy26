@@ -1,12 +1,24 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Image as ImageIcon, Loader2, Trash2 } from "lucide-react";
+import { Card } from "@/components/console/Card";
+import { Banner } from "@/components/console/Banner";
+import { IconButton } from "@/components/console/Button";
+import { ConfirmDialog } from "@/components/console/Dialog";
+import { CopyButton } from "@/components/console/Copy";
+import { Input } from "@/components/console/fields";
+import { EmptyState, PermissionNote } from "@/components/console/bits";
+import { useToast } from "@/components/console/Toast";
 
-// Media library console (S38 / MC12). Uploads go through /api/admin/media as
-// multipart; for raster images (not gif/svg) a THUMB derivative is generated
-// here with a canvas (no native image library exists server-side) and rides
-// the same request. Deletes are usage-guarded: a 409 lists what still
-// references the file, and deleting anyway is a second, explicit step.
+// Media library console (S38 / MC12, redesigned S50). Uploads go through
+// /api/admin/media as multipart; for raster images (not gif/svg) a THUMB
+// derivative is generated here with a canvas (no native image library exists
+// server-side) and rides the same request. Deletes are usage-guarded: every
+// delete confirms in a dialog first, and a 409 lists what still references
+// the file in a second "delete anyway" dialog (same force semantics as
+// before). S50 fixes: blur-saving alt text now toasts (it was silent), and
+// read-only support actors see an honest PermissionNote instead of nothing.
 
 const fmtSize = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`);
 
@@ -40,11 +52,12 @@ async function imageDims(file) {
 
 export default function MediaAdmin({ initial, readOnly = false }) {
   const [media, setMedia] = useState(initial);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null); // {id, usage}
-  const [copied, setCopied] = useState(null);
+  const [uploading, setUploading] = useState(null); // filename in flight
+  const [error, setError] = useState(null);
+  const [deleting, setDeleting] = useState(null); // media row
+  const [usageGuard, setUsageGuard] = useState(null); // {media, usage}
   const fileRef = useRef(null);
+  const toast = useToast();
 
   async function refresh() {
     const res = await fetch("/api/admin/media");
@@ -53,10 +66,10 @@ export default function MediaAdmin({ initial, readOnly = false }) {
   }
 
   async function upload(files) {
-    for (const file of files) {
-      setBusy(true);
-      setMsg({ ok: true, text: `Uploading ${file.name}…` });
-      try {
+    setError(null);
+    try {
+      for (const file of files) {
+        setUploading(file.name);
         const form = new FormData();
         form.set("file", file);
         const dims = await imageDims(file);
@@ -73,142 +86,181 @@ export default function MediaAdmin({ initial, readOnly = false }) {
         const res = await fetch("/api/admin/media", { method: "POST", body: form });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok) {
-          setMsg({ ok: false, text: (json.errors || [json.error || `Upload failed (${res.status})`]).join(" · ") });
-          setBusy(false);
+          setError((json.errors || [json.error || `Upload failed (${res.status})`]).join(" · "));
           return;
         }
-        setMsg({ ok: true, text: json.media.deduped ? `${file.name} was already in the library — reused.` : `${file.name} uploaded.` });
-      } catch (e) {
-        setMsg({ ok: false, text: String(e?.message || e) });
+        toast.success(json.media.deduped ? `${file.name} was already in the library — reused` : `${file.name} uploaded`);
       }
+    } catch (e) {
+      setError(String(e?.message || e));
+    } finally {
+      setUploading(null);
+      await refresh();
+      if (fileRef.current) fileRef.current.value = "";
     }
-    await refresh();
-    setBusy(false);
-    if (fileRef.current) fileRef.current.value = "";
   }
 
   async function saveAlt(id, alt) {
-    await fetch("/api/admin/media", {
+    const res = await fetch("/api/admin/media", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, alt }),
     });
-    setMsg({ ok: true, text: "Alt text saved." });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      toast.error(json.error || "Couldn't save alt text");
+      return;
+    }
+    setMedia((list) => list.map((m) => (m.id === id ? { ...m, alt } : m)));
+    toast.success("Alt text saved");
   }
 
-  async function del(id, force) {
-    setBusy(true);
+  // One DELETE helper, same API semantics as before: force=false may come
+  // back 409 with a usage list; force=true removes regardless.
+  async function requestDelete(id, force) {
     const res = await fetch("/api/admin/media", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, force }),
     });
     const json = await res.json().catch(() => ({}));
-    if (res.status === 409) {
-      setConfirmDelete({ id, usage: json.usage || [] });
-    } else if (json.ok) {
-      setConfirmDelete(null);
-      setMsg({ ok: true, text: "Deleted." });
-      await refresh();
-    } else {
-      setMsg({ ok: false, text: json.error || "Delete failed" });
-    }
-    setBusy(false);
-  }
-
-  async function copyUrl(m) {
-    try {
-      await navigator.clipboard.writeText(m.url);
-      setCopied(m.id);
-      setTimeout(() => setCopied(null), 1500);
-    } catch {
-      setMsg({ ok: true, text: `URL: ${m.url}` });
-    }
+    if (res.status === 409) return { usage: json.usage || [] };
+    if (!res.ok || !json.ok) throw new Error(json.error || "Delete failed");
+    return { ok: true };
   }
 
   return (
     <div className="space-y-4">
-      {!readOnly && (
-        <div className="rounded-2xl border border-dashed border-zinc-300 p-5 text-center">
+      {readOnly ? (
+        <PermissionNote role="support" need="upload or change media" />
+      ) : (
+        <Card className="border-dashed text-center">
           <input
             ref={fileRef}
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
             multiple
-            disabled={busy}
+            disabled={!!uploading}
             onChange={(e) => e.target.files?.length && upload([...e.target.files])}
-            className="mx-auto block text-sm text-zinc-600 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-zinc-800"
+            className="mx-auto block rounded text-sm text-fg-muted focus-ring file:mr-3 file:rounded-ctl file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary-fg hover:file:bg-primary-hover disabled:opacity-50"
           />
-          <p className="mt-2 text-xs text-zinc-400">PNG, JPEG, WebP, GIF up to 1.5MB · SVG up to 300KB (sanitized). Duplicates are detected and reused.</p>
-        </div>
+          <p className="mt-2 text-xs text-fg-subtle">PNG, JPEG, WebP, GIF up to 1.5MB · SVG up to 300KB (sanitized). Duplicates are detected and reused.</p>
+        </Card>
       )}
 
-      {msg && <div className={`rounded-xl px-4 py-3 text-sm ${msg.ok ? "bg-lime-50 text-lime-700" : "bg-red-50 text-red-600"}`}>{msg.text}</div>}
-
-      {confirmDelete && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <p className="font-semibold">This file is still referenced:</p>
-          <ul className="mt-1 list-inside list-disc">
-            {confirmDelete.usage.map((u) => (
-              <li key={u.where} className="font-mono text-xs">{u.where}</li>
-            ))}
-          </ul>
-          <p className="mt-2">Deleting it leaves broken images there (and in any older release you roll back to).</p>
-          <div className="mt-2 flex gap-2">
-            <button type="button" disabled={busy} onClick={() => del(confirmDelete.id, true)} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-500 disabled:opacity-50">
-              Delete anyway
-            </button>
-            <button type="button" onClick={() => setConfirmDelete(null)} className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold hover:bg-amber-100">
-              Keep it
-            </button>
-          </div>
-        </div>
+      {uploading && (
+        <Banner tone="info">
+          <span className="inline-flex items-center gap-2">
+            <Loader2 size={13} className="motion-safe:animate-spin" aria-hidden />
+            Uploading {uploading}…
+          </span>
+        </Banner>
       )}
+
+      {error && <Banner tone="danger">{error}</Banner>}
 
       {media.length === 0 ? (
-        <p className="rounded-2xl border border-zinc-200 p-8 text-center text-sm text-zinc-400">No files yet — upload your first image above.</p>
+        <Card>
+          <EmptyState icon={<ImageIcon size={20} aria-hidden />} title="No files yet" body={readOnly ? "Uploads appear here." : "Upload your first image above."} />
+        </Card>
       ) : (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {media.map((m) => {
             const thumb = m.variants?.find((v) => v.variant === "thumb");
             return (
-              <li key={m.id} className="overflow-hidden rounded-2xl border border-zinc-200">
-                <div className="flex h-36 items-center justify-center bg-zinc-50">
+              <Card key={m.id} as="li" padded={false} className="overflow-hidden">
+                <div className="flex h-36 items-center justify-center bg-surface-sunken">
                   {/* library files are same-origin; plain <img> keeps this simple */}
                   <img src={thumb ? `/api/media/${thumb.id}` : m.url} alt={m.alt || m.filename} className="max-h-36 max-w-full object-contain" loading="lazy" />
                 </div>
                 <div className="space-y-2 p-3">
-                  <p className="truncate text-xs font-semibold text-zinc-700" title={m.filename}>
+                  <p className="truncate text-xs font-medium text-fg" title={m.filename}>
                     {m.filename}
                   </p>
-                  <p className="text-[11px] text-zinc-400">
+                  <p className="text-[11px] text-fg-subtle">
                     {m.mime.replace("image/", "")} · {fmtSize(m.size)}
                     {m.width ? ` · ${m.width}×${m.height}` : ""}
                     {thumb ? " · +thumb" : ""}
                   </p>
-                  <input
+                  <Input
                     defaultValue={m.alt}
                     placeholder="Alt text (describe the image)"
+                    aria-label={`Alt text for ${m.filename}`}
                     disabled={readOnly}
-                    onBlur={(e) => !readOnly && e.target.value !== m.alt && saveAlt(m.id, e.target.value)}
-                    className="w-full rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-zinc-400"
+                    onBlur={(e) => !readOnly && e.target.value !== (m.alt || "") && saveAlt(m.id, e.target.value)}
+                    className="px-2 py-1 text-xs"
                   />
                   <div className="flex items-center justify-between">
-                    <button type="button" onClick={() => copyUrl(m)} className="text-xs font-medium text-lime-700 hover:underline">
-                      {copied === m.id ? "Copied ✓" : "Copy URL"}
-                    </button>
+                    <CopyButton value={m.url} label={`Copy URL for ${m.filename}`} />
                     {!readOnly && (
-                      <button type="button" disabled={busy} onClick={() => del(m.id, false)} className="text-xs text-zinc-400 hover:text-red-600">
-                        Delete
-                      </button>
+                      <IconButton
+                        label={`Delete ${m.filename}`}
+                        icon={<Trash2 size={14} aria-hidden />}
+                        onClick={() => setDeleting(m)}
+                        className="text-fg-muted hover:bg-danger-bg hover:text-danger"
+                      />
                     )}
                   </div>
                 </div>
-              </li>
+              </Card>
             );
           })}
         </ul>
       )}
+
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        title="Delete file"
+        tone="danger"
+        confirmLabel="Delete"
+        body={
+          deleting && (
+            <>
+              Deletes <strong>{deleting.filename}</strong> from the library permanently. If anything still references it, you&rsquo;ll be shown where before it goes.
+            </>
+          )
+        }
+        onConfirm={async () => {
+          const r = await requestDelete(deleting.id, false);
+          if (r.usage) {
+            setUsageGuard({ media: deleting, usage: r.usage });
+          } else {
+            toast.success("Deleted");
+            await refresh();
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!usageGuard}
+        onClose={() => setUsageGuard(null)}
+        title="Still referenced — delete anyway?"
+        tone="danger"
+        confirmLabel="Delete anyway"
+        body={
+          usageGuard && (
+            <>
+              <Banner tone="warning" title="This file is still referenced:">
+                <ul className="list-inside list-disc">
+                  {usageGuard.usage.map((u) => (
+                    <li key={u.where} className="font-mono text-xs">
+                      {u.where}
+                    </li>
+                  ))}
+                </ul>
+              </Banner>
+              <p className="mt-2">Deleting it leaves broken images there (and in any older release you roll back to).</p>
+            </>
+          )
+        }
+        onConfirm={async () => {
+          const r = await requestDelete(usageGuard.media.id, true);
+          if (r.usage) throw new Error("Still referenced — the server refused the forced delete");
+          toast.success("Deleted");
+          await refresh();
+        }}
+      />
     </div>
   );
 }

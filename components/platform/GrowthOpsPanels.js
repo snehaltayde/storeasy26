@@ -1,136 +1,226 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { Card, CardHeader } from "@/components/console/Card";
+import { Banner } from "@/components/console/Banner";
+import { Button } from "@/components/console/Button";
+import { Badge, StatusBadge } from "@/components/console/Badge";
+import { Table } from "@/components/console/Table";
+import { Field, Input } from "@/components/console/fields";
+import { Switch } from "@/components/console/Switch";
+import { ConfirmDialog } from "@/components/console/Dialog";
+import { SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
+import { useToast } from "@/components/console/Toast";
 
-// S47 operator panels: FlagsPanel (OP13) + CostsPanel (OP09).
-const btn = "rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-semibold hover:bg-zinc-50 disabled:opacity-40";
-const btnDark = "rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-40";
-const input = "rounded-lg border border-zinc-200 px-2 py-1.5 text-sm outline-none focus:border-zinc-400";
+// S47 operator panels (redesigned S50): FlagsPanel (OP13) + CostsPanel (OP09).
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
 // ---- OP13: feature flags ------------------------------------------------------
 
 export function FlagsPanel() {
   const [flags, setFlags] = useState(null);
+  const [err, setErr] = useState(null);
   const [form, setForm] = useState(null);
-  const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(null); // { type: "disable"|"remove", flag }
+  const toast = useToast();
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/platform/flags");
-    if (res.ok) setFlags((await res.json()).flags);
+    setErr(null);
+    try {
+      const res = await fetch("/api/platform/flags");
+      if (res.ok) setFlags((await res.json()).flags);
+      else setErr(`Couldn't load flags (${res.status})`);
+    } catch (e) {
+      setErr(String(e?.message || e));
+    }
   }, []);
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   async function post(body, label) {
-    setBusy(true);
-    setMsg("");
     const res = await fetch("/api/platform/flags", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const j = await res.json().catch(() => ({}));
-    setMsg(res.ok ? `${label}: ok` : `${label}: ${j.error || res.status}`);
-    setBusy(false);
+    if (!res.ok) throw new Error(`${label}: ${j.error || res.status}`);
+    toast.success(`${label}: ok`);
     refresh();
   }
 
-  if (!flags) return null;
   return (
-    <section className="mt-8 rounded-2xl border border-zinc-200 p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold">Feature flags</h2>
-        <button type="button" className={btn} onClick={() => setForm({ key: "ff_", description: "", default_on: false, critical: false, tenantsText: "", expires_at: "" })}>
-          New flag
-        </button>
-      </div>
-      <p className="mt-1 text-xs text-zinc-500">
-        Server-evaluated rollout/kill switches (ff_*) — separate from billing entitlements. Critical flags are
-        read uncached on every request, so an emergency disable is immediate everywhere. All changes audited.
-      </p>
-      {msg && <p className="mt-2 text-xs text-zinc-500">{msg}</p>}
-      {flags.length === 0 && !form && <p className="mt-3 text-sm text-zinc-400">No flags defined — absent flags fall back to each consumer&rsquo;s default.</p>}
-      <ul className="mt-3 space-y-2 text-sm">
-        {flags.map((f) => (
-          <li key={f.key} className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-100 p-2.5">
-            <code className="font-mono text-xs font-bold">{f.key}</code>
-            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${f.expired ? "bg-zinc-100 text-zinc-400" : Number(f.default_on) || f.default_on ? "bg-lime-100 text-lime-700" : "bg-zinc-100 text-zinc-500"}`}>
-              {f.expired ? "expired" : f.default_on ? "on" : "off"}
-            </span>
-            {f.critical && <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-red-700">critical · uncached</span>}
-            {Object.keys(f.tenants || {}).length > 0 && (
-              <span className="text-xs text-zinc-400">
-                cohort: {Object.entries(f.tenants).map(([t, v]) => `${t}=${v ? "on" : "off"}`).join(", ")}
-              </span>
-            )}
-            {f.description && <span className="text-xs text-zinc-500">{f.description}</span>}
-            <span className="ml-auto flex gap-2">
-              <button type="button" className={btn} onClick={() => setForm({ key: f.key, description: f.description || "", default_on: !!f.default_on, critical: !!f.critical, tenantsText: Object.entries(f.tenants || {}).map(([t, v]) => `${t}=${v ? 1 : 0}`).join(", "), expires_at: f.expires_at || "" })}>
-                Edit
-              </button>
-              <button type="button" className={`${btn} text-red-600`} disabled={busy} onClick={() => post({ disable: { key: f.key } }, `emergency-disable ${f.key}`)}>
-                Emergency disable
-              </button>
-              <button type="button" className={btn} disabled={busy} onClick={() => post({ remove: { key: f.key } }, `delete ${f.key}`)}>
-                ✕
-              </button>
-            </span>
-          </li>
-        ))}
-      </ul>
-      {form && (
-        <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <input className={input} placeholder="ff_my-flag" value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value })} />
-            <input className={input} placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-            <input className={`${input} sm:col-span-2`} placeholder="Tenant cohort: demo=1, beastlife=0 (optional)" value={form.tenantsText} onChange={(e) => setForm({ ...form, tenantsText: e.target.value })} />
-            <input className={input} placeholder="Expires (ISO, optional)" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} />
-            <div className="flex items-center gap-4 text-xs">
-              <label className="flex items-center gap-1.5">
-                <input type="checkbox" checked={form.default_on} onChange={(e) => setForm({ ...form, default_on: e.target.checked })} /> default on
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input type="checkbox" checked={form.critical} onChange={(e) => setForm({ ...form, critical: e.target.checked })} /> checkout-critical (uncached)
-              </label>
+    <Card id="flags">
+      <CardHeader
+        title="Feature flags"
+        description="Server-evaluated rollout/kill switches (ff_*) — separate from billing entitlements. Critical flags are read uncached on every request, so an emergency disable is immediate everywhere. All changes audited."
+        actions={
+          <Button
+            size="sm"
+            onClick={() => setForm({ key: "ff_", description: "", default_on: false, critical: false, tenantsText: "", expires_at: "" })}
+          >
+            New flag
+          </Button>
+        }
+      />
+      {err && <ErrorState title="Couldn't load feature flags" detail={err} onRetry={refresh} />}
+      {!flags && !err && <SkeletonText lines={3} />}
+      {flags && (
+        <>
+          {flags.length === 0 && !form && (
+            <EmptyState title="No flags defined" body="Absent flags fall back to each consumer's default." />
+          )}
+          <ul className="space-y-2 text-sm">
+            {flags.map((f) => (
+              <li key={f.key} className="flex flex-wrap items-center gap-2 rounded-ctl border border-edge p-3">
+                <code className="font-mono text-xs font-semibold text-fg">{f.key}</code>
+                <StatusBadge status={f.expired ? "expired" : f.default_on ? "on" : "off"} />
+                {f.critical && (
+                  <Badge tone="danger" title="critical">
+                    Critical · uncached
+                  </Badge>
+                )}
+                {Object.keys(f.tenants || {}).length > 0 && (
+                  <span className="text-xs text-fg-subtle">
+                    cohort: {Object.entries(f.tenants).map(([t, v]) => `${t}=${v ? "on" : "off"}`).join(", ")}
+                  </span>
+                )}
+                {f.description && <span className="text-xs text-fg-muted">{f.description}</span>}
+                <span className="ml-auto flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      setForm({
+                        key: f.key,
+                        description: f.description || "",
+                        default_on: !!f.default_on,
+                        critical: !!f.critical,
+                        tenantsText: Object.entries(f.tenants || {}).map(([t, v]) => `${t}=${v ? 1 : 0}`).join(", "),
+                        expires_at: f.expires_at || "",
+                      })
+                    }
+                  >
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="dangerOutline" disabled={busy} onClick={() => setConfirm({ type: "disable", flag: f })}>
+                    Emergency disable
+                  </Button>
+                  <Button size="sm" disabled={busy} onClick={() => setConfirm({ type: "remove", flag: f })}>
+                    Delete
+                  </Button>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {form && (
+            <div className="mt-3 rounded-ctl border border-edge bg-surface-sunken p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Key" htmlFor="ff-key" required>
+                  <Input id="ff-key" mono placeholder="ff_my-flag" value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value })} />
+                </Field>
+                <Field label="Description" htmlFor="ff-desc">
+                  <Input id="ff-desc" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                </Field>
+                <Field label="Tenant cohort" htmlFor="ff-cohort" hint="Format: demo=1, beastlife=0 (optional)." className="sm:col-span-2">
+                  <Input id="ff-cohort" mono value={form.tenantsText} onChange={(e) => setForm({ ...form, tenantsText: e.target.value })} />
+                </Field>
+                <Field label="Expires" htmlFor="ff-expires" hint="ISO timestamp, optional.">
+                  <Input id="ff-expires" mono value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} />
+                </Field>
+                <div className="flex items-center gap-6 text-xs text-fg-muted">
+                  <span className="flex items-center gap-2">
+                    <Switch label="Default on" checked={form.default_on} onChange={(v) => setForm({ ...form, default_on: v })} />
+                    default on
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Switch label="Checkout-critical (uncached)" checked={form.critical} onChange={(v) => setForm({ ...form, critical: v })} />
+                    checkout-critical (uncached)
+                  </span>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  busy={busy}
+                  onClick={async () => {
+                    const tenants = {};
+                    for (const part of form.tenantsText.split(",").map((s) => s.trim()).filter(Boolean)) {
+                      const [t, v] = part.split("=");
+                      if (t?.trim()) tenants[t.trim()] = v?.trim() !== "0";
+                    }
+                    setBusy(true);
+                    try {
+                      await post(
+                        { flag: { key: form.key.trim(), description: form.description, default_on: form.default_on, critical: form.critical, tenants, expires_at: form.expires_at.trim() || null } },
+                        `save ${form.key}`
+                      );
+                      setForm(null);
+                    } catch (e) {
+                      toast.error(String(e?.message || e));
+                    }
+                    setBusy(false);
+                  }}
+                >
+                  Save flag
+                </Button>
+                <Button size="sm" onClick={() => setForm(null)}>
+                  Cancel
+                </Button>
+              </div>
             </div>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              className={btnDark}
-              disabled={busy}
-              onClick={async () => {
-                const tenants = {};
-                for (const part of form.tenantsText.split(",").map((s) => s.trim()).filter(Boolean)) {
-                  const [t, v] = part.split("=");
-                  if (t?.trim()) tenants[t.trim()] = v?.trim() !== "0";
-                }
-                await post({ flag: { key: form.key.trim(), description: form.description, default_on: form.default_on, critical: form.critical, tenants, expires_at: form.expires_at.trim() || null } }, `save ${form.key}`);
-                setForm(null);
-              }}
-            >
-              Save flag
-            </button>
-            <button type="button" className={btn} onClick={() => setForm(null)}>
-              Cancel
-            </button>
-          </div>
-        </div>
+          )}
+        </>
       )}
-    </section>
+
+      <ConfirmDialog
+        open={confirm?.type === "disable"}
+        onClose={() => setConfirm(null)}
+        title={`Emergency-disable ${confirm?.flag?.key}?`}
+        tone="danger"
+        confirmLabel="Disable now"
+        body="Forces the flag off and stops the next request on every instance — critical flags are read uncached. The change is audited."
+        onConfirm={() => post({ disable: { key: confirm.flag.key } }, `emergency-disable ${confirm.flag.key}`)}
+      />
+      <ConfirmDialog
+        open={confirm?.type === "remove"}
+        onClose={() => setConfirm(null)}
+        title={`Delete ${confirm?.flag?.key}?`}
+        tone="danger"
+        confirmLabel="Delete flag"
+        body="Consumers fall back to their own defaults once the flag is gone."
+        onConfirm={() => post({ remove: { key: confirm.flag.key } }, `delete ${confirm.flag.key}`)}
+      />
+    </Card>
   );
 }
 
 // ---- OP09: tenant unit costs --------------------------------------------------
 
+const COST_COLUMNS = [
+  { key: "tenant", header: "Tenant" },
+  { key: "compute", header: "Compute", align: "right" },
+  { key: "db", header: "DB", align: "right" },
+  { key: "mail", header: "Mail", align: "right" },
+  { key: "ai", header: "AI", align: "right" },
+  { key: "allocated", header: "Allocated", align: "right" },
+  { key: "budget", header: "Budget", align: "right" },
+];
+
 export function CostsPanel() {
   const [report, setReport] = useState(null);
+  const [err, setErr] = useState(null);
   const [inputs, setInputs] = useState(null);
-  const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/platform/costs");
-    if (res.ok) setReport((await res.json()).report);
+    setErr(null);
+    try {
+      const res = await fetch("/api/platform/costs");
+      if (res.ok) setReport((await res.json()).report);
+      else setErr(`Couldn't load costs (${res.status})`);
+    } catch (e) {
+      setErr(String(e?.message || e));
+    }
   }, []);
   useEffect(() => {
     refresh();
@@ -138,113 +228,137 @@ export function CostsPanel() {
 
   async function post(body, label) {
     setBusy(true);
-    setMsg("");
     const res = await fetch("/api/platform/costs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const j = await res.json().catch(() => ({}));
-    setMsg(res.ok ? `${label}: ok` : `${label}: ${j.error || res.status}`);
+    if (res.ok) toast.success(`${label}: ok`);
+    else toast.error(`${label}: ${j.error || res.status}`);
     setBusy(false);
     refresh();
   }
 
-  if (!report) return null;
-  if (!report.configured) return null;
-  const t = report.inputs?.totals || {};
+  const t = report?.inputs?.totals || {};
+
   return (
-    <section className="mt-8 rounded-2xl border border-zinc-200 p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold">Tenant unit costs — {report.month}</h2>
-        <button type="button" className={btn} onClick={() => setInputs({ month: report.month, compute: t.compute || "", db: t.db || "", mail: t.mail || "", ai: t.ai || "", other: t.other || "", note: report.inputs?.note || "" })}>
-          {report.inputs ? "Edit provider totals" : "Enter provider totals"}
-        </button>
-      </div>
-      <p className="mt-1 text-xs text-zinc-500">
-        Real provider bills, allocated by measured drivers. Method per bucket: compute {report.method.compute}; db {report.method.db}; mail {report.method.mail}; ai {report.method.ai}.
-        Gaps: {report.gaps.join("; ")}.
-      </p>
-      {msg && <p className="mt-2 text-xs text-zinc-500">{msg}</p>}
-
-      {!report.inputs && !inputs && <p className="mt-3 text-sm text-zinc-400">No provider totals entered for {report.month} yet — nothing is allocated.</p>}
-
-      {inputs && (
-        <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-          <div className="grid gap-2 sm:grid-cols-3">
-            {["compute", "db", "mail", "ai", "other"].map((k) => (
-              <label key={k} className="text-xs text-zinc-600">
-                {k} (₹/month)
-                <input className={`${input} w-full`} type="number" min="0" value={inputs[k]} onChange={(e) => setInputs({ ...inputs, [k]: e.target.value })} />
-              </label>
-            ))}
-            <label className="text-xs text-zinc-600 sm:col-span-3">
-              Note
-              <input className={`${input} w-full`} value={inputs.note} onChange={(e) => setInputs({ ...inputs, note: e.target.value })} />
-            </label>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              className={btnDark}
-              disabled={busy}
-              onClick={async () => {
-                await post({ inputs: { month: inputs.month, totals: { compute: Number(inputs.compute) || 0, db: Number(inputs.db) || 0, mail: Number(inputs.mail) || 0, ai: Number(inputs.ai) || 0, other: Number(inputs.other) || 0 }, note: inputs.note } }, "save totals");
-                setInputs(null);
-              }}
+    <Card id="costs">
+      <CardHeader
+        title={report ? `Tenant unit costs — ${report.month}` : "Tenant unit costs"}
+        description={
+          report?.configured
+            ? `Real provider bills, allocated by measured drivers. Method per bucket: compute ${report.method.compute}; db ${report.method.db}; mail ${report.method.mail}; ai ${report.method.ai}. Gaps: ${report.gaps.join("; ")}.`
+            : "Real provider bills, allocated by measured drivers."
+        }
+        actions={
+          report?.configured ? (
+            <Button
+              size="sm"
+              onClick={() =>
+                setInputs({ month: report.month, compute: t.compute || "", db: t.db || "", mail: t.mail || "", ai: t.ai || "", other: t.other || "", note: report.inputs?.note || "" })
+              }
             >
-              Save totals
-            </button>
-            <button type="button" className={btn} onClick={() => setInputs(null)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {report.inputs && (
+              {report.inputs ? "Edit provider totals" : "Enter provider totals"}
+            </Button>
+          ) : null
+        }
+      />
+      {err && <ErrorState title="Couldn't load tenant costs" detail={err} onRetry={refresh} />}
+      {!report && !err && <SkeletonText lines={3} />}
+      {report && !report.configured && <Banner tone="info">No provider totals configured — cost allocation is off until it is.</Banner>}
+      {report?.configured && (
         <>
-          <div className="mt-3 flex flex-wrap gap-3 text-xs">
-            <span className="rounded-lg bg-zinc-100 px-3 py-2">total {inr(report.total)}</span>
-            <span className="rounded-lg bg-lime-50 px-3 py-2 text-lime-800">allocated {inr(report.allocated)}</span>
-            <span className="rounded-lg bg-amber-50 px-3 py-2 text-amber-800">unallocated {inr(report.unallocated)} — stays visible, never invented into per-tenant numbers</span>
-            {report.unmeasured.length > 0 && <span className="rounded-lg bg-red-50 px-3 py-2 text-red-700">unmeasured tenants: {report.unmeasured.join(", ")}</span>}
-          </div>
-          {report.alerts.length > 0 && (
-            <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-              Over budget: {report.alerts.map((a) => `${a.tenant} (${inr(a.allocated)} / ${inr(a.budget)})`).join("; ")} — review quotas/flags; nothing is auto-charged.
-            </p>
+          {!report.inputs && !inputs && (
+            <EmptyState
+              title={`No provider totals entered for ${report.month} yet`}
+              body="Nothing is allocated until the month's real bills are entered."
+            />
           )}
-          <table className="mt-3 w-full text-xs">
-            <thead>
-              <tr className="text-left text-zinc-400">
-                <th className="py-1 font-medium">tenant</th>
-                <th className="font-medium">compute</th>
-                <th className="font-medium">db</th>
-                <th className="font-medium">mail</th>
-                <th className="font-medium">ai</th>
-                <th className="font-medium">allocated</th>
-                <th className="font-medium">budget</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.tenants.map((row) => (
-                <tr key={row.tenant} className={`border-t border-zinc-100 ${row.overBudget ? "bg-red-50/50" : ""}`}>
-                  <td className="py-1 font-semibold">
-                    {row.tenant}
-                    {!row.measured && <span className="ml-1 text-red-500">(unmeasured)</span>}
-                  </td>
-                  <td>{inr(row.costs.compute)}</td>
-                  <td>{inr(row.costs.db)}</td>
-                  <td>{inr(row.costs.mail)}</td>
-                  <td>{inr(row.costs.ai)}</td>
-                  <td className="font-semibold">{inr(row.allocated)}</td>
-                  <td>
-                    <BudgetCell row={row} busy={busy} onSet={(amount) => post({ budget: { tenant: row.tenant, amount } }, `budget ${row.tenant}`)} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+          {inputs && (
+            <div className="mt-1 rounded-ctl border border-edge bg-surface-sunken p-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {["compute", "db", "mail", "ai", "other"].map((k) => (
+                  <Field key={k} label={`${k} (₹/month)`} htmlFor={`cost-${k}`}>
+                    <Input id={`cost-${k}`} type="number" min="0" value={inputs[k]} onChange={(e) => setInputs({ ...inputs, [k]: e.target.value })} />
+                  </Field>
+                ))}
+                <Field label="Note" htmlFor="cost-note" className="sm:col-span-3">
+                  <Input id="cost-note" value={inputs.note} onChange={(e) => setInputs({ ...inputs, note: e.target.value })} />
+                </Field>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  busy={busy}
+                  onClick={async () => {
+                    await post(
+                      {
+                        inputs: {
+                          month: inputs.month,
+                          totals: { compute: Number(inputs.compute) || 0, db: Number(inputs.db) || 0, mail: Number(inputs.mail) || 0, ai: Number(inputs.ai) || 0, other: Number(inputs.other) || 0 },
+                          note: inputs.note,
+                        },
+                      },
+                      "save totals"
+                    );
+                    setInputs(null);
+                  }}
+                >
+                  Save totals
+                </Button>
+                <Button size="sm" onClick={() => setInputs(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {report.inputs && (
+            <>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <Badge tone="neutral">total {inr(report.total)}</Badge>
+                <Badge tone="success">allocated {inr(report.allocated)}</Badge>
+                <Badge tone="warning" title="unallocated">
+                  unallocated {inr(report.unallocated)}
+                </Badge>
+                <span className="text-fg-subtle">— stays visible, never invented into per-tenant numbers</span>
+                {report.unmeasured.length > 0 && <Badge tone="danger">unmeasured tenants: {report.unmeasured.join(", ")}</Badge>}
+              </div>
+              {report.alerts.length > 0 && (
+                <Banner tone="danger" className="mt-3">
+                  Over budget: {report.alerts.map((a) => `${a.tenant} (${inr(a.allocated)} / ${inr(a.budget)})`).join("; ")} — review quotas/flags;
+                  nothing is auto-charged.
+                </Banner>
+              )}
+              <Table
+                className="mt-3"
+                dense
+                columns={COST_COLUMNS}
+                rows={report.tenants}
+                rowKey={(row) => row.tenant}
+                empty={<EmptyState title="No measured tenants" body="Per-tenant allocations appear once drivers are measured." className="py-6" />}
+                renderCell={(row, col) => {
+                  switch (col.key) {
+                    case "tenant":
+                      return (
+                        <span className={`font-medium ${row.overBudget ? "text-danger" : ""}`}>
+                          {row.tenant}
+                          {!row.measured && <span className="ml-1 text-xs text-danger">(unmeasured)</span>}
+                        </span>
+                      );
+                    case "allocated":
+                      return <span className="font-semibold">{inr(row.allocated)}</span>;
+                    case "budget":
+                      return <BudgetCell row={row} busy={busy} onSet={(amount) => post({ budget: { tenant: row.tenant, amount } }, `budget ${row.tenant}`)} />;
+                    default:
+                      return inr(row.costs[col.key]);
+                  }
+                }}
+              />
+            </>
+          )}
         </>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -253,25 +367,25 @@ function BudgetCell({ row, busy, onSet }) {
   const [val, setVal] = useState(row.budget ?? "");
   if (!editing) {
     return (
-      <button type="button" className="text-zinc-500 underline-offset-2 hover:underline" onClick={() => setEditing(true)}>
-        {row.budget != null ? inr(row.budget) : "set"}
-      </button>
+      <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+        {row.budget != null ? inr(row.budget) : "Set"}
+      </Button>
     );
   }
   return (
-    <span className="flex items-center gap-1">
-      <input className="w-20 rounded border border-zinc-200 px-1 py-0.5" type="number" min="1" value={val} onChange={(e) => setVal(e.target.value)} />
-      <button
-        type="button"
-        className="font-semibold"
-        disabled={busy}
+    <span className="flex items-center justify-end gap-1.5">
+      <Input type="number" min="1" value={val} onChange={(e) => setVal(e.target.value)} className="w-24 px-2 py-1 text-xs" aria-label={`Budget for ${row.tenant}`} />
+      <Button
+        size="sm"
+        variant="primary"
+        busy={busy}
         onClick={() => {
           onSet(val === "" ? null : Number(val));
           setEditing(false);
         }}
       >
-        ✓
-      </button>
+        Save
+      </Button>
     </span>
   );
 }

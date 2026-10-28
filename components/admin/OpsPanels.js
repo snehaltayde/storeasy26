@@ -1,355 +1,559 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Copy, Mail, Plus } from "lucide-react";
+import { Card, CardHeader } from "@/components/console/Card";
+import { Badge, StatusBadge } from "@/components/console/Badge";
+import { Banner } from "@/components/console/Banner";
+import { Button } from "@/components/console/Button";
+import { Field, Input, Select } from "@/components/console/fields";
+import { ConfirmDialog } from "@/components/console/Dialog";
+import { SkeletonText, EmptyState, ErrorState, PermissionNote, KeyValue } from "@/components/console/bits";
+import { CopyButton, SecretReveal } from "@/components/console/Copy";
+import { Table } from "@/components/console/Table";
+import { useToast } from "@/components/console/Toast";
 
-// Merchant ops panels (S43): Team (MC23), Domains & SEO (MC21), Privacy
-// (MC25), Audit log (MC26), Help & diagnostics (MC27) — appended to the
-// Settings page. Each panel speaks to its own API and renders an honest
-// no-access / unsupported state instead of hiding.
-
-const input = "mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400";
+// Merchant ops panels (S43, redesigned S50): Team (MC23), Agency access
+// (AG02), Domains & SEO (MC21), Privacy (MC25), Audit log (MC26), Help &
+// diagnostics (MC27) — appended to the Settings page as anchor-target Cards.
+// Each panel speaks to its own API and renders exactly one of loading /
+// permission / error / unsupported / data — never blank. Destructive actions
+// (remove member, change role, revoke agency) confirm via ConfirmDialog.
 
 function usePanel(url) {
   const [data, setData] = useState(null);
-  const [err, setErr] = useState(null);
-  const load = () =>
-    fetch(url)
+  const [err, setErr] = useState(null); // { status, message }
+  const load = () => {
+    setErr(null);
+    setData(null);
+    return fetch(url)
       .then(async (r) => ({ status: r.status, json: await r.json().catch(() => ({})) }))
       .then(({ status, json }) => {
         if (json.ok) setData(json);
-        else setErr(status === 403 ? "Your role can't view this section." : json.error || `failed (${status})`);
+        else setErr({ status, message: json.error || `Request failed (${status})` });
       })
-      .catch((e) => setErr(String(e)));
+      .catch((e) => setErr({ status: 0, message: String(e) }));
+  };
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return [data, err, load, setData, setErr];
+  return { data, err, load, setData };
 }
 
-const Panel = ({ title, desc, children }) => (
-  <section className="rounded-2xl border border-zinc-200 p-5">
-    <h2 className="text-sm font-bold">{title}</h2>
-    {desc && <p className="mt-0.5 text-xs text-zinc-500">{desc}</p>}
-    <div className="mt-3">{children}</div>
-  </section>
-);
+// One gate for the mandatory states: 403 → PermissionNote (role-aware),
+// other errors → ErrorState with retry, null data → skeleton. `children` is
+// a render-prop so panels only deal with real data.
+function PanelState({ data, err, load, role, need, children }) {
+  if (err) {
+    return err.status === 403 ? <PermissionNote role={role} need={need} /> : <ErrorState detail={err.message} onRetry={load} className="py-6" />;
+  }
+  if (!data) return <SkeletonText lines={3} />;
+  return children(data);
+}
+
+const postJson = async (url, body) => {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.ok) throw new Error(json.error || `Request failed (${res.status})`);
+  return json;
+};
 
 // ---- Team (MC23) -------------------------------------------------------------
 
-function TeamPanel() {
-  const [data, err, load, setData, setErr] = usePanel("/api/admin/team");
+const ROLES = ["owner", "admin", "staff", "support"];
+const ROLE_TONE = { owner: "info", admin: "neutral", staff: "neutral", support: "neutral" };
+const ROLE_SCOPE = {
+  owner: "full control, including team and settings",
+  admin: "ops and settings access",
+  staff: "merchandising access only",
+  support: "read-only access",
+};
+
+function TeamPanel({ role }) {
+  const { data, err, load, setData } = usePanel("/api/admin/team");
   const [form, setForm] = useState({ email: "", role: "staff" });
   const [inviteUrl, setInviteUrl] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [actionErr, setActionErr] = useState(null);
+  const [roleChange, setRoleChange] = useState(null); // { member, role }
+  const [removing, setRemoving] = useState(null); // member
 
   async function post(body) {
-    setBusy(true);
-    setErr(null);
-    const res = await fetch("/api/admin/team", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const json = await res.json().catch(() => ({}));
-    if (res.ok && json.ok) {
-      setData(json);
-      if (json.inviteUrl) setInviteUrl(`${window.location.origin}${json.inviteUrl}`);
-    } else setErr(json.error || `failed (${res.status})`);
-    setBusy(false);
+    const json = await postJson("/api/admin/team", body);
+    setData(json);
+    if (json.inviteUrl) setInviteUrl(`${window.location.origin}${json.inviteUrl}`);
+    return json;
   }
 
   return (
-    <Panel title="Team & permissions" desc="Roles: owner (everything) · admin (ops + settings) · staff (merchandising) · support (read-only). A store can never lose its last owner.">
-      {err && <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</p>}
-      {data && !data.supported && <p className="text-sm text-zinc-400">{data.reason}</p>}
-      {data?.supported && (
-        <>
-          <ul className="divide-y divide-zinc-100">
-            {data.members.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="font-medium">{m.email}</span>
-                  {m.name && <span className="ml-2 text-xs text-zinc-400">{m.name}</span>}
-                </span>
-                <select value={m.role} disabled={busy} onChange={(e) => post({ action: "role", userId: m.id, role: e.target.value })} className="rounded-lg border border-zinc-200 px-2 py-1 text-xs">
-                  {["owner", "admin", "staff", "support"].map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
+    <Card id="team">
+      <CardHeader
+        title="Team & permissions"
+        description="Roles: owner (everything) · admin (ops + settings) · staff (merchandising) · support (read-only). A store can never lose its last owner."
+      />
+      {actionErr && (
+        <Banner tone="danger" className="mb-3">
+          {actionErr}
+        </Banner>
+      )}
+      <PanelState data={data} err={err} load={load} role={role} need="view team & permissions">
+        {(d) =>
+          !d.supported ? (
+            <p className="text-sm text-fg-subtle">{d.reason}</p>
+          ) : (
+            <>
+              {d.members.length === 0 ? (
+                <EmptyState
+                  title="No individual accounts yet"
+                  body="This store still runs on the bootstrap password. Invite yourself first."
+                  className="py-6"
+                />
+              ) : (
+                <ul className="divide-y divide-edge">
+                  {d.members.map((m) => (
+                    <li key={m.id} className="flex flex-wrap items-center gap-2 py-2.5 text-sm">
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="font-medium text-fg">{m.email}</span>
+                        {m.name && <span className="ml-2 text-xs text-fg-subtle">{m.name}</span>}
+                      </span>
+                      <Badge tone={ROLE_TONE[m.role] || "neutral"}>{m.role}</Badge>
+                      {/* controlled to m.role: picking a value opens the confirm
+                          dialog; cancel reverts the select by never committing */}
+                      <span className="w-28 shrink-0">
+                        <Select
+                          aria-label={`Change role for ${m.email}`}
+                          value={m.role}
+                          onChange={(e) => setRoleChange({ member: m, role: e.target.value })}
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </Select>
+                      </span>
+                      <Button size="sm" variant="dangerOutline" onClick={() => setRemoving(m)}>
+                        Remove
+                      </Button>
+                    </li>
                   ))}
-                </select>
-                <button type="button" disabled={busy} onClick={() => window.confirm(`Remove ${m.email} from this store?`) && post({ action: "remove", userId: m.id })} className="text-xs text-zinc-400 hover:text-red-600">
-                  remove
-                </button>
-              </li>
-            ))}
-            {data.members.length === 0 && <li className="py-3 text-sm text-zinc-400">No individual accounts yet — this store still runs on the bootstrap password. Invite yourself first.</li>}
-          </ul>
-          {data.invites.length > 0 && (
-            <p className="mt-2 text-xs text-zinc-400">Pending: {data.invites.map((i) => `${i.email} (${i.role})`).join(", ")}</p>
-          )}
-          {inviteUrl && (
-            <p className="mt-2 break-all rounded-lg bg-lime-50 px-3 py-2 text-xs text-lime-800">
-              Invitation link (shown once — send it yourself): <code>{inviteUrl}</code>
-            </p>
-          )}
-          <div className="mt-3 flex flex-wrap items-end gap-2">
-            <label className="min-w-48 flex-1">
-              <span className="text-xs font-semibold text-zinc-600">Email</span>
-              <input className={input} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="teammate@store.in" />
-            </label>
-            <label>
-              <span className="text-xs font-semibold text-zinc-600">Role</span>
-              <select className={input} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                {["admin", "staff", "support", "owner"].map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" disabled={busy || !form.email} onClick={() => post({ action: "invite", email: form.email, role: form.role })} className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-40">
-              Invite
-            </button>
-          </div>
-        </>
-      )}
-    </Panel>
-  );
-}
+                </ul>
+              )}
+              {d.invites.length > 0 && (
+                <p className="mt-2 text-xs text-fg-subtle">Pending: {d.invites.map((i) => `${i.email} (${i.role})`).join(", ")}</p>
+              )}
+              {inviteUrl && (
+                <div className="mt-3">
+                  <SecretReveal value={inviteUrl} label="Invitation link" note="Shown once — send it to your teammate yourself; it can't be retrieved later." />
+                </div>
+              )}
+              <div className="mt-4 flex flex-wrap items-end gap-2">
+                <Field label="Email" htmlFor="team-invite-email" className="flex-1 basis-48">
+                  <Input
+                    id="team-invite-email"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="teammate@store.in"
+                  />
+                </Field>
+                <Field label="Role" htmlFor="team-invite-role">
+                  <Select id="team-invite-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                    {["admin", "staff", "support", "owner"].map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Button
+                  variant="primary"
+                  icon={<Plus size={14} aria-hidden />}
+                  busy={inviteBusy}
+                  disabled={!form.email}
+                  onClick={async () => {
+                    setInviteBusy(true);
+                    setActionErr(null);
+                    try {
+                      await post({ action: "invite", email: form.email, role: form.role });
+                      setForm((f) => ({ ...f, email: "" }));
+                    } catch (e) {
+                      setActionErr(String(e?.message || e));
+                    }
+                    setInviteBusy(false);
+                  }}
+                >
+                  Invite
+                </Button>
+              </div>
+            </>
+          )
+        }
+      </PanelState>
 
-// ---- Domains & SEO (MC21) -----------------------------------------------------
-
-function DomainsPanel() {
-  const [data, err, load, setData, setErr] = usePanel("/api/admin/domains");
-  const [busy, setBusy] = useState(false);
-
-  async function verify(host) {
-    setBusy(true);
-    setErr(null);
-    const res = await fetch("/api/admin/domains", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify", host }) });
-    const json = await res.json().catch(() => ({}));
-    if (res.ok && json.ok) {
-      setData((d) => ({ ...d, domains: json.domains }));
-      if (!json.result?.verified) setErr(`TXT record not found yet for ${host} — DNS can take a few minutes to propagate.`);
-    } else setErr(json.error || `failed (${res.status})`);
-    setBusy(false);
-  }
-
-  return (
-    <Panel title="Domains & SEO" desc="Your storefront answers on these hosts. Robots + sitemap are per-tenant and release-aware; campaigns stay noindex.">
-      {err && <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{err}</p>}
-      {data && !data.supported && <p className="text-sm text-zinc-400">{data.reason}</p>}
-      {data?.supported && (
-        <>
-          <ul className="space-y-2">
-            {data.domains.map((d) => (
-              <li key={d.host} className="rounded-xl border border-zinc-100 p-3 text-sm">
-                <p className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono font-medium">{d.host}</span>
-                  {d.verified ? (
-                    <span className="rounded bg-lime-100 px-1.5 py-0.5 text-[10px] font-bold text-lime-700">VERIFIED</span>
-                  ) : (
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">PENDING DNS PROOF</span>
-                  )}
-                  {d.primary && <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">PRIMARY</span>}
-                  {!d.verified && (
-                    <button type="button" disabled={busy} onClick={() => verify(d.host)} className="ml-auto rounded-lg bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50">
-                      Verify now
-                    </button>
-                  )}
-                </p>
-                {d.challenge && (
-                  <div className="mt-2 rounded-lg bg-zinc-50 p-2 font-mono text-xs text-zinc-600">
-                    <p>Add this DNS record, then press Verify:</p>
-                    <p className="mt-1">TXT &nbsp;{d.challenge.record}</p>
-                    <p className="break-all">{d.challenge.value}</p>
-                  </div>
-                )}
-              </li>
-            ))}
-            {data.domains.length === 0 && (
-              <li className="text-sm text-zinc-400">
-                No custom domain claimed yet. Tell the platform operator which host you want (e.g. shop.yourbrand.in) — they claim it, you add the TXT record and verify here.
-              </li>
-            )}
-          </ul>
-          {data.activeHosts?.length > 0 && <p className="mt-2 text-xs text-zinc-400">Currently serving: {data.activeHosts.join(", ")}</p>}
-        </>
-      )}
-    </Panel>
-  );
-}
-
-// ---- Privacy (MC25) -----------------------------------------------------------
-
-function PrivacyPanel() {
-  const [data, err] = usePanel("/api/admin/privacy");
-  const chip = (s) => (s === "done" ? "bg-lime-100 text-lime-700" : s === "manual" ? "bg-amber-100 text-amber-700" : "bg-zinc-100 text-zinc-500");
-  return (
-    <Panel title="Privacy & data" desc="Consent configuration, shopper privacy requests and redactions — the automated lifecycle is webhook-driven; everything here is tracked.">
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      {data && (
-        <>
-          <p className="text-xs text-zinc-500">
-            Consent v{data.consent.version}: {data.consent.purposes.map((p) => p.label).join(" · ")}. {data.consent.note}
-          </p>
-          <p className="mt-2 text-xs text-zinc-500">
-            Retention: orders — {data.retention.orders}; events — {data.retention.events}.
-          </p>
-          <p className="mt-2 text-sm">
-            <span className="font-semibold">{data.redacted_orders}</span> order(s) redacted to date.
-          </p>
-          <ul className="mt-2 divide-y divide-zinc-100">
-            {data.requests.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${chip(r.status)}`}>{r.status}</span>
-                <span className="text-zinc-600">{r.kind.replace(/_/g, " ")}</span>
-                <span className="ml-auto text-xs text-zinc-400">{r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN") : ""}</span>
-                {r.notes && <span className="w-full text-xs text-zinc-400">{r.notes}</span>}
-              </li>
-            ))}
-            {data.requests.length === 0 && <li className="py-2 text-sm text-zinc-400">No privacy requests received.</li>}
-          </ul>
-        </>
-      )}
-    </Panel>
-  );
-}
-
-// ---- Audit log (MC26) ----------------------------------------------------------
-
-function AuditPanel() {
-  const [data, err] = usePanel("/api/admin/audit?limit=30");
-  return (
-    <Panel title="Audit log" desc="Append-only record of privileged actions on this store — who, what, when. Secrets and shopper PII are redacted at write.">
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      {data && (
-        <ul className="divide-y divide-zinc-100 font-mono text-xs">
-          {(data.entries || []).map((e, i) => (
-            <li key={i} className="flex flex-wrap gap-2 py-1.5">
-              <span className="text-zinc-400">{new Date(e.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-              <span className="font-semibold text-zinc-700">{e.action}</span>
-              {e.resource && <span className="text-zinc-500">{e.resource}</span>}
-              <span className="ml-auto text-zinc-400">{e.actor_kind}:{String(e.actor || "").slice(0, 12)}</span>
-            </li>
-          ))}
-          {(data.entries || []).length === 0 && <li className="py-2 font-sans text-sm text-zinc-400">{data.note || "No entries yet."}</li>}
-        </ul>
-      )}
-    </Panel>
-  );
-}
-
-// ---- Help & diagnostics (MC27) -------------------------------------------------
-
-function HelpPanel() {
-  const [data, err] = usePanel("/api/admin/help");
-  const [copied, setCopied] = useState(false);
-  return (
-    <Panel title="Help & support" desc="Stuck? Copy the diagnostics below into your message — it's exactly what you see here: status flags and counts, never shopper data.">
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      {data && (
-        <>
-          <pre className="max-h-56 overflow-auto rounded-xl bg-zinc-900 p-3 text-[11px] leading-relaxed text-lime-300">{JSON.stringify(data.diagnostics, null, 2)}</pre>
-          <div className="mt-2 flex gap-3">
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(JSON.stringify(data.diagnostics, null, 2));
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                } catch { /* clipboard blocked */ }
-              }}
-              className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
-            >
-              {copied ? "Copied ✓" : "Copy diagnostics"}
-            </button>
-            <a href="mailto:support@storeasy.app?subject=Support%20request" className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50">
-              Email platform support
-            </a>
-          </div>
-        </>
-      )}
-    </Panel>
+      <ConfirmDialog
+        open={!!roleChange}
+        onClose={() => setRoleChange(null)}
+        title="Change role"
+        body={
+          roleChange
+            ? `Change ${roleChange.member.name || roleChange.member.email}'s role to ${roleChange.role}? They immediately get ${ROLE_SCOPE[roleChange.role] || "that role's access"} — it applies on their very next request.`
+            : ""
+        }
+        confirmLabel="Change role"
+        onConfirm={() => post({ action: "role", userId: roleChange.member.id, role: roleChange.role })}
+      />
+      <ConfirmDialog
+        open={!!removing}
+        onClose={() => setRemoving(null)}
+        title="Remove team member"
+        tone="danger"
+        body={removing ? `Remove ${removing.email} from this store? Their console access ends immediately.` : ""}
+        confirmLabel="Remove"
+        onConfirm={() => post({ action: "remove", userId: removing.id })}
+      />
+    </Card>
   );
 }
 
 // ---- Agency access (S48 / AG02 client side) ------------------------------------
 
-function AgencyAccessPanel() {
-  const [data, err, load] = usePanel("/api/admin/agency-grants");
+function AgencyAccessPanel({ role }) {
+  const toast = useToast();
+  const { data, err, load } = usePanel("/api/admin/agency-grants");
   const [token, setToken] = useState("");
-  const [msg, setMsg] = useState(null);
+  const [actionErr, setActionErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [revoking, setRevoking] = useState(null); // grant
 
-  async function post(body) {
-    setBusy(true);
-    setMsg(null);
-    const res = await fetch("/api/admin/agency-grants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const json = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) {
-      setMsg({ kind: "err", text: json.error || "Request failed" });
-      return null;
-    }
-    return json;
-  }
-
-  const CHIP = { pending: "bg-amber-100 text-amber-700", accepted: "bg-lime-100 text-lime-700", revoked: "bg-zinc-100 text-zinc-400", expired: "bg-zinc-100 text-zinc-400" };
   return (
-    <Panel
-      title="Agency access"
-      desc="An agency only sees this store after YOU accept their invitation code here — and you can revoke at any moment (it cuts their access on their very next request). Agencies are never owners."
-    >
-      {err && <p className="text-sm text-zinc-400">{err}</p>}
-      {msg && <p className={`mb-2 rounded-lg px-3 py-2 text-xs ${msg.kind === "err" ? "bg-red-50 text-red-600" : "bg-lime-50 text-lime-800"}`}>{msg.text}</p>}
-      <div className="flex flex-wrap items-center gap-2">
-        <input className="min-w-64 rounded-lg border border-zinc-200 px-2 py-1.5 font-mono text-xs outline-none focus:border-zinc-400" placeholder="paste the agency's invitation code" value={token} onChange={(e) => setToken(e.target.value)} />
-        <button
-          type="button"
-          disabled={busy || token.trim().length < 10}
-          className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-40"
-          onClick={async () => {
-            const r = await post({ accept: { token: token.trim() } });
-            if (r) {
-              setMsg({ kind: "ok", text: `Access granted (role: ${r.grant.role}).` });
-              setToken("");
-              load();
-            }
-          }}
-        >
-          Accept invitation
-        </button>
-      </div>
-      {data?.grants?.length > 0 && (
-        <ul className="mt-3 space-y-1.5 text-xs text-zinc-600">
-          {data.grants.map((g) => (
-            <li key={g.id} className="flex items-center gap-2">
-              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${CHIP[g.status] || CHIP.pending}`}>{g.status}</span>
-              <span className="font-semibold">{g.agency_name}</span>
-              <span>· {g.role}</span>
-              {g.accepted_at && <span className="text-zinc-400">since {new Date(g.accepted_at).toLocaleDateString("en-IN")}</span>}
-              {g.status === "accepted" && (
-                <button type="button" className="text-red-500 hover:underline" disabled={busy} onClick={async () => (await post({ revoke: { id: g.id } })) && load()}>
-                  revoke
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
+    <Card id="agency-access">
+      <CardHeader
+        title="Agency access"
+        description="An agency only sees this store after YOU accept their invitation code here — and you can revoke at any moment (it cuts their access on their very next request). Agencies are never owners."
+      />
+      {actionErr && (
+        <Banner tone="danger" className="mb-3">
+          {actionErr}
+        </Banner>
       )}
-    </Panel>
+      <PanelState data={data} err={err} load={load} role={role} need="view agency access">
+        {(d) => (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                mono
+                aria-label="Agency invitation code"
+                className="min-w-64 flex-1"
+                placeholder="paste the agency's invitation code"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+              />
+              <Button
+                variant="primary"
+                busy={busy}
+                disabled={token.trim().length < 10}
+                onClick={async () => {
+                  setBusy(true);
+                  setActionErr(null);
+                  try {
+                    const r = await postJson("/api/admin/agency-grants", { accept: { token: token.trim() } });
+                    toast.success(`Access granted (role: ${r.grant.role}).`);
+                    setToken("");
+                    load();
+                  } catch (e) {
+                    setActionErr(String(e?.message || e));
+                  }
+                  setBusy(false);
+                }}
+              >
+                Accept invitation
+              </Button>
+            </div>
+            {d.grants?.length > 0 ? (
+              <ul className="mt-4 divide-y divide-edge">
+                {d.grants.map((g) => (
+                  <li key={g.id} className="flex flex-wrap items-center gap-2 py-2.5 text-sm">
+                    <StatusBadge status={g.status} />
+                    <span className="font-medium text-fg">{g.agency_name}</span>
+                    <span className="text-fg-muted">· {g.role}</span>
+                    {g.accepted_at && <span className="text-xs text-fg-subtle">since {new Date(g.accepted_at).toLocaleDateString("en-IN")}</span>}
+                    {g.status === "accepted" && (
+                      <Button size="sm" variant="dangerOutline" className="ml-auto" onClick={() => setRevoking(g)}>
+                        Revoke
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-xs text-fg-subtle">No agency has access to this store.</p>
+            )}
+          </>
+        )}
+      </PanelState>
+
+      <ConfirmDialog
+        open={!!revoking}
+        onClose={() => setRevoking(null)}
+        title="Revoke agency access"
+        tone="danger"
+        body={revoking ? `Revoke ${revoking.agency_name}'s access? This cuts the agency's access on their very next request.` : ""}
+        confirmLabel="Revoke"
+        onConfirm={async () => {
+          await postJson("/api/admin/agency-grants", { revoke: { id: revoking.id } });
+          load();
+        }}
+      />
+    </Card>
   );
 }
 
-export default function OpsPanels() {
+// ---- Domains & SEO (MC21) -----------------------------------------------------
+
+function DomainsPanel({ role }) {
+  const toast = useToast();
+  const { data, err, load, setData } = usePanel("/api/admin/domains");
+  const [verifying, setVerifying] = useState(null); // host
+  const [warn, setWarn] = useState(null);
+  const [actionErr, setActionErr] = useState(null);
+
+  async function verify(host) {
+    setVerifying(host);
+    setWarn(null);
+    setActionErr(null);
+    try {
+      const json = await postJson("/api/admin/domains", { action: "verify", host });
+      setData((d) => ({ ...d, domains: json.domains }));
+      if (json.result?.verified) toast.success(`${host} verified.`);
+      else setWarn(`TXT record not found yet for ${host} — DNS can take a few minutes to propagate.`);
+    } catch (e) {
+      setActionErr(String(e?.message || e));
+    }
+    setVerifying(null);
+  }
+
   return (
-    <div className="mx-auto max-w-4xl space-y-5 px-4 pb-10 sm:px-6">
-      <TeamPanel />
-      <AgencyAccessPanel />
-      <DomainsPanel />
-      <PrivacyPanel />
-      <AuditPanel />
-      <HelpPanel />
+    <Card id="domains-seo">
+      <CardHeader
+        title="Domains & SEO"
+        description="Your storefront answers on these hosts. Robots + sitemap are per-tenant and release-aware; campaigns stay noindex."
+      />
+      {actionErr && (
+        <Banner tone="danger" className="mb-3">
+          {actionErr}
+        </Banner>
+      )}
+      {warn && (
+        <Banner tone="warning" className="mb-3">
+          {warn}
+        </Banner>
+      )}
+      <PanelState data={data} err={err} load={load} role={role} need="view domains & SEO">
+        {(d) =>
+          !d.supported ? (
+            <p className="text-sm text-fg-subtle">{d.reason}</p>
+          ) : (
+            <>
+              {d.domains.length === 0 ? (
+                <EmptyState
+                  title="No custom domain claimed yet"
+                  body="Tell the platform operator which host you want (e.g. shop.yourbrand.in) — they claim it, you add the TXT record and verify here."
+                  className="py-6"
+                />
+              ) : (
+                <ul className="space-y-2">
+                  {d.domains.map((dom) => (
+                    <li key={dom.host} className="rounded-ctl border border-edge p-3 text-sm">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono font-medium text-fg">{dom.host}</span>
+                        {dom.verified ? <StatusBadge status="verified" /> : <Badge tone="warning">Pending DNS proof</Badge>}
+                        {dom.primary && <Badge tone="neutral">Primary</Badge>}
+                        {!dom.verified && (
+                          <Button size="sm" variant="primary" className="ml-auto" busy={verifying === dom.host} onClick={() => verify(dom.host)}>
+                            Verify now
+                          </Button>
+                        )}
+                      </div>
+                      {dom.challenge && (
+                        <div className="mt-2 rounded-ctl bg-surface-sunken p-2.5 font-mono text-xs text-fg-muted">
+                          <p className="font-sans">Add this DNS record, then press Verify:</p>
+                          <p className="mt-1">TXT&ensp;{dom.challenge.record}</p>
+                          <p className="flex items-center gap-1 break-all">
+                            <span className="min-w-0">{dom.challenge.value}</span>
+                            <CopyButton value={dom.challenge.value} label="Copy TXT value" />
+                          </p>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {d.activeHosts?.length > 0 && <p className="mt-2 text-xs text-fg-subtle">Currently serving: {d.activeHosts.join(", ")}</p>}
+            </>
+          )
+        }
+      </PanelState>
+    </Card>
+  );
+}
+
+// ---- Privacy (MC25) -----------------------------------------------------------
+
+const PRIVACY_TONE = { done: "success", manual: "warning" };
+
+function PrivacyPanel({ role }) {
+  const { data, err, load } = usePanel("/api/admin/privacy");
+  return (
+    <Card id="privacy">
+      <CardHeader
+        title="Privacy & data"
+        description="Consent configuration, shopper privacy requests and redactions — the automated lifecycle is webhook-driven; everything here is tracked."
+      />
+      <PanelState data={data} err={err} load={load} role={role} need="view privacy & data">
+        {(d) => (
+          <>
+            <KeyValue
+              className="text-sm"
+              items={[
+                { key: "Consent", value: `v${d.consent.version}: ${d.consent.purposes.map((p) => p.label).join(" · ")}. ${d.consent.note}` },
+                { key: "Retention", value: `orders — ${d.retention.orders}; events — ${d.retention.events}` },
+                { key: "Redacted", value: `${d.redacted_orders} order(s) redacted to date` },
+              ]}
+            />
+            {d.requests.length === 0 ? (
+              <EmptyState title="No privacy requests received" className="py-6" />
+            ) : (
+              <ul className="mt-3 divide-y divide-edge">
+                {d.requests.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center gap-2 py-2.5 text-sm">
+                    <Badge tone={PRIVACY_TONE[r.status] || "neutral"} title={String(r.status)}>
+                      {r.status}
+                    </Badge>
+                    <span className="text-fg-muted">{r.kind.replace(/_/g, " ")}</span>
+                    <span className="ml-auto text-xs text-fg-subtle">{r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN") : ""}</span>
+                    {r.notes && <span className="w-full text-xs text-fg-subtle">{r.notes}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </PanelState>
+    </Card>
+  );
+}
+
+// ---- Audit log (MC26) ----------------------------------------------------------
+
+const AUDIT_COLUMNS = [
+  { key: "at", header: "At" },
+  { key: "actor", header: "Actor" },
+  { key: "action", header: "Action" },
+  { key: "resource", header: "Resource" },
+];
+
+const auditWhen = (iso) =>
+  new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
+function AuditPanel({ role }) {
+  const { data, err, load } = usePanel("/api/admin/audit?limit=30");
+  return (
+    <Card id="audit-log">
+      <CardHeader
+        title="Audit log"
+        description="Append-only record of privileged actions on this store — who, what, when. Secrets and shopper PII are redacted at write."
+      />
+      <PanelState data={data} err={err} load={load} role={role} need="view the audit log">
+        {(d) => (
+          <Table
+            dense
+            columns={AUDIT_COLUMNS}
+            rows={d.entries || []}
+            rowKey={(r, i) => i}
+            empty={<EmptyState title="No entries yet" body={d.note} className="py-6" />}
+            renderCell={(e, col) => {
+              switch (col.key) {
+                case "at":
+                  return <span className="whitespace-nowrap text-xs text-fg-muted">{auditWhen(e.at)}</span>;
+                case "actor":
+                  return (
+                    <span className="font-mono text-xs text-fg-muted">
+                      {e.actor_kind}:{String(e.actor || "").slice(0, 12)}
+                    </span>
+                  );
+                case "action":
+                  return <span className="font-mono text-xs font-medium text-fg">{e.action}</span>;
+                case "resource":
+                  return e.resource ? <span className="break-all font-mono text-xs text-fg-muted">{e.resource}</span> : null;
+                default:
+                  return e[col.key];
+              }
+            }}
+          />
+        )}
+      </PanelState>
+    </Card>
+  );
+}
+
+// ---- Help & diagnostics (MC27) -------------------------------------------------
+
+function HelpPanel({ role }) {
+  const toast = useToast();
+  const { data, err, load } = usePanel("/api/admin/help");
+  return (
+    <Card id="help">
+      <CardHeader
+        title="Help & support"
+        description="Stuck? Copy the diagnostics below into your message — it's exactly what you see here: status flags and counts, never shopper data."
+      />
+      <PanelState data={data} err={err} load={load} role={role} need="view diagnostics">
+        {(d) => (
+          <>
+            <pre className="max-h-56 overflow-auto rounded-ctl border border-edge bg-surface-sunken p-3 font-mono text-[11px] leading-relaxed text-fg">
+              {JSON.stringify(d.diagnostics, null, 2)}
+            </pre>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                variant="primary"
+                icon={<Copy size={14} aria-hidden />}
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(JSON.stringify(d.diagnostics, null, 2));
+                    toast.success("Diagnostics copied");
+                  } catch {
+                    toast.error("Couldn't copy — select the text instead");
+                  }
+                }}
+              >
+                Copy diagnostics
+              </Button>
+              <a
+                href="mailto:support@storeasy.app?subject=Support%20request"
+                className="inline-flex items-center gap-2 rounded-ctl border border-edge-strong bg-surface px-3.5 py-2 text-sm font-medium text-fg focus-ring motion-safe:transition-colors hover:bg-surface-muted"
+              >
+                <Mail size={14} aria-hidden />
+                Email platform support
+              </a>
+            </div>
+          </>
+        )}
+      </PanelState>
+    </Card>
+  );
+}
+
+export default function OpsPanels({ role }) {
+  return (
+    <div className="mt-4 space-y-4">
+      <TeamPanel role={role} />
+      <AgencyAccessPanel role={role} />
+      <DomainsPanel role={role} />
+      <PrivacyPanel role={role} />
+      <AuditPanel role={role} />
+      <HelpPanel role={role} />
     </div>
   );
 }

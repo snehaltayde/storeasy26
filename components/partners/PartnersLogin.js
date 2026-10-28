@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/console/Button";
+import { Field, Input } from "@/components/console/fields";
+import { Banner } from "@/components/console/Banner";
 
-// Agency sign-in + member-invite acceptance (S48).
+// Agency sign-in + member-invite acceptance (S48, redesigned S50): renders
+// inside the centered auth card shell in app/(console)/partners/page.js,
+// matching the admin (auth) layout's look.
 export default function PartnersLogin() {
   const router = useRouter();
   const [mode, setMode] = useState("login");
@@ -25,40 +30,46 @@ export default function PartnersLogin() {
     return json;
   }
 
-  const input = "mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400";
   return (
-    <div className="mx-auto max-w-sm px-4 py-20 sm:px-6">
-      <h1 className="text-2xl font-extrabold tracking-tight">Partner console</h1>
-      <p className="mt-1 text-sm text-zinc-500">For agencies managing client stores. Access exists only where a client granted it.</p>
-      {err && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{err}</p>}
-      {note && <p className="mt-4 rounded-lg bg-lime-50 px-3 py-2 text-sm text-lime-800">{note}</p>}
+    <div>
+      <h1 className="text-base font-semibold text-fg">{mode === "login" ? "Sign in" : "Join your agency"}</h1>
+      <p className="mt-0.5 text-xs text-fg-muted">For agencies managing client stores. Access exists only where a client granted it.</p>
 
       {mode === "login" ? (
         <form
-          className="mt-6"
+          className="mt-5 space-y-4"
           onSubmit={async (e) => {
             e.preventDefault();
             if (await post({ action: "login", email: form.email, password: form.password })) router.refresh();
           }}
         >
-          <label className="block text-xs font-semibold text-zinc-600">
-            Email
-            <input type="email" required className={input} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          </label>
-          <label className="mt-3 block text-xs font-semibold text-zinc-600">
-            Password
-            <input type="password" required className={input} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          </label>
-          <button type="submit" disabled={busy} className="mt-5 w-full rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-50">
-            {busy ? "Signing in…" : "Sign in"}
-          </button>
-          <button type="button" className="mt-3 w-full text-xs text-zinc-400 hover:text-zinc-600" onClick={() => setMode("invite")}>
-            Have an invitation code?
-          </button>
+          {err && <Banner tone="danger">{err}</Banner>}
+          {note && <Banner tone="success">{note}</Banner>}
+          <Field label="Email" htmlFor="partners-email">
+            <Input id="partners-email" type="email" required autoFocus autoComplete="username" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </Field>
+          <Field label="Password" htmlFor="partners-password">
+            <Input id="partners-password" type="password" required autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          </Field>
+          <Button type="submit" variant="primary" busy={busy} className="w-full">
+            Sign in
+          </Button>
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("invite");
+                setErr(null);
+              }}
+              className="rounded text-xs text-fg-muted underline-offset-2 focus-ring hover:text-fg hover:underline"
+            >
+              Have an invitation code?
+            </button>
+          </div>
         </form>
       ) : (
         <form
-          className="mt-6"
+          className="mt-5 space-y-4"
           onSubmit={async (e) => {
             e.preventDefault();
             const r = await post({ action: "accept_invite", token: form.token.trim(), name: form.name, password: form.password });
@@ -69,24 +80,31 @@ export default function PartnersLogin() {
             }
           }}
         >
-          <label className="block text-xs font-semibold text-zinc-600">
-            Invitation code
-            <input required className={`${input} font-mono`} value={form.token} onChange={(e) => setForm({ ...form, token: e.target.value })} />
-          </label>
-          <label className="mt-3 block text-xs font-semibold text-zinc-600">
-            Your name
-            <input className={input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </label>
-          <label className="mt-3 block text-xs font-semibold text-zinc-600">
-            Choose a password (10+ characters)
-            <input type="password" required minLength={10} className={input} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          </label>
-          <button type="submit" disabled={busy} className="mt-5 w-full rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-50">
+          {err && <Banner tone="danger">{err}</Banner>}
+          <Field label="Invitation code" htmlFor="partners-token">
+            <Input id="partners-token" mono required autoFocus value={form.token} onChange={(e) => setForm({ ...form, token: e.target.value })} />
+          </Field>
+          <Field label="Your name" htmlFor="partners-name">
+            <Input id="partners-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </Field>
+          <Field label="Choose a password" htmlFor="partners-new-password" hint="10+ characters.">
+            <Input id="partners-new-password" type="password" required minLength={10} autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          </Field>
+          <Button type="submit" variant="primary" busy={busy} className="w-full">
             Join your agency
-          </button>
-          <button type="button" className="mt-3 w-full text-xs text-zinc-400 hover:text-zinc-600" onClick={() => setMode("login")}>
-            Back to sign-in
-          </button>
+          </Button>
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setErr(null);
+              }}
+              className="rounded text-xs text-fg-muted underline-offset-2 focus-ring hover:text-fg hover:underline"
+            >
+              Back to sign-in
+            </button>
+          </div>
         </form>
       )}
     </div>

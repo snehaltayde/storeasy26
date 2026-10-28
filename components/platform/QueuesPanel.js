@@ -1,128 +1,198 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { RotateCcw } from "lucide-react";
+import { Card, CardHeader } from "@/components/console/Card";
+import { Button } from "@/components/console/Button";
+import { StatusBadge } from "@/components/console/Badge";
+import { Table } from "@/components/console/Table";
+import { Stat, SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
+import { useToast } from "@/components/console/Toast";
 
-// Queue & webhook inspector (S29 / OP05): stats, non-done jobs and inbox rows
-// (metadata only — payloads never leave the server), per-row replay, and a
-// "run due now" button. Replays are audited server-side.
+// Queue & webhook inspector (S29 / OP05, redesigned S50): stats, non-done
+// jobs and inbox rows (metadata only — payloads never leave the server),
+// per-row replay, and a "run due now" button. Replays are audited
+// server-side.
+const JOB_COLUMNS = [
+  { key: "status", header: "Status" },
+  { key: "type", header: "Job" },
+  { key: "tenant_id", header: "Tenant" },
+  { key: "attempts", header: "Attempts", align: "right" },
+  { key: "last_error", header: "Last error" },
+  { key: "replay", header: "", width: "6rem" },
+];
+
+const INBOX_COLUMNS = [
+  { key: "status", header: "Status" },
+  { key: "topic", header: "Webhook" },
+  { key: "tenant_id", header: "Tenant" },
+  { key: "last_error", header: "Last error" },
+  { key: "replay", header: "", width: "6rem" },
+];
+
 export default function QueuesPanel() {
   const [data, setData] = useState(null);
-  const [msg, setMsg] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(null); // action key in flight ("tick" | "job:<id>" | "inbox:<id>")
+  const toast = useToast();
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/platform/queues?limit=30");
-    if (res.ok) setData(await res.json());
+    setErr(null);
+    try {
+      const res = await fetch("/api/platform/queues?limit=30");
+      if (res.ok) setData(await res.json());
+      else setErr(`Couldn't load queues (${res.status})`);
+    } catch (e) {
+      setErr(String(e?.message || e));
+    }
   }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  async function act(body, label) {
-    setBusy(true);
-    setMsg("");
+  async function act(body, label, key) {
+    setBusy(key);
     const res = await fetch("/api/platform/queues", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const j = await res.json().catch(() => ({}));
-    setMsg(res.ok ? `${label}: ok${j.ran !== undefined ? ` (ran ${j.ran}, failed ${j.failed})` : ""}` : `${label}: ${j.error || res.status}`);
-    setBusy(false);
+    if (res.ok) toast.success(`${label}: ok${j.ran !== undefined ? ` (ran ${j.ran}, failed ${j.failed})` : ""}`);
+    else toast.error(`${label}: ${j.error || res.status}`);
+    setBusy(null);
     refresh();
   }
 
-  if (!data) return null;
-  const { stats, jobs, inbox } = data;
-  const interesting = (jobs || []).filter((j) => j.status !== "done");
-  const inboxRows = (inbox || []).filter((r) => r.status !== "done" && r.status !== "ignored");
+  const interesting = (data?.jobs || []).filter((j) => j.status !== "done");
+  const inboxRows = (data?.inbox || []).filter((r) => r.status !== "done" && r.status !== "ignored");
 
-  const badge = (s) =>
-    s === "dead"
-      ? "bg-red-100 text-red-700"
-      : s === "pending" || s === "leased"
-        ? "bg-amber-100 text-amber-700"
-        : "bg-zinc-100 text-zinc-600";
+  const replayCell = (kind) => (row) =>
+    row.status === "dead" ? (
+      <Button
+        size="sm"
+        icon={<RotateCcw size={13} aria-hidden />}
+        busy={busy === `${kind}:${row.id}`}
+        disabled={busy !== null && busy !== `${kind}:${row.id}`}
+        onClick={() => act({ action: "replay", kind, id: row.id }, `replay ${row.id}`, `${kind}:${row.id}`)}
+      >
+        Replay
+      </Button>
+    ) : null;
 
   return (
-    <div className="mt-10 rounded-2xl border border-zinc-200 p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-bold">Queues & webhooks</h3>
-          <p className="mt-0.5 text-xs text-zinc-500">
-            jobs: {stats.jobs.pending} pending · {stats.jobs.leased} leased · {stats.jobs.dead} dead
-            {stats.jobs.oldest_pending_min ? ` · oldest ${stats.jobs.oldest_pending_min}m` : ""} — inbox:{" "}
-            {stats.inbox.pending} pending · {stats.inbox.dead} dead
-          </p>
-        </div>
-        <div className="flex gap-2 text-xs">
-          <button
-            onClick={() => act({ action: "tick" }, "tick")}
-            disabled={busy}
-            className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50 disabled:opacity-50"
-          >
-            Run due now
-          </button>
-          <button onClick={refresh} disabled={busy} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50 disabled:opacity-50">
-            Refresh
-          </button>
-        </div>
-      </div>
-      {msg && <p className="mt-2 text-xs text-zinc-500">{msg}</p>}
+    <Card id="queues">
+      <CardHeader
+        title="Queues & webhooks"
+        description="Metadata only — payloads never leave the server. Replays are audited."
+        actions={
+          <>
+            <Button size="sm" busy={busy === "tick"} disabled={busy !== null && busy !== "tick"} onClick={() => act({ action: "tick" }, "tick", "tick")}>
+              Run due now
+            </Button>
+            <Button size="sm" disabled={busy !== null} onClick={refresh}>
+              Refresh
+            </Button>
+          </>
+        }
+      />
+      {err && <ErrorState title="Couldn't load queues" detail={err} onRetry={refresh} />}
+      {!data && !err && <SkeletonText lines={3} />}
+      {data && (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Stat label="Jobs pending" value={data.stats.jobs.pending} sub={data.stats.jobs.oldest_pending_min ? `oldest ${data.stats.jobs.oldest_pending_min}m` : undefined} />
+            <Stat label="Jobs leased" value={data.stats.jobs.leased} />
+            <Stat label="Jobs dead" value={data.stats.jobs.dead} tone={data.stats.jobs.dead ? "danger" : "muted"} />
+            <Stat label="Inbox" value={data.stats.inbox.pending} sub={`pending · ${data.stats.inbox.dead} dead`} tone={data.stats.inbox.dead ? "danger" : undefined} />
+          </div>
 
-      {interesting.length > 0 && (
-        <ul className="mt-4 space-y-1.5 text-xs">
-          {interesting.map((j) => (
-            <li key={j.id} className="flex items-center justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-1.5">
-              <span className="truncate">
-                <span className={`mr-2 rounded px-1.5 py-0.5 font-semibold ${badge(j.status)}`}>{j.status}</span>
-                <span className="font-mono">{j.type}</span>
-                {j.tenant_id ? <span className="text-zinc-500"> · {j.tenant_id}</span> : null}
-                <span className="text-zinc-400"> · try {j.attempts}/{j.max_attempts}</span>
-                {j.last_error ? <span className="text-red-500"> · {String(j.last_error).slice(0, 80)}</span> : null}
-              </span>
-              {j.status === "dead" && (
-                <button
-                  onClick={() => act({ action: "replay", kind: "job", id: j.id }, `replay ${j.id}`)}
-                  disabled={busy}
-                  className="shrink-0 rounded-lg border border-lime-300 px-2 py-0.5 font-semibold text-lime-700 hover:bg-lime-50 disabled:opacity-50"
-                >
-                  Replay
-                </button>
+          {interesting.length === 0 && inboxRows.length === 0 ? (
+            <EmptyState title="Queue drained" body="Nothing pending or dead across jobs and webhook inbox." />
+          ) : (
+            <>
+              {interesting.length > 0 && (
+                <>
+                  <h3 className="mt-5 text-xs font-semibold text-fg-muted">Jobs</h3>
+                  <Table
+                    className="mt-1"
+                    dense
+                    columns={JOB_COLUMNS}
+                    rows={interesting}
+                    renderCell={(j, col) => {
+                      switch (col.key) {
+                        case "status":
+                          return <StatusBadge status={j.status} />;
+                        case "type":
+                          return <span className="font-mono text-xs">{j.type}</span>;
+                        case "tenant_id":
+                          return <span className="text-xs text-fg-muted">{j.tenant_id || "—"}</span>;
+                        case "attempts":
+                          return (
+                            <span className="text-xs text-fg-muted">
+                              {j.attempts}/{j.max_attempts}
+                            </span>
+                          );
+                        case "last_error":
+                          return j.last_error ? (
+                            <span className="block max-w-56 truncate text-xs text-danger" title={String(j.last_error)}>
+                              {String(j.last_error).slice(0, 80)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-fg-subtle">—</span>
+                          );
+                        case "replay":
+                          return replayCell("job")(j);
+                        default:
+                          return j[col.key];
+                      }
+                    }}
+                  />
+                </>
               )}
-            </li>
-          ))}
-        </ul>
-      )}
 
-      {inboxRows.length > 0 && (
-        <ul className="mt-3 space-y-1.5 text-xs">
-          {inboxRows.map((r) => (
-            <li key={r.id} className="flex items-center justify-between gap-3 rounded-lg bg-zinc-50 px-3 py-1.5">
-              <span className="truncate">
-                <span className={`mr-2 rounded px-1.5 py-0.5 font-semibold ${badge(r.status)}`}>{r.status}</span>
-                <span className="font-mono">{r.source}:{r.topic || "?"}</span>
-                {r.tenant_id ? <span className="text-zinc-500"> · {r.tenant_id}</span> : null}
-                {r.last_error ? <span className="text-red-500"> · {String(r.last_error).slice(0, 80)}</span> : null}
-              </span>
-              {r.status === "dead" && (
-                <button
-                  onClick={() => act({ action: "replay", kind: "inbox", id: r.id }, `replay ${r.id}`)}
-                  disabled={busy}
-                  className="shrink-0 rounded-lg border border-lime-300 px-2 py-0.5 font-semibold text-lime-700 hover:bg-lime-50 disabled:opacity-50"
-                >
-                  Replay
-                </button>
+              {inboxRows.length > 0 && (
+                <>
+                  <h3 className="mt-5 text-xs font-semibold text-fg-muted">Webhook inbox</h3>
+                  <Table
+                    className="mt-1"
+                    dense
+                    columns={INBOX_COLUMNS}
+                    rows={inboxRows}
+                    renderCell={(r, col) => {
+                      switch (col.key) {
+                        case "status":
+                          return <StatusBadge status={r.status} />;
+                        case "topic":
+                          return (
+                            <span className="font-mono text-xs">
+                              {r.source}:{r.topic || "?"}
+                            </span>
+                          );
+                        case "tenant_id":
+                          return <span className="text-xs text-fg-muted">{r.tenant_id || "—"}</span>;
+                        case "last_error":
+                          return r.last_error ? (
+                            <span className="block max-w-56 truncate text-xs text-danger" title={String(r.last_error)}>
+                              {String(r.last_error).slice(0, 80)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-fg-subtle">—</span>
+                          );
+                        case "replay":
+                          return replayCell("inbox")(r);
+                        default:
+                          return r[col.key];
+                      }
+                    }}
+                  />
+                </>
               )}
-            </li>
-          ))}
-        </ul>
+            </>
+          )}
+        </>
       )}
-
-      {interesting.length === 0 && inboxRows.length === 0 && (
-        <p className="mt-3 text-xs text-zinc-400">Nothing pending or dead — the queue is drained.</p>
-      )}
-    </div>
+    </Card>
   );
 }

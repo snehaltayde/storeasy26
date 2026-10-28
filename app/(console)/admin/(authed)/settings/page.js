@@ -7,10 +7,50 @@ import { siteName } from "@/lib/site";
 import { db } from "@/lib/db";
 import SettingsAdmin from "@/components/admin/SettingsAdmin";
 import OpsPanels from "@/components/admin/OpsPanels";
+import { PageHeader } from "@/components/console/PageHeader";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings · Admin", robots: { index: false } };
+
+// Anchor targets: ids on the Cards below (Card adds scroll-mt-20 for the
+// sticky chrome). Order matches the on-page order of the sections.
+const SECTIONS = [
+  { id: "store-profile", label: "Store profile" },
+  { id: "commerce", label: "Commerce" },
+  { id: "payments", label: "Payments" },
+  { id: "tracking", label: "Tracking" },
+  { id: "shipping", label: "Shipping" },
+  { id: "catalog-sync", label: "Catalog sync" },
+  { id: "password", label: "Password" },
+  { id: "team", label: "Team" },
+  { id: "agency-access", label: "Agency access" },
+  { id: "domains-seo", label: "Domains & SEO" },
+  { id: "privacy", label: "Privacy" },
+  { id: "audit-log", label: "Audit log" },
+  { id: "help", label: "Help" },
+];
+
+function SectionNav() {
+  return (
+    <nav
+      aria-label="Settings sections"
+      className="sticky top-[45px] z-10 -mx-4 mb-5 border-b border-edge bg-surface-muted/95 px-4 backdrop-blur sm:-mx-6 sm:px-6 md:top-0"
+    >
+      <div className="flex gap-1.5 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {SECTIONS.map((s) => (
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            className="whitespace-nowrap rounded-ctl border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-fg-muted focus-ring motion-safe:transition-colors hover:border-edge-strong hover:text-fg"
+          >
+            {s.label}
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
 
 export default async function AdminSettingsPage() {
   const jar = await cookies();
@@ -35,10 +75,12 @@ export default async function AdminSettingsPage() {
 
   return (
     <>
+      <PageHeader title="Settings" description="Store configuration — changes go live without a deploy." />
+      <SectionNav />
       <SettingsAdmin initial={view} />
-      {/* S43: Team (MC23) · Domains & SEO (MC21) · Privacy (MC25) · Audit
-          (MC26) · Help (MC27) */}
-      <OpsPanels />
+      {/* S43: Team (MC23) · Agency (AG02) · Domains & SEO (MC21) · Privacy
+          (MC25) · Audit (MC26) · Help (MC27) */}
+      <OpsPanels role={actor.role} />
     </>
   );
 }

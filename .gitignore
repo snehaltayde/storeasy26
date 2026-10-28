@@ -52,3 +52,7 @@ next-env.d.ts
 # control-plane + tenant local databases (S20)
 platform.db
 *.db
+
+# S50 design-preview harness (local file DBs + generated test creds)
+.design-env
+.design-*.db

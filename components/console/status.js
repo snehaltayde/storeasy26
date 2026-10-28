@@ -66,6 +66,14 @@ export const STATUS_TONE = {
   ok: "success",
   warn: "warning",
   error: "danger",
+  // AI insights
+  proposed: "info",
+  applied: "success",
+  dismissed: "neutral",
+  new: "info",
+  // integrations
+  connected: "success",
+  unconfigured: "neutral",
 };
 
 const LABELS = {

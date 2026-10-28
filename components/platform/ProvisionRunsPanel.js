@@ -1,94 +1,121 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Card, CardHeader } from "@/components/console/Card";
+import { Button } from "@/components/console/Button";
+import { StatusBadge } from "@/components/console/Badge";
+import { DangerDialog } from "@/components/console/Dialog";
+import { SecretReveal } from "@/components/console/Copy";
+import { SkeletonText, ErrorState, EmptyState } from "@/components/console/bits";
+import { useToast } from "@/components/console/Toast";
 
-// Provisioning runs panel (S41 / OP04): per-step state, safe resume of
-// failed runs (steps are idempotent — no duplicate resources), conservative
-// compensation. Done runs are history, not buttons.
-const STEP_CHIP = {
-  done: "bg-lime-100 text-lime-700",
-  failed: "bg-red-100 text-red-600",
-  running: "bg-amber-100 text-amber-700",
-  pending: "bg-zinc-100 text-zinc-400",
-  compensated: "bg-purple-100 text-purple-700",
-  skipped: "bg-zinc-100 text-zinc-400",
-};
-
+// Provisioning runs panel (S41 / OP04, redesigned S50): per-step state, safe
+// resume of failed runs (steps are idempotent — no duplicate resources),
+// conservative compensation. Done runs are history, not buttons.
 export default function ProvisionRunsPanel() {
   const [runs, setRuns] = useState(null);
   const [err, setErr] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(null); // run id being resumed
+  const [rollingBack, setRollingBack] = useState(null); // run pending typed confirmation
   const [generated, setGenerated] = useState(null); // {run, password}
+  const toast = useToast();
 
-  const load = () =>
-    fetch("/api/platform/provisions")
+  const load = useCallback(() => {
+    setErr(null);
+    return fetch("/api/platform/provisions")
       .then((r) => r.json())
       .then((j) => (j.ok ? setRuns(j.runs) : setErr(j.error || "failed")))
       .catch((e) => setErr(String(e)));
+  }, []);
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   async function act(action, run) {
-    if (action === "compensate" && !window.confirm(`Roll back run ${run.id}? Deregisters what it created (the database is never deleted).`)) return;
-    setBusy(true);
-    setErr(null);
     const res = await fetch("/api/platform/provisions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, run: run.id }),
     });
     const json = await res.json().catch(() => ({}));
-    if (res.ok && json.ok) {
-      if (json.generated?.admin_password) setGenerated({ run: run.id, password: json.generated.admin_password });
-      load();
-    } else setErr(json.error || `failed (${res.status})`);
-    setBusy(false);
+    if (!(res.ok && json.ok)) throw new Error(json.error || `failed (${res.status})`);
+    if (json.generated?.admin_password) setGenerated({ run: run.id, password: json.generated.admin_password });
+    load();
+    return json;
   }
 
-  if (runs !== null && runs.length === 0) return null; // nothing to show yet
+  async function resume(run) {
+    setBusy(run.id);
+    try {
+      await act("resume", run);
+      toast.success(`Run ${run.id} resumed`);
+    } catch (e) {
+      toast.error(String(e?.message || e));
+    }
+    setBusy(null);
+  }
 
   return (
-    <section className="mt-8 rounded-2xl border border-zinc-200 p-5">
-      <h2 className="text-sm font-bold">Provisioning runs</h2>
-      {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
+    <Card id="provisioning">
+      <CardHeader
+        title="Provisioning runs"
+        description="Resume re-runs only unfinished steps against real state (no duplicate resources). Roll-back deregisters what a failed run created — databases are never deleted automatically."
+      />
+      {err && <ErrorState title="Couldn't load provisioning runs" detail={err} onRetry={load} />}
+      {!runs && !err && <SkeletonText lines={3} />}
       {generated && (
-        <p className="mt-2 rounded-lg bg-lime-50 px-3 py-2 text-sm text-lime-800">
-          Run {generated.run} finished — console password: <code className="rounded bg-white px-1.5 font-mono">{generated.password}</code> (shown once).
-        </p>
+        <div className="mb-3">
+          <SecretReveal label={`Run ${generated.run} finished — console password`} value={generated.password} note="Shown once — hand it to the merchant now." />
+        </div>
       )}
-      {!runs && !err && <p className="mt-2 text-sm text-zinc-400">Loading…</p>}
-      <ul className="mt-3 space-y-2">
-        {runs?.map((r) => (
-          <li key={r.id} className="rounded-xl border border-zinc-100 p-3">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-bold">{r.tenant_id}</span>
-              <span className="font-mono text-xs text-zinc-400">{r.id}</span>
-              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${STEP_CHIP[r.status] || STEP_CHIP.pending}`}>{r.status}</span>
-              <span className="ml-auto text-xs text-zinc-400">{new Date(r.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {r.steps.map((s) => (
-                <span key={s.name} title={s.detail || ""} className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${STEP_CHIP[s.status] || STEP_CHIP.pending}`}>
-                  {s.name} {s.status === "done" ? "✓" : s.status === "failed" ? "✗" : ""}
+      {runs && runs.length === 0 && <EmptyState title="No provisioning runs yet" body="Each New-tenant provision records a resumable run here." />}
+      {runs && runs.length > 0 && (
+        <ul className="space-y-2">
+          {runs.map((r) => (
+            <li key={r.id} className="rounded-ctl border border-edge p-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="font-semibold text-fg">{r.tenant_id}</span>
+                <span className="font-mono text-xs text-fg-subtle">{r.id}</span>
+                <StatusBadge status={r.status} />
+                <span className="ml-auto text-xs text-fg-subtle">
+                  {new Date(r.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </span>
-              ))}
-            </div>
-            {r.error && <p className="mt-1.5 text-xs text-red-500">{r.error}</p>}
-            {r.status === "failed" && (
-              <div className="mt-2 flex gap-2">
-                <button type="button" disabled={busy} onClick={() => act("resume", r)} className="rounded-lg bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50">
-                  Resume
-                </button>
-                <button type="button" disabled={busy} onClick={() => act("compensate", r)} className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">
-                  Roll back
-                </button>
               </div>
-            )}
-          </li>
-        ))}
-      </ul>
-      <p className="mt-3 text-xs text-zinc-400">Resume re-runs only unfinished steps against real state (no duplicate resources). Roll-back deregisters what a failed run created — databases are never deleted automatically.</p>
-    </section>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {r.steps.map((s) => (
+                  <span key={s.name} title={s.detail || undefined}>
+                    <StatusBadge status={s.status} label={`${s.name} · ${s.status}`} />
+                  </span>
+                ))}
+              </div>
+              {r.error && <p className="mt-1.5 text-xs text-danger">{r.error}</p>}
+              {r.status === "failed" && (
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" variant="primary" busy={busy === r.id} onClick={() => resume(r)}>
+                    Resume
+                  </Button>
+                  <Button size="sm" variant="dangerOutline" disabled={busy === r.id} onClick={() => setRollingBack(r)}>
+                    Roll back
+                  </Button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <DangerDialog
+        open={!!rollingBack}
+        onClose={() => setRollingBack(null)}
+        title={`Roll back run ${rollingBack?.id}?`}
+        confirmLabel="Roll back"
+        typedConfirmation={rollingBack?.id}
+        body="Deregisters what this failed run created. The database is never deleted — compensation is deliberately conservative."
+        onConfirm={async () => {
+          await act("compensate", rollingBack);
+          toast.success(`Run ${rollingBack.id} rolled back`);
+        }}
+      />
+    </Card>
   );
 }

@@ -2,8 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { buildChecklist } from "@/lib/admin/onboarding";
-import { siteName } from "@/lib/site";
 import SetupAdmin from "@/components/admin/SetupAdmin";
+import { PageHeader } from "@/components/console/PageHeader";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
@@ -16,20 +16,15 @@ export default async function AdminSetupPage() {
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
-  const [initial, name] = await tfetch(async () => [await buildChecklist(), siteName()]);
+  const initial = await tfetch(() => buildChecklist());
 
   return (
     <>
-      <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
-        <h1 className="text-2xl font-bold">Setup</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Everything between here and your first sale. Most steps tick themselves off as the work lands; the
-          last three are your call.
-        </p>
-        <div className="mt-5">
-          <SetupAdmin initial={initial} />
-        </div>
-      </div>
+      <PageHeader
+        title="Setup"
+        description="Everything between here and your first sale. Most steps tick themselves off as the work lands; the last three are your call."
+      />
+      <SetupAdmin initial={initial} />
     </>
   );
 }

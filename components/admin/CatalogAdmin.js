@@ -1,178 +1,244 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ExternalLink, Loader2, Plus, Search, X } from "lucide-react";
+import { Card, CardHeader, CardFooter } from "@/components/console/Card";
+import { StatusBadge } from "@/components/console/Badge";
+import { Banner } from "@/components/console/Banner";
+import { Button, IconButton } from "@/components/console/Button";
+import { Field, Input, Textarea } from "@/components/console/fields";
+import { EmptyState } from "@/components/console/bits";
+import { useToast } from "@/components/console/Toast";
 
-// Catalog browser (S39 / MC05 + MC06). Shopify-owned values are READ-ONLY
-// here, labeled and linked to Shopify admin; what the console edits is
-// per-tenant PRESENTATION: per-product PDP modules + badge, and per-
-// collection pinned ordering. Overrides whose product vanished from the
+// Catalog browser (S39 / MC05 + MC06, redesigned S50). Shopify-owned values
+// are READ-ONLY here, labeled and linked to Shopify admin; what the console
+// edits is per-tenant PRESENTATION: per-product PDP modules + badge, and
+// per-collection pinned ordering. Overrides whose product vanished from the
 // catalog are flagged ORPHANED (deleted-product guard), never hidden.
+// S50 fixes: the debounced search shows a spinner (it used to give no
+// feedback), saves toast, and errors land in a persistent Banner.
 
-const input =
-  "mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400";
+const money = (v, cur) => {
+  try {
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency: cur || "INR", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(v || 0));
+  } catch {
+    return `${v ?? "—"} ${cur || ""}`.trim();
+  }
+};
 
 export default function CatalogAdmin({ initial }) {
   const [data, setData] = useState(initial);
   const [q, setQ] = useState("");
-  const [editing, setEditing] = useState(null); // {product, override}
+  const [searching, setSearching] = useState(false);
+  const [editing, setEditing] = useState(null); // {product, modules, badge}
+  const [opening, setOpening] = useState(null); // product gid being fetched
   const [colHandle, setColHandle] = useState("");
   const [colPins, setColPins] = useState("");
-  const [msg, setMsg] = useState(null);
+  const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const debounceRef = useRef(null);
+  const firstRun = useRef(true);
+  const toast = useToast();
 
   useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false; // the server already rendered the unfiltered list
+      return;
+    }
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      const res = await fetch(`/api/admin/catalog?q=${encodeURIComponent(q)}`);
-      const json = await res.json().catch(() => ({}));
-      if (json.ok) setData(json);
+      setSearching(true);
+      try {
+        const res = await fetch(`/api/admin/catalog?q=${encodeURIComponent(q)}`);
+        const json = await res.json().catch(() => ({}));
+        if (json.ok) setData(json);
+      } finally {
+        setSearching(false);
+      }
     }, 250);
     return () => clearTimeout(debounceRef.current);
   }, [q]);
 
   async function openProduct(gid) {
-    setBusy(true);
-    const res = await fetch(`/api/admin/catalog?product=${encodeURIComponent(gid)}`);
-    const json = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (json.ok) setEditing({ product: json.product, modules: json.override.modules || [], badge: json.override.badge || "" });
+    setOpening(gid);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/catalog?product=${encodeURIComponent(gid)}`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || `Couldn't load the product (${res.status})`);
+      setEditing({ product: json.product, modules: json.override.modules || [], badge: json.override.badge || "" });
+    } catch (e) {
+      setError(String(e?.message || e));
+    } finally {
+      setOpening(null);
+    }
   }
 
   async function post(body, okText) {
     setBusy(true);
-    setMsg(null);
-    const res = await fetch("/api/admin/catalog", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (res.ok && json.ok) {
-      setMsg({ ok: true, text: okText });
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/catalog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error((json.errors || [json.error || `Save failed (${res.status})`]).join(" · "));
+      toast.success(okText);
       const r = await fetch(`/api/admin/catalog?q=${encodeURIComponent(q)}`).then((x) => x.json()).catch(() => ({}));
       if (r.ok) setData(r);
-    } else {
-      setMsg({ ok: false, text: (json.errors || [json.error || `Save failed (${res.status})`]).join(" · ") });
+      return true;
+    } catch (e) {
+      setError(String(e?.message || e));
+      return false;
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
-    return res.ok && json.ok;
   }
 
   const mod = (i, patch) => setEditing((e) => ({ ...e, modules: e.modules.map((m, j) => (j === i ? { ...m, ...patch } : m)) }));
 
   return (
-    <div className="space-y-5">
-      {msg && <div className={`rounded-xl px-4 py-3 text-sm ${msg.ok ? "bg-lime-50 text-lime-700" : "bg-red-50 text-red-600"}`}>{msg.text}</div>}
+    <div className="space-y-4">
+      {error && <Banner tone="danger">{error}</Banner>}
 
       {editing ? (
-        <section className="rounded-2xl border border-lime-300 p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-bold">{editing.product.title}</h2>
-              <p className="mt-0.5 font-mono text-xs text-zinc-400">/products/{editing.product.handle}</p>
-            </div>
-            {editing.product.shopify_url && (
-              <a href={editing.product.shopify_url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs font-medium text-lime-700 hover:underline">
-                Open in Shopify admin ↗
-              </a>
-            )}
-          </div>
+        <Card>
+          <CardHeader
+            title={editing.product.title}
+            description={`/products/${editing.product.handle}`}
+            actions={
+              editing.product.shopify_url && (
+                <a
+                  href={editing.product.shopify_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded text-xs font-medium text-fg-muted focus-ring hover:text-fg hover:underline"
+                >
+                  Open in Shopify admin <ExternalLink size={12} aria-hidden />
+                </a>
+              )
+            }
+          />
 
           {/* Shopify-owned values: labeled, read-only */}
-          <div className="mt-4 rounded-xl bg-zinc-50 p-3 text-xs text-zinc-600">
-            <p className="mb-1 font-semibold text-zinc-500">Shopify owns these — edit them in Shopify admin; they sync here.</p>
-            <p>
+          <div className="rounded-ctl bg-surface-sunken px-3.5 py-2.5 text-xs text-fg-muted">
+            <p className="font-medium text-fg">Shopify owns these — edit them in Shopify admin; they sync here.</p>
+            <p className="mt-0.5">
               Type: {editing.product.product_type || "—"} · Vendor: {editing.product.vendor || "—"} · Price: {editing.product.price_min}
               {editing.product.price_max !== editing.product.price_min ? `–${editing.product.price_max}` : ""} {editing.product.currency} ·{" "}
               {editing.product.available ? "In stock" : "Sold out"}
             </p>
           </div>
 
-          <div className="mt-4">
-            <label className="block">
-              <span className="text-xs font-semibold text-zinc-600">Badge</span>
-              <input className={input + " max-w-xs"} placeholder='e.g. "Lab tested" (blank = none)' value={editing.badge} onChange={(e) => setEditing({ ...editing, badge: e.target.value })} />
-            </label>
-          </div>
+          <Field label="Badge" htmlFor="cat-badge" hint="Shown on the product card — blank = none." className="mt-4 max-w-xs">
+            <Input id="cat-badge" placeholder='e.g. "Lab tested"' value={editing.badge} onChange={(e) => setEditing({ ...editing, badge: e.target.value })} />
+          </Field>
 
-          <p className="mt-4 text-xs font-semibold text-zinc-600">Product-page modules (ingredients, usage, specs — accordions on this PDP)</p>
+          <p className="mt-5 text-xs font-medium text-fg-muted">Product-page modules (ingredients, usage, specs — accordions on this PDP)</p>
           {editing.modules.map((m, i) => (
-            <div key={i} className="mt-2 rounded-xl border border-zinc-100 p-3">
-              <div className="flex items-center gap-2">
-                <input className={input + " mt-0"} placeholder="Module title (e.g. Ingredients)" value={m.title} onChange={(e) => mod(i, { title: e.target.value })} />
-                <button type="button" onClick={() => setEditing((e) => ({ ...e, modules: e.modules.filter((_, j) => j !== i) }))} className="text-zinc-400 hover:text-red-600">
-                  ✕
-                </button>
+            <div key={i} className="mt-2 rounded-ctl border border-edge p-3">
+              <div className="flex items-start gap-2">
+                <Input aria-label={`Module ${i + 1} title`} placeholder="Module title (e.g. Ingredients)" value={m.title} onChange={(e) => mod(i, { title: e.target.value })} />
+                <IconButton
+                  label={`Remove module ${i + 1}`}
+                  icon={<X size={14} aria-hidden />}
+                  onClick={() => setEditing((e) => ({ ...e, modules: e.modules.filter((_, j) => j !== i) }))}
+                />
               </div>
-              <textarea className={input + " min-h-20 font-mono text-xs"} placeholder="<p>HTML — sanitized on save</p>" value={m.html} onChange={(e) => mod(i, { html: e.target.value })} />
+              <Textarea mono aria-label={`Module ${i + 1} HTML`} className="mt-2" placeholder="<p>HTML — sanitized on save</p>" value={m.html} onChange={(e) => mod(i, { html: e.target.value })} />
             </div>
           ))}
-          <button type="button" onClick={() => setEditing((e) => ({ ...e, modules: [...e.modules, { title: "", html: "" }] }))} className="mt-2 text-sm font-medium text-lime-700 hover:underline">
-            + Add module
-          </button>
+          <Button size="sm" variant="ghost" icon={<Plus size={13} aria-hidden />} className="mt-2" onClick={() => setEditing((e) => ({ ...e, modules: [...e.modules, { title: "", html: "" }] }))}>
+            Add module
+          </Button>
 
-          <div className="mt-4 flex gap-2">
-            <button
-              type="button"
-              disabled={busy}
+          <CardFooter>
+            <Button
+              variant="primary"
+              busy={busy}
               onClick={async () => {
-                const ok = await post({ product: { handle: editing.product.handle, modules: editing.modules, badge: editing.badge } }, "Saved — live on the product page now.");
+                const ok = await post({ product: { handle: editing.product.handle, modules: editing.modules, badge: editing.badge } }, "Saved — live on the product page now");
                 if (ok) setEditing(null);
               }}
-              className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-lime-300 disabled:opacity-50"
             >
               Save presentation
-            </button>
-            <button type="button" onClick={() => setEditing(null)} className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50">
+            </Button>
+            <Button disabled={busy} onClick={() => setEditing(null)}>
               Cancel
-            </button>
-          </div>
-        </section>
+            </Button>
+          </CardFooter>
+        </Card>
       ) : (
         <>
-          <section className="rounded-2xl border border-zinc-200 p-5">
-            <h2 className="text-sm font-bold">Products</h2>
-            <input className={input + " mt-3"} type="search" placeholder="Search by title, handle or type…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search catalog" />
-            <ul className="mt-3 divide-y divide-zinc-100">
-              {data.products.map((p) => (
-                <li key={p.id} className="flex items-center gap-3 py-2.5 text-sm">
-                  <span className="min-w-0 flex-1 truncate">
-                    <span className="font-medium">{p.title}</span>
-                    <span className="ml-2 font-mono text-xs text-zinc-400">{p.handle}</span>
-                    {!p.available && <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">SOLD OUT</span>}
-                    {p.customized && <span className="ml-2 rounded bg-lime-100 px-1.5 py-0.5 text-[10px] font-bold text-lime-700">CUSTOMIZED</span>}
-                  </span>
-                  <button type="button" disabled={busy} onClick={() => openProduct(p.id)} className="font-medium text-lime-700 hover:underline">
-                    Presentation
-                  </button>
-                </li>
-              ))}
-              {data.products.length === 0 && <li className="py-6 text-center text-sm text-zinc-400">No products match.</li>}
-            </ul>
-          </section>
-
-          {data.overrides.some((o) => o.orphaned) && (
-            <section className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-sm text-amber-800">
-              <h2 className="font-bold">Orphaned overrides</h2>
-              <p className="mt-1 text-xs">These products were deleted from the catalog; their presentation rows do nothing. Remove them or restore the product in Shopify.</p>
-              <ul className="mt-2 space-y-1">
-                {data.overrides.filter((o) => o.orphaned).map((o) => (
-                  <li key={o.product_id} className="font-mono text-xs">{o.product_id}</li>
+          <Card>
+            <CardHeader title="Products" />
+            <div className="relative max-w-md">
+              <Search size={14} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
+              <Input
+                type="search"
+                aria-label="Search catalog"
+                placeholder="Search by title, handle or type…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="pl-8 pr-8"
+              />
+              {searching && <Loader2 size={14} aria-hidden className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle motion-safe:animate-spin" />}
+            </div>
+            {data.products.length === 0 ? (
+              <EmptyState title="No products match" body="Try a different title, handle or type." className="py-6" />
+            ) : (
+              <ul className="mt-2 divide-y divide-edge">
+                {data.products.map((p) => (
+                  <li key={p.id} className="flex items-center gap-3 py-2.5 text-sm">
+                    {p.featured_image ? (
+                      <img src={p.featured_image} alt="" loading="lazy" className="size-9 shrink-0 rounded-ctl border border-edge bg-surface-sunken object-cover" />
+                    ) : (
+                      <span className="size-9 shrink-0 rounded-ctl border border-edge bg-surface-sunken" aria-hidden />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span className="truncate font-medium text-fg">{p.title}</span>
+                        <StatusBadge status={p.available ? "active" : "sold_out"} label={p.available ? "In stock" : "Sold out"} />
+                        {p.customized && <StatusBadge status="customized" />}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-fg-subtle">
+                        <span className="font-mono">{p.handle}</span>
+                        {p.product_type ? ` · ${p.product_type}` : ""}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right text-sm tabular-nums text-fg-muted">{money(p.price_min, p.currency)}</span>
+                    <Button size="sm" busy={opening === p.id} disabled={!!opening && opening !== p.id} onClick={() => openProduct(p.id)}>
+                      Presentation
+                    </Button>
+                  </li>
                 ))}
               </ul>
-            </section>
+            )}
+          </Card>
+
+          {data.overrides.some((o) => o.orphaned) && (
+            <Banner tone="warning" title="Orphaned overrides">
+              These products were deleted from the catalog; their presentation rows do nothing. Remove them or restore the product in Shopify.
+              <ul className="mt-1.5 space-y-0.5">
+                {data.overrides.filter((o) => o.orphaned).map((o) => (
+                  <li key={o.product_id} className="font-mono text-xs">
+                    {o.product_id}
+                  </li>
+                ))}
+              </ul>
+            </Banner>
           )}
 
-          <section className="rounded-2xl border border-zinc-200 p-5">
-            <h2 className="text-sm font-bold">Collection merchandising</h2>
-            <p className="mt-0.5 text-xs text-zinc-500">
-              Pin products to the top of a collection&rsquo;s default (&ldquo;Featured&rdquo;) order — everything else keeps Shopify&rsquo;s order. Pins must belong to the collection.
-            </p>
-            <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-xs font-semibold text-zinc-600">Collection handle</span>
-                <input className={input} list="catalog-collections" value={colHandle} onChange={(e) => setColHandle(e.target.value)} placeholder="protein" />
+          <Card>
+            <CardHeader
+              title="Collection merchandising"
+              description="Pin products to the top of a collection’s default (“Featured”) order — everything else keeps Shopify’s order. Pins must belong to the collection."
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Collection handle" htmlFor="cat-col-handle">
+                <Input id="cat-col-handle" list="catalog-collections" mono value={colHandle} onChange={(e) => setColHandle(e.target.value)} placeholder="protein" />
                 <datalist id="catalog-collections">
                   {data.collections.map((c) => (
                     <option key={c.handle} value={c.handle}>
@@ -181,22 +247,27 @@ export default function CatalogAdmin({ initial }) {
                     </option>
                   ))}
                 </datalist>
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold text-zinc-600">Pinned product handles</span>
-                <textarea className={input + " min-h-20 font-mono text-xs"} value={colPins} onChange={(e) => setColPins(e.target.value)} placeholder={"whey-gold-1kg\ncreatine-250g"} />
-                <span className="mt-0.5 block text-[11px] text-zinc-400">one per line, in display order · empty = back to Shopify&rsquo;s order</span>
-              </label>
+              </Field>
+              <Field label="Pinned product handles" htmlFor="cat-col-pins" hint="One per line, in display order · empty = back to Shopify’s order.">
+                <Textarea id="cat-col-pins" mono value={colPins} onChange={(e) => setColPins(e.target.value)} placeholder={"whey-gold-1kg\ncreatine-250g"} />
+              </Field>
             </div>
-            <button
-              type="button"
-              disabled={busy || !colHandle.trim()}
-              onClick={() => post({ collection: { handle: colHandle.trim(), pinnedHandles: colPins.split("\n").map((s) => s.trim()).filter(Boolean) } }, "Pinned order saved — live on the collection page now.")}
-              className="mt-3 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
-            >
-              Save pinned order
-            </button>
-          </section>
+            <CardFooter>
+              <Button
+                variant="primary"
+                busy={busy}
+                disabled={!colHandle.trim()}
+                onClick={() =>
+                  post(
+                    { collection: { handle: colHandle.trim(), pinnedHandles: colPins.split("\n").map((s) => s.trim()).filter(Boolean) } },
+                    "Pinned order saved — live on the collection page now"
+                  )
+                }
+              >
+                Save pinned order
+              </Button>
+            </CardFooter>
+          </Card>
         </>
       )}
     </div>

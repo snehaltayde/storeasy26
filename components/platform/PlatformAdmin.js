@@ -2,6 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Download, LogOut, MoreHorizontal, Plus, Wrench } from "lucide-react";
+import { Card, CardHeader } from "@/components/console/Card";
+import { Button } from "@/components/console/Button";
+import { Banner } from "@/components/console/Banner";
+import { StatusBadge } from "@/components/console/Badge";
+import { Dialog, ConfirmDialog, DangerDialog } from "@/components/console/Dialog";
+import { Field, Input, Textarea } from "@/components/console/fields";
+import { SecretReveal } from "@/components/console/Copy";
+import { SkeletonText, EmptyState, ErrorState } from "@/components/console/bits";
+import { useToast } from "@/components/console/Toast";
 import QueuesPanel from "./QueuesPanel";
 import { FlagsPanel, CostsPanel } from "./GrowthOpsPanels";
 import PartnersPanel from "./PartnersPanel";
@@ -13,18 +23,25 @@ import OverviewPanel from "./OverviewPanel";
 import IncidentsPanel from "./IncidentsPanel";
 import PrivacyOpsPanel from "./PrivacyOpsPanel";
 
-// Operator console (Session 22): tenant table + health, suspend/activate,
-// per-tenant sync, Shopify connect links, and the provisioning wizard.
-const inputCls =
-  "mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400";
+// Operator console (Session 22, redesigned S50): sticky shell + anchor nav
+// over the one-page console — tenant registry with consolidated actions,
+// then every ops panel as an addressable Card. All destructive paths go
+// through dialogs; transient results are toasts, persistent failures are
+// row banners. API contracts unchanged.
 
-const F = ({ label, hint, children }) => (
-  <label className="block">
-    <span className="text-xs font-semibold text-zinc-600">{label}</span>
-    {children}
-    {hint && <span className="mt-0.5 block text-[11px] text-zinc-400">{hint}</span>}
-  </label>
-);
+const SECTIONS = [
+  ["tenants", "Tenants"],
+  ["overview", "Overview"],
+  ["incidents", "Incidents"],
+  ["privacy", "Privacy"],
+  ["provisioning", "Provisioning"],
+  ["themes", "Themes"],
+  ["billing", "Billing"],
+  ["flags", "Flags"],
+  ["costs", "Costs"],
+  ["partners", "Partners"],
+  ["queues", "Queues"],
+];
 
 function NewTenantForm({ onDone }) {
   const [f, setF] = useState({ id: "", name: "", shopDomain: "", domains: "", clientId: "", clientSecret: "", dbUrl: "", dbToken: "" });
@@ -52,129 +69,157 @@ function NewTenantForm({ onDone }) {
 
   if (created) {
     return (
-      <div className="rounded-2xl border border-lime-300 bg-lime-50 p-5">
-        <h3 className="text-sm font-bold text-lime-800">✓ Tenant “{created.tenant.id}” provisioned</h3>
-        <p className="mt-2 text-sm text-lime-800">
-          Console password: <code className="rounded bg-white px-2 py-0.5 font-mono text-sm">{created.generated.admin_password}</code>
-        </p>
-        <p className="mt-1 text-xs text-lime-700">Shown ONCE — hand it to the merchant now. Next: connect Shopify from the tenant row.</p>
-        <button onClick={onDone} className="mt-3 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white">
-          Done
-        </button>
-      </div>
+      <Card>
+        <CardHeader title={`Tenant “${created.tenant.id}” provisioned`} description="Next: connect Shopify from the tenant row." />
+        <SecretReveal
+          label="Console password"
+          value={created.generated.admin_password}
+          note="Shown ONCE — hand it to the merchant now; it can't be retrieved later."
+        />
+        <div className="mt-4">
+          <Button variant="primary" onClick={onDone}>
+            Done
+          </Button>
+        </div>
+      </Card>
     );
   }
 
   return (
-    <form onSubmit={submit} className="rounded-2xl border border-zinc-200 p-5">
-      <h3 className="text-sm font-bold">New tenant</h3>
-      <p className="mt-0.5 text-xs text-zinc-500">
-        Recorded, resumable steps: Turso DB → schema → neutral defaults (nothing brand-flavored) → register → Free plan → onboarding record. A failed run shows below with Resume.
-      </p>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <F label="Slug" hint="lowercase, hyphens — becomes storeasy-t-<slug>">
-          <input className={inputCls} required value={f.id} onChange={(e) => setF({ ...f, id: e.target.value })} placeholder="acme" />
-        </F>
-        <F label="Display name">
-          <input className={inputCls} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Acme Nutrition" />
-        </F>
-        <F label="Shopify store domain" hint="x.myshopify.com">
-          <input className={inputCls} required value={f.shopDomain} onChange={(e) => setF({ ...f, shopDomain: e.target.value })} placeholder="acme.myshopify.com" />
-        </F>
-        <F label="Storefront domains" hint="comma-separated hosts">
-          <input className={inputCls} value={f.domains} onChange={(e) => setF({ ...f, domains: e.target.value })} placeholder="shop.acme.in" />
-        </F>
-        <F label="Shopify app client id" hint="the tenant's custom-distribution app">
-          <input className={inputCls} value={f.clientId} onChange={(e) => setF({ ...f, clientId: e.target.value })} />
-        </F>
-        <F label="Shopify app client secret">
-          <input type="password" autoComplete="new-password" className={inputCls} value={f.clientSecret} onChange={(e) => setF({ ...f, clientSecret: e.target.value })} />
-        </F>
-        <F label="Adopt existing DB url" hint="optional — skips Turso create">
-          <input className={inputCls} value={f.dbUrl} onChange={(e) => setF({ ...f, dbUrl: e.target.value })} placeholder="libsql://…" />
-        </F>
-        <F label="Adopt DB token">
-          <input type="password" autoComplete="new-password" className={inputCls} value={f.dbToken} onChange={(e) => setF({ ...f, dbToken: e.target.value })} />
-        </F>
-      </div>
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-      <div className="mt-4 flex gap-2">
-        <button type="submit" disabled={busy} className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-lime-300 disabled:opacity-50">
-          {busy ? "Provisioning…" : "Provision tenant"}
-        </button>
-        <button type="button" onClick={onDone} className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50">
-          Cancel
-        </button>
-      </div>
-    </form>
+    <Card as="div">
+      <form onSubmit={submit}>
+        <CardHeader
+          title="New tenant"
+          description="Recorded, resumable steps: Turso DB → schema → neutral defaults (nothing brand-flavored) → register → Free plan → onboarding record. A failed run shows below with Resume."
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Slug" htmlFor="nt-slug" required hint="lowercase, hyphens — becomes storeasy-t-<slug>">
+            <Input id="nt-slug" required value={f.id} onChange={(e) => setF({ ...f, id: e.target.value })} placeholder="acme" />
+          </Field>
+          <Field label="Display name" htmlFor="nt-name">
+            <Input id="nt-name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Acme Nutrition" />
+          </Field>
+          <Field label="Shopify store domain" htmlFor="nt-shop" required hint="x.myshopify.com">
+            <Input id="nt-shop" required value={f.shopDomain} onChange={(e) => setF({ ...f, shopDomain: e.target.value })} placeholder="acme.myshopify.com" />
+          </Field>
+          <Field label="Storefront domains" htmlFor="nt-domains" hint="comma-separated hosts">
+            <Input id="nt-domains" value={f.domains} onChange={(e) => setF({ ...f, domains: e.target.value })} placeholder="shop.acme.in" />
+          </Field>
+          <Field label="Shopify app client id" htmlFor="nt-client-id" hint="the tenant's custom-distribution app">
+            <Input id="nt-client-id" value={f.clientId} onChange={(e) => setF({ ...f, clientId: e.target.value })} />
+          </Field>
+          <Field label="Shopify app client secret" htmlFor="nt-client-secret">
+            <Input id="nt-client-secret" type="password" autoComplete="new-password" value={f.clientSecret} onChange={(e) => setF({ ...f, clientSecret: e.target.value })} />
+          </Field>
+          <Field label="Adopt existing DB url" htmlFor="nt-db-url" hint="optional — skips Turso create">
+            <Input id="nt-db-url" mono value={f.dbUrl} onChange={(e) => setF({ ...f, dbUrl: e.target.value })} placeholder="libsql://…" />
+          </Field>
+          <Field label="Adopt DB token" htmlFor="nt-db-token">
+            <Input id="nt-db-token" type="password" autoComplete="new-password" value={f.dbToken} onChange={(e) => setF({ ...f, dbToken: e.target.value })} />
+          </Field>
+        </div>
+        {error && (
+          <Banner tone="danger" className="mt-4">
+            {error}
+          </Banner>
+        )}
+        <div className="mt-4 flex gap-2">
+          <Button type="submit" variant="primary" busy={busy}>
+            Provision tenant
+          </Button>
+          <Button type="button" onClick={onDone} disabled={busy}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 
+const when = (s) => (s ? new Date(s).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "never");
+
 export default function PlatformAdmin() {
   const [tenants, setTenants] = useState(null);
+  const [loadErr, setLoadErr] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [rowMsg, setRowMsg] = useState({}); // id → text
+  const [rowErr, setRowErr] = useState({}); // id → persistent failure text
   const [detail, setDetail] = useState(null); // expanded tenant id (S41 / OP03)
+  const [syncing, setSyncing] = useState({}); // id → true while sync in flight
+  const [menuFor, setMenuFor] = useState(null); // tenant whose "More" menu is open
+  const [confirm, setConfirm] = useState(null); // { type, tenant } — suspend/activate/maintenance/offboard
+  const [maintMsg, setMaintMsg] = useState("");
   const router = useRouter();
+  const toast = useToast();
 
   async function refresh() {
-    const data = await fetch("/api/platform/tenants").then((r) => r.json()).catch(() => ({}));
-    if (data.ok) setTenants(data.tenants);
+    try {
+      const res = await fetch("/api/platform/tenants");
+      const data = await res.json().catch(() => ({}));
+      if (data.ok) {
+        setTenants(data.tenants);
+        setLoadErr(null);
+      } else setLoadErr(data.error || `Couldn't load tenants (${res.status})`);
+    } catch (e) {
+      setLoadErr(String(e?.message || e));
+    }
   }
   useEffect(() => {
     refresh();
   }, []);
 
-  const say = (id, text) => setRowMsg((m) => ({ ...m, [id]: text }));
+  const fail = (id, text) => setRowErr((m) => ({ ...m, [id]: text }));
+  const clearFail = (id) => setRowErr((m) => ({ ...m, [id]: null }));
 
   async function syncNow(id) {
-    say(id, "Syncing — can take a minute…");
+    setSyncing((s) => ({ ...s, [id]: true }));
+    clearFail(id);
     const data = await fetch(`/api/platform/tenants/${id}`, { method: "POST" }).then((r) => r.json()).catch(() => ({}));
-    say(id, data.ok ? `Synced ${data.products}p/${data.collections}c` : `Sync failed: ${data.error || "?"}`);
+    if (data.ok) toast.success(`${id}: synced ${data.products}p/${data.collections}c`);
+    else fail(id, `Sync failed: ${data.error || "?"}`);
+    setSyncing((s) => ({ ...s, [id]: false }));
     refresh();
   }
 
   async function setStatus(id, status) {
-    if (status === "suspended" && !window.confirm(`Suspend "${id}"? Its hosts fall back to the default store.`)) return;
     const data = await fetch(`/api/platform/tenants/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     }).then((r) => r.json()).catch(() => ({}));
-    say(id, data.ok ? `Now ${status}` : data.error || "Failed");
+    if (!data.ok) throw new Error(data.error || "Failed");
+    toast.success(`${id}: now ${status}`);
     refresh();
   }
 
   // S43 (OP12): maintenance — branded closed page for shoppers, console stays
   // reachable, checkout closes for everyone.
-  async function toggleMaintenance(t) {
-    const enabling = !t.maintenanceOn;
-    const message = enabling ? window.prompt(`Maintenance message shoppers will see on "${t.id}" (blank = default copy):`, "") : null;
-    if (enabling && message === null) return;
-    const data = await fetch(`/api/platform/tenants/${t.id}`, {
+  async function setMaintenance(id, enabling, message) {
+    const data = await fetch(`/api/platform/tenants/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ maintenance: enabling ? { enabled: true, message } : { enabled: false } }),
     }).then((r) => r.json()).catch(() => ({}));
-    say(t.id, data.ok ? (enabling ? "Maintenance ON — shoppers see the closed page" : "Maintenance off") : data.error || "Failed");
+    if (!data.ok) throw new Error(data.error || "Failed");
+    toast.success(enabling ? `${id}: maintenance ON — shoppers see the closed page` : `${id}: maintenance off`);
     refresh();
   }
 
   // S43 (BE29): expiring export link + staged offboarding.
   async function exportTenant(id) {
+    clearFail(id);
     const data = await fetch(`/api/platform/tenants/${id}/export`, { method: "POST" }).then((r) => r.json()).catch(() => ({}));
     if (data.ok) window.open(data.url, "_blank");
-    else say(id, data.error || "Export link failed");
+    else fail(id, data.error || "Export link failed");
   }
+
   async function offboard(id) {
-    const typed = window.prompt(`Offboard "${id}"? Suspends the store, revokes keys, cancels billing, purges platform-side queues. The database and export stay available.\n\nType the tenant id to confirm:`);
-    if (typed === null) return;
     const data = await fetch(`/api/platform/tenants/${id}/offboard`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ confirm: typed }),
+      body: JSON.stringify({ confirm: id }),
     }).then((r) => r.json()).catch(() => ({}));
-    say(id, data.ok ? `Offboarded: ${data.steps.join(" · ")}` : data.error || "Failed");
+    if (!data.ok) throw new Error(data.error || "Failed");
+    toast.success(`${id} offboarded: ${data.steps.join(" · ")}`);
     refresh();
   }
 
@@ -183,110 +228,273 @@ export default function PlatformAdmin() {
     router.refresh();
   }
 
-  const when = (s) => (s ? new Date(s).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "never");
+  const openMenuAction = (fn) => {
+    setMenuFor(null);
+    fn();
+  };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Storeasy platform</h1>
-          <p className="text-sm text-zinc-500">Tenants, onboarding, health.</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setCreating(true)} className="rounded-xl bg-lime-400 px-4 py-2 text-sm font-bold text-zinc-950 hover:bg-lime-300">
-            + New tenant
-          </button>
-          <button onClick={logout} className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50">
-            Sign out
-          </button>
+    <div className="min-h-screen pb-16">
+      {/* Sticky shell: title row + anchor nav */}
+      <div className="sticky top-0 z-30 border-b border-edge bg-surface shadow-card">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
+            <h1 className="text-lg font-semibold tracking-tight text-fg">Platform operations</h1>
+            <div className="flex items-center gap-2">
+              <Button variant="primary" size="sm" icon={<Plus size={13} aria-hidden />} onClick={() => setCreating(true)}>
+                New tenant
+              </Button>
+              <Button size="sm" icon={<LogOut size={13} aria-hidden />} onClick={logout}>
+                Sign out
+              </Button>
+            </div>
+          </div>
+          <nav aria-label="Console sections" className="mt-1 overflow-x-auto">
+            <div className="flex gap-0.5 pb-2">
+              {SECTIONS.map(([id, label]) => (
+                <a
+                  key={id}
+                  href={`#${id}`}
+                  className="whitespace-nowrap rounded-ctl px-2.5 py-1 text-xs font-medium text-fg-muted focus-ring hover:bg-surface-sunken hover:text-fg"
+                >
+                  {label}
+                </a>
+              ))}
+            </div>
+          </nav>
         </div>
       </div>
 
-      {creating && (
-        <div className="mt-6">
+      <main className="mx-auto max-w-6xl space-y-6 px-6 pt-6">
+        {creating && (
           <NewTenantForm
             onDone={() => {
               setCreating(false);
               refresh();
             }}
           />
-        </div>
-      )}
+        )}
 
-      <ul className="mt-6 space-y-3">
-        {tenants === null && <li className="text-sm text-zinc-500">Loading…</li>}
-        {tenants?.map((t) => {
-          const h = t.health || {};
-          return (
-            <li key={t.id} className={`rounded-2xl border p-4 ${t.status === "suspended" ? "border-zinc-200 opacity-60" : "border-zinc-200"}`}>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold">
-                    {t.name} <span className="font-mono text-xs font-normal text-zinc-400">{t.id}</span>
-                    <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold ${t.status === "active" ? "bg-lime-100 text-lime-700" : "bg-zinc-100 text-zinc-500"}`}>
-                      {t.status}
-                    </span>
-                    {h.uninstalledAt && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">APP UNINSTALLED</span>}
-                    {h.maintenance && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">MAINTENANCE</span>}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-zinc-500">
-                    {(t.domains || []).join(", ") || "no domains"} · {h.shopDomain || "no shop"} ·{" "}
-                    {h.reachable ? (
-                      <>
-                        {h.products} products · synced {when(h.lastSyncedAt)} · {h.ordersInFlight} order(s) in flight ·{" "}
-                        {h.shopifyConnected ? "Shopify ✓" : "Shopify not connected"}
-                      </>
-                    ) : (
-                      <span className="text-red-600">DB unreachable: {h.error}</span>
-                    )}
-                  </p>
+        {/* Tenant registry */}
+        <section id="tenants" aria-label="Tenants" className="scroll-mt-20 space-y-3">
+          {tenants === null && !loadErr && (
+            <Card>
+              <CardHeader title="Tenants" />
+              <SkeletonText lines={4} />
+            </Card>
+          )}
+          {loadErr && (
+            <Card>
+              <CardHeader title="Tenants" />
+              <ErrorState title="Couldn't load tenants" detail={loadErr} onRetry={refresh} />
+            </Card>
+          )}
+          {tenants && tenants.length === 0 && (
+            <Card>
+              <CardHeader title="Tenants" />
+              <EmptyState
+                title="No tenants yet"
+                body="Provision the first store to get started."
+                action={
+                  <Button size="sm" variant="primary" icon={<Plus size={13} aria-hidden />} onClick={() => setCreating(true)}>
+                    New tenant
+                  </Button>
+                }
+              />
+            </Card>
+          )}
+          {tenants?.map((t) => {
+            const h = t.health || {};
+            return (
+              <Card key={t.id} className={t.status === "suspended" ? "opacity-75" : ""}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fg">
+                      {t.name}
+                      <span className="font-mono text-xs font-normal text-fg-subtle">{t.id}</span>
+                      <StatusBadge status={t.status} />
+                      {h.uninstalledAt && <StatusBadge status="uninstalled" label="App uninstalled" />}
+                      {h.maintenance && <StatusBadge status="maintenance" />}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-fg-muted">
+                      {(t.domains || []).join(", ") || "no domains"} · {h.shopDomain || "no shop"} ·{" "}
+                      {h.reachable ? (
+                        <>
+                          {h.products} products · synced {when(h.lastSyncedAt)} · {h.ordersInFlight} order(s) in flight ·{" "}
+                          {h.shopifyConnected ? "Shopify connected" : "Shopify not connected"}
+                        </>
+                      ) : (
+                        <span className="text-danger">DB unreachable: {h.error}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <Button size="sm" onClick={() => setDetail(detail === t.id ? null : t.id)}>
+                      {detail === t.id ? "Hide details" : "Details"}
+                    </Button>
+                    <Button size="sm" busy={!!syncing[t.id]} onClick={() => syncNow(t.id)}>
+                      Sync
+                    </Button>
+                    <a
+                      href={`/api/connect/shopify/start?tenant=${t.id}`}
+                      className="inline-flex items-center gap-1.5 rounded-ctl border border-edge-strong bg-surface px-2.5 py-1.5 text-xs font-medium text-fg focus-ring hover:bg-surface-muted"
+                    >
+                      Connect Shopify
+                    </a>
+                    <Button
+                      size="sm"
+                      icon={<MoreHorizontal size={13} aria-hidden />}
+                      aria-haspopup="dialog"
+                      onClick={() => setMenuFor(t)}
+                    >
+                      More
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2 text-xs">
-                  <button onClick={() => setDetail(detail === t.id ? null : t.id)} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50">
-                    {detail === t.id ? "Hide" : "Details"}
-                  </button>
-                  <button onClick={() => syncNow(t.id)} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50">
-                    Sync
-                  </button>
-                  <a href={`/api/connect/shopify/start?tenant=${t.id}`} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50">
-                    Connect Shopify
-                  </a>
-                  <button onClick={() => toggleMaintenance({ id: t.id, maintenanceOn: h.maintenance })} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50">
-                    {h.maintenance ? "End maint." : "Maintenance"}
-                  </button>
-                  <button onClick={() => exportTenant(t.id)} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50">
-                    Export
-                  </button>
-                  <button onClick={() => offboard(t.id)} className="rounded-lg border border-red-200 px-2.5 py-1 font-semibold text-red-600 hover:bg-red-50">
-                    Offboard
-                  </button>
-                  {t.status === "active" ? (
-                    <button onClick={() => setStatus(t.id, "suspended")} className="rounded-lg border border-red-200 px-2.5 py-1 font-semibold text-red-600 hover:bg-red-50">
-                      Suspend
-                    </button>
-                  ) : (
-                    <button onClick={() => setStatus(t.id, "active")} className="rounded-lg border border-lime-300 px-2.5 py-1 font-semibold text-lime-700 hover:bg-lime-50">
-                      Activate
-                    </button>
-                  )}
-                </div>
-              </div>
-              {rowMsg[t.id] && <p className="mt-2 text-xs text-zinc-500">{rowMsg[t.id]}</p>}
-              {detail === t.id && <TenantDetail id={t.id} />}
-            </li>
-          );
-        })}
-      </ul>
-      <OverviewPanel />
-      <IncidentsPanel />
-      <PrivacyOpsPanel />
-      <ProvisionRunsPanel />
-      <ThemesPanel />
-      <BillingPanel />
-      <FlagsPanel />
-      <CostsPanel />
-      <PartnersPanel />
-      <QueuesPanel />
+                {rowErr[t.id] && (
+                  <Banner
+                    tone="danger"
+                    className="mt-3"
+                    actions={
+                      <Button size="sm" onClick={() => clearFail(t.id)}>
+                        Dismiss
+                      </Button>
+                    }
+                  >
+                    {rowErr[t.id]}
+                  </Banner>
+                )}
+                {detail === t.id && <TenantDetail id={t.id} />}
+              </Card>
+            );
+          })}
+        </section>
+
+        <OverviewPanel />
+        <IncidentsPanel />
+        <PrivacyOpsPanel />
+        <ProvisionRunsPanel />
+        <ThemesPanel />
+        <BillingPanel />
+        <FlagsPanel />
+        <CostsPanel />
+        <PartnersPanel />
+        <QueuesPanel />
+      </main>
+
+      {/* "More" overflow menu — native dialog gives keyboard/focus handling */}
+      <Dialog open={!!menuFor} onClose={() => setMenuFor(null)} title={menuFor ? `More actions — ${menuFor.id}` : ""} size="sm">
+        {menuFor && (
+          <div className="flex flex-col gap-2">
+            <Button icon={<Download size={13} aria-hidden />} onClick={() => openMenuAction(() => exportTenant(menuFor.id))}>
+              Export data
+            </Button>
+            <Button
+              icon={<Wrench size={13} aria-hidden />}
+              onClick={() =>
+                openMenuAction(() => {
+                  setMaintMsg("");
+                  setConfirm({ type: "maintenance", tenant: menuFor, enabling: !menuFor.health?.maintenance });
+                })
+              }
+            >
+              {menuFor.health?.maintenance ? "End maintenance…" : "Maintenance…"}
+            </Button>
+            {menuFor.status === "active" ? (
+              <Button variant="dangerOutline" onClick={() => openMenuAction(() => setConfirm({ type: "suspend", tenant: menuFor }))}>
+                Suspend…
+              </Button>
+            ) : (
+              <Button onClick={() => openMenuAction(() => setConfirm({ type: "activate", tenant: menuFor }))}>Activate…</Button>
+            )}
+            <Button variant="dangerOutline" onClick={() => openMenuAction(() => setConfirm({ type: "offboard", tenant: menuFor }))}>
+              Offboard…
+            </Button>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Suspend / Activate */}
+      <ConfirmDialog
+        open={confirm?.type === "suspend"}
+        onClose={() => setConfirm(null)}
+        title={`Suspend “${confirm?.tenant?.id}”?`}
+        tone="danger"
+        confirmLabel="Suspend"
+        body="Its hosts fall back to the default store until it's activated again."
+        onConfirm={() => setStatus(confirm.tenant.id, "suspended")}
+      />
+      <ConfirmDialog
+        open={confirm?.type === "activate"}
+        onClose={() => setConfirm(null)}
+        title={`Activate “${confirm?.tenant?.id}”?`}
+        confirmLabel="Activate"
+        body="The store serves again on its configured domains."
+        onConfirm={() => setStatus(confirm.tenant.id, "active")}
+      />
+
+      {/* Maintenance (dialog replaces the old prompt flow) */}
+      <Dialog
+        open={confirm?.type === "maintenance"}
+        onClose={() => setConfirm(null)}
+        title={confirm?.enabling ? `Enable maintenance on “${confirm?.tenant?.id}”` : `End maintenance on “${confirm?.tenant?.id}”`}
+        footer={
+          <>
+            <Button onClick={() => setConfirm(null)}>Cancel</Button>
+            <MaintenanceConfirmButton
+              enabling={!!confirm?.enabling}
+              onConfirm={async () => {
+                await setMaintenance(confirm.tenant.id, confirm.enabling, confirm.enabling ? maintMsg : null);
+                setConfirm(null);
+              }}
+            />
+          </>
+        }
+      >
+        {confirm?.enabling ? (
+          <Field label="Maintenance message shoppers will see" htmlFor="maint-msg" hint="Blank = default copy. The console stays reachable; checkout closes for everyone.">
+            <Textarea id="maint-msg" value={maintMsg} onChange={(e) => setMaintMsg(e.target.value)} placeholder="We're down for a short maintenance window…" autoFocus />
+          </Field>
+        ) : (
+          <p>Shoppers see the live store again and checkout reopens.</p>
+        )}
+      </Dialog>
+
+      {/* Offboard (replaces prompt-the-id) */}
+      <DangerDialog
+        open={confirm?.type === "offboard"}
+        onClose={() => setConfirm(null)}
+        title={`Offboard “${confirm?.tenant?.id}”?`}
+        confirmLabel="Offboard"
+        typedConfirmation={confirm?.tenant?.id}
+        body="Suspends the store, revokes keys, cancels billing, purges platform-side queues. The database and export stay available."
+        onConfirm={() => offboard(confirm.tenant.id)}
+      />
     </div>
+  );
+}
+
+// The maintenance dialog is a plain Dialog (it carries a form), so its
+// confirm button owns the in-flight state the way ConfirmDialog does.
+function MaintenanceConfirmButton({ enabling, onConfirm }) {
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  return (
+    <Button
+      variant="primary"
+      busy={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await onConfirm();
+        } catch (e) {
+          toast.error(String(e?.message || e));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {enabling ? "Enable maintenance" : "End maintenance"}
+    </Button>
   );
 }

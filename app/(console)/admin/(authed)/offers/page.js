@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { listOffers } from "@/lib/offers/store";
-import { siteName } from "@/lib/site";
 import OffersAdmin from "@/components/admin/OffersAdmin";
 import { tfetch } from "@/lib/tenant-request";
 
@@ -15,10 +14,8 @@ export default async function AdminOffersPage() {
   // active support grant (support role — read-only, PII-redacted).
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
-  const [offers, name] = await tfetch(async () => [await listOffers(), siteName()]);
-  return (
-    <>
-      <OffersAdmin initialOffers={offers} />
-    </>
-  );
+  const offers = await tfetch(() => listOffers());
+  // PageHeader renders inside OffersAdmin: the "New offer" action needs client
+  // state, and OfferForm swaps the whole view (breadcrumb header included).
+  return <OffersAdmin initialOffers={offers} />;
 }
