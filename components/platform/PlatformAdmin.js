@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import QueuesPanel from "./QueuesPanel";
 import ThemesPanel from "./ThemesPanel";
 import BillingPanel from "./BillingPanel";
+import ProvisionRunsPanel from "./ProvisionRunsPanel";
+import TenantDetail from "./TenantDetail";
 
 // Operator console (Session 22): tenant table + health, suspend/activate,
 // per-tenant sync, Shopify connect links, and the provisioning wizard.
@@ -61,7 +63,9 @@ function NewTenantForm({ onDone }) {
   return (
     <form onSubmit={submit} className="rounded-2xl border border-zinc-200 p-5">
       <h3 className="text-sm font-bold">New tenant</h3>
-      <p className="mt-0.5 text-xs text-zinc-500">Creates its Turso DB, applies the schema, seeds default offers.</p>
+      <p className="mt-0.5 text-xs text-zinc-500">
+        Recorded, resumable steps: Turso DB → schema → neutral defaults (nothing brand-flavored) → register → Free plan → onboarding record. A failed run shows below with Resume.
+      </p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <F label="Slug" hint="lowercase, hyphens — becomes storeasy-t-<slug>">
           <input className={inputCls} required value={f.id} onChange={(e) => setF({ ...f, id: e.target.value })} placeholder="acme" />
@@ -105,6 +109,7 @@ export default function PlatformAdmin() {
   const [tenants, setTenants] = useState(null);
   const [creating, setCreating] = useState(false);
   const [rowMsg, setRowMsg] = useState({}); // id → text
+  const [detail, setDetail] = useState(null); // expanded tenant id (S41 / OP03)
   const router = useRouter();
 
   async function refresh() {
@@ -198,6 +203,9 @@ export default function PlatformAdmin() {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs">
+                  <button onClick={() => setDetail(detail === t.id ? null : t.id)} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50">
+                    {detail === t.id ? "Hide" : "Details"}
+                  </button>
                   <button onClick={() => syncNow(t.id)} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50">
                     Sync
                   </button>
@@ -216,10 +224,12 @@ export default function PlatformAdmin() {
                 </div>
               </div>
               {rowMsg[t.id] && <p className="mt-2 text-xs text-zinc-500">{rowMsg[t.id]}</p>}
+              {detail === t.id && <TenantDetail id={t.id} />}
             </li>
           );
         })}
       </ul>
+      <ProvisionRunsPanel />
       <ThemesPanel />
       <BillingPanel />
       <QueuesPanel />

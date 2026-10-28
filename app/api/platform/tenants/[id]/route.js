@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 import { sameOrigin } from "@/lib/origin-check";
-import { patchTenant, getTenant } from "@/lib/platform/control.js";
+import { patchTenant, getTenant, platformDb } from "@/lib/platform/control.js";
 import { audit } from "@/lib/platform/audit";
 import { syncTenantCatalog } from "@/lib/sync.js";
+import { withTenant } from "@/lib/tenant-context.js";
 import { slog } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -11,6 +12,54 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+// GET — tenant DETAIL (S41 / OP03): lifecycle, config summary, secrets as a
+// PRESENCE MAP (which keys exist — values never leave the envelope), billing
+// snapshot, onboarding progress, provisioning history.
+export async function GET(request, { params }) {
+  if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
+  const { id } = await params;
+  const tenant = await getTenant(id);
+  if (!tenant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const secretsPresent = Object.fromEntries(Object.keys(tenant.secrets || {}).map((k) => [k, true]));
+  const runs = (
+    await platformDb().execute({ sql: "SELECT id, status, steps, error, created_at FROM provision_runs WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 10", args: [id] })
+  ).rows.map((r) => {
+    let steps = [];
+    try {
+      steps = JSON.parse(r.steps || "[]").map((s) => ({ name: s.name, status: s.status }));
+    } catch { /* malformed */ }
+    return { id: r.id, status: r.status, steps, error: r.error, created_at: r.created_at };
+  });
+  let onboarding = null;
+  try {
+    const { buildChecklist } = await import("@/lib/admin/onboarding.js");
+    onboarding = await withTenant(tenant, buildChecklist);
+  } catch { /* tenant db unreachable */ }
+
+  return NextResponse.json({
+    ok: true,
+    tenant: {
+      id: tenant.id,
+      name: tenant.name,
+      status: tenant.status,
+      domains: tenant.domains || [],
+      config: {
+        shop_domain: tenant.config?.shopify_store_domain || null,
+        site_name: tenant.config?.site?.name || null,
+        support_email: tenant.config?.site?.support_email || null,
+        checkout_mode: tenant.config?.checkout_mode || "direct",
+        theme: tenant.config?.theme || null,
+        billing: tenant.config?.billing || null,
+        onboarding_manual: tenant.config?.onboarding?.manual || {},
+      },
+      secretsPresent,
+    },
+    onboarding: onboarding && onboarding.supported ? { doneCount: onboarding.doneCount, total: onboarding.total, launched: onboarding.launched, items: onboarding.items.map((i) => ({ id: i.id, done: i.done })) } : null,
+    runs,
+  });
+}
 
 // PATCH {status} — suspend/reactivate a tenant. S25: suspended hosts FAIL
 // CLOSED (neutral "temporarily unavailable", 503 on APIs) — see resolveHost.

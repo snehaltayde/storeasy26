@@ -345,7 +345,7 @@ too. -->
 
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
-Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Brand · Releases · Upsells · Integrations · Billing · Settings**.
+Navigation: **Setup · Offers · Orders · Storefront · Catalog · Media · Theme · Brand · Releases · Upsells · Integrations · Billing · Settings** (+ the store switcher for multi-store users).
 
 #### Login
 - **Use** (S26): `<tenant-host>/admin` → `/admin/login`; sign in with your EMAIL +
@@ -667,10 +667,21 @@ Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Bra
   `PlatformLogin.js`, `app/api/platform/*`,
   [lib/platform/admin-auth.js](../lib/platform/admin-auth.js).
 
-#### Tenant provisioning
-- **What**: end-to-end tenant creation — Turso database (`storeasy-t-<slug>`),
-  commerce schema, default offer seed, generated admin password + order-link secret,
-  control-plane registration.
+#### Tenant provisioning (reworked S41 / BE26)
+- **What**: end-to-end tenant creation as RECORDED, RESUMABLE, IDEMPOTENT
+  steps: `create_db → apply_schema → seed_defaults → register_tenant →
+  init_billing → record_onboarding`. Every attempt is a `provision_runs` row
+  (step states + non-secret resource refs — generated passwords and db
+  tokens are NEVER stored there). A failed run resumes from the `/platform`
+  Provisioning-runs panel: done steps are skipped and each step checks REAL
+  state first, so retries never duplicate a resource or rotate secrets.
+  Compensation (roll back a FAILED run) is conservative: it deregisters a
+  tenant the run created and removes its Free subscription, but NEVER
+  deletes a Turso database — that stays a manual operator action.
+  **Neutral seeds (quirk #14 closed)**: nothing brand-flavored is seeded —
+  offers start EMPTY; cms/page/brand defaults derive neutrally at render.
+  New tenants start on the **Free plan** (explicit billing activation is
+  still an MC02 checklist item — Free counts) with an onboarding record.
 - **Use**:
   ```bash
   pnpm tenant:provision <slug> --shop <x.myshopify.com> --name "Store" \
@@ -681,8 +692,31 @@ Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Bra
 - **Setup**: operator's `turso auth login` (provisioning shells out to the CLI — no
   standing API token on disk); set `TURSO_API_TOKEN`+`TURSO_ORG` to use the Platform
   HTTP API instead (CI). App creds default from env for the shared-dev-store flow.
-- **Files**: [lib/platform/provision.js](../lib/platform/provision.js),
-  `scripts/provision-tenant.js`.
+- **Files**: [lib/platform/provision.js](../lib/platform/provision.js)
+  (`runProvision`/`compensateProvision`), `scripts/provision-tenant.js`,
+  `app/api/platform/provisions/route.js`,
+  `components/platform/ProvisionRunsPanel.js`, migration
+  `migrations/platform/0006_provision_runs.sql`.
+
+#### Setup tab & onboarding (S41 / MC02 + MC03)
+- **What**: `/admin/setup` — the merchant's path to launch: connect →
+  catalog → theme/brand → legal pages → billing → domain → preview → test
+  order → launch. Resumable by construction: the first six DERIVE from real
+  state (token present, product count, brand/theme set, privacy+terms pages
+  enabled, billing snapshot, a real domain), only the last three are stored
+  check-offs, and **Launch stays gated (server-enforced) until everything
+  above it is done**. The **store switcher** (header dropdown, MC03) appears
+  when the signed-in user has VERIFIED memberships in 2+ active stores and
+  navigates to each store's own console host — sessions stay tenant-bound.
+- **Operator (OP03/OP04)**: each `/platform` tenant row expands into a
+  detail view — config summary, credentials as a PRESENCE map (values never
+  leave the envelope), billing snapshot, onboarding progress, provisioning
+  history; the Provisioning-runs panel carries Resume/Roll-back for failed
+  runs.
+- **Files**: [lib/admin/onboarding.js](../lib/admin/onboarding.js),
+  `app/admin/setup/`, `app/api/admin/setup/`, `app/api/admin/stores/`,
+  `components/admin/SetupAdmin.js`, `components/admin/StoreSwitcher.js`,
+  `components/platform/TenantDetail.js`.
 
 #### Shopify OAuth connect
 - **What**: the web install flow that stores a tenant's permanent Admin token —
@@ -789,7 +823,7 @@ Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Bra
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 27 aliased suites, **351 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 28 aliased suites, **360 tests**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -848,9 +882,13 @@ Navigation: **Offers · Orders · Storefront · Catalog · Media · Theme · Bra
   watermark, grace→degraded clocks + recovery, terminal-state protection,
   orphan-event exceptions, pinned-version entitlements, override
   precedence/expiry, degraded-pauses-checkout-only, idempotent usage + 80%
-  quota warnings, MRR).
+  quota warnings, MRR) · provision 9 (S41: failed-run step records, resume
+  completes only the tail with no duplicate resources/secret rotation,
+  neutral seeds, force-refusal, conservative compensation incl. never-delete-
+  db + done-run refusal, derived checklist + server-gated launch, verified-
+  membership switcher query).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **372 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **381 checks in all**) and `pnpm build` as the compile gate.
 
 ### 2F. Known quirks & follow-ups
 
@@ -912,10 +950,10 @@ multi-tenant payments go live. Severity-ordered:
     to `OAUTH_SCOPES` (and the legacy script's list) with a suite assertion.
     Tokens minted from now on carry it; tenants connected before this need a
     re-auth through the connect flow to gain the scope.
-14. **New tenants are seeded with BeastLife's offers** — `applyTenantSchema` seeds
-    the six `lib/offers/config.js` entries (BeastLife handles/tags/gift gid) into
-    every fresh tenant DB. Harmless (targets won't match a different catalog) but
-    the merchant should edit/delete them during onboarding.
+14. ~~**New tenants are seeded with BeastLife's offers**~~ — **FIXED (S41 /
+    BE26)**: provisioning is neutral (offers start empty); the brand seed is
+    opt-in (`seedBrandOffers`) and only the BeastLife/env store's own
+    `pnpm migrate` path uses it.
 15. **`runSyncSweep`'s `dead[]` can under-report** — the scan loop breaks once the
     push limit is reached, so dead orders sorted after the break point miss that
     sweep's digest. `/api/health`'s dead count is computed separately and complete.
@@ -1663,3 +1701,4 @@ run the verify checklist.
 | S38 | 389a0d1 | W3: media pipeline + library (tenant-DB blobs, magic-byte + SVG sanitize, dedupe, usage-guarded delete), typed/policy pages + BeastLife-defaults containment + checkout policy links, curated collections index, collection sort/filters, PDP extras + sticky CTA + invalid-variant states, SQL search decision + ranking + recents (BE15+MC12+SF13+SF14+SF01–05+BE05) |
 | S39 | ed34439 | W3 EXIT: BE23 notification service (durable intents, honest states, consent separation) + contact form/inbox, FAQ accordions w/ deep links, campaign landing pages (UTC windows, utm retention), catalog browser w/ per-product modules + pinned collections, nested nav + real footer links, upsell quirk fix (SF15–17+MC05+MC06+MC11+MC15+BE23) |
 | S40 | 3b114ef | W4 opens: billing & entitlements — versioned plan catalog, Razorpay Subscriptions lifecycle (HMAC webhook → inbox → jobs; dedupe, out-of-order watermark, terminal protection), signed-amount ledger, grace→degraded (checkout pauses, store never dies), quotas w/ 80% warnings, MC24 billing tab, OP08 operator reconciliation + overrides (BE11+BE33+MC24+OP08) |
+| S41 | (this session) | W4: provisioning as recorded/resumable/idempotent steps w/ conservative compensation + NEUTRAL seeds (quirk #14 closed; new tenants start on Free), Setup tab onboarding checklist (derived + server-gated launch), store switcher (verified memberships), operator tenant detail (presence-only creds) + provisioning-runs panel (BE26+MC02+MC03+OP03+OP04) |

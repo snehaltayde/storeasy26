@@ -5,10 +5,10 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S40 (W1+W2+W3 complete; W4 underway).
+- Created: 2026-10-28 (session S25). Last updated: S41 (W1+W2+W3 complete; W4 underway).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 64 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 69 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
@@ -16,9 +16,9 @@ by a code audit or implementation in this repo — never by documentation alone.
   OP10 — S34; BE08, MC10 — S35; BE09, MC13 — S36, with SF23 completed;
   MC07, MC08, MC09, OP07 — S37; SF01–05, SF13, SF14, BE05, BE15,
   MC12 — S38; SF15, SF16, SF17, MC05, MC06, MC11, MC15, BE23 — S39;
-  BE11, BE33, MC24, OP08 — S40). The other 52 are **not inspected** — the
-  handoff's Fix/Extend/New labels for them remain unverified documentation
-  claims.
+  BE11, BE33, MC24, OP08 — S40; BE26, MC02, MC03, OP03, OP04 — S41). The
+  other 47 are **not inspected** — the handoff's Fix/Extend/New labels for
+  them remain unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -1033,6 +1033,58 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   audited, optional expiry). Merchant-order revenue reconciliation (the
   storefront side) is BE21/S42 — this view is the SUBSCRIPTION ledger.
 
+### BE26 — Provisioning orchestration · **verified complete (S41, current scope)**
+
+- runProvision: recorded steps (provision_runs rows — step states +
+  NON-SECRET refs only; passwords/db tokens never persisted), resume skips
+  done steps and each step verifies REAL state (no duplicate resources, no
+  secret rotation — suite-proven by password equality across resume), db
+  tokens re-minted on resume when lost (they're memory-only). Compensation
+  is conservative: deregisters a run-created tenant (via cache-busting
+  deleteTenant) + removes its Free subscription; NEVER deletes a database
+  (left-in-place note recorded); done runs refuse compensation (offboarding
+  = BE29/S43). **Neutral seeds — quirk #14 closed**: zero offers seeded;
+  brand seed is opt-in for the BeastLife/env store only. New tenants start
+  on the Free plan + an onboarding record. Live-drilled against the HOSTED
+  control plane: fail-at-billing → resume → done → cleaned.
+- Remaining (recorded): provisioning stays a synchronous recorded run (fits
+  Vercel's 60s window today); moving steps onto the jobs queue is a scale
+  follow-up, not a W4 need.
+
+### MC02 — Onboarding checklist · **verified complete (S41)**
+
+- /admin/setup: connect → catalog → brand → policies → billing → domain →
+  preview → test order → launch. The first six DERIVE from real state (a
+  reopened checklist can never lie); preview/test-order/launch are stored
+  check-offs; **launch is server-gated** until everything above is done and
+  stamps launched_at. Billing activation is its own explicit item (Free
+  counts). Live: demo derives 5/9 honestly (connect/catalog/brand/policies/
+  billing ✓, domain pending on localhost hosts, launch gated).
+
+### MC03 — Store switcher · **verified complete (S41)**
+
+- Header dropdown fed by /api/admin/stores: VERIFIED memberships only
+  (control-plane rows for the signed-in user), active tenants only,
+  bootstrap/legacy sessions get none. Switching navigates to the target
+  store's own console host — admin sessions stay tenant-bound, nothing is
+  shared across stores.
+
+### OP03 — Tenant registry & detail · **verified complete (S41, detail scope)**
+
+- Each /platform tenant row expands into GET /api/platform/tenants/[id]:
+  lifecycle status, config summary (shop/site/checkout/theme), credentials
+  as a PRESENCE MAP (values never leave the encrypted envelope), billing
+  snapshot, onboarding progress (computed in-tenant, unreachable-DB safe),
+  provisioning history. Lifecycle workflows = existing suspend/activate +
+  the new provisioning resume/compensate; richer flows (offboard) are BE29.
+
+### OP04 — Provisioning jobs UI · **verified complete (S41)**
+
+- /platform Provisioning-runs panel: per-step chips with failure details,
+  Resume (idempotent tail re-run; surfaces a once-only generated password
+  when registration happens on resume), conservative Roll-back with
+  confirm. Done runs are history, not buttons.
+
 ## W3 EXIT (recorded S39, 2026-10-28)
 
 Exit evidence per the handoff ("tenant-specific pages from releases; no
@@ -1053,6 +1105,22 @@ draft/live leakage; publish + rollback demonstrated"):
 - Deliberate scope notes carried into W4: catalog presentation overrides +
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S41, 2026-10-28)
+
+28 suites / **360 tests + 21 offers = 381 checks** green (new
+`test:provision`, 9; test-platform-sync updated for neutral-by-default
+seeding), `pnpm build` clean. Platform migration 0006 applied to the hosted
+control plane. Live: provisioning drill AGAINST THE HOSTED control plane
+(throwaway tenant, adopted local db) — fail-at-init_billing → run recorded
+with the tail pending → resume → done with all six steps, Free sub active,
+onboarding record written, ZERO offers in the fresh tenant (quirk #14
+verified closed) → drill tenant/sub/runs fully cleaned from the control
+plane. Demo checklist derived live: 5/9 (connect/catalog/brand/policies/
+billing ✓ from prior sessions' real state; domain honest-pending on
+localhost hosts; launch gated). Shopper regression: beastlife + demo home
+200. Console UI walkthrough (Setup tab, switcher, platform panels) remains
+the standing user action (no demo login account by policy).
 
 ## Verification state (S40, 2026-10-28)
 
@@ -1271,7 +1339,7 @@ shopify-push 13, hardening 11, offers-admin 8, events 16, tenancy 9, platform-sy
 
 ## Other records
 
-All remaining 52 records: **not inspected** (states will change only with code
+All remaining 47 records: **not inspected** (states will change only with code
 audits/implementation in their scheduled sessions; see roadmap phases S26–S49).
 Incidental observations made during the S25 audits, recorded WITHOUT claiming a full
 audit of those records:

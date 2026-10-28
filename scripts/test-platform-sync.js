@@ -242,16 +242,20 @@ await t("applyWebhook routes topics; unknown topics are declared unhandled", asy
 });
 
 // --- provisioning bootstrap -----------------------------------------------------
-await t("applyTenantSchema: commerce tables + offers seeded, idempotent", async () => {
+await t("applyTenantSchema: commerce tables; NEUTRAL by default, brand seed opt-in (S41)", async () => {
   const client = createClient({ url: "file:.test-psync-prov.db" });
+  // S41 (quirk #14 closed): a fresh tenant gets NO BeastLife offers
   const first = await applyTenantSchema(client);
-  ok(first.seededOffers > 0, "offers seeded on fresh DB");
+  eq(first.seededOffers, 0, "neutral: nothing seeded on a fresh tenant");
   const tables = await client.execute("SELECT name FROM sqlite_master WHERE type='table'");
   const names = new Set(tables.rows.map((r) => r.name));
   for (const want of ["products", "variants", "collections", "collection_products", "orders", "offers", "events"]) {
     ok(names.has(want), `table ${want} exists`);
   }
-  const again = await applyTenantSchema(client);
+  // the BeastLife/env store's own bootstrap still seeds, explicitly
+  const brand = await applyTenantSchema(client, { seedBrandOffers: true });
+  ok(brand.seededOffers > 0, "brand seed is opt-in");
+  const again = await applyTenantSchema(client, { seedBrandOffers: true });
   eq(again.seededOffers, 0, "second run seeds nothing (INSERT OR IGNORE)");
   client.close?.();
 });

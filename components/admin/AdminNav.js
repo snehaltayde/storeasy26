@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import StoreSwitcher from "./StoreSwitcher";
 
 const TABS = [
+  { href: "/admin/setup", label: "Setup" },
   { href: "/admin/offers", label: "Offers" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/storefront", label: "Storefront" },
@@ -43,9 +45,12 @@ export default function AdminNav({ storeName }) {
           {t.label}
         </Link>
       ))}
-      <button onClick={logout} className="ml-auto text-sm text-zinc-400 hover:text-zinc-700">
-        Sign out
-      </button>
+      <span className="ml-auto flex items-center gap-3">
+        <StoreSwitcher />
+        <button onClick={logout} className="text-sm text-zinc-400 hover:text-zinc-700">
+          Sign out
+        </button>
+      </span>
     </div>
   );
 }
