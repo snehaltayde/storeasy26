@@ -18,7 +18,7 @@ export async function POST(request) {
   if (!platformConfigured()) return NextResponse.json({ error: "platform mode required" }, { status: 503 });
   const rawBody = await request.text();
   const signature = request.headers.get("x-razorpay-signature") || "";
-  const hmacOk = verifyBillingWebhookSignature(rawBody, signature);
+  const hmacOk = await verifyBillingWebhookSignature(rawBody, signature);
   if (!hmacOk) {
     slog("billing_webhook_rejected", { reason: "bad signature" });
     return NextResponse.json({ error: "invalid signature" }, { status: 401 });

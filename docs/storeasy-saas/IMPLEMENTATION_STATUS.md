@@ -5,10 +5,10 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S41 (W1+W2+W3 complete; W4 underway).
+- Created: 2026-10-28 (session S25). Last updated: S42 (W1+W2+W3 complete; W4 underway).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 69 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 75 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
@@ -16,9 +16,10 @@ by a code audit or implementation in this repo — never by documentation alone.
   OP10 — S34; BE08, MC10 — S35; BE09, MC13 — S36, with SF23 completed;
   MC07, MC08, MC09, OP07 — S37; SF01–05, SF13, SF14, BE05, BE15,
   MC12 — S38; SF15, SF16, SF17, MC05, MC06, MC11, MC15, BE23 — S39;
-  BE11, BE33, MC24, OP08 — S40; BE26, MC02, MC03, OP03, OP04 — S41). The
-  other 47 are **not inspected** — the handoff's Fix/Extend/New labels for
-  them remain unverified documentation claims.
+  BE11, BE33, MC24, OP08 — S40; BE26, MC02, MC03, OP03, OP04 — S41;
+  BE21, MC04, MC17, OP02, OP06, BE35 — S42). The other 41 are **not
+  inspected** — the handoff's Fix/Extend/New labels for them remain
+  unverified documentation claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -1085,6 +1086,67 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   when registration happens on resume), conservative Roll-back with
   confirm. Done runs are history, not buttons.
 
+### BE21 — Reporting rollups · **partial (core implemented & verified, S42)**
+
+- lib/reporting.js: sales from the orders ledger (sale statuses = money
+  committed), refunds from the S31 provider-mirrored projection, day buckets
+  in the MERCHANT timezone (suite proves 19:00 UTC lands on the next IST
+  day); freshness watermarks; coverage (% pushed to Shopify, % of sales the
+  consented event stream sees); discrepancy queue (dead pushes, stuck
+  pushes, refund mismatches — each with an action). Honest unknowns: nulls
+  with reasons, never fake zeros. Live on beastlife's real data: 120d = 15
+  orders / ₹1,01,070 net; the queue surfaced the 9 known dead pushes.
+- Remaining (recorded): a true order-by-order reconcile AGAINST Shopify's
+  API (ours reconciles against the webhook-mirrored projection); MRR
+  movement classification (new/churn/expansion) — the ledger has the data,
+  the rollup lands when there are real subscriptions to classify.
+
+### MC04 — Merchant dashboard · **verified complete (S42)**
+
+- /admin/dashboard is the console landing page: today/7d/30d net + orders +
+  AOV, freshness + coverage chips, needs-attention queue (discrepancies w/
+  actions, failed contact deliveries, unfinished setup), 30-day bar chart.
+  Unknown renders as "unknown"/null copy, never 0.
+
+### MC17 — Analytics tab · **verified complete (S42, current event scope)**
+
+- Funnel (consent-badged), top products (order snapshots — not consent-
+  limited, says so), search terms with zero-result flags, campaigns by
+  utm_source, coarse device split; definitions under every card; CSV
+  exports are aggregated rows only. Small-sample effects are visible by
+  design (directional label) — e.g. 2 purchases over 1 view reads >100%
+  conversion on a near-empty window rather than being massaged.
+
+### OP02 — Platform overview · **verified complete (S42)**
+
+- /platform Fleet panel: active/suspended counts, 30d GMV + orders summed
+  over REACHABLE active tenants with uncovered tenants LISTED (never a
+  silent zero), MRR. Backed by /api/platform/overview.
+
+### OP06 — Fleet releases & migrations · **verified complete (S42, current scale)**
+
+- Same panel: per tenant (suspended included) the migration-ledger head vs
+  the repo head (BEHIND flagged), live release hash + date (pre-first-
+  publish honest), theme kit pin. **Canary rollouts**:
+  `pnpm tenant:migrate -- --all --canary <slug>` migrates the canary FIRST
+  and a canary failure aborts the rollout with the rest untouched; unknown
+  canary refused (both live-verified). Cohorts beyond one canary + an
+  operator-triggered rollout UI are recorded for real fleet scale.
+
+### BE35 — Performance & scale · **partial (budgets + fixtures, S42)**
+
+- `pnpm test:perf`: 5,000-product / 120-collection fixture; budget-asserted
+  hot paths (PDP, collection sort+facets+filters, multi-term search, home),
+  offers on a 20-line cart, 50-page snapshot+hash, queue drain throughput,
+  noisy-neighbor search. S42 measured (local SQLite): all storefront paths
+  ≤2ms p50, snapshot 0.6ms, drain ~2,400 jobs/s — headroom is 2–3 orders of
+  magnitude inside budgets that exist to catch lost indexes/N+1s.
+- Measurement honesty (recorded): single-process harness — the noisy-
+  neighbor check interleaves on one event loop, so it proves file-level DB
+  isolation, not true concurrent-I/O contention; hosted-Turso network
+  latency dominates production and isn't modeled here. HTTP-level load
+  (concurrent render paths) not measured — revisit before checkpoint C.
+
 ## W3 EXIT (recorded S39, 2026-10-28)
 
 Exit evidence per the handoff ("tenant-specific pages from releases; no
@@ -1105,6 +1167,24 @@ draft/live leakage; publish + rollback demonstrated"):
 - Deliberate scope notes carried into W4: catalog presentation overrides +
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S42, 2026-10-28)
+
+30 aliased suites / **366 tests + 10 perf budgets + 21 offers = 397 checks**
+green (new `test:reporting` 6 + `test:perf` 10), `pnpm build` clean (back to
+the single known NFT warning — an S40 edge-bundle leak of node:crypto
+through billing.js/razorpay-billing.js surfaced in this session's clean
+build and was fixed: Web-Crypto HMAC + lazy provider import; billing +
+security suites re-green). No new migrations (reporting is read-only).
+Live: BE21 against beastlife's REAL hosted data (120d: 15 orders,
+₹1,01,070 net, TZ Asia/Kolkata; discrepancy queue = exactly the 9 known
+dead pushes; coverage honest nulls on the empty 30d window); fleet view:
+all 3 tenants at migration head 0009 "current ✓", demo release 89b985a4 on
+glow-1, beastlife pre-first-publish on pulse-1; canary rollout live (demo
+first, then fleet; unknown canary exit 1). /admin now 307s to /admin/
+dashboard; shopper regression beastlife+demo 200. Perf report (BE35)
+measured set recorded above. Authenticated dashboard/analytics UI
+walkthrough remains the standing user action.
 
 ## Verification state (S41, 2026-10-28)
 
@@ -1339,7 +1419,7 @@ shopify-push 13, hardening 11, offers-admin 8, events 16, tenancy 9, platform-sy
 
 ## Other records
 
-All remaining 47 records: **not inspected** (states will change only with code
+All remaining 41 records: **not inspected** (states will change only with code
 audits/implementation in their scheduled sessions; see roadmap phases S26–S49).
 Incidental observations made during the S25 audits, recorded WITHOUT claiming a full
 audit of those records:

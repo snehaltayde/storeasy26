@@ -5,7 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import StoreSwitcher from "./StoreSwitcher";
 
 const TABS = [
+  { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/setup", label: "Setup" },
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/offers", label: "Offers" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/storefront", label: "Storefront" },
@@ -32,7 +34,7 @@ export default function AdminNav({ storeName }) {
   }
 
   return (
-    <div className="mx-auto mb-2 flex max-w-4xl items-center gap-1 px-4 pt-8 sm:px-6">
+    <div className="no-scrollbar mx-auto mb-2 flex max-w-4xl items-center gap-1 overflow-x-auto whitespace-nowrap px-4 pt-8 sm:px-6">
       <span className="mr-3 text-sm font-bold">{storeName} admin</span>
       {TABS.map((t) => (
         <Link

@@ -345,7 +345,7 @@ too. -->
 
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
-Navigation: **Setup · Offers · Orders · Storefront · Catalog · Media · Theme · Brand · Releases · Upsells · Integrations · Billing · Settings** (+ the store switcher for multi-store users).
+Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront · Catalog · Media · Theme · Brand · Releases · Upsells · Integrations · Billing · Settings** (horizontally scrollable; + the store switcher for multi-store users). `/admin` lands on the Dashboard.
 
 #### Login
 - **Use** (S26): `<tenant-host>/admin` → `/admin/login`; sign in with your EMAIL +
@@ -491,6 +491,29 @@ Navigation: **Setup · Offers · Orders · Storefront · Catalog · Media · The
 - **Files**: `components/admin/SectionsEditor.js`,
   `components/admin/PreviewPane.js`, banner/rich_text validation in
   [lib/cms/validate.js](../lib/cms/validate.js), renderers in `app/page.js`.
+
+#### Dashboard & Analytics tabs (S42 / BE21 + MC04 + MC17)
+- **What**: `/admin/dashboard` (the console's landing page) — today/7d/30d
+  net revenue + orders + AOV from the ORDERS ledger (refunds provider-
+  mirrored, S31), freshness chips (catalog sync, last order), coverage
+  badges (% of sales pushed to Shopify; % visible to analytics given
+  consent), a needs-attention queue (dead/stuck pushes, refund mismatches —
+  each row says why and what fixes it — failed contact deliveries, unfinished
+  setup), and a 30-day bar chart. **Honest unknowns**: AOV with no orders is
+  "unknown", coverage with no sales is null — never a fake 0. Day buckets
+  use the MERCHANT's timezone (`config.timezone`).
+  `/admin/analytics` — funnel, top products (from order snapshots — consent
+  doesn't limit those), search terms with zero-result flags, campaign views
+  by utm_source, coarse device split; every card carries its coverage badge
+  and a definition line; CSV exports are the AGGREGATED rows only, never raw
+  events or PII.
+- **Files**: [lib/reporting.js](../lib/reporting.js) (BE21 rollups —
+  `salesRollup`, `coverage`, `discrepancies`, `funnel`, …),
+  `app/admin/dashboard/`, `app/admin/analytics/`,
+  `components/admin/ExportCsv.js`.
+- **Honesty contract**: behavioural numbers exist only for consented
+  sessions and say so; Shopify stays authoritative for money; a metric that
+  can't be computed returns null with a reason.
 
 #### Billing tab (S40 / BE11 + MC24)
 - **What**: the merchant's plan, subscription state, usage and charges. The
@@ -823,7 +846,7 @@ Navigation: **Setup · Offers · Orders · Storefront · Catalog · Media · The
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 28 aliased suites, **360 tests**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 30 aliased suites, **366 tests + 10 perf budgets**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -886,9 +909,22 @@ Navigation: **Setup · Offers · Orders · Storefront · Catalog · Media · The
   completes only the tail with no duplicate resources/secret rotation,
   neutral seeds, force-refusal, conservative compensation incl. never-delete-
   db + done-run refusal, derived checklist + server-gated launch, verified-
-  membership switcher query).
+  membership switcher query) · reporting 6 (S42: TZ-correct day bucketing —
+  19:00 UTC lands on the next IST day, sale-status filtering + refund
+  netting, honest-unknown nulls on empty stores, push/event coverage
+  percentages, discrepancy queue with per-row actions, consented-events
+  funnel/search-terms-with-zero-result-flags/devices/campaigns + snapshot
+  top-products) · perf 10 (S42 / BE35 budgets — see below).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **381 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **397 checks in all**) and `pnpm build` as the compile gate.
+- **Perf budgets** (`pnpm test:perf`, BE35): 5,000-product fixture — PDP
+  lookup ≤150ms, collection page (featured sort + facets, price+stock
+  filters) ≤400ms, multi-term SQL search ≤400ms, home queries ≤400ms,
+  offers engine on a 20-line cart ≤50ms, 50-page snapshot+hash ≤600ms,
+  queue drain ≥25 jobs/s, noisy-neighbor search ≤800ms. Budgets are
+  deliberately generous (CI variance) — they catch order-of-magnitude
+  regressions like a lost index, not micro-drift. S42 measured: everything
+  sub-2ms on local SQLite, drain ~2,400 jobs/s.
 
 ### 2F. Known quirks & follow-ups
 
@@ -1702,3 +1738,4 @@ run the verify checklist.
 | S39 | ed34439 | W3 EXIT: BE23 notification service (durable intents, honest states, consent separation) + contact form/inbox, FAQ accordions w/ deep links, campaign landing pages (UTC windows, utm retention), catalog browser w/ per-product modules + pinned collections, nested nav + real footer links, upsell quirk fix (SF15–17+MC05+MC06+MC11+MC15+BE23) |
 | S40 | 3b114ef | W4 opens: billing & entitlements — versioned plan catalog, Razorpay Subscriptions lifecycle (HMAC webhook → inbox → jobs; dedupe, out-of-order watermark, terminal protection), signed-amount ledger, grace→degraded (checkout pauses, store never dies), quotas w/ 80% warnings, MC24 billing tab, OP08 operator reconciliation + overrides (BE11+BE33+MC24+OP08) |
 | S41 | dcf5f65 | W4: provisioning as recorded/resumable/idempotent steps w/ conservative compensation + NEUTRAL seeds (quirk #14 closed; new tenants start on Free), Setup tab onboarding checklist (derived + server-gated launch), store switcher (verified memberships), operator tenant detail (presence-only creds) + provisioning-runs panel (BE26+MC02+MC03+OP03+OP04) |
+| S42 | (this session) | W4: reporting & fleet ops — BE21 TZ-correct reconciled rollups + coverage + discrepancy queue, MC04 dashboard (honest unknowns, /admin lands here), MC17 analytics (consent-badged funnel/products/search/campaigns/devices, scoped CSV), OP02 fleet overview (explicit uncovered tenants), OP06 releases/migrations view + canary rollout flag, BE35 perf budgets suite; billing/provider modules made edge-bundle-safe (BE21+MC04+MC17+OP02+OP06+BE35) |

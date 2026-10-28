@@ -62,7 +62,9 @@
     "test:storefront": "node scripts/test-storefront.js",
     "test:surfaces": "node scripts/test-surfaces.js",
     "test:billing": "node scripts/test-billing.js",
-    "test:provision": "node scripts/test-provision.js"
+    "test:provision": "node scripts/test-provision.js",
+    "test:reporting": "node scripts/test-reporting.js",
+    "test:perf": "node scripts/perf-report.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

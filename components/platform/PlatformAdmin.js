@@ -7,6 +7,7 @@ import ThemesPanel from "./ThemesPanel";
 import BillingPanel from "./BillingPanel";
 import ProvisionRunsPanel from "./ProvisionRunsPanel";
 import TenantDetail from "./TenantDetail";
+import OverviewPanel from "./OverviewPanel";
 
 // Operator console (Session 22): tenant table + health, suspend/activate,
 // per-tenant sync, Shopify connect links, and the provisioning wizard.
@@ -229,6 +230,7 @@ export default function PlatformAdmin() {
           );
         })}
       </ul>
+      <OverviewPanel />
       <ProvisionRunsPanel />
       <ThemesPanel />
       <BillingPanel />

@@ -22,7 +22,19 @@ if (!one && !all) {
 }
 
 const migrations = await loadMigrations("tenant");
-const targets = one ? [{ id: one }] : await listTenants();
+// S42 (OP06): --canary <slug> migrates that tenant FIRST and pauses the whole
+// rollout if it fails — the rest of the fleet is never touched by a migration
+// that just broke the canary.
+const canary = flag("canary");
+let targets = one ? [{ id: one }] : await listTenants();
+if (canary && all) {
+  const rest = targets.filter((t) => t.id !== canary);
+  if (rest.length === targets.length) {
+    console.error(`✗ canary "${canary}" is not a registered tenant`);
+    process.exit(1);
+  }
+  targets = [{ id: canary, canary: true }, ...rest];
+}
 let failures = 0;
 
 for (const row of targets) {
@@ -43,6 +55,10 @@ for (const row of targets) {
   } catch (e) {
     failures++;
     console.error(`✗ ${row.id}: ${String(e?.message || e).slice(0, 300)}`);
+    if (row.canary) {
+      console.error(`✗ CANARY FAILED — rollout paused, ${targets.length - 1} tenant(s) untouched`);
+      process.exit(1);
+    }
   }
 }
 
