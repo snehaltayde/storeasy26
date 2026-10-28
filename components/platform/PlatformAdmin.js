@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, LogOut, MoreHorizontal, Pencil, Plus, Wrench } from "lucide-react";
+import { Download, ExternalLink, KeyRound, LogOut, MoreHorizontal, Pencil, Plus, UserPlus, Wrench } from "lucide-react";
 import { Card, CardHeader } from "@/components/console/Card";
 import { Button } from "@/components/console/Button";
 import { Banner } from "@/components/console/Banner";
 import { StatusBadge } from "@/components/console/Badge";
 import { Dialog, ConfirmDialog, DangerDialog } from "@/components/console/Dialog";
-import { Field, Input, Textarea } from "@/components/console/fields";
-import { SecretReveal } from "@/components/console/Copy";
+import { Field, Input, Select, Textarea } from "@/components/console/fields";
+import { CopyButton, SecretReveal } from "@/components/console/Copy";
 import { SkeletonText, EmptyState, ErrorState } from "@/components/console/bits";
 import { useToast } from "@/components/console/Toast";
 import QueuesPanel from "./QueuesPanel";
@@ -246,6 +246,152 @@ function EditTenantDialog({ id, onClose, onSaved }) {
   );
 }
 
+// First domain → a clickable origin (local hosts are http, real ones https).
+const storeOrigin = (t) => {
+  const host = (t.domains || [])[0];
+  if (!host) return null;
+  const proto = /(^|\.)localhost(:|$)|^127\.0\.0\.1/.test(host) ? "http" : "https";
+  return `${proto}://${host}`;
+};
+
+// S51: merchant hand-off — give a store's owner their access from the console.
+// Preferred path: a single-use invite link (the merchant registers their own
+// email+password). Fallback: rotate the bootstrap console password (shown
+// once). Both existed only as CLI commands before.
+function HandoffDialog({ tenant, onClose }) {
+  const origin = storeOrigin(tenant);
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("owner");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [invite, setInvite] = useState(null); // { link, expiresAt, mail }
+  const [rotateArmed, setRotateArmed] = useState(false);
+  const [rotated, setRotated] = useState(null); // { password, loginUrl }
+
+  async function call(payload) {
+    setBusy(true);
+    setError("");
+    const data = await fetch(`/api/platform/tenants/${tenant.id}/handoff`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then((r) => r.json())
+      .catch((e) => ({ ok: false, error: String(e?.message || e) }));
+    setBusy(false);
+    if (!data.ok) {
+      setError(data.error || "Request failed");
+      return null;
+    }
+    return data;
+  }
+
+  return (
+    <Dialog open onClose={busy ? undefined : onClose} title={`Share access — ${tenant.name}`} size="lg">
+      <div className="space-y-5 text-left">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">Links to share</p>
+          {origin ? (
+            <div className="mt-2 space-y-1.5">
+              <p className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-fg-muted">Store console</span>
+                <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-xs text-fg">{origin}/admin/login</code>
+                <CopyButton value={`${origin}/admin/login`} />
+              </p>
+              <p className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-fg-muted">Storefront</span>
+                <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-xs text-fg">{origin}</code>
+                <CopyButton value={origin} />
+              </p>
+            </div>
+          ) : (
+            <Banner tone="warning" className="mt-2">
+              No domains yet — add one first (More → Edit details) so the merchant has somewhere to sign in.
+            </Banner>
+          )}
+        </div>
+
+        <div className="border-t border-edge pt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">Invite the merchant (recommended)</p>
+          <p className="mt-1 text-xs text-fg-muted">
+            A single-use link, valid 7 days — they pick their own password. It's emailed when a mail provider is
+            configured, and always shown here so you can pass it on yourself.
+          </p>
+          {!invite && (
+            <form
+              className="mt-3 flex flex-wrap items-end gap-2"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const data = await call({ action: "invite", email, role });
+                if (data) setInvite(data);
+              }}
+            >
+              <Field label="Email" htmlFor="ho-email" className="min-w-52 flex-1">
+                <Input id="ho-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="owner@store.com" />
+              </Field>
+              <Field label="Role" htmlFor="ho-role">
+                <Select id="ho-role" value={role} onChange={(e) => setRole(e.target.value)}>
+                  <option value="owner">owner</option>
+                  <option value="admin">admin</option>
+                  <option value="staff">staff</option>
+                  <option value="support">support</option>
+                </Select>
+              </Field>
+              <Button type="submit" variant="primary" busy={busy} icon={<UserPlus size={13} aria-hidden />}>
+                Create invite
+              </Button>
+            </form>
+          )}
+          {invite && (
+            <div className="mt-3 space-y-2">
+              <SecretReveal label={`Invite link for ${email} (${invite.role})`} value={invite.link} note={`Single use, expires ${new Date(invite.expiresAt).toLocaleString()}. ${invite.mail?.mock ? "Mail is not configured — share this link yourself." : invite.mail?.ok ? "Also emailed." : `Email failed (${invite.mail?.error || "?"}) — share this link yourself.`}`} />
+              <Button size="sm" onClick={() => setInvite(null)}>
+                Invite someone else
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-edge pt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-fg-subtle">Bootstrap console password</p>
+          <p className="mt-1 text-xs text-fg-muted">
+            The shared setup password from provisioning. Rotate it if it was lost or exposed — the old one stops
+            working immediately. Once the merchant has their own account, they should stop using it.
+          </p>
+          {rotated ? (
+            <div className="mt-3">
+              <SecretReveal label="New console password" value={rotated.password} note="Shown once. Sign in with an EMPTY email + this password." />
+            </div>
+          ) : (
+            <div className="mt-3 flex items-center gap-2">
+              <Button
+                variant={rotateArmed ? "danger" : "dangerOutline"}
+                busy={busy}
+                icon={<KeyRound size={13} aria-hidden />}
+                onClick={async () => {
+                  if (!rotateArmed) return setRotateArmed(true);
+                  const data = await call({ action: "rotate_password" });
+                  if (data) setRotated(data);
+                  setRotateArmed(false);
+                }}
+              >
+                {rotateArmed ? "Confirm — old password stops working" : "Rotate console password"}
+              </Button>
+              {rotateArmed && (
+                <Button onClick={() => setRotateArmed(false)} disabled={busy}>
+                  Keep current
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {error && <Banner tone="danger">{error}</Banner>}
+      </div>
+    </Dialog>
+  );
+}
+
 export default function PlatformAdmin() {
   const [tenants, setTenants] = useState(null);
   const [loadErr, setLoadErr] = useState(null);
@@ -255,6 +401,7 @@ export default function PlatformAdmin() {
   const [syncing, setSyncing] = useState({}); // id → true while sync in flight
   const [menuFor, setMenuFor] = useState(null); // tenant whose "More" menu is open
   const [editing, setEditing] = useState(null); // tenant id being edited (S51)
+  const [handoff, setHandoff] = useState(null); // tenant being handed off (S51)
   const [confirm, setConfirm] = useState(null); // { type, tenant } — suspend/activate/maintenance/offboard
   const [maintMsg, setMaintMsg] = useState("");
   const router = useRouter();
@@ -438,6 +585,17 @@ export default function PlatformAdmin() {
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {storeOrigin(t) && (
+                      <a
+                        href={storeOrigin(t)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-ctl border border-edge-strong bg-surface px-2.5 py-1.5 text-xs font-medium text-fg focus-ring hover:bg-surface-muted"
+                      >
+                        <ExternalLink size={13} aria-hidden />
+                        View store
+                      </a>
+                    )}
                     <Button size="sm" onClick={() => setDetail(detail === t.id ? null : t.id)}>
                       {detail === t.id ? "Hide details" : "Details"}
                     </Button>
@@ -503,12 +661,18 @@ export default function PlatformAdmin() {
         />
       )}
 
+      {/* Share access / merchant hand-off (S51) */}
+      {handoff && <HandoffDialog tenant={handoff} onClose={() => setHandoff(null)} />}
+
       {/* "More" overflow menu — native dialog gives keyboard/focus handling */}
       <Dialog open={!!menuFor} onClose={() => setMenuFor(null)} title={menuFor ? `More actions — ${menuFor.id}` : ""} size="sm">
         {menuFor && (
           <div className="flex flex-col gap-2">
             <Button icon={<Pencil size={13} aria-hidden />} onClick={() => openMenuAction(() => setEditing(menuFor.id))}>
               Edit details…
+            </Button>
+            <Button icon={<UserPlus size={13} aria-hidden />} onClick={() => openMenuAction(() => setHandoff(menuFor))}>
+              Share access…
             </Button>
             <Button icon={<Download size={13} aria-hidden />} onClick={() => openMenuAction(() => exportTenant(menuFor.id))}>
               Export data
