@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { requestOtp, verifyOtp, customerFromToken, revokeCustomerSession, updateCustomerProfile, customerOrders, buildReorder, validEmail, CUSTOMER_COOKIE } from "@/lib/customers";
+import { requestReturn } from "@/lib/returns";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
@@ -65,6 +66,19 @@ export const POST = tenantHandler(async (request) => {
       const res = NextResponse.json({ ok: true });
       res.cookies.set(COOKIE, "", { ...COOKIE_OPTS, maxAge: 0 });
       return res;
+    }
+    if (body.action === "request_return") {
+      const customer = await me(request);
+      if (!customer) return NextResponse.json({ error: "sign in first" }, { status: 401 });
+      const limited = rateLimit(request, { name: "account_return", limit: 5, windowMs: 60 * 60 * 1000 });
+      if (limited) return limited;
+      const r = await requestReturn({ customerId: customer.id, orderId: String(body.orderId || ""), reason: body.reason });
+      // merchant notification rides the jobs fast path, like the contact form
+      after(async () => {
+        const { runDueJobs } = await import("@/lib/platform/worker.js");
+        await runDueJobs({ limit: 5 }).catch(() => {});
+      });
+      return NextResponse.json({ ok: true, request: r });
     }
     if (body.action === "profile") {
       const customer = await me(request);

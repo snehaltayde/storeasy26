@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
-import { resolvedContentPageList } from "@/lib/content/resolve";
+import { resolvedContentPage, resolvedContentPageList } from "@/lib/content/resolve";
+import { campaignVisible } from "@/lib/cms/store";
 
 // Full-catalog sitemap (Session 16): every product + collection from Turso,
 // plus the content pages. Regenerated per request (catalog syncs mutate it).
@@ -20,13 +21,21 @@ async function buildSitemap() {
   ]);
 
   // Content pages per tenant (S23): defaults + merchant-added, enabled only.
-  // S39: campaign pages are EXCLUDED — they're noindex paid/social landing
-  // pages with visibility windows (a sitemap entry would contradict both).
-  const pages = (await resolvedContentPageList()).filter((p) => p.enabled && (p.family || "page") !== "campaign");
+  // S39: campaign pages are EXCLUDED (noindex, windowed). S46: journal posts
+  // ARE listed at /journal/<slug> — but only once their publish window opens.
+  const all = (await resolvedContentPageList()).filter((p) => p.enabled);
+  const pages = all.filter((p) => (p.family || "page") === "page");
+  const journalPaths = [];
+  for (const p of all.filter((x) => x.family === "journal")) {
+    const page = await resolvedContentPage(p.slug);
+    if (page && campaignVisible(page)) journalPaths.push(`/journal/${p.slug}`);
+  }
   const statics = [
     "/",
     "/collections",
     "/search",
+    ...(journalPaths.length ? ["/journal"] : []),
+    ...journalPaths,
     ...pages.map((p) => (p.slug === "about" || p.slug === "contact" ? `/${p.slug}` : `/policies/${p.slug}`)),
   ];
 

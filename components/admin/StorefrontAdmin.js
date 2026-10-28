@@ -108,6 +108,7 @@ function PageEditor({ page, onSave, onCancel, busy }) {
     family: page.family || "page",
     windowStart: isoToLocalInput(page.window_start),
     windowEnd: isoToLocalInput(page.window_end),
+    redirectFrom: "", // S46 (SF20): old slug to 301 from after a rename
     sections: (page.sections || []).map(toEditSection),
   });
   const isNew = !page.slug;
@@ -143,21 +144,36 @@ function PageEditor({ page, onSave, onCancel, busy }) {
         <Field label="Effective date" hint="optional — shown under the title (policy pages)">
           <input type="date" className={input} value={p.effective_at} onChange={(e) => setP({ ...p, effective_at: e.target.value })} />
         </Field>
-        <Field label="Family" hint={p.family === "campaign" ? "served at /campaigns/<slug>, noindex, keeps utm params" : "served at /policies/<slug> (or /about, /contact)"}>
+        <Field
+          label="Family"
+          hint={
+            p.family === "campaign"
+              ? "served at /campaigns/<slug>, noindex, keeps utm params"
+              : p.family === "journal"
+                ? "served at /journal/<slug>; 'Visible from' is the publish time"
+                : "served at /policies/<slug> (or /about, /contact)"
+          }
+        >
           <select className={input} value={p.family} onChange={(e) => setP({ ...p, family: e.target.value })}>
             <option value="page">Content / policy page</option>
             <option value="campaign">Campaign landing</option>
+            <option value="journal">Journal post</option>
           </select>
         </Field>
-        {p.family === "campaign" && (
+        {(p.family === "campaign" || p.family === "journal") && (
           <>
-            <Field label="Visible from" hint="your local time — blank = immediately">
+            <Field label={p.family === "journal" ? "Publish at" : "Visible from"} hint="your local time — blank = immediately">
               <input type="datetime-local" className={input} value={p.windowStart} onChange={(e) => setP({ ...p, windowStart: e.target.value })} />
             </Field>
             <Field label="Visible until" hint="your local time — blank = no end">
               <input type="datetime-local" className={input} value={p.windowEnd} onChange={(e) => setP({ ...p, windowEnd: e.target.value })} />
             </Field>
           </>
+        )}
+        {p.family === "journal" && !isNew && (
+          <Field label="Redirect from old slug" hint="renamed this post? the old slug 301s here (optional)">
+            <input className={input} placeholder="old-slug" value={p.redirectFrom} onChange={(e) => setP({ ...p, redirectFrom: e.target.value })} />
+          </Field>
         )}
         {p.sections.map((s, i) => (
           <div key={i} className="sm:col-span-2 rounded-xl border border-zinc-100 p-3">
@@ -248,8 +264,9 @@ function PageEditor({ page, onSave, onCancel, busy }) {
               enabled: p.enabled,
               effective_at: p.effective_at || null,
               family: p.family,
-              window_start: p.family === "campaign" ? localInputToIso(p.windowStart) : null,
-              window_end: p.family === "campaign" ? localInputToIso(p.windowEnd) : null,
+              window_start: p.family === "campaign" || p.family === "journal" ? localInputToIso(p.windowStart) : null,
+              window_end: p.family === "campaign" || p.family === "journal" ? localInputToIso(p.windowEnd) : null,
+              redirect_from: p.family === "journal" && p.redirectFrom.trim() ? p.redirectFrom.trim() : undefined,
               sections: p.sections.filter((s) => !editSectionEmpty(s)).map(fromEditSection),
             })
           }
@@ -566,7 +583,7 @@ export default function StorefrontAdmin({ initial }) {
                   <span className="min-w-0 flex-1 truncate">
                     <span className="font-medium">{p.title}</span>
                     <span className="ml-2 font-mono text-xs text-zinc-400">
-                      /{p.slug === "about" || p.slug === "contact" ? p.slug : p.family === "campaign" ? `campaigns/${p.slug}` : `policies/${p.slug}`}
+                      /{p.slug === "about" || p.slug === "contact" ? p.slug : p.family === "campaign" ? `campaigns/${p.slug}` : p.family === "journal" ? `journal/${p.slug}` : `policies/${p.slug}`}
                     </span>
                     <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold ${p.source === "custom" ? "bg-lime-100 text-lime-700" : "bg-zinc-100 text-zinc-500"}`}>
                       {p.source === "custom" ? "CUSTOMIZED" : "DEFAULT"}

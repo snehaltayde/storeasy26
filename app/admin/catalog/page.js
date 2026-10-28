@@ -6,6 +6,9 @@ import { listProductOverrides, getCollectionPins } from "@/lib/catalog-overrides
 import { siteName } from "@/lib/site";
 import AdminNav from "@/components/admin/AdminNav";
 import CatalogAdmin from "@/components/admin/CatalogAdmin";
+import { BundlesPanel, QuizPanel } from "@/components/admin/CommercePanels";
+import { listBundles } from "@/lib/bundles";
+import { listQuizzes } from "@/lib/quiz";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +21,7 @@ export default async function AdminCatalogPage() {
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
-  const [initial, name] = await tfetch(async () => {
+  const [initial, name, bundles, quizzes] = await tfetch(async () => {
     const [products, overrides, collections] = await Promise.all([
       db
         .selectFrom("products")
@@ -43,6 +46,8 @@ export default async function AdminCatalogPage() {
         collections: cols,
       },
       siteName(),
+      await listBundles(),
+      await listQuizzes(),
     ];
   });
 
@@ -57,6 +62,10 @@ export default async function AdminCatalogPage() {
         </p>
         <div className="mt-5">
           <CatalogAdmin initial={initial} />
+        </div>
+        <div className="mt-6">
+          <BundlesPanel initial={bundles} />
+          <QuizPanel initial={quizzes} />
         </div>
       </div>
     </>

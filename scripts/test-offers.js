@@ -62,6 +62,32 @@ check("money shot total = 10129", r.total === 10129, "got " + r.total);
 check("money shot includes the free gift", r.gifts.length === 1);
 check("money shot = 3 discounts + 1 gift", r.appliedOffers.filter((o) => o.amount > 0).length === 3 && r.appliedOffers.filter((o) => o.gift).length === 1);
 
+// ---- BUNDLE (S46 / BE31) ----
+const BUNDLE = {
+  id: "bundle-starter",
+  type: "BUNDLE",
+  scope: "line",
+  priority: 5,
+  title: "Starter set",
+  items: [{ variantId: "v-a", quantity: 1 }, { variantId: "v-b", quantity: 2 }],
+  price: 5000,
+};
+// components: a=3000×1 + b=1500×2 = 6000 → bundle 5000 → saving 1000
+r = evaluateOffers([item(plain("a", 3000), 1), item(plain("b", 1500), 2)], { offers: [BUNDLE] });
+check("BUNDLE complete set saves componentsSum − price", r.discountTotal === 1000, "got " + r.discountTotal);
+check("BUNDLE allocation sums exactly to the saving", Object.values(r.lineDiscounts).reduce((s, v) => s + v, 0) === 1000, JSON.stringify(r.lineDiscounts));
+r = evaluateOffers([item(plain("a", 3000), 2), item(plain("b", 1500), 4)], { offers: [BUNDLE] });
+check("BUNDLE multiples: two complete sets save double", r.discountTotal === 2000, "got " + r.discountTotal);
+r = evaluateOffers([item(plain("a", 3000), 1), item(plain("b", 1500), 1)], { offers: [BUNDLE] });
+check("BUNDLE incomplete set (b needs 2) saves nothing", r.discountTotal === 0, "got " + r.discountTotal);
+// claimed-line exclusivity: bundle (priority 5) claims v-a before a TIERED on the same line
+const TIER_A = { id: "tier-a", type: "TIERED_QTY", scope: "line", priority: 10, title: "Tier", target: { kind: "variantId", value: "v-a" }, tiers: [{ minQty: 1, percent: 50 }] };
+r = evaluateOffers([item(plain("a", 3000), 1), item(plain("b", 1500), 2)], { offers: [BUNDLE, TIER_A] });
+check("BUNDLE claims its lines first — no double line-offer", r.discountTotal === 1000 && r.appliedOffers.length === 1, JSON.stringify(r.appliedOffers.map((o) => o.type)));
+// coupon still applies on the NET after a bundle
+r = evaluateOffers([item(plain("a", 3000), 1), item(plain("b", 1500), 2)], { offers: [BUNDLE, { id: "flat", type: "COUPON", scope: "order", priority: 50, title: "Flat", code: "FLAT500", discount: { kind: "fixed", value: 500 } }], coupon: "FLAT500" });
+check("BUNDLE + coupon: coupon on the net, no double-dip", r.discountTotal === 1500, "got " + r.discountTotal);
+
 // ---- determinism ----
 const sig = () => JSON.stringify(evaluateOffers([item(BCAA, 3), item(whey("a"), 2)], { coupon: "BEAST10" }));
 check("deterministic (same input twice)", sig() === sig());

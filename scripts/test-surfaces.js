@@ -173,7 +173,7 @@ await t("campaign pages: family + UTC window validated; windows refused on plain
   eq(page.family, "campaign");
   eq(page.window_start, "2026-10-01T00:00:00.000Z");
   await throws(() => inT(() => S.upsertContentPage({ slug: "x1", title: "x", family: "fiesta", sections: [] })), /unknown page family/);
-  await throws(() => inT(() => S.upsertContentPage({ slug: "x1", title: "x", window_end: "2026-01-01T00:00:00Z", sections: [] })), /campaign pages/);
+  await throws(() => inT(() => S.upsertContentPage({ slug: "x1", title: "x", window_end: "2026-01-01T00:00:00Z", sections: [] })), /campaign and journal pages/);
   await throws(
     () => inT(() => S.upsertContentPage({ slug: "x1", title: "x", family: "campaign", window_start: "2026-02-01T00:00:00Z", window_end: "2026-01-01T00:00:00Z", sections: [] })),
     /after window start/,

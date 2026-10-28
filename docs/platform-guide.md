@@ -284,6 +284,55 @@ too. -->
   `app/account/`, `components/account/*`; OTP mail rides the BE23
   notification queue (dev-mock labeled until a mail key is set).
 
+#### Bundles, product-finder quiz, journal, returns (S46 / BE31 + SF18–21)
+- **Bundles (BE31 + SF18)**: a bundle is a LOCAL curated set priced through the
+  offers engine — each bundle keeps a linked `BUNDLE` line offer (priority 5,
+  id `bundle-<id>`) in sync, so cart/checkout/snapshot/push see just another
+  offer: **zero new money paths**. Engine math: sets = min(floor(qty/need))
+  per component, saving = (component value − set price) × sets, allocated
+  proportionally across lines (claimed lines are exclusive — one offer per
+  line). ENABLING runs the compatibility gate (components exist + available,
+  price actually saves) and refuses otherwise; a live bundle whose component
+  sells out shows honestly as unavailable on `/bundles/<slug>` (math still
+  shown, add button disabled). Console: Catalog tab → Bundles (components by
+  product handle or variant GID, dry-run compatibility check, draft/enable/
+  delete). Selling plans (shopper subscriptions) are NOT built — recorded in
+  the status file, not pretended.
+- **Quiz (SF19)**: deterministic product finder at `/quiz/<slug>` — options
+  carry catalog tags, scoring is a tally (ties break A–Z), recommendations
+  are available products ranked by tag matches then title. No AI anywhere in
+  the runtime; same answers always give the same picks (live-verified).
+  Optional consented one-email results capture ("no list, no follow-ups")
+  rides the notification queue. Console: Catalog tab → quiz editor
+  (≤10 questions, 2–6 options each).
+- **Journal (SF20)**: `family: "journal"` content pages — index at
+  `/journal`, posts at `/journal/<slug>`, scheduled publish via
+  `window_start` (future posts are invisible everywhere incl. sitemap),
+  release-governed like all content (drafts never leak past a live
+  release). Renames keep old URLs alive: `redirect_from` writes
+  `page_redirects` and the old slug 308s; self-redirects refused, a page
+  saved at a slug always kills any redirect FROM that slug (no loops).
+  Sitemap lists only visible posts; campaigns stay excluded.
+- **Returns (SF21)**: signed-in shoppers request a return from the account
+  order page (eligible = money committed, not cancelled, within
+  `returns_window_days` (14 default), not fully refunded; one open request
+  per order, reason ≥10 chars). Merchant decides in Orders → Return
+  requests: requested→approved|rejected, approved→completed|rejected.
+  **APPROVAL IS NOT A REFUND** — stated on every surface and proven in
+  tests: this flow never touches money columns; refunds happen through the
+  provider and mirror back via the S31 projection. Merchant heads-up mail
+  rides the notification queue.
+- **Files**: [lib/bundles.js](../lib/bundles.js), [lib/quiz.js](../lib/quiz.js),
+  [lib/returns.js](../lib/returns.js), BUNDLE branch in
+  [lib/offers/engine.js](../lib/offers/engine.js) +
+  [lib/offers/validate.js](../lib/offers/validate.js), journal/redirects in
+  [lib/cms/store.js](../lib/cms/store.js), migration
+  `migrations/tenant/0011_commerce_expansion.sql`, `app/bundles/`,
+  `app/quiz/`, `app/journal/`, `app/api/admin/{bundles,quiz,returns}/`,
+  `components/admin/CommercePanels.js`,
+  `components/account/ReturnRequest.js`. New authz action `returns.decide`
+  (staff+).
+
 #### Order status page (guest)
 - **What**: tokenized, no-login order tracking — Placed → Confirmed → Being prepared →
   Shipped steps from our state machine MERGED with live Shopify fulfillment +
@@ -937,7 +986,7 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 33 aliased suites, **388 tests + 10 perf budgets**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 34 aliased suites, **406 tests + 10 perf budgets**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -1019,10 +1068,21 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   order claiming, revocable sessions, CROSS-STORE same-email isolation both
   directions, profile validation + ownership-scoped order reads, reorder
   revalidation matrix ok/price_changed/unavailable/missing, safe return
-  paths, privacy redaction of accounts+sessions+codes) · perf 10 (S42 /
-  BE35 budgets — see below).
-  Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **419 checks in all**) and `pnpm build` as the compile gate.
+  paths, privacy redaction of accounts+sessions+codes) · commerce-exp 18
+  (S46: bundle compatibility gate — refusals for missing/sold-out/non-saving,
+  draft-vs-enable semantics, offer sync incl. re-gate against today's catalog
+  on re-enable, honest storefront availability, delete removes the linked
+  offer; quiz validation + deterministic scoring w/ A–Z tie-break +
+  availability-filtered recommendations + disabled-hidden-from-shoppers;
+  journal scheduled publish + redirect_from incl. self-redirect refusal and
+  live-page-beats-stale-redirect; returns eligibility matrix + ownership-as-
+  404 + one-open-per-order + state machine + APPROVAL-MOVES-NO-MONEY proof) ·
+  perf 10 (S42 / BE35 budgets — see below).
+  Plus the standalone S4 engine suite `node scripts/test-offers.js` (27 pure
+  assertions incl. the S46 BUNDLE matrix: complete-set saving, exact
+  proportional allocation, multiples, incomplete sets, claimed-line
+  exclusivity vs TIERED, coupons on the net — **443 checks in all**) and
+  `pnpm build` as the compile gate.
 - **Perf budgets** (`pnpm test:perf`, BE35): 5,000-product fixture — PDP
   lookup ≤150ms, collection page (featured sort + facets, price+stock
   filters) ≤400ms, multi-term SQL search ≤400ms, home queries ≤400ms,
@@ -1848,3 +1908,4 @@ run the verify checklist.
 | S43 | 75e6dec | W4: merchant ops completeness — Settings ops panels (team w/ last-owner guards, domain TXT wizard + per-tenant robots (quirk #9), privacy tracking, audit UI, PII-free diagnostics), OP12 branded maintenance mode (checkout 503, console reachable) + incidents (internal/public split), BE29 expiring tenant exports + staged conservative offboarding (MC21+MC23+MC25+MC26+MC27+OP11+OP12+BE29) |
 | S44 | d878967 | W4 EXIT: marketing website on designated platform hosts — homepage w/ substantiated claims, pricing from the LIVE plan catalog, honest template gallery, vertical pages, status-accurate integrations, deployed-controls-only trust page, consent-aware lead capture + SaaS legal drafts; tenant hosts 404 all of it (MK01–05+MK07+MK08) |
 | S45 | c9f7429 | W5: customer accounts — passwordless OTP (hashed, capped, enumeration-safe), verified-email order claiming, per-store identities with structural cross-store isolation, account dashboard + ownership-scoped order detail, reorder with live line-by-line revalidation, redaction covers accounts (BE30+SF10+SF11+SF12) |
+| S46 | _(recorded post-commit)_ | W5: commerce expansion — bundles AS offers (compatibility-gated BUNDLE line offers, zero new money paths, honest sold-out states), deterministic product-finder quiz (tags tally, no AI), editorial journal (scheduled publish, slug-rename 308 redirects), returns request flow (state machine, APPROVAL ≠ REFUND, money columns proven untouched); selling plans recorded as not built (BE31 partial+SF18+SF19+SF20+SF21) |

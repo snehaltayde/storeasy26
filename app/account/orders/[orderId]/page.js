@@ -4,6 +4,8 @@ import { notFound, redirect } from "next/navigation";
 import { customerFromToken, customerOrder, CUSTOMER_COOKIE } from "@/lib/customers";
 import { formatMoney } from "@/lib/format";
 import ReorderPanel from "@/components/account/ReorderPanel";
+import ReturnRequest from "@/components/account/ReturnRequest";
+import { returnForOrder, returnEligibility, returnsWindowDays } from "@/lib/returns";
 import { db } from "@/lib/db";
 import { tfetch } from "@/lib/tenant-request";
 
@@ -29,11 +31,13 @@ export default async function AccountOrderPage({ params }) {
     if (!customer) return { customer: null };
     const order = await customerOrder(customer.id, orderId);
     if (!order) return { customer, order: null };
-    const [fulfillments, refunds] = await Promise.all([
+    const [fulfillments, refunds, ret] = await Promise.all([
       db.selectFrom("order_fulfillments").selectAll().where("order_id", "=", order.id).execute().catch(() => []),
       db.selectFrom("order_refunds").selectAll().where("order_id", "=", order.id).execute().catch(() => []),
+      returnForOrder(customer.id, order.id),
     ]);
-    return { customer, order, fulfillments, refunds };
+    const elig = ret ? { ok: false } : returnEligibility(order, { windowDays: returnsWindowDays() });
+    return { customer, order, fulfillments, refunds, ret, elig };
   });
 
   if (!data.customer) redirect(`/account?return=${encodeURIComponent(`/account/orders/${orderId}`)}`);
@@ -113,6 +117,10 @@ export default async function AccountOrderPage({ params }) {
 
       <section className="mt-6">
         <ReorderPanel orderId={o.id} />
+      </section>
+
+      <section className="mt-6">
+        <ReturnRequest orderId={o.id} existing={data.ret} eligible={data.elig.ok} reasonIfNot={data.elig.reason || "not available for this order"} />
       </section>
     </div>
   );

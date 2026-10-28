@@ -5,10 +5,10 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S45 (W1–W4 complete; W5 underway).
+- Created: 2026-10-28 (session S25). Last updated: S46 (W1–W4 complete; W5 underway).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 94 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 99 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
@@ -19,7 +19,8 @@ by a code audit or implementation in this repo — never by documentation alone.
   BE11, BE33, MC24, OP08 — S40; BE26, MC02, MC03, OP03, OP04 — S41;
   BE21, MC04, MC17, OP02, OP06, BE35 — S42; MC21, MC23, MC25, MC26, MC27,
   OP11, OP12, BE29 — S43; MK01, MK02, MK03, MK04, MK05, MK07, MK08 — S44;
-  BE30, SF10, SF11, SF12 — S45). The other 22 are **not inspected** — the
+  BE30, SF10, SF11, SF12 — S45; BE31 (partial — selling plans not built),
+  SF18, SF19, SF20, SF21 — S46). The other 17 are **not inspected** — the
   handoff's Fix/Extend/New labels for them remain unverified documentation
   claims.
 
@@ -1282,6 +1283,75 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   server re-derives current prices (an old snapshot can never set a price).
   Suite covers the full matrix; live-verified on a real demo order.
 
+### BE31 — Bundles & selling plans · **partial (S46: bundles built, selling plans NOT)**
+
+- **Bundles ride the offers engine** — a bundle is a local curated set whose
+  linked `BUNDLE` line offer (`bundle-<id>`, priority 5) is kept in sync by
+  lib/bundles.js: cart, checkout, order snapshot and Shopify push see just
+  another offer, so there are ZERO new money paths. Engine semantics:
+  complete sets only (min over floor(lineQty/need)), saving allocated
+  proportionally with the last line absorbing rounding (allocation sums
+  exactly — suite-proven), claimed lines are exclusive to one offer.
+- **The capability gate the record asks for**: ENABLE (and re-enable) runs
+  checkBundleCompatibility — every component exists and is available, the
+  set price actually saves against the component sum — and refuses with the
+  reasons listed; a live bundle whose component sells out serves honestly as
+  unavailable (math shown, add disabled). Dry-run check in the console.
+- **Selling plans / subscriptions are NOT built** — they require recurring
+  shopper payments (mandates/tokenized charges) this platform does not have;
+  pretending with a label would violate the honesty rules. Recorded as the
+  remaining half of BE31; it would slot in as a per-tenant capability behind
+  the S32 commerce adapter.
+
+### SF18 — Bundle detail page · **verified complete (S46)**
+
+- `/bundles/<slug>`: components with images/variant titles/struck-through
+  individual prices (sold-out/missing labeled), sticky price card (set price
+  vs component sum + save badge), add-the-set via the NORMAL cart API (server
+  re-derives everything; the BUNDLE offer applies in-cart automatically —
+  copy says exactly that), returnability note. Unknown/disabled slug → 404.
+  Live-proven on demo: ₹43,154 → −₹3,155 → ₹39,999 in a real cart, and the
+  COD probe order carried the bundle-priced total end-to-end.
+
+### SF19 — Product-finder quiz · **verified complete (S46)**
+
+- Deterministic by construction, NO AI at runtime: options carry catalog
+  tags, scoring is a tally (ties A–Z), recommendProducts ranks available
+  products by tag matches then title. Same answers → byte-identical results
+  (suite + live double-POST). Console editor (≤10 questions, 2–6 options,
+  ≤5 tags/option); `/quiz/<slug>` stepper with progress/back; optional
+  consented one-email results capture ("no list, no follow-ups") through the
+  BE23 notification queue; rate-limited POST.
+
+### SF20 — Editorial journal · **verified complete (S46)**
+
+- `family: "journal"` pages: `/journal` index + `/journal/<slug>`, scheduled
+  publish via window_start (future posts invisible everywhere incl. sitemap
+  — live-proven), release-governed like all content (drafts after a live
+  release stay invisible until published — observed live on demo and
+  resolved by publishing a release). Slug renames: redirect_from →
+  page_redirects, old URL 308s (live-proven); self-redirect refused; a page
+  saved at a slug kills any redirect FROM that slug (loop-proof, suite).
+  PageEditor grew the journal family + redirect field; campaigns remain
+  noindex/excluded.
+
+### SF21 — Returns request flow · **verified complete (S46)**
+
+- **APPROVAL ≠ REFUND, enforced and stated everywhere**: the whole flow
+  never touches money columns (suite asserts byte-equal money before/after;
+  live probe confirmed on a real order) — refunds happen through the
+  provider per docs/refunds.md and mirror back via the S31 projection.
+- Shopper: eligibility = money committed + not cancelled + within
+  returns_window_days (14 default) + not fully refunded; ownership via
+  customer_id (foreign order = "not found", never "ineligible"); reason ≥10
+  chars; ONE open request per order; status + merchant note shown on the
+  account order page. Merchant: Orders → Return requests panel; state
+  machine requested→approved|rejected, approved→completed|rejected (bad hops
+  refused); `returns.decide` authz action (staff+); audit rows; merchant
+  heads-up mail through the notification queue. Live-proven end-to-end on
+  demo over HTTP (request → duplicate refused → approve → complete), then
+  the probe order was cancelled per test-order hygiene.
+
 ## W4 EXIT (recorded S44, 2026-10-28)
 
 Exit evidence per the handoff ("independent merchants launch self-serve;
@@ -1338,6 +1408,36 @@ draft/live leakage; publish + rollback demonstrated"):
 - Deliberate scope notes carried into W4: catalog presentation overrides +
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S46, 2026-10-28)
+
+34 aliased suites / **406 tests + 10 perf budgets + 27 offers = 443 checks**
+green (new `test:commerce-exp` 18; offers engine +6 BUNDLE assertions;
+test-surfaces' window-refusal copy updated for the journal family),
+`pnpm build` clean. Migration tenant/0011 (bundles, quizzes,
+page_redirects, return_requests) rolled out CANARY-FIRST (demo, then
+fleet) + env default. The suite caught three real defects before any live
+run: bundle offer ids used underscores the offer-id slug rules refuse (ids
+are now `bun-`/`bundle-`), a page reappearing at a redirected-from slug
+left the stale redirect alive (upsert now always clears redirects FROM its
+slug), and a fixture mismatch. Live on hosted demo: bundle "muscle-duo"
+seeded from two REAL variants → /bundles page renders the set math → both
+components added through the normal cart API applied the BUNDLE offer
+(₹43,154 − ₹3,155 = ₹39,999 exactly); quiz seeded over real catalog tags →
+double-POST returned byte-identical picks; journal post + scheduled post +
+rename redirect — drafts stayed correctly invisible until a release was
+published (release governance observed working), then index/post 200,
+scheduled 404, old slug 308, sitemap lists only the visible post and still
+excludes campaigns; returns: COD probe order (snehal@mediastic.in, carrying
+the bundle price) → OTP login claimed it → return requested over HTTP →
+duplicate refused → foreign order "not found" → approve + complete via
+decideReturn with money columns byte-identical before/after → **probe order
+cancelled on both sides** per hygiene (Shopify restock, no refund, no
+email). Regression sweep: beastlife 200s with empty-journal/no-bundles
+honest states, marketing host unchanged and 404s /journal, unknown host
+404. Demo seeds (bundle, quiz, journal posts, release) kept as demo
+content. Residual: bundles aren't yet surfaced on home/collections — the
+detail page is linkable from nav/sections via the existing CMS.
 
 ## Verification state (S45, 2026-10-28)
 
