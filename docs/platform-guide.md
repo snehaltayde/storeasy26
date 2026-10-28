@@ -492,6 +492,51 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   `components/admin/PreviewPane.js`, banner/rich_text validation in
   [lib/cms/validate.js](../lib/cms/validate.js), renderers in `app/page.js`.
 
+#### Settings ops panels (S43 / MC21 + MC23 + MC25 + MC26 + MC27)
+- **What**: five panels under Settings —
+  **Team** (MC23): invite by email+role (link shown once, token hashed at
+  rest), role changes, removal; last-owner guards surface from the identity
+  layer; owner grants need the owner role.
+  **Domains & SEO** (MC21): the tenant's claimed hosts with status, the
+  exact TXT record to add, and merchant-triggered verification (own hosts
+  only); robots.txt is per-tenant per-request (quirk #9 closed), the sitemap
+  is release-aware, campaigns stay noindex. Claiming stays operator-side.
+  **Privacy & data** (MC25): consent version + purposes, retention summary,
+  the shopper privacy-request queue with statuses, redaction count.
+  **Audit log** (MC26): the S27 append-only trail — who/what/when, redacted
+  at write.
+  **Help & support** (MC27): a copyable diagnostics bundle (presence flags,
+  counts, watermarks, discrepancy KINDS + order ids only — never shopper
+  PII or secret values; nothing auto-sends) + the support contact.
+- **Files**: `components/admin/OpsPanels.js`, `app/api/admin/team|domains|
+  privacy|help/route.js` (audit API existed since S27).
+
+#### Maintenance & incidents (S43 / OP12) + offboarding (BE29)
+- **Maintenance mode** (per tenant, operator-toggled): shoppers get a
+  BRANDED kit-styled closed page with the operator's message; any
+  console/platform cookie (or the 15-min `_mx` sign-in pass the page links
+  to) lifts the visual curtain so the team keeps working — presence-only, a
+  UX curtain, not auth — while **checkout answers 503 for everyone**,
+  cookie or not. Toggle: /platform tenant row or
+  `PATCH /api/platform/tenants/<id> {maintenance:{enabled,message}}`.
+- **Incidents**: operator-declared, with the INTERNAL note strictly separated
+  from the PUBLIC message; open incidents (platform-wide or tenant-scoped)
+  banner in the affected merchant consoles (login page included) and vanish
+  on resolve.
+- **Export (BE29)**: operator mints an EXPIRING (1h), tenant-bound,
+  tamper-proof download link → versioned JSON (manifest + every tenant-owned
+  table; media metadata only, blobs stay in the DB; secrets never included).
+- **Offboarding (BE29)**: typed-confirmation, staged and conservative —
+  suspend (hosts fail closed) → rotate order-link secret + console password
+  (outstanding links/sessions die; unrelated secrets retained) → cancel the
+  local subscription → purge platform-side queues/usage. The tenant DB and
+  row are KEPT (export stays possible); deletion is a separate manual act.
+- **Files**: [lib/platform/export.js](../lib/platform/export.js),
+  [lib/platform/incidents.js](../lib/platform/incidents.js),
+  `app/api/platform/incidents|privacy/`, `app/api/platform/tenants/[id]/
+  export|offboard/`, maintenance branch in [app/layout.js](../app/layout.js),
+  `app/api/admin/maintenance-pass/`, platform migration 0007.
+
 #### Dashboard & Analytics tabs (S42 / BE21 + MC04 + MC17)
 - **What**: `/admin/dashboard` (the console's landing page) — today/7d/30d
   net revenue + orders + AOV from the ORDERS ledger (refunds provider-
@@ -846,7 +891,7 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 - `pnpm events:stats`, `pnpm search:report [days]`.
 
 #### Test suites
-- **Use**: `pnpm test:<suite>` — 30 aliased suites, **366 tests + 10 perf budgets**, all on throwaway
+- **Use**: `pnpm test:<suite>` — 31 aliased suites, **375 tests + 10 perf budgets**, all on throwaway
   file DBs (never touch Turso): orders 18 · shipping 12 · shopify-push 13 ·
   hardening 11 · offers-admin 8 · events 16 · tenancy 9 · platform-sync 13 ·
   admin-console 9 · cms 10 · platform-ops 9 · tenant-boundary 24 (S25: fail-closed
@@ -914,9 +959,16 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   netting, honest-unknown nulls on empty stores, push/event coverage
   percentages, discrepancy queue with per-row actions, consented-events
   funnel/search-terms-with-zero-result-flags/devices/campaigns + snapshot
-  top-products) · perf 10 (S42 / BE35 budgets — see below).
+  top-products) · tenant-ops 9 (S43: export manifest/counts/no-secrets +
+  separate-DB isolation, expiring tenant-bound tamper-proof export tokens,
+  offboard = suspend + key rotation (unrelated secrets retained) + billing
+  cancel + platform purge with db kept and OTHER tenants untouched,
+  maintenance closes checkout honestly, incident visibility scoping incl.
+  internal-note never-serialized, merchant domain TXT verify matrix,
+  invite→accept→role flow + last-owner guards, privacy redact keeps money
+  rows) · perf 10 (S42 / BE35 budgets — see below).
   Plus the standalone S4 engine suite `node scripts/test-offers.js` (21 pure
-  assertions — **397 checks in all**) and `pnpm build` as the compile gate.
+  assertions — **406 checks in all**) and `pnpm build` as the compile gate.
 - **Perf budgets** (`pnpm test:perf`, BE35): 5,000-product fixture — PDP
   lookup ≤150ms, collection page (featured sort + facets, price+stock
   filters) ≤400ms, multi-term SQL search ≤400ms, home queries ≤400ms,
@@ -969,9 +1021,9 @@ multi-tenant payments go live. Severity-ordered:
    `pushResultMessage` (lib/admin/order-view.js) translates every refusal shape
    into honest copy ("Not pushable from status …", "Refused: Shopify's total
    didn't match…", "Dead-lettered after N attempts…").
-9. **robots.txt is prerendered at build time** — its sitemap line bakes the
-   build-env origin (currently `localhost:3007` in local builds), and `/platform`
-   isn't in the disallow list.
+9. ~~**robots.txt is prerendered at build time**~~ — **FIXED (S43 / MC21)**:
+   per-request + tenant-scoped (sitemap carries the resolving host's origin;
+   `/platform` and `/campaigns/` disallowed).
 10. **Static BeastLife branding remnants** — mostly FIXED (S36): manifest, SW cache
     names, offline page and 404 copy are per-tenant now. Still platform-generic or
     BeastLife-flavored: the shared icon set (per-tenant icons still pending), 500
@@ -1739,3 +1791,4 @@ run the verify checklist.
 | S40 | 3b114ef | W4 opens: billing & entitlements — versioned plan catalog, Razorpay Subscriptions lifecycle (HMAC webhook → inbox → jobs; dedupe, out-of-order watermark, terminal protection), signed-amount ledger, grace→degraded (checkout pauses, store never dies), quotas w/ 80% warnings, MC24 billing tab, OP08 operator reconciliation + overrides (BE11+BE33+MC24+OP08) |
 | S41 | dcf5f65 | W4: provisioning as recorded/resumable/idempotent steps w/ conservative compensation + NEUTRAL seeds (quirk #14 closed; new tenants start on Free), Setup tab onboarding checklist (derived + server-gated launch), store switcher (verified memberships), operator tenant detail (presence-only creds) + provisioning-runs panel (BE26+MC02+MC03+OP03+OP04) |
 | S42 | 35d05d0 | W4: reporting & fleet ops — BE21 TZ-correct reconciled rollups + coverage + discrepancy queue, MC04 dashboard (honest unknowns, /admin lands here), MC17 analytics (consent-badged funnel/products/search/campaigns/devices, scoped CSV), OP02 fleet overview (explicit uncovered tenants), OP06 releases/migrations view + canary rollout flag, BE35 perf budgets suite; billing/provider modules made edge-bundle-safe (BE21+MC04+MC17+OP02+OP06+BE35) |
+| S43 | (this session) | W4: merchant ops completeness — Settings ops panels (team w/ last-owner guards, domain TXT wizard + per-tenant robots (quirk #9), privacy tracking, audit UI, PII-free diagnostics), OP12 branded maintenance mode (checkout 503, console reachable) + incidents (internal/public split), BE29 expiring tenant exports + staged conservative offboarding (MC21+MC23+MC25+MC26+MC27+OP11+OP12+BE29) |

@@ -1,14 +1,27 @@
 import { activeSupportGrant } from "@/lib/platform/support";
+import { openIncidentsFor } from "@/lib/platform/incidents";
 import { currentTenant } from "@/lib/tenant-context";
 import { tfetch } from "@/lib/tenant-request";
 
 // Admin section layout (S34 / OP10): ONE place for the merchant-visible
 // support-access banner — whenever an operator grant is active on this tenant,
-// everyone in the console sees who/why/until-when. No other chrome.
+// everyone in the console sees who/why/until-when. S43 (OP12): open platform
+// incidents with a PUBLIC message show here too (internal notes never do).
 export default async function AdminLayout({ children }) {
-  const grant = await tfetch(async () => (currentTenant() ? activeSupportGrant(currentTenant().id) : null)).catch(() => null);
+  const [grant, incidents] = await tfetch(async () =>
+    Promise.all([
+      currentTenant() ? activeSupportGrant(currentTenant().id) : null,
+      openIncidentsFor(currentTenant()?.id || null),
+    ]),
+  ).catch(() => [null, []]);
   return (
     <>
+      {incidents.map((i) => (
+        <div key={i.id} className="border-b border-sky-200 bg-sky-50 px-4 py-2 text-center text-xs text-sky-800">
+          <span className="font-semibold">{i.tenant_id ? "Notice for your store" : "Platform notice"}: {i.title}</span>
+          {i.public_message ? <> — {i.public_message}</> : null}
+        </div>
+      ))}
       {grant && (
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-800">
           <span className="font-semibold">Platform support access is active</span> — operator{" "}

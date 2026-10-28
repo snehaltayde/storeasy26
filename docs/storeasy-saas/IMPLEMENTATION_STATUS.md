@@ -5,10 +5,10 @@ Tracking file required by `Storeasy_Claude_Developer_Handoff.md` §6 and
 **partial** · **missing** · **blocked**. A state other than "not inspected" is backed
 by a code audit or implementation in this repo — never by documentation alone.
 
-- Created: 2026-10-28 (session S25). Last updated: S42 (W1+W2+W3 complete; W4 underway).
+- Created: 2026-10-28 (session S25). Last updated: S43 (W1+W2+W3 complete; W4 underway).
 - Roadmap: all 116 records are phased S25–S49 in the approved plan
   (`~/.claude/plans/lively-moseying-bunny.md`); waves per the handoff.
-- **Audit coverage honesty:** 75 of 116 records audited/implemented so far
+- **Audit coverage honesty:** 83 of 116 records audited/implemented so far
   (BE01, SF23, SF08 — S25; BE02, MC01, OP01 — S26; BE03, BE16 — S27;
   BE13, BE17, BE12 — S28; BE14, BE19, OP05 — S29; BE04, BE25 — S30;
   BE10, BE36, SF09, MC16 — S31; BE06, BE07, SF06, SF07, MC14, MC22 — S32;
@@ -17,9 +17,10 @@ by a code audit or implementation in this repo — never by documentation alone.
   MC07, MC08, MC09, OP07 — S37; SF01–05, SF13, SF14, BE05, BE15,
   MC12 — S38; SF15, SF16, SF17, MC05, MC06, MC11, MC15, BE23 — S39;
   BE11, BE33, MC24, OP08 — S40; BE26, MC02, MC03, OP03, OP04 — S41;
-  BE21, MC04, MC17, OP02, OP06, BE35 — S42). The other 41 are **not
-  inspected** — the handoff's Fix/Extend/New labels for them remain
-  unverified documentation claims.
+  BE21, MC04, MC17, OP02, OP06, BE35 — S42; MC21, MC23, MC25, MC26, MC27,
+  OP11, OP12, BE29 — S43). The other 33 are **not inspected** — the
+  handoff's Fix/Extend/New labels for them remain unverified documentation
+  claims.
 
 ## Package gaps (blockers: none hard, recorded)
 
@@ -1147,6 +1148,75 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   latency dominates production and isn't modeled here. HTTP-level load
   (concurrent render paths) not measured — revisit before checkpoint C.
 
+### MC21 — Domains & SEO · **partial (merchant UX + robots, S43)**
+
+- Settings → Domains panel: claimed hosts, verification status, the exact
+  TXT record to add, merchant-triggered verify (own hosts only; claiming
+  stays operator-side — it changes fleet routing). robots.txt is now
+  per-tenant per-request (quirk #9 closed; /platform + /campaigns/
+  disallowed); the sitemap was already release-aware (S36/S39).
+- Remaining (recorded since S28): the path-preserving primary-host HTTP
+  redirect (needs middleware or the domains activation layer) and automated
+  TLS/Vercel-Domains wiring — pre-launch (checkpoint C) items.
+
+### MC23 — Team & permissions UI · **verified complete (S43)**
+
+- Settings → Team: members with roles, invite-by-email (link shown once,
+  token hashed at rest, 7-day expiry), role select, removal; last-owner
+  demote/remove guards surface from the identity layer (suite: sole owner
+  blocked both ways, second owner unlocks). Owner grants require team.owner.
+
+### MC25 — Privacy & exports (merchant) · **verified complete (S43, current scope)**
+
+- Settings → Privacy: consent version + purposes + collection note,
+  retention summary, the shopper privacy-request queue (statuses + notes),
+  redaction count, per-consent event-snapshot counts. Shopper DATA export
+  requests flow through the S33 data_request lifecycle; the TENANT's own
+  full export is BE29 (operator-minted).
+
+### MC26 — Audit log UI · **verified complete (S43)**
+
+- Settings → Audit: the S27 append-only trail (time, action, resource,
+  actor), served by the existing scoped+redacted API.
+
+### MC27 — Help & support · **verified complete (S43)**
+
+- Settings → Help: the diagnostics bundle rendered BEFORE anything is
+  shared — presence flags, counts, freshness watermarks, discrepancy kinds
+  with order ids only; no shopper PII, no secret values, nothing
+  auto-sends. Copy button + support mail link.
+
+### OP11 — Privacy operations · **verified complete (S43)**
+
+- /platform Privacy ops: the fleet's request queue (unreachable tenants
+  listed, never skipped silently), operator-executed redaction for
+  pending/manual rows (confirm → redactCustomer → request marked done with
+  counts; audited). Money rows retained by the S33 redaction semantics.
+
+### OP12 — Incidents & maintenance · **verified complete (S43)**
+
+- Maintenance: per-tenant config.maintenance → BRANDED kit-styled closed
+  page for shoppers; console/platform cookie or the 15-min _mx pass lifts
+  the visual curtain (presence-only, UX not auth); checkout 503s for
+  EVERYONE. Live-drilled on demo end-to-end incl. restore. Honest notes:
+  the closed page serves HTTP 200 (a real 503 status needs middleware —
+  recorded), and the unused page payload still rides the response (content
+  isn't secret; the store is just closed).
+- Incidents: internal note / public message strictly split; open incidents
+  banner in affected merchant consoles (live-verified on the login page,
+  internal note absent from the HTML); resolve removes it.
+
+### BE29 — Export & offboarding · **verified complete (S43, current scope)**
+
+- Versioned export (manifest + all tenant-owned tables; media metadata
+  only; secrets never; other tenants impossible by construction — separate
+  DBs, suite-asserted). Expiring (1h) tenant-bound tamper-proof download
+  links. Offboarding: typed confirm → suspend → key revocation (order-link
+  + console password rotated, unrelated secrets retained) → local billing
+  cancel → platform-side queue/usage purge; tenant DB + row KEPT, export
+  still works after. Live: demo export downloaded (19 populated tables,
+  attachment headers, bad token 401). Final DB deletion stays manual.
+
 ## W3 EXIT (recorded S39, 2026-10-28)
 
 Exit evidence per the handoff ("tenant-specific pages from releases; no
@@ -1167,6 +1237,25 @@ draft/live leakage; publish + rollback demonstrated"):
 - Deliberate scope notes carried into W4: catalog presentation overrides +
   upsell placements are live-on-save (catalog-adjacent, recorded in MC05);
   maintenance mode → OP12; collection/PDP template families → W4.
+
+## Verification state (S43, 2026-10-28)
+
+31 aliased suites / **375 tests + 10 perf budgets + 21 offers = 406 checks**
+green (new `test:tenant-ops`, 9), `pnpm build` clean (the known NFT
+warning). Platform migration 0007 (incidents) applied hosted. Live drills:
+maintenance ON demo → branded closed page with the custom message, checkout
+API 503 CHECKOUT_DISABLED, `_mx` pass 302+cookie, any console cookie lifts
+the visual curtain while checkout stays 503 → OFF restored (resolver 30s
+cache window applies, as designed). Incident banner: platform-wide incident
+showed its PUBLIC message on demo's /admin/login, the internal note never
+appeared in the HTML, resolve removed it. Export: operator-minted link
+downloaded demo's real export (manifest v1, 19 populated tables, attachment
+headers), bad token 401. robots.txt per-host live (beastlife origin +
+/platform+/campaigns disallowed; demo gets its own origin). Offboarding
+exercised in-suite only (deliberately — no hosted tenant to sacrifice).
+Dev-ops note repeated for a reason: `rm -rf .next` during baselines KILLS
+the running dev server — restart the preview afterwards (bit us twice now;
+the baseline script order now does build last).
 
 ## Verification state (S42, 2026-10-28)
 
@@ -1419,7 +1508,7 @@ shopify-push 13, hardening 11, offers-admin 8, events 16, tenancy 9, platform-sy
 
 ## Other records
 
-All remaining 41 records: **not inspected** (states will change only with code
+All remaining 33 records: **not inspected** (states will change only with code
 audits/implementation in their scheduled sessions; see roadmap phases S26–S49).
 Incidental observations made during the S25 audits, recorded WITHOUT claiming a full
 audit of those records:

@@ -36,6 +36,7 @@ async function tenantHealth(row) {
         shopifyConnected: Boolean(tenant.secrets?.shopify_admin_token),
         uninstalledAt: tenant.config?.shopify_app_uninstalled_at || null,
         shopDomain: tenant.config?.shopify_store_domain || null,
+        maintenance: Boolean(tenant.config?.maintenance?.enabled),
       };
     });
   } catch (e) {

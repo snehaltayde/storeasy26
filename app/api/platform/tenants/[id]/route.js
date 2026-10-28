@@ -61,16 +61,27 @@ export async function GET(request, { params }) {
   });
 }
 
-// PATCH {status} — suspend/reactivate a tenant. S25: suspended hosts FAIL
-// CLOSED (neutral "temporarily unavailable", 503 on APIs) — see resolveHost.
+// PATCH {status} — suspend/reactivate a tenant (S25: suspended hosts FAIL
+// CLOSED). PATCH {maintenance: {enabled, message?}} — S43 (OP12): branded
+// maintenance page for shoppers, console stays reachable, checkout closes.
 export async function PATCH(request, { params }) {
   if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
-  if (!["active", "suspended"].includes(body.status))
-    return NextResponse.json({ error: 'status must be "active" or "suspended"' }, { status: 400 });
   try {
+    if (body.maintenance !== undefined) {
+      const m = body.maintenance;
+      const maintenance = m?.enabled
+        ? { enabled: true, message: String(m.message || "").slice(0, 300), since: new Date().toISOString() }
+        : null;
+      const t = await patchTenant(id, { config: { maintenance } });
+      slog("tenant_maintenance", { tenant: id, enabled: !!maintenance });
+      await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.status", tenantId: id, diff: { maintenance: !!maintenance } });
+      return NextResponse.json({ ok: true, tenant: { id: t.id, maintenance: t.config?.maintenance || null } });
+    }
+    if (!["active", "suspended"].includes(body.status))
+      return NextResponse.json({ error: 'status must be "active" or "suspended" (or pass maintenance)' }, { status: 400 });
     const t = await patchTenant(id, { status: body.status });
     slog("tenant_status_changed", { tenant: id, status: body.status });
     await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.status", tenantId: id, diff: { status: body.status } });

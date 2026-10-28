@@ -8,6 +8,8 @@ import BillingPanel from "./BillingPanel";
 import ProvisionRunsPanel from "./ProvisionRunsPanel";
 import TenantDetail from "./TenantDetail";
 import OverviewPanel from "./OverviewPanel";
+import IncidentsPanel from "./IncidentsPanel";
+import PrivacyOpsPanel from "./PrivacyOpsPanel";
 
 // Operator console (Session 22): tenant table + health, suspend/activate,
 // per-tenant sync, Shopify connect links, and the provisioning wizard.
@@ -141,6 +143,39 @@ export default function PlatformAdmin() {
     refresh();
   }
 
+  // S43 (OP12): maintenance — branded closed page for shoppers, console stays
+  // reachable, checkout closes for everyone.
+  async function toggleMaintenance(t) {
+    const enabling = !t.maintenanceOn;
+    const message = enabling ? window.prompt(`Maintenance message shoppers will see on "${t.id}" (blank = default copy):`, "") : null;
+    if (enabling && message === null) return;
+    const data = await fetch(`/api/platform/tenants/${t.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ maintenance: enabling ? { enabled: true, message } : { enabled: false } }),
+    }).then((r) => r.json()).catch(() => ({}));
+    say(t.id, data.ok ? (enabling ? "Maintenance ON — shoppers see the closed page" : "Maintenance off") : data.error || "Failed");
+    refresh();
+  }
+
+  // S43 (BE29): expiring export link + staged offboarding.
+  async function exportTenant(id) {
+    const data = await fetch(`/api/platform/tenants/${id}/export`, { method: "POST" }).then((r) => r.json()).catch(() => ({}));
+    if (data.ok) window.open(data.url, "_blank");
+    else say(id, data.error || "Export link failed");
+  }
+  async function offboard(id) {
+    const typed = window.prompt(`Offboard "${id}"? Suspends the store, revokes keys, cancels billing, purges platform-side queues. The database and export stay available.\n\nType the tenant id to confirm:`);
+    if (typed === null) return;
+    const data = await fetch(`/api/platform/tenants/${id}/offboard`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: typed }),
+    }).then((r) => r.json()).catch(() => ({}));
+    say(id, data.ok ? `Offboarded: ${data.steps.join(" · ")}` : data.error || "Failed");
+    refresh();
+  }
+
   async function logout() {
     await fetch("/api/platform/logout", { method: "POST" });
     router.refresh();
@@ -190,6 +225,7 @@ export default function PlatformAdmin() {
                       {t.status}
                     </span>
                     {h.uninstalledAt && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">APP UNINSTALLED</span>}
+                    {h.maintenance && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">MAINTENANCE</span>}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-zinc-500">
                     {(t.domains || []).join(", ") || "no domains"} · {h.shopDomain || "no shop"} ·{" "}
@@ -213,6 +249,15 @@ export default function PlatformAdmin() {
                   <a href={`/api/connect/shopify/start?tenant=${t.id}`} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50">
                     Connect Shopify
                   </a>
+                  <button onClick={() => toggleMaintenance({ id: t.id, maintenanceOn: h.maintenance })} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50">
+                    {h.maintenance ? "End maint." : "Maintenance"}
+                  </button>
+                  <button onClick={() => exportTenant(t.id)} className="rounded-lg border border-zinc-300 px-2.5 py-1 font-semibold hover:bg-zinc-50">
+                    Export
+                  </button>
+                  <button onClick={() => offboard(t.id)} className="rounded-lg border border-red-200 px-2.5 py-1 font-semibold text-red-600 hover:bg-red-50">
+                    Offboard
+                  </button>
                   {t.status === "active" ? (
                     <button onClick={() => setStatus(t.id, "suspended")} className="rounded-lg border border-red-200 px-2.5 py-1 font-semibold text-red-600 hover:bg-red-50">
                       Suspend
@@ -231,6 +276,8 @@ export default function PlatformAdmin() {
         })}
       </ul>
       <OverviewPanel />
+      <IncidentsPanel />
+      <PrivacyOpsPanel />
       <ProvisionRunsPanel />
       <ThemesPanel />
       <BillingPanel />

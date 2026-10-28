@@ -7,6 +7,7 @@ import { siteName } from "@/lib/site";
 import { db } from "@/lib/db";
 import AdminNav from "@/components/admin/AdminNav";
 import SettingsAdmin from "@/components/admin/SettingsAdmin";
+import OpsPanels from "@/components/admin/OpsPanels";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,9 @@ export default async function AdminSettingsPage() {
     <>
       <AdminNav storeName={name} />
       <SettingsAdmin initial={view} />
+      {/* S43: Team (MC23) · Domains & SEO (MC21) · Privacy (MC25) · Audit
+          (MC26) · Help (MC27) */}
+      <OpsPanels />
     </>
   );
 }
