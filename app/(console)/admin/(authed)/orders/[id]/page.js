@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
-import { getOrder } from "@/lib/orders";
+import { getOrder, canTransition, ORDER_STATUS } from "@/lib/orders";
+import { roleAllows } from "@/lib/platform/authz";
 import { getOrderProjection } from "@/lib/order-projection";
 import { redactOrderForRole } from "@/lib/admin/order-view";
 import { StatusBadge, Badge } from "@/components/console/Badge";
@@ -11,6 +12,7 @@ import { KeyValue } from "@/components/console/bits";
 import { Banner } from "@/components/console/Banner";
 import RetryPushButton from "@/components/admin/RetryPushButton";
 import ReconcileButton from "@/components/admin/ReconcileButton";
+import CancelOrderButton from "@/components/admin/CancelOrderButton";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +52,9 @@ export default async function AdminOrderDetail({ params }) {
           <>
             {order.status === "sync_failed" && <RetryPushButton orderId={order.id} />}
             {order.shopify_order_id && role !== "support" && <ReconcileButton orderId={order.id} />}
+            {roleAllows(role, "orders.cancel") && canTransition(order.status, ORDER_STATUS.CANCELLED) && (
+              <CancelOrderButton orderId={order.id} paymentCaptured={rawOrder.payment_status === "paid"} />
+            )}
           </>
         }
       />

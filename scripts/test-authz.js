@@ -75,7 +75,7 @@ const req = (cookie, headers = {}) => ({
 // --- role matrix ---------------------------------------------------------------
 await t("roleAllows matrix: owner all · admin no team.owner · staff no settings/push · support read-only", () => {
   const { roleAllows } = AUTHZ;
-  for (const a of ["offers.write", "settings.write", "orders.push", "team.manage", "team.owner", "audit.read"]) {
+  for (const a of ["offers.write", "settings.write", "orders.push", "orders.cancel", "team.manage", "team.owner", "audit.read"]) {
     eq(roleAllows("owner", a), true, `owner ${a}`);
   }
   eq(roleAllows("admin", "team.owner"), false, "admin team.owner");
@@ -83,6 +83,8 @@ await t("roleAllows matrix: owner all · admin no team.owner · staff no setting
   eq(roleAllows("staff", "offers.write"), true, "staff offers.write");
   eq(roleAllows("staff", "settings.read"), false, "staff settings.read");
   eq(roleAllows("staff", "orders.push"), false, "staff orders.push");
+  eq(roleAllows("staff", "orders.cancel"), false, "staff orders.cancel");
+  eq(roleAllows("admin", "orders.cancel"), true, "admin orders.cancel");
   eq(roleAllows("staff", "sync.run"), false, "staff sync.run");
   eq(roleAllows("support", "offers.read"), true, "support offers.read");
   eq(roleAllows("support", "offers.write"), false, "support offers.write");

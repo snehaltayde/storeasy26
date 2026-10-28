@@ -318,6 +318,68 @@ await t("findOrderByIdempotencyKey returns the row (and null for unknown)", asyn
   eq(await O.findOrderByIdempotencyKey(null), null, "null key → null");
 });
 
+// --- cancellation (S51: shared engine behind admin action + CLI) -------------
+const { cancelOrder } = await import("../lib/order-cancel.js");
+
+await t("cancelOrder: COD order cancels with audited reason", async () => {
+  const o = await mk({ idempotencyKey: key("cancel-cod") });
+  const r = await cancelOrder(o.id, { reason: "customer request", via: "admin-console" });
+  eq(r.ok, true, "ok");
+  eq(r.from, "cod_pending", "from");
+  eq(r.shopifyCancelled, false, "no Shopify side");
+  eq((await orderRow(o.id)).status, "cancelled", "row cancelled");
+  const ev = (await events(o.id)).at(-1);
+  eq(ev.to_status, "cancelled", "event");
+  const meta = JSON.parse(ev.meta);
+  eq(meta.reason, "customer request", "reason recorded");
+  eq(meta.via, "admin-console", "via recorded");
+});
+
+await t("cancelOrder: idempotent on an already-cancelled order", async () => {
+  const o = await mk({ idempotencyKey: key("cancel-again") });
+  await cancelOrder(o.id, {});
+  const r = await cancelOrder(o.id, {});
+  eq(r.ok, true, "ok");
+  eq(r.already, true, "already");
+  eq((await events(o.id)).filter((e) => e.to_status === "cancelled").length, 1, "one cancel event");
+});
+
+await t("cancelOrder: unknown order → 404, not a throw", async () => {
+  const r = await cancelOrder("BL-NOPE0000", {});
+  eq(r.ok, false, "refused");
+  eq(r.status, 404, "status");
+});
+
+await t("cancelOrder: refuses mid-sync (invalid transition) with 409", async () => {
+  const o = await mk({ idempotencyKey: key("cancel-syncing"), paymentMethod: "razorpay", razorpayOrderId: "order_C1" });
+  await O.markOrderPaid(o.id, { razorpayPaymentId: "pay_C1" });
+  await O.beginShopifySync(o.id);
+  const r = await cancelOrder(o.id, {});
+  eq(r.ok, false, "refused");
+  eq(r.status, 409, "status");
+  eq(r.code, "INVALID_TRANSITION", "code");
+  eq((await orderRow(o.id)).status, "syncing_shopify", "untouched");
+});
+
+await t("cancelOrder: captured payment refused without a recorded refund", async () => {
+  const o = await mk({ idempotencyKey: key("cancel-paid"), paymentMethod: "razorpay", razorpayOrderId: "order_C2" });
+  await O.markOrderPaid(o.id, { razorpayPaymentId: "pay_C2" });
+  const r = await cancelOrder(o.id, { reason: "cleanup" });
+  eq(r.ok, false, "refused");
+  eq(r.code, "REFUND_REQUIRED", "code");
+  eq((await orderRow(o.id)).status, "paid", "untouched");
+});
+
+await t("cancelOrder: captured payment cancels once the refund id is recorded", async () => {
+  const o = await mk({ idempotencyKey: key("cancel-refunded"), paymentMethod: "razorpay", razorpayOrderId: "order_C3" });
+  await O.markOrderPaid(o.id, { razorpayPaymentId: "pay_C3" });
+  const r = await cancelOrder(o.id, { reason: "cleanup", refundId: "rfnd_TEST1" });
+  eq(r.ok, true, "ok");
+  const meta = JSON.parse((await events(o.id)).at(-1).meta);
+  eq(meta.razorpay_refund_id, "rfnd_TEST1", "refund id recorded");
+  eq(meta.refunded_amount, 8911.89, "refund amount recorded");
+});
+
 // ----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);
 await rm(join(here, "../.test-orders.db"), { force: true });
