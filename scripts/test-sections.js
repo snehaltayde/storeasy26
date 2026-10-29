@@ -47,7 +47,7 @@ const ok = (cond, label = "") => {
 
 // --- registry ---------------------------------------------------------------
 await t("registry: families enumerate the real kinds; every component has defaults + settings", () => {
-  eq(JSON.stringify(HOME_SECTION_KINDS.sort()), JSON.stringify(["banner", "collections", "new", "rich_text"]));
+  eq(JSON.stringify(HOME_SECTION_KINDS.sort()), JSON.stringify(["banner", "collections", "image_with_text", "new", "product_rail", "rich_text"]));
   eq(JSON.stringify(PAGE_SECTION_KINDS.sort()), JSON.stringify(["faq", "image", "rich", "text"]));
   for (const kind of [...HOME_SECTION_KINDS, ...PAGE_SECTION_KINDS]) {
     const c = componentFor(kind);
@@ -130,6 +130,53 @@ await t("identical queries batch; curated collections fetch ONCE and slice per i
   eq(data.get("sec_c1").collections.length, 2, "sliced per instance");
   eq(data.get("sec_c2").collections.length, 5, "sliced per instance");
   eq(data.get("sec_n1").products, data.get("sec_n2").products, "batch shares the resolved array");
+});
+
+// --- S55 (slice 4): the broader library ---------------------------------------
+await t("image_with_text + product_rail validate (and reject bad input) through the registry", () => {
+  const good = validateBlock("home_sections", [
+    { kind: "image_with_text", image: "/api/media/med1", image_alt: "Serum on linen", image_side: "right", title: "Why it works", text: "t", label: "Read", href: "/journal" },
+    { kind: "product_rail", title: "Bestsellers", collection: "serums", limit: 4 },
+  ]);
+  eq(good.ok, true, good.errors.join("; "));
+  eq(good.value[0].image_side, "right");
+  eq(good.value[1].collection, "serums");
+  const bad = validateBlock("home_sections", [
+    { kind: "image_with_text", image: "javascript:x", image_alt: "" },
+    { kind: "product_rail", collection: "NOT A HANDLE!" },
+  ]);
+  eq(bad.ok, false);
+  ok(bad.errors.some((e) => /image must be/.test(e)) && bad.errors.some((e) => /alt text/.test(e)) && bad.errors.some((e) => /pick a collection/.test(e)), bad.errors.join("; "));
+});
+
+await t("product_rail binds to ITS collection per instance; same (collection,limit) batches", async () => {
+  const calls = [];
+  const railRepo = {
+    ...repo,
+    getProductsInCollection: async (handle, { limit }) => {
+      calls.push(`${handle}:${limit}`);
+      return { products: Array.from({ length: limit }, (_, i) => ({ id: `${handle}-${i}` })) };
+    },
+  };
+  const sections = [
+    { id: "sec_r1", kind: "product_rail", collection: "serums", limit: 3, enabled: true },
+    { id: "sec_r2", kind: "product_rail", collection: "masks", limit: 5, enabled: true },
+    { id: "sec_r3", kind: "product_rail", collection: "serums", limit: 3, enabled: true }, // identical → batched
+  ];
+  const data = await resolveHomeSectionData(sections, { repo: railRepo });
+  eq(data.get("sec_r1").products.length, 3);
+  eq(data.get("sec_r2").products.length, 5);
+  eq(data.get("sec_r2").products[0].id, "masks-0", "bound to its own collection");
+  eq(calls.length, 2, "identical rails batched");
+});
+
+await t("renderer-side filters include the new kinds (registry-driven, nothing dropped)", async () => {
+  const saved = validateBlock("home_sections", [{ kind: "product_rail", collection: "serums", limit: 4 }]);
+  await S.setBlock("home_sections", saved.value);
+  const rendered = await S.getHomeSections();
+  eq(rendered.length, 1, "product_rail survives the render filter");
+  eq(rendered[0].kind, "product_rail");
+  await S.deleteBlock("home_sections");
 });
 
 await t("id-less legacy sections key by index (old live snapshots keep rendering)", async () => {

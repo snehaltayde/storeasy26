@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronUp, Copy, ExternalLink, ImagePlus, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Copy, ExternalLink, History, ImagePlus, Plus, Trash2, X } from "lucide-react";
 import { PageHeader } from "@/components/console/PageHeader";
 import { Card, CardHeader } from "@/components/console/Card";
 import { Badge } from "@/components/console/Badge";
@@ -10,12 +10,12 @@ import { Banner } from "@/components/console/Banner";
 import { Button, IconButton } from "@/components/console/Button";
 import { Switch } from "@/components/console/Switch";
 import { Field, Input, Textarea, Select } from "@/components/console/fields";
-import { ConfirmDialog } from "@/components/console/Dialog";
-import { EmptyState } from "@/components/console/bits";
+import { ConfirmDialog, Dialog } from "@/components/console/Dialog";
+import { EmptyState, ErrorState, SkeletonText } from "@/components/console/bits";
 import { useToast } from "@/components/console/Toast";
 import { isoToLocalInput, localInputToIso } from "@/lib/admin/schedule";
 import { PAGE_TEMPLATES } from "@/lib/content/templates";
-import { savePage, getPage, startPreview, useTemplate, saveTemplateApi } from "./api";
+import { savePage, getPage, getHistory, startPreview, useTemplate, saveTemplateApi } from "./api";
 import { ConflictBanner } from "./ConflictBanner";
 import { useDirtyGuard } from "./useDirtyGuard";
 import { MediaPicker } from "./MediaPicker";
@@ -126,6 +126,8 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
   const [pickerFor, setPickerFor] = useState(null); // section id the MediaPicker fills
   const [saveTplOpen, setSaveTplOpen] = useState(false); // S54: "Save as template" dialog
   const [templateName, setTemplateName] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false); // S55: draft revision history dialog
+  const [hist, setHist] = useState({ status: "idle", entries: [], error: null }); // idle|loading|error|ready
   const idRef = useRef((page.sections || []).length); // next client-side section id
   const nextId = () => `n${idRef.current++}`;
 
@@ -295,6 +297,29 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
     toast.info("Loaded their version — your unsaved edits were discarded.");
   }
 
+  // ---- history (S55 / audit slice 5) -----------------------------------------
+  // Restore is deliberately NOT a write: "Load this version" replaces the FORM
+  // (through the same formFrom machinery a fresh load uses) as an UNSAVED
+  // change — the ordinary save path (validation + CAS) takes it from there.
+  async function loadHistory() {
+    setHist({ status: "loading", entries: [], error: null });
+    const r = await getHistory("page", page.slug);
+    if (r.ok) setHist({ status: "ready", entries: r.history || [], error: null });
+    else setHist({ status: "error", entries: [], error: r.error || "Couldn't load the version history." });
+  }
+  function openHistory() {
+    setHistoryOpen(true);
+    loadHistory();
+  }
+  function loadVersion(entry) {
+    if (!entry?.value) return;
+    // keep the CURRENT slug (slugs are permanent) and the CURRENT revision —
+    // the eventual save stays CAS-checked against today's head, not history's.
+    setForm(formFrom({ ...entry.value, slug: page.slug }));
+    setHistoryOpen(false);
+    toast.info("Version loaded into the editor — nothing changes until you save.");
+  }
+
   // ---- preview --------------------------------------------------------------
   async function preview() {
     setPreviewBusy(true);
@@ -343,6 +368,14 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
               onClick={preview}
             >
               Preview
+            </Button>
+            <Button
+              icon={<History size={14} aria-hidden />}
+              disabled={isNew}
+              title={isNew ? "Save the page first — history starts with your first save" : "Load an earlier saved version into the editor"}
+              onClick={openHistory}
+            >
+              History
             </Button>
             <Button
               icon={<Copy size={14} aria-hidden />}
@@ -658,6 +691,45 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
           toast.success(`Template “${r.template.name}” saved — it’s in “Start from a template” on new pages`);
         }}
       />
+
+      {/* S55: draft version history — read-only list; "Load this version" is an unsaved form replace */}
+      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} title="Version history" size="lg">
+        <p>Every save keeps a version here (latest first). Loads into the editor — nothing changes until you save.</p>
+        <div className="mt-3">
+          {hist.status === "loading" ? (
+            <SkeletonText lines={4} />
+          ) : hist.status === "error" ? (
+            <ErrorState title="Couldn't load the history" detail={hist.error} onRetry={loadHistory} />
+          ) : hist.entries.length === 0 ? (
+            <EmptyState
+              icon={<History size={20} aria-hidden />}
+              title="No saved versions yet"
+              body="History starts with your next save."
+            />
+          ) : (
+            <ul className="divide-y divide-edge rounded-ctl border border-edge">
+              {hist.entries.map((e) => (
+                <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                  <span className="whitespace-nowrap text-sm text-fg">{new Date(e.created_at).toLocaleString()}</span>
+                  <span className="font-mono text-[11px] text-fg-muted">{e.actor || "unknown"}</span>
+                  <span className="text-xs text-fg-subtle">
+                    {(e.value?.sections || []).length} {(e.value?.sections || []).length === 1 ? "section" : "sections"}
+                  </span>
+                  <Button
+                    size="sm"
+                    className="ml-auto"
+                    disabled={!e.value}
+                    title={e.value ? "Replace the editor contents with this version — unsaved until you save" : "This version couldn't be read"}
+                    onClick={() => loadVersion(e)}
+                  >
+                    Load this version
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmBack}

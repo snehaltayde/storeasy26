@@ -68,7 +68,7 @@ export default async function Home() {
             {hero.primary?.label ? (
               <Link
                 href={hero.primary.href || "/collections"}
-                className="rounded-full bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition hover:bg-accent-300"
+                className="rounded-[var(--btn-radius,9999px)] bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition hover:bg-accent-300"
               >
                 {hero.primary.label}
               </Link>
@@ -76,7 +76,7 @@ export default async function Home() {
             {hero.secondary?.label ? (
               <Link
                 href={hero.secondary.href || "#new"}
-                className="rounded-full border border-hero-fg/20 px-6 py-3 text-sm font-semibold text-hero-fg transition hover:bg-hero-fg/10"
+                className="rounded-[var(--btn-radius,9999px)] border border-hero-fg/20 px-6 py-3 text-sm font-semibold text-hero-fg transition hover:bg-hero-fg/10"
               >
                 {hero.secondary.label}
               </Link>

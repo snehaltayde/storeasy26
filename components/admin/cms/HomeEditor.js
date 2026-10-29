@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/console/Dialog";
 import { Field, Input, Textarea } from "@/components/console/fields";
 import { Switch } from "@/components/console/Switch";
 import { useToast } from "@/components/console/Toast";
+import { COMPONENTS } from "@/lib/cms/registry"; // pure data, no server imports — safe in a client file
 import { getStorefrontView, saveBlock, resetBlock } from "./api";
 import { CollectionPicker } from "./RefPicker";
 import { ConflictBanner } from "./ConflictBanner";
@@ -38,6 +39,13 @@ const NEW_SECTION = {
   banner: { kind: "banner", title: "Festive offer", text: "", label: "Shop now", href: "/collections", enabled: true },
   rich_text: { kind: "rich_text", title: "", html: "<p>Tell your story…</p>", enabled: true },
 };
+// S55: the registry has kinds this screen has NO form for (image_with_text,
+// product_rail, whatever comes next) — they're edited in the Designer. Here
+// they render a neutral body; the generic controls (move/hide/duplicate/
+// remove) still apply, and saves round-trip them untouched (the save sends
+// the full section objects — only the client-side `_id` is stripped).
+const FORM_KINDS = new Set(Object.keys(KIND_META));
+const kindLabel = (kind) => KIND_META[kind]?.label || COMPONENTS[kind]?.label || kind;
 const HISTORY_CAP = 30;
 const HANDLE_RE = /^[a-z0-9][a-z0-9-]{0,80}$/;
 
@@ -462,7 +470,7 @@ export default function HomeEditor({ initial }) {
               <li key={s._id} className={cx("rounded-ctl border border-edge p-3", s.enabled === false && "bg-surface-sunken")}>
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-xs font-semibold text-fg-muted">
-                    {i + 1}. {KIND_META[s.kind]?.label || s.kind}
+                    {i + 1}. {kindLabel(s.kind)}
                   </p>
                   {s.enabled === false && <Badge tone="warning">Hidden</Badge>}
                   <span className="ml-auto flex items-center gap-1">
@@ -470,7 +478,7 @@ export default function HomeEditor({ initial }) {
                       <Switch
                         checked={s.enabled !== false}
                         onChange={(v) => patchSection(s._id, { enabled: v })}
-                        label={`${s.enabled === false ? "Show" : "Hide"} section ${i + 1} (${KIND_META[s.kind]?.label || s.kind})`}
+                        label={`${s.enabled === false ? "Show" : "Hide"} section ${i + 1} (${kindLabel(s.kind)})`}
                       />
                       {s.enabled === false ? "Hidden" : "Shown"}
                     </span>
@@ -524,6 +532,16 @@ export default function HomeEditor({ initial }) {
                       <Field label="Button link" htmlFor={`${s._id}-href`}>
                         <Input id={`${s._id}-href`} value={s.href || ""} placeholder="/collections/…" onChange={(e) => patchSection(s._id, { href: e.target.value })} />
                       </Field>
+                    </div>
+                  )}
+                  {/* S55: a registry kind with no form here — settings live in the Designer;
+                      the generic controls above still work, and saving leaves it untouched. */}
+                  {!FORM_KINDS.has(s.kind) && (
+                    <div className="mt-2 rounded-ctl bg-surface-sunken px-3 py-2">
+                      <p className="text-xs font-medium text-fg">{kindLabel(s.kind)}</p>
+                      <p className="mt-0.5 text-xs text-fg-muted">
+                        Edit this section&rsquo;s settings in the Designer — reorder, show/hide and duplicate work here.
+                      </p>
                     </div>
                   )}
                   {s.kind === "rich_text" && (

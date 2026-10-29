@@ -42,7 +42,9 @@ export const GET = tenantHandler(async (request) => {
 export const POST = tenantHandler(async (request) => {
   const body = await request.json().catch(() => ({}));
   const action = body.action;
-  const auth = await requireAdmin(request, action === "preview" ? "storefront.read" : "storefront.write");
+  // S55: publishing is its OWN capability — staff edit drafts and preview,
+  // but flipping live (publish/schedule/rollback/cancel) is admin+.
+  const auth = await requireAdmin(request, action === "preview" ? "storefront.read" : "storefront.publish");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {

@@ -12,7 +12,7 @@ export default function Header({ collections = [], logo = { text1: "Store", text
   return (
     <header className="sticky top-0 z-30 bg-header text-header-fg">
       {announcement?.enabled && announcement.text ? (
-        <div className="bg-accent-400 px-4 py-1.5 text-center text-xs font-semibold text-accent-label">
+        <div data-sec="announcement" className="bg-accent-400 px-4 py-1.5 text-center text-xs font-semibold text-accent-label">
           {announcement.href ? (
             <Link href={announcement.href} className="hover:underline">
               {announcement.text}

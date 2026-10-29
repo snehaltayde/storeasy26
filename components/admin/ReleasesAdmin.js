@@ -12,7 +12,7 @@ import { Banner } from "@/components/console/Banner";
 import { Button } from "@/components/console/Button";
 import { Field, Input } from "@/components/console/fields";
 import { Table } from "@/components/console/Table";
-import { EmptyState } from "@/components/console/bits";
+import { EmptyState, PermissionNote } from "@/components/console/bits";
 import { ConfirmDialog } from "@/components/console/Dialog";
 import { useToast } from "@/components/console/Toast";
 
@@ -22,7 +22,10 @@ import { useToast } from "@/components/console/Toast";
 // no re-validation), history with rollback and cancel-schedule, preview.
 // Validation errors surface BEFORE publish (the server re-gates anyway) as
 // persistent Banners; every POST returns the full view, so state refreshes
-// from the response. Role-blind on purpose: the server owns permissions.
+// from the response. S55: `canPublish` (computed by the SERVER page from
+// storefront.publish — staff edit, admin+ publish) gates every go-live
+// control; the server still owns the real permission check. Preview stays
+// open to everyone who can edit.
 const when = (s) => (s ? new Date(s).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—");
 
 const HISTORY_COLUMNS = [
@@ -32,7 +35,7 @@ const HISTORY_COLUMNS = [
   { key: "state", header: "State", align: "right" },
 ];
 
-export default function ReleasesAdmin({ initial }) {
+export default function ReleasesAdmin({ initial, canPublish = true }) {
   const toast = useToast();
   const [data, setData] = useState(initial);
   const [note, setNote] = useState("");
@@ -96,7 +99,7 @@ export default function ReleasesAdmin({ initial }) {
   const v = data.validation || { ok: true, errors: [], warnings: [] };
   const diff = data.diff || { firstPublish: !data.live, dirty: !!data.dirty, items: [] };
   const diffItems = diff.items || [];
-  const canPublish = v.ok && !!data.dirty;
+  const readyToPublish = v.ok && !!data.dirty; // content gate; canPublish is the ROLE gate
   const diffLabels = diffItems.map((it) => diffItemInfo(it).label);
 
   return (
@@ -185,11 +188,15 @@ export default function ReleasesAdmin({ initial }) {
       <Card>
         <CardHeader title="Publish" description="Publishing snapshots the current drafts into an immutable release and flips live to it. Rollback always works." />
 
+        {/* S55: the ONE role note on this screen — the go-live controls below (and
+            rollback/cancel in History) disable with it. Preview stays enabled. */}
+        {!canPublish && <PermissionNote className="mb-3" need="publish — you can edit drafts and preview, but an admin or owner takes them live" />}
+
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Release note (optional)" htmlFor="release-note" className="min-w-48 flex-1">
             <Input id="release-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Diwali hero + navy brand" />
           </Field>
-          <Button variant="primary" disabled={!canPublish || !!busy} onClick={() => setConfirmPublish(true)}>
+          <Button variant="primary" disabled={!canPublish || !readyToPublish || !!busy} onClick={() => setConfirmPublish(true)}>
             Publish now
           </Button>
         </div>
@@ -201,7 +208,7 @@ export default function ReleasesAdmin({ initial }) {
             </Field>
             <Button
               busy={busy === "schedule"}
-              disabled={(!!busy && busy !== "schedule") || !canPublish || !at}
+              disabled={(!!busy && busy !== "schedule") || !canPublish || !readyToPublish || !at}
               onClick={async () => {
                 const iso = localInputToIso(at);
                 if (!iso) return setApiErrors(["Pick a date and time first."]);
@@ -254,14 +261,14 @@ export default function ReleasesAdmin({ initial }) {
                   return (
                     <span className="inline-flex items-center gap-2">
                       <span className="whitespace-nowrap text-xs text-warning">Scheduled for {when(r.scheduled_for)}</span>
-                      <Button size="sm" variant="dangerOutline" disabled={!!busy} onClick={() => setCancelRow(r)}>
+                      <Button size="sm" variant="dangerOutline" disabled={!canPublish || !!busy} onClick={() => setCancelRow(r)}>
                         Cancel schedule
                       </Button>
                     </span>
                   );
                 if (r.published_at)
                   return (
-                    <Button size="sm" variant="dangerOutline" disabled={!!busy} onClick={() => setRollback(r)}>
+                    <Button size="sm" variant="dangerOutline" disabled={!canPublish || !!busy} onClick={() => setRollback(r)}>
                       Roll back to this
                     </Button>
                   );

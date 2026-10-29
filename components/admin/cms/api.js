@@ -40,6 +40,9 @@ export const deletePage = (slug, revision) => put(revision == null ? { deletePag
 // S54: tenant-saved templates. useTemplate returns sections with FRESH
 // instance ids (an independent copy, never a live link).
 export const listTemplates = (family) => put({ listTemplates: family || true });
+// S55: draft revision history (read) — restore = load into the editor as an
+// unsaved change; the ordinary save path takes it from there.
+export const getHistory = (kind, key) => put({ history: { kind, key } });
 export const useTemplate = (id) => put({ useTemplate: id });
 export const saveTemplateApi = (template) => put({ saveTemplate: template });
 export const deleteTemplateApi = (id) => put({ deleteTemplate: id });

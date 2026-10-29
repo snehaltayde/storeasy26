@@ -237,6 +237,28 @@ await t("templates: save (write-gated) → list (read) → instantiate twice = f
   eq(gone.body.templates.length, 0, "deleted");
 });
 
+// --- S55: draft revision history --------------------------------------------
+await t("history: console saves trail into cms_history, newest first, readable by support, capped", async () => {
+  const { appendHistory, listHistory, HISTORY_KEEP } = await import("../lib/cms/history.js");
+  const a = await inT(() => handleStorefrontPut(req(staffTok, { block: "announcement", value: { enabled: true, text: "First", href: "" }, revision: null })));
+  eq(a.status, 200, "save 1");
+  const rev = a.body.revisions.announcement;
+  const b = await inT(() => handleStorefrontPut(req(staffTok, { block: "announcement", value: { enabled: true, text: "Second", href: "" }, revision: rev })));
+  eq(b.status, 200, "save 2");
+  const h = await inT(() => handleStorefrontPut(req(supportTok, { history: { kind: "block", key: "announcement" } })));
+  eq(h.status, 200, "support reads history");
+  ok(h.body.history.length >= 2, "two entries");
+  ok(String(h.body.history[0].value.text) === "Second" && String(h.body.history[1].value.text) === "First", "newest first");
+  ok(/merchant:/.test(h.body.history[0].actor || ""), "actor recorded");
+  // cap at the lib level
+  await inT(async () => {
+    for (let i = 0; i < HISTORY_KEEP + 7; i++) await appendHistory({ kind: "block", key: "cap-probe", value: { i } });
+  });
+  const capped = await inT(() => listHistory("block", "cap-probe"));
+  eq(capped.length, HISTORY_KEEP, "pruned to the cap");
+  eq(capped[0].value.i, HISTORY_KEEP + 6, "newest kept");
+});
+
 await t("validation errors still 422 with the errors list", async () => {
   const r = await inT(() => handleStorefrontPut(req(staffTok, { block: "hero", value: { title: "" }, revision: 1 })));
   eq(r.status, 422);

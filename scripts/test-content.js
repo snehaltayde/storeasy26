@@ -161,6 +161,21 @@ await t("validateBrand: bad hex rejected, enums checked", async () => {
   eq(B.validateBrand({ accent: "#0ea5e9" }).ok, true);
 });
 
+await t("S55 composition tokens: button_shape + section_spacing validate, default to today's look, emit vars", async () => {
+  eq(B.validateBrand({ button_shape: "blob" }).ok, false);
+  eq(B.validateBrand({ section_spacing: "huge" }).ok, false);
+  const v = B.validateBrand({ button_shape: "square", section_spacing: "airy" });
+  eq(v.ok, true);
+  eq(v.value.button_shape, "square");
+  const css = B.brandCssVars(v.value);
+  includes(css, "--btn-radius:0.25rem");
+  includes(css, "--section-pad-y:5rem");
+  // defaults preserve the pre-S55 hardcoded look exactly
+  const d = B.brandCssVars(B.validateBrand({}).value);
+  includes(d, "--btn-radius:9999px");
+  includes(d, "--section-pad-y:3.5rem");
+});
+
 await t("WCAG gate: unreadable body text BLOCKS; readable passes with the ratio computed", async () => {
   const bad = B.validateBrand({ foreground: "#cccccc", background: "#ffffff" });
   eq(bad.ok, false);

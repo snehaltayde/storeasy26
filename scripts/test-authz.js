@@ -85,6 +85,11 @@ await t("roleAllows matrix: owner all · admin no team.owner · staff no setting
   eq(roleAllows("staff", "orders.push"), false, "staff orders.push");
   eq(roleAllows("staff", "orders.cancel"), false, "staff orders.cancel");
   eq(roleAllows("admin", "orders.cancel"), true, "admin orders.cancel");
+  // S55: edit ≠ publish — staff draft, admin+ flips live
+  eq(roleAllows("staff", "storefront.write"), true, "staff still edits");
+  eq(roleAllows("staff", "storefront.publish"), false, "staff cannot publish");
+  eq(roleAllows("admin", "storefront.publish"), true, "admin publishes");
+  eq(roleAllows("support", "storefront.publish"), false, "support cannot publish");
   eq(roleAllows("staff", "sync.run"), false, "staff sync.run");
   eq(roleAllows("support", "offers.read"), true, "support offers.read");
   eq(roleAllows("support", "offers.write"), false, "support offers.write");

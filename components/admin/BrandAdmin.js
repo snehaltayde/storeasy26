@@ -20,6 +20,12 @@ import { useDirtyGuard } from "@/components/admin/cms/useDirtyGuard";
 // PLATFORM default look (that is what the API does — not the kit's colors).
 const RADII = ["sm", "md", "lg", "xl"];
 const SCALES = ["compact", "regular", "large"];
+// S55: storefront CTA shape + homepage section rhythm (API validates; defaults
+// pill/regular). SHAPE_RADII mirrors lib/brand.js BUTTON_SHAPES for the
+// local "Buy now" sample only — the storefront reads the real tokens.
+const SHAPES = ["pill", "rounded", "square"];
+const SPACINGS = ["compact", "regular", "airy"];
+const SHAPE_RADII = { pill: "9999px", rounded: "0.75rem", square: "0.25rem" };
 const PREVIEW_DEBOUNCE_MS = 300;
 
 function ColorField({ id, label, value, onChange, hint }) {
@@ -170,6 +176,24 @@ export default function BrandAdmin({ initial }) {
               ))}
             </Select>
           </Field>
+          <Field label="Button shape" htmlFor="brand-shape" hint="Storefront call-to-action buttons">
+            <Select id="brand-shape" value={brand.button_shape || "pill"} onChange={(e) => set("button_shape")(e.target.value)}>
+              {SHAPES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Section spacing" htmlFor="brand-spacing" hint="Vertical rhythm of homepage sections">
+            <Select id="brand-spacing" value={brand.section_spacing || "regular"} onChange={(e) => set("section_spacing")(e.target.value)}>
+              {SPACINGS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Select>
+          </Field>
         </div>
         <div className="mt-4 rounded-ctl border border-edge bg-surface-sunken p-4">
           <p className="text-xs text-fg-subtle">Preview</p>
@@ -179,7 +203,7 @@ export default function BrandAdmin({ initial }) {
             </span>
             <button
               type="button"
-              style={{ background: shades["400"], color: brand.accent_label || "#0a0a0b", borderRadius: "9999px" }}
+              style={{ background: shades["400"], color: brand.accent_label || "#0a0a0b", borderRadius: SHAPE_RADII[brand.button_shape] || SHAPE_RADII.pill }}
               className="px-4 py-2 text-sm font-bold"
             >
               Buy now
