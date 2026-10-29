@@ -48,6 +48,7 @@ export async function GET(request, { params }) {
       config: {
         shop_domain: tenant.config?.shopify_store_domain || null,
         client_id: tenant.config?.shopify_client_id || null,
+        order_prefix: tenant.config?.order_prefix || null,
         site_name: tenant.config?.site?.name || null,
         support_email: tenant.config?.site?.support_email || null,
         checkout_mode: tenant.config?.checkout_mode || "direct",
@@ -121,6 +122,12 @@ async function applyUpdate(id, u) {
   if (u.client_secret) {
     secrets.shopify_client_secret = String(u.client_secret).trim();
     changed.push("client_secret");
+  }
+  if (u.order_prefix !== undefined) {
+    const p = String(u.order_prefix).trim().toUpperCase();
+    if (p && !/^[A-Z0-9]{2,4}$/.test(p)) return bad("Order id prefix must be 2–4 letters/digits (e.g. PAV)");
+    config.order_prefix = p || null;
+    changed.push("order_prefix");
   }
   if (u.support_email !== undefined) {
     const email = String(u.support_email).trim();

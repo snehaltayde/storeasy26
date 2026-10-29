@@ -318,6 +318,25 @@ await t("findOrderByIdempotencyKey returns the row (and null for unknown)", asyn
   eq(await O.findOrderByIdempotencyKey(null), null, "null key → null");
 });
 
+// --- order id prefix (S51: per-store, BL- was BeastLife's hardcoded brand) ---
+const { withTenant } = await import("../lib/tenant-context.js");
+const fakeTenant = (over = {}) => ({ id: "pavos", dbUrl: "file:.test-orders.db", dbToken: null, config: {}, secrets: {}, ...over });
+
+await t("order ids: no tenant context keeps the legacy BL- prefix", async () => {
+  const o = await mk({ idempotencyKey: key("prefix-legacy") });
+  ok(o.id.startsWith("BL-"), `got ${o.id}`);
+});
+
+await t("order ids: a tenant derives its own prefix from its id", async () => {
+  const o = await withTenant(fakeTenant(), () => mk({ idempotencyKey: key("prefix-derived") }));
+  ok(o.id.startsWith("PAV-"), `got ${o.id}`);
+});
+
+await t("order ids: config.order_prefix wins over the derived one", async () => {
+  const o = await withTenant(fakeTenant({ config: { order_prefix: "BL" } }), () => mk({ idempotencyKey: key("prefix-config") }));
+  ok(o.id.startsWith("BL-"), `got ${o.id}`);
+});
+
 // --- cancellation (S51: shared engine behind admin action + CLI) -------------
 const { cancelOrder } = await import("../lib/order-cancel.js");
 

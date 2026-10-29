@@ -163,6 +163,7 @@ function EditTenantDialog({ id, onClose, onSaved }) {
           clientId: data.tenant.config?.client_id || "",
           clientSecret: "",
           supportEmail: data.tenant.config?.support_email || "",
+          orderPrefix: data.tenant.config?.order_prefix || "",
         });
       } catch (e) {
         if (alive) setLoadErr(String(e?.message || e));
@@ -188,6 +189,7 @@ function EditTenantDialog({ id, onClose, onSaved }) {
           client_id: f.clientId,
           ...(f.clientSecret.trim() ? { client_secret: f.clientSecret } : {}),
           support_email: f.supportEmail,
+          order_prefix: f.orderPrefix,
         },
       }),
     });
@@ -228,9 +230,14 @@ function EditTenantDialog({ id, onClose, onSaved }) {
               <Input id="et-csec" mono type="password" value={f.clientSecret} onChange={set("clientSecret")} placeholder={secretPresent ? "unchanged" : ""} />
             </Field>
           </div>
-          <Field label="Support email" htmlFor="et-support" hint="Merchant notifications (returns, contact form) go here.">
-            <Input id="et-support" type="email" value={f.supportEmail} onChange={set("supportEmail")} />
-          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Support email" htmlFor="et-support" hint="Merchant notifications (returns, contact form) go here.">
+              <Input id="et-support" type="email" value={f.supportEmail} onChange={set("supportEmail")} />
+            </Field>
+            <Field label="Order id prefix" htmlFor="et-prefix" hint="2–4 letters/digits on new order ids. Blank = derived from the tenant id.">
+              <Input id="et-prefix" mono value={f.orderPrefix} onChange={set("orderPrefix")} placeholder={id.replace(/[^a-z0-9]/gi, "").slice(0, 3).toUpperCase()} />
+            </Field>
+          </div>
           {error && <Banner tone="danger">{error}</Banner>}
           <div className="flex justify-end gap-2 pt-1">
             <Button onClick={onClose} disabled={busy}>
