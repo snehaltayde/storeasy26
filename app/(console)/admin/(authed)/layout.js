@@ -27,6 +27,12 @@ export default async function AdminAuthedLayout({ children }) {
       const c = await buildChecklist();
       if (c?.supported && !c.launched) badges.setup = `${c.doneCount}/${c.total}`;
     } catch {}
+    try {
+      // S52: unpublished-changes dot on Publishing (hash compare, cheap)
+      const { snapshotContent, getLiveRelease } = await import("@/lib/releases");
+      const [snap, live] = await Promise.all([snapshotContent(), getLiveRelease()]);
+      if (!live || live.content_hash !== snap.hash) badges.publish = "•";
+    } catch {}
     return [siteName(), currentTenant()?.domains?.[0] || null, badges];
   }).catch(() => ["Store", null, {}]);
 

@@ -7,12 +7,16 @@ import {
   BadgePercent,
   ChartNoAxesColumn,
   CreditCard,
+  FileText,
   FlaskConical,
+  Home,
   Image as ImageIcon,
   LayoutDashboard,
   Lightbulb,
   ListChecks,
+  ListTree,
   Package,
+  PackageOpen,
   Paintbrush,
   Palette,
   PanelsTopLeft,
@@ -36,6 +40,10 @@ const ICONS = {
   catalog: Package,
   media: ImageIcon,
   storefront: PanelsTopLeft,
+  "cms-home": Home,
+  "cms-pages": FileText,
+  "cms-nav": ListTree,
+  "cms-pdp": PackageOpen,
   theme: Palette,
   brand: Paintbrush,
   releases: Rocket,
@@ -65,18 +73,23 @@ export const NAV_GROUPS = [
   },
   {
     label: "Catalog",
-    items: [
-      { id: "catalog", label: "Catalog", href: "/admin/catalog" },
-      { id: "media", label: "Media", href: "/admin/media" },
-    ],
+    items: [{ id: "catalog", label: "Catalog", href: "/admin/catalog" }],
   },
+  // S52: the one overloaded Storefront screen became a CMS with dedicated
+  // areas. Media moved here from Catalog (it's content, and the pickers live
+  // in these editors); Releases reads as "Publishing".
   {
     label: "Storefront",
     items: [
-      { id: "storefront", label: "Storefront", href: "/admin/storefront" },
+      { id: "storefront", label: "Overview", href: "/admin/storefront", exact: true },
+      { id: "cms-home", label: "Home page", href: "/admin/storefront/home" },
+      { id: "cms-pages", label: "Pages", href: "/admin/storefront/pages" },
+      { id: "cms-nav", label: "Navigation", href: "/admin/storefront/navigation" },
+      { id: "cms-pdp", label: "Product pages", href: "/admin/storefront/product-pages" },
       { id: "theme", label: "Theme", href: "/admin/theme" },
       { id: "brand", label: "Brand", href: "/admin/brand" },
-      { id: "releases", label: "Releases", href: "/admin/releases" },
+      { id: "media", label: "Media", href: "/admin/media" },
+      { id: "releases", label: "Publishing", href: "/admin/releases", badgeKey: "publish" },
     ],
   },
   {
@@ -115,7 +128,9 @@ export function SidebarNav({ role, badges = {}, collapsed = false, onNavigate })
             <ul className="space-y-0.5">
               {items.map((it) => {
                 const Icon = ICONS[it.id];
-                const active = pathname.startsWith(it.href);
+                // exact: an index item (e.g. Storefront overview) must not
+                // stay lit while a sibling child route is open
+                const active = it.exact ? pathname === it.href : pathname.startsWith(it.href);
                 const badge = badges[it.badgeKey];
                 return (
                   <li key={it.id}>
