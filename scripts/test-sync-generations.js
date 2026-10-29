@@ -195,6 +195,10 @@ await t("missingScopes: full grant passes; partial grant names what's absent", (
   ok(missing.includes("write_orders") && missing.includes("read_orders"), "names missing scopes");
   eq(O.missingScopes("").length, O.OAUTH_SCOPES.split(",").length, "empty grant misses all");
   ok(O.missingScopes(` ${O.OAUTH_SCOPES.split(",").join(" , ")} `).length === 0, "whitespace tolerated");
+  // S51: Shopify implies read when write is granted and echoes only write_x —
+  // the real pavos grant (write_orders, no read_orders) must NOT alarm.
+  const impliedRead = O.OAUTH_SCOPES.split(",").filter((s) => s !== "read_orders").join(",");
+  eq(O.missingScopes(impliedRead).length, 0, "write_orders satisfies read_orders");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
