@@ -31,18 +31,27 @@ pnpm tenant:provision <slug> --shop <x.myshopify.com> --name "Store Name" \
   --domain shop.partner.in --client-id <id> --client-secret <secret>
 ```
 
-Creates `storeasy-t-<slug>` on Turso, applies the commerce schema, seeds
-default offers, generates the **console password (shown once — hand it over
-securely)** and the order-link secret, registers the tenant. (Also available
-from `/platform` → New tenant.)
+Creates `storeasy-t-<slug>` on Turso, applies the commerce schema, generates
+the **console password (shown once — hand it over securely)** and the
+order-link secret, registers the tenant, and starts a Free-plan subscription.
+Nothing brand-flavored is seeded (S41): offers, CMS content and pages start
+empty. (Also available from `/platform` → **New tenant** — the preferred,
+console-first path. S51 additions on the tenant row: **More → Edit details**
+fixes domains/app credentials/order-id prefix after the fact, **More → Share
+access** creates the merchant's single-use owner invite or rotates the
+console password, and **View store** opens the storefront.)
 
 ## 3. Connect Shopify
 
 Open `https://<platform>/api/connect/shopify/start?tenant=<slug>` (as a
 signed-in operator, or append `&secret=$CRON_SECRET`), have the PARTNER click
 Install/Approve on the Shopify screen. The callback stores the permanent
-admin token encrypted, registers the 7 catalog webhooks, and kicks the first
-sync. Big catalogs: run `pnpm tenant:sync <slug>` yourself.
+admin token encrypted, registers the 11 webhooks (catalog ×6, app/uninstalled,
+refunds, fulfillments ×2, orders/cancelled — https platform URLs only; on
+localhost run `pnpm webhooks:register <slug>` later), and kicks the first
+sync. Big catalogs: run `pnpm tenant:sync <slug>` yourself. Shopify implies
+read access when write is granted (write_orders covers read_orders) — the
+scope check knows this (S51).
 
 ## 4. Domain
 

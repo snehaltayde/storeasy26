@@ -105,20 +105,25 @@ Harness Orders shows all 7 statuses. Check tones: paid/synced = green, sync fail
 - Open **DD-SYNC1** → shows a ₹899 refund and links to the return.
 - **Returns tab:** approve the `requested` return (ret_d1) via its confirm dialog — note the money-handling toast (refunds go via the provider, not here). The seeded approved/completed/rejected rows render their statuses.
 - "Load more" paginates without duplicating rows.
+- **Cancel order** (S51): on any cancellable order's detail page — typed order-id confirm, reason field, refund-id field when money is captured. It cancels on the Shopify side too (restock, no refund, no email), and treats "already cancelled in Shopify" as success. **Reconcile** also adopts Shopify-side cancellations.
 
 ### 4.3 Catalog · Media
 - Catalog lists the 8 seeded products (Detox Clay Mask shows unavailable). Bundles and Quiz builders open; quiz delete asks for confirmation.
 - Media uploads/deletes ask for confirmation on delete.
 
-### 4.4 Storefront editor (the CMS)
-- Hero and Announcement show **Customized** (lime accent badge); other sections show Default.
-- Edit one section → only that section shows a dirty state and its own Save; saving it must **not** touch other sections' drafts.
-- **Conflict drill:** open the editor in two tabs, save a section in tab A, then save the same section in tab B → tab B gets a conflict banner (409) with an explicit overwrite choice — never a silent wipe.
-- Page remove asks for confirmation.
+### 4.4 Storefront CMS (S52 — dedicated areas, WordPress-style)
+The old single Storefront screen is now a CMS with its own routes, all deep-linkable:
+- **Overview** (`/admin/storefront`): live-vs-draft state with a per-item change list — every chip links to the right editor; recent edits; validation blockers; the two publish planes stated honestly (drafts-until-publish vs applies-immediately).
+- **Home page** (`/admin/storefront/home`): hero, homepage sections (hidden sections show a Hidden badge and survive saves), collections curation with a real picker (chips + reorder). One explicit save model; undo/redo on sections; draft preview pane at the bottom.
+- **Pages** (`/admin/storefront/pages`): searchable list with family tabs (Pages/Campaigns/Journal), window-aware status (Scheduled/Expired), Customized vs Standard copy; per-row Preview/Duplicate/Delete (typed confirm; default pages read "Revert to standard copy"). Each page edits at its own URL with breadcrumbs, a template picker on create (slug always editable), a media picker on image sections, meta description, visibility windows in local time.
+- **Navigation** (`/admin/storefront/navigation`): announcement bar + structured header/footer menu editors (label/link rows, one child level, visible caps, automatic-vs-custom mode made explicit). The footer's auto-added links are documented read-only.
+- **Product pages** (`/admin/storefront/product-pages`): the global PDP accordions with working Show/Hide.
+- **Conflict drill** (works on every editor): two tabs, save in A, save in B → B gets ONE consistent banner: "Load their version" / "Overwrite with mine" — never a silent wipe. Unsaved changes also warn on tab close.
 
-### 4.5 Theme · Brand · Releases
-- Theme/Brand changes preview and save; destructive/apply actions confirm via dialog (no browser `confirm()` anywhere).
-- Releases shows the published "Launch content" release **and an unpublished-changes state** (the seed edited the hero after publishing). Publish the draft, then **roll back** to the earlier release (dialog asks for the release id) — the storefront hero should flip accordingly (verify on 3007, not the harness).
+### 4.5 Theme · Brand · Publishing
+- **Theme**: applying a kit asks explicitly before replacing your brand colors or hero copy (both off by default); kit cards preview from their real swatches.
+- **Brand**: the accent ladder, sample button and contrast warnings update live while you type (debounced); Save only enables when dirty; reset is honestly labeled "Reset to platform default".
+- **Publishing** (`/admin/releases`): the "What will publish" card lists exactly which blocks/pages/brand/theme changed since live — publish confirms with that list; scheduling states its honest limits (snapshot taken now, no re-validation) and pending schedules can be **cancelled** from history; rollback copy states drafts stay untouched, and after a rollback the diff recomputes against the old live. Verify a published change on the storefront on 3007 (the harness storefront 500s by design).
 
 ### 4.6 Offers · Upsells
 - Three seeded offers in three states: "Serum duo" **active**, "FESTIVE10" **scheduled**, "Free lip mask" **draft/disabled** — statuses and dates render correctly.

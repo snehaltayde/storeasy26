@@ -2221,3 +2221,19 @@ CLI final-owner guard: `member:set --remove`/demote on the lone owner both
 refused with the guard message. `pnpm platform:migrate` applied `audit_log`
 to the hosted dev control plane. Probe audit rows remain in the log by design
 (append-only; they record exactly what happened).
+
+## Verification state (S51–S52, 2026-10-29) — real-tenant onboarding + Storefront CMS
+S51 (pavos.in, first real tenant): provisioning/connect/sync all exercised through the product by
+the merchant-user themselves on the shared hosted control plane; order cancel + Shopify mirroring
+covered by test:orders 27 + test:order-projection 14; tenant edit/hand-off/OAuth page verified live
+in the operator console. PENDING user actions: Razorpay test keys, owner-invite acceptance, the
+Razorpay+COD E2E orders, hosted phase (deploy is confirm-first).
+S52 (Storefront CMS): the brief's 8-step workflow ran interactively on the seeded design harness —
+page edit→save→reload persisted; publish flipped the per-item diff to in-sync; rollback recomputed
+the diff against the old live; schedule + cancel round-tripped; announcement/menu edits tracked as
+edited/customized; deep links + browser back; whole console driven at 306px width (mobile drawer).
+HONEST LIMITS: harness storefront routes 500 by design (edge runtime + file DBs), so published-
+content rendering and menu behavior on the SHOPPER side were verified via suites (content/
+storefront/surfaces) and remain part of the user's functional pass on :3007; keyboard/focus
+spot-checked (native dialogs), not exhaustively audited; MediaPicker upload exercised in code
+review + suite coverage only (harness media library starts empty).
