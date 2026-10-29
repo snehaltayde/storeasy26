@@ -6,9 +6,7 @@ import WishlistButton from "@/components/WishlistButton";
 import ProductCard from "@/components/ProductCard";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import { getProductByHandle } from "@/lib/repo";
-import { getPdpPairs } from "@/lib/cms/placements";
-import { resolvedPdpExtras } from "@/lib/content/resolve";
-import { getProductOverride } from "@/lib/catalog-overrides";
+import { resolvedPdpExtras, resolvedPdpPairs, resolvedProductOverride } from "@/lib/content/resolve";
 import { numericId } from "@/lib/ids";
 import { abs, siteName } from "@/lib/site";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -89,10 +87,11 @@ export default async function ProductPage({ params }) {
     if (!product) return { product: null };
     // "Pairs well with" (S23): manual placement, else same-collection auto.
     // S39 (MC05): per-product presentation override — modules + badge.
+    // S53 (0B-2): both are release-gated now (drafts stay draft until publish).
     const [pairs, extras, override] = await Promise.all([
-      getPdpPairs(product.id, { limit: 4 }),
+      resolvedPdpPairs(product.id, { limit: 4 }),
       resolvedPdpExtras(),
-      getProductOverride(product.id),
+      resolvedProductOverride(product.id),
     ]);
     return { product, pairs, brandName: siteName(), extras, override };
   });

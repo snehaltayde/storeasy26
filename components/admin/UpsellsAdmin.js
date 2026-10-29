@@ -116,7 +116,7 @@ export default function UpsellsAdmin({ initial }) {
     <div>
       <PageHeader
         title="Upsells"
-        description="PDP “pairs well with” (per product; auto same-collection when unset) and the cart-drawer slot."
+        description="PDP “pairs well with” (per product; auto same-collection when unset) and the cart-drawer slot. Saved as drafts — shoppers see changes after you publish from Publishing (S53)."
         actions={!form ? newPlacementButton : null}
       />
 

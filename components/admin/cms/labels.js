@@ -18,6 +18,7 @@ export const CHANGE_LABELS = {
   reset: "reset to default",
   added: "new",
   removed: "removed",
+  upgrade: "publishing upgrade",
 };
 
 export const CHANGE_TONES = {
@@ -43,6 +44,22 @@ export function diffItemInfo(item) {
     };
   if (item.type === "brand") return { label: "Brand", href: "/admin/brand", changeLabel: CHANGE_LABELS[item.change] || item.change, tone: CHANGE_TONES[item.change] || "info" };
   if (item.type === "theme") return { label: "Theme kit", href: "/admin/theme", changeLabel: CHANGE_LABELS[item.change] || item.change, tone: CHANGE_TONES[item.change] || "info" };
+  // S53 (0B-2): the presentation sets that joined the release snapshot
+  if (item.type === "overrides")
+    return { label: "Product modules & badges", href: "/admin/catalog", changeLabel: CHANGE_LABELS[item.change] || item.change, tone: "info" };
+  if (item.type === "pins")
+    return { label: "Collection pins", href: "/admin/catalog", changeLabel: CHANGE_LABELS[item.change] || item.change, tone: "info" };
+  if (item.type === "placements")
+    return { label: "Upsell placements", href: "/admin/upsells", changeLabel: CHANGE_LABELS[item.change] || item.change, tone: "info" };
+  if (item.type === "redirects")
+    return { label: "Page redirects", href: "/admin/storefront/pages", changeLabel: CHANGE_LABELS[item.change] || item.change, tone: "info" };
+  if (item.type === "envelope")
+    return {
+      label: "Publishing upgrade — pins, modules, placements & redirects now publish with releases",
+      href: "/admin/releases",
+      changeLabel: "one-time",
+      tone: "info",
+    };
   return { label: item.key, href: "/admin/storefront", changeLabel: item.change, tone: "info" };
 }
 

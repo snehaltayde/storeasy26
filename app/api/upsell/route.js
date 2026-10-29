@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCartUpsell } from "@/lib/cms/placements";
+import { resolvedCartUpsell } from "@/lib/content/resolve";
 import { tenantHandler } from "@/lib/tenant-request";
 
 // Cart-drawer upsell slot (Session 23). Fetched lazily by the drawer when it
@@ -13,7 +13,7 @@ export const GET = tenantHandler(async (request) => {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const slot = await getCartUpsell(exclude, { limit: 3 });
+  const slot = await resolvedCartUpsell(exclude, { limit: 3 }); // release-gated since S53
   return NextResponse.json(slot, {
     headers: { "Cache-Control": "private, max-age=60" },
   });

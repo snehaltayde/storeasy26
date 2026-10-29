@@ -62,7 +62,7 @@ export default async function StorefrontOverviewPage() {
     <>
       <PageHeader
         title="Storefront"
-        description="Everything content saves as a draft; shoppers see it after you publish. Site identity, upsell placements and catalog overrides apply immediately (they live outside publishing)."
+        description="Everything here saves as a draft — including product modules, collection pins, upsell placements and redirects (since S53) — and goes live when you publish. Only site identity (Settings) applies immediately."
         actions={
           <Link
             href="/admin/releases"

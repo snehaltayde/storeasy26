@@ -211,11 +211,11 @@ export default function PdpExtrasEditor({ initial }) {
       </Card>
 
       {/* Honest pointer, not a duplicate editor: per-product presentation
-          lives in Catalog and applies immediately (outside publishing). */}
+          lives in Catalog; since S53 it publishes with releases too. */}
       <Card>
         <CardHeader
           title="Per-product accordions & badges"
-          description="Modules for ONE product (ingredients, usage, specs) and its card badge live with the product itself, in Catalog — and apply immediately, outside publishing."
+          description="Modules for ONE product (ingredients, usage, specs) and its card badge live with the product itself, in Catalog — saved as drafts and published from Publishing, like everything else."
           actions={
             <Link
               href="/admin/catalog"

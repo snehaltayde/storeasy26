@@ -56,8 +56,12 @@ export default async function CollectionPage({ params, searchParams }) {
   if (!collection) notFound();
 
   const { products, total, facets } = await tfetch(async () => {
+    // S53 (0B-2): pin order is release-gated — the resolver supplies the
+    // frozen pins in live mode, the draft table in preview/pre-publish.
+    const { resolvedCollectionPins } = await import("@/lib/content/resolve");
+    const pins = await resolvedCollectionPins(handle);
     const [{ products, total }, facets] = await Promise.all([
-      getProductsInCollection(handle, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, ...filters }),
+      getProductsInCollection(handle, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, ...filters, pins }),
       getCollectionTypeFacets(handle),
     ]);
     return { products, total, facets };

@@ -292,6 +292,73 @@ await t("a failing pages read makes the snapshot THROW — never a partial relea
   await rm(join(here, "../.test-rel-t3.db"), { force: true });
 });
 
+console.log("— S53 (0B-2): ALL presentation state publishes together");
+
+await t("v2 snapshot freezes overrides/pins/placements/redirects; draft edits stay draft; v1 falls back", async () => {
+  const P = await import("../lib/content/presentation.js");
+  await inTenant(async () => {
+    await db.insertInto("product_overrides").values({ product_id: "gid://p/ov1", modules: JSON.stringify([{ title: "Ingredients", html: "<p>aqua</p>" }]), badge: "NEW" }).execute();
+    await db.insertInto("collection_overrides").values({ collection_id: "gid://c/pin1", pinned: JSON.stringify(["gid://p/a", "gid://p/b"]) }).execute();
+    await db.insertInto("placements").values({ id: "pl_cart1", kind: "cart_upsell", source_product_id: null, target_product_ids: JSON.stringify(["gid://p/a"]), title: "Add this", enabled: 1, position: 0 }).execute();
+    await db.insertInto("page_redirects").values({ from_slug: "old-post", to_slug: "new-post", created_at: new Date().toISOString() }).execute();
+  });
+  const snap = await inTenant(() => R.snapshotContent());
+  if (snap.content.v !== 2) throw new Error(`expected v2 envelope, got v${snap.content.v}`);
+  if (snap.content.product_overrides.length !== 1 || snap.content.placements.length !== 1) throw new Error("sets missing from snapshot");
+  await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" } }));
+
+  // mutate every draft set AFTER publish
+  await inTenant(async () => {
+    await db.updateTable("product_overrides").set({ badge: "CHANGED" }).where("product_id", "=", "gid://p/ov1").execute();
+    await db.deleteFrom("placements").where("id", "=", "pl_cart1").execute();
+    await db.updateTable("collection_overrides").set({ pinned: JSON.stringify(["gid://p/z"]) }).where("collection_id", "=", "gid://c/pin1").execute();
+    await db.updateTable("page_redirects").set({ to_slug: "changed-post" }).where("from_slug", "=", "old-post").execute();
+  });
+
+  const liveC = (await inTenant(() => R.getLiveRelease())).content;
+  if (P.presentationProductOverride(liveC, "gid://p/ov1").found.badge !== "NEW") throw new Error("live badge not frozen");
+  if (P.presentationCollectionPins(liveC, "gid://c/pin1").found.join() !== "gid://p/a,gid://p/b") throw new Error("live pins not frozen");
+  if (P.presentationPlacements(liveC, "cart_upsell").length !== 1) throw new Error("live placement not frozen");
+  if (P.presentationSlugRedirect(liveC, "old-post").found !== "new-post") throw new Error("live redirect not frozen");
+  // v1 releases never froze these → null = fall back to live tables
+  if (P.presentationProductOverride({ v: 1 }, "x") !== null) throw new Error("v1 must fall back");
+  if (P.presentationPlacements({ v: 1 }, "cart_upsell") !== null) throw new Error("v1 must fall back");
+
+  const d = await inTenant(() => R.releaseDiff());
+  for (const type of ["overrides", "pins", "placements", "redirects"]) {
+    if (!d.items.find((i) => i.type === type)) throw new Error(`diff missing ${type}: ${JSON.stringify(d.items)}`);
+  }
+  await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" } })); // settle for later tests
+});
+
+await t("mediaUsage protects scheduled + retained releases and derivative URLs", async () => {
+  const { mediaUsage, mediaUrl } = await import("../lib/media.js");
+  await inTenant(async () => {
+    await db
+      .insertInto("releases")
+      .values({ id: "rel_medsched", content: JSON.stringify({ v: 2, note: mediaUrl("medAAA111") }), content_hash: "x", note: "", created_by: null, created_at: new Date().toISOString(), scheduled_for: new Date(Date.now() + 86400000).toISOString() })
+      .execute();
+    await db
+      .insertInto("media")
+      .values({ id: "medAAA111", filename: "a.png", mime: "image/png", size: 1, sha256: "s1", data: new Uint8Array([1]), created_at: new Date().toISOString() })
+      .execute();
+    await db
+      .insertInto("media")
+      .values({ id: "medAAA111thumb", filename: "t.webp", mime: "image/webp", size: 1, sha256: "s2", variant: "thumb", parent_id: "medAAA111", data: new Uint8Array([1]), created_at: new Date().toISOString() })
+      .execute();
+    // a page referencing only the DERIVATIVE url
+    await db.insertInto("cms_pages").values({ slug: "thumb-user", title: "T", sections: JSON.stringify([{ kind: "image", src: mediaUrl("medAAA111thumb"), alt: "t" }]), enabled: 1, updated_at: new Date().toISOString() }).execute();
+  });
+  const uses = await inTenant(() => mediaUsage("medAAA111"));
+  if (!uses.find((u) => /scheduled release:rel_medsched/.test(u.where))) throw new Error(`scheduled release not protected: ${JSON.stringify(uses)}`);
+  if (!uses.find((u) => /page:thumb-user/.test(u.where))) throw new Error(`derivative reference not protected: ${JSON.stringify(uses)}`);
+  await inTenant(async () => {
+    await db.deleteFrom("releases").where("id", "=", "rel_medsched").execute();
+    await db.deleteFrom("cms_pages").where("slug", "=", "thumb-user").execute();
+  });
+  await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" } })); // settle
+});
+
 console.log("— S53 (audit A2): live-release reads fail closed");
 
 await t("getLiveReleaseState: live / none / corrupt / dangling pointer are DISTINCT", async () => {

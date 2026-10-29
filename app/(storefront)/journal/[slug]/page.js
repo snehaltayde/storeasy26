@@ -1,7 +1,8 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import ContentPage from "@/components/ContentPage";
 import { resolvedContentPage } from "@/lib/content/resolve";
-import { campaignVisible, resolveSlugRedirect } from "@/lib/cms/store";
+import { campaignVisible } from "@/lib/cms/store";
+import { resolvedSlugRedirect } from "@/lib/content/resolve";
 import { siteLegalName } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 async function loadPost(slug) {
   const page = await resolvedContentPage(slug);
   if (page && (page.family || "page") === "journal" && campaignVisible(page)) return { page };
-  const to = await resolveSlugRedirect(slug);
+  const to = await resolvedSlugRedirect(slug); // release-gated since S53
   return { page: null, redirectTo: to };
 }
 
