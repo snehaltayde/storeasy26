@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardHeader } from "@/components/console/Card";
 import { StatusBadge } from "@/components/console/Badge";
 import { Banner } from "@/components/console/Banner";
@@ -8,14 +8,19 @@ import { Button } from "@/components/console/Button";
 import { Field, Input, Select } from "@/components/console/fields";
 import { ConfirmDialog } from "@/components/console/Dialog";
 import { useToast } from "@/components/console/Toast";
+import { useDirtyGuard } from "@/components/admin/cms/useDirtyGuard";
 
-// Brand tokens editor (S35 / MC10, redesigned S50). Colors + radius + type
-// scale; live shade ladder preview; WCAG contrast errors BLOCK save (server
-// re-validates) and render as a persistent danger Banner; warnings persist
-// as a warning Banner even after a successful save. Reset confirms via
-// ConfirmDialog; saves are toasts.
+// Brand tokens editor (S35 / MC10, redesigned S50, live preview S52).
+// Colors + radius + type scale. The shade ladder, "Buy now" sample and
+// contrast warnings track the CURRENT values via a debounced read-only
+// preview call (PUT {preview}) — on any preview failure they silently fall
+// back to the last-saved state. WCAG contrast errors BLOCK save (server
+// re-validates) and render as a persistent danger Banner. Save enables only
+// while dirty; useDirtyGuard covers tab close/reload. Reset goes to the
+// PLATFORM default look (that is what the API does — not the kit's colors).
 const RADII = ["sm", "md", "lg", "xl"];
 const SCALES = ["compact", "regular", "large"];
+const PREVIEW_DEBOUNCE_MS = 300;
 
 function ColorField({ id, label, value, onChange, hint }) {
   return (
@@ -38,13 +43,51 @@ export default function BrandAdmin({ initial }) {
   const toast = useToast();
   const [brand, setBrand] = useState(initial.brand);
   const [customized, setCustomized] = useState(initial.customized);
+  // last-saved snapshot: the dirty baseline and the silent preview fallback
+  const [saved, setSaved] = useState({ brand: initial.brand, shades: initial.shades, warnings: [] });
   const [shades, setShades] = useState(initial.shades);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState([]);
   const [warnings, setWarnings] = useState([]);
   const [confirmReset, setConfirmReset] = useState(false);
 
+  const dirty = JSON.stringify(brand) !== JSON.stringify(saved.brand);
+  useDirtyGuard(dirty);
+
   const set = (key) => (value) => setBrand((b) => ({ ...b, [key]: value }));
+
+  // Debounced live preview: validation + shades only, nothing stored. A
+  // stale or failed response never surfaces — the ladder just shows the
+  // last-saved look until a newer preview lands.
+  const previewSeq = useRef(0);
+  useEffect(() => {
+    if (!dirty) return;
+    const seq = ++previewSeq.current;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/admin/brand", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ preview: brand }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (seq !== previewSeq.current) return; // a newer edit superseded this one
+        if (res.ok && json.ok && json.shades) {
+          setShades(json.shades);
+          setWarnings(json.warnings || []);
+        } else {
+          setShades(saved.shades);
+          setWarnings(saved.warnings);
+        }
+      } catch {
+        if (seq === previewSeq.current) {
+          setShades(saved.shades);
+          setWarnings(saved.warnings);
+        }
+      }
+    }, PREVIEW_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [brand, dirty, saved]);
 
   async function call(body) {
     setBusy(true);
@@ -57,15 +100,13 @@ export default function BrandAdmin({ initial }) {
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.ok) {
+        previewSeq.current++; // drop any in-flight preview
         setBrand(json.brand);
         setCustomized(json.customized);
         setShades(json.shades);
         setWarnings(json.warnings || []);
-        toast.success(
-          body.reset
-            ? "Reset to the default look."
-            : "Saved as a draft. If this store has published a release, publish again from the Releases tab to take it live; before the first release it applies within ~30s.",
-        );
+        setSaved({ brand: json.brand, shades: json.shades, warnings: json.warnings || [] });
+        toast.success(body.reset ? "Reset to the platform default look." : "Saved as a draft — publish from Publishing to take it live.");
       } else {
         setErrors(json.errors || [json.error || `Save failed (${res.status})`]);
       }
@@ -147,13 +188,14 @@ export default function BrandAdmin({ initial }) {
         </div>
       </Card>
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="primary" busy={busy} onClick={() => call({ brand })}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="primary" busy={busy} disabled={!dirty} onClick={() => call({ brand })}>
           Save brand
         </Button>
         <Button variant="dangerOutline" disabled={busy || !customized} onClick={() => setConfirmReset(true)}>
-          Reset to theme
+          Reset to platform default
         </Button>
+        <p className="text-xs text-fg-subtle">Re-applying a kit from Theme restores that kit’s colors.</p>
       </div>
 
       <ConfirmDialog
@@ -162,7 +204,7 @@ export default function BrandAdmin({ initial }) {
         title="Reset to the platform default look?"
         tone="danger"
         confirmLabel="Reset"
-        body="Your custom brand tokens are removed and the storefront returns to the platform default look."
+        body="Your custom brand tokens are removed and the storefront returns to the PLATFORM default look — not your theme kit's colors. To get a kit's colors back, re-apply the kit from Theme."
         onConfirm={() => call({ reset: true })}
       />
     </div>

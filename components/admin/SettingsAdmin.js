@@ -139,6 +139,24 @@ export default function SettingsAdmin({ initial }) {
           <Field label="Support phone" htmlFor="sa-support-phone">
             <Input id="sa-support-phone" disabled={ro} value={identity.support_phone} onChange={(e) => setIdentity({ ...identity, support_phone: e.target.value })} />
           </Field>
+          <Field label="Site title" hint="Browser tab + search results title" htmlFor="sa-title">
+            <Input id="sa-title" disabled={ro} value={identity.title} onChange={(e) => setIdentity({ ...identity, title: e.target.value })} />
+          </Field>
+          <Field label="Tagline" hint="Default description + hero fallback copy" htmlFor="sa-tagline">
+            <Input id="sa-tagline" disabled={ro} value={identity.tagline} onChange={(e) => setIdentity({ ...identity, tagline: e.target.value })} />
+          </Field>
+          <Field label="Footer tagline" htmlFor="sa-footer-tagline">
+            <Input id="sa-footer-tagline" disabled={ro} value={identity.footer_tagline} onChange={(e) => setIdentity({ ...identity, footer_tagline: e.target.value })} />
+          </Field>
+          <Field label="Logo text" hint="The storefront logo is text; the second part renders in your accent color" htmlFor="sa-logo-text1">
+            <div className="flex gap-2">
+              <Input id="sa-logo-text1" aria-label="Logo text, first part" disabled={ro} value={identity.logo_text1} onChange={(e) => setIdentity({ ...identity, logo_text1: e.target.value })} />
+              <Input id="sa-logo-text2" aria-label="Logo text, accent part" disabled={ro} value={identity.logo_text2} onChange={(e) => setIdentity({ ...identity, logo_text2: e.target.value })} />
+            </div>
+          </Field>
+          <Field label="Legal name" hint="Shown in the footer and on policy pages" htmlFor="sa-legal-name">
+            <Input id="sa-legal-name" disabled={ro} value={identity.legal_name} onChange={(e) => setIdentity({ ...identity, legal_name: e.target.value })} />
+          </Field>
           <Field label="Domains" hint="Managed by the platform operator" htmlFor="sa-domains">
             <Input id="sa-domains" disabled value={(s.domains || []).join(", ")} />
           </Field>

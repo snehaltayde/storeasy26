@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { CircleCheck, ExternalLink } from "lucide-react";
 import { localInputToIso } from "@/lib/admin/schedule";
+import { diffItemInfo } from "@/components/admin/cms/labels";
+import { startPreview } from "@/components/admin/cms/api";
 import { Card, CardHeader } from "@/components/console/Card";
-import { StatusBadge } from "@/components/console/Badge";
+import { Badge, StatusBadge } from "@/components/console/Badge";
 import { Banner } from "@/components/console/Banner";
 import { Button } from "@/components/console/Button";
 import { Field, Input } from "@/components/console/fields";
@@ -12,18 +16,20 @@ import { EmptyState } from "@/components/console/bits";
 import { ConfirmDialog } from "@/components/console/Dialog";
 import { useToast } from "@/components/console/Toast";
 
-// Releases console (S36 / MC13, redesigned S50): what's live, whether drafts
-// differ, publish now / schedule / preview draft / roll back. Validation
-// errors surface BEFORE publish (the server re-gates anyway) as persistent
-// Banners; publish and rollback confirm via ConfirmDialog; action results
-// are toasts.
+// Publishing console (S36 / MC13, redesigned S52): the diff — WHAT will
+// publish — leads, as linked chips into the right editor. Then publish now
+// (confirm lists the changes), schedule (honest about snapshot-now and
+// no re-validation), history with rollback and cancel-schedule, preview.
+// Validation errors surface BEFORE publish (the server re-gates anyway) as
+// persistent Banners; every POST returns the full view, so state refreshes
+// from the response. Role-blind on purpose: the server owns permissions.
 const when = (s) => (s ? new Date(s).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—");
 
 const HISTORY_COLUMNS = [
   { key: "created_at", header: "When" },
   { key: "note", header: "Note" },
   { key: "content_hash", header: "Hash" },
-  { key: "state", header: "", align: "right" },
+  { key: "state", header: "State", align: "right" },
 ];
 
 export default function ReleasesAdmin({ initial }) {
@@ -31,14 +37,15 @@ export default function ReleasesAdmin({ initial }) {
   const [data, setData] = useState(initial);
   const [note, setNote] = useState("");
   const [at, setAt] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(null); // "schedule" | "preview" | dialog action name
   const [apiErrors, setApiErrors] = useState([]);
   const [resultWarnings, setResultWarnings] = useState([]);
   const [confirmPublish, setConfirmPublish] = useState(false);
   const [rollback, setRollback] = useState(null); // release row
+  const [cancelRow, setCancelRow] = useState(null); // scheduled release row
 
   async function call(body) {
-    setBusy(true);
+    setBusy(body.action);
     setApiErrors([]);
     try {
       const res = await fetch("/api/admin/releases", {
@@ -48,26 +55,42 @@ export default function ReleasesAdmin({ initial }) {
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.ok) {
-        if (json.releases) setData(json);
-        if (json.url) {
-          window.open(json.url, "_blank", "noopener");
-          toast.success("Preview opened in a new tab (valid 1 hour, this browser only).");
-        } else {
-          toast.success(json.scheduled ? `Scheduled for ${when(json.scheduled.scheduledFor)}.` : body.action === "rollback" ? "Rolled back — live now." : "Published — live now.");
-          setResultWarnings(json.published?.warnings || json.scheduled?.warnings || []);
-          setNote("");
-          setAt("");
-        }
-      } else {
-        setApiErrors(json.errors ? [json.error, ...json.errors].filter(Boolean) : [json.error || `Failed (${res.status})`]);
+        if (json.releases) setData(json); // every mutating POST returns the full view
+        return json;
       }
-      return json;
+      const msgs = json.errors ? [json.error, ...json.errors].filter(Boolean) : [json.error || `Request failed (${res.status})`];
+      setApiErrors(msgs);
+      return { ok: false, error: msgs.join(" — ") };
+    } catch (e) {
+      const msg = `Network error: ${String(e?.message || e)}`;
+      setApiErrors([msg]);
+      return { ok: false, error: msg };
     } finally {
-      setBusy(false);
+      setBusy(null);
+    }
+  }
+
+  async function onPreview() {
+    setBusy("preview");
+    setApiErrors([]);
+    try {
+      const r = await startPreview("/");
+      if (!r.ok) {
+        toast.error(r.error || (r.errors || []).join("; ") || "Preview failed.");
+        return;
+      }
+      window.open("/", "_blank", "noopener");
+      toast.success("Preview opened in a new tab — drafts visible to you only.");
+    } finally {
+      setBusy(null);
     }
   }
 
   const v = data.validation || { ok: true, errors: [], warnings: [] };
+  const diff = data.diff || { firstPublish: !data.live, dirty: !!data.dirty, items: [] };
+  const diffItems = diff.items || [];
+  const canPublish = v.ok && !!data.dirty;
+  const diffLabels = diffItems.map((it) => diffItemInfo(it).label);
 
   return (
     <div className="space-y-4">
@@ -86,17 +109,24 @@ export default function ReleasesAdmin({ initial }) {
         </Banner>
       )}
 
+      {/* 1 · What will publish — the diff leads */}
       <Card>
         <CardHeader
-          title="Draft state"
-          badge={
-            <>
-              {data.dirty ? <StatusBadge status="stale" label="Unpublished changes" /> : <StatusBadge status="current" label="In sync with live" />}
-              {!data.live && <StatusBadge status="draft" label="No release yet — drafts serve directly" />}
-            </>
+          title="What will publish"
+          badge={data.dirty ? <StatusBadge status="stale" label="Unpublished changes" /> : <StatusBadge status="current" label="In sync with live" />}
+          description="Each chip links to its editor. This is the item-level draft-vs-live difference — exactly what the next publish changes."
+          actions={
+            <Button size="sm" icon={<ExternalLink size={13} aria-hidden />} busy={busy === "preview"} disabled={!!busy && busy !== "preview"} onClick={onPreview}>
+              Preview draft
+            </Button>
           }
         />
 
+        {diff.firstPublish && (
+          <Banner tone="warning" className="mb-3">
+            Never published — drafts currently serve directly to shoppers; the first publish freezes them into a release.
+          </Banner>
+        )}
         {!v.ok && (
           <Banner tone="danger" title="Fix before publishing" className="mb-3">
             <ul className="list-disc space-y-1 pl-4">
@@ -116,34 +146,78 @@ export default function ReleasesAdmin({ initial }) {
           </Banner>
         )}
 
+        {diffItems.length > 0 ? (
+          <ul className="flex flex-wrap gap-2">
+            {diffItems.map((item) => {
+              const info = diffItemInfo(item);
+              return (
+                <li key={`${item.type}:${item.key}`}>
+                  <Link
+                    href={info.href}
+                    className="inline-flex items-center gap-2 rounded-ctl border border-edge bg-surface px-2.5 py-1.5 text-xs font-medium text-fg focus-ring hover:border-edge-strong hover:bg-surface-muted motion-safe:transition-colors"
+                  >
+                    {info.label}
+                    <Badge tone={info.tone}>{info.changeLabel}</Badge>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        ) : diff.firstPublish ? (
+          <p className="text-sm text-fg-muted">The first release snapshots every draft as-is — publish below to freeze the current state.</p>
+        ) : (
+          <EmptyState
+            icon={<CircleCheck size={20} aria-hidden />}
+            title="In sync with live"
+            body={`Drafts match the live release${data.liveHash ? ` (${data.liveHash.slice(0, 12)})` : ""} — nothing to publish.`}
+          />
+        )}
+      </Card>
+
+      {/* 2+3 · Publish now / schedule */}
+      <Card>
+        <CardHeader title="Publish" description="Publishing snapshots the current drafts into an immutable release and flips live to it. Rollback always works." />
+
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Release note (optional)" htmlFor="release-note" className="min-w-48 flex-1">
             <Input id="release-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Diwali hero + navy brand" />
           </Field>
-          <Button variant="primary" busy={busy} disabled={!v.ok} onClick={() => setConfirmPublish(true)}>
+          <Button variant="primary" disabled={!canPublish || !!busy} onClick={() => setConfirmPublish(true)}>
             Publish now
           </Button>
-          <Button disabled={busy} onClick={() => call({ action: "preview" })}>
-            Preview draft
-          </Button>
         </div>
-        <div className="mt-3 flex flex-wrap items-end gap-3">
-          <Field label="…or publish at (your local time)" htmlFor="release-at">
-            <Input id="release-at" type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} className="w-auto" />
-          </Field>
-          <Button
-            disabled={busy || !v.ok || !at}
-            onClick={() => {
-              const iso = localInputToIso(at);
-              if (!iso) return setApiErrors(["Pick a date and time first."]);
-              call({ action: "schedule", note, at: iso });
-            }}
-          >
-            Schedule
-          </Button>
+
+        <div className="mt-4 border-t border-edge pt-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <Field label="…or publish at (your local time)" htmlFor="release-at">
+              <Input id="release-at" type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} className="w-auto" />
+            </Field>
+            <Button
+              busy={busy === "schedule"}
+              disabled={(!!busy && busy !== "schedule") || !canPublish || !at}
+              onClick={async () => {
+                const iso = localInputToIso(at);
+                if (!iso) return setApiErrors(["Pick a date and time first."]);
+                const json = await call({ action: "schedule", note, at: iso });
+                if (json.ok) {
+                  toast.success(`Scheduled for ${when(json.scheduled?.scheduledFor)} — the pending release is in the history below.`);
+                  setResultWarnings(json.scheduled?.warnings || []);
+                  setNote("");
+                  setAt("");
+                }
+              }}
+            >
+              Schedule
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-fg-muted">
+            The snapshot is taken now — edits made after scheduling are NOT included. Scheduled publishes aren&rsquo;t re-validated. You can cancel a pending
+            schedule from the history below.
+          </p>
         </div>
       </Card>
 
+      {/* 4 · History */}
       <Card>
         <CardHeader title="History" />
         <Table
@@ -163,21 +237,28 @@ export default function ReleasesAdmin({ initial }) {
                 return (
                   <span className="block max-w-72 truncate" title={r.note || undefined}>
                     {r.note || <span className="text-fg-subtle">no note</span>}
-                    {r.scheduled_for && !r.published_at && <span className="ml-2 text-xs text-warning">scheduled {when(r.scheduled_for)}</span>}
                   </span>
                 );
               case "content_hash":
                 return <span className="font-mono text-xs text-fg-muted">{r.content_hash.slice(0, 12)}</span>;
               case "state":
-                return r.id === data.live ? (
-                  <StatusBadge status="live" />
-                ) : r.published_at ? (
-                  <Button size="sm" variant="dangerOutline" disabled={busy} onClick={() => setRollback(r)}>
-                    Roll back to this
-                  </Button>
-                ) : (
-                  <span className="text-xs text-fg-subtle">{r.scheduled_for ? "pending" : "never live"}</span>
-                );
+                if (r.id === data.live) return <StatusBadge status="live" />;
+                if (r.scheduled_for && !r.published_at)
+                  return (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="whitespace-nowrap text-xs text-warning">Scheduled for {when(r.scheduled_for)}</span>
+                      <Button size="sm" variant="dangerOutline" disabled={!!busy} onClick={() => setCancelRow(r)}>
+                        Cancel schedule
+                      </Button>
+                    </span>
+                  );
+                if (r.published_at)
+                  return (
+                    <Button size="sm" variant="dangerOutline" disabled={!!busy} onClick={() => setRollback(r)}>
+                      Roll back to this
+                    </Button>
+                  );
+                return <span className="text-xs text-fg-subtle">never live</span>;
               default:
                 return r[col.key];
             }
@@ -185,6 +266,7 @@ export default function ReleasesAdmin({ initial }) {
         />
       </Card>
 
+      {/* Publish confirm — lists exactly what goes live */}
       <ConfirmDialog
         open={confirmPublish}
         onClose={() => setConfirmPublish(false)}
@@ -192,13 +274,32 @@ export default function ReleasesAdmin({ initial }) {
         confirmLabel="Publish now"
         body={
           <>
-            <p>The current draft snapshot becomes an immutable release and goes live immediately. Rollback always works.</p>
-            <p className="mt-1.5">{note.trim() ? <>Note: &ldquo;{note.trim()}&rdquo;</> : "No release note."}</p>
+            {diffLabels.length > 0 ? (
+              <>
+                <p>This goes live for shoppers immediately:</p>
+                <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+                  {diffLabels.slice(0, 8).map((l, i) => (
+                    <li key={i}>{l}</li>
+                  ))}
+                </ul>
+                {diffLabels.length > 8 && <p className="mt-1">…and {diffLabels.length - 8} more.</p>}
+              </>
+            ) : (
+              <p>The current draft snapshot becomes an immutable release and goes live immediately.</p>
+            )}
+            <p className="mt-1.5">{note.trim() ? <>Note: &ldquo;{note.trim()}&rdquo;</> : "No release note."} Rollback always works.</p>
           </>
         }
-        onConfirm={() => call({ action: "publish", note })}
+        onConfirm={async () => {
+          const json = await call({ action: "publish", note });
+          if (!json.ok) throw new Error(json.error); // keeps the dialog open, shows the reason
+          toast.success("Published — live now.");
+          setResultWarnings(json.published?.warnings || []);
+          setNote("");
+        }}
       />
 
+      {/* Rollback confirm */}
       <ConfirmDialog
         open={!!rollback}
         onClose={() => setRollback(null)}
@@ -208,14 +309,43 @@ export default function ReleasesAdmin({ initial }) {
         body={
           rollback ? (
             <>
-              <p>Point the live storefront back at this release? Drafts are not affected.</p>
+              <p>Point the live storefront back at this release? Your drafts stay untouched — this only changes what shoppers see.</p>
               <p className="mt-1.5 font-mono text-xs text-fg-subtle">
                 {rollback.content_hash.slice(0, 12)} · {when(rollback.created_at)}
               </p>
             </>
           ) : null
         }
-        onConfirm={() => call({ action: "rollback", id: rollback.id })}
+        onConfirm={async () => {
+          const json = await call({ action: "rollback", id: rollback.id });
+          if (!json.ok) throw new Error(json.error);
+          toast.success("Rolled back — live now.");
+        }}
+      />
+
+      {/* Cancel-schedule confirm */}
+      <ConfirmDialog
+        open={!!cancelRow}
+        onClose={() => setCancelRow(null)}
+        title="Cancel this scheduled publish?"
+        tone="danger"
+        confirmLabel="Cancel schedule"
+        body={
+          cancelRow ? (
+            <>
+              <p>The pending job and its never-published release are deleted. Drafts are untouched — you can schedule again any time.</p>
+              <p className="mt-1.5 text-xs text-fg-subtle">
+                Scheduled for {when(cancelRow.scheduled_for)}
+                {cancelRow.note ? <> · &ldquo;{cancelRow.note}&rdquo;</> : null}
+              </p>
+            </>
+          ) : null
+        }
+        onConfirm={async () => {
+          const json = await call({ action: "cancel", id: cancelRow.id });
+          if (!json.ok) throw new Error(json.error); // 409 "too late" text surfaces here and in the banner
+          toast.success("Schedule cancelled — nothing will publish.");
+        }}
       />
     </div>
   );
