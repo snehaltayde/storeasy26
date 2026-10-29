@@ -2255,3 +2255,18 @@ redirects; admin badge surfaces still map release read errors to null
 (shopper path fails closed); slices 2–5 (component registry + durable section
 IDs incl. the duplicate-section data fix, visual editor, template families,
 editorial roles/approvals).
+
+## Verification state (S54, 2026-10-29) — composition foundation + home designer
+Audit slices 2 + 3(first path), continuing the Codex review cadence (packets
+S54-2, S54-3). Locally verified: NEW test:sections 7 (duplicate-section
+independence, batching, deterministic id upgrade), releases 24 (id-only
+changes aren't publish dirt), cms-api 16 (template ops under one-op
+authorization), plus cms/content/storefront/surfaces/themes/security/
+admin-console/authz green and clean builds after every commit. NOT verified:
+the interactive designer drill (click-select both-way sync, save/refresh,
+conflict) and the S53 browser pass — both blocked on an orphaned next-dev
+process holding the project's dev-server lock (user action: kill it, then
+run the harness); staging/production untouched. Honest scope: preview shows
+the SAVED draft (live unsaved-edit preview is future work); no drag-and-drop;
+PDP/collection designer paths, template→layout assignment, editorial role
+split = next slices.
