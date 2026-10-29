@@ -252,6 +252,50 @@ await t("publishReleaseById on an unknown id fails (job dead-letters, pointer sa
   eq((await inTenant(R.getLiveRelease)).id, before);
 });
 
+console.log("— S53 (audit A2): live-release reads fail closed");
+
+await t("getLiveReleaseState: live / none / corrupt / dangling pointer are DISTINCT", async () => {
+  // live (whatever the suite last published)
+  const live = await inTenant(() => R.getLiveReleaseState());
+  if (live.state !== "live") throw new Error(`expected live, got ${live.state}`);
+  const liveId = live.release.id;
+
+  // corrupt content → error, and the compat wrapper maps it to null
+  await inTenant(() => db.updateTable("releases").set({ content: "{broken" }).where("id", "=", liveId).execute());
+  const corrupt = await inTenant(() => R.getLiveReleaseState());
+  if (corrupt.state !== "error") throw new Error(`corrupt: expected error, got ${corrupt.state}`);
+  if ((await inTenant(() => R.getLiveRelease())) !== null) throw new Error("wrapper should badge null on error");
+
+  // restore, then dangling pointer → error (NOT "none")
+  const canonical = (await inTenant(() => R.snapshotContent())).canonical;
+  await inTenant(() => db.updateTable("releases").set({ content: canonical }).where("id", "=", liveId).execute());
+  await inTenant(() => db.updateTable("release_state").set({ live_release_id: "rel_ghost" }).where("id", "=", 1).execute());
+  const dangling = await inTenant(() => R.getLiveReleaseState());
+  if (dangling.state !== "error") throw new Error(`dangling: expected error, got ${dangling.state}`);
+
+  // no pointer → none (genuinely pre-first-publish)
+  await inTenant(() => db.updateTable("release_state").set({ live_release_id: null }).where("id", "=", 1).execute());
+  const none = await inTenant(() => R.getLiveReleaseState());
+  if (none.state !== "none") throw new Error(`no pointer: expected none, got ${none.state}`);
+
+  // restore the suite's live pointer
+  await inTenant(() => db.updateTable("release_state").set({ live_release_id: liveId }).where("id", "=", 1).execute());
+  const restored = await inTenant(() => R.getLiveReleaseState());
+  if (restored.state !== "live") throw new Error("restore failed");
+});
+
+await t("getLiveReleaseState: missing release tables = none (pre-migration tenant)", async () => {
+  const { createClient } = await import("@libsql/client");
+  await rm(join(here, "../.test-rel-t2.db"), { force: true });
+  const t2db = createClient({ url: "file:.test-rel-t2.db" });
+  await t2db.executeMultiple(schema); // baseline only — NO 0007 release tables
+  await C.upsertTenant({ id: "rt2", name: "Rel bare", domains: [], dbUrl: "file:.test-rel-t2.db", config: {}, secrets: {} });
+  const T2 = await C.getTenant("rt2");
+  const s = await withTenant(T2, () => R.getLiveReleaseState());
+  if (s.state !== "none") throw new Error(`expected none, got ${s.state} (${s.error || ""})`);
+  await rm(join(here, "../.test-rel-t2.db"), { force: true });
+});
+
 console.log("— preview tokens");
 
 await t("preview token round-trips; expiry and tamper are rejected", async () => {
