@@ -36,6 +36,7 @@
     "test:admin-console": "node scripts/test-admin-console.js",
     "test:cms-api": "node scripts/test-cms-api.js",
     "test:refs": "node scripts/test-refs.js",
+    "test:sections": "node scripts/test-sections.js",
     "test:cms": "node scripts/test-cms.js",
     "test:platform-ops": "node scripts/test-platform-ops.js",
     "test:tenant-boundary": "node scripts/test-tenant-boundary.js",

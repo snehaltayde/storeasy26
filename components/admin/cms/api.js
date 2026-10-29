@@ -37,6 +37,13 @@ export const savePage = (page, revision, { force = false } = {}) =>
 
 export const deletePage = (slug, revision) => put(revision == null ? { deletePage: slug } : { deletePage: slug, revision });
 
+// S54: tenant-saved templates. useTemplate returns sections with FRESH
+// instance ids (an independent copy, never a live link).
+export const listTemplates = (family) => put({ listTemplates: family || true });
+export const useTemplate = (id) => put({ useTemplate: id });
+export const saveTemplateApi = (template) => put({ saveTemplate: template });
+export const deleteTemplateApi = (id) => put({ deleteTemplate: id });
+
 export const getPage = (slug) => put({ getPage: slug });
 
 // Mint a preview session (sets the httpOnly cookie) deep-linked at `to`.

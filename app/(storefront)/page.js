@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { headers, cookies } from "next/headers";
-import ProductGrid from "@/components/ProductGrid";
-import CollectionCard from "@/components/CollectionCard";
 import ExperimentPing from "@/components/ExperimentPing";
 import MarketingHome from "@/components/site/MarketingHome";
+import HomeSections from "@/components/sections/HomeSections";
 import { runningExperimentFor, heroVariantFor, UNIT_COOKIE } from "@/lib/experiments";
 import { isPlatformSiteHost } from "@/lib/platform-site";
-import { getFeaturedCollections, getCollectionsByHandles, getNewestProducts, getCatalogStats } from "@/lib/repo";
+import { getCatalogStats } from "@/lib/repo";
+import { resolveHomeSectionData } from "@/lib/cms/section-data";
 import { resolvedHero, resolvedHomeSections, resolvedCollectionsIndex } from "@/lib/content/resolve";
 import { tfetch } from "@/lib/tenant-request";
 
@@ -38,20 +38,14 @@ export default async function Home() {
   // assignment makes this render and every later one agree on the variant.
   const unitId = (await cookies()).get(UNIT_COOKIE)?.value || crypto.randomUUID();
 
-  const { hero, sections, stats, data, assignment } = await tfetch(async () => {
+  const { hero, sections, stats, dataById, assignment } = await tfetch(async () => {
     const [liveHero, sections, stats, index] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats(), resolvedCollectionsIndex()]);
     const heroExp = await runningExperimentFor("hero");
     const { hero, assignment } = heroVariantFor(heroExp, liveHero, unitId);
-    const data = {};
-    for (const s of sections) {
-      if (s.kind === "collections") {
-        // S38 (SF02): merchant-featured collections win over the size heuristic
-        const curated = index?.featured?.length ? await getCollectionsByHandles(index.featured) : [];
-        data.collections = curated.length ? curated.slice(0, s.limit || 6) : await getFeaturedCollections(s.limit || 6);
-      }
-      if (s.kind === "new") data.products = await getNewestProducts(s.limit || 8);
-    }
-    return { hero, sections, stats, data, assignment };
+    // S54: data resolves PER SECTION INSTANCE (registry bindings, batched) —
+    // duplicate sections no longer overwrite each other's data or limits.
+    const dataById = await resolveHomeSectionData(sections, { index });
+    return { hero, sections, stats, dataById, assignment };
   });
   const empty = stats.products === 0;
 
@@ -92,65 +86,9 @@ export default async function Home() {
       </section>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        {empty ? (
-          <EmptyState />
-        ) : (
-          sections.map((s) => {
-            if (s.kind === "collections" && data.collections?.length > 0) {
-              return (
-                <section key={`${s.kind}-${s.title}`} className="py-14">
-                  <div className="mb-6 flex items-end justify-between">
-                    <h2 className="text-2xl font-bold tracking-tight">{s.title}</h2>
-                    <Link href="/collections" className="text-sm font-medium text-accent-700 hover:underline">
-                      View all →
-                    </Link>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {data.collections.map((c) => (
-                      <CollectionCard key={c.handle} collection={c} />
-                    ))}
-                  </div>
-                </section>
-              );
-            }
-            if (s.kind === "new" && data.products?.length > 0) {
-              return (
-                <section key={`${s.kind}-${s.title}`} id="new" className="scroll-mt-24 py-14">
-                  <div className="mb-6 flex items-end justify-between">
-                    <h2 className="text-2xl font-bold tracking-tight">{s.title}</h2>
-                  </div>
-                  <ProductGrid products={data.products} priorityCount={4} />
-                </section>
-              );
-            }
-            {/* S37 (MC08): merchant-composed sections */}
-            if (s.kind === "banner") {
-              return (
-                <section key={`banner-${s.title}-${s.text}`} className="py-14">
-                  <div className="rounded-brand bg-accent-100 px-6 py-10 text-center sm:px-10">
-                    {s.title ? <h2 className="font-display text-2xl font-bold tracking-tight text-accent-900">{s.title}</h2> : null}
-                    {s.text ? <p className="mx-auto mt-2 max-w-xl text-accent-800">{s.text}</p> : null}
-                    {s.href && s.label ? (
-                      <Link href={s.href} className="mt-5 inline-block rounded-full bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition hover:bg-accent-300">
-                        {s.label}
-                      </Link>
-                    ) : null}
-                  </div>
-                </section>
-              );
-            }
-            if (s.kind === "rich_text") {
-              // html is allowlist-SANITIZED at save (lib/cms/validate.js, S37)
-              return (
-                <section key={`rich-${s.title}`} className="py-14">
-                  {s.title ? <h2 className="mb-4 text-2xl font-bold tracking-tight">{s.title}</h2> : null}
-                  <div className="rte max-w-3xl" dangerouslySetInnerHTML={{ __html: s.html || "" }} />
-                </section>
-              );
-            }
-            return null;
-          })
-        )}
+        {/* S54: one shared renderer for shoppers AND preview, keyed by durable
+            section ids with per-instance data. */}
+        {empty ? <EmptyState /> : <HomeSections sections={sections} dataById={dataById} />}
       </div>
     </div>
   );

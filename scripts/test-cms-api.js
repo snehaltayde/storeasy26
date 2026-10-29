@@ -213,6 +213,30 @@ await t("deletePage with a stale revision conflicts; with the current one it del
   eq((await inT(() => db.selectFrom("cms_pages").selectAll().where("slug", "=", "del-me").execute())).length, 0, "row gone");
 });
 
+// --- S54: tenant templates through the one-op API ---------------------------
+await t("templates: save (write-gated) → list (read) → instantiate twice = fresh independent ids", async () => {
+  const sections = [{ kind: "text", heading: "About us", body: ["hello"] }, { kind: "faq", heading: "FAQ", items: [{ q: "Q1", a: "<p>A1</p>" }] }];
+  const denied = await inT(() => handleStorefrontPut(req(supportTok, { saveTemplate: { name: "Nope", sections } })));
+  eq(denied.status, 403, "support cannot save templates");
+  const saved = await inT(() => handleStorefrontPut(req(staffTok, { saveTemplate: { name: "Standard about", family: "page", sections } })));
+  eq(saved.status, 200, "staff saves");
+  const tplId = saved.body.template.id;
+  const listed = await inT(() => handleStorefrontPut(req(supportTok, { listTemplates: true })));
+  eq(listed.status, 200, "support can LIST (read)");
+  eq(listed.body.templates.length, 1);
+  const a = await inT(() => handleStorefrontPut(req(supportTok, { useTemplate: tplId })));
+  const b = await inT(() => handleStorefrontPut(req(supportTok, { useTemplate: tplId })));
+  eq(a.status, 200);
+  ok(a.body.template.sections.every((s) => /^sec_/.test(s.id)), "instantiation carries ids");
+  ok(a.body.template.sections[0].id !== b.body.template.sections[0].id, "each instantiation is an INDEPENDENT copy");
+  const ambiguous = await inT(() => handleStorefrontPut(req(staffTok, { saveTemplate: { name: "x", sections }, deletePage: "y" })));
+  eq(ambiguous.status, 400, "template ops obey one-operation parsing");
+  eq(ambiguous.body.code, "AMBIGUOUS_OPERATION");
+  const gone = await inT(() => handleStorefrontPut(req(staffTok, { deleteTemplate: tplId })));
+  eq(gone.status, 200);
+  eq(gone.body.templates.length, 0, "deleted");
+});
+
 await t("validation errors still 422 with the errors list", async () => {
   const r = await inT(() => handleStorefrontPut(req(staffTok, { block: "hero", value: { title: "" }, revision: 1 })));
   eq(r.status, 422);

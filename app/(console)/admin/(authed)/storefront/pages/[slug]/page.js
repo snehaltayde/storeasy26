@@ -58,11 +58,14 @@ export default async function StorefrontPageEditorPage({ params, searchParams })
   if (slug === "new") {
     const sp = await searchParams;
     const from = typeof sp?.from === "string" ? sp.from : null;
-    const source = from ? await tfetch(() => loadPage(from)) : null;
+    const [source, tenantTemplates] = await tfetch(async () => {
+      const { listTemplates } = await import("@/lib/cms/templates-store");
+      return [from ? await loadPage(from) : null, await listTemplates()];
+    });
     const initial = source
       ? { ...source, slug: "", title: source.title ? `Copy of ${source.title}` : "", enabled: true }
       : BLANK;
-    return <PageEditor mode="create" page={initial} revision={null} fromMissing={Boolean(from && !source)} />;
+    return <PageEditor mode="create" page={initial} revision={null} fromMissing={Boolean(from && !source)} tenantTemplates={tenantTemplates} />;
   }
 
   const [page, revs] = await tfetch(async () => [await loadPage(slug), await pageRevisions()]);

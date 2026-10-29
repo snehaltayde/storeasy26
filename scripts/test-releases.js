@@ -303,7 +303,7 @@ await t("v2 snapshot freezes overrides/pins/placements/redirects; draft edits st
     await db.insertInto("page_redirects").values({ from_slug: "old-post", to_slug: "new-post", created_at: new Date().toISOString() }).execute();
   });
   const snap = await inTenant(() => R.snapshotContent());
-  if (snap.content.v !== 2) throw new Error(`expected v2 envelope, got v${snap.content.v}`);
+  if (snap.content.v < 2) throw new Error(`expected v2+ envelope, got v${snap.content.v}`);
   if (snap.content.product_overrides.length !== 1 || snap.content.placements.length !== 1) throw new Error("sets missing from snapshot");
   await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" } }));
 
@@ -356,6 +356,25 @@ await t("mediaUsage protects scheduled + retained releases and derivative URLs",
     await db.deleteFrom("releases").where("id", "=", "rel_medsched").execute();
     await db.deleteFrom("cms_pages").where("slug", "=", "thumb-user").execute();
   });
+  await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" } })); // settle
+});
+
+console.log("— S54: section-id changes are not publish dirt; envelope upgrade is named");
+
+await t("an id-only home_sections change does NOT dirty the diff; a content change does", async () => {
+  const saved = await inTenant(() => S.setBlock("home_sections", [{ kind: "new", title: "Diff ids", limit: 5 }]));
+  await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" } }));
+  const current = (await inTenant(() => S.getBlockRow("home_sections"))).value;
+  // re-save the SAME content with different instance ids
+  await inTenant(() => S.setBlock("home_sections", current.map((s, i) => ({ ...s, id: `sec_zz${i}abcd` }))));
+  const d = await inTenant(() => R.releaseDiff());
+  if (d.items.find((i) => i.type === "block" && i.key === "home_sections")) {
+    throw new Error(`id-only change dirtied the diff: ${JSON.stringify(d.items)}`);
+  }
+  // a REAL change still registers
+  await inTenant(() => S.setBlock("home_sections", current.map((s) => ({ ...s, title: "Changed title" }))));
+  const d2 = await inTenant(() => R.releaseDiff());
+  if (!d2.items.find((i) => i.type === "block" && i.key === "home_sections")) throw new Error("content change missed");
   await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" } })); // settle
 });
 

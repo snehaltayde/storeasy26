@@ -317,6 +317,7 @@ export default function HomeEditor({ initial }) {
     const i = sections.findIndex((s) => s._id === id);
     if (i < 0) return;
     const copy = { ...JSON.parse(JSON.stringify(stripIds([sections[i]])[0])), _id: mintId() };
+    delete copy.id; // S54: a duplicate is a NEW instance — the server mints its durable id
     mutate([...sections.slice(0, i + 1), copy, ...sections.slice(i + 1)]);
   };
   const addSection = (kind) => mutate([...sections, { ...NEW_SECTION[kind], _id: mintId() }]);

@@ -15,7 +15,7 @@ import { EmptyState } from "@/components/console/bits";
 import { useToast } from "@/components/console/Toast";
 import { isoToLocalInput, localInputToIso } from "@/lib/admin/schedule";
 import { PAGE_TEMPLATES } from "@/lib/content/templates";
-import { savePage, getPage, startPreview } from "./api";
+import { savePage, getPage, startPreview, useTemplate, saveTemplateApi } from "./api";
 import { ConflictBanner } from "./ConflictBanner";
 import { useDirtyGuard } from "./useDirtyGuard";
 import { MediaPicker } from "./MediaPicker";
@@ -47,18 +47,23 @@ const textToBody = (text) =>
     .map((p) => p.replace(/\s*\n\s*/g, " ").trim())
     .filter(Boolean);
 
+// S54: `pid` is the DURABLE server-side instance id (sec_…) riding alongside
+// the client-only list key `id` — it goes back out on save so section
+// identity survives edits; new/duplicated sections send none (server mints).
 const toEdit = (s, id) => {
   const kind = s?.kind || "text";
-  if (kind === "rich") return { id, kind, heading: s.heading || "", html: s.html || "" };
-  if (kind === "image") return { id, kind, src: s.src || "", alt: s.alt || "", caption: s.caption || "" };
-  if (kind === "faq") return { id, kind, heading: s.heading || "", items: (s.items || []).map((it) => ({ q: it?.q || "", a: it?.a || "" })) };
-  return { id, kind: "text", heading: s?.heading || "", text: bodyToText(s?.body) };
+  const pid = typeof s?.id === "string" ? s.id : undefined;
+  if (kind === "rich") return { id, pid, kind, heading: s.heading || "", html: s.html || "" };
+  if (kind === "image") return { id, pid, kind, src: s.src || "", alt: s.alt || "", caption: s.caption || "" };
+  if (kind === "faq") return { id, pid, kind, heading: s.heading || "", items: (s.items || []).map((it) => ({ q: it?.q || "", a: it?.a || "" })) };
+  return { id, pid, kind: "text", heading: s?.heading || "", text: bodyToText(s?.body) };
 };
 const fromEdit = (s) => {
-  if (s.kind === "rich") return { kind: "rich", heading: s.heading, html: s.html };
-  if (s.kind === "image") return { kind: "image", src: s.src, alt: s.alt, caption: s.caption };
-  if (s.kind === "faq") return { kind: "faq", heading: s.heading, items: s.items.filter((it) => it.q.trim()) };
-  return { kind: "text", heading: s.heading, body: textToBody(s.text) };
+  const base = s.pid ? { id: s.pid } : {};
+  if (s.kind === "rich") return { ...base, kind: "rich", heading: s.heading, html: s.html };
+  if (s.kind === "image") return { ...base, kind: "image", src: s.src, alt: s.alt, caption: s.caption };
+  if (s.kind === "faq") return { ...base, kind: "faq", heading: s.heading, items: s.items.filter((it) => it.q.trim()) };
+  return { ...base, kind: "text", heading: s.heading, body: textToBody(s.text) };
 };
 const editEmpty = (s) =>
   s.kind === "rich" ? !s.html.trim() : s.kind === "image" ? !s.src.trim() : s.kind === "faq" ? !s.items.some((it) => it.q.trim()) : !s.heading.trim();
@@ -89,9 +94,9 @@ const formFrom = (page) => ({
   sections: (page.sections || []).map((s, i) => toEdit(s, `s${i}`)),
 });
 
-// Dirty = the form (minus the client-only section ids) no longer matches the
-// snapshot taken at load / last save.
-const fingerprint = (f) => JSON.stringify({ ...f, sections: f.sections.map(({ id, ...rest }) => rest) });
+// Dirty = the form (minus the client-only keys AND the durable pids — ids
+// are identity, not content) no longer matches the load/save snapshot.
+const fingerprint = (f) => JSON.stringify({ ...f, sections: f.sections.map(({ id, pid, ...rest }) => rest) });
 
 const FAMILY_HINTS = {
   page: "Served at /policies/<slug> (about and contact get their own URLs).",
@@ -99,7 +104,7 @@ const FAMILY_HINTS = {
   journal: "Served at /journal/<slug>; “Publish at” is the scheduled publish time.",
 };
 
-export function PageEditor({ mode, page, revision: initialRevision, fromMissing = false }) {
+export function PageEditor({ mode, page, revision: initialRevision, fromMissing = false, tenantTemplates = [] }) {
   const router = useRouter();
   const toast = useToast();
   const isNew = mode === "create";
@@ -119,6 +124,8 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
   const [removeId, setRemoveId] = useState(null); // section id pending the remove confirm
   const [confirmBack, setConfirmBack] = useState(false);
   const [pickerFor, setPickerFor] = useState(null); // section id the MediaPicker fills
+  const [saveTplOpen, setSaveTplOpen] = useState(false); // S54: "Save as template" dialog
+  const [templateName, setTemplateName] = useState("");
   const idRef = useRef((page.sections || []).length); // next client-side section id
   const nextId = () => `n${idRef.current++}`;
 
@@ -150,7 +157,25 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
   };
 
   // ---- templates (create mode): prefill ONCE on explicit pick ---------------
-  function applyTemplate(id) {
+  // S54: "tpl:<id>" values are TENANT-SAVED templates (cms_templates) — the
+  // server instantiates an independent copy with fresh durable section ids.
+  async function applyTemplate(id) {
+    if (id.startsWith("tpl:")) {
+      const r = await useTemplate(id.slice(4));
+      if (!r.ok || !r.template) {
+        toast.error(r.error || "Couldn’t load that template");
+        return;
+      }
+      setForm((f) => ({
+        ...f,
+        family: r.template.family || "page",
+        windowStart: "",
+        windowEnd: "",
+        sections: (r.template.sections || []).map((s) => toEdit(s, nextId())),
+      }));
+      setTemplateId(id);
+      return;
+    }
     const t = PAGE_TEMPLATES.find((x) => x.id === id);
     if (!t) return;
     const tp = t.page || {};
@@ -192,6 +217,7 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
       if (i < 0) return f;
       const copy = JSON.parse(JSON.stringify(f.sections[i]));
       copy.id = nextId();
+      delete copy.pid; // a duplicate is a NEW instance — the server mints its id
       const sections = [...f.sections];
       sections.splice(i + 1, 0, copy);
       return { ...f, sections };
@@ -231,7 +257,19 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
       setSavedFamily(payload.family);
       setSnap(fingerprint(form));
       toast.success("Saved as a draft — publish from Publishing");
-      if (isNew) router.replace(`/admin/storefront/pages/${payload.slug}`);
+      if (isNew) {
+        router.replace(`/admin/storefront/pages/${payload.slug}`);
+        return;
+      }
+      // S54: adopt the server-minted durable ids for sections saved without
+      // one, so identity holds from THIS save on (not only after a reload).
+      const fresh = await getPage(payload.slug);
+      if (fresh.ok && Array.isArray(fresh.page?.sections)) {
+        setForm((f) => ({
+          ...f,
+          sections: f.sections.map((s, i) => (s.pid ? s : { ...s, pid: fresh.page.sections[i]?.id })),
+        }));
+      }
       return;
     }
     if (res.conflict) {
@@ -305,6 +343,17 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
               onClick={preview}
             >
               Preview
+            </Button>
+            <Button
+              icon={<Copy size={14} aria-hidden />}
+              disabled={!form.sections.some((s) => !editEmpty(s))}
+              title="Save these sections as a reusable template for new pages"
+              onClick={() => {
+                setTemplateName(form.title ? `${form.title} layout` : "");
+                setSaveTplOpen(true);
+              }}
+            >
+              Save as template
             </Button>
             <Button variant="primary" busy={saving} disabled={!dirty} onClick={() => save()}>
               Save
@@ -488,6 +537,15 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
                         {t.label}
                       </option>
                     ))}
+                    {tenantTemplates.length > 0 && (
+                      <optgroup label="Your templates">
+                        {tenantTemplates.map((t) => (
+                          <option key={t.id} value={`tpl:${t.id}`}>
+                            {t.name} ({FAMILY_LABELS[t.family] || t.family})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </Select>
                 </Field>
               )}
@@ -574,6 +632,31 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
         confirmLabel="Apply template"
         body="Applying a template replaces the title, sections and settings you've entered so far."
         onConfirm={() => applyTemplate(pendingTemplate)}
+      />
+
+      {/* S54: save the current sections as a reusable tenant template */}
+      <ConfirmDialog
+        open={saveTplOpen}
+        onClose={() => setSaveTplOpen(false)}
+        title="Save as template"
+        confirmLabel="Save template"
+        body={
+          <div className="space-y-2">
+            <p>
+              Saves the current sections (empty ones are skipped) as a reusable starting point for new {FAMILY_LABELS[form.family]?.toLowerCase() || "page"}s.
+              New pages get an independent copy — editing the template later never changes existing pages.
+            </p>
+            <Field label="Template name" htmlFor="pe-tpl-name">
+              <Input id="pe-tpl-name" value={templateName} onChange={(e) => setTemplateName(e.target.value)} autoFocus />
+            </Field>
+          </div>
+        }
+        onConfirm={async () => {
+          const sections = form.sections.filter((s) => !editEmpty(s)).map(fromEdit);
+          const r = await saveTemplateApi({ name: templateName, family: form.family, sections });
+          if (!r.ok) throw new Error(r.error || (r.errors || []).join("; ") || "Couldn’t save the template");
+          toast.success(`Template “${r.template.name}” saved — it’s in “Start from a template” on new pages`);
+        }}
       />
 
       <ConfirmDialog
