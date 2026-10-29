@@ -2270,3 +2270,15 @@ run the harness); staging/production untouched. Honest scope: preview shows
 the SAVED draft (live unsaved-edit preview is future work); no drag-and-drop;
 PDP/collection designer paths, template→layout assignment, editorial role
 split = next slices.
+
+## Verification state (S55, 2026-10-29) — slices 4–5 increments
+Locally verified: sections 10 (new-kind validation + collection-bound rails +
+batching + registry filters), content 19 (composition tokens + default-look
+preservation), authz 14 (edit≠publish matrix), cms-api 17 (history trail/cap/
+actor), and the surrounding suite set green; clean builds per commit. NOT
+verified: all interactive drills (S53→S55) remain blocked on the orphaned
+next-dev process; staging/production untouched; releases-route gating tested
+at the authz level, not route-level (route not extracted). BREAKING recorded:
+staff can no longer publish. Remaining slice-4/5 scope recorded in the
+packets (structural header/footer + PDP/collection template variants,
+approvals, changesets, perf fixtures).
