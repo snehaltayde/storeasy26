@@ -256,6 +256,66 @@ await t("pushResultMessage: refusal shapes get honest copy (the 'Push failed: 20
   ok(/HTTP 500/.test(V.pushResultMessage({}, 500)), "real http error");
 });
 
+// --- S51: Shopify-side cancellation must mirror locally ----------------------------
+const { cancelOrder } = await import("../lib/order-cancel.js");
+const mkSyncedOrder = (id, gid) =>
+  inT(() =>
+    db
+      .insertInto("orders")
+      .values({
+        id,
+        status: "synced",
+        payment_method: "cod",
+        payment_status: "cod",
+        total: 500,
+        currency: "INR",
+        shopify_order_id: gid,
+        email: "c@example.com",
+        created_at: new Date().toISOString(),
+      })
+      .execute(),
+  );
+
+await t("reconcile adopts a Shopify-side cancellation (synced → cancelled)", async () => {
+  await mkSyncedOrder("BL-PROJCANC", "gid://shopify/Order/9002");
+  const r = await inT(() =>
+    P.reconcileOrderProjection("BL-PROJCANC", {
+      gql: gqlFor({
+        node: { id: "gid://shopify/Order/9002", updatedAt: "2026-10-29T10:00:00Z", cancelledAt: "2026-10-29T09:00:00Z", displayFinancialStatus: "VOIDED", displayFulfillmentStatus: "UNFULFILLED", refunds: [], fulfillments: [] },
+      }),
+    }),
+  );
+  eq(r.ok, true, "ok");
+  eq(r.adopted_cancellation, true, "adopted");
+  const row = await inT(() => db.selectFrom("orders").select("status").where("id", "=", "BL-PROJCANC").executeTakeFirst());
+  eq(row.status, "cancelled", "local status mirrors Shopify");
+});
+
+await t("cancelOrder: 'already cancelled in Shopify' is success, not an error", async () => {
+  await mkSyncedOrder("BL-CANCSHOP", "gid://shopify/Order/9003");
+  const gql = async (q) =>
+    q.includes("orderCancel")
+      ? { orderCancel: { orderCancelUserErrors: [{ message: "Order has already been canceled" }] } }
+      : { node: { cancelledAt: "2026-10-29T09:00:00Z" } };
+  const r = await inT(() => cancelOrder("BL-CANCSHOP", { reason: "mirror", gql }));
+  eq(r.ok, true, "ok");
+  const row = await inT(() => db.selectFrom("orders").select("status").where("id", "=", "BL-CANCSHOP").executeTakeFirst());
+  eq(row.status, "cancelled", "adopted locally");
+});
+
+await t("cancelOrder: a genuine Shopify failure (not cancelled there) still refuses", async () => {
+  await mkSyncedOrder("BL-CANCFAIL", "gid://shopify/Order/9004");
+  const gql = async (q) =>
+    q.includes("orderCancel")
+      ? { orderCancel: { orderCancelUserErrors: [{ message: "Payment gateway is unavailable" }] } }
+      : { node: { cancelledAt: null } };
+  const r = await inT(() => cancelOrder("BL-CANCFAIL", { reason: "x", gql }));
+  eq(r.ok, false, "refused");
+  eq(r.status, 502, "502");
+  const row = await inT(() => db.selectFrom("orders").select("status").where("id", "=", "BL-CANCFAIL").executeTakeFirst());
+  eq(row.status, "synced", "untouched");
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 process.exit(fail ? 1 : 0);
