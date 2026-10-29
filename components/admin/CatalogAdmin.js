@@ -9,6 +9,7 @@ import { Button, IconButton } from "@/components/console/Button";
 import { Field, Input, Textarea } from "@/components/console/fields";
 import { EmptyState } from "@/components/console/bits";
 import { useToast } from "@/components/console/Toast";
+import { CollectionPicker, ProductPicker } from "@/components/admin/cms/RefPicker";
 
 // Catalog browser (S39 / MC05 + MC06, redesigned S50). Shopify-owned values
 // are READ-ONLY here, labeled and linked to Shopify admin; what the console
@@ -33,7 +34,10 @@ export default function CatalogAdmin({ initial }) {
   const [editing, setEditing] = useState(null); // {product, modules, badge}
   const [opening, setOpening] = useState(null); // product gid being fetched
   const [colHandle, setColHandle] = useState("");
+  const [colId, setColId] = useState(null); // catalog id behind colHandle — known after a pick, resolved on demand otherwise (S53 B2)
   const [colPins, setColPins] = useState("");
+  const [pinsPicker, setPinsPicker] = useState(null); // "collection" | "products" | null
+  const [resolvingCol, setResolvingCol] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const debounceRef = useRef(null);
@@ -98,6 +102,37 @@ export default function CatalogAdmin({ initial }) {
   }
 
   const mod = (i, patch) => setEditing((e) => ({ ...e, modules: e.modules.map((m, j) => (j === i ? { ...m, ...patch } : m)) }));
+
+  // S53 B2: the pins product picker filters to the chosen collection's MEMBERS
+  // (the server rejects non-members). The refs API filters by collection id;
+  // a picked collection carries its id, a typed handle resolves on demand.
+  async function openPinsProducts() {
+    if (colId) return setPinsPicker("products");
+    setResolvingCol(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/refs?type=collection&q=${encodeURIComponent(colHandle.trim())}&limit=50`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json.error || `Couldn't look up the collection (${res.status})`);
+      const hit = (json.items || []).find((c) => c.handle === colHandle.trim());
+      if (!hit) throw new Error(`“${colHandle.trim()}” isn't in the synced catalog — pick a collection with Choose…, or type product handles by hand.`);
+      setColId(hit.id);
+      setPinsPicker("products");
+    } catch (e) {
+      setError(String(e?.message || e));
+    } finally {
+      setResolvingCol(false);
+    }
+  }
+
+  // Picker items → the SAME one-handle-per-line textarea the form always
+  // saved: current lines keep their order, picked handles append (deduped).
+  const addPins = (items) =>
+    setColPins((cur) => {
+      const lines = cur.split("\n").map((s) => s.trim()).filter(Boolean);
+      const added = items.map((it) => it.handle).filter((h) => h && !lines.includes(h));
+      return [...lines, ...added].join("\n");
+    });
 
   return (
     <div className="space-y-4">
@@ -238,7 +273,23 @@ export default function CatalogAdmin({ initial }) {
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Collection handle" htmlFor="cat-col-handle">
-                <Input id="cat-col-handle" list="catalog-collections" mono value={colHandle} onChange={(e) => setColHandle(e.target.value)} placeholder="protein" />
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="cat-col-handle"
+                    list="catalog-collections"
+                    mono
+                    className="flex-1"
+                    value={colHandle}
+                    onChange={(e) => {
+                      setColHandle(e.target.value);
+                      setColId(null); // typed handle — id unknown until resolved
+                    }}
+                    placeholder="protein"
+                  />
+                  <Button size="sm" onClick={() => setPinsPicker("collection")}>
+                    Choose…
+                  </Button>
+                </div>
                 <datalist id="catalog-collections">
                   {data.collections.map((c) => (
                     <option key={c.handle} value={c.handle}>
@@ -248,8 +299,11 @@ export default function CatalogAdmin({ initial }) {
                   ))}
                 </datalist>
               </Field>
-              <Field label="Pinned product handles" htmlFor="cat-col-pins" hint="One per line, in display order · empty = back to Shopify’s order.">
+              <Field label="Pinned product handles" htmlFor="cat-col-pins" hint="One per line, in display order · empty = back to Shopify’s order. Picked products append — edit the lines to reorder.">
                 <Textarea id="cat-col-pins" mono value={colPins} onChange={(e) => setColPins(e.target.value)} placeholder={"whey-gold-1kg\ncreatine-250g"} />
+                <Button size="sm" className="mt-2" busy={resolvingCol} disabled={!colHandle.trim()} onClick={openPinsProducts}>
+                  Choose products…
+                </Button>
               </Field>
             </div>
             <CardFooter>
@@ -270,6 +324,28 @@ export default function CatalogAdmin({ initial }) {
           </Card>
         </>
       )}
+
+      {/* S53 B2: catalog pickers for the pins form — the save still sends the
+          collection handle + pinned product handles exactly as before. */}
+      <CollectionPicker
+        open={pinsPicker === "collection"}
+        onClose={() => setPinsPicker(null)}
+        title="Choose the collection"
+        onConfirm={(items) => {
+          if (items[0]) {
+            setColHandle(items[0].handle);
+            setColId(items[0].id);
+          }
+        }}
+      />
+      <ProductPicker
+        open={pinsPicker === "products"}
+        onClose={() => setPinsPicker(null)}
+        title={`Pin products from “${colHandle.trim()}”`}
+        multi
+        collectionId={colId || undefined}
+        onConfirm={addPins}
+      />
     </div>
   );
 }

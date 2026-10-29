@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/console/Dialog";
 import { Field, Input } from "@/components/console/fields";
 import { EmptyState } from "@/components/console/bits";
 import { Switch } from "@/components/console/Switch";
+import { VariantPicker } from "@/components/admin/cms/RefPicker";
 
 // S46 commerce-expansion panels (redesigned S50): BundlesPanel + QuizPanel,
 // both on the Catalog page. They talk to /api/admin/bundles and
@@ -41,6 +42,7 @@ export function BundlesPanel({ initial }) {
   const [toggling, setToggling] = useState(null); // bundle id
   const [err, setErr] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // bundle
+  const [pickerRow, setPickerRow] = useState(null); // component index with the variant picker open (S53 B2)
 
   async function refresh() {
     const data = await fetch("/api/admin/bundles").then((r) => r.json()).catch(() => null);
@@ -163,7 +165,7 @@ export function BundlesPanel({ initial }) {
             </Field>
           </div>
 
-          <p className="mt-4 text-xs font-medium text-fg-muted">Components — a product handle (first variant) or a variant ID, plus quantity</p>
+          <p className="mt-4 text-xs font-medium text-fg-muted">Components — pick a variant from the catalog, or type a product handle (first variant) / variant ID, plus quantity</p>
           {form.items.map((c, i) => (
             <div key={i} className="mt-2 flex items-center gap-2">
               <Input
@@ -174,6 +176,9 @@ export function BundlesPanel({ initial }) {
                 value={c.variantId}
                 onChange={(e) => setItem(i, { variantId: e.target.value.trim() })}
               />
+              <Button size="sm" onClick={() => setPickerRow(i)}>
+                Choose…
+              </Button>
               <Input
                 type="number"
                 min="1"
@@ -247,6 +252,19 @@ export function BundlesPanel({ initial }) {
         onConfirm={async () => {
           await postJson("/api/admin/bundles", { remove: { id: confirmDelete.id } });
           await refresh();
+        }}
+      />
+
+      {/* S53 B2: fills the SAME component field (a variant GID string) the
+          form always sent — typed handles/GIDs still work for anything the
+          catalog hasn't synced. */}
+      <VariantPicker
+        open={pickerRow != null}
+        onClose={() => setPickerRow(null)}
+        title={pickerRow != null ? `Choose component ${pickerRow + 1}` : "Choose a variant"}
+        selectedVariantId={pickerRow != null && form?.items[pickerRow]?.variantId?.startsWith("gid://") ? form.items[pickerRow].variantId : undefined}
+        onConfirm={({ variantId }) => {
+          if (pickerRow != null) setItem(pickerRow, { variantId });
         }}
       />
     </Card>

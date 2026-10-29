@@ -12,9 +12,13 @@ import { ConfirmDialog } from "@/components/console/Dialog";
 import { Field, Input, Select } from "@/components/console/fields";
 import { EmptyState, Skeleton } from "@/components/console/bits";
 import { useToast } from "@/components/console/Toast";
+import { ProductPicker } from "@/components/admin/cms/RefPicker";
 
-// Upsell placements console (Session 23, redesigned S50). Merchants reference
-// products by HANDLE (the /products/<handle> part); the server stores gids.
+// Upsell placements console (Session 23, redesigned S50). The wire format is
+// unchanged: this form sends product HANDLES (the /products/<handle> part);
+// the server stores gids. S53 B2 adds the catalog picker — it hands back
+// items with a `handle` field, which is what gets written into the same
+// handle inputs; typing handles still works for unsynced products.
 
 const EMPTY = { kind: "pdp_pairs", sourceHandle: "", targetHandles: "", title: "", position: 0 };
 
@@ -27,6 +31,18 @@ export default function UpsellsAdmin({ initial }) {
   const [refreshing, setRefreshing] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
   const [deleting, setDeleting] = useState(null); // placement row | null
+  const [picker, setPicker] = useState(null); // "source" | "targets" | null
+
+  // Picker items → the form's existing comma-separated handle string: current
+  // entries keep their order, picked handles append (deduped). Entries the
+  // catalog hasn't synced stay typed by hand — never dropped.
+  const addTargets = (items) =>
+    setForm((f) => {
+      if (!f) return f;
+      const cur = f.targetHandles.split(",").map((s) => s.trim()).filter(Boolean);
+      const added = items.map((it) => it.handle).filter((h) => h && !cur.includes(h));
+      return { ...f, targetHandles: [...cur, ...added].join(", ") };
+    });
 
   // silent=true keeps the rows on screen (the toggling Switch already shows
   // pending); the skeleton pass is for refetches after delete.
@@ -131,7 +147,7 @@ export default function UpsellsAdmin({ initial }) {
           <Card className="mb-4">
             <CardHeader
               title={form.id ? "Edit placement" : "New placement"}
-              description="Reference products by handle — the /products/<handle> part of the URL."
+              description="Pick products from your catalog — or type a handle (the /products/<handle> part of the URL) for anything not synced yet."
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Kind" htmlFor="upsell-kind">
@@ -142,15 +158,30 @@ export default function UpsellsAdmin({ initial }) {
               </Field>
               {form.kind === "pdp_pairs" ? (
                 <Field label="Source product handle" hint="the PDP this strip appears on" htmlFor="upsell-source">
-                  <Input id="upsell-source" value={form.sourceHandle} onChange={(e) => setForm({ ...form, sourceHandle: e.target.value })} placeholder="whey-protein-1kg" />
+                  <div className="flex items-center gap-2">
+                    <Input id="upsell-source" className="flex-1" value={form.sourceHandle} onChange={(e) => setForm({ ...form, sourceHandle: e.target.value })} placeholder="whey-protein-1kg" />
+                    <Button size="sm" onClick={() => setPicker("source")}>
+                      Choose…
+                    </Button>
+                  </div>
                 </Field>
               ) : (
                 <Field label="Position" hint="lower shows first when several slots exist" htmlFor="upsell-position">
                   <Input id="upsell-position" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
                 </Field>
               )}
-              <Field label="Target product handles" hint="comma-separated, shown in this order" htmlFor="upsell-targets" className="sm:col-span-2">
-                <Input id="upsell-targets" value={form.targetHandles} onChange={(e) => setForm({ ...form, targetHandles: e.target.value })} placeholder="creatine-100g, shaker-neon" />
+              <Field
+                label="Target product handles"
+                hint="comma-separated, shown in this order — picked products append; edit the text to reorder or to add unsynced handles"
+                htmlFor="upsell-targets"
+                className="sm:col-span-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Input id="upsell-targets" className="flex-1" value={form.targetHandles} onChange={(e) => setForm({ ...form, targetHandles: e.target.value })} placeholder="creatine-100g, shaker-neon" />
+                  <Button size="sm" onClick={() => setPicker("targets")}>
+                    Choose products…
+                  </Button>
+                </div>
               </Field>
               <Field label="Title" hint={form.kind === "pdp_pairs" ? 'blank = "Pairs well with"' : 'blank = "You might also like"'} htmlFor="upsell-title">
                 <Input id="upsell-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -256,6 +287,23 @@ export default function UpsellsAdmin({ initial }) {
             : null
         }
         onConfirm={() => remove(deleting)}
+      />
+
+      {/* S53 B2: catalog pickers — they work in ids, the form keeps storing handles */}
+      <ProductPicker
+        open={picker === "source"}
+        onClose={() => setPicker(null)}
+        title="Choose the source product"
+        onConfirm={(items) => {
+          if (items[0]?.handle) setForm((f) => ({ ...f, sourceHandle: items[0].handle }));
+        }}
+      />
+      <ProductPicker
+        open={picker === "targets"}
+        onClose={() => setPicker(null)}
+        title="Choose target products"
+        multi
+        onConfirm={addTargets}
       />
     </div>
   );

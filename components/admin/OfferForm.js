@@ -9,6 +9,7 @@ import { Button, IconButton } from "@/components/console/Button";
 import { Switch } from "@/components/console/Switch";
 import { Field, Input, Select } from "@/components/console/fields";
 import { cx } from "@/components/console/cx";
+import { VariantPicker } from "@/components/admin/cms/RefPicker";
 
 // One form, four offer types — fields mirror lib/offers/validate.js exactly.
 const TYPES = ["COUPON", "TIERED_QTY", "BXGY", "FREE_GIFT"];
@@ -37,6 +38,7 @@ export default function OfferForm({ existing, onDone, onCancel }) {
   const [tiers, setTiers] = useState(cfg.tiers || [{ minQty: 2, percent: 5 }]);
   const [threshold, setThreshold] = useState(cfg.threshold ?? 1499);
   const [gift, setGift] = useState(cfg.gift || { variantId: "", title: "", value: 0, image: "", productId: "", handle: "" });
+  const [giftPickerOpen, setGiftPickerOpen] = useState(false); // S53 B2: the catalog variant picker
   const [code, setCode] = useState(cfg.code || "");
   const [discKind, setDiscKind] = useState(cfg.discount?.kind || "percent");
   const [discValue, setDiscValue] = useState(cfg.discount?.value ?? 10);
@@ -225,8 +227,13 @@ export default function OfferForm({ existing, onDone, onCancel }) {
                 <Field label="Subtotal threshold (₹, pre-discount)" htmlFor="offer-threshold">
                   <Input id="offer-threshold" type="number" min="1" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
                 </Field>
-                <Field label="Gift variant GID" htmlFor="offer-gift-gid">
-                  <Input id="offer-gift-gid" mono value={gift.variantId} onChange={(e) => setGift({ ...gift, variantId: e.target.value })} placeholder="gid://shopify/ProductVariant/…" />
+                <Field label="Gift variant" htmlFor="offer-gift-gid" hint="pick from the catalog, or paste a variant GID">
+                  <div className="flex items-center gap-2">
+                    <Input id="offer-gift-gid" mono className="flex-1" value={gift.variantId} onChange={(e) => setGift({ ...gift, variantId: e.target.value })} placeholder="gid://shopify/ProductVariant/…" />
+                    <Button size="sm" onClick={() => setGiftPickerOpen(true)}>
+                      Choose variant…
+                    </Button>
+                  </div>
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Gift title" htmlFor="offer-gift-title">
@@ -374,6 +381,19 @@ export default function OfferForm({ existing, onDone, onCancel }) {
           </Button>
         </div>
       </form>
+
+      {/* S53 B2: fills the SAME gift fields the form always saved (variantId,
+          productId, handle, title) — a variant is only ever set by an explicit
+          click in the picker or by typing; nothing is auto-picked. */}
+      <VariantPicker
+        open={giftPickerOpen}
+        onClose={() => setGiftPickerOpen(false)}
+        title="Choose the gift variant"
+        selectedVariantId={gift.variantId || undefined}
+        onConfirm={({ variantId, productId, productHandle, label }) =>
+          setGift((g) => ({ ...g, variantId, productId, handle: productHandle, title: label }))
+        }
+      />
     </div>
   );
 }

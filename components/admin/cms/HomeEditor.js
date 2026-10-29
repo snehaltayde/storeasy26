@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, Copy, Loader2, Plus, Redo2, Trash2, Undo2, X } from "lucide-react";
 import { cx } from "@/components/console/cx";
 import { Card, CardHeader, CardFooter } from "@/components/console/Card";
@@ -11,8 +11,8 @@ import { ConfirmDialog } from "@/components/console/Dialog";
 import { Field, Input, Textarea } from "@/components/console/fields";
 import { Switch } from "@/components/console/Switch";
 import { useToast } from "@/components/console/Toast";
-import { ErrorState, Skeleton } from "@/components/console/bits";
 import { getStorefrontView, saveBlock, resetBlock } from "./api";
+import { CollectionPicker } from "./RefPicker";
 import { ConflictBanner } from "./ConflictBanner";
 import PreviewFrame from "./PreviewFrame";
 import { useDirtyGuard } from "./useDirtyGuard";
@@ -92,36 +92,6 @@ function CardErrors({ error, className = "" }) {
   );
 }
 
-// The catalog-backed add-chips under each curated list. Module-level (NOT
-// defined inside HomeEditor) so re-renders don't remount it. States per the
-// house rules: loading → Skeleton, error → ErrorState with retry (the manual
-// input below still works), empty → honest copy, data → chips.
-function AvailableChips({ catalog, selected, full, onAdd, onRetry }) {
-  if (catalog.state === "loading") return <Skeleton className="h-7 w-full" />;
-  if (catalog.state === "error")
-    return <ErrorState className="py-4" title="Couldn't load your collections" detail="You can still type handles below." onRetry={onRetry} />;
-  if (catalog.state === "ready" && !catalog.collections.length)
-    return <p className="text-xs text-fg-subtle">No collections synced yet — type handles below.</p>;
-  const avail = catalog.collections.filter((c) => !selected.includes(c.handle));
-  if (!avail.length) return <p className="text-xs text-fg-subtle">Every synced collection is already in this list.</p>;
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {avail.map((c) => (
-        <button
-          key={c.handle}
-          type="button"
-          title={c.title}
-          disabled={full}
-          onClick={() => onAdd(c.handle)}
-          className="inline-flex items-center gap-1 rounded-ctl border border-edge bg-surface px-2 py-1 font-mono text-[11px] text-fg-muted focus-ring hover:bg-surface-sunken hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus size={11} aria-hidden /> {c.handle}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // Manual handle entry (covers collections the catalog hasn't synced yet).
 // Module-level for the same remount reason — it owns the typed draft.
 function ManualAdd({ label, badHandle, onAdd }) {
@@ -183,7 +153,7 @@ export default function HomeEditor({ initial }) {
   const [ciMode, setCiMode] = useState(initial.blocks.collections_index == null ? "auto" : "curated");
   const [ci, setCi] = useState(() => ciLists(initial.blocks.collections_index));
   const [ciSnap, setCiSnap] = useState(() => ciSnapOf(initial.blocks.collections_index));
-  const [catalog, setCatalog] = useState({ state: "idle", collections: [] }); // idle|loading|error|ready
+  const [ciPicker, setCiPicker] = useState(null); // curated list key with the CollectionPicker open (S53 B2)
   const [handleErr, setHandleErr] = useState({}); // list key -> bad manual handle
   const ciDirty = JSON.stringify(ciValue(ciMode, ci)) !== ciSnap;
 
@@ -361,23 +331,6 @@ export default function HomeEditor({ initial }) {
 
   // -- collections picker ---------------------------------------------------------
 
-  async function loadCatalog() {
-    setCatalog((c) => ({ ...c, state: "loading" }));
-    let res, data;
-    try {
-      res = await fetch("/api/admin/catalog");
-      data = await res.json().catch(() => ({}));
-    } catch {
-      return setCatalog({ state: "error", collections: [] });
-    }
-    if (!res.ok || !data.ok) return setCatalog({ state: "error", collections: [] });
-    setCatalog({ state: "ready", collections: data.collections || [] });
-  }
-  // Fetch once, as soon as curated mode is (or becomes) active.
-  useEffect(() => {
-    if (ciMode === "curated" && catalog.state === "idle") loadCatalog();
-  }, [ciMode, catalog.state]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const LIST_MAX = { featured: 6, order: 50, hide: 50 };
   const addHandle = (list, handle) => {
     const h = String(handle).trim().toLowerCase();
@@ -402,14 +355,19 @@ export default function HomeEditor({ initial }) {
   // handles that are both shown and hidden — the server rejects this; say so first
   const ciOverlap = ci.hide.filter((h) => ci.featured.includes(h) || ci.order.includes(h));
 
-  // props for the module-level picker pieces, per curated list
-  const pickerProps = (list) => ({
-    catalog,
-    selected: ci[list],
-    full: ci[list].length >= LIST_MAX[list],
-    onAdd: (h) => addHandle(list, h),
-    onRetry: loadCatalog,
-  });
+  // The CollectionPicker (S53 B2) works in catalog ids; this card stores
+  // collection HANDLES — picked items convert via their handle field and go
+  // through addHandle (same validation/dedup/cap as the manual input).
+  const CI_PICKER_TITLES = { featured: "Add to Featured", order: "Add to the explicit order", hide: "Add to Hidden" };
+  const ciPickerButton = (list, label) => {
+    const room = LIST_MAX[list] - ci[list].length;
+    return (
+      <Button size="sm" icon={<Plus size={13} aria-hidden />} disabled={room <= 0} onClick={() => setCiPicker(list)}>
+        Choose collections…{room <= 0 ? " (list is full)" : ""}
+        <span className="sr-only"> for {label}</span>
+      </Button>
+    );
+  };
 
   // -----------------------------------------------------------------------------
 
@@ -646,7 +604,7 @@ export default function HomeEditor({ initial }) {
                     ))}
                   </div>
                 )}
-                <AvailableChips {...pickerProps("featured")} />
+                {ciPickerButton("featured", "Featured")}
                 <ManualAdd label="Featured" badHandle={handleErr.featured} onAdd={(h) => addHandle("featured", h)} />
               </div>
 
@@ -675,7 +633,7 @@ export default function HomeEditor({ initial }) {
                     ))}
                   </ul>
                 )}
-                <AvailableChips {...pickerProps("order")} />
+                {ciPickerButton("order", "Order")}
                 <ManualAdd label="Order" badHandle={handleErr.order} onAdd={(h) => addHandle("order", h)} />
               </div>
 
@@ -696,7 +654,7 @@ export default function HomeEditor({ initial }) {
                     ))}
                   </div>
                 )}
-                <AvailableChips {...pickerProps("hide")} />
+                {ciPickerButton("hide", "Hidden")}
                 <ManualAdd label="Hidden" badHandle={handleErr.hide} onAdd={(h) => addHandle("hide", h)} />
               </div>
             </div>
@@ -729,6 +687,21 @@ export default function HomeEditor({ initial }) {
         confirmLabel="Reset to default"
         body={`This discards your customized ${RESET_LABELS[resetKey] || resetKey} draft and returns it to the default. The live site keeps showing the published version until your next publish.`}
         onConfirm={() => doReset(resetKey)}
+      />
+
+      {/* S53 B2: curated-list collection picker — one dialog, opened per list.
+          Picked collections land through addHandle, so the stored format
+          (handles), dedup and the list caps are exactly what typing gives. */}
+      <CollectionPicker
+        open={ciPicker != null}
+        onClose={() => setCiPicker(null)}
+        title={ciPicker ? CI_PICKER_TITLES[ciPicker] : "Choose collections"}
+        multi
+        max={ciPicker ? Math.max(LIST_MAX[ciPicker] - ci[ciPicker].length, 0) : undefined}
+        onConfirm={(items) => {
+          if (!ciPicker) return;
+          for (const it of items) if (it.handle) addHandle(ciPicker, it.handle);
+        }}
       />
     </div>
   );
