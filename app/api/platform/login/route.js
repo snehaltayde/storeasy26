@@ -115,9 +115,19 @@ export async function POST(request) {
   }
 
   // --- bootstrap / legacy shared-password path ---
-  if (platformConfigured() && (await operatorsExist())) {
-    slog("platform_login_failed", { reason: "email_required" });
-    return fail(401, "Sign in with your operator email, password and code");
+  // S53 (audit A3): an operator-lookup FAILURE refuses the bootstrap path
+  // (same response as "operators exist") — it never reads as "no operators".
+  if (platformConfigured()) {
+    let haveOperators = true;
+    try {
+      haveOperators = await operatorsExist();
+    } catch {
+      haveOperators = true;
+    }
+    if (haveOperators) {
+      slog("platform_login_failed", { reason: "email_required" });
+      return fail(401, "Sign in with your operator email, password and code");
+    }
   }
   if (!platformAdminConfigured()) {
     return fail(503, "Platform console is not configured (set PLATFORM_ADMIN_PASSWORD)");

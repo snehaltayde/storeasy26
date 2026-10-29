@@ -260,6 +260,43 @@ await t("applyTenantSchema: commerce tables; NEUTRAL by default, brand seed opt-
   client.close?.();
 });
 
+// --- S53 (audit A3): tenant sources never borrow env credentials ----------------
+await t("a credential-less platform tenant refuses to sync even with env Shopify creds set", async () => {
+  process.env.SHOPIFY_STORE_DOMAIN = "env-shop.example.com";
+  process.env.SHOPIFY_STOREFRONT_TOKEN = "env-leak-token";
+  try {
+    await C.upsertTenant({ id: "nocreds", name: "No creds", domains: [], dbUrl: "file:.test-psync-t1.db", config: {}, secrets: {} });
+    const NC = await C.getTenant("nocreds");
+    let threw = null;
+    try {
+      await withTenant(NC, () => S.runCatalogSync());
+    } catch (e) {
+      threw = String(e?.message || e);
+    }
+    if (!threw || !/No Shopify credentials/.test(threw)) {
+      throw new Error(`expected a fail-closed credentials error, got: ${threw || "no throw (env was borrowed!)"}`);
+    }
+  } finally {
+    delete process.env.SHOPIFY_STORE_DOMAIN;
+    delete process.env.SHOPIFY_STOREFRONT_TOKEN;
+  }
+});
+
+await t("Typesense namespace: platform tenant without its own never falls back to a shared index", async () => {
+  const { productsCollection } = await import("../lib/typesense-search.js");
+  process.env.TYPESENSE_COLLECTION = "shared-index";
+  try {
+    const NC = await C.getTenant("nocreds");
+    const none = await withTenant(NC, () => productsCollection());
+    if (none !== null) throw new Error(`expected null, got ${JSON.stringify(none)} (shared-index leak)`);
+    await C.patchTenant("nocreds", { config: { typesense_collection: "products_nocreds" } });
+    const own = await withTenant(await C.getTenant("nocreds"), () => productsCollection());
+    if (own !== "products_nocreds") throw new Error(`expected own namespace, got ${JSON.stringify(own)}`);
+  } finally {
+    delete process.env.TYPESENSE_COLLECTION;
+  }
+});
+
 // --- summary --------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });

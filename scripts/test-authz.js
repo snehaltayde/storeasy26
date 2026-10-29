@@ -230,6 +230,28 @@ await t("bootstrap cookie acts as owner on a user-less tenant", async () => {
   });
 });
 
+// --- S53 (audit A3): membership-lookup failure can NEVER resurrect bootstrap ----
+// Runs LAST: it breaks the memberships table on purpose.
+await t("fail closed: a membership lookup failure denies the legacy cookie (no bootstrap resurrection)", async () => {
+  const { adminSessionToken, adminBootstrapMode } = await import("../lib/admin-auth.js");
+  const ZC = await C.getTenant("zc"); // the user-less bootstrap tenant from the previous test
+  await withTenant(ZC, async () => {
+    const legacy = await adminSessionToken();
+    // sanity: bootstrap works while the lookup SUCCEEDS with zero rows
+    eq((await requireAdmin(req(legacy), "settings.write")).ok, true, "bootstrap ok pre-outage");
+    // simulate the control-plane lookup failing
+    await C.platformDb().execute("ALTER TABLE memberships RENAME TO memberships_broken");
+    try {
+      const denied = await requireAdmin(req(legacy), "settings.write");
+      eq(denied.ok, false, "outage must deny");
+      eq(await adminBootstrapMode(), false, "bootstrap mode reports closed during outage");
+    } finally {
+      await C.platformDb().execute("ALTER TABLE memberships_broken RENAME TO memberships");
+    }
+    eq((await requireAdmin(req(legacy), "settings.write")).ok, true, "bootstrap recovers after outage");
+  });
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 process.exit(fail ? 1 : 0);
