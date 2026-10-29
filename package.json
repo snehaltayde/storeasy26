@@ -35,6 +35,7 @@
     "test:platform-sync": "node scripts/test-platform-sync.js",
     "test:admin-console": "node scripts/test-admin-console.js",
     "test:cms-api": "node scripts/test-cms-api.js",
+    "test:refs": "node scripts/test-refs.js",
     "test:cms": "node scripts/test-cms.js",
     "test:platform-ops": "node scripts/test-platform-ops.js",
     "test:tenant-boundary": "node scripts/test-tenant-boundary.js",
