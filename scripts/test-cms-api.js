@@ -173,6 +173,46 @@ await t("CAS preserved: stale revision → 409 CMS_CONFLICT with the server's cu
   ok(String(row.value).includes("First"), "server kept the first value");
 });
 
+// --- S53 (0B-1): revision-required writes + explicit force ------------------
+await t("REVISION_REQUIRED: a save that omits the revision (and force) is a 428, storage unchanged", async () => {
+  const before = await blockRow("hero");
+  const r = await inT(() => handleStorefrontPut(req(staffTok, { block: "hero", value: { title: "Sneaky" } })));
+  eq(r.status, 428);
+  eq(r.body.code, "REVISION_REQUIRED");
+  const after = await blockRow("hero");
+  eq(after.revision, before.revision, "revision untouched");
+  ok(String(after.value).includes("First"), "value untouched");
+  const p = await inT(() => handleStorefrontPut(req(staffTok, { page: { slug: "p9", title: "P9", sections: [] } })));
+  eq(p.status, 428, "pages too");
+});
+
+await t("force:true is the explicit overwrite path and is audited through", async () => {
+  const r = await inT(() => handleStorefrontPut(req(staffTok, { block: "hero", value: { title: "Forced over" }, force: true })));
+  eq(r.status, 200);
+  ok(String((await blockRow("hero")).value).includes("Forced over"), "overwrote");
+});
+
+await t("reset with a stale revision conflicts; with the current revision it applies", async () => {
+  const current = (await blockRow("hero")).revision;
+  const stale = await inT(() => handleStorefrontPut(req(staffTok, { block: "hero", reset: true, revision: current - 1 })));
+  eq(stale.status, 409, "stale reset");
+  ok((await blockRow("hero")) != null, "row survived");
+  const okReset = await inT(() => handleStorefrontPut(req(staffTok, { block: "hero", reset: true, revision: current })));
+  eq(okReset.status, 200, "current reset");
+  eq(await blockRow("hero"), undefined, "row gone");
+});
+
+await t("deletePage with a stale revision conflicts; with the current one it deletes", async () => {
+  const mk = await inT(() => handleStorefrontPut(req(staffTok, { page: { slug: "del-me", title: "Del", sections: [] }, revision: null })));
+  eq(mk.status, 200, "create");
+  const rev = mk.body.pageRevisions["del-me"];
+  const stale = await inT(() => handleStorefrontPut(req(staffTok, { deletePage: "del-me", revision: rev + 5 })));
+  eq(stale.status, 409, "stale delete");
+  const good = await inT(() => handleStorefrontPut(req(staffTok, { deletePage: "del-me", revision: rev })));
+  eq(good.status, 200, "current delete");
+  eq((await inT(() => db.selectFrom("cms_pages").selectAll().where("slug", "=", "del-me").execute())).length, 0, "row gone");
+});
+
 await t("validation errors still 422 with the errors list", async () => {
   const r = await inT(() => handleStorefrontPut(req(staffTok, { block: "hero", value: { title: "" }, revision: 1 })));
   eq(r.status, 422);

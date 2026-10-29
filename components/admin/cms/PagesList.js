@@ -54,7 +54,7 @@ function SortHeader({ label, col, sort, onSort }) {
   );
 }
 
-export function PagesList({ pages }) {
+export function PagesList({ pages, pageRevisions = {} }) {
   const router = useRouter();
   const toast = useToast();
   const [tab, setTab] = useState("all");
@@ -262,7 +262,9 @@ export function PagesList({ pages }) {
           )
         }
         onConfirm={async () => {
-          const r = await deletePage(toDelete.slug);
+          // S53: the revision we listed rides along — a delete racing a
+          // colleague's edit conflicts instead of discarding their work
+          const r = await deletePage(toDelete.slug, pageRevisions[toDelete.slug] ?? undefined);
           if (!r.ok) throw new Error(r.error || "Delete failed — try again.");
           toast.success(isRevert ? "Reverted to the standard copy" : `Deleted “${toDelete.title || toDelete.slug}”`);
           router.refresh();

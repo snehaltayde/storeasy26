@@ -252,6 +252,46 @@ await t("publishReleaseById on an unknown id fails (job dead-letters, pointer sa
   eq((await inTenant(R.getLiveRelease)).id, before);
 });
 
+console.log("— S53 (0B-1): reviewed candidate binding + no partial snapshots");
+
+await t("expectedDraftHash binds the publish: mismatch is DRAFTS_CHANGED, match publishes", async () => {
+  const before = (await inTenant(() => R.listReleases({ limit: 50 }))).releases.length;
+  try {
+    await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" }, expectedDraftHash: "sha-of-something-older" }));
+    throw new Error("expected DRAFTS_CHANGED");
+  } catch (e) {
+    if (e.code !== "DRAFTS_CHANGED") throw e;
+  }
+  const after = (await inTenant(() => R.listReleases({ limit: 50 }))).releases.length;
+  if (after !== before) throw new Error("a refused publish must not create a release row");
+  const snap = await inTenant(() => R.snapshotContent());
+  const r = await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" }, expectedDraftHash: snap.hash }));
+  if (r.hash !== snap.hash) throw new Error("published a different candidate than reviewed");
+});
+
+await t("a failing pages read makes the snapshot THROW — never a partial release", async () => {
+  const { createClient } = await import("@libsql/client");
+  await rm(join(here, "../.test-rel-t3.db"), { force: true });
+  const t3db = createClient({ url: "file:.test-rel-t3.db" });
+  await t3db.executeMultiple(schema);
+  await runMigrations(t3db, tenantMigrations);
+  // swap cms_pages for a view that ERRORS on read (not "no such table")
+  await t3db.execute("DROP TABLE cms_pages");
+  await t3db.execute("CREATE VIEW cms_pages AS SELECT json_extract('not json', '$.x') AS slug");
+  await C.upsertTenant({ id: "rt3", name: "Rel broken-pages", domains: [], dbUrl: "file:.test-rel-t3.db", config: {}, secrets: {} });
+  const T3 = await C.getTenant("rt3");
+  let threw = null;
+  try {
+    await withTenant(T3, () => R.snapshotContent());
+  } catch (e) {
+    threw = String(e?.message || e);
+  }
+  if (!threw || !/release snapshot failed reading pages/.test(threw)) {
+    throw new Error(`expected a loud snapshot failure, got: ${threw || "no throw (partial release possible!)"}`);
+  }
+  await rm(join(here, "../.test-rel-t3.db"), { force: true });
+});
+
 console.log("— S53 (audit A2): live-release reads fail closed");
 
 await t("getLiveReleaseState: live / none / corrupt / dangling pointer are DISTINCT", async () => {

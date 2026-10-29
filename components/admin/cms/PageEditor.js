@@ -222,8 +222,8 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
     }
     setProblems(null);
     setSaving(true);
-    // revision semantics (S35): number = CAS, null = expect-create, OMITTED = deliberate overwrite
-    const res = overwrite ? await savePage(payload) : await savePage(payload, revision);
+    // revision semantics (S35/S53): number = CAS, null = expect-create, force = deliberate overwrite
+    const res = overwrite ? await savePage(payload, undefined, { force: true }) : await savePage(payload, revision);
     setSaving(false);
     if (res.ok) {
       setConflict(null);

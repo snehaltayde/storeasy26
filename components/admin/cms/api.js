@@ -23,16 +23,19 @@ const put = (body) =>
 
 export const getStorefrontView = () => call("/api/admin/storefront");
 
-// revision semantics (S35): number = CAS check · null = "expect to create" ·
-// undefined (omit) = deliberate overwrite after a conflict.
-export const saveBlock = (block, value, revision) =>
-  put(revision === undefined ? { block, value } : { block, value, revision });
+// revision semantics (S35, hardened S53): number = CAS check · null =
+// "expect to create" · a deliberate overwrite after a conflict is the
+// EXPLICIT {force:true} — the server now rejects saves that simply omit the
+// revision (428 REVISION_REQUIRED).
+export const saveBlock = (block, value, revision, { force = false } = {}) =>
+  put(force ? { block, value, force: true } : { block, value, revision: revision ?? null });
 
-export const resetBlock = (block) => put({ block, reset: true });
+export const resetBlock = (block, revision) => put(revision == null ? { block, reset: true } : { block, reset: true, revision });
 
-export const savePage = (page, revision) => put(revision === undefined ? { page } : { page, revision });
+export const savePage = (page, revision, { force = false } = {}) =>
+  put(force ? { page, force: true } : { page, revision: revision ?? null });
 
-export const deletePage = (slug) => put({ deletePage: slug });
+export const deletePage = (slug, revision) => put(revision == null ? { deletePage: slug } : { deletePage: slug, revision });
 
 export const getPage = (slug) => put({ getPage: slug });
 

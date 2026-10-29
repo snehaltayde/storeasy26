@@ -72,9 +72,9 @@ export default function PdpExtrasEditor({ initial }) {
   }
 
   const save = () => run(() => saveBlock("pdp_extras", rowsValue(rows), rev), "Saved as a draft — publish from Publishing");
-  const overwrite = () => run(() => saveBlock("pdp_extras", rowsValue(rows)), "Overwrote their version — publish from Publishing"); // revision OMITTED
+  const overwrite = () => run(() => saveBlock("pdp_extras", rowsValue(rows), undefined, { force: true }), "Overwrote their version — publish from Publishing");
   const takeTheirs = () => run(() => getStorefrontView(), "Loaded their version — your edits were discarded");
-  const reset = () => run(() => resetBlock("pdp_extras"), "Reset to default — publish from Publishing");
+  const reset = () => run(() => resetBlock("pdp_extras", rev ?? undefined), "Reset to default — publish from Publishing");
 
   const patch = (i, p) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...p } : x)));
   const move = (i, d) =>

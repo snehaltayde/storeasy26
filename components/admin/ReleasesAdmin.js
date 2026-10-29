@@ -58,6 +58,13 @@ export default function ReleasesAdmin({ initial }) {
         if (json.releases) setData(json); // every mutating POST returns the full view
         return json;
       }
+      // S53 (0B-1): the publish was bound to the hash we DISPLAYED; drafts
+      // moved since — adopt the fresh view so the diff shows what changed.
+      if (res.status === 409 && json.code === "DRAFTS_CHANGED") {
+        if (json.releases) setData(json);
+        setApiErrors([json.error || "Drafts changed since you reviewed them — review the updated list, then publish again."]);
+        return { ok: false, error: json.error };
+      }
       const msgs = json.errors ? [json.error, ...json.errors].filter(Boolean) : [json.error || `Request failed (${res.status})`];
       setApiErrors(msgs);
       return { ok: false, error: msgs.join(" — ") };
@@ -198,7 +205,7 @@ export default function ReleasesAdmin({ initial }) {
               onClick={async () => {
                 const iso = localInputToIso(at);
                 if (!iso) return setApiErrors(["Pick a date and time first."]);
-                const json = await call({ action: "schedule", note, at: iso });
+                const json = await call({ action: "schedule", note, at: iso, expectedDraftHash: data.draftHash });
                 if (json.ok) {
                   toast.success(`Scheduled for ${when(json.scheduled?.scheduledFor)} — the pending release is in the history below.`);
                   setResultWarnings(json.scheduled?.warnings || []);
@@ -291,7 +298,8 @@ export default function ReleasesAdmin({ initial }) {
           </>
         }
         onConfirm={async () => {
-          const json = await call({ action: "publish", note });
+          // bound to the hash whose diff the merchant is LOOKING at (S53)
+          const json = await call({ action: "publish", note, expectedDraftHash: data.draftHash });
           if (!json.ok) throw new Error(json.error); // keeps the dialog open, shows the reason
           toast.success("Published — live now.");
           setResultWarnings(json.published?.warnings || []);

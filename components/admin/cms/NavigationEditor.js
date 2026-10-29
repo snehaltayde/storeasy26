@@ -68,9 +68,9 @@ function useBlockSaver(key, view, onFresh) {
     conflict,
     errors,
     save: (value) => run(() => saveBlock(key, value, rev), "Saved as a draft — publish from Publishing"),
-    overwrite: (value) => run(() => saveBlock(key, value), "Overwrote their version — publish from Publishing"), // revision OMITTED on purpose
+    overwrite: (value) => run(() => saveBlock(key, value, undefined, { force: true }), "Overwrote their version — publish from Publishing"),
     takeTheirs: () => run(() => getStorefrontView(), "Loaded their version — your edits were discarded"),
-    reset: () => run(() => resetBlock(key), "Reset to default — publish from Publishing"),
+    reset: () => run(() => resetBlock(key, rev ?? undefined), "Reset to default — publish from Publishing"),
   };
 }
 

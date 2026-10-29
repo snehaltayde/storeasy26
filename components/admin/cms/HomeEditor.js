@@ -222,13 +222,13 @@ export default function HomeEditor({ initial }) {
     }
   }
 
-  // One save wire for all three cards. overwrite=true OMITS the revision —
-  // the deliberate post-409 overwrite; otherwise the loaded revision rides
-  // along (number = CAS check, null = "I expect to create this row").
+  // One save wire for all three cards. overwrite=true sends the EXPLICIT
+  // force flag (S53) — the deliberate post-409 overwrite; otherwise the
+  // loaded revision rides along (number = CAS, null = "expect to create").
   async function save(block, value, { overwrite = false, onSaved } = {}) {
     busy(block, true);
     fail(block, null);
-    const res = overwrite ? await saveBlock(block, value) : await saveBlock(block, value, revisions[block] ?? null);
+    const res = overwrite ? await saveBlock(block, value, undefined, { force: true }) : await saveBlock(block, value, revisions[block] ?? null);
     if (res.ok) {
       adopt(res, block);
       onSaved?.();
@@ -262,7 +262,7 @@ export default function HomeEditor({ initial }) {
   // Reset to default — ConfirmDialog owns the in-flight state; throw = stays
   // open with the error. The response is a full view: adopt it.
   async function doReset(block) {
-    const res = await resetBlock(block);
+    const res = await resetBlock(block, revisions[block] ?? undefined);
     if (!res.ok) throw new Error(res.error || (res.errors || []).join("; ") || "Reset failed");
     adopt(res, block);
     fail(block, null);

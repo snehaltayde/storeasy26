@@ -46,15 +46,18 @@ export const POST = tenantHandler(async (request) => {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
+    // S53 (0B-1): expectedDraftHash binds publish/schedule to the EXACT
+    // reviewed candidate; a mismatch is a 409 carrying the fresh view.
+    const expectedDraftHash = typeof body.expectedDraftHash === "string" && body.expectedDraftHash ? body.expectedDraftHash : null;
     if (action === "publish") {
-      const r = await createRelease({ note: body.note, actor: auth.actor });
+      const r = await createRelease({ note: body.note, actor: auth.actor, expectedDraftHash });
       return NextResponse.json({ ok: true, published: r, ...(await view()) });
     }
     if (action === "schedule") {
       const at = new Date(String(body.at || ""));
       if (Number.isNaN(at.getTime())) return NextResponse.json({ error: "Scheduled time is invalid" }, { status: 422 });
       if (at <= new Date()) return NextResponse.json({ error: "Scheduled time must be in the future" }, { status: 422 });
-      const r = await createRelease({ note: body.note, actor: auth.actor, scheduledFor: at.toISOString() });
+      const r = await createRelease({ note: body.note, actor: auth.actor, scheduledFor: at.toISOString(), expectedDraftHash });
       return NextResponse.json({ ok: true, scheduled: r, ...(await view()) });
     }
     if (action === "rollback") {
@@ -75,6 +78,10 @@ export const POST = tenantHandler(async (request) => {
   } catch (e) {
     if (e.code === "RELEASE_INVALID") {
       return NextResponse.json({ error: "Publish blocked by validation", errors: e.errors, warnings: e.warnings }, { status: 422 });
+    }
+    if (e.code === "DRAFTS_CHANGED") {
+      // carry the FRESH view so the client can re-render the updated diff
+      return NextResponse.json({ error: String(e.message), code: e.code, ...(await view()) }, { status: 409 });
     }
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: e.status || 422 });
   }
