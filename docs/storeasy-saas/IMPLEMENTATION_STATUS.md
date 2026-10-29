@@ -2237,3 +2237,21 @@ content rendering and menu behavior on the SHOPPER side were verified via suites
 storefront/surfaces) and remain part of the user's functional pass on :3007; keyboard/focus
 spot-checked (native dialogs), not exhaustively audited; MediaPicker upload exercised in code
 review + suite coverage only (harness media library starts empty).
+
+## Verification state (S53, 2026-10-29) — enterprise-CMS foundation sprint
+Scope per docs/CMS_ENTERPRISE_AUDIT_2026-10-29.md + CMS_CLAUDE_DIRECTION_BRIEF
+(slices 0A, 0B, 1; user-approved "foundation sprint", continuous with review
+packets). All four urgent audit findings verified in source before fixing and
+closed with regression proof; every work item has a packet in docs/cms-reviews/
+(S53-0A1…S53-B2) separating implemented / locally tested / browser verified /
+staging. Full local baseline after the sprint: 39 suites, 528 checks, 0
+failures; production build compiles. NOT verified: staging/production (nothing
+deployed); the interactive browser drill (stale-hash publish banner,
+publish-gated pins/placements, picker flows) is pending an orphaned 3007 dev
+server being cleared so the design harness can bind — recorded, not claimed.
+Known follow-ups recorded for the next slices: handle→ID reference migration
+for upsells/pins/home curation; validateRelease checks for placements/
+redirects; admin badge surfaces still map release read errors to null
+(shopper path fails closed); slices 2–5 (component registry + durable section
+IDs incl. the duplicate-section data fix, visual editor, template families,
+editorial roles/approvals).
