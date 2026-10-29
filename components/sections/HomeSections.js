@@ -19,7 +19,7 @@ export default function HomeSections({ sections, dataById }) {
         const data = dataById.get(key) || {};
         if (s.kind === "collections" && data.collections?.length > 0) {
           return (
-            <section key={key} className="py-14">
+            <section key={key} data-sec={key} className="py-14">
               <div className="mb-6 flex items-end justify-between">
                 <h2 className="text-2xl font-bold tracking-tight">{s.title}</h2>
                 <Link href="/collections" className="text-sm font-medium text-accent-700 hover:underline">
@@ -38,7 +38,7 @@ export default function HomeSections({ sections, dataById }) {
           const anchor = !newAnchorUsed;
           newAnchorUsed = true;
           return (
-            <section key={key} id={anchor ? "new" : undefined} className="scroll-mt-24 py-14">
+            <section key={key} data-sec={key} id={anchor ? "new" : undefined} className="scroll-mt-24 py-14">
               <div className="mb-6 flex items-end justify-between">
                 <h2 className="text-2xl font-bold tracking-tight">{s.title}</h2>
               </div>
@@ -48,7 +48,7 @@ export default function HomeSections({ sections, dataById }) {
         }
         if (s.kind === "banner") {
           return (
-            <section key={key} className="py-14">
+            <section key={key} data-sec={key} className="py-14">
               <div className="rounded-brand bg-accent-100 px-6 py-10 text-center sm:px-10">
                 {s.title ? <h2 className="font-display text-2xl font-bold tracking-tight text-accent-900">{s.title}</h2> : null}
                 {s.text ? <p className="mx-auto mt-2 max-w-xl text-accent-800">{s.text}</p> : null}
@@ -64,7 +64,7 @@ export default function HomeSections({ sections, dataById }) {
         if (s.kind === "rich_text") {
           // html is allowlist-SANITIZED at save (lib/cms/validate.js, S37)
           return (
-            <section key={key} className="py-14">
+            <section key={key} data-sec={key} className="py-14">
               {s.title ? <h2 className="mb-4 text-2xl font-bold tracking-tight">{s.title}</h2> : null}
               <div className="rte max-w-3xl" dangerouslySetInnerHTML={{ __html: s.html || "" }} />
             </section>

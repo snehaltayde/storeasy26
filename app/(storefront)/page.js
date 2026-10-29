@@ -53,7 +53,7 @@ export default async function Home() {
     <div>
       {assignment && <ExperimentPing slug={assignment.slug} unit={unitId} />}
       {/* Hero */}
-      <section className="relative overflow-hidden bg-hero text-hero-fg">
+      <section data-sec="hero" className="relative overflow-hidden bg-hero text-hero-fg">
         <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-accent-500/20 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
           <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-accent-400">

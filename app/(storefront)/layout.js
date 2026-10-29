@@ -22,6 +22,7 @@ import { isPlatformSiteHost } from "@/lib/platform-site";
 import { headers } from "next/headers";
 import SiteNav from "@/components/site/SiteNav";
 import Link from "next/link";
+import PreviewBridgeMount from "@/components/preview/PreviewBridge";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -240,6 +241,10 @@ export default async function RootLayout({ children }) {
             </a>
           </div>
         )}
+        {/* S54: designer⇄preview bridge — preview mode ONLY, inert unless the
+            console iframe performs the same-origin handshake. Public pages
+            never ship it. */}
+        {chrome.preview && <PreviewBridgeMount />}
         <CartProvider initialCart={cart}>
           <Header collections={collections} logo={chrome.logo} nav={chrome.navHeader} announcement={chrome.announcement} />
           <main className="flex-1">{children}</main>

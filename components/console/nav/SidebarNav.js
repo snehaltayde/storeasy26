@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   ArrowUpRight,
   BadgePercent,
+  Brush,
   ChartNoAxesColumn,
   CreditCard,
   FileText,
@@ -41,6 +42,7 @@ const ICONS = {
   media: ImageIcon,
   storefront: PanelsTopLeft,
   "cms-home": Home,
+  "cms-designer": Brush,
   "cms-pages": FileText,
   "cms-nav": ListTree,
   "cms-pdp": PackageOpen,
@@ -83,6 +85,7 @@ export const NAV_GROUPS = [
     items: [
       { id: "storefront", label: "Overview", href: "/admin/storefront", exact: true },
       { id: "cms-home", label: "Home page", href: "/admin/storefront/home" },
+      { id: "cms-designer", label: "Designer", href: "/admin/storefront/designer" },
       { id: "cms-pages", label: "Pages", href: "/admin/storefront/pages" },
       { id: "cms-nav", label: "Navigation", href: "/admin/storefront/navigation" },
       { id: "cms-pdp", label: "Product pages", href: "/admin/storefront/product-pages" },
