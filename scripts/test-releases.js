@@ -172,6 +172,75 @@ await t("schedule creates the release WITHOUT flipping; the due job flips it", a
   if (!(await inTenant(R.getLiveRelease)).published_at) throw new Error("published_at missing after scheduled flip");
 });
 
+console.log("— S52: schedule cancel + per-item diff + known paths");
+
+await t("cancelScheduledRelease removes the pending job and the never-published row", async () => {
+  const future = new Date(Date.now() + 120_000).toISOString();
+  const r = await inTenant(() => R.createRelease({ note: "to-cancel", actor: { kind: "merchant", id: "u1" }, scheduledFor: future }));
+  const out = await inTenant(() => R.cancelScheduledRelease(r.id, { actor: { kind: "merchant", id: "u1" } }));
+  eq(out.cancelled, true);
+  const job = (await C.platformDb().execute({ sql: "SELECT id FROM jobs WHERE idempotency_key = ?", args: [`publish_${r.id}`] })).rows[0];
+  if (job) throw new Error("job still queued after cancel");
+  const row = (await C.platformDb().execute({ sql: "SELECT 1 FROM jobs WHERE idempotency_key = ?", args: [`publish_${r.id}`] })).rows[0];
+  if (row) throw new Error("job row survived");
+  const rels = await inTenant(() => R.listReleases({ limit: 50 }));
+  if (rels.releases.find((x) => x.id === r.id)) throw new Error("release row survived cancel");
+});
+
+await t("cancelScheduledRelease refuses published and non-scheduled releases", async () => {
+  try {
+    await inTenant(() => R.cancelScheduledRelease(relA.id));
+    throw new Error("expected refuse");
+  } catch (e) {
+    if (!/not a scheduled release|already published/.test(e.message)) throw e;
+  }
+  try {
+    await inTenant(() => R.cancelScheduledRelease("rel_nope"));
+    throw new Error("expected 404");
+  } catch (e) {
+    if (!/not found/.test(e.message)) throw e;
+  }
+});
+
+await t("releaseDiff names exactly what changed since live", async () => {
+  await inTenant(() => S.setBlock("hero", { title: "Diff hero edit" })); // block edit vs live
+  await inTenant(() => S.upsertContentPage({ slug: "diff-page", title: "Diff page", sections: [{ kind: "text", heading: "H", body: ["x"] }] }));
+  const d = await inTenant(() => R.releaseDiff());
+  eq(d.firstPublish, false);
+  eq(d.dirty, true);
+  const hero = d.items.find((i) => i.type === "block" && i.key === "hero");
+  if (!hero) throw new Error(`hero change missing: ${JSON.stringify(d.items)}`);
+  const page = d.items.find((i) => i.type === "page" && i.key === "diff-page");
+  eq(page?.change, "added");
+  // publish → diff empties
+  await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" } }));
+  const d2 = await inTenant(() => R.releaseDiff());
+  eq(d2.dirty, false);
+  eq(d2.items.length, 0, "clean after publish:");
+  // delete the page → "removed"
+  await inTenant(() => S.deleteContentPage("diff-page"));
+  const d3 = await inTenant(() => R.releaseDiff());
+  eq(d3.items.find((i) => i.type === "page" && i.key === "diff-page")?.change, "removed");
+  await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" } })); // settle
+});
+
+await t("links to /journal, /quiz, /bundles, /wishlist, /account no longer warn", async () => {
+  await inTenant(() =>
+    S.setBlock("nav_header", [
+      { label: "Journal", href: "/journal" },
+      { label: "Quiz", href: "/quiz/skin" },
+      { label: "Sets", href: "/bundles/kit" },
+      { label: "Wishlist", href: "/wishlist" },
+      { label: "Account", href: "/account" },
+    ]),
+  );
+  const snap = await inTenant(() => R.snapshotContent());
+  const v = await inTenant(() => R.validateRelease(snap.content));
+  const navWarnings = v.warnings.filter((w) => /nav/.test(w) && /isn't a storefront route/.test(w));
+  eq(navWarnings.length, 0, `spurious warnings: ${navWarnings.join(" | ")}`);
+  await inTenant(() => S.deleteBlock("nav_header"));
+});
+
 await t("publishReleaseById on an unknown id fails (job dead-letters, pointer safe)", async () => {
   const before = (await inTenant(R.getLiveRelease)).id;
   try {

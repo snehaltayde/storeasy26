@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { snapshotContent, validateRelease, createRelease, rollbackRelease, listReleases, getLiveRelease, previewToken } from "@/lib/releases";
+import { snapshotContent, validateRelease, createRelease, rollbackRelease, cancelScheduledRelease, listReleases, getLiveRelease, previewToken, releaseDiff } from "@/lib/releases";
 import { tenantHandler } from "@/lib/tenant-request";
 
 // Releases console API (S36 / BE09+MC13).
@@ -12,19 +12,23 @@ import { tenantHandler } from "@/lib/tenant-request";
 //        datetime-local input via lib/admin/schedule.js in the browser, so
 //        the merchant's own timezone — not the server's — decides the moment)
 //   POST {action:"rollback", id}                     → point live at an older release
-//   POST {action:"preview"}                          → mint a signed preview URL
+//   POST {action:"cancel", id}                       → S52: cancel a scheduled release
+//   POST {action:"preview", to?}                     → mint a signed preview URL
+//        (S52: `to` deep-links the preview to a specific storefront path)
+// GET also returns `diff` (S52): the per-item draft-vs-live change list.
 // Everything is storefront.* gated: support stays read-only by construction.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function view() {
-  const [list, live, snap] = await Promise.all([listReleases({ limit: 20 }), getLiveRelease(), snapshotContent()]);
+  const [list, live, snap, diff] = await Promise.all([listReleases({ limit: 20 }), getLiveRelease(), snapshotContent(), releaseDiff()]);
   const validation = await validateRelease(snap.content);
   return {
     ...list,
     liveHash: live?.content_hash || null,
     draftHash: snap.hash,
     dirty: !live || live.content_hash !== snap.hash,
+    diff,
     validation,
   };
 }
@@ -57,15 +61,21 @@ export const POST = tenantHandler(async (request) => {
       await rollbackRelease(String(body.id || ""), { actor: auth.actor });
       return NextResponse.json({ ok: true, ...(await view()) });
     }
+    if (action === "cancel") {
+      await cancelScheduledRelease(String(body.id || ""), { actor: auth.actor });
+      return NextResponse.json({ ok: true, ...(await view()) });
+    }
     if (action === "preview") {
       const token = await previewToken();
-      return NextResponse.json({ ok: true, url: `/api/preview?token=${token}&to=/` });
+      // S52: deep-link the preview — a path only, same-site, no protocol tricks
+      const to = typeof body.to === "string" && /^\/[^\s]*$/.test(body.to) && !body.to.startsWith("//") ? body.to : "/";
+      return NextResponse.json({ ok: true, url: `/api/preview?token=${token}&to=${encodeURIComponent(to)}` });
     }
-    return NextResponse.json({ error: "action must be publish|schedule|rollback|preview" }, { status: 400 });
+    return NextResponse.json({ error: "action must be publish|schedule|rollback|cancel|preview" }, { status: 400 });
   } catch (e) {
     if (e.code === "RELEASE_INVALID") {
       return NextResponse.json({ error: "Publish blocked by validation", errors: e.errors, warnings: e.warnings }, { status: 422 });
     }
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
+    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: e.status || 422 });
   }
 });

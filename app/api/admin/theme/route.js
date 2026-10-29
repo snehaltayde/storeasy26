@@ -32,7 +32,7 @@ export const POST = tenantHandler(async (request) => {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   try {
     if (body.action !== "apply") return NextResponse.json({ error: "action must be apply" }, { status: 400 });
-    const r = await applyKit(String(body.kit || ""), { actor: auth.actor, withPresets: body.withPresets !== false });
+    const r = await applyKit(String(body.kit || ""), { actor: auth.actor, withPresets: body.withPresets !== false, withBrand: body.withBrand !== false });
     // this request's tenant context predates the patch — answer with the pin we just wrote
     return NextResponse.json({ ok: true, applied: r, ...view(), theme: r.theme, upgradeAvailable: false });
   } catch (e) {

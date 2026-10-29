@@ -220,6 +220,32 @@ await t("isolation: blocks and placements are per-tenant", async () => {
   eq((await withTenant(T2, () => P.listPlacements())).length, 0, "default tenant's placements invisible in T2");
 });
 
+// --- S52: editors get RAW lists — hidden entries must survive a round-trip ---
+await t("hidden home sections and disabled PDP extras survive the editor view", async () => {
+  const { storefrontView } = await import("../lib/cms/view.js");
+  await withTenant(T2, async () => {
+    await S.setBlock("home_sections", [
+      { kind: "banner", title: "Hidden promo", text: "later", label: "", href: "/collections", enabled: false },
+      { kind: "new", title: "New in", limit: 8, enabled: true },
+    ]);
+    await S.setBlock("pdp_extras", [
+      { title: "Shipping", html: "<p>fast</p>", enabled: true },
+      { title: "Seasonal", html: "<p>off-season copy</p>", enabled: false },
+    ]);
+    const view = await storefrontView();
+    eq(view.blocks.home_sections.length, 2, "editor keeps the hidden section");
+    eq(view.blocks.home_sections[0].enabled, false, "hidden flag intact");
+    eq(view.blocks.pdp_extras.length, 2, "editor keeps the disabled accordion");
+    eq((await S.getHomeSections()).length, 1, "renderer still filters sections");
+    eq((await S.getPdpExtras()).length, 1, "renderer still filters extras");
+    // the round-trip itself: saving the editor's list back changes nothing
+    await S.setBlock("home_sections", view.blocks.home_sections);
+    eq((await S.getHomeSectionsRaw()).length, 2, "round-trip preserves hidden");
+    await S.deleteBlock("home_sections");
+    await S.deleteBlock("pdp_extras");
+  });
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 process.exit(fail ? 1 : 0);
