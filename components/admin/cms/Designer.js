@@ -509,7 +509,9 @@ export default function Designer({ initial }) {
   function onCollectionPick(items) {
     const t = picker; // single mode closes itself; onClose clears `picker` after us
     if (!t || !items?.[0]) return;
-    patchSection(t.sectionKey, { [t.settingKey]: items[0].handle || "" });
+    // S57: record the catalog id beside the handle — renders heal the handle
+    // from the id after a Shopify rename.
+    patchSection(t.sectionKey, { [t.settingKey]: items[0].handle || "", [`${t.settingKey}_id`]: items[0].id || "" });
   }
 
   // -- status line ---------------------------------------------------------------
@@ -691,7 +693,7 @@ export default function Designer({ initial }) {
     }
     if (st.kind === "collection") {
       return (
-        <Field key={st.key} label={st.label} htmlFor={id} required={st.required} hint="a collection handle — Choose picks from the synced catalog">
+        <Field key={st.key} label={st.label} htmlFor={id} required={st.required} hint="a collection handle — Choose picks from the synced catalog (and survives renames)">
           <div className="flex gap-2">
             <Input
               id={id}
@@ -699,7 +701,9 @@ export default function Designer({ initial }) {
               value={v || ""}
               placeholder="summer-sale"
               invalid={st.required && !String(v || "").trim()}
-              onChange={(e) => onChange(e.target.value)}
+              // typing a handle by hand drops the recorded id — a stale id
+              // would silently override the typed handle at render time
+              onChange={(e) => patchSection(s._key, { [st.key]: e.target.value, [`${st.key}_id`]: "" })}
             />
             <Button className="shrink-0" onClick={() => setPicker({ kind: "collection", sectionKey: s._key, settingKey: st.key })}>
               Choose

@@ -83,8 +83,16 @@ const ciLists = (ci) => ({
   featured: Array.isArray(ci?.featured) ? [...ci.featured] : [],
   order: Array.isArray(ci?.order) ? [...ci.order] : [],
   hide: Array.isArray(ci?.hide) ? [...ci.hide] : [],
+  // S57: handle → catalog-id map recorded by the picker (render heals
+  // renamed handles from it); hand-typed handles simply have no entry.
+  ids: ci?.ids && typeof ci.ids === "object" ? { ...ci.ids } : {},
 });
-const ciValue = (mode, lists) => (mode === "auto" ? null : { featured: lists.featured, order: lists.order, hide: lists.hide });
+const ciValue = (mode, lists) => {
+  if (mode === "auto") return null;
+  const present = new Set([...lists.featured, ...lists.order, ...lists.hide]);
+  const ids = Object.fromEntries(Object.entries(lists.ids || {}).filter(([h]) => present.has(h)));
+  return { featured: lists.featured, order: lists.order, hide: lists.hide, ...(Object.keys(ids).length ? { ids } : {}) };
+};
 // snapshot via the same normalized shape, so stored key order can't fake dirty
 const ciSnapOf = (v) => JSON.stringify(v == null ? null : ciValue("curated", ciLists(v)));
 
@@ -341,14 +349,18 @@ export default function HomeEditor({ initial }) {
   // -- collections picker ---------------------------------------------------------
 
   const LIST_MAX = { featured: 6, order: 50, hide: 50 };
-  const addHandle = (list, handle) => {
+  const addHandle = (list, handle, catalogId = null) => {
     const h = String(handle).trim().toLowerCase();
     if (!HANDLE_RE.test(h)) {
       setHandleErr((e) => ({ ...e, [list]: h }));
       return false;
     }
     setHandleErr((e) => ({ ...e, [list]: null }));
-    setCi((c) => (c[list].includes(h) || c[list].length >= LIST_MAX[list] ? c : { ...c, [list]: [...c[list], h] }));
+    setCi((c) => {
+      if (c[list].includes(h) || c[list].length >= LIST_MAX[list]) return c;
+      // picker adds carry the catalog id (rename-proof); manual adds don't
+      return { ...c, [list]: [...c[list], h], ids: catalogId ? { ...c.ids, [h]: catalogId } : c.ids };
+    });
     return true;
   };
   const dropHandle = (list, handle) => setCi((c) => ({ ...c, [list]: c[list].filter((x) => x !== handle) }));
@@ -367,6 +379,8 @@ export default function HomeEditor({ initial }) {
   // The CollectionPicker (S53 B2) works in catalog ids; this card stores
   // collection HANDLES — picked items convert via their handle field and go
   // through addHandle (same validation/dedup/cap as the manual input).
+  // S57: picker adds also record the id in the `ids` sidecar, so a later
+  // Shopify handle rename can't orphan the curated entry.
   const CI_PICKER_TITLES = { featured: "Add to Featured", order: "Add to the explicit order", hide: "Add to Hidden" };
   const ciPickerButton = (list, label) => {
     const room = LIST_MAX[list] - ci[list].length;
@@ -719,7 +733,7 @@ export default function HomeEditor({ initial }) {
         max={ciPicker ? Math.max(LIST_MAX[ciPicker] - ci[ciPicker].length, 0) : undefined}
         onConfirm={(items) => {
           if (!ciPicker) return;
-          for (const it of items) if (it.handle) addHandle(ciPicker, it.handle);
+          for (const it of items) if (it.handle) addHandle(ciPicker, it.handle, it.id || null);
         }}
       />
     </div>

@@ -231,6 +231,49 @@ await t("effectiveSurfaceTemplate: entity → family → platform precedence; ju
   eq(effectiveSurfaceTemplate({ collection: "sidebar" }, "collection", null).template, "sidebar", "entityId null → family path");
 });
 
+// --- S57: handle→id reference migration (rename-proof curation) ----------------
+await t("validate: product_rail keeps collection_id; empty id drops; collections_index ids filter to present handles", () => {
+  const rail = validateBlock("home_sections", [{ kind: "product_rail", collection: "serums", collection_id: "gid://c/9", limit: 4 }]);
+  eq(rail.ok, true, rail.errors.join("; "));
+  eq(rail.value[0].collection_id, "gid://c/9");
+  const cleared = validateBlock("home_sections", [{ kind: "product_rail", collection: "serums", collection_id: "", limit: 4 }]);
+  eq("collection_id" in cleared.value[0], false, "hand-typed handle carries no id");
+  const ci = validateBlock("collections_index", {
+    featured: ["serums"],
+    order: [],
+    hide: ["masks"],
+    ids: { serums: "gid://c/9", masks: "gid://c/8", gone: "gid://c/7", "": "gid://c/6" },
+  });
+  eq(ci.ok, true, ci.errors.join("; "));
+  eq(JSON.stringify(ci.value.ids), JSON.stringify({ serums: "gid://c/9", masks: "gid://c/8" }), "only listed handles keep ids");
+});
+
+await t("rename heals: rail + collections_index follow the id to the CURRENT handle; editors keep the stored value", async () => {
+  await libsql.execute({ sql: "INSERT INTO collections (id, handle, title) VALUES (?, ?, ?)", args: ["gid://c/9", "serums", "Serums"] });
+  const rail = validateBlock("home_sections", [{ kind: "product_rail", collection: "serums", collection_id: "gid://c/9", limit: 4 }]);
+  await S.setBlock("home_sections", rail.value);
+  const ci = validateBlock("collections_index", { featured: ["serums"], order: [], hide: [], ids: { serums: "gid://c/9" } });
+  await S.setBlock("collections_index", ci.value);
+
+  // Shopify rename: serums → face-serums (same id)
+  await libsql.execute({ sql: "UPDATE collections SET handle = 'face-serums' WHERE id = 'gid://c/9'", args: [] });
+  const sections = await S.getHomeSections();
+  eq(sections[0].collection, "face-serums", "rail healed to the current handle");
+  const healed = await S.getCollectionsIndex();
+  eq(JSON.stringify(healed.featured), JSON.stringify(["face-serums"]), "index healed");
+  eq("ids" in healed, false, "ids sidecar never reaches renderers");
+  const raw = await S.getCollectionsIndexRaw();
+  eq(raw.featured[0], "serums", "editor raw view keeps the STORED handle");
+  eq(raw.ids.serums, "gid://c/9", "and the ids sidecar");
+
+  // deleted collection: id lookup misses → stored handle is the fallback
+  await libsql.execute({ sql: "DELETE FROM collections WHERE id = 'gid://c/9'", args: [] });
+  const after = await S.getHomeSections();
+  eq(after[0].collection, "serums", "missing id falls back to the stored handle");
+  await S.deleteBlock("home_sections");
+  await S.deleteBlock("collections_index");
+});
+
 // ----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of [".test-sections.db"]) await rm(join(here, "..", f), { force: true });
