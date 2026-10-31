@@ -29,7 +29,7 @@ const I = await import("../lib/platform/identity.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { verifyAdminToken, adminSessionToken, adminBootstrapMode } = await import("../lib/admin-auth.js");
 const { verifyPlatformToken, platformSessionToken } = await import("../lib/platform/admin-auth.js");
-const { sameOrigin } = await import("../lib/origin-check.js");
+const { sameOrigin, requestOrigin } = await import("../lib/origin-check.js");
 
 // --- harness -----------------------------------------------------------------
 let pass = 0;
@@ -259,6 +259,20 @@ await t("sameOrigin: no header passes, match passes, mismatch/null fail", async 
   eq(sameOrigin(req({ host: "Shop.Test", origin: "https://shop.test" })), true, "case-insensitive");
   eq(sameOrigin(req({ host: "shop.test", origin: "https://evil.test" })), false, "mismatch");
   eq(sameOrigin(req({ host: "shop.test", origin: "null" })), false, "opaque origin");
+});
+
+await t("requestOrigin: Host header wins over the server bind address (tenant-host redirects stay same-origin)", async () => {
+  const req = (headers, url = "http://localhost:3007/api/preview") => ({
+    headers: { get: (k) => headers[k.toLowerCase()] ?? null },
+    url,
+    nextUrl: new URL(url),
+  });
+  // The pavos Designer bug: browser on pavos.localhost:3007, server bound to
+  // localhost:3007 — the redirect must stay on the browser's origin.
+  eq(requestOrigin(req({ host: "pavos.localhost:3007" })), "http://pavos.localhost:3007", "dev tenant host");
+  eq(requestOrigin(req({ host: "pavos.in", "x-forwarded-proto": "https" })), "https://pavos.in", "proxied custom domain");
+  eq(requestOrigin(req({ "x-forwarded-host": "pavos.in", host: "storeasy26.vercel.app", "x-forwarded-proto": "https" })), "https://pavos.in", "x-forwarded-host wins");
+  eq(requestOrigin(req({})), "http://localhost:3007", "no host header → request URL origin");
 });
 
 // --- summary --------------------------------------------------------------------

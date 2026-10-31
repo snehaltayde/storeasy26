@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyPreviewToken } from "@/lib/releases";
 import { PREVIEW_COOKIE } from "@/lib/content/resolve";
 import { tenantHandler } from "@/lib/tenant-request";
+import { requestOrigin } from "@/lib/origin-check";
 
 // Draft preview switch (S36 / BE09).
 //   GET ?token=p.<exp>.<hmac>[&to=/path] → verify, set the preview cookie
@@ -18,7 +19,10 @@ const safePath = (p) => (typeof p === "string" && p.startsWith("/") && !p.starts
 export const GET = tenantHandler(async (request) => {
   const params = request.nextUrl.searchParams;
   const to = safePath(params.get("to"));
-  const dest = new URL(to, request.nextUrl.origin);
+  // Host-header origin, NOT nextUrl.origin: tenant hosts (pavos.localhost,
+  // custom domains) otherwise get bounced to the server's bind address — a
+  // cross-origin 302 that kills the console's cookie-mint fetch with CORS.
+  const dest = new URL(to, requestOrigin(request));
 
   if (params.get("exit")) {
     const res = NextResponse.redirect(dest, 302);
