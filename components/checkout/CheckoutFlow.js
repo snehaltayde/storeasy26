@@ -42,7 +42,7 @@ const FIELDS = [
   { key: "pincode", label: "PIN code", required: true, half: true },
 ];
 
-export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store", policies = [] }) {
+export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store", logo = null, policies = [] }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     email: "",
@@ -235,7 +235,9 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-8 flex items-center justify-between">
         <Link href="/" className="text-xl font-extrabold tracking-tight">
-          BEAST<span className="text-accent-500">LIFE</span>
+          {/* S55 fix: the tenant's own wordmark — this hardcoded BEASTLIFE on every store */}
+          {logo?.text1 || storeName}
+          {logo?.text2 ? <span className="text-accent-500">{logo.text2}</span> : null}
         </Link>
         <ol className="flex items-center gap-2 text-sm">
           {STEPS.map((label, i) => (

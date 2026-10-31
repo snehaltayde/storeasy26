@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { checkoutCapability } from "@/lib/commerce/adapter";
-import { siteName } from "@/lib/site";
+import { siteName, siteLogo } from "@/lib/site";
 import { resolvedContentPageList } from "@/lib/content/resolve";
 import CheckoutFlow from "@/components/checkout/CheckoutFlow";
 import { tfetch } from "@/lib/tenant-request";
@@ -29,9 +29,10 @@ export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage() {
   const id = (await cookies()).get(CART_COOKIE)?.value;
-  const { cart, storeName, razorpayEnabled, capability, policies } = await tfetch(async () => ({
+  const { cart, storeName, logo, razorpayEnabled, capability, policies } = await tfetch(async () => ({
     cart: id ? await getCart(id) : emptyCart(),
     storeName: siteName(),
+    logo: siteLogo(), // S55 fix: the checkout wordmark hardcoded BEASTLIFE on every tenant
     // Key id is public; TENANT-aware presence gates the Razorpay option (a
     // tenant without keys checks out COD-only). Config accessor, not
     // lib/razorpay.js — that module is node-only and this page renders on edge.
@@ -72,5 +73,5 @@ export default async function CheckoutPage() {
     );
   }
 
-  return <CheckoutFlow cart={cart} razorpayEnabled={razorpayEnabled} storeName={storeName} policies={policies} />;
+  return <CheckoutFlow cart={cart} razorpayEnabled={razorpayEnabled} storeName={storeName} logo={logo} policies={policies} />;
 }
