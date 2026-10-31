@@ -12,6 +12,7 @@ export default function Footer({
   // S39 (MC11): links to pages that actually EXIST on this store — the old
   // hardcoded /policies/* list 404'd on tenants without those pages.
   pages = { about: true, policies: [] },
+  variant = "columns", // S61: "columns" (default, original) | "minimal"
 }) {
   // nested nav items flatten here (dropdowns are a header affordance)
   const shopItems = Array.isArray(nav)
@@ -20,6 +21,51 @@ export default function Footer({
         ...(i.children || []).map((c) => ({ key: i.href + c.href + c.label, href: c.href, label: `· ${c.label}` })),
       ])
     : collections.slice(0, 5).map((c) => ({ key: c.handle, href: `/collections/${c.handle}`, label: c.title }));
+
+  // S61 "minimal": one centered band — wordmark, a single link row, inline
+  // support, legal line. Same links/pages logic, materially different
+  // structure than the four-column default.
+  if (variant === "minimal") {
+    const links = [
+      { key: "all", href: "/collections", label: "All collections" },
+      ...(pages.about ? [{ key: "about", href: "/about", label: "About us" }] : []),
+      { key: "contact", href: "/contact", label: "Contact" },
+      ...pages.policies.map((p) => ({ key: p.href, href: p.href, label: p.label })),
+    ];
+    return (
+      <footer className="mt-20 border-t border-zinc-100 bg-zinc-50">
+        <div className="mx-auto max-w-7xl px-4 py-10 text-center sm:px-6">
+          <p className="text-xl font-extrabold">
+            {logo.text1}
+            {logo.text2 ? <span className="text-accent-600">{logo.text2}</span> : null}
+          </p>
+          {tagline ? <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">{tagline}</p> : null}
+          <nav className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-zinc-500">
+            {links.map((l) => (
+              <Link key={l.key} href={l.href} className="hover:text-zinc-900">
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+          {(support.email || support.phone) && (
+            <p className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-zinc-500">
+              {support.email ? (
+                <a href={`mailto:${support.email}`} className="hover:text-zinc-900">
+                  {support.email}
+                </a>
+              ) : null}
+              {support.phone ? (
+                <a href={`tel:${support.phone.replace(/[^+\d]/g, "")}`} className="hover:text-zinc-900">
+                  {support.phone}
+                </a>
+              ) : null}
+            </p>
+          )}
+          <p className="mt-8 border-t border-zinc-200 pt-5 text-xs text-zinc-400">© {legalName} · Catalog synced from the live Shopify store</p>
+        </div>
+      </footer>
+    );
+  }
 
   return (
     <footer className="mt-20 border-t border-zinc-100 bg-zinc-50">

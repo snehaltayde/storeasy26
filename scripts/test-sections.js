@@ -202,6 +202,13 @@ await t("surface_templates: choices validate, defaults merge, null = platform de
   await S.deleteBlock("surface_templates");
   const back = await S.getSurfaceTemplates();
   eq(back.pdp, "classic", "reset restores defaults");
+  // S61: global chrome variants ride the same block (family-level only)
+  eq(back.header, "standard", "chrome defaults present");
+  eq(back.footer, "columns");
+  const chrome = validateBlock("surface_templates", { header: "centered", footer: "minimal" });
+  eq(chrome.ok, true, chrome.errors.join("; "));
+  eq(chrome.value.header, "centered");
+  eq(validateBlock("surface_templates", { header: "mega" }).ok, false, "unknown chrome variant rejected");
 });
 
 // --- S57: explicit per-entity assignment --------------------------------------

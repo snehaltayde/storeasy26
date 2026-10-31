@@ -14,7 +14,7 @@ import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { resolveBrand, brandCssVars } from "@/lib/brand";
-import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolvedContentPageList, contentSource } from "@/lib/content/resolve";
+import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolvedContentPageList, resolvedSurfaceTemplates, contentSource } from "@/lib/content/resolve";
 import { kitAttr } from "@/lib/themes/kits";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
@@ -81,7 +81,7 @@ async function navCollections() {
 async function chromeData() {
   try {
     return await tfetch(async () => {
-      const [announcement, navHeader, navFooter, brand, theme, src, pageList] = await Promise.all([
+      const [announcement, navHeader, navFooter, brand, theme, src, pageList, surfaces] = await Promise.all([
         resolvedAnnouncement(),
         resolvedNav("header"),
         resolvedNav("footer"),
@@ -89,6 +89,7 @@ async function chromeData() {
         resolvedTheme(),
         contentSource(),
         resolvedContentPageList().catch(() => []),
+        resolvedSurfaceTemplates(), // S61: header/footer structural variants (release-governed)
       ]);
       // S39 (MC11): footer links only to pages that EXIST on this store.
       const enabledPages = pageList.filter((p) => p.enabled && (p.family || "page") === "page");
@@ -120,6 +121,8 @@ async function chromeData() {
         kitAttr: kitAttr(theme),
         preview: src.preview,
         footerPages,
+        headerVariant: surfaces.header || "standard",
+        footerVariant: surfaces.footer || "columns",
       };
     });
   } catch {
@@ -138,6 +141,8 @@ async function chromeData() {
       kitAttr: "pulse-1",
       preview: false,
       footerPages: { about: false, policies: [] },
+      headerVariant: "standard",
+      footerVariant: "columns",
     };
   }
 }
@@ -246,7 +251,7 @@ export default async function RootLayout({ children }) {
             never ship it. */}
         {chrome.preview && <PreviewBridgeMount />}
         <CartProvider initialCart={cart}>
-          <Header collections={collections} logo={chrome.logo} nav={chrome.navHeader} announcement={chrome.announcement} />
+          <Header collections={collections} logo={chrome.logo} nav={chrome.navHeader} announcement={chrome.announcement} variant={chrome.headerVariant} />
           <main className="flex-1">{children}</main>
           <Footer
             collections={collections}
@@ -256,6 +261,7 @@ export default async function RootLayout({ children }) {
             support={chrome.support}
             legalName={chrome.legalName}
             pages={chrome.footerPages}
+            variant={chrome.footerVariant}
           />
           <CartDrawer />
         </CartProvider>

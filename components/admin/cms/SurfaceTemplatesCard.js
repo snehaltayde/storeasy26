@@ -44,9 +44,29 @@ const SURFACES = [
       ["sidebar", "Sidebar — filter rail"],
     ],
   },
+  // S61: global chrome — structural variants, family-level only (no
+  // per-entity exceptions: there is exactly one header and one footer).
+  {
+    key: "header",
+    label: "Header layout",
+    hint: "Standard = logo left with inline search. Centered = centered logo, search on its own row, centered menu.",
+    options: [
+      ["standard", "Standard — logo left"],
+      ["centered", "Centered — logo in the middle"],
+    ],
+  },
+  {
+    key: "footer",
+    label: "Footer layout",
+    hint: "Columns = four link groups. Minimal = one centered band with a single link row.",
+    options: [
+      ["columns", "Columns — link groups"],
+      ["minimal", "Minimal — one band"],
+    ],
+  },
 ];
 
-const DEFAULTS = { pdp: "classic", collection: "standard" };
+const DEFAULTS = { pdp: "classic", collection: "standard", header: "standard", footer: "columns" };
 
 const normalize = (stored) => ({
   ...DEFAULTS,
@@ -168,7 +188,7 @@ export default function SurfaceTemplatesCard({ initial }) {
       )}
       <div className="grid gap-6 sm:grid-cols-2">
         {SURFACES.map((s) => {
-          const exceptions = Object.entries(value[s.mapKey]);
+          const exceptions = s.mapKey ? Object.entries(value[s.mapKey]) : [];
           return (
             <div key={s.key} className="space-y-3">
               <Field label={s.label} htmlFor={`tpl-${s.key}`} hint={s.hint}>
@@ -216,14 +236,16 @@ export default function SurfaceTemplatesCard({ initial }) {
                   })}
                 </ul>
               )}
-              <Button variant="secondary" size="sm" onClick={() => setPickerFor(s.key)}>
-                {s.addLabel}
-              </Button>
+              {s.mapKey && (
+                <Button variant="secondary" size="sm" onClick={() => setPickerFor(s.key)}>
+                  {s.addLabel}
+                </Button>
+              )}
             </div>
           );
         })}
       </div>
-      {SURFACES.map((s) => {
+      {SURFACES.filter((s) => s.mapKey).map((s) => {
         const Picker = s.refType === "product" ? ProductPicker : CollectionPicker;
         return (
           <Picker
