@@ -265,6 +265,62 @@ await t("validation errors still 422 with the errors list", async () => {
   ok(Array.isArray(r.body.errors), "errors list");
 });
 
+// --- S59: live unsaved-edit preview candidates --------------------------------
+const reqC = (adminTok, previewTok, body) => ({
+  cookies: {
+    get: (name) => {
+      if (name === "_admin" && adminTok) return { value: adminTok };
+      if (name === "_preview" && previewTok) return { value: previewTok };
+      return undefined;
+    },
+  },
+  headers: { get: (k) => ({ host: "zc.test" })[k.toLowerCase()] ?? null },
+  json: async () => body,
+});
+
+await t("candidate: no preview session → 409 NO_PREVIEW; support (read-only) → 403", async () => {
+  const r = await inT(() => handleStorefrontPut(reqC(staffTok, null, { previewCandidate: { hero: { title: "x" } } })));
+  eq(r.status, 409);
+  eq(r.body.code, "NO_PREVIEW");
+  const s = await inT(() => handleStorefrontPut(reqC(supportTok, "whatever", { previewCandidate: { hero: { title: "x" } } })));
+  eq(s.status, 403, "write-gated before the token check");
+});
+
+await t("candidate: valid push stores VALIDATED blocks keyed by token hash; overlay reads them; null clears", async () => {
+  const { previewToken } = await import("../lib/releases.js");
+  const { getPreviewCandidate } = await import("../lib/cms/candidates.js");
+  const ptok = await inT(() => previewToken());
+  const r = await inT(() =>
+    handleStorefrontPut(reqC(staffTok, ptok, { previewCandidate: { hero: { title: "Live-typed title", highlight: "Live", subtitle: "s" } } })),
+  );
+  eq(r.status, 200, JSON.stringify(r.body));
+  const cand = await inT(() => getPreviewCandidate(ptok));
+  eq(cand.hero.title, "Live-typed title", "validated value readable by the resolver");
+  const raw = await inT(() => db.selectFrom("cms_preview_candidates").selectAll().execute());
+  eq(raw.length, 1);
+  ok(raw[0].token_hash !== ptok && /^[0-9a-f]{64}$/.test(raw[0].token_hash), "raw token never stored");
+  // another preview session sees nothing
+  const other = await inT(() => previewToken({ now: Date.now() + 1000 }));
+  eq(await inT(() => getPreviewCandidate(other)), null, "sessions are isolated");
+  // clear
+  const c = await inT(() => handleStorefrontPut(reqC(staffTok, ptok, { previewCandidate: null })));
+  eq(c.status, 200);
+  eq(await inT(() => getPreviewCandidate(ptok)), null, "cleared");
+});
+
+await t("candidate: unknown block → 400; invalid value → 422; publishing NEVER sees candidates", async () => {
+  const { previewToken, snapshotContent } = await import("../lib/releases.js");
+  const ptok = await inT(() => previewToken());
+  const u = await inT(() => handleStorefrontPut(reqC(staffTok, ptok, { previewCandidate: { surface_templates: { pdp: "editorial" } } })));
+  eq(u.status, 400, "unknown candidate key");
+  const v = await inT(() => handleStorefrontPut(reqC(staffTok, ptok, { previewCandidate: { hero: { title: "" } } })));
+  eq(v.status, 422, "invalid value");
+  const before = await inT(() => snapshotContent());
+  await inT(() => handleStorefrontPut(reqC(staffTok, ptok, { previewCandidate: { hero: { title: "Candidate only", highlight: "", subtitle: "" } } })));
+  const after = await inT(() => snapshotContent());
+  eq(after.hash, before.hash, "snapshot hash untouched by a candidate");
+});
+
 // ----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });

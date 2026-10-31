@@ -39,7 +39,7 @@ import { Field, Input, Select, Textarea } from "@/components/console/fields";
 import { Switch } from "@/components/console/Switch";
 import { useToast } from "@/components/console/Toast";
 import { COMPONENTS, HOME_SECTION_KINDS } from "@/lib/cms/registry";
-import { getStorefrontView, saveBlock, resetBlock, startPreview, getHistory } from "./api";
+import { getStorefrontView, saveBlock, resetBlock, startPreview, getHistory, saveCandidate } from "./api";
 import { ConflictBanner } from "./ConflictBanner";
 import DesignerTabs from "./DesignerTabs";
 import { MediaPicker } from "./MediaPicker";
@@ -264,6 +264,41 @@ export default function Designer({ initial }) {
     mintPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // -- S59: LIVE unsaved-edit preview ------------------------------------------
+  // While anything is dirty, the editor state rides (debounced, validated
+  // server-side) to THIS preview session's candidate and the frame reloads —
+  // the preview then shows the unsaved edits, clearly labeled. Saving or
+  // reverting pushes null, which clears the candidate back to the last save.
+  const [liveEdits, setLiveEdits] = useState(false);
+  const candSeq = useRef(0);
+  const candState = JSON.stringify([heroDirty && hero, annDirty && ann, sectionsDirty && stripKeys(sections)]);
+  useEffect(() => {
+    if (mint.phase !== "up") return;
+    const seq = ++candSeq.current;
+    const timer = setTimeout(async () => {
+      const anyDirty = heroDirty || annDirty || sectionsDirty;
+      if (!anyDirty && !liveEdits) return; // nothing pushed, nothing to clear
+      const payload = anyDirty
+        ? {
+            ...(heroDirty ? { hero: heroValue(hero) } : {}),
+            ...(annDirty ? { announcement: { ...ann } } : {}),
+            ...(sectionsDirty ? { home_sections: stripKeys(sectionsRef.current) } : {}),
+          }
+        : null;
+      const res = await saveCandidate(payload);
+      if (seq !== candSeq.current) return; // superseded by newer keystrokes
+      if (res.ok) {
+        setLiveEdits(anyDirty);
+        postRefresh();
+      }
+      // a mid-typing validation failure (or an expired preview) just leaves
+      // the frame on the last candidate/save — never an error storm
+    }, 700);
+    return () => clearTimeout(timer);
+    // candState captures exactly the dirty payload; liveEdits gates the clear
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candState, mint.phase]);
 
   // Handshake: on iframe load we hello; the bridge replies (or announces)
   // "ready", and we hello ONCE more in case our load-time hello raced its
@@ -872,7 +907,7 @@ export default function Designer({ initial }) {
               <Loader2 size={13} className="motion-safe:animate-spin" aria-hidden /> Connecting…
             </>
           )}
-          {mint.phase === "up" && connected && "Preview shows your last save"}
+          {mint.phase === "up" && connected && (liveEdits ? "Preview shows your UNSAVED edits — nothing is saved yet" : "Preview shows your last save")}
         </span>
       </div>
       {mint.phase === "error" && (

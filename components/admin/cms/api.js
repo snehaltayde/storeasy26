@@ -49,6 +49,10 @@ export const deleteTemplateApi = (id) => put({ deleteTemplate: id });
 
 export const getPage = (slug) => put({ getPage: slug });
 
+// S59: live unsaved-edit preview — push the editor's dirty blocks to THIS
+// preview session's candidate (validated server-side); null clears it.
+export const saveCandidate = (blocks) => put({ previewCandidate: blocks });
+
 // Mint a preview session (sets the httpOnly cookie) deep-linked at `to`.
 export async function startPreview(to = "/") {
   const r = await call("/api/admin/releases", {
