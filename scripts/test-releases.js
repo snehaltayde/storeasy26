@@ -439,6 +439,26 @@ await t("preview token is tenant-bound: another tenant's context rejects it", as
   eq(await withTenant(other, () => R.verifyPreviewToken(token)), false);
 });
 
+// --- S60: approvals bound to the candidate hash --------------------------------
+await t("approval: binds to the exact candidate; a draft edit silently withdraws it; stale hash → DRAFTS_CHANGED", async () => {
+  const A = await import("../lib/cms/approvals.js");
+  const snap = await inTenant(R.snapshotContent);
+  const approved = await inTenant(() => A.approveCandidate({ expectedHash: snap.hash, actor: "merchant:reviewer", note: "festive check" }));
+  eq(approved.draft_hash, snap.hash, "bound to the reviewed hash");
+  const cur = await inTenant(A.currentApproval);
+  eq(cur?.actor, "merchant:reviewer", "current candidate reads approved");
+  // drafts move → the approval stops applying, nothing has to invalidate it
+  await inTenant(() => S.setBlock("hero", { title: "Post-approval edit", primary: { label: "Shop", href: "/collections/whey" } }));
+  eq(await inTenant(A.currentApproval), null, "edited candidate is NOT approved");
+  // approving with the hash the reviewer SAW (now stale) refuses, same contract as publish
+  const stale = await inTenant(() => A.approveCandidate({ expectedHash: snap.hash, actor: "merchant:reviewer" }).then(() => null, (e) => e));
+  eq(stale?.code, "DRAFTS_CHANGED", "stale approval refused");
+  // re-approve the new candidate → applies again
+  const snap2 = await inTenant(R.snapshotContent);
+  await inTenant(() => A.approveCandidate({ expectedHash: snap2.hash, actor: "merchant:reviewer2" }));
+  eq((await inTenant(A.currentApproval))?.actor, "merchant:reviewer2");
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 process.exit(fail ? 1 : 0);

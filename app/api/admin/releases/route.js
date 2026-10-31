@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { snapshotContent, validateRelease, createRelease, rollbackRelease, cancelScheduledRelease, listReleases, getLiveRelease, previewToken, releaseDiff } from "@/lib/releases";
+import { approveCandidate, currentApproval } from "@/lib/cms/approvals";
+import { audit } from "@/lib/platform/audit";
 import { tenantHandler } from "@/lib/tenant-request";
 
 // Releases console API (S36 / BE09+MC13).
@@ -21,7 +23,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function view() {
-  const [list, live, snap, diff] = await Promise.all([listReleases({ limit: 20 }), getLiveRelease(), snapshotContent(), releaseDiff()]);
+  const [list, live, snap, diff, approval] = await Promise.all([listReleases({ limit: 20 }), getLiveRelease(), snapshotContent(), releaseDiff(), currentApproval()]);
   const validation = await validateRelease(snap.content);
   return {
     ...list,
@@ -30,6 +32,7 @@ async function view() {
     dirty: !live || live.content_hash !== snap.hash,
     diff,
     validation,
+    approval, // S60: latest approval of THIS candidate (hash-bound), or null
   };
 }
 
@@ -69,6 +72,13 @@ export const POST = tenantHandler(async (request) => {
     if (action === "cancel") {
       await cancelScheduledRelease(String(body.id || ""), { actor: auth.actor });
       return NextResponse.json({ ok: true, ...(await view()) });
+    }
+    if (action === "approve") {
+      // S60: bless EXACTLY the reviewed candidate — stale hash = 409 with
+      // the fresh view, same contract as publish.
+      const a = await approveCandidate({ expectedHash: expectedDraftHash, actor: `${auth.actor.kind}:${auth.actor.id}`, note: body.note });
+      await audit({ actor: auth.actor, action: "storefront.publish", resource: `approval:${a.draft_hash.slice(0, 12)}` });
+      return NextResponse.json({ ok: true, approved: a, ...(await view()) });
     }
     if (action === "preview") {
       const token = await previewToken();

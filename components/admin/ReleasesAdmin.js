@@ -182,6 +182,41 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
             body={`Drafts match the live release${data.liveHash ? ` (${data.liveHash.slice(0, 12)})` : ""} — nothing to publish.`}
           />
         )}
+
+        {/* S60: approval of THIS candidate — bound to the draft hash, so any
+            edit makes it disappear instead of blessing unreviewed content. */}
+        {data.dirty && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-edge pt-3 text-sm">
+            {data.approval ? (
+              <>
+                <Badge tone="success">Approved</Badge>
+                <span className="text-fg-muted">
+                  This exact candidate ({String(data.draftHash || "").slice(0, 12)}) was approved by <span className="font-medium text-fg">{data.approval.actor}</span>{" "}
+                  on {new Date(data.approval.created_at).toLocaleString()}
+                  {data.approval.note ? ` — “${data.approval.note}”` : ""}. Any draft edit withdraws it.
+                </span>
+              </>
+            ) : (
+              <>
+                <Badge tone="neutral">Not approved</Badge>
+                <span className="text-fg-muted">No one has approved this candidate yet. Approval is a record, not a gate — publishing still works.</span>
+                {canPublish && (
+                  <Button
+                    size="sm"
+                    busy={busy === "approve"}
+                    disabled={!!busy && busy !== "approve"}
+                    onClick={async () => {
+                      const json = await call({ action: "approve", expectedDraftHash: data.draftHash });
+                      if (json.ok) toast.success("Candidate approved — bound to this exact draft state");
+                    }}
+                  >
+                    Approve this candidate
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* 2+3 · Publish now / schedule */}
