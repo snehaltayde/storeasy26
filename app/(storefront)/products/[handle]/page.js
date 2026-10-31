@@ -1,15 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import ProductGallery from "@/components/ProductGallery";
-import ProductPurchase from "@/components/ProductPurchase";
-import WishlistButton from "@/components/WishlistButton";
-import ProductCard from "@/components/ProductCard";
 import TrackEvent from "@/components/analytics/TrackEvent";
+import { PdpClassic, PdpEditorial } from "@/components/pdp/PdpLayouts";
 import { getProductByHandle } from "@/lib/repo";
-import { resolvedPdpExtras, resolvedPdpPairs, resolvedProductOverride } from "@/lib/content/resolve";
+import { resolvedPdpExtras, resolvedPdpPairs, resolvedProductOverride, resolvedSurfaceTemplates } from "@/lib/content/resolve";
 import { numericId } from "@/lib/ids";
 import { abs, siteName } from "@/lib/site";
-import { sanitizeHtml } from "@/lib/sanitize";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
@@ -82,18 +78,19 @@ function productJsonLd(product, brandName) {
 
 export default async function ProductPage({ params }) {
   const { handle } = await params;
-  const { product, pairs, brandName, extras, override } = await tfetch(async () => {
+  const { product, pairs, brandName, extras, override, template } = await tfetch(async () => {
     const product = await getProductByHandle(handle);
     if (!product) return { product: null };
     // "Pairs well with" (S23): manual placement, else same-collection auto.
     // S39 (MC05): per-product presentation override — modules + badge.
     // S53 (0B-2): both are release-gated now (drafts stay draft until publish).
-    const [pairs, extras, override] = await Promise.all([
+    const [pairs, extras, override, surfaces] = await Promise.all([
       resolvedPdpPairs(product.id, { limit: 4 }),
       resolvedPdpExtras(),
       resolvedProductOverride(product.id),
+      resolvedSurfaceTemplates(), // S56: which PDP template this store runs
     ]);
-    return { product, pairs, brandName: siteName(), extras, override };
+    return { product, pairs, brandName: siteName(), extras, override, template: surfaces.pdp };
   });
   if (!product) notFound();
 
@@ -126,71 +123,12 @@ export default async function ProductPage({ params }) {
         <span className="text-zinc-600">{product.title}</span>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-        <ProductGallery images={product.images} title={product.title} />
-
-        <div>
-          {product.vendor || override?.badge ? (
-            <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-accent-700">
-              {product.vendor}
-              {override?.badge ? (
-                <span className="rounded-full bg-accent-100 px-2.5 py-0.5 text-[11px] font-bold normal-case tracking-normal text-accent-800">
-                  {override.badge}
-                </span>
-              ) : null}
-            </p>
-          ) : null}
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight">{product.title}</h1>
-
-          <ProductPurchase product={product} />
-          <div className="mt-3">
-            <WishlistButton handle={product.handle} />
-          </div>
-
-          {product.description_html ? (
-            <div className="mt-8 border-t border-zinc-100 pt-8">
-              <h2 className="mb-3 text-lg font-bold">Details</h2>
-              {/* Merchant-authored HTML from the store's own Shopify catalog —
-                  allowlist-sanitized (S35): a compromised catalog must not XSS shoppers. */}
-              <div
-                className="rte"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description_html) }}
-              />
-            </div>
-          ) : product.description ? (
-            <div className="mt-8 border-t border-zinc-100 pt-8">
-              <h2 className="mb-3 text-lg font-bold">Details</h2>
-              <p className="whitespace-pre-line text-zinc-700">{product.description}</p>
-            </div>
-          ) : null}
-
-          {/* S39 (MC05): per-product modules (ingredients/usage/specs) lead;
-              S38 (SF04): store-wide pdp_extras follow. Both sanitized at save. */}
-          {(override?.modules?.length > 0 || extras?.length > 0) && (
-            <div className="mt-6 divide-y divide-zinc-100 border-t border-zinc-100">
-              {[...(override?.modules || []), ...(extras || [])].map((x) => (
-                <details key={x.title} className="group py-3">
-                  <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-zinc-800 [&::-webkit-details-marker]:hidden">
-                    {x.title}
-                    <span className="text-zinc-400 transition group-open:rotate-45">+</span>
-                  </summary>
-                  <div className="rte mt-2 text-sm text-zinc-600" dangerouslySetInnerHTML={{ __html: x.html }} />
-                </details>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {pairs?.products?.length > 0 && (
-        <section className="mt-16 border-t border-zinc-100 pt-10">
-          <h2 className="mb-6 text-2xl font-bold tracking-tight">{pairs.title}</h2>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {pairs.products.map((p) => (
-              <ProductCard key={p.handle} product={p} />
-            ))}
-          </div>
-        </section>
+      {/* S56: template variants over the SAME purchase/gallery components —
+          the family default is picked in Theme → Page templates. */}
+      {template === "editorial" ? (
+        <PdpEditorial product={product} override={override} extras={extras} pairs={pairs} />
+      ) : (
+        <PdpClassic product={product} override={override} extras={extras} pairs={pairs} />
       )}
     </div>
   );

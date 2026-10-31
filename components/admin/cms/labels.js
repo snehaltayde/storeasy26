@@ -10,6 +10,7 @@ export const BLOCK_INFO = {
   nav_footer: { label: "Footer links", href: "/admin/storefront/navigation#footer" },
   collections_index: { label: "Collections page", href: "/admin/storefront/home#collections" },
   pdp_extras: { label: "Product page accordions", href: "/admin/storefront/product-pages" },
+  surface_templates: { label: "Page templates", href: "/admin/theme#page-templates" },
 };
 
 export const CHANGE_LABELS = {

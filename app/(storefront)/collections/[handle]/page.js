@@ -55,16 +55,16 @@ export default async function CollectionPage({ params, searchParams }) {
   const collection = await tfetch(() => getCollectionByHandle(handle));
   if (!collection) notFound();
 
-  const { products, total, facets } = await tfetch(async () => {
+  const { products, total, facets, template } = await tfetch(async () => {
     // S53 (0B-2): pin order is release-gated — the resolver supplies the
     // frozen pins in live mode, the draft table in preview/pre-publish.
-    const { resolvedCollectionPins } = await import("@/lib/content/resolve");
-    const pins = await resolvedCollectionPins(handle);
+    const { resolvedCollectionPins, resolvedSurfaceTemplates } = await import("@/lib/content/resolve");
+    const [pins, surfaces] = await Promise.all([resolvedCollectionPins(handle), resolvedSurfaceTemplates()]);
     const [{ products, total }, facets] = await Promise.all([
       getProductsInCollection(handle, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, ...filters, pins }),
       getCollectionTypeFacets(handle),
     ]);
-    return { products, total, facets };
+    return { products, total, facets, template: surfaces.collection };
   });
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   if (page > totalPages && total > 0) notFound();
@@ -103,59 +103,93 @@ export default async function CollectionPage({ params, searchParams }) {
         {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
       </p>
 
-      {/* filter bar — chips are links, so every state has a URL */}
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        {facets.length > 1 &&
-          facets.map((f) => {
-            const active = filters.type === f.type;
-            return (
-              <Link
-                key={f.type}
-                href={qs(handle, { ...filters, type: active ? "" : f.type })}
-                aria-pressed={active}
-                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
-                  active ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
-                }`}
-              >
-                {f.type} <span className={active ? "text-zinc-300" : "text-zinc-400"}>{f.count}</span>
-              </Link>
-            );
-          })}
-        <Link
-          href={qs(handle, { ...filters, inStock: !filters.inStock })}
-          aria-pressed={filters.inStock}
-          className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
-            filters.inStock ? "border-accent-700 bg-accent-100 text-accent-800" : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
-          }`}
-        >
-          In stock
-        </Link>
-        <span className="ml-auto flex items-center gap-3">
-          {filtered && (
-            <Link href={`/collections/${handle}`} className="text-sm font-medium text-accent-700 hover:underline">
-              Clear all
+      {/* S56: template variants — "standard" keeps the original filter bar;
+          "sidebar" moves the SAME link-based filters into a left rail on
+          desktop (every state still has a URL). Picked in Theme → Page
+          templates, release-governed. */}
+      {(() => {
+        const facetChip = (f) => {
+          const active = filters.type === f.type;
+          return (
+            <Link
+              key={f.type}
+              href={qs(handle, { ...filters, type: active ? "" : f.type })}
+              aria-pressed={active}
+              className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                active ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
+              }`}
+            >
+              {f.type} <span className={active ? "text-zinc-300" : "text-zinc-400"}>{f.count}</span>
             </Link>
-          )}
+          );
+        };
+        const inStockChip = (
+          <Link
+            href={qs(handle, { ...filters, inStock: !filters.inStock })}
+            aria-pressed={filters.inStock}
+            className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+              filters.inStock ? "border-accent-700 bg-accent-100 text-accent-800" : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
+            }`}
+          >
+            In stock
+          </Link>
+        );
+        const clearLink = filtered && (
+          <Link href={`/collections/${handle}`} className="text-sm font-medium text-accent-700 hover:underline">
+            Clear all
+          </Link>
+        );
+        const controls = (
           <CollectionControls basePath={`/collections/${handle}`} params={{ ...(filters.type ? { type: filters.type } : {}), ...(filters.inStock ? { instock: "1" } : {}) }} sort={filters.sort} />
-        </span>
-      </div>
+        );
+        const grid =
+          products.length === 0 ? (
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-10 text-center">
+              <p className="font-medium text-zinc-700">
+                {filtered ? "Nothing matches these filters." : "No products in this collection yet."}
+              </p>
+              {filtered && (
+                <Link href={`/collections/${handle}`} className="mt-3 inline-block rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800">
+                  Clear all filters
+                </Link>
+              )}
+            </div>
+          ) : (
+            <ProductGrid products={products} priorityCount={4} />
+          );
 
-      <div className="mt-8">
-        {products.length === 0 ? (
-          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-10 text-center">
-            <p className="font-medium text-zinc-700">
-              {filtered ? "Nothing matches these filters." : "No products in this collection yet."}
-            </p>
-            {filtered && (
-              <Link href={`/collections/${handle}`} className="mt-3 inline-block rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800">
-                Clear all filters
-              </Link>
-            )}
+        if (template === "sidebar") {
+          return (
+            <div data-collection-template="sidebar" className="mt-6 gap-8 lg:grid lg:grid-cols-[13rem_1fr]">
+              <aside className="mb-6 lg:mb-0 lg:sticky lg:top-24 lg:self-start" aria-label="Filters">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Filter</p>
+                <div className="flex flex-wrap gap-2 lg:flex-col lg:items-start">
+                  {facets.length > 1 && facets.map(facetChip)}
+                  {inStockChip}
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3 lg:flex-col lg:items-start">
+                  {controls}
+                  {clearLink}
+                </div>
+              </aside>
+              <div>{grid}</div>
+            </div>
+          );
+        }
+        return (
+          <div data-collection-template="standard">
+            <div className="mt-6 flex flex-wrap items-center gap-2">
+              {facets.length > 1 && facets.map(facetChip)}
+              {inStockChip}
+              <span className="ml-auto flex items-center gap-3">
+                {clearLink}
+                {controls}
+              </span>
+            </div>
+            <div className="mt-8">{grid}</div>
           </div>
-        ) : (
-          <ProductGrid products={products} priorityCount={4} />
-        )}
-      </div>
+        );
+      })()}
 
       {totalPages > 1 && (
         <nav className="mt-10 flex items-center justify-center gap-2" aria-label="Pagination">

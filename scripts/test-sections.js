@@ -184,6 +184,26 @@ await t("id-less legacy sections key by index (old live snapshots keep rendering
   eq(data.get("i-0").products.length, 3);
 });
 
+// --- S56: per-surface templates ------------------------------------------------
+await t("surface_templates: choices validate, defaults merge, null = platform defaults", async () => {
+  eq(validateBlock("surface_templates", null).ok, true, "null ok");
+  const bad = validateBlock("surface_templates", { pdp: "brutalist" });
+  eq(bad.ok, false);
+  const good = validateBlock("surface_templates", { pdp: "editorial" });
+  eq(good.ok, true);
+  eq(good.value.pdp, "editorial");
+  eq(good.value.collection, undefined, "unset surface stays unset in storage");
+  // default-only picks normalize back to null (nothing customized)
+  eq(validateBlock("surface_templates", {}).value, null);
+  await S.setBlock("surface_templates", { pdp: "editorial" });
+  const eff = await S.getSurfaceTemplates();
+  eq(eff.pdp, "editorial", "stored pick wins");
+  eq(eff.collection, "standard", "unset surface keeps the platform default");
+  await S.deleteBlock("surface_templates");
+  const back = await S.getSurfaceTemplates();
+  eq(back.pdp, "classic", "reset restores defaults");
+});
+
 // ----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of [".test-sections.db"]) await rm(join(here, "..", f), { force: true });
