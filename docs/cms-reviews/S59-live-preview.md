@@ -44,10 +44,16 @@ release, and publishing/review flows are untouched.
   unknown-key 400; invalid-value 422; snapshot hash untouched.
 - content 19, releases 24, sections 15, cms 11, storefront 15, security 13,
   `pnpm build` ✓.
-- Browser drill: PENDING with the S59 surface-designer drill (same harness
-  window): type in the hero title → frame updates with the typed text and
-  the UNSAVED label → Save → label returns to "last save" → close without
-  saving → a fresh preview shows the saved draft.
+- Browser drill: DONE (2026-11-01, design harness). Typed a new hero title
+  in the Designer → after the debounce the frame re-rendered with the typed
+  text ("Typed live, never saved.") and the status flipped to "Preview
+  shows your UNSAVED edits — nothing is saved yet"; Save flipped it back to
+  "last save" and the candidate row was confirmed deleted (0 rows). Two
+  honest behaviors also observed live: a mid-edit validation mismatch
+  (highlight not a substring of the typed title) was silently skipped —
+  422, frame stayed on the last good state; and a pre-0016 tenant DB
+  surfaced "no such table: cms_preview_candidates" as a 422 — hosted
+  tenants get 0016 through the normal migration runner before this ships.
 
 ## Boundaries
 

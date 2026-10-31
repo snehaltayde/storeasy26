@@ -42,17 +42,22 @@ designers in real entity context.
 - All CMS suites re-run green earlier this session; this slice adds NO new
   server logic — every save path (surface_templates saveBlock CAS, catalog
   override POST) is an existing, suite-covered API.
-- Browser drill: PENDING. The interactive pass needs the design harness,
-  which cannot run while the user's own dev server holds the project's
-  dev-server slot (recorded gotcha), and the harness storefront needs the
-  temporary Node-runtime flip for PDP previews. To be drilled exactly like
-  S57 at the next window: pick product → preview renders → assign Editorial
-  → preview refreshes with data-pdp-template=editorial → click the modules
-  region → card flash → badge edit → save → refresh. The user can also
-  exercise it immediately on :3007 (hot reload serves the new routes).
-- An attempt to verify against the running :3007 via the demo tenant was
-  stopped at the credential step (password rotation is the user's call) —
-  no tenant credentials were changed.
+- Browser drill: DONE (2026-11-01, design harness, temporary Node-runtime
+  flip reverted after). Product designer: picked Radiance Glow Serum →
+  preview rendered /products/glow-serum with the handshake label; Template
+  card read "Renders Classic — two columns — the platform default"; picking
+  Editorial saved as a draft, flipped the badge to "Assigned", updated the
+  reason to "assigned to this product" and auto-refreshed the preview to
+  data-pdp-template="editorial". Modules card: added a module + badge, Save
+  → preview rendered the new accordion inside [data-sec="pdp-modules"];
+  clicking that region in the frame selected it (bridge outline) AND
+  scrolled/flashed the matching card (click-to-jump). Collection designer:
+  picked Bestsellers → preview rendered with [data-sec="collection-products"];
+  assigning Sidebar re-rendered data-collection-template="sidebar". All
+  drill drafts reset afterwards (surface_templates reset, override cleared).
+- An earlier attempt to verify against the running :3007 via the demo tenant
+  was stopped at the credential step (password rotation is the user's call)
+  — no tenant credentials were changed.
 
 ## Boundaries / follow-ups
 
