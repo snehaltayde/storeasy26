@@ -19,6 +19,13 @@ import { CollectionPicker, ProductPicker } from "@/components/admin/cms/RefPicke
 // S50 fixes: the debounced search shows a spinner (it used to give no
 // feedback), saves toast, and errors land in a persistent Banner.
 
+const TEMPLATE_LABELS = {
+  classic: "Classic — two columns",
+  editorial: "Editorial — story-led",
+  standard: "Standard — filter bar",
+  sidebar: "Sidebar — filter rail",
+};
+
 const money = (v, cur) => {
   try {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: cur || "INR", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -70,7 +77,7 @@ export default function CatalogAdmin({ initial }) {
       const res = await fetch(`/api/admin/catalog?product=${encodeURIComponent(gid)}`);
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || `Couldn't load the product (${res.status})`);
-      setEditing({ product: json.product, modules: json.override.modules || [], badge: json.override.badge || "" });
+      setEditing({ product: json.product, modules: json.override.modules || [], badge: json.override.badge || "", surface: json.surface || null });
     } catch (e) {
       setError(String(e?.message || e));
     } finally {
@@ -167,6 +174,20 @@ export default function CatalogAdmin({ initial }) {
             </p>
           </div>
 
+          {/* S57: explain the selected PDP template and WHY (audit: assignment
+              reasons are visible where merchants edit the entity). */}
+          {editing.surface && (
+            <p className="mt-2 text-xs text-fg-muted">
+              Page template: <span className="font-medium text-fg">{TEMPLATE_LABELS[editing.surface.template] || editing.surface.template}</span>
+              {" — "}
+              {editing.surface.source === "entity" ? "assigned to this product" : editing.surface.source === "family" ? "your store default" : "the platform default"}
+              {" · "}
+              <a href="/admin/theme#page-templates" className="font-medium text-fg underline-offset-2 hover:underline">
+                Change on Theme
+              </a>
+            </p>
+          )}
+
           <Field label="Badge" htmlFor="cat-badge" hint="Shown on the product card — blank = none." className="mt-4 max-w-xs">
             <Input id="cat-badge" placeholder='e.g. "Lab tested"' value={editing.badge} onChange={(e) => setEditing({ ...editing, badge: e.target.value })} />
           </Field>
@@ -194,7 +215,7 @@ export default function CatalogAdmin({ initial }) {
               variant="primary"
               busy={busy}
               onClick={async () => {
-                const ok = await post({ product: { handle: editing.product.handle, modules: editing.modules, badge: editing.badge } }, "Saved — live on the product page now");
+                const ok = await post({ product: { handle: editing.product.handle, modules: editing.modules, badge: editing.badge } }, "Saved as a draft — publish from Publishing");
                 if (ok) setEditing(null);
               }}
             >
@@ -314,7 +335,7 @@ export default function CatalogAdmin({ initial }) {
                 onClick={() =>
                   post(
                     { collection: { handle: colHandle.trim(), pinnedHandles: colPins.split("\n").map((s) => s.trim()).filter(Boolean) } },
-                    "Pinned order saved — live on the collection page now"
+                    "Pinned order saved as a draft — publish from Publishing"
                   )
                 }
               >

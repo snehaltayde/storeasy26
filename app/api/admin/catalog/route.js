@@ -4,6 +4,8 @@ import { audit } from "@/lib/platform/audit";
 import { db } from "@/lib/db";
 import { getProductOverride, setProductOverride, listProductOverrides, getCollectionPins, setCollectionPins } from "@/lib/catalog-overrides";
 import { tenantOwnCfg } from "@/lib/tenant-context";
+import { getBlock } from "@/lib/cms/store";
+import { effectiveSurfaceTemplate } from "@/lib/cms/defaults";
 import { numericId } from "@/lib/ids";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
@@ -50,6 +52,10 @@ export const GET = tenantHandler(async (request) => {
         shopify_url: base ? `${base}/products/${numericId(p.id)}` : null,
       },
       override: (await getProductOverride(p.id)) || { modules: [], badge: "" },
+      // S57: which PDP template THIS product renders with, and why — the
+      // editor explains the selected template (audit requirement). Draft view:
+      // what the next publish makes live.
+      surface: effectiveSurfaceTemplate(await getBlock("surface_templates"), "pdp", p.id),
     });
   }
 
