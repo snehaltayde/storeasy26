@@ -173,7 +173,8 @@ export default async function CollectionPage({ params, searchParams }) {
                   {clearLink}
                 </div>
               </aside>
-              <div>{grid}</div>
+              {/* data-sec: S59 surface designer click-target */}
+              <div data-sec="collection-products">{grid}</div>
             </div>
           );
         }
@@ -187,7 +188,7 @@ export default async function CollectionPage({ params, searchParams }) {
                 {controls}
               </span>
             </div>
-            <div className="mt-8">{grid}</div>
+            <div data-sec="collection-products" className="mt-8">{grid}</div>
           </div>
         );
       })()}

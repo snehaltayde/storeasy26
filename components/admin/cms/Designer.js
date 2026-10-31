@@ -41,6 +41,7 @@ import { useToast } from "@/components/console/Toast";
 import { COMPONENTS, HOME_SECTION_KINDS } from "@/lib/cms/registry";
 import { getStorefrontView, saveBlock, resetBlock, startPreview, getHistory } from "./api";
 import { ConflictBanner } from "./ConflictBanner";
+import DesignerTabs from "./DesignerTabs";
 import { MediaPicker } from "./MediaPicker";
 import { CollectionPicker } from "./RefPicker";
 import { useDirtyGuard } from "./useDirtyGuard";
@@ -935,6 +936,7 @@ export default function Designer({ initial }) {
           </>
         }
       />
+      <DesignerTabs />
 
       <div className="space-y-3">
         {errs.hero?.kind === "conflict" && (

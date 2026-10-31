@@ -52,7 +52,8 @@ function DetailsBlock({ product }) {
 function Accordions({ override, extras }) {
   if (!(override?.modules?.length > 0 || extras?.length > 0)) return null;
   return (
-    <div className="mt-6 divide-y divide-zinc-100 border-t border-zinc-100">
+    // data-sec: S59 surface designer click-target (PreviewBridge select)
+    <div data-sec="pdp-modules" className="mt-6 divide-y divide-zinc-100 border-t border-zinc-100">
       {[...(override?.modules || []), ...(extras || [])].map((x) => (
         <details key={x.title} className="group py-3">
           <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-zinc-800 [&::-webkit-details-marker]:hidden">
@@ -69,7 +70,7 @@ function Accordions({ override, extras }) {
 export function PairsSection({ pairs }) {
   if (!(pairs?.products?.length > 0)) return null;
   return (
-    <section className="mt-16 border-t border-zinc-100 pt-10">
+    <section data-sec="pdp-pairs" className="mt-16 border-t border-zinc-100 pt-10">
       <h2 className="mb-6 text-2xl font-bold tracking-tight">{pairs.title}</h2>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {pairs.products.map((p) => (
