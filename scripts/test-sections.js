@@ -204,6 +204,33 @@ await t("surface_templates: choices validate, defaults merge, null = platform de
   eq(back.pdp, "classic", "reset restores defaults");
 });
 
+// --- S57: explicit per-entity assignment --------------------------------------
+await t("surface_templates: entity exception maps validate; bad picks and shapes rejected", () => {
+  const good = validateBlock("surface_templates", { pdp: "editorial", products: { "gid://p/1": "classic" }, collections: { "gid://c/2": "sidebar" } });
+  eq(good.ok, true, good.errors.join("; "));
+  eq(good.value.products["gid://p/1"], "classic", "explicit pin kept even though family differs");
+  eq(good.value.collections["gid://c/2"], "sidebar");
+  const badPick = validateBlock("surface_templates", { products: { "gid://p/1": "sidebar" } }); // collection tpl on a product
+  eq(badPick.ok, false);
+  const badShape = validateBlock("surface_templates", { products: ["gid://p/1"] });
+  eq(badShape.ok, false);
+  // empty maps normalize away; all-default+empty → null
+  eq(validateBlock("surface_templates", { products: {} }).value, null);
+});
+
+await t("effectiveSurfaceTemplate: entity → family → platform precedence; junk ignored", async () => {
+  const { effectiveSurfaceTemplate } = await import("../lib/cms/defaults.js");
+  const value = { pdp: "editorial", products: { "gid://p/1": "classic" } };
+  eq(effectiveSurfaceTemplate(value, "pdp", "gid://p/1").template, "classic", "explicit assignment wins");
+  eq(effectiveSurfaceTemplate(value, "pdp", "gid://p/1").source, "entity");
+  eq(effectiveSurfaceTemplate(value, "pdp", "gid://p/9").template, "editorial", "unassigned entity → family default");
+  eq(effectiveSurfaceTemplate(value, "pdp", "gid://p/9").source, "family");
+  eq(effectiveSurfaceTemplate(null, "pdp", "gid://p/1").template, "classic", "no block → platform default");
+  eq(effectiveSurfaceTemplate(null, "pdp", "gid://p/1").source, "platform");
+  eq(effectiveSurfaceTemplate({ products: { "gid://p/1": "nope" } }, "pdp", "gid://p/1").source, "platform", "invalid stored pick ignored");
+  eq(effectiveSurfaceTemplate({ collection: "sidebar" }, "collection", null).template, "sidebar", "entityId null → family path");
+});
+
 // ----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of [".test-sections.db"]) await rm(join(here, "..", f), { force: true });

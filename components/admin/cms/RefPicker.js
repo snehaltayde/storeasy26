@@ -29,7 +29,7 @@ const money = (v, cur) => {
   }
 };
 
-async function fetchRefs(params) {
+export async function fetchRefs(params) {
   const sp = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v != null && v !== "") sp.set(k, String(v));
   const res = await fetch(`/api/admin/refs?${sp}`);

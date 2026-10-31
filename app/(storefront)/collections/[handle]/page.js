@@ -58,13 +58,14 @@ export default async function CollectionPage({ params, searchParams }) {
   const { products, total, facets, template } = await tfetch(async () => {
     // S53 (0B-2): pin order is release-gated — the resolver supplies the
     // frozen pins in live mode, the draft table in preview/pre-publish.
-    const { resolvedCollectionPins, resolvedSurfaceTemplates } = await import("@/lib/content/resolve");
-    const [pins, surfaces] = await Promise.all([resolvedCollectionPins(handle), resolvedSurfaceTemplates()]);
+    const { resolvedCollectionPins, resolvedSurfaceTemplateFor } = await import("@/lib/content/resolve");
+    // S57: this collection's explicit assignment wins over the family default
+    const [pins, surface] = await Promise.all([resolvedCollectionPins(handle), resolvedSurfaceTemplateFor("collection", collection.id)]);
     const [{ products, total }, facets] = await Promise.all([
       getProductsInCollection(handle, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, ...filters, pins }),
       getCollectionTypeFacets(handle),
     ]);
-    return { products, total, facets, template: surfaces.collection };
+    return { products, total, facets, template: surface.template };
   });
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   if (page > totalPages && total > 0) notFound();

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import { PdpClassic, PdpEditorial } from "@/components/pdp/PdpLayouts";
 import { getProductByHandle } from "@/lib/repo";
-import { resolvedPdpExtras, resolvedPdpPairs, resolvedProductOverride, resolvedSurfaceTemplates } from "@/lib/content/resolve";
+import { resolvedPdpExtras, resolvedPdpPairs, resolvedProductOverride, resolvedSurfaceTemplateFor } from "@/lib/content/resolve";
 import { numericId } from "@/lib/ids";
 import { abs, siteName } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
@@ -84,13 +84,13 @@ export default async function ProductPage({ params }) {
     // "Pairs well with" (S23): manual placement, else same-collection auto.
     // S39 (MC05): per-product presentation override — modules + badge.
     // S53 (0B-2): both are release-gated now (drafts stay draft until publish).
-    const [pairs, extras, override, surfaces] = await Promise.all([
+    const [pairs, extras, override, surface] = await Promise.all([
       resolvedPdpPairs(product.id, { limit: 4 }),
       resolvedPdpExtras(),
       resolvedProductOverride(product.id),
-      resolvedSurfaceTemplates(), // S56: which PDP template this store runs
+      resolvedSurfaceTemplateFor("pdp", product.id), // S56/S57: family default or this product's explicit assignment
     ]);
-    return { product, pairs, brandName: siteName(), extras, override, template: surfaces.pdp };
+    return { product, pairs, brandName: siteName(), extras, override, template: surface.template };
   });
   if (!product) notFound();
 
