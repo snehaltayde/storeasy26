@@ -47,7 +47,7 @@ export default function ContentPage({ page, legalName = "", children = null }) {
           }
           return (
             <section key={idx}>
-              <h2 className="text-lg font-bold text-zinc-900">{s.heading}</h2>
+              {s.heading ? <h2 className="text-lg font-bold text-zinc-900">{s.heading}</h2> : null}
               <div className="mt-2 space-y-3">
                 {(s.body || []).map((p, i) => (
                   <p key={i} className="leading-relaxed text-zinc-600">
