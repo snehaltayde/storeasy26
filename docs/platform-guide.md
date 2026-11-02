@@ -1509,8 +1509,9 @@ context implicitly.
    is why context is established at the entry points rather than in middleware.
 3. **Data access** — `db` and `libsql` in [lib/db.js](../lib/db.js) are **Proxies**:
    every property access resolves the ACTIVE tenant's Kysely/libSQL client (clients
-   cached per DB URL, each retry-wrapped for transient Turso failures — 4 attempts,
-   bounded backoff). No tenant context → the env-configured client. One subtlety: the
+   cached per DB URL, each retry-wrapped — 4 attempts, bounded backoff; reads retry on
+   any transient failure, writes only when the request never reached Turso). No tenant
+   context → the env-configured client. One subtlety: the
    proxy's function-forwarder uses an apply/get Proxy rather than `.bind()`, because
    Kysely's `db.fn` is a callable-with-attached-methods and bind would strip them.
 4. **Config/secrets** — accessors read tenant-first with env fallback (§3.3).

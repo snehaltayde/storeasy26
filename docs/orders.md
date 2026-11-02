@@ -68,9 +68,10 @@ the source of truth for reproduction.
 
 ## Durability
 
-All order reads/writes go through `lib/db.js`, whose libSQL client retry-wraps
-transient Turso connection failures (bounded backoff). Retried writes are safe by
-construction: creation dedups on the key, transitions are CAS.
+All order reads/writes go through `lib/db.js`, whose libSQL client retries with
+bounded backoff. Reads retry on any transient failure. Writes retry only when the
+request never reached Turso (DNS or TCP connect failed). A write whose outcome is
+unknown (timeout, reset, gateway 5xx) throws, because it may already have committed.
 
 Legacy Phase-0 rows (`status='confirmed'`) were mapped by `pnpm migrate`:
 razorpay → `paid`, cod → `cod_pending`.
