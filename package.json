@@ -59,6 +59,7 @@
     "support": "node --env-file=.env.local scripts/support-grant.js",
     "restore:drill": "node --env-file=.env.local scripts/restore-drill.js",
     "test:security": "node scripts/test-security.js",
+    "test:maintenance": "node scripts/test-maintenance.js",
     "test:content": "node scripts/test-content.js",
     "test:releases": "node scripts/test-releases.js",
     "test:themes": "node scripts/test-themes.js",

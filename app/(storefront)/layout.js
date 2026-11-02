@@ -19,6 +19,7 @@ import { kitAttr } from "@/lib/themes/kits";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
 import { isPlatformSiteHost } from "@/lib/platform-site";
+import { maintenanceCurtain } from "@/lib/maintenance";
 import { headers } from "next/headers";
 import SiteNav from "@/components/site/SiteNav";
 import Link from "next/link";
@@ -199,34 +200,31 @@ export default async function RootLayout({ children }) {
   }
 
   // S43 (OP12): maintenance mode — shoppers get the BRANDED closed page;
-  // console/platform cookie holders (and the short-lived _mx sign-in pass)
-  // see the real site so the team can work while the store is closed.
+  // holders of a VERIFIED console/platform session or _mx pass see the real
+  // site so the team can work while the store is closed (lib/maintenance.js).
   // Checkout is closed for EVERYONE via checkoutCapability.
-  const maintenance = await tfetch(() => tenantOwnCfg("maintenance", null, null)).catch(() => null);
-  if (maintenance?.enabled) {
-    const jar = await cookies();
-    const bypass = jar.get("_admin") || jar.get("_platform") || jar.get("_mx");
-    if (!bypass) {
-      const [name, brand, theme] = await tfetch(async () => [siteName(), resolvedBrand(), resolvedTheme()]).catch(() => ["Store", null, null]);
-      const brandCss = brand ? brandCssVars(resolveBrand(brand)) : "";
-      return (
-        <html lang="en" data-kit={kitAttr(theme)} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
-          {brandCss ? <style id="brand-vars" precedence="default" href="brand-vars">{brandCss}</style> : null}
-          <body className="flex min-h-full flex-col items-center justify-center bg-hero px-6 text-center text-hero-fg antialiased">
-            <p className="inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-accent-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent-400" /> Scheduled maintenance
-            </p>
-            <h1 className="mt-5 max-w-xl font-display text-4xl font-extrabold tracking-tight">{name} will be right back.</h1>
-            <p className="mt-4 max-w-md text-hero-muted">
-              {maintenance.message || "We're doing some quick work behind the scenes. Nothing is lost — your cart will be waiting."}
-            </p>
-            <a href="/api/admin/maintenance-pass" className="mt-10 text-xs text-hero-muted underline opacity-60 hover:opacity-100">
-              Store team sign-in
-            </a>
-          </body>
-        </html>
-      );
-    }
+  const jar = await cookies();
+  const maintenance = await tfetch(() => maintenanceCurtain(jar)).catch(() => null);
+  if (maintenance) {
+    const [name, brand, theme] = await tfetch(async () => [siteName(), resolvedBrand(), resolvedTheme()]).catch(() => ["Store", null, null]);
+    const brandCss = brand ? brandCssVars(resolveBrand(brand)) : "";
+    return (
+      <html lang="en" data-kit={kitAttr(theme)} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
+        {brandCss ? <style id="brand-vars" precedence="default" href="brand-vars">{brandCss}</style> : null}
+        <body className="flex min-h-full flex-col items-center justify-center bg-hero px-6 text-center text-hero-fg antialiased">
+          <p className="inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-accent-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-400" /> Scheduled maintenance
+          </p>
+          <h1 className="mt-5 max-w-xl font-display text-4xl font-extrabold tracking-tight">{name} will be right back.</h1>
+          <p className="mt-4 max-w-md text-hero-muted">
+            {maintenance.message || "We're doing some quick work behind the scenes. Nothing is lost — your cart will be waiting."}
+          </p>
+          <a href="/api/admin/maintenance-pass" className="mt-10 text-xs text-hero-muted underline opacity-60 hover:opacity-100">
+            Store team sign-in
+          </a>
+        </body>
+      </html>
+    );
   }
 
   const [collections, cart, chrome] = await Promise.all([navCollections(), initialCart(), chromeData()]);
