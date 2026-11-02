@@ -1,14 +1,16 @@
 // Maintenance bypass suite: a cookie lifts the curtain only when its VALUE
 // verifies for this tenant. Forged, cross-tenant, wrong-kind and expired values
 // get the closed page; genuine staff keep the real site; checkout stays closed.
-// Runs on Node against file DBs — this covers the decision logic, NOT the edge
-// runtime or the layout wiring.
+// Runs on Node against file DBs — this covers the decision logic and which files
+// use the gate, NOT the edge runtime or real responses. For those, run
+// `pnpm drill:maintenance-edge`.
 //   pnpm test:maintenance
-import { readFile, rm } from "node:fs/promises";
+import { readFile, readdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, "..");
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -225,6 +227,56 @@ await t("forged cookies → no bypass; the derived tokens and a pass still work"
     eq(await bypass({ _mx: value }), true, "pass:");
   } finally {
     process.env.PLATFORM_DB_URL = saved;
+  }
+});
+
+console.log("— every storefront data path is gated");
+
+const walk = async (dir) => {
+  const out = [];
+  for (const e of await readdir(join(root, dir), { withFileTypes: true })) {
+    const rel = join(dir, e.name);
+    if (e.isDirectory()) out.push(...(await walk(rel)));
+    else out.push(rel);
+  }
+  return out;
+};
+const source = (f) => readFile(join(root, f), "utf8");
+// Pages with no tenant data: marketing-host pages (404 on a store), the
+// catch-all 404, and the browser-side wishlist (its API is gated).
+const NO_DATA_PAGES = ["pricing", "legal/[doc]", "verticals/[vertical]", "customers", "customers/[slug]", "integrations", "templates", "trust", "[...unmatched]", "wishlist"];
+
+await t("storefront pages fetch through the gated tfetch only", async () => {
+  const pages = (await walk("app/(storefront)")).filter((f) => f.endsWith("page.js"));
+  eq(pages.length > 20, true, "found the pages:");
+  for (const f of pages) {
+    const src = await source(f);
+    eq(/tenant-request|withTenant/.test(src), false, `${f} bypasses the gate:`);
+    const name = f.replace("app/(storefront)/", "").replace(/\/?page\.js$/, "");
+    if (!NO_DATA_PAGES.includes(name)) eq(src.includes('from "@/lib/storefront-request"'), true, `${f} not gated:`);
+  }
+});
+await t("the no-data pages still read no catalog", async () => {
+  for (const name of NO_DATA_PAGES) {
+    const src = await source(`app/(storefront)/${name}/page.js`);
+    eq(/@\/lib\/(db|repo|content\/|cms\/|cart|orders|wishlist)/.test(src), false, `${name} reads data:`);
+  }
+});
+await t("the sitemap and every catalog-returning shopper API are gated", async () => {
+  eq((await source("app/sitemap.js")).includes('from "@/lib/storefront-request"'), true, "sitemap:");
+  for (const r of ["search", "wishlist", "upsell", "quiz/[slug]", "cart"]) {
+    const src = await source(`app/api/${r}/route.js`);
+    eq(src.includes("storefrontHandler(") && !src.includes("tenantHandler"), true, `/api/${r}:`);
+  }
+});
+await t("webhooks, jobs and console APIs are NOT gated", async () => {
+  const routes = (await walk("app/api")).filter((f) => /app\/api\/(razorpay|shopify|jobs|admin|platform|partners|connect)\//.test(f) && f.endsWith("route.js"));
+  eq(routes.length > 20, true, "found the routes:");
+  for (const f of routes) eq((await source(f)).includes("storefrontHandler"), false, `${f} gated:`);
+});
+await t("console pages keep the ungated tfetch (sign-in works during maintenance)", async () => {
+  for (const f of (await walk("app/(console)")).filter((x) => x.endsWith(".js"))) {
+    eq((await source(f)).includes("storefront-request"), false, `${f} gated:`);
   }
 });
 

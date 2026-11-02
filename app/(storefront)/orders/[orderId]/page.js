@@ -6,7 +6,7 @@ import { getOrder, verifyOrderStatusToken, ORDER_STATUS } from "@/lib/orders";
 import { getOrderProjection, reconcileOrderProjection } from "@/lib/order-projection";
 import { formatMoney } from "@/lib/format";
 import { siteSupport } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Guest order-status page (Session 18; S31 projection-backed). Reachable ONLY
 // via the tokenized link. Renders our durable state machine PLUS the local

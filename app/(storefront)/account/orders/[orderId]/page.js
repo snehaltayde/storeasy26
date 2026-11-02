@@ -7,7 +7,7 @@ import ReorderPanel from "@/components/account/ReorderPanel";
 import ReturnRequest from "@/components/account/ReturnRequest";
 import { returnForOrder, returnEligibility, returnsWindowDays } from "@/lib/returns";
 import { db } from "@/lib/db";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Account order detail (S45 / SF11 + SF12): ownership-checked server-side
 // (someone else's order id is a plain 404), fulfilment + refunds from the

@@ -6,7 +6,7 @@ import { getProductByHandle } from "@/lib/repo";
 import { resolvedPdpExtras, resolvedPdpPairs, resolvedProductOverride, resolvedSurfaceTemplateFor } from "@/lib/content/resolve";
 import { numericId } from "@/lib/ids";
 import { abs, siteName } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 export const dynamic = "force-dynamic";
 

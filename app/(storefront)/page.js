@@ -8,7 +8,7 @@ import { isPlatformSiteHost } from "@/lib/platform-site";
 import { getCatalogStats } from "@/lib/repo";
 import { resolveHomeSectionData } from "@/lib/cms/section-data";
 import { resolvedHero, resolvedHomeSections, resolvedCollectionsIndex } from "@/lib/content/resolve";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Catalog reflects the latest sync — render per request (sub-ms SQLite reads).
 // Session 23: hero + section layout come from the tenant's CMS (defaults when

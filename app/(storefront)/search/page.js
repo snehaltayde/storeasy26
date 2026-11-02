@@ -5,7 +5,7 @@ import SearchResults from "@/components/analytics/SearchResults";
 import { numericId } from "@/lib/ids";
 import { typesenseSearch } from "@/lib/typesense-search";
 import { searchProductsInDb } from "@/lib/repo";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 export const dynamic = "force-dynamic";
 

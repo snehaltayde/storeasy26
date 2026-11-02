@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getBundle } from "@/lib/bundles";
 import { formatMoney } from "@/lib/format";
 import BundleAddButton from "@/components/BundleAddButton";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Bundle detail (S46 / SF18): the set, its components, the honest math
 // (components sum vs bundle price) and one-tap add — priced by the offers

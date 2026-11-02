@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveWishlist } from "@/lib/wishlist";
 import { rateLimit } from "@/lib/rate-limit";
-import { tenantHandler } from "@/lib/tenant-request";
+import { storefrontHandler } from "@/lib/storefront-request";
 
 // Anonymous wishlist resolution (S49 / SF22): the browser keeps the list;
 // this endpoint only answers "what are these handles TODAY" (availability,
@@ -11,7 +11,7 @@ import { tenantHandler } from "@/lib/tenant-request";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const POST = tenantHandler(async (request) => {
+export const POST = storefrontHandler(async (request) => {
   const limited = rateLimit(request, { name: "wishlist", limit: 30 });
   if (limited) return limited;
   const body = await request.json().catch(() => ({}));

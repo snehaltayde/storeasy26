@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
-import { tenantHandler } from "@/lib/tenant-request";
+import { storefrontHandler } from "@/lib/storefront-request";
 import {
   CART_COOKIE,
   emptyCart,
@@ -24,13 +24,13 @@ const COOKIE_OPTS = {
   secure: process.env.NODE_ENV === "production",
 };
 
-export const GET = tenantHandler(async (request) => {
+export const GET = storefrontHandler(async (request) => {
   const id = request.cookies.get(CART_COOKIE)?.value;
   const cart = id ? await getCart(id) : emptyCart();
   return NextResponse.json(cart);
 });
 
-export const POST = tenantHandler(async (request) => {
+export const POST = storefrontHandler(async (request) => {
   const limited = rateLimit(request, { name: "cart", limit: 60 });
   if (limited) return limited;
   let id = request.cookies.get(CART_COOKIE)?.value;

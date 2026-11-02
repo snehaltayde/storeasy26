@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 import { resolvedContentPage, resolvedContentPageList } from "@/lib/content/resolve";
 import { campaignVisible } from "@/lib/cms/store";
 

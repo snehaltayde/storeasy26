@@ -4,7 +4,7 @@ import { customerFromToken, customerOrders, CUSTOMER_COOKIE, safeReturnPath } fr
 import { formatMoney } from "@/lib/format";
 import AccountAuth from "@/components/account/AccountAuth";
 import ProfileForm from "@/components/account/ProfileForm";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Account home (S45 / SF10 + SF11): sign-in (passwordless) or the dashboard
 // — orders + profile. Guest purchase is untouched; this page is optional.

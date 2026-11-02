@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getQuiz } from "@/lib/quiz";
 import QuizRunner from "@/components/QuizRunner";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Product-finder quiz (S46 / SF19): deterministic — no AI at runtime.
 export const dynamic = "force-dynamic";
