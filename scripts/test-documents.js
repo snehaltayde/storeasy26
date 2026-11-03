@@ -1,5 +1,676 @@
-// Placeholder suite, pre-registered by P2-ATOM (plan decision 14) so that no
-// later phase 2 item edits package.json. cms/p2-docs replaces this file with
-// the real suite.
-console.log("pending: owned by cms/p2-docs");
-process.exit(0);
+// P2-DOCS: the document write service (lib/documents/service.js) and its
+// console API (lib/admin/documents-api.js, behind PUT /api/admin/documents),
+// run for real: real requireAdmin and sessions, real tenant databases with
+// every migration, storage re-read after each refusal. Also the media scan of
+// documents (lib/media.js), the team names behind "Earlier versions"
+// (lib/platform/identity.js teamMemberNames) and a scan that no code outside
+// lib/documents/ writes the document tables.
+//   pnpm test:documents
+import { readFile, readdir, rm } from "node:fs/promises";
+import { registerHooks } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { dirname, join, relative } from "node:path";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(here, "..");
+
+registerHooks({
+  resolve(spec, ctx, next) {
+    if (spec.startsWith("@/")) return next(pathToFileURL(join(ROOT, spec.slice(2) + (/\.\w+$/.test(spec) ? "" : ".js"))).href, ctx);
+    if (/^next\/(headers|server|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
+    return next(spec, ctx);
+  },
+});
+process.env.RATE_LIMIT_DISABLED = "1";
+process.env.TURSO_DB_URL = "";
+process.env.TURSO_DB_AUTH_TOKEN = "";
+process.env.DATABASE_URL = "file:.test-documents-default.db";
+process.env.PLATFORM_DB_URL = "file:.test-documents-platform.db";
+process.env.PLATFORM_DB_TOKEN = "";
+process.env.PLATFORM_SECRET = "test-platform-secret";
+process.env.PLATFORM_CACHE_MS = "50";
+
+const dbs = [".test-documents-default.db", ".test-documents-platform.db", ".test-documents-docs.db", ".test-documents-legacy.db"];
+const cleanup = async () => {
+  for (const f of dbs) await rm(join(ROOT, f), { force: true });
+};
+await cleanup();
+
+const started = Date.now();
+const { createClient } = await import("@libsql/client");
+const C = await import("../lib/platform/control.js");
+const S = await import("../lib/platform/sessions.js");
+const I = await import("../lib/platform/identity.js");
+const { withTenant } = await import("../lib/tenant-context.js");
+const { currentDatabase } = await import("../lib/db.js");
+const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+const Docs = await import("../lib/documents/service.js");
+const V = await import("../lib/documents/versions.js");
+const { handleDocumentsPut, parseDocumentsOperation } = await import("../lib/admin/documents-api.js");
+const R = await import("../lib/registry/index.js");
+const M = await import("../lib/media.js");
+const { issueText } = await import("../lib/cms/issues.js");
+
+let pass = 0;
+let fail = 0;
+async function t(name, fn) {
+  try {
+    await fn();
+    pass++;
+    console.log(`✓ ${name}`);
+  } catch (e) {
+    fail++;
+    console.error(`✗ ${name}\n   ${e.stack?.split("\n").slice(0, 3).join("\n   ") || e.message}`);
+  }
+}
+const eq = (got, want, label = "") => {
+  const g = JSON.stringify(got);
+  const w = JSON.stringify(want);
+  if (g !== w) throw new Error(`${label} expected ${w}, got ${g}`);
+};
+const ok = (cond, label = "") => {
+  if (!cond) throw new Error(`${label} expected truthy`);
+};
+
+// --- fixtures ----------------------------------------------------------------------
+await C.migratePlatform(await readFile(join(here, "../lib/platform/schema.sql"), "utf8"));
+const schema = await readFile(join(here, "../lib/schema.sql"), "utf8");
+const migrations = await loadMigrations("tenant");
+const raw = {};
+for (const [key, file] of [["docs", ".test-documents-docs.db"], ["legacy", ".test-documents-legacy.db"]]) {
+  const c = createClient({ url: `file:${file}` });
+  await c.executeMultiple(schema);
+  await runMigrations(c, migrations);
+  raw[key] = c;
+}
+await raw.docs.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+await C.upsertTenant({ id: "zd", name: "Docs", domains: ["zd.test"], dbUrl: "file:.test-documents-docs.db", config: {}, secrets: {} });
+await C.upsertTenant({ id: "zl", name: "Legacy", domains: ["zl.test"], dbUrl: "file:.test-documents-legacy.db", config: {}, secrets: {} });
+const TEN = { docs: await C.getTenant("zd"), legacy: await C.getTenant("zl") };
+
+const ownerU = await I.createUser({ email: "asha@zd.test", name: "Asha Rao", password: "owner-pass-docs" });
+const staffU = await I.createUser({ email: "ravi@zd.test", password: "staff-pass-docs" }); // no name: the email is shown
+const supportU = await I.createUser({ email: "help@zd.test", name: "Support Person", password: "support-pass-docs" });
+const leftU = await I.createUser({ email: "left@zd.test", name: "Gone Person", password: "left-pass-docs" });
+for (const tid of ["zd", "zl"]) {
+  await I.addMembership(ownerU.id, tid, "owner");
+  await I.addMembership(staffU.id, tid, "staff");
+  await I.addMembership(supportU.id, tid, "support");
+}
+await I.addMembership(leftU.id, "zd", "staff");
+const tok = async (u) => (await S.createSession({ userId: u.id, kind: "merchant", ttlMs: 600_000 })).token;
+const OWNER = await tok(ownerU);
+const STAFF = await tok(staffU);
+const SUPPORT = await tok(supportU);
+const LEFT = await tok(leftU);
+
+const req = (tenant, cookie, body) => ({
+  cookies: { get: (name) => (name === "_admin" && cookie ? { value: cookie } : undefined) },
+  headers: { get: (k) => ({ host: `${tenant.id}.test` })[k.toLowerCase()] ?? null },
+  json: async () => body,
+});
+// Every issue that reaches the API in this suite, for the wording check.
+const SEEN_ISSUES = [];
+const api = async (body, { as = OWNER, store = "docs" } = {}) => {
+  const r = await withTenant(TEN[store], () => handleDocumentsPut(req(TEN[store], as, body)));
+  if (Array.isArray(r.body?.issues)) SEEN_ISSUES.push(...r.body.issues);
+  return r;
+};
+const inT = (fn, store = "docs") => withTenant(TEN[store], fn);
+const sql = async (q, args = [], store = "docs") => (await raw[store].execute({ sql: q, args })).rows;
+// Everything a write could touch, to prove a refusal changed nothing.
+const dump = async (store = "docs") => {
+  const out = {};
+  for (const table of ["documents", "document_versions", "publish_log", "release_state", "releases", "cms_state"]) {
+    out[table] = (await raw[store].execute(`SELECT * FROM ${table} ORDER BY rowid`)).rows.map((r) => ({ ...r }));
+  }
+  return JSON.stringify(out);
+};
+const unchanged = async (before, label, store = "docs") => eq(await dump(store), before, `${label}: storage changed:`);
+
+const route = (slug, title, type = "page") => ({ ...R.emptyBody(type), meta: { ...R.emptyBody(type).meta, slug, title } });
+const textSection = (id, title = "Hello", body = ["Some words."]) => ({ id, kind: "text", v: 1, enabled: true, settings: { title, body }, blocks: [] });
+const create = async (args, opts) => api({ createDocument: args }, opts);
+const save = async (id, revision, body, opts) => api({ saveDraft: { id, body }, revision }, opts);
+const docRow = async (id) => (await sql("SELECT * FROM documents WHERE id = ?", [id]))[0];
+
+// --- DOC-01: one store for every type ------------------------------------------------------
+console.log("— one document store (DOC-01)");
+const made = {};
+await t("a home, a campaign, a journal post, the product layout and one product's content are rows of one table, created and saved through the same functions", async () => {
+  const home = await create({ type: "home" });
+  eq(home.status, 200, "home create:");
+  eq(home.body.document.id, "doc_home", "a singleton id:");
+  const camp = await create({ type: "campaign", meta: { slug: "summer-sale", title: "Summer sale" } });
+  const post = await create({ type: "journal", meta: { slug: "our-story", title: "Our story" } });
+  const layout = await create({ type: "product_layout" });
+  const content = await create({ type: "product_content", entityId: "gid://shopify/Product/1" });
+  for (const [name, r] of Object.entries({ camp, post, layout, content })) eq(r.status, 200, `${name} create:`);
+  eq(layout.body.document.id, "doc_product_layout", "product layout is a singleton:");
+  for (const r of [camp, post, content]) ok(/^doc_[a-z2-7]{16}$/.test(r.body.document.id), `random route id, got ${r.body.document.id}:`);
+  Object.assign(made, { home: home.body.document, camp: camp.body.document, post: post.body.document, layout: layout.body.document, content: content.body.document });
+
+  // ...and saved through the same saveDraft
+  const withText = (d) => ({ ...d.body, sections: [...(d.body.sections || []), textSection("sec_t1")] });
+  for (const [key, d] of Object.entries(made)) {
+    const r = await save(d.id, d.revision, withText(d));
+    eq(r.status, 200, `${key} save:`);
+    eq(r.body.document.revision, 2, `${key} revision bumped:`);
+    made[key] = r.body.document;
+  }
+  const rows = await sql("SELECT id, type, revision FROM documents ORDER BY type");
+  eq(rows.map((r) => [r.type, r.revision]), [["campaign", 2], ["home", 2], ["journal", 2], ["product_content", 2], ["product_layout", 2]], "all in documents:");
+  eq((await docRow(made.content.id)).entity_id, "gid://shopify/Product/1", "product content keeps its product:");
+  const stored = JSON.parse((await docRow("doc_home")).draft);
+  eq(stored.sections.map((s) => s.kind), ["text"], "the saved home draft:");
+});
+
+await t("an unregistered type is refused and nothing is stored; an unknown section kind gives 422 and nothing is stored", async () => {
+  const before = await dump();
+  const r = await create({ type: "landing_page", meta: { slug: "x", title: "X" } });
+  eq(r.status, 422, "unknown type:");
+  eq(r.body.issues.map((i) => i.code), ["UNKNOWN_TYPE"], "issue:");
+  const s = await save("doc_home", made.home.revision, { ...made.home.body, sections: [{ id: "sec_zz1", kind: "carousel", v: 1, enabled: true, settings: {}, blocks: [] }] });
+  eq(s.status, 422, "unknown kind:");
+  ok(s.body.issues.some((i) => i.code === "UNKNOWN_KIND" && i.sectionId === "sec_zz1" && i.documentId === "doc_home"), `UNKNOWN_KIND on its section: ${JSON.stringify(s.body.issues)}`);
+  const svc = await inT(() => Docs.createDocument({ type: "nope" }).then(() => "stored", (e) => e.code));
+  eq(svc, "VALIDATION_FAILED", "the service itself refuses:");
+  await unchanged(before, "refusals");
+});
+
+await t("a page's meta.slug change updates documents.slug and keeps the id; after renaming 'about' to 'about-us', a new 'about' can be created; after archiving a page, a page at its slug can be created", async () => {
+  const about = (await create({ type: "page", meta: { slug: "about", title: "About us" } })).body.document;
+  eq((await docRow(about.id)).slug, "about", "slug cached:");
+  const renamed = await save(about.id, about.revision, { ...about.body, meta: { ...about.body.meta, slug: "about-us" } });
+  eq(renamed.status, 200, "rename:");
+  eq(renamed.body.document.id, about.id, "same id:");
+  eq((await docRow(about.id)).slug, "about-us", "documents.slug follows meta.slug:");
+  const again = await create({ type: "page", meta: { slug: "about", title: "About (new)" } });
+  eq(again.status, 200, "a new 'about':");
+  ok(again.body.document.id !== about.id, "a new id:");
+
+  const old = (await create({ type: "page", meta: { slug: "old-offer", title: "Old offer" } })).body.document;
+  const arch = await api({ archive: old.id, revision: old.revision });
+  eq(arch.status, 200, "archive:");
+  ok((await docRow(old.id)).archived_at, "archived_at set:");
+  const reuse = await create({ type: "page", meta: { slug: "old-offer", title: "New offer" } });
+  eq(reuse.status, 200, "a page at an archived page's slug:");
+  made.aboutUs = renamed.body.document;
+});
+
+await t("two racing creates at one slug give one success and one 409 SLUG_TAKEN, never 422 or 5xx (10 races)", async () => {
+  for (let i = 0; i < 10; i++) {
+    const meta = (n) => ({ slug: `race-${i}`, title: `Racer ${n}` });
+    const [a, b] = await Promise.all([create({ type: "page", meta: meta("A") }), create({ type: i % 2 ? "campaign" : "page", meta: meta("B") })]);
+    const statuses = [a.status, b.status].sort();
+    eq(statuses, [200, 409], `race ${i} statuses:`);
+    const lost = a.status === 409 ? a : b;
+    const won = a.status === 200 ? a : b;
+    eq(lost.body.code, "SLUG_TAKEN", "code:");
+    eq(lost.body.error, `Another page already uses /race-${i}: ${won.body.document.body.meta.title}`, "names the winner:");
+    eq((await sql("SELECT count(*) AS n FROM documents WHERE slug = ?", [`race-${i}`]))[0].n, 1, "one row:");
+  }
+});
+
+await t("saveDraft moving a page onto a taken slug gives 409 SLUG_TAKEN naming the other page, with storage unchanged", async () => {
+  const page = (await create({ type: "page", meta: { slug: "contact", title: "Contact" } })).body.document;
+  const before = await dump();
+  const r = await save(page.id, page.revision, { ...page.body, meta: { ...page.body.meta, slug: "about-us" } });
+  eq(r.status, 409, "status:");
+  eq(r.body.code, "SLUG_TAKEN", "code:");
+  eq(r.body.error, "Another page already uses /about-us: About us", "message:");
+  eq(r.body.other?.id, made.aboutUs.id, "names the other page:");
+  await unchanged(before, "slug clash");
+});
+
+// --- DOC-02: revisions -------------------------------------------------------------------
+console.log("— revisions (DOC-02)");
+await t("API: a stale saveDraft returns 409 with the current body and revision, and storage is unchanged", async () => {
+  const d = made.camp;
+  const theirs = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "Theirs" } }, { as: STAFF });
+  eq(theirs.status, 200, "their save:");
+  const before = await dump();
+  const mine = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "Mine" } });
+  eq(mine.status, 409, "status:");
+  eq(mine.body.code, "DOCUMENT_CHANGED", "code:");
+  eq(mine.body.current.revision, d.revision + 1, "the current revision rides along:");
+  eq(mine.body.current.body.meta.title, "Theirs", "the current body rides along:");
+  ok(!JSON.stringify(mine.body).includes("merchant:"), "no raw actor ids:");
+  await unchanged(before, "stale save");
+  made.camp = theirs.body.document;
+});
+
+await t("a stale write that slips past the first read still loses inside the batch (the guarded UPDATE and its abort), storage unchanged", async () => {
+  const d = made.post;
+  // another save lands between our read and our batch
+  const inst = await inT(() => currentDatabase());
+  const send = inst.libsql.batch;
+  inst.libsql.batch = async (stmts, mode) => {
+    delete inst.libsql.batch;
+    await raw.docs.execute({ sql: "UPDATE documents SET revision = revision + 1, draft = ?, updated_at = 'theirs' WHERE id = ?", args: [JSON.stringify({ ...d.body, meta: { ...d.body.meta, title: "Theirs" } }), d.id] });
+    snap = await dump();
+    return send.call(inst.libsql, stmts, mode);
+  };
+  let snap = null;
+  let r;
+  try {
+    r = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "Mine" } });
+  } finally {
+    delete inst.libsql.batch;
+  }
+  ok(snap, "the other save landed between the read and the batch:");
+  await unchanged(snap, "the losing batch");
+  eq(r.status, 409, "status:");
+  eq(r.body.code, "DOCUMENT_CHANGED", "code:");
+  eq(r.body.current.body.meta.title, "Theirs", "theirs kept:");
+  eq((await sql("SELECT count(*) AS n FROM document_versions WHERE document_id = ? AND body LIKE '%Mine%'", [d.id]))[0].n, 0, "no checkpoint of the losing save:");
+  made.post = (await api({ getDocument: d.id })).body.document;
+});
+
+await t("a save whose answer was lost after it committed is reported saved (200), never as a conflict or a failure", async () => {
+  const d = made.post;
+  const inst = await inT(() => currentDatabase());
+  const send = inst.libsql.batch;
+  inst.libsql.batch = async (stmts, mode) => {
+    await send.call(inst.libsql, stmts, mode);
+    throw Object.assign(new TypeError("fetch failed"), {});
+  };
+  let r;
+  try {
+    r = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "Committed" } });
+  } finally {
+    delete inst.libsql.batch;
+  }
+  eq(r.status, 200, "status:");
+  eq((await docRow(d.id)).revision, d.revision + 1, "stored once:");
+  made.post = r.body.document;
+});
+
+await t("API: archive, discardDraft and restoreVersion (and saveDraft) with no revision return 428, and storage is unchanged", async () => {
+  const before = await dump();
+  const vid = (await sql("SELECT id FROM document_versions WHERE document_id = 'doc_home' LIMIT 1"))[0].id;
+  for (const body of [{ archive: made.camp.id }, { discardDraft: made.camp.id }, { restoreVersion: { id: "doc_home", versionId: vid } }, { saveDraft: { id: "doc_home", body: made.home.body } }, { archive: made.camp.id, revision: null }]) {
+    const r = await api(body);
+    eq(r.status, 428, `${Object.keys(body)[0]} status:`);
+    eq(r.body.code, "REVISION_REQUIRED", "code:");
+  }
+  await unchanged(before, "428s");
+});
+
+await t("archive is refused on a live document; discardDraft puts the live version back into the draft and keeps the old draft as a checkpoint", async () => {
+  const d = made.camp;
+  // stand in for P2-PUBLISH: one published version, pointed at by the document
+  const pub = await V.versionRow({ documentId: d.id, kind: "published", body: d.body, schemaVersion: 1, createdBy: `merchant:${ownerU.id}`, createdAt: new Date().toISOString() });
+  await raw.docs.execute(V.versionStatement(pub));
+  await raw.docs.execute({ sql: "UPDATE documents SET published_version_id = ?, published_hash = draft_hash WHERE id = ?", args: [pub.id, d.id] });
+  const before = await dump();
+  const a = await api({ archive: d.id, revision: d.revision });
+  eq([a.status, a.body.code], [409, "DOCUMENT_LIVE"], "archive refused:");
+  await unchanged(before, "archive of a live page");
+
+  const edited = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "Unpublished edit" } });
+  eq(edited.status, 200, "edit:");
+  const disc = await api({ discardDraft: d.id, revision: edited.body.document.revision });
+  eq(disc.status, 200, "discard:");
+  eq(disc.body.document.body.meta.title, d.body.meta.title, "the draft is the live body again:");
+  eq(disc.body.document.unpublishedChanges, false, "no unpublished changes:");
+  const kept = await sql("SELECT body FROM document_versions WHERE document_id = ? AND kind = 'checkpoint' ORDER BY created_at DESC, rowid DESC LIMIT 1", [d.id]);
+  eq(JSON.parse(kept[0].body).meta.title, "Unpublished edit", "the discarded draft is kept:");
+  const never = await api({ discardDraft: made.post.id, revision: made.post.revision });
+  eq([never.status, never.body.code], [409, "NOTHING_PUBLISHED"], "never published:");
+  made.camp = disc.body.document;
+});
+
+// --- DOC-04 / DOC-05: tolerant drafts, strict structure, sanitizing -----------------------
+console.log("— drafts are tolerant, structure and sanitizing are not (DOC-04, DOC-05)");
+await t("a draft with <script> stores no script", async () => {
+  const d = made.post;
+  const body = { ...d.body, sections: [{ id: "sec_rt1", kind: "rich_text", v: 1, enabled: true, settings: { title: "", html: "<p>Hello</p><script>alert(1)</script>" }, blocks: [] }] };
+  const r = await save(d.id, d.revision, body);
+  eq(r.status, 200, "status:");
+  const stored = (await docRow(d.id)).draft;
+  ok(!/<script/i.test(stored), `no script stored: ${stored}`);
+  eq(JSON.parse(stored).sections[0].settings.html, "<p>Hello</p>", "the words are kept:");
+  ok(!/<script/i.test((await sql("SELECT group_concat(body) AS b FROM document_versions WHERE document_id = ?", [d.id]))[0].b || ""), "no script in any version either:");
+  made.post = r.body.document;
+});
+
+await t("a new banner with no text saves (200) with an 'incomplete' issue carrying documentId, sectionId and field", async () => {
+  const banner = R.newSection("banner", { id: "sec_bn1" });
+  const r = await save("doc_home", made.home.revision, { ...made.home.body, sections: [banner] });
+  eq(r.status, 200, "status:");
+  const inc = r.body.issues.filter((i) => i.severity === "incomplete");
+  ok(inc.length > 0, `incomplete issues: ${JSON.stringify(r.body.issues)}`);
+  for (const i of inc) {
+    eq(i.documentId, "doc_home", "documentId:");
+    eq(i.sectionId, "sec_bn1", "sectionId:");
+    ok(typeof i.field === "string" && i.field, "field:");
+  }
+  made.home = r.body.document;
+});
+
+await t("an explicit empty sections list on the home draft is stored and read back as [], never defaults (DOC-07)", async () => {
+  const r = await save("doc_home", made.home.revision, { ...made.home.body, sections: [] });
+  eq(r.status, 200, "status:");
+  eq(JSON.parse((await docRow("doc_home")).draft).sections, [], "stored:");
+  const g = await api({ getDocument: "doc_home" });
+  eq(g.body.document.body.sections, [], "read back:");
+  made.home = g.body.document;
+});
+
+await t("a founder can add an image to the hero through the API (DOC-07)", async () => {
+  const hero = { ...R.newSection("hero", { id: "sec_hero1" }), settings: { ...R.newSection("hero").settings, image: { media: "/api/media/med_heroimg000000000001", alt: "Our jar" } } };
+  const r = await save("doc_home", made.home.revision, { ...made.home.body, sections: [hero] });
+  eq(r.status, 200, `status: ${JSON.stringify(r.body).slice(0, 300)}`);
+  eq(JSON.parse((await docRow("doc_home")).draft).sections[0].settings.image, { media: "/api/media/med_heroimg000000000001", alt: "Our jar" }, "stored:");
+  made.home = r.body.document;
+});
+
+// --- DOC-08: versions ---------------------------------------------------------------------
+console.log("— earlier versions (DOC-08)");
+await t("restoreVersion puts the version into the draft, bumps the revision and leaves release_state (and releases) untouched", async () => {
+  V.setCheckpointInterval(0);
+  let d;
+  try {
+    d = (await create({ type: "page", meta: { slug: "our-team", title: "Our team" } })).body.document;
+    d = (await save(d.id, d.revision, { ...d.body, sections: [textSection("sec_r1", "First words")] })).body.document;
+  } finally {
+    V.setCheckpointInterval(null);
+  }
+  const first = (await sql("SELECT id, body FROM document_versions WHERE document_id = ? AND body LIKE '%First words%'", [d.id]))[0];
+  const now = await save(d.id, d.revision, { ...d.body, sections: [textSection("sec_r1", "Changed since")] });
+  eq(now.status, 200, "the later edit:");
+  const liveBefore = JSON.stringify(await sql("SELECT * FROM release_state")) + JSON.stringify(await sql("SELECT * FROM releases"));
+  const r = await api({ restoreVersion: { id: d.id, versionId: first.id }, revision: now.body.document.revision });
+  eq(r.status, 200, `status: ${JSON.stringify(r.body).slice(0, 200)}`);
+  eq(r.body.document.revision, now.body.document.revision + 1, "revision bumped:");
+  eq(r.body.document.body.sections[0].settings.title, "First words", "the version is the draft:");
+  eq(JSON.parse((await docRow(d.id)).draft).sections[0].settings.title, "First words", "stored:");
+  eq(JSON.stringify(await sql("SELECT * FROM release_state")) + JSON.stringify(await sql("SELECT * FROM releases")), liveBefore, "the live store is untouched:");
+  const kept = await sql("SELECT body FROM document_versions WHERE document_id = ? AND note = 'Before restoring an earlier version'", [d.id]);
+  eq(kept.length, 1, "the replaced draft is kept:");
+  eq(JSON.parse(kept[0].body).sections[0].settings.title, "Changed since", "with its words:");
+});
+
+await t("restoring a version whose address another page now uses gives 409 SLUG_TAKEN and changes nothing", async () => {
+  const d = made.aboutUs; // created at /about, renamed to /about-us; a new page took /about since
+  const first = (await sql("SELECT id, body FROM document_versions WHERE document_id = ? ORDER BY created_at, rowid LIMIT 1", [d.id]))[0];
+  eq(JSON.parse(first.body).meta.slug, "about", "the old version's address:");
+  const before = await dump();
+  const r = await api({ restoreVersion: { id: d.id, versionId: first.id }, revision: d.revision });
+  eq([r.status, r.body.code, r.body.error], [409, "SLUG_TAKEN", "Another page already uses /about: About (new)"], "refused:");
+  await unchanged(before, "restore onto a taken slug");
+});
+
+await t("an undo_saved version survives 100 later autosaves (interval 0) and appears in listHistory; checkpoints never exceed 20 per document", async () => {
+  V.setCheckpointInterval(0);
+  try {
+    let d = (await create({ type: "page", meta: { slug: "busy-page", title: "Busy" } })).body.document;
+    const saved = await inT(() => Docs.saveVersion({ documentId: d.id, kind: "undo_saved", actor: { kind: "merchant", id: ownerU.id }, note: "Edits kept by Undo" }));
+    let most = 0;
+    for (let i = 0; i < 100; i++) {
+      const r = await save(d.id, d.revision, { ...d.body, sections: [textSection("sec_b1", `Save ${i}`)] });
+      if (r.status !== 200) throw new Error(`save ${i}: ${r.status} ${JSON.stringify(r.body)}`);
+      d = r.body.document;
+      const n = (await sql("SELECT count(*) AS n FROM document_versions WHERE document_id = ? AND kind = 'checkpoint'", [d.id]))[0].n;
+      most = Math.max(most, Number(n));
+    }
+    eq(most, 20, "checkpoints at most (and reaching) 20:");
+    eq((await sql("SELECT kind FROM document_versions WHERE id = ?", [saved.id]))[0]?.kind, "undo_saved", "the undo_saved version is still there:");
+    const h = await api({ listHistory: d.id });
+    eq(h.status, 200, "history:");
+    const it = h.body.versions.find((v) => v.id === saved.id);
+    ok(it, "listed:");
+    eq([it.kind, it.by, it.note], ["undo_saved", "Asha Rao", "Edits kept by Undo"], "how it is listed:");
+    eq(h.body.versions.length, 21, "20 checkpoints plus the undo_saved one:");
+    const newest = JSON.parse((await sql("SELECT body FROM document_versions WHERE document_id = ? AND kind = 'checkpoint' ORDER BY created_at DESC, rowid DESC LIMIT 1", [d.id]))[0].body);
+    eq(newest.sections[0].settings.title, "Save 99", "the newest checkpoint is the last save:");
+    made.busy = d;
+  } finally {
+    V.setCheckpointInterval(null);
+  }
+});
+
+await t("at the normal 5-minute interval, autosaves in a row add no checkpoint after the first", async () => {
+  let d = (await create({ type: "page", meta: { slug: "calm-page", title: "Calm" } })).body.document;
+  for (let i = 0; i < 5; i++) d = (await save(d.id, d.revision, { ...d.body, sections: [textSection("sec_c1", `Edit ${i}`)] })).body.document;
+  eq((await sql("SELECT count(*) AS n FROM document_versions WHERE document_id = ? AND kind = 'checkpoint'", [d.id]))[0].n, 1, "only the one made at create:");
+});
+
+await t("pruning never removes a checkpoint referenced by publish_log (from, to or saved); the trigger blocks deleting published, migrated or undo_saved versions", async () => {
+  V.setCheckpointInterval(0);
+  try {
+    let d = made.busy;
+    const oldest = await sql("SELECT id FROM document_versions WHERE document_id = ? AND kind = 'checkpoint' ORDER BY created_at, rowid LIMIT 3", [d.id]);
+    const [a, b, c] = oldest.map((r) => r.id);
+    const at = new Date().toISOString();
+    await raw.docs.execute({ sql: "INSERT INTO publish_log (id, set_id, document_id, action, from_version_id, created_at) VALUES ('log_t1', 'set_t1', ?, 'publish', ?, ?)", args: [d.id, a, at] });
+    await raw.docs.execute({ sql: "INSERT INTO publish_log (id, set_id, document_id, action, to_version_id, created_at) VALUES ('log_t2', 'set_t1', ?, 'publish', ?, ?)", args: [d.id, b, at] });
+    await raw.docs.execute({ sql: "INSERT INTO publish_log (id, set_id, document_id, action, saved_version_id, created_at) VALUES ('log_t3', 'set_t1', ?, 'undo', ?, ?)", args: [d.id, c, at] });
+    for (let i = 0; i < 30; i++) d = (await save(d.id, d.revision, { ...d.body, sections: [textSection("sec_b1", `Later ${i}`)] })).body.document;
+    const left = (await sql(`SELECT id FROM document_versions WHERE id IN (?, ?, ?)`, [a, b, c])).map((r) => r.id).sort();
+    eq(left, [a, b, c].sort(), "all three referenced checkpoints kept:");
+    const unref = (await sql("SELECT count(*) AS n FROM document_versions WHERE document_id = ? AND kind = 'checkpoint' AND id NOT IN (?, ?, ?)", [d.id, a, b, c]))[0].n;
+    eq(unref, 17, "the rest is still capped (20 newest, minus the 3 old ones kept by the log):");
+  } finally {
+    V.setCheckpointInterval(null);
+  }
+  const at = new Date().toISOString();
+  for (const kind of ["published", "migrated", "undo_saved"]) {
+    const row = await V.versionRow({ documentId: "doc_x", kind, body: { schema: 1 }, schemaVersion: 1, createdAt: at });
+    await raw.docs.execute(V.versionStatement(row));
+    let refused = null;
+    await raw.docs.execute({ sql: "DELETE FROM document_versions WHERE id = ?", args: [row.id] }).catch((e) => (refused = String(e.message)));
+    ok(/only checkpoint versions can be deleted/.test(refused || ""), `${kind}: the trigger refuses, got ${refused}`);
+  }
+});
+
+await t("listHistory shows plain names, never matching /^(user|member|tenant|kind)[:_]/", async () => {
+  const d = (await create({ type: "page", meta: { slug: "names", title: "Names" } }, { as: STAFF })).body.document;
+  let cur = d;
+  for (const as of [OWNER, LEFT]) {
+    V.setCheckpointInterval(0);
+    cur = (await save(cur.id, cur.revision, { ...cur.body, meta: { ...cur.body.meta, title: `By ${as === OWNER ? "owner" : "left"}` } }, { as })).body.document;
+    V.setCheckpointInterval(null);
+  }
+  await I.removeMembership(leftU.id, "zd"); // they left the store since
+  const at = new Date().toISOString();
+  for (const [by, note] of [[`operator-support:op_1`, "support"], [null, "system"], ["bootstrap:bootstrap", "bootstrap"], ["user:u_raw", "odd"]]) {
+    await raw.docs.execute(V.versionStatement(await V.versionRow({ documentId: d.id, kind: "undo_saved", body: { schema: 1 }, schemaVersion: 1, createdBy: by, createdAt: at, note })));
+  }
+  const h = await api({ listHistory: d.id }, { as: SUPPORT });
+  eq(h.status, 200, "a read-only role can read history:");
+  const by = Object.fromEntries(h.body.versions.map((v) => [v.note ?? v.id, v.by]));
+  for (const v of h.body.versions) ok(!/^(user|member|tenant|kind)[:_]/.test(v.by) && !/^(merchant|bootstrap|operator)/.test(v.by) && !/\bu_[0-9a-f]+/.test(v.by), `plain name, got "${v.by}"`);
+  const names = new Set(h.body.versions.map((v) => v.by));
+  for (const want of ["ravi@zd.test", "Asha Rao", "Someone on your team", "Storeasy"]) ok(names.has(want), `"${want}" listed: ${JSON.stringify([...names])}`);
+  eq([by.support, by.system, by.bootstrap, by.odd], ["Storeasy", "Storeasy", "Someone on your team", "Someone on your team"], "fallbacks:");
+  ok(!names.has("Gone Person"), "someone who left is not named:");
+  eq((await I.teamMemberNames("zd")).get(ownerU.id), "Asha Rao", "teamMemberNames:");
+});
+
+// --- media --------------------------------------------------------------------------------
+console.log("— media in documents (lib/media.js)");
+const PNG = (n) => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, n, 1, 2, 3, 4, 5, 6, 7]);
+await t("a media id used only in a doc_home draft, or only in a retained version body, is reported in use with the right label, and deleteMedia refuses it (even forced); unused media still deletes", async () => {
+  const up = (n) => inT(() => M.saveMedia({ filename: `p${n}.png`, mime: "image/png", bytes: PNG(n) }));
+  const inDraft = await up(1);
+  const inOld = await up(2);
+  const inLive = await up(3);
+  const unused = await up(4);
+  const heroWith = (src) => ({ ...R.newSection("hero", { id: "sec_hero1" }), settings: { ...R.newSection("hero").settings, image: { media: src, alt: "Jar" } } });
+
+  // only in an older version: saved into the home draft, then replaced
+  let home = (await save("doc_home", made.home.revision, { ...made.home.body, sections: [heroWith(M.mediaUrl(inOld.id))] })).body.document;
+  const oldVersion = await inT(() => Docs.saveVersion({ documentId: "doc_home", kind: "undo_saved" }));
+  home = (await save("doc_home", home.revision, { ...home.body, sections: [heroWith(M.mediaUrl(inDraft.id))] })).body.document;
+  // only in the live version of the campaign
+  const camp = made.camp;
+  const live = await V.versionRow({ documentId: camp.id, kind: "published", body: { ...camp.body, sections: [{ id: "sec_iw1", kind: "image_with_text", v: 1, enabled: true, settings: { image: { media: M.mediaUrl(inLive.id), alt: "x" } }, blocks: [] }] }, schemaVersion: 1, createdAt: new Date().toISOString() });
+  await raw.docs.execute(V.versionStatement(live));
+  await raw.docs.execute({ sql: "UPDATE documents SET published_version_id = ? WHERE id = ?", args: [live.id, camp.id] });
+  ok(!(await docRow(camp.id)).draft.includes(inLive.id), "the campaign draft doesn't use it:");
+  made.home = home;
+
+  const uses = async (m) => (await inT(() => M.mediaUsage(m.id))).map((u) => [u.label, u.document]);
+  eq(await uses(inDraft), [["draft", "doc_home"]], "draft only:");
+  eq(await uses(inOld), [["older version", "doc_home"]], "older version only:");
+  eq(await uses(inLive), [["live", camp.id]], "live only:");
+  eq(await uses(unused), [], "unused:");
+  ok(oldVersion.id, "the version holding it:");
+
+  for (const [m, label] of [[inDraft, "draft"], [inOld, "older version"], [inLive, "live"]]) {
+    for (const force of [false, true]) {
+      const code = await inT(() => M.deleteMedia(m.id, { force }).then(() => "deleted", (e) => e.code));
+      eq(code, "MEDIA_IN_USE", `${label}${force ? " (forced)" : ""}:`);
+    }
+    eq((await sql("SELECT count(*) AS n FROM media WHERE id = ?", [m.id]))[0].n, 1, `${label} still stored:`);
+  }
+  const msg = await inT(() => M.deleteMedia(inDraft.id).catch((e) => e.message));
+  ok(/Home page \(draft\)/.test(msg), `the refusal names the page: ${msg}`);
+  const gone = await inT(() => M.deleteMedia(unused.id));
+  eq(gone.deleted, unused.id, "unused deletes:");
+  eq((await sql("SELECT count(*) AS n FROM media WHERE id = ?", [unused.id]))[0].n, 0, "really gone:");
+});
+
+await t("an archived document's draft no longer holds media in use, but its kept versions still do", async () => {
+  const m = await inT(() => M.saveMedia({ filename: "arch.png", mime: "image/png", bytes: PNG(9) }));
+  const p = (await create({ type: "page", meta: { slug: "arch-media", title: "Arch" }, body: { ...route("arch-media", "Arch"), sections: [{ id: "sec_im1", kind: "image_with_text", v: 1, enabled: true, settings: { image: { media: M.mediaUrl(m.id), alt: "x" } }, blocks: [] }] } })).body.document;
+  eq((await inT(() => M.mediaUsage(m.id))).map((u) => u.label).sort(), ["draft", "older version"], "draft and the create checkpoint:");
+  await api({ archive: p.id, revision: p.revision });
+  eq((await inT(() => M.mediaUsage(m.id))).map((u) => u.label), ["older version"], "after archive:");
+});
+
+await t("a media scan that can't read the documents tables refuses the delete (5xx path), never lets it through", async () => {
+  const m = await inT(() => M.saveMedia({ filename: "scan.png", mime: "image/png", bytes: PNG(11) }));
+  const inst = await inT(() => currentDatabase());
+  const send = inst.libsql.execute;
+  inst.libsql.execute = (stmt, ...rest) =>
+    /FROM documents WHERE archived_at IS NULL AND \(instr/.test(typeof stmt === "string" ? stmt : stmt?.sql || "")
+      ? Promise.reject(Object.assign(new Error("SQLITE_ERROR: disk I/O error"), { name: "LibsqlError", code: "SQLITE_IOERR" }))
+      : send.call(inst.libsql, stmt, ...rest);
+  let out;
+  try {
+    out = await inT(() => M.deleteMedia(m.id).then(() => "deleted", (e) => e.code));
+  } finally {
+    delete inst.libsql.execute;
+  }
+  eq(out, "SQLITE_IOERR", "the scan's own failure:");
+  eq((await sql("SELECT count(*) AS n FROM media WHERE id = ?", [m.id]))[0].n, 1, "not deleted:");
+});
+
+// --- the API ------------------------------------------------------------------------------
+console.log("— the API (authorization, mode, parsing)");
+const WRITE_BODIES = () => [
+  { createDocument: { type: "page", meta: { slug: "support-made", title: "S" } } },
+  { saveDraft: { id: "doc_home", body: made.home.body }, revision: made.home.revision },
+  { discardDraft: made.camp.id, revision: made.camp.revision },
+  { restoreVersion: { id: "doc_home", versionId: "ver_x" }, revision: made.home.revision },
+  { archive: made.post.id, revision: made.post.revision },
+];
+await t("API: storefront.read-only staff get 403 on every write op, with storage unchanged; their reads work", async () => {
+  const before = await dump();
+  for (const body of WRITE_BODIES()) {
+    const r = await api(body, { as: SUPPORT });
+    eq(r.status, 403, `${Object.keys(body)[0]}:`);
+  }
+  await unchanged(before, "support writes");
+  for (const body of [{ getDocument: "doc_home" }, { listDocuments: true }, { listHistory: "doc_home" }]) eq((await api(body, { as: SUPPORT })).status, 200, `${Object.keys(body)[0]} read:`);
+  eq((await api({ listDocuments: true }, { as: null })).status, 401, "signed out:");
+});
+
+await t("API: a mixed payload gives 400 before anything is authorized or written, for every role", async () => {
+  const before = await dump();
+  for (const as of [SUPPORT, OWNER]) {
+    for (const body of [
+      { getDocument: "doc_home", saveDraft: { id: "doc_home", body: made.home.body }, revision: made.home.revision },
+      { listHistory: "doc_home", archive: made.post.id, revision: 1 },
+      { saveDraft: { id: "doc_home", body: made.home.body }, block: "hero", value: {}, revision: 1 },
+    ]) {
+      const r = await api(body, { as });
+      eq(r.status, 400, `mixed ${Object.keys(body).join("+")}:`);
+      ok(["AMBIGUOUS_OPERATION", "UNKNOWN_OPERATION"].includes(r.body.code), `code ${r.body.code}:`);
+    }
+  }
+  for (const [body, code] of [[{}, "NO_OPERATION"], [null, "NO_OPERATION"], [{ revision: 2 }, "NO_OPERATION"], [{ saveDraft: { id: "doc_home" } }, "MALFORMED"], [{ saveDraft: { id: "doc_home", body: [] } }, "MALFORMED"], [{ archive: "doc_x", revision: "2" }, "MALFORMED"], [{ publish: "doc_home" }, "UNKNOWN_OPERATION"]]) {
+    eq(parseDocumentsOperation(body).code, code, `${JSON.stringify(body)}:`);
+    eq((await api(body)).status, 400, `${JSON.stringify(body)} answers 400:`);
+  }
+  await unchanged(before, "mixed payloads");
+});
+
+await t("API: a legacy-mode tenant gets 409 STORE_USES_LEGACY on writes (also with no revision) and 200 on reads", async () => {
+  const before = await dump("legacy");
+  for (const body of [...WRITE_BODIES(), { archive: "doc_home" }]) {
+    const r = await api(body, { store: "legacy" });
+    eq([r.status, r.body.code], [409, "STORE_USES_LEGACY"], `${Object.keys(body)[0]}:`);
+    ok(r.body.error && !/STORE_USES|legacy mode|cms_state/i.test(r.body.error), `plain words: ${r.body.error}`);
+  }
+  await unchanged(before, "legacy writes", "legacy");
+  const list = await api({ listDocuments: true }, { store: "legacy" });
+  eq([list.status, list.body.documents], [200, []], "list:");
+  eq((await api({ getDocument: "doc_home" }, { store: "legacy" })).status, 404, "a document that isn't there:");
+  eq((await api({ listHistory: "doc_home" }, { store: "legacy" })).status, 404, "history of one that isn't there:");
+  // migrating is not documents
+  await raw.legacy.execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
+  eq((await api({ createDocument: { type: "home" } }, { store: "legacy" })).body.code, "STORE_USES_LEGACY", "migrating:");
+  await raw.legacy.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
+});
+
+await t("API: a cms_state that can't be read is a 5xx on writes, never a go-ahead", async () => {
+  await raw.legacy.executeMultiple("ALTER TABLE cms_state RENAME TO cms_state_data; CREATE VIEW cms_state AS SELECT * FROM cms_state_gone;");
+  try {
+    const r = await api({ createDocument: { type: "home" } }, { store: "legacy" });
+    ok(r.status >= 500, `status ${r.status}:`);
+    ok(!("issues" in r.body), "never a validation list:");
+    eq((await sql("SELECT count(*) AS n FROM documents", [], "legacy"))[0].n, 0, "nothing written:");
+  } finally {
+    await raw.legacy.executeMultiple("DROP VIEW cms_state; ALTER TABLE cms_state_data RENAME TO cms_state;");
+  }
+});
+
+await t("no issue text reaching the API matches /Section \\d+ \\(/ (as sent, and as the editor words it)", async () => {
+  // a body with several problems at once, so there is plenty to read
+  const r = await save("doc_home", made.home.revision, { ...made.home.body, sections: [R.newSection("banner", { id: "sec_bn9" }), R.newSection("hero", { id: "sec_h2" }), R.newSection("hero", { id: "sec_h3" }), { id: "sec_x9", kind: "carousel", v: 1 }] });
+  eq(r.status, 422, "a body with structure problems:");
+  ok(r.body.issues.length >= 4, `every issue, not the first: ${JSON.stringify(r.body.issues.map((i) => i.code))}`);
+  ok(SEEN_ISSUES.length >= 8 && ["incomplete", "error"].every((s) => SEEN_ISSUES.some((i) => i.severity === s)), `issues seen: ${SEEN_ISSUES.length}`);
+  for (const i of SEEN_ISSUES) {
+    ok(!/Section \d+ \(/.test(i.message), `message: ${i.message}`);
+    ok(!/Section \d+ \(/.test(issueText(i)), `worded: ${issueText(i)}`);
+  }
+});
+
+// --- the write guard -----------------------------------------------------------------------
+console.log("— one writer");
+const WRITE_RE = /\b(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE|DELETE\s+FROM|REPLACE\s+INTO)\s+["'`]?(documents|document_versions|publish_log)\b|\b(?:insertInto|updateTable|deleteFrom|replaceInto)\(\s*["'`](documents|document_versions|publish_log)["'`]/i;
+export function writesOutsideService(files) {
+  return files.filter(({ path, text }) => !path.startsWith("lib/documents/") && WRITE_RE.test(text)).map((f) => f.path);
+}
+await t("a scan finds no INSERT, UPDATE or DELETE on documents, document_versions or publish_log outside lib/documents/ (test files allowlisted)", async () => {
+  const files = [];
+  const walk = async (dir) => {
+    for (const e of await readdir(join(ROOT, dir), { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) {
+        if (!["node_modules", ".next"].includes(e.name)) await walk(p);
+      } else if (/\.(m?js|jsx|ts|tsx|sql)$/.test(e.name)) files.push({ path: p, text: await readFile(join(ROOT, p), "utf8") });
+    }
+  };
+  for (const d of ["lib", "app", "components", "scripts", "migrations"]) await walk(d);
+  ok(files.length > 100, `files scanned: ${files.length}`);
+  ok(files.some((f) => f.path === "lib/documents/service.js"), "the service is in the scan:");
+  const allowed = (p) => /^scripts\/test-[\w.-]+\.js$/.test(p);
+  const found = writesOutsideService(files).filter((p) => !allowed(p));
+  eq(found, [], "writers outside lib/documents/:");
+  // the scan itself bites: each of these shapes is caught
+  for (const text of ['await db.execute("UPDATE documents SET draft = 1")', "INSERT INTO document_versions (id) VALUES (1)", 'db.deleteFrom("publish_log")', "await db.updateTable('documents')", "INSERT OR REPLACE INTO documents VALUES (1)"]) {
+    eq(writesOutsideService([{ path: "lib/cms/x.js", text }]), ["lib/cms/x.js"], `caught: ${text}`);
+  }
+  eq(writesOutsideService([{ path: "lib/cms/x.js", text: 'SELECT * FROM documents; db.selectFrom("documents")' }]), [], "reads are fine:");
+});
+
+console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);
+for (const c of Object.values(raw)) c.close();
+await cleanup();
+process.exit(fail ? 1 : 0);

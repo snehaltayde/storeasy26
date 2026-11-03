@@ -74,6 +74,9 @@ const FILES = {
   // P1-FIX-C: the offer go-back route (c513d27)
   offers: ".test-failmatrix-offers.db",
   nooffers: ".test-failmatrix-nooffers.db",
+  // P2-DOCS: a store on the new editor (cms_state 'documents'), for the
+  // documents API rows
+  docs: ".test-failmatrix-docs.db",
 };
 const dbs = [".test-failmatrix-default.db", ".test-failmatrix-platform.db", ...Object.values(FILES)];
 const cleanup = async () => {
@@ -91,6 +94,8 @@ const Id = await import("../lib/platform/identity.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { handleStorefrontGet, handleStorefrontPut } = await import("../lib/admin/cms-api.js");
 const { handleReleasesGet, handleReleasesPost } = await import("../lib/admin/releases-api.js");
+const { handleDocumentsPut } = await import("../lib/admin/documents-api.js");
+const DocsService = await import("../lib/documents/service.js");
 const { previewToken } = await import("../lib/releases.js");
 const { setBlock } = await import("../lib/cms/store.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
@@ -255,6 +260,9 @@ const breakColumn = async (c, table, column, { drop = null } = {}) => {
   const no = await build(FILES.nooffers);
   await no.execute({ sql: "INSERT INTO offers (id, type, label, enabled, config, previous_config, created_at, updated_at) VALUES ('o-prev', 'COUPON', 'Coupon', 1, ?, ?, 'x', 'x')", args: [JSON.stringify(coupon("NEW15")), snap(coupon("OLD10"))] });
   await breakReads(no, "offers");
+  // P2-DOCS: documents mode
+  const dc = await build(FILES.docs);
+  await dc.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
 }
 
 const TENANTS = {
@@ -282,6 +290,7 @@ const TENANTS = {
   apprview: `file:${FILES.apprview}`,
   offers: `file:${FILES.offers}`,
   nooffers: `file:${FILES.nooffers}`,
+  docs: `file:${FILES.docs}`,
   // nothing answers here (undici refuses port 9 at once, then lib/db.js retries)
   down: "http://127.0.0.1:9",
 };
@@ -550,6 +559,83 @@ row("publish", "published, then the panel's refresh fails", () => releases("noap
   const live = await withTenant(T.noappr, async () => (await import("../lib/db.js")).db.selectFrom("release_state").select("live_release_id").where("id", "=", 1).executeTakeFirst());
   eq(live?.live_release_id, r.body.published?.id, "the release really is live:");
 });
+
+// --- the documents API (P2-DOCS) ------------------------------------------------------
+// A write batch the database refuses. Only libsql.batch is broken, and only for
+// a batch carrying a statement that matches, so the reads before it (the
+// document, the version) and the re-read after it still work: the row must
+// then show the write did NOT happen, and the answer must be a 5xx with a code
+// and "nothing was saved", never a 422.
+const failingBatch = async (name, pattern, fn) => {
+  const inst = await withTenant(T[name], async () => (await import("../lib/db.js")).currentDatabase());
+  const send = inst.libsql.batch;
+  let refused = 0;
+  inst.libsql.batch = (stmts, ...rest) => {
+    if ((stmts || []).some((st) => pattern.test(typeof st === "string" ? st : st?.sql || ""))) {
+      refused++;
+      return Promise.reject(Object.assign(new Error("SQLITE_ERROR: disk image is malformed"), { name: "LibsqlError", code: "SQLITE_CORRUPT" }));
+    }
+    return send.call(inst.libsql, stmts, ...rest);
+  };
+  try {
+    const res = await fn();
+    ok(refused > 0, `${name}: the batch was really sent and refused:`);
+    return res;
+  } finally {
+    delete inst.libsql.batch;
+  }
+};
+const documents = (name, body, opts = {}) => withTenant(T[name], () => handleDocumentsPut(request(T[name], { ...opts, body })));
+const docsDump = (name) =>
+  withTenant(T[name], async () => {
+    const { libsql } = await import("../lib/db.js");
+    const out = [];
+    for (const table of ["documents", "document_versions", "publish_log"]) out.push((await libsql.execute(`SELECT * FROM ${table} ORDER BY rowid`)).rows.map((r) => ({ ...r })));
+    return JSON.stringify(out);
+  });
+// One page, with an earlier version to restore.
+const DOCS_PAGE = await withTenant(T.docs, async () => {
+  const { document } = await DocsService.createDocument({ type: "page", meta: { slug: "fm-about", title: "About" }, actor: { kind: "merchant", id: owner.id } });
+  return document;
+});
+const docsNow = () => withTenant(T.docs, () => DocsService.getDocument(DOCS_PAGE.id));
+const unchangedDocs = async (before, label) => eq(await docsDump("docs"), before, `${label}: storage changed:`);
+const withDocsDump = async (fn) => {
+  const before = await docsDump("docs");
+  const res = await fn();
+  res.__before = before;
+  return res;
+};
+const firstVersion = async () => withTenant(T.docs, async () => (await (await import("../lib/db.js")).libsql.execute({ sql: "SELECT id FROM document_versions WHERE document_id = ? ORDER BY rowid LIMIT 1", args: [DOCS_PAGE.id] })).rows[0].id);
+const DOC_WRITE = /^(UPDATE documents|INSERT INTO documents )/;
+row("save", "documents: the database refuses the saveDraft batch", () => withDocsDump(async () => {
+  const d = await docsNow();
+  return failingBatch("docs", DOC_WRITE, () => documents("docs", { saveDraft: { id: d.id, body: { ...d.body, meta: { ...d.body.meta, title: "Typed" } } }, revision: d.revision }));
+}), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" }, (r) => unchangedDocs(r.__before, "saveDraft"));
+row("save", "documents: the database refuses the createDocument batch", () => withDocsDump(() => failingBatch("docs", DOC_WRITE, () => documents("docs", { createDocument: { type: "page", meta: { slug: "fm-new", title: "New" } } }))), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" }, (r) => unchangedDocs(r.__before, "createDocument"));
+row("save", "documents: the database refuses the restoreVersion batch", () => withDocsDump(async () => {
+  const d = await docsNow();
+  const versionId = await firstVersion();
+  return failingBatch("docs", DOC_WRITE, () => documents("docs", { restoreVersion: { id: d.id, versionId }, revision: d.revision }));
+}), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" }, (r) => unchangedDocs(r.__before, "restoreVersion"));
+row("save", "documents: the database doesn't answer", () => documents("down", { saveDraft: { id: "doc_home", body: { schema: 1, type: "home", sections: [] } }, revision: 1 }), { status: 503, code: "DATABASE_UNAVAILABLE", cls: "infrastructure" });
+row("save", "documents: an unknown section kind", async () => {
+  const d = await docsNow();
+  return documents("docs", { saveDraft: { id: d.id, body: { ...d.body, sections: [{ id: "sec_fm1", kind: "carousel", v: 1 }] } }, revision: d.revision });
+}, { status: 422, code: "VALIDATION_FAILED", cls: "validation" }, (r) => eq(r.body.issues.find((i) => i.code === "UNKNOWN_KIND")?.sectionId, "sec_fm1", "names the section:"));
+row("save", "documents: someone else saved first", async () => {
+  const d = await docsNow();
+  return documents("docs", { saveDraft: { id: d.id, body: d.body }, revision: d.revision - 1 });
+}, { status: 409, code: "DOCUMENT_CHANGED", cls: "refusal" }, async (r) => eq(r.body.current?.revision, (await docsNow()).revision, "the current version rides along:"));
+row("save", "documents: another page already has this address", async () => {
+  const d = await docsNow();
+  await withTenant(T.docs, () => DocsService.createDocument({ type: "page", meta: { slug: "fm-taken", title: "Taken page" } }).catch(() => null));
+  return documents("docs", { saveDraft: { id: d.id, body: { ...d.body, meta: { ...d.body.meta, slug: "fm-taken" } } }, revision: d.revision });
+}, { status: 409, code: "SLUG_TAKEN", cls: "refusal" }, (r) => eq(r.body.error, "Another page already uses /fm-taken: Taken page", "names it:"));
+row("save", "documents: no revision sent", () => documents("docs", { archive: DOCS_PAGE.id }), { status: 428, code: "REVISION_REQUIRED", cls: "refusal" });
+row("save", "documents: a store still on the current editor", () => documents("ok", { createDocument: { type: "home" } }), { status: 409, code: "STORE_USES_LEGACY", cls: "refusal" });
+row("save", "documents: two operations in one request", () => documents("docs", { getDocument: DOCS_PAGE.id, archive: DOCS_PAGE.id, revision: 1 }), { status: 400, code: "AMBIGUOUS_OPERATION", cls: "refusal" });
+row("save", "documents: read-only role (support)", () => documents("docs", { archive: DOCS_PAGE.id, revision: 1 }, { admin: SUPPORT }), { status: 403, cls: "refusal" });
 
 // --- run the matrix ------------------------------------------------------------------
 for (const area of ["save", "load", "preview", "publish"]) {
