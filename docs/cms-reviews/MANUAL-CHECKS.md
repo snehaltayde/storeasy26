@@ -175,6 +175,23 @@ The full list goes to the owner when all six phases are done. Each entry names t
 - [ ] After deploy, look at the closed-store page of a closed glow-kit test store: the "Scheduled maintenance" label should be easy to read on the light background.
 - [ ] Check that a closed pulse-1 (dark) store's page looks the same as before (the label falls back to accent-400).
 
+## Phase 2, batch 2
+
+### Section and link rules ignore built-in names (P2-REG)
+No owner checks for this item.
+
+### Old editors refuse on new-editor stores, and legacy publishes can't clash (P2-GUARD)
+- [ ] OC-G1 Hosted Turso: two legacy publishes at the same time on a staging store should give one live release and one 'Another publish just went live, review again', with no orphan row in the releases list.
+- [ ] OC-G2 Hosted Turso: schedule a release, then publish by hand just before its time. The scheduled release should be live afterwards.
+- [ ] OC-G3 Before any real store changes mode, MIG-03 must move the mode check into each write's own statement. Today it is a separate check before the write.
+- [ ] OC-G4 Desktop Chrome on the design harness with a test store in documents mode (not run): the Publishing page shows 'This store publishes with the new editor', the sidebar badge shows the dirty count, the Storefront overview shows the note, and every old editor's save shows the plain refusal.
+- [ ] OC-G5 CI's sqld download still needs the owner's approval of its source and checksum. Nothing under .github/ was changed.
+
+### Reused ids, bad builds and missing pages never report success (P2-HARDEN)
+- [ ] CI sqld install step: still needs your approval of the source and checksum (same as P2-ATOM owner check 1). I did not touch .github/; test:publish fails in CI until the step is added.
+- [ ] Hosted Turso on a staging tenant: repeat the P2-ATOM concurrency and lost-answer checks, and once publish a build that reuses another document's version id to confirm it ends failed with nothing written.
+- [ ] Approve the new {failed} codes (BAD_BUILD, VERSION_ID_CLASH, RELEASE_ID_CLASH, MISSING_DOCUMENT, DB_REFUSED) and the reply mapping suggested in P2-HARDEN.md, then have P2-PLAN.md decision 2 updated before P2-PUBLISH starts (it still names three outcomes).
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
