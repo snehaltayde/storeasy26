@@ -23,6 +23,7 @@ import { headers } from "next/headers";
 import SiteNav from "@/components/site/SiteNav";
 import Link from "next/link";
 import PreviewBridgeMount from "@/components/preview/PreviewBridge";
+import PreviewBanner from "@/components/PreviewBanner";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -122,6 +123,8 @@ async function chromeData() {
         brandCss: brandCssVars(brand ? resolveBrand(brand) : null, { kit: kitAttr(theme) }),
         kitAttr: kitAttr(theme),
         preview: src.preview,
+        // P2-PREVIEW: what a documents preview shows (null on legacy previews)
+        previewOverlay: src.overlay ? { designDirty: src.overlay.designDirty, showDesign: src.overlay.showDesign, otherTab: src.overlay.otherTab } : null,
         footerPages,
         headerVariant: surfaces.header || "standard",
         footerVariant: surfaces.footer || "columns",
@@ -142,6 +145,7 @@ async function chromeData() {
       brandCss: "",
       kitAttr: "pulse-1",
       preview: false,
+      previewOverlay: null,
       footerPages: { about: false, policies: [] },
       headerVariant: "standard",
       footerVariant: "columns",
@@ -262,10 +266,7 @@ export default async function RootLayout({ children }) {
       <body className="flex min-h-full flex-col bg-background text-foreground antialiased">
         {chrome.preview && (
           <div className="bg-purple-700 px-4 py-1.5 text-center text-xs font-semibold text-white">
-            Draft preview — this is NOT what shoppers see.{" "}
-            <a href="/api/preview?exit=1" className="underline">
-              Exit preview
-            </a>
+            <PreviewBanner overlay={chrome.previewOverlay} />
           </div>
         )}
         {/* S54: designer⇄preview bridge — preview mode ONLY, inert unless the
