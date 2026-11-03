@@ -19,6 +19,11 @@ const SUITE_TIMEOUT_MS = Number(process.env.TEST_SUITE_TIMEOUT_MS || 2 * 60_000)
 // test:perf is a measurement. It reports numbers and has nothing to fail on.
 const NOT_A_GATE = new Set(["test:perf"]);
 const BOUNDARY_COMMAND = "node scripts/test-shopify-boundary.js";
+// The gate reads a suite's result from its exit code, so nothing may sit around the
+// suite that changes it (`... || true`).
+const SUITE_COMMAND = /^node scripts\/[\w.-]+\.js$/;
+// How long a suite's output may stay open once its process has gone.
+const DRAIN_MS = 1000;
 
 const args = process.argv.slice(2);
 const unknown = args.filter((a) => a !== "--verbose");
@@ -36,10 +41,13 @@ const problems = [];
 if (!suites.includes("test:shopify-boundary")) problems.push("test:shopify-boundary is missing from package.json");
 // The suite cannot report its own command being weakened (`... || true`), so this does.
 else if (scripts["test:shopify-boundary"] !== BOUNDARY_COMMAND) problems.push(`test:shopify-boundary must be exactly: ${BOUNDARY_COMMAND}`);
-// A suite file with no test:* script would silently never run.
-const commands = Object.values(scripts).join("\n");
+for (const [name, command] of Object.entries(scripts)) {
+  if (name.startsWith("test:") && !SUITE_COMMAND.test(command)) problems.push(`${name} must be: node scripts/<file>.js`);
+}
+// A suite file that no gated test:* script runs would silently never run.
+const commands = new Set(suites.map((name) => scripts[name]));
 for (const file of await readdir(join(ROOT, "scripts"))) {
-  if (/^test-.*\.js$/.test(file) && !commands.includes(`scripts/${file}`)) {
+  if (/^test-.*\.js$/.test(file) && !commands.has(`node scripts/${file}`)) {
     problems.push(`scripts/${file} has no test:* script in package.json, so it would never run`);
   }
 }
@@ -86,17 +94,38 @@ function runSuite(name) {
     collect(child.stderr, process.stderr);
 
     let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      killRunning();
-    }, SUITE_TIMEOUT_MS);
-
+    let finished = false;
+    let drain = null;
     const finish = (code, spawnError) => {
+      if (finished) return;
+      finished = true;
       clearTimeout(timer);
+      clearTimeout(drain);
       running = null;
       resolve({ name, ok: code === 0 && !timedOut && !spawnError, code, timedOut, spawnError, ms: Date.now() - started, output });
     };
+    // `close` waits for everything holding the output pipes, and a child that left
+    // the process group survives the kill. So once the suite's own process has gone
+    // (or been killed), its output gets DRAIN_MS and then the run moves on.
+    const drainThenFinish = (code) => {
+      drain ??= setTimeout(() => {
+        killRunning();
+        child.stdout.destroy();
+        child.stderr.destroy();
+        finish(code);
+      }, DRAIN_MS);
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killRunning();
+      drainThenFinish(null);
+    }, SUITE_TIMEOUT_MS);
+
     child.on("error", (e) => finish(null, e.message));
+    child.on("exit", (code) => {
+      clearTimeout(timer);
+      drainThenFinish(code);
+    });
     child.on("close", (code) => finish(code));
   });
 }

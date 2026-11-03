@@ -69,8 +69,11 @@ banner is `position:fixed` (no CLS). Re-run Lighthouse after major UI changes.
 measurement), one at a time, prints one line per suite, shows the output of any
 that failed and exits non-zero. It takes about 25 seconds. It needs no secrets
 and no network. A suite stuck for 2 minutes is stopped and counted as failed
-(`TEST_SUITE_TIMEOUT_MS` changes that). A `scripts/test-*.js` file with no
-`test:*` script fails the run, because it would otherwise never run.
+(`TEST_SUITE_TIMEOUT_MS` changes that), even if it started a background process
+that keeps its output open. A `scripts/test-*.js` file that no `test:*` script
+runs fails the run, because it would otherwise never run. So does a `test:*`
+script that is anything other than exactly `node scripts/<file>.js`, because
+something like `|| true` would hide a failure.
 
 - **On push:** `.github/workflows/test.yml` runs `pnpm test`. It does nothing
   until this repo is pushed to GitHub.

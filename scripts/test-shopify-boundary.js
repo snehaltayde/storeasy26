@@ -2,16 +2,18 @@
 // written back to Shopify. Only orders and admin data go there.
 //   node scripts/test-shopify-boundary.js          (pnpm test:shopify-boundary)
 //
-// Two halves. Source scans read every file in lib, app, components and scripts
+// Three parts. Source scans read every file in lib, app, components and scripts
 // for mutations, Admin REST calls, OAuth scopes and Shopify cart links. Payload
 // checks run the real push and cancel code against a fake Shopify and lock what
-// is sent. Fully isolated: throwaway libSQL file, fake transports, no network.
+// is sent. Gate checks run the real hook and a copy of the real test runner on
+// throwaway packages. Fully isolated: temp files, fake transports, no network.
 //
 // This file is the one file the scans skip, because it has to name what it bans.
-import { rm, readFile, readdir, stat } from "node:fs/promises";
+import { rm, readFile, readdir, mkdtemp, mkdir, copyFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, join, relative } from "node:path";
+import { delimiter, dirname, join, relative } from "node:path";
+import { tmpdir } from "node:os";
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -193,10 +195,28 @@ const MUTATION_NAME =
 
 const findMutationNames = (text) => [...text.matchAll(MUTATION_NAME)].map((m) => m[0]);
 
+// The only Shopify Admin endpoints this codebase may call.
+const SHOPIFY_ADMIN_ENDPOINT = /^\/admin\/(?:api\/(?:\$\{[^}]*\}|[\w.-]+)\/graphql\.json|oauth\/(?:access_token|authorize))(?:\?.*)?$/;
+// This app's own console pages, always built on a store's own origin, which is a
+// variable. A URL that spells out http(s):// and its host gets no such allowance.
+const CONSOLE_PAGE = /^\/admin(?:\/(?:login|accept-invite|reset))?(?:\?.*)?$/;
+// Not Shopify: a line the design seed prints to the terminal.
+const NOT_SHOPIFY_URLS = ["http://localhost:3017/admin/login"];
+
 // There is no way to read the HTTP method reliably from source, so any Admin API
-// URL other than graphql.json counts as a REST write until someone reviews it.
+// URL other than graphql.json counts as a REST write until someone reviews it. So
+// does any URL whose path starts at /admin and is not on the lists above, which
+// sees a call whose path arrives as an argument (`https://${d}/admin/${p}`).
 function findAdminRest(text) {
   const hits = [];
+  for (const m of text.matchAll(/https?:\/\/(?:\$\{[^}]*\}|[^\s"'`\/$])*(\/admin(?![\w-])[^\s"'`<]*)/g)) {
+    if (!SHOPIFY_ADMIN_ENDPOINT.test(m[1]) && !NOT_SHOPIFY_URLS.includes(m[0])) hits.push(m[0]);
+  }
+  // After a variable (`${base}/admin/...`) or a join (base + "/admin/..."). With
+  // the origin out of sight, one of the app's own console pages is allowed.
+  for (const m of text.matchAll(/(?:\}|\+\s*["'`])(\/admin(?![\w-])[^\s"'`<]*)/g)) {
+    if (!SHOPIFY_ADMIN_ENDPOINT.test(m[1]) && !CONSOLE_PAGE.test(m[1])) hits.push(m[0]);
+  }
   for (const m of text.matchAll(/\/admin\/api(?![\w-])/g)) {
     const rest = text.slice(m.index + m[0].length, m.index + m[0].length + 80);
     if (!/^\/(?:\$\{[^}]*\}|[\w.-]+)\/graphql\.json/.test(rest)) hits.push(`${m[0]}${rest.split(/[\s"'`]/)[0]}`);
@@ -222,7 +242,7 @@ function findShopifyCartLinks(text) {
 }
 
 const WRITE_SCOPE_TOKEN = /\b(?:unauthenticated_|customer_)?write_[a-z_]+\b/g;
-const SCOPE_AT_STRING_START = /["'`](?:unauthenticated_|customer_)?(?:read|write)_[a-z_]+(?:,|["'`])/g;
+const READ_SCOPE_TOKEN = /\b(?:unauthenticated_|customer_)?read_[a-z_]+\b/g;
 
 const files = await sourceFiles();
 const prodFiles = files.filter((f) => !/^scripts\/test-/.test(f.path));
@@ -283,8 +303,22 @@ await t("SHOP-01: scanners catch what they must and ignore prose", async () => {
   ok(findAdminRest("const ADMIN_API = () => `https://${shop}/admin/api`;").length, "base URL with no trailing slash");
   ok(findAdminRest("fetch(`https://${shop}/admin/products/1.json`)").length, "unversioned REST");
   ok(findAdminRest("fetch(`https://${shop}/admin/oauth/access_scopes.json`)").length, "other oauth endpoint");
+  ok(findAdminRest("const url = (d, p) => `https://${d}/admin/${p}`;").length, "path passed in as an argument");
+  ok(findAdminRest("fetch(`https://${d}/admin/products/1`, { method: 'PUT', headers })").length, "no .json, no api");
+  ok(findAdminRest("fetch(`http://x.myshopify.com/admin`)").length, "literal host, bare /admin");
+  ok(findAdminRest("fetch(`https://${d}/admin/login`)").length, "a spelled-out host gets no console allowance");
+  ok(findAdminRest("fetch(`${base}/admin/${p}`)").length, "origin in a variable");
+  ok(findAdminRest("fetch(`${proto}://${d}/admin/products/1`)").length, "scheme in a variable");
+  ok(findAdminRest("fetch('https://' + d + '/admin/' + p)").length, "joined with +");
+  ok(findAdminRest("fetch(base + '/admin/products/1')").length, "joined to a variable");
+  ok(findAdminRest("fetch(`https://${d}/admin/api/${v}/graphql.json${x}`)").length, "more after graphql.json");
   eq(findAdminRest("`https://${storeDomain()}/admin/api/${API_VERSION()}/graphql.json`"), [], "graphql.json:");
   eq(findAdminRest("`https://${d}/admin/oauth/access_token` `https://${d}/admin/oauth/authorize?x=1` href='/admin/orders' href='/admin/api-keys'"), [], "oauth + console paths:");
+  eq(findAdminRest('"http://localhost:3017/admin/login" `http://rf1.test/api/admin/refs?${qs}`'), [], "not Shopify:");
+  eq(findAdminRest("`${base}/admin/accept-invite?token=${t}` `${proto}://${host}/admin/reset?token=${t}\\n\\nIf` `${origin}/admin` <code>{origin}/admin/login</code>"), [], "console pages:");
+
+  eq(["'x,read_themes'", '"read_products read_themes"', "`\n  read_themes,\n`", "'unauthenticated_read_checkouts'"].map((s) => s.match(READ_SCOPE_TOKEN).at(-1)), ["read_themes", "read_themes", "read_themes", "unauthenticated_read_checkouts"], "read scopes in a string:");
+  eq("thread_id spread_x already_read".match(READ_SCOPE_TOKEN), null, "ordinary identifiers:");
 
   ok(findShopifyCartLinks("return `https://${domain}/cart/${parts}`;").length, "cart permalink");
   ok(findShopifyCartLinks("`https://x.myshopify.com/cart/123:1`").length, "literal permalink");
@@ -378,12 +412,14 @@ await t("SHOP-01: no other write_* scope is named anywhere in the source", async
   eq(bad.length, 0, `Write scopes not allowed (if this is not a Shopify scope, add it to NOT_SCOPES here):${listIn(bad)}\n   `);
 });
 
+// Where a read scope is named outside the list: a comment and an error message.
+const READ_SCOPE_MENTIONS = ["lib/platform/shopify-webhooks.js: read_orders", "scripts/shopify-mint-token.js: unauthenticated_read_product_listings"];
+
 await t("SHOP-01: there is one scope list in the codebase", async () => {
   const declarations = files.flatMap((f) => [...f.text.matchAll(/\b\w*SCOPES\s*=(?!=)/g)].map((m) => `${f.path}: ${m[0].trim()}`));
   eq(declarations, ["lib/platform/oauth.js: OAUTH_SCOPES ="], "scope list declarations:");
-  const literals = prodFiles.filter((f) => f.path !== "lib/platform/oauth.js" && SCOPE_AT_STRING_START.test(f.text));
-  SCOPE_AT_STRING_START.lastIndex = 0;
-  eq(literals.map((f) => f.path), [], "scope names written as strings outside the list:");
+  const named = prodFiles.filter((f) => f.path !== "lib/platform/oauth.js").flatMap((f) => [...f.text.matchAll(READ_SCOPE_TOKEN)].map((m) => `${f.path}: ${m[0]}`));
+  eq(named.filter((n) => !READ_SCOPE_MENTIONS.includes(n)), [], "Read scopes belong in OAUTH_SCOPES. If this is not a Shopify scope, add it to READ_SCOPE_MENTIONS here. Found:");
   const params = files.flatMap((f) => [...f.text.matchAll(/[?&]scope=([^\s"'`&]*)/g)].map((m) => [f.path, m[1]]));
   eq(sorted(params.map(([p]) => p)), ["lib/platform/oauth.js", "scripts/shopify-oauth.js"], "files building an authorize URL:");
   for (const [path, value] of params) eq(value, "${encodeURIComponent(OAUTH_SCOPES)}", `${path} scope param:`);
@@ -411,21 +447,35 @@ const GIFT_PRODUCT_ID = "gid://shopify/Product/9003";
 const GIFT_VARIANT_ID = "gid://shopify/ProductVariant/9004";
 
 // What the catalog says, deliberately different from what the order froze.
+// Every text column except the ids. A test below holds these lists to the schema.
 const CATALOG_STRINGS = {
+  handle: "CATALOG-HANDLE-SENTINEL",
   title: "CATALOG-TITLE-SENTINEL",
   description: "CATALOG-DESCRIPTION-SENTINEL",
   description_html: "<p>CATALOG-HTML-SENTINEL</p>",
   product_type: "CATALOG-TYPE-SENTINEL",
   vendor: "CATALOG-VENDOR-SENTINEL",
   tags: JSON.stringify(["CATALOG-TAG-SENTINEL"]),
+  currency: "CATALOG-CURRENCY-SENTINEL",
   featured_image: "https://cdn.test/CATALOG-IMAGE-SENTINEL.png",
   featured_image_alt: "CATALOG-ALT-SENTINEL",
+  options: JSON.stringify([{ name: "CATALOG-OPTIONS-SENTINEL", values: ["CATALOG-OPTIONS-SENTINEL"] }]),
+  created_at: "CATALOG-CREATED-SENTINEL",
+  updated_at: "CATALOG-UPDATED-SENTINEL",
+  synced_at: "CATALOG-SYNCED-SENTINEL",
 };
 const CATALOG_VARIANT_STRINGS = {
   title: "CATALOG-VARIANT-TITLE-SENTINEL",
   sku: "CATALOG-SKU-SENTINEL",
+  currency: "CATALOG-VARIANT-CURRENCY-SENTINEL",
+  selected_options: JSON.stringify([{ name: "CATALOG-SELECTED-OPTIONS-SENTINEL", value: "CATALOG-SELECTED-OPTIONS-SENTINEL" }]),
   image_url: "https://cdn.test/CATALOG-VARIANT-IMAGE-SENTINEL.png",
 };
+const CATALOG_IMAGE_STRINGS = {
+  url: "https://cdn.test/CATALOG-GALLERY-IMAGE-SENTINEL.png",
+  alt: "CATALOG-GALLERY-ALT-SENTINEL",
+};
+const CATALOG_IDS = { products: ["id"], variants: ["id", "product_id"], product_images: ["id", "product_id"] };
 // What the cart froze on the order.
 const ORDER_STRINGS = {
   title: "ORDER-TITLE-SENTINEL",
@@ -451,7 +501,7 @@ async function seedOverlay() {
 const sentinelOf = (s) => /[A-Z-]+-SENTINEL|order-handle-sentinel/.exec(s)[0];
 const CONTENT_THAT_MUST_NOT_REACH_SHOPIFY = [
   OVERLAY_TITLE,
-  ...[...Object.values(CATALOG_STRINGS), ...Object.values(CATALOG_VARIANT_STRINGS), ...Object.values(ORDER_STRINGS)].map(sentinelOf),
+  ...[...Object.values(CATALOG_STRINGS), ...Object.values(CATALOG_VARIANT_STRINGS), ...Object.values(CATALOG_IMAGE_STRINGS), ...Object.values(ORDER_STRINGS)].map(sentinelOf),
 ];
 
 const CART = {
@@ -584,9 +634,19 @@ await t("SHOP-02: content on the snapshot (title, handle, image, sku, catalog_ti
   }
 });
 
-await t("SHOP-02: through the real push, a catalog title different from the order title appears nowhere", async () => {
-  await db.insertInto("products").values({ id: PRODUCT_ID, handle: "boundary-product", available: 1, ...CATALOG_STRINGS }).execute();
+await t("SHOP-02: the push test below seeds every text column of the catalog tables", async () => {
+  const seeded = { products: CATALOG_STRINGS, variants: CATALOG_VARIANT_STRINGS, product_images: CATALOG_IMAGE_STRINGS };
+  for (const [table, strings] of Object.entries(seeded)) {
+    const { rows } = await libsql.execute(`PRAGMA table_info(${table})`);
+    const text = rows.filter((c) => c.type === "TEXT").map((c) => c.name);
+    eq(sorted(text.filter((c) => !CATALOG_IDS[table].includes(c))), sorted(Object.keys(strings)), `${table} text columns:`);
+  }
+});
+
+await t("SHOP-02: through the real push, no catalog text and no order content appears anywhere", async () => {
+  await db.insertInto("products").values({ id: PRODUCT_ID, available: 1, ...CATALOG_STRINGS }).execute();
   await db.insertInto("variants").values({ id: VARIANT_ID, product_id: PRODUCT_ID, available: 1, ...CATALOG_VARIANT_STRINGS }).execute();
+  await db.insertInto("product_images").values({ id: `${PRODUCT_ID}::img::0`, product_id: PRODUCT_ID, ...CATALOG_IMAGE_STRINGS }).execute();
   await seedOverlay();
   ok(CATALOG_STRINGS.title !== ORDER_STRINGS.title, "the fixture must have two different titles");
 
@@ -614,6 +674,7 @@ const MERCHANT_TEXT_ROUTES = {
   "shipping title": { path: "shippingLine.title", from: "the shipping label, which can carry a merchant's zone label" },
   note: { path: "note", from: "a fixed sentence with our order id, which carries the store's order-id prefix" },
   tags: { path: "tags[]", from: "a fixed tag and our order id" },
+  "order id attribute": { path: "customAttributes[].value", from: "our order id on bl_order_id, with the store's order-id prefix. The other attributes are a fixed string, an amount and payment ids" },
 };
 const CANCEL_STAFF_NOTE = { variable: "staffNote", from: "the reason typed when cancelling an order" };
 
@@ -625,7 +686,6 @@ const FIXED_PATHS = [
   "appliedDiscount.value",
   "appliedDiscount.valueType",
   "customAttributes[].key",
-  "customAttributes[].value",
   "lineItems[].appliedDiscount.description",
   "lineItems[].appliedDiscount.title",
   "lineItems[].appliedDiscount.value",
@@ -655,8 +715,8 @@ await t("SHOP-04: an empty array or object still gets a path", async () => {
   eq(wireLeaves({ a: [], b: {}, c: [{ d: [] }] }).map((l) => l.path), ["a[]", "b", "c[].d[]"], "paths:");
 });
 
-await t("SHOP-04: the route list names all six: discount description and title, shipping title, note, tags, cancel staff note", async () => {
-  eq(Object.keys(MERCHANT_TEXT_ROUTES).sort(), ["discount description", "discount title", "note", "shipping title", "tags"], "draft order routes:");
+await t("SHOP-04: the route list names the spec's six (discount description and title, shipping title, note, tags, cancel staff note) and the order id attribute", async () => {
+  eq(Object.keys(MERCHANT_TEXT_ROUTES).sort(), ["discount description", "discount title", "note", "order id attribute", "shipping title", "tags"], "draft order routes:");
   eq(CANCEL_STAFF_NOTE.variable, "staffNote", "cancel route:");
 });
 
@@ -675,11 +735,37 @@ await t("SHOP-04: a field behind a value the order does not have yet fails here 
   eq(sorted(unknownReads), [], READS_UNKNOWN);
 });
 
-await t("SHOP-04: a real order's draft (COD, nothing optional) holds no unknown field either", async () => {
+// The checks above read what the builder returns. These read what the fake Shopify
+// received from the real push, so anything added between the builder and the send
+// fails too. The sent draft must equal the builder's, which carries those checks over.
+function checkRealPush({ order, gql, pending, attributeKeys }) {
+  eq(gql.calls.map((c) => Object.keys(c.variables).sort()), [["q"], ["input"], ["id", "pending"]], "variables of find, create, complete:");
+  eq(gql.calls[0].variables.q, `tag:'${order.id}'`, "find:");
+  eq(gql.calls[2].variables, { id: "gid://shopify/DraftOrder/1", pending }, "complete:");
+  const { input } = gql.calls[1].variables;
+  const found = sorted(wireLeaves(input).map((l) => l.path));
+  eq(found.filter((p) => !KNOWN_PATHS.includes(p)), [], "New field sent to Shopify. Decide whether it is order data, then name it in this test:");
+  eq(input.customAttributes.map((a) => a.key).sort(), attributeKeys, "custom attribute keys on the wire:");
+  eq(input, P.buildDraftOrderInput(order), "the draft sent is the draft the builder returned:");
+  return found;
+}
+
+await t("SHOP-04: through the real push, a paid order sends only known fields and variables", async () => {
+  const id = await seedOrder();
+  const gql = fakeShopify();
+  const r = await P.pushOrderToShopify(id, { gql });
+  ok(r.ok, `push failed: ${JSON.stringify(r)}`);
+  const attributeKeys = ["bl_order_id", "captured_amount_inr", "channel", "razorpay_order_id", "razorpay_payment_id"];
+  const found = checkRealPush({ order: await O.getOrder(id), gql, pending: false, attributeKeys });
+  eq(found, sorted(KNOWN_PATHS), "every known field still sent:");
+});
+
+await t("SHOP-04: through the real push, a COD order with nothing optional sends only known fields and variables", async () => {
   const id = await seedOrder({ method: "cod", cart: { ...CART, gifts: [], appliedOffers: [], discountTotal: 0, total: 2000 } });
-  const order = await O.getOrder(id);
-  const unknown = sorted(wireLeaves(P.buildDraftOrderInput(order)).map((l) => l.path)).filter((p) => !KNOWN_PATHS.includes(p));
-  eq(unknown, [], "unknown fields:");
+  const gql = fakeShopify(2000);
+  const r = await P.pushOrderToShopify(id, { gql });
+  ok(r.ok, `push failed: ${JSON.stringify(r)}`);
+  checkRealPush({ order: await O.getOrder(id), gql, pending: true, attributeKeys: ["bl_order_id", "captured_amount_inr", "channel"] });
 });
 
 await t("SHOP-04: each piece of merchant text reaches Shopify only through its named field", async () => {
@@ -703,7 +789,7 @@ await t("SHOP-04: each piece of merchant text reaches Shopify only through its n
   eq(whereIs(OFFER), [MERCHANT_TEXT_ROUTES["discount description"].path], "offer label:");
   eq(whereIs(STORE), [MERCHANT_TEXT_ROUTES["discount title"].path], "store name:");
   eq(whereIs(SHIP), [MERCHANT_TEXT_ROUTES["shipping title"].path], "shipping label:");
-  eq(whereIs(PREFIX), sorted(["note", "tags[]", "customAttributes[].value"]), "order id:");
+  eq(whereIs(PREFIX), sorted(["note", "tags", "order id attribute"].map((r) => MERCHANT_TEXT_ROUTES[r].path)), "order id:");
   eq(input.tags, ["storeasy26", `${PREFIX}-1`], "tags are the fixed tag and the order id:");
   eq(input.customAttributes.map((a) => a.key).sort(), ["bl_order_id", "captured_amount_inr", "channel", "razorpay_order_id", "razorpay_payment_id"], "custom attribute keys:");
 });
@@ -775,10 +861,14 @@ await t("SHOP-03: no Shopify cart or checkout link in lib, app, components", asy
 // ===========================================================================
 // SHOP-06: the check is wired up
 // ===========================================================================
-await t("SHOP-06: pnpm test, the workflow and the hook all reach this suite, and nothing turns them off", async () => {
+await t("SHOP-06: pnpm test, the workflow and the hook name this suite, and their text has no off switch", async () => {
   const pkg = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
   eq(pkg.scripts.test, "node scripts/run-tests.js", "test script:");
   eq(pkg.scripts["test:shopify-boundary"], "node scripts/test-shopify-boundary.js", "suite script:");
+  const weakened = Object.entries(pkg.scripts).filter(([name, cmd]) => name.startsWith("test:") && !/^node scripts\/[\w.-]+\.js$/.test(cmd));
+  eq(weakened, [], "every test:* command must be exactly node scripts/<file>.js:");
+  const runner = await readFile(join(ROOT, "scripts/run-tests.js"), "utf8");
+  ok(runner.includes('const NOT_A_GATE = new Set(["test:perf"]);'), "only test:perf is left out of the gate");
 
   // Comment lines first: a line that has been commented out runs nothing.
   const code = (text) => text.split("\n").filter((line) => !/^\s*#/.test(line)).join("\n");
@@ -786,13 +876,140 @@ await t("SHOP-06: pnpm test, the workflow and the hook all reach this suite, and
   const workflow = code(await readFile(join(ROOT, ".github/workflows/test.yml"), "utf8"));
   ok(/^on:\n  push:\n  workflow_dispatch: \{\}$/m.test(workflow), "the workflow runs on every push");
   ok(/^\s*- run: pnpm test\s*$/m.test(workflow), "the workflow runs pnpm test");
-  eq([...workflow.matchAll(/^[\s-]*(if|continue-on-error):/gm)].map((m) => m[1]), [], "switches that skip the gate or ignore its failure:");
+  eq([...workflow.matchAll(/^[\s-]*["']?(if|continue-on-error)["']?\s*:/gm)].map((m) => m[1]), [], "switches that skip the gate or ignore its failure:");
 
   const hook = code(await readFile(join(ROOT, ".githooks/pre-commit"), "utf8"));
   ok(/^pnpm test\nstatus=\$\?$/m.test(hook), "the hook runs pnpm test and keeps its result");
   ok(hook.trimEnd().endsWith('exit "$status"'), 'the hook ends with exit "$status"');
   eq([...hook.matchAll(/\bexit\b.*/g)].map((m) => m[0]), ["exit 1", 'exit "$status"'], "the hook's exits:");
-  ok(((await stat(join(ROOT, ".githooks/pre-commit"))).mode & 0o111) !== 0, "the hook is executable");
+});
+
+// Runs the real hook with a stand-in pnpm first on PATH, so nothing recurses.
+async function runHook(pnpmExit) {
+  const dir = await mkdtemp(join(tmpdir(), "boundary-hook-"));
+  try {
+    const log = join(dir, "calls");
+    await writeFile(log, "");
+    await writeFile(join(dir, "pnpm"), `#!/bin/sh\necho "$*" >> "$STUB_PNPM_LOG"\nexit ${pnpmExit}\n`, { mode: 0o755 });
+    const { GIT_DIR, GIT_INDEX_FILE, GIT_WORK_TREE, ...env } = process.env;
+    const r = spawnSync(join(ROOT, ".githooks/pre-commit"), [], {
+      cwd: ROOT,
+      env: { ...env, PATH: `${dir}${delimiter}${env.PATH}`, STUB_PNPM_LOG: log },
+      encoding: "utf8",
+    });
+    return { status: r.status, stderr: r.stderr, calls: await readFile(log, "utf8") };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+await t("SHOP-06: the hook runs pnpm test and stops the commit when it fails", async () => {
+  const failed = await runHook(3);
+  eq(failed.calls, "test\n", "what the hook ran:");
+  eq(failed.status, 3, "hook exit when pnpm test fails:");
+  ok(failed.stderr.includes("Commit stopped"), `expected the stop message, got: ${failed.stderr.slice(0, 200)}`);
+  const passed = await runHook(0);
+  eq(passed.calls, "test\n", "what the hook ran:");
+  eq(passed.status, 0, "hook exit when pnpm test passes:");
+});
+
+// Runs a copy of the real runner over a small package of its own, through the real
+// pnpm, as the gate does.
+const PASSES = "";
+async function runGate({ scripts = {}, suites = {}, env = {} } = {}) {
+  const dir = await mkdtemp(join(tmpdir(), "boundary-gate-"));
+  try {
+    await mkdir(join(dir, "scripts"));
+    await copyFile(join(ROOT, "scripts/run-tests.js"), join(dir, "scripts/run-tests.js"));
+    for (const [file, text] of Object.entries({ "test-shopify-boundary.js": PASSES, ...suites })) {
+      await writeFile(join(dir, "scripts", file), text);
+    }
+    const allScripts = { "test:shopify-boundary": "node scripts/test-shopify-boundary.js", ...scripts };
+    await writeFile(join(dir, "package.json"), JSON.stringify({ name: "gate-fixture", private: true, type: "module", scripts: allScripts }));
+    const started = Date.now();
+    const r = spawnSync(process.execPath, ["scripts/run-tests.js"], {
+      cwd: dir,
+      env: { ...process.env, TEST_SUITE_TIMEOUT_MS: "60000", ...env },
+      encoding: "utf8",
+    });
+    return { status: r.status, output: r.stdout + r.stderr, ms: Date.now() - started };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+await t("SHOP-06: the runner exits non-zero when a suite fails, this one included", async () => {
+  const r = await runGate({
+    scripts: { "test:other": "node scripts/test-other.js" },
+    suites: { "test-shopify-boundary.js": "console.log('BOUNDARY-OUTPUT');\nprocess.exit(1);\n", "test-other.js": PASSES },
+  });
+  eq(r.status, 1, `exit code, output:\n${r.output}\n`);
+  ok(r.output.includes("1 of 2 suites passed"), r.output);
+  ok(r.output.includes("Failed: test:shopify-boundary\n"), r.output);
+  ok(r.output.includes("BOUNDARY-OUTPUT"), "shows the failed suite's output");
+});
+
+await t("SHOP-06: the runner refuses a weakened suite command, and a suite file no gated script runs", async () => {
+  const suites = { "test-zz.js": "process.exit(1);\n" };
+  const refused = async (scripts, message) => {
+    const r = await runGate({ scripts, suites });
+    eq(r.status, 1, `${JSON.stringify(scripts)} exit code, output:\n${r.output}\n`);
+    ok(r.output.includes(message), r.output);
+    ok(!r.output.includes("Running"), "refused before any suite ran");
+  };
+  const BAD_COMMAND = "must be: node scripts/<file>.js";
+  await refused({ "test:zz": "node scripts/test-zz.js || true" }, BAD_COMMAND);
+  await refused({ "test:zz": "FOO=1 node scripts/test-zz.js" }, BAD_COMMAND);
+  await refused({ "test:zz": "true" }, BAD_COMMAND);
+  const NOT_RUN = "scripts/test-zz.js has no test:* script";
+  await refused({ "zz:helper": "node scripts/test-zz.js" }, NOT_RUN);
+  await refused({ "test:perf": "node scripts/test-zz.js" }, NOT_RUN);
+  await refused({}, NOT_RUN);
+});
+
+// A suite that starts a process in its own group, which holds the suite's output
+// pipes after everything the runner can kill has gone. It writes down the pid so
+// the test can clean up. The sleep outlasts the limits asserted below.
+const HOLDER_SECONDS = 30;
+const HOLDER = `
+import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+const child = spawn("sleep", ["${HOLDER_SECONDS}"], { detached: true, stdio: "inherit" });
+child.unref();
+writeFileSync(process.env.HOLDER_PID_FILE, String(child.pid));
+`;
+async function runGateWithHolder(suiteBody, env = {}) {
+  const dir = await mkdtemp(join(tmpdir(), "boundary-holder-"));
+  const pidFile = join(dir, "pid");
+  try {
+    return await runGate({
+      scripts: { "test:holder": "node scripts/test-holder.js" },
+      suites: { "test-holder.js": HOLDER + suiteBody },
+      env: { HOLDER_PID_FILE: pidFile, ...env },
+    });
+  } finally {
+    const pid = Number(await readFile(pidFile, "utf8").catch(() => 0));
+    if (pid) {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {}
+    }
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+await t("SHOP-06: a suite that exits leaving a detached child on its output does not hold up the runner", async () => {
+  const r = await runGateWithHolder("");
+  eq(r.status, 0, `exit code, output:\n${r.output}\n`);
+  ok(r.output.includes("2 of 2 suites passed"), r.output);
+  ok(r.ms < (HOLDER_SECONDS - 10) * 1000, `took ${r.ms}ms, so it waited for the child`);
+});
+
+await t("SHOP-06: a stuck suite is stopped at its limit, even with a detached child on its output", async () => {
+  const r = await runGateWithHolder("setInterval(() => {}, 1000);\n", { TEST_SUITE_TIMEOUT_MS: "2000" });
+  eq(r.status, 1, `exit code, output:\n${r.output}\n`);
+  ok(r.output.includes("stopped after 2.0s without finishing"), r.output);
+  ok(r.ms < (HOLDER_SECONDS - 10) * 1000, `took ${r.ms}ms, so it waited for the child`);
 });
 
 // ----------------------------------------------------------------------------
