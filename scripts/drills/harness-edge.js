@@ -8,8 +8,9 @@
 // It switches maintenance on through the operator console and always switches
 // it off again before it ends. Checks marked known are expected to fail until
 // an app bug outside the harness is fixed (P1-HARNESS finding 5: a closed store
-// still ships its content in the page source; finding 6: checkout scrolls
-// sideways at 375). They are reported but don't fail the drill.
+// still ships its content in the page source). They are reported but don't
+// fail the drill. (Finding 6, checkout scrolling sideways at 375, is fixed:
+// its marker is gone, so a sideways scroll there fails the drill again.)
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -151,8 +152,7 @@ export default async function harnessEdge(drill) {
   const cartJson = await cartGet.json().catch(() => ({}));
   drill.check(cartGet.status() === 200 && (cartJson.items || []).some((i) => i.title?.includes(PRODUCT)), "cart: GET /api/cart answers 200 and holds the product", cartGet.status());
   drill.check(edgeFunctionInDev(root, "/api/cart/route"), "cart: Next compiled /api/cart as an edge function (.next/dev/server/app/api/cart/route/middleware-manifest.json)");
-  // Finding 6: the checkout step row doesn't wrap, so a phone-width checkout scrolls sideways.
-  const checkout = { name: "checkout", path: "/checkout", all: ["Contact & shipping address", PRODUCT], knownOverflow: { 375: "finding 6" } };
+  const checkout = { name: "checkout", path: "/checkout", all: ["Contact & shipping address", PRODUCT] };
   for (const width of [1440, 768, 375]) await pageCheck(drill, page, checkout, { width });
   drill.check(!errors.console.length && !errors.page.length, "storefront: no console errors or page errors on any page above", [...errors.console, ...errors.page].slice(0, 8));
   drill.check(!errors.failed.length && !errors.status.length, "storefront: no failed requests and no 4xx/5xx answers on any page above", [...errors.failed, ...errors.status].slice(0, 8));

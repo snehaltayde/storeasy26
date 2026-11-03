@@ -2,7 +2,7 @@
   "id": "TOK-01-02",
   "part": "repeat",
   "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — repeat",
-  "ranAt": "2026-11-03T14:02:09.967Z",
+  "ranAt": "2026-11-03T14:12:29.318Z",
   "harness": "http://localhost:3204",
   "chrome": "156.0.8078.80",
   "passed": 72,
@@ -11,362 +11,362 @@
   "checks": [
     {
       "ok": true,
-      "label": "after2/seeded: home at 375 answers 200",
+      "label": "after3/seeded: home at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: product at 375 answers 200",
+      "label": "after3/seeded: product at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: collection at 375 answers 200",
+      "label": "after3/seeded: collection at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: collections at 375 answers 200",
+      "label": "after3/seeded: collections at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: search at 375 answers 200",
+      "label": "after3/seeded: search at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: cart-drawer at 375 answers 200",
+      "label": "after3/seeded: cart-drawer at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: cart at 375: Add to cart answers 200",
+      "label": "after3/seeded: cart at 375: Add to cart answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: checkout at 375 answers 200",
+      "label": "after3/seeded: checkout at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: account at 375 answers 200",
+      "label": "after3/seeded: account at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: cms-page at 375 answers 200",
+      "label": "after3/seeded: cms-page at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: not-found at 375 answers 404",
+      "label": "after3/seeded: not-found at 375 answers 404",
       "detail": 404
     },
     {
       "ok": true,
-      "label": "after2/seeded: no page errors at 375",
+      "label": "after3/seeded: no page errors at 375",
       "detail": []
     },
     {
       "ok": true,
-      "label": "after2/seeded: home at 768 answers 200",
+      "label": "after3/seeded: home at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: product at 768 answers 200",
+      "label": "after3/seeded: product at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: collection at 768 answers 200",
+      "label": "after3/seeded: collection at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: collections at 768 answers 200",
+      "label": "after3/seeded: collections at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: search at 768 answers 200",
+      "label": "after3/seeded: search at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: cart-drawer at 768 answers 200",
+      "label": "after3/seeded: cart-drawer at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: cart at 768: Add to cart answers 200",
+      "label": "after3/seeded: cart at 768: Add to cart answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: checkout at 768 answers 200",
+      "label": "after3/seeded: checkout at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: account at 768 answers 200",
+      "label": "after3/seeded: account at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: cms-page at 768 answers 200",
+      "label": "after3/seeded: cms-page at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: not-found at 768 answers 404",
+      "label": "after3/seeded: not-found at 768 answers 404",
       "detail": 404
     },
     {
       "ok": true,
-      "label": "after2/seeded: no page errors at 768",
+      "label": "after3/seeded: no page errors at 768",
       "detail": []
     },
     {
       "ok": true,
-      "label": "after2/seeded: home at 1440 answers 200",
+      "label": "after3/seeded: home at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: product at 1440 answers 200",
+      "label": "after3/seeded: product at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: collection at 1440 answers 200",
+      "label": "after3/seeded: collection at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: collections at 1440 answers 200",
+      "label": "after3/seeded: collections at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: search at 1440 answers 200",
+      "label": "after3/seeded: search at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: cart-drawer at 1440 answers 200",
+      "label": "after3/seeded: cart-drawer at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: cart at 1440: Add to cart answers 200",
+      "label": "after3/seeded: cart at 1440: Add to cart answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: checkout at 1440 answers 200",
+      "label": "after3/seeded: checkout at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: account at 1440 answers 200",
+      "label": "after3/seeded: account at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: cms-page at 1440 answers 200",
+      "label": "after3/seeded: cms-page at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/seeded: not-found at 1440 answers 404",
+      "label": "after3/seeded: not-found at 1440 answers 404",
       "detail": 404
     },
     {
       "ok": true,
-      "label": "after2/seeded: no page errors at 1440",
+      "label": "after3/seeded: no page errors at 1440",
       "detail": []
     },
     {
       "ok": true,
-      "label": "after2/default: home at 375 answers 200",
+      "label": "after3/default: home at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: product at 375 answers 200",
+      "label": "after3/default: product at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: collection at 375 answers 200",
+      "label": "after3/default: collection at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: collections at 375 answers 200",
+      "label": "after3/default: collections at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: search at 375 answers 200",
+      "label": "after3/default: search at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: cart-drawer at 375 answers 200",
+      "label": "after3/default: cart-drawer at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: cart at 375: Add to cart answers 200",
+      "label": "after3/default: cart at 375: Add to cart answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: checkout at 375 answers 200",
+      "label": "after3/default: checkout at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: account at 375 answers 200",
+      "label": "after3/default: account at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: cms-page at 375 answers 200",
+      "label": "after3/default: cms-page at 375 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: not-found at 375 answers 404",
+      "label": "after3/default: not-found at 375 answers 404",
       "detail": 404
     },
     {
       "ok": true,
-      "label": "after2/default: no page errors at 375",
+      "label": "after3/default: no page errors at 375",
       "detail": []
     },
     {
       "ok": true,
-      "label": "after2/default: home at 768 answers 200",
+      "label": "after3/default: home at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: product at 768 answers 200",
+      "label": "after3/default: product at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: collection at 768 answers 200",
+      "label": "after3/default: collection at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: collections at 768 answers 200",
+      "label": "after3/default: collections at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: search at 768 answers 200",
+      "label": "after3/default: search at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: cart-drawer at 768 answers 200",
+      "label": "after3/default: cart-drawer at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: cart at 768: Add to cart answers 200",
+      "label": "after3/default: cart at 768: Add to cart answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: checkout at 768 answers 200",
+      "label": "after3/default: checkout at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: account at 768 answers 200",
+      "label": "after3/default: account at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: cms-page at 768 answers 200",
+      "label": "after3/default: cms-page at 768 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: not-found at 768 answers 404",
+      "label": "after3/default: not-found at 768 answers 404",
       "detail": 404
     },
     {
       "ok": true,
-      "label": "after2/default: no page errors at 768",
+      "label": "after3/default: no page errors at 768",
       "detail": []
     },
     {
       "ok": true,
-      "label": "after2/default: home at 1440 answers 200",
+      "label": "after3/default: home at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: product at 1440 answers 200",
+      "label": "after3/default: product at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: collection at 1440 answers 200",
+      "label": "after3/default: collection at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: collections at 1440 answers 200",
+      "label": "after3/default: collections at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: search at 1440 answers 200",
+      "label": "after3/default: search at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: cart-drawer at 1440 answers 200",
+      "label": "after3/default: cart-drawer at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: cart at 1440: Add to cart answers 200",
+      "label": "after3/default: cart at 1440: Add to cart answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: checkout at 1440 answers 200",
+      "label": "after3/default: checkout at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: account at 1440 answers 200",
+      "label": "after3/default: account at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: cms-page at 1440 answers 200",
+      "label": "after3/default: cms-page at 1440 answers 200",
       "detail": 200
     },
     {
       "ok": true,
-      "label": "after2/default: not-found at 1440 answers 404",
+      "label": "after3/default: not-found at 1440 answers 404",
       "detail": 404
     },
     {
       "ok": true,
-      "label": "after2/default: no page errors at 1440",
+      "label": "after3/default: no page errors at 1440",
       "detail": []
     }
   ],

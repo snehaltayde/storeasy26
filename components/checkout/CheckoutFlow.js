@@ -226,13 +226,13 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <Link href="/" className="text-xl font-extrabold tracking-tight">
           {/* S55 fix: the tenant's own wordmark — this hardcoded BEASTLIFE on every store */}
           {logo?.text1 || storeName}
           {logo?.text2 ? <span className="text-sf-accent-mark">{logo.text2}</span> : null}
         </Link>
-        <ol className="flex items-center gap-2 text-sm">
+        <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           {STEPS.map((label, i) => (
             <li key={label} className="flex items-center gap-2">
               <span
@@ -243,7 +243,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
                 {i + 1}
               </span>
               <span className={i === step ? "font-semibold" : "text-sf-text-faint"}>{label}</span>
-              {i < STEPS.length - 1 && <span className="text-sf-mark">→</span>}
+              {i < STEPS.length - 1 && <span className="hidden text-sf-mark sm:inline">→</span>}
             </li>
           ))}
         </ol>

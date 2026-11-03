@@ -2,7 +2,7 @@
   "id": "TOK-01-02",
   "part": "themes",
   "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — themes",
-  "ranAt": "2026-11-03T14:03:00.331Z",
+  "ranAt": "2026-11-03T14:15:04.154Z",
   "harness": "http://localhost:3204",
   "chrome": "156.0.8078.80",
   "passed": 20,
@@ -31,7 +31,7 @@
     },
     {
       "ok": true,
-      "label": "light theme, checkout at 375: every one of 50 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "label": "light theme, checkout at 375: every one of 49 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
       "detail": []
     },
     {
@@ -81,7 +81,7 @@
     },
     {
       "ok": true,
-      "label": "dark theme, checkout at 375: every one of 50 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "label": "dark theme, checkout at 375: every one of 49 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
       "detail": []
     },
     {

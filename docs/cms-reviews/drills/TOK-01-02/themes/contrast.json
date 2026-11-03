@@ -1534,7 +1534,7 @@
         ]
       },
       "checkout-375": {
-        "checked": 50,
+        "checked": 49,
         "exempt": [
           {
             "text": "Continue to review",
@@ -1669,15 +1669,6 @@
             "fg": "#1c1917",
             "bg": "#fffdf8",
             "ratio": 17.2,
-            "need": 4.5,
-            "kind": "text (4.5:1)"
-          },
-          {
-            "text": "→",
-            "tag": "span",
-            "fg": "#777471",
-            "bg": "#fffdf8",
-            "ratio": 4.57,
             "need": 4.5,
             "kind": "text (4.5:1)"
           },
@@ -5557,7 +5548,7 @@
         ]
       },
       "checkout-375": {
-        "checked": 50,
+        "checked": 49,
         "exempt": [
           {
             "text": "Continue to review",
@@ -5692,15 +5683,6 @@
             "fg": "#f1f5f9",
             "bg": "#0b0f17",
             "ratio": 17.51,
-            "need": 4.5,
-            "kind": "text (4.5:1)"
-          },
-          {
-            "text": "→",
-            "tag": "span",
-            "fg": "#797d83",
-            "bg": "#0b0f17",
-            "ratio": 4.63,
             "need": 4.5,
             "kind": "text (4.5:1)"
           },

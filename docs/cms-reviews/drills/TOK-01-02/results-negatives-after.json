@@ -2,7 +2,7 @@
   "id": "TOK-01-02",
   "part": "negatives-after",
   "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — negatives-after",
-  "ranAt": "2026-11-03T14:03:02.815Z",
+  "ranAt": "2026-11-03T14:15:06.437Z",
   "harness": "http://localhost:3204",
   "chrome": "156.0.8078.80",
   "passed": 2,

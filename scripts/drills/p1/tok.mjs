@@ -487,6 +487,40 @@ export const parts = {
     }
   },
 
+  // P1-HARNESS finding 6: checkout with one item must not scroll sideways on
+  // a phone. TOK_LABEL names the screenshot folder (before / after the fix).
+  async width(drill) {
+    const label = process.env.TOK_LABEL || "width";
+    const out = {};
+    for (const w of [320, 360, 375, 390, 414]) {
+      const ctx = await shopper(drill, w);
+      const page = await ctx.newPage();
+      await page.goto("/products/glow-serum", { waitUntil: "load" });
+      await settle(page);
+      await addToCart(page);
+      await page.goto("/checkout", { waitUntil: "load" });
+      await settle(page);
+      const m = await page.evaluate(() => {
+        const ol = document.querySelector("main ol");
+        const r = ol?.getBoundingClientRect();
+        const pay = [...document.querySelectorAll("main ol li span")].find((s) => s.textContent.trim() === "Payment")?.getBoundingClientRect();
+        const wide = [...document.querySelectorAll("main *")].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1).map((e) => `${e.tagName.toLowerCase()}.${String(e.className).split(" ").slice(0, 3).join(".")}`).slice(0, 4);
+        return { vw: window.innerWidth, sw: document.documentElement.scrollWidth, stepsRight: r && Math.round(r.right), paymentRight: pay && Math.round(pay.right), paymentVisible: Boolean(pay && pay.right <= window.innerWidth && pay.width > 0), wide };
+      });
+      out[w] = m;
+      drill.note(`${label}: checkout at ${w}: page ${m.sw}px wide in a ${m.vw}px window; step row ends at ${m.stepsRight}px; "Payment" ends at ${m.paymentRight}px; past the edge: ${m.wide.join(", ") || "nothing"}`);
+      drill.check(m.sw <= m.vw + 1, `${label}: checkout at ${w}: no sideways scroll`, `page is ${m.sw}px wide`);
+      drill.check(m.paymentVisible, `${label}: checkout at ${w}: "Payment" in the step row is fully visible`, m);
+      await page.mouse.move(1, 1);
+      const raw = await page.screenshot({ fullPage: false, animations: "disabled", caret: "hide" });
+      mkdirSync(join(drill.dir, "checkout-width"), { recursive: true });
+      writeFileSync(join(drill.dir, "checkout-width", `${label}-${w}.png`), await smallCopy(raw, { maxBytes: 40 * 1024 }));
+      await ctx.close();
+    }
+    mkdirSync(join(drill.dir, "checkout-width"), { recursive: true });
+    writeFileSync(join(drill.dir, "checkout-width", `${label}.json`), JSON.stringify(out, null, 2) + "\n");
+  },
+
   // TOK exit check: the two test themes, every text and icon on home, product,
   // collection, cart and checkout, measured from computed styles.
   async themes(drill) {
