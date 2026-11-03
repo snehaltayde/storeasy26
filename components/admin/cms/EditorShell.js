@@ -21,7 +21,9 @@ import { DEVICES, TREE_DOCKED_FROM, fitCaption, frameStyles } from "./editorLayo
 // pages, which have no tree). Callers pass their own pieces; this file only
 // arranges them, so save, preview and issue display stay in the callers.
 // `children` are the notices (conflicts, refused saves) shown under the top
-// bar, above the panes.
+// bar, above the panes. In the tree, a control marked `data-tree-pick` (a
+// section's row) closes the tree drawer when clicked, so the founder lands
+// straight on that section's settings instead of pressing Escape first.
 
 export function EditorShell({ title, description, breadcrumb, tabs, actions, tree, treeTitle = "Sections", preview, inspector, children }) {
   const nav = useConsoleNav();
@@ -67,6 +69,12 @@ export function EditorShell({ title, description, breadcrumb, tabs, actions, tre
     >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-edge bg-surface px-3 py-2">
         {nav?.openNav && <IconButton data-console-menu label="Open menu" icon={<Menu size={17} aria-hidden />} onClick={nav.openNav} />}
+        {/* which store this is, where the top bar has room (the menu has it too) */}
+        {nav?.storeName && (
+          <span data-store-name className="hidden max-w-48 truncate text-xs font-medium text-fg-muted xl:inline" title={nav.storeName}>
+            {nav.storeName}
+          </span>
+        )}
         {hasTree && (
           <Button
             data-tree-toggle
@@ -121,7 +129,15 @@ export function EditorShell({ title, description, breadcrumb, tabs, actions, tre
 
       {hasTree && (
         <Drawer open={treeOpen} onClose={() => setTreeOpen(false)} side="left" title={treeTitle} closeLabel={`Close ${treeTitle.toLowerCase()}`}>
-          {tree}
+          {/* picking a section closes the drawer; the row's own click selects it first */}
+          <div
+            data-tree-drawer
+            onClick={(e) => {
+              if (e.target?.closest?.("[data-tree-pick]")) setTreeOpen(false);
+            }}
+          >
+            {tree}
+          </div>
         </Drawer>
       )}
     </div>

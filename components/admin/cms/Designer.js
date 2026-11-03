@@ -563,6 +563,7 @@ export default function Designer({ initial }) {
     <li key={key} className={cx("rounded-ctl border", isSelected ? "border-edge-strong bg-surface-sunken" : "border-transparent")}>
       <button
         type="button"
+        data-tree-pick
         aria-current={isSelected || undefined}
         onClick={onSelect}
         className={cx(

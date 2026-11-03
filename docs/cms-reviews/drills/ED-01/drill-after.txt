@@ -6,6 +6,8 @@
 ✓ home @1440: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 687px tall
 ✓ home @1440: inspector beside the preview — preview ends 1152, inspector starts 1152
 ✓ home @1440: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ home @1440: the store's name is in the top bar, which stays one row — name "Design Demo Co", top bar 55px tall
+✓ home @1440: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ home @1440: Mobile renders at 375px — page inside is 375px wide
 ✓ home @1440: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ home @1440: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -30,6 +32,8 @@
 ✓ home @1280: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 687px tall
 ✓ home @1280: inspector beside the preview — preview ends 992, inspector starts 992
 ✓ home @1280: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ home @1280: the store's name is in the top bar, which stays one row — name "Design Demo Co", top bar 55px tall
+✓ home @1280: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ home @1280: Mobile renders at 375px — page inside is 375px wide
 ✓ home @1280: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ home @1280: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -52,6 +56,8 @@
 ✓ home @1279: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 687px tall
 ✓ home @1279: inspector beside the preview — preview ends 991, inspector starts 991
 ✓ home @1279: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ home @1279: below 1280 the store's name is only in the menu — name ""
+✓ home @1279: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ home @1279: Mobile renders at 375px — page inside is 375px wide
 ✓ home @1279: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ home @1279: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -74,6 +80,8 @@
 ✓ home @1100: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 687px tall
 ✓ home @1100: inspector beside the preview — preview ends 812, inspector starts 812
 ✓ home @1100: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ home @1100: below 1280 the store's name is only in the menu — name ""
+✓ home @1100: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ home @1100: Mobile renders at 375px — page inside is 375px wide
 ✓ home @1100: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ home @1100: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -96,6 +104,8 @@
 ✓ home @1024: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 687px tall
 ✓ home @1024: inspector beside the preview — preview ends 736, inspector starts 736
 ✓ home @1024: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ home @1024: below 1280 the store's name is only in the menu — name ""
+✓ home @1024: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ home @1024: Mobile renders at 375px — page inside is 375px wide
 ✓ home @1024: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ home @1024: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -115,6 +125,8 @@
 ✓ home @900: Desktop preview at least 600px — frame 884px seen, pane 900px
 ✓ home @900: tree is a drawer, not a pane — tree hidden, drawer button true
 ✓ home @900: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ home @900: below 1280 the store's name is only in the menu — name ""
+✓ home @900: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ home @900: Mobile renders at 375px — page inside is 375px wide
 ✓ home @900: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ home @900: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -134,6 +146,8 @@
 ✓ home @768: Desktop preview at least 600px — frame 752px seen, pane 768px
 ✓ home @768: tree is a drawer, not a pane — tree hidden, drawer button true
 ✓ home @768: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ home @768: below 1280 the store's name is only in the menu — name ""
+✓ home @768: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ home @768: Mobile renders at 375px — page inside is 375px wide
 ✓ home @768: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ home @768: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -156,6 +170,8 @@
 ✓ product @1440: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 665px tall
 ✓ product @1440: inspector beside the preview — preview ends 1152, inspector starts 1152
 ✓ product @1440: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ product @1440: the store's name is in the top bar, which stays one row — name "Design Demo Co", top bar 55px tall
+✓ product @1440: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ product @1440: Mobile renders at 375px — page inside is 375px wide
 ✓ product @1440: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ product @1440: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -178,6 +194,8 @@
 ✓ product @1280: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 665px tall
 ✓ product @1280: inspector beside the preview — preview ends 992, inspector starts 992
 ✓ product @1280: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ product @1280: the store's name is in the top bar, which stays one row — name "Design Demo Co", top bar 55px tall
+✓ product @1280: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ product @1280: Mobile renders at 375px — page inside is 375px wide
 ✓ product @1280: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ product @1280: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -199,6 +217,8 @@
 ✓ product @1279: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 665px tall
 ✓ product @1279: inspector beside the preview — preview ends 991, inspector starts 991
 ✓ product @1279: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ product @1279: below 1280 the store's name is only in the menu — name ""
+✓ product @1279: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ product @1279: Mobile renders at 375px — page inside is 375px wide
 ✓ product @1279: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ product @1279: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -220,6 +240,8 @@
 ✓ product @1100: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 665px tall
 ✓ product @1100: inspector beside the preview — preview ends 812, inspector starts 812
 ✓ product @1100: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ product @1100: below 1280 the store's name is only in the menu — name ""
+✓ product @1100: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ product @1100: Mobile renders at 375px — page inside is 375px wide
 ✓ product @1100: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ product @1100: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -241,6 +263,8 @@
 ✓ product @1024: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 665px tall
 ✓ product @1024: inspector beside the preview — preview ends 736, inspector starts 736
 ✓ product @1024: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ product @1024: below 1280 the store's name is only in the menu — name ""
+✓ product @1024: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ product @1024: Mobile renders at 375px — page inside is 375px wide
 ✓ product @1024: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ product @1024: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -259,6 +283,8 @@
 ✓ product @1024: negative: Desktop never narrower than Mobile — Desktop 720px on screen / 1280px page, Mobile 375px / 375px
 ✓ product @900: Desktop preview at least 600px — frame 884px seen, pane 900px
 ✓ product @900: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ product @900: below 1280 the store's name is only in the menu — name ""
+✓ product @900: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ product @900: Mobile renders at 375px — page inside is 375px wide
 ✓ product @900: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ product @900: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -277,6 +303,8 @@
 ✓ product @900: negative: Desktop never narrower than Mobile — Desktop 884px on screen / 1280px page, Mobile 375px / 375px
 ✓ product @768: Desktop preview at least 600px — frame 752px seen, pane 768px
 ✓ product @768: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ product @768: below 1280 the store's name is only in the menu — name ""
+✓ product @768: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ product @768: Mobile renders at 375px — page inside is 375px wide
 ✓ product @768: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ product @768: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -299,6 +327,8 @@
 ✓ collection @1440: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 665px tall
 ✓ collection @1440: inspector beside the preview — preview ends 1152, inspector starts 1152
 ✓ collection @1440: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ collection @1440: the store's name is in the top bar, which stays one row — name "Design Demo Co", top bar 55px tall
+✓ collection @1440: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ collection @1440: Mobile renders at 375px — page inside is 375px wide
 ✓ collection @1440: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ collection @1440: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -321,6 +351,8 @@
 ✓ collection @1280: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 665px tall
 ✓ collection @1280: inspector beside the preview — preview ends 992, inspector starts 992
 ✓ collection @1280: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ collection @1280: the store's name is in the top bar, which stays one row — name "Design Demo Co", top bar 55px tall
+✓ collection @1280: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ collection @1280: Mobile renders at 375px — page inside is 375px wide
 ✓ collection @1280: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ collection @1280: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -342,6 +374,8 @@
 ✓ collection @1279: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 665px tall
 ✓ collection @1279: inspector beside the preview — preview ends 991, inspector starts 991
 ✓ collection @1279: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ collection @1279: below 1280 the store's name is only in the menu — name ""
+✓ collection @1279: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ collection @1279: Mobile renders at 375px — page inside is 375px wide
 ✓ collection @1279: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ collection @1279: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -363,6 +397,8 @@
 ✓ collection @1100: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 665px tall
 ✓ collection @1100: inspector beside the preview — preview ends 812, inspector starts 812
 ✓ collection @1100: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ collection @1100: below 1280 the store's name is only in the menu — name ""
+✓ collection @1100: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ collection @1100: Mobile renders at 375px — page inside is 375px wide
 ✓ collection @1100: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ collection @1100: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -384,6 +420,8 @@
 ✓ collection @1024: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 665px tall
 ✓ collection @1024: inspector beside the preview — preview ends 736, inspector starts 736
 ✓ collection @1024: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ collection @1024: below 1280 the store's name is only in the menu — name ""
+✓ collection @1024: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ collection @1024: Mobile renders at 375px — page inside is 375px wide
 ✓ collection @1024: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ collection @1024: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -402,6 +440,8 @@
 ✓ collection @1024: negative: Desktop never narrower than Mobile — Desktop 720px on screen / 1280px page, Mobile 375px / 375px
 ✓ collection @900: Desktop preview at least 600px — frame 884px seen, pane 900px
 ✓ collection @900: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ collection @900: below 1280 the store's name is only in the menu — name ""
+✓ collection @900: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ collection @900: Mobile renders at 375px — page inside is 375px wide
 ✓ collection @900: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ collection @900: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -420,6 +460,8 @@
 ✓ collection @900: negative: Desktop never narrower than Mobile — Desktop 884px on screen / 1280px page, Mobile 375px / 375px
 ✓ collection @768: Desktop preview at least 600px — frame 752px seen, pane 768px
 ✓ collection @768: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ collection @768: below 1280 the store's name is only in the menu — name ""
+✓ collection @768: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
 ✓ collection @768: Mobile renders at 375px — page inside is 375px wide
 ✓ collection @768: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
 ✓ collection @768: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
@@ -440,8 +482,9 @@
 ✓ home @1024: keyboard: Enter opens the drawer with the tree, focus inside — {"open":true,"focusInside":true,"hasTree":true,"hasAdd":true,"expanded":"true","treesInPage":1}
 ✓ home @1024: the open drawer holds the only copy of the tree — 1 trees in the page
 ✓ home @1024: keyboard: Tab never leaves the open drawer — 0 of 12 Tab presses landed outside
-✓ home @1024: picking a section in the drawer opens it in the inspector
 ✓ home @1024: keyboard: Escape closes it and focus returns to the button — {"open":false,"focusBack":true,"expanded":"false"}
+✓ home @1024: keyboard: picking a section in the drawer closes it and opens the section in the inspector, focus back on the button — {"open":false,"focusBack":true,"expanded":"false","hero":true}
+✓ home @1024: a tree control that is not a pick (Add section) keeps the drawer open — {"open":true,"button":true,"list":true}
 ✓ home @1024: keyboard: the drawer opens on its close button, which closes it, focus returns — first focus in drawer: "Close sections", after: {"open":false,"focusBack":true}
 ✓ home @1024: widening past 1280 with the drawer open: drawer closes, tree docks, one tree — {"open":false,"treeShown":true,"sectionsHeadings":1}
 ✓ home @1024: resizing the window refits the frame without reloading the page in it — {"mark":true,"inner":1280,"caption":"Desktop, 1280 px wide, shown at 71% to fit"}
@@ -449,13 +492,19 @@
 ✓ home @1279: keyboard: Enter opens the drawer with the tree, focus inside — {"open":true,"focusInside":true,"hasTree":true,"hasAdd":true,"expanded":"true","treesInPage":1}
 ✓ home @1279: the open drawer holds the only copy of the tree — 1 trees in the page
 ✓ home @1279: keyboard: Tab never leaves the open drawer — 0 of 12 Tab presses landed outside
-✓ home @1279: picking a section in the drawer opens it in the inspector
 ✓ home @1279: keyboard: Escape closes it and focus returns to the button — {"open":false,"focusBack":true,"expanded":"false"}
+✓ home @1279: keyboard: picking a section in the drawer closes it and opens the section in the inspector, focus back on the button — {"open":false,"focusBack":true,"expanded":"false","hero":true}
+✓ home @1279: a tree control that is not a pick (Add section) keeps the drawer open — {"open":true,"button":true,"list":true}
 ✓ home @1279: keyboard: the drawer opens on its close button, which closes it, focus returns — first focus in drawer: "Close sections", after: {"open":false,"focusBack":true}
 ✓ home @1279: widening past 1280 with the drawer open: drawer closes, tree docks, one tree — {"open":false,"treeShown":true,"sectionsHeadings":1}
 ✓ home @1279: resizing the window refits the frame without reloading the page in it — {"mark":true,"inner":1280,"caption":"Desktop, 1280 px wide, shown at 71% to fit"}
 ✓ home @1440: console menu opens the store navigation — {"open":true,"links":23,"designer":true}
 ✓ home @1440: keyboard: the menu button opens the navigation, Escape closes it, focus returns — Tab presses 1, opened {"open":true,"focusInside":true}, after Escape {"open":false,"focusBack":true}
 ✓ storefront @1440: other console pages unchanged: sidebar shown, page capped at 1024px — {"main":1024,"maxWidth":"1024px","sidebar":240,"menu":false}
+✓ home @1280: long tree (28 rows): the page itself does not scroll — {"pane":true,"drawer":false,"client":767,"scroll":1151,"bottom":900,"pageScrollY":0,"lastInView":true,"viewH":900}
+✓ home @1280: long tree: it scrolls inside its own pane, which ends inside the window, and the last section is reachable — {"pane":true,"drawer":false,"client":767,"scroll":1151,"bottom":900,"pageScrollY":0,"lastInView":true,"viewH":900}
+✓ home @1024: long tree (28 rows): the page itself does not scroll — {"pane":true,"drawer":true,"client":848,"scroll":1151,"bottom":900,"pageScrollY":0,"lastInView":true,"viewH":900}
+✓ home @1024: long tree: it scrolls inside its own drawer, which ends inside the window, and the last section is reachable — {"pane":true,"drawer":true,"client":848,"scroll":1151,"bottom":900,"pageScrollY":0,"lastInView":true,"viewH":900}
 
-459 passed, 0 failed
+507 passed, 0 failed
+exit 0

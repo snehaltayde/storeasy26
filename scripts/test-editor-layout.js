@@ -160,29 +160,56 @@ const stubs = {
   "@/lib/cms/defaults": await import("../lib/cms/defaults.js"),
 };
 const cache = new Map();
+const compile = async (file) =>
+  (
+    await swc.transform(await readFile(file, "utf8"), {
+      filename: file,
+      jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" },
+      module: { type: "commonjs" },
+    })
+  ).code;
+// resolve every local import first, so the synchronous require has it
+async function locals(file, code, skip) {
+  const local = new Map();
+  for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
+    if (id in skip || id in stubs) continue;
+    const target = id.startsWith("@/") ? join(ROOT, id.slice(2)) : id.startsWith(".") ? resolve(dirname(file), id) : null;
+    if (target) local.set(id, await load(target.endsWith(".js") ? target : `${target}.js`));
+  }
+  return local;
+}
 async function load(file) {
   if (cache.has(file)) return cache.get(file);
   const mod = { exports: {} };
   cache.set(file, mod.exports);
-  const { code } = await swc.transform(await readFile(file, "utf8"), {
-    filename: file,
-    jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" },
-    module: { type: "commonjs" },
-  });
-  // resolve every local import first, so the synchronous require below has it
-  const local = new Map();
-  for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
-    if (id in stubs) continue;
-    const target = id.startsWith("@/") ? join(ROOT, id.slice(2)) : id.startsWith(".") ? resolve(dirname(file), id) : null;
-    if (target) local.set(id, await load(target.endsWith(".js") ? target : `${target}.js`));
-  }
+  const code = await compile(file);
+  const local = await locals(file, code, {});
   new Function("require", "module", "exports", code)((id) => (id in stubs ? stubs[id] : local.has(id) ? local.get(id) : require(id)), mod, mod.exports);
   cache.set(file, mod.exports);
+  return mod.exports;
+}
+// A second, separate copy of one file, with some of its imports swapped
+// (used below to give a component stand-in hooks). Its other imports are the
+// shared copies.
+async function loadIsolated(file, overrides) {
+  const mod = { exports: {} };
+  const code = await compile(file);
+  const local = await locals(file, code, overrides);
+  new Function("require", "module", "exports", code)(
+    (id) => (id in overrides ? overrides[id] : id in stubs ? stubs[id] : local.has(id) ? local.get(id) : require(id)),
+    mod,
+    mod.exports
+  );
   return mod.exports;
 }
 const { ConsoleShell } = await load(join(ROOT, "components/console/nav/ConsoleShell.js"));
 const Designer = (await load(join(ROOT, "components/admin/cms/Designer.js"))).default;
 const SurfaceDesigner = (await load(join(ROOT, "components/admin/cms/SurfaceDesigner.js"))).default;
+const AUTHED = join(ROOT, "app/(console)/admin/(authed)");
+const AdminError = (await load(join(AUTHED, "error.js"))).default;
+const AdminLoading = (await load(join(AUTHED, "loading.js"))).default;
+const DesignerLoading = (await load(join(AUTHED, "storefront/designer/loading.js"))).default;
+const { Drawer } = await load(join(ROOT, "components/console/Drawer.js"));
 
 const shellHtml = (path, child = React.createElement("p", { id: "page-content" }, "page")) => {
   pathname = path;
@@ -254,6 +281,54 @@ await t("every other console page keeps the sidebar and the 1024px cap", () => {
   }
 });
 
+// The editor routes draw no sidebar: the editor's top bar has the menu. When
+// the page throws, Next shows the (authed) error boundary instead of the
+// editor, so that page must bring its own menu button, or the founder is left
+// with no navigation and no sign-out.
+const errorEl = () => React.createElement(AdminError, { error: new Error("boom"), reset() {} });
+await t("on the designer, a page that fails to load still has the menu (navigation and sign-out) and the usual padding", () => {
+  for (const p of ["/admin/storefront/designer", "/admin/storefront/designer/product", "/admin/storefront/designer/collection"]) {
+    const html = shellHtml(p, errorEl());
+    ok(html.includes("This page hit an error") && />Try again</.test(html), `${p}: error page not shown`);
+    const menu = tagWith(html, 'aria-label="Open menu"');
+    ok(menu.startsWith("<button") && menu.includes("data-console-menu"), `${p}: no "Open menu" button: ${html.slice(0, 300)}`);
+    ok(html.indexOf('aria-label="Open menu"') < html.indexOf("This page hit an error"), `${p}: the menu should come before the error`);
+    ok(html.includes("Design Demo Co"), `${p}: store name missing from the bar`);
+    const frameAt = html.indexOf("data-console-page-frame");
+    ok(frameAt > 0, `${p}: no page frame`);
+    const box = classesOf(html.slice(frameAt).match(/<div class="mx-auto[^"]*"/)?.[0] || "");
+    ok(box.includes("max-w-5xl") && box.some((c) => /^px-/.test(c)) && box.some((c) => /^py-/.test(c)), `${p}: error not in the padded page: ${box.join(" ")}`);
+  }
+});
+
+await t("on the designer, the console's loading skeleton has the menu too", () => {
+  const html = shellHtml("/admin/storefront/designer/product", React.createElement(AdminLoading));
+  ok(html.includes('aria-busy="true"'), "skeleton not shown");
+  ok(tagWith(html, 'aria-label="Open menu"').includes("data-console-menu"), "no menu while loading");
+});
+
+await t("the designer's own loading state is editor-shaped, with the menu, and a tree only on the home page", () => {
+  const home = shellHtml("/admin/storefront/designer", React.createElement(DesignerLoading));
+  ok(home.includes('aria-busy="true"') && home.includes("data-editor-shell"), "not the editor's shape");
+  ok(tagWith(home, 'aria-label="Open menu"').includes("data-console-menu"), "no menu while loading");
+  ok(home.includes('data-editor-pane="tree"') && home.includes('data-editor-pane="preview"') && home.includes('data-editor-pane="inspector"'), "panes missing");
+  const product = shellHtml("/admin/storefront/designer/product", React.createElement(DesignerLoading));
+  ok(!product.includes('data-editor-pane="tree"') && !product.includes("data-tree-toggle"), "the product designer has no tree");
+});
+
+await t("on every other console page the error and loading pages are as before: no extra bar", () => {
+  for (const p of ["/admin/dashboard", "/admin/storefront", "/admin/storefront/designerx"]) {
+    for (const child of [errorEl(), React.createElement(AdminLoading)]) {
+      const html = shellHtml(p, child);
+      ok(!html.includes("data-console-page-frame") && !html.includes("data-console-menu"), `${p}: an editor bar was added`);
+      ok(/<aside\b/.test(html) && html.includes("max-w-5xl"), `${p}: sidebar or cap missing`);
+    }
+  }
+  // and outside any console shell the frame is a no-op
+  const bare = renderToStaticMarkup(errorEl());
+  ok(bare.includes("This page hit an error") && !bare.includes("data-console-page-frame"), "frame outside the shell");
+});
+
 console.log("— Designer and SurfaceDesigner in the editor shell");
 
 await t("Designer: tree on the left, preview in the centre, inspector on the right", () => {
@@ -273,6 +348,9 @@ await t("Designer: the classes say the same widths as the numbers (tree 224, ins
   eq(L.TREE_DOCKED_FROM, 1280, "xl is 1280:");
   eq(rem(inspector, "lg:w-"), L.INSPECTOR_WIDTH, "inspector width class:");
   ok(inspector.includes("shrink-0"), "inspector never shrinks");
+  // a long tree or a long form scrolls inside its own pane, never the page
+  ok(tree.includes("overflow-y-auto"), `tree pane does not scroll on its own: ${tree.join(" ")}`);
+  ok(inspector.includes("overflow-y-auto"), `inspector pane does not scroll on its own: ${inspector.join(" ")}`);
   eq(L.SIDE_BY_SIDE_FROM, 1024, "lg is 1024:");
   const panes = classesOf(tagWith(html, "data-editor-panes"));
   ok(panes.includes("lg:flex-row") && panes.includes("flex-col"), `panes side by side from lg: ${panes.join(" ")}`);
@@ -324,6 +402,211 @@ await t("SurfaceDesigner (collection, nothing picked yet): the shell asks for a 
   ok(html.includes("data-editor-shell"), "no editor shell");
   ok(html.includes("Pick a collection to design"), "empty state");
   ok(!html.includes('data-editor-pane="inspector"'), "an empty inspector pane is shown");
+});
+
+// ---- 3. behaviour, without a browser --------------------------------------------
+// A small shallow renderer. The component is called as a plain function with
+// stand-in hooks (state, refs, effects recorded, not run); its returned
+// elements are searched, their handlers called, and it is called again with
+// the new state. Child components are not rendered. This covers the clicks
+// and window changes the static render above cannot; the measured proof is
+// still the browser drill.
+console.log("— behaviour (stand-in hooks, no browser)");
+
+function* walk(node, parent) {
+  if (node == null || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    for (const n of node) yield* walk(n, parent);
+    return;
+  }
+  if (!node.props) return;
+  yield { el: node, parent };
+  yield* walk(node.props.children, node);
+}
+let H = null; // the shallow render in progress
+const hookReact = new Proxy(React, {
+  get: (target, key) => (H && (key === "useState" || key === "useRef" || key === "useEffect") ? H[key] : target[key]),
+});
+function shallow(Component, props, { nav = null } = {}) {
+  const states = [];
+  const refs = [];
+  let effects = [];
+  let si = 0;
+  let ri = 0;
+  const h = {
+    nav,
+    useState(init) {
+      const k = si++;
+      if (!(k in states)) states[k] = typeof init === "function" ? init() : init;
+      return [states[k], (v) => (states[k] = typeof v === "function" ? v(states[k]) : v)];
+    },
+    useRef(init) {
+      const k = ri++;
+      if (!(k in refs)) refs[k] = { current: init ?? null };
+      return refs[k];
+    },
+    useEffect(fn) {
+      effects.push(fn);
+    },
+  };
+  const s = {
+    refs,
+    tree: null,
+    render() {
+      si = ri = 0;
+      effects = [];
+      const prev = H;
+      H = h;
+      try {
+        s.tree = Component(props);
+      } finally {
+        H = prev;
+      }
+      return s;
+    },
+    runEffects: () => effects.map((fn) => fn()),
+    // every element under `root` (default: the whole returned tree), with its parent element
+    all: (root = s.tree) => walk(root, null),
+    find(pred) {
+      for (const hit of s.all()) if (pred(hit.el)) return hit;
+      return null;
+    },
+    has: (pred, root) => {
+      for (const { el } of s.all(root)) if (pred(el)) return true;
+      return false;
+    },
+  };
+  return s.render();
+}
+const hookOverrides = {
+  react: hookReact,
+  "@/components/console/nav/ConsoleShell": { useConsoleNav: () => H?.nav ?? null },
+};
+const Iso = await loadIsolated(join(ROOT, "components/admin/cms/EditorShell.js"), hookOverrides);
+const IsoShell = await loadIsolated(join(ROOT, "components/console/nav/ConsoleShell.js"), { react: hookReact });
+const marker = (name) => React.createElement("p", { "data-marker": name }, name);
+const isMarker = (name) => (el) => el.props?.["data-marker"] === name;
+const shellProps = { title: "Designer", tree: marker("tree"), preview: marker("preview"), inspector: marker("inspector") };
+const drawerOf = (s) => s.find((el) => el.type === Drawer)?.el;
+const treePane = (s) => s.find((el) => el.props?.["data-editor-pane"] === "tree")?.el;
+
+await t("the Sections button opens the tree in its drawer, and the tree leaves the pane while it is open", () => {
+  const s = shallow(Iso.EditorShell, shellProps, { nav: { openNav() {} } });
+  eq(drawerOf(s).props.open, false, "drawer at first:");
+  ok(s.has(isMarker("tree"), treePane(s)), "tree should be in its pane at first");
+  const toggle = s.find((el) => el.props?.["data-tree-toggle"])?.el;
+  ok(toggle && typeof toggle.props.onClick === "function", "no Sections button");
+  toggle.props.onClick();
+  s.render();
+  eq(drawerOf(s).props.open, true, "drawer after a click:");
+  eq(s.find((el) => el.props?.["data-tree-toggle"]).el.props["aria-expanded"], true, "aria-expanded:");
+  ok(!s.has(isMarker("tree"), treePane(s)), "the tree is still in the pane while the drawer holds it");
+  ok(s.has(isMarker("tree"), drawerOf(s)), "the drawer does not hold the tree");
+  eq(drawerOf(s).props.closeLabel, "Close sections", "close button:");
+  drawerOf(s).props.onClose();
+  s.render();
+  eq(drawerOf(s).props.open, false, "drawer after Close:");
+});
+
+await t("widening the window past 1280 closes the tree drawer (the tree docks)", () => {
+  const s = shallow(Iso.EditorShell, shellProps, { nav: { openNav() {} } });
+  s.find((el) => el.props?.["data-tree-toggle"]).el.props.onClick();
+  s.render();
+  const mq = { matches: false, query: null, fns: new Set(), addEventListener: (_, f) => mq.fns.add(f), removeEventListener: (_, f) => mq.fns.delete(f) };
+  globalThis.window = { matchMedia: (q) => ((mq.query = q), mq) };
+  try {
+    s.runEffects();
+  } finally {
+    delete globalThis.window;
+  }
+  eq(mq.query, `(min-width: ${L.TREE_DOCKED_FROM}px)`, "watched width:");
+  ok(mq.fns.size === 1, "nothing listens for the window widening");
+  mq.matches = false;
+  for (const f of mq.fns) f();
+  eq(s.render().find((el) => el.type === Drawer).el.props.open, true, "narrowing must not close it:");
+  mq.matches = true;
+  for (const f of mq.fns) f();
+  eq(drawerOf(s.render()).props.open, false, "drawer after widening:");
+});
+
+await t("picking a section in the tree drawer closes it, so its settings are in reach; other clicks keep it open", () => {
+  const s = shallow(Iso.EditorShell, shellProps, { nav: { openNav() {} } });
+  const open = () => {
+    s.find((el) => el.props?.["data-tree-toggle"]).el.props.onClick();
+    return s.render();
+  };
+  const body = () => s.find((el) => el.props?.["data-tree-drawer"])?.el;
+  open();
+  ok(body() && typeof body().props.onClick === "function", "the drawer's tree has no click handler");
+  body().props.onClick({ target: { closest: () => null } }); // e.g. Move up, Add section
+  eq(drawerOf(s.render()).props.open, true, "a click that is not a pick:");
+  body().props.onClick({ target: { closest: (sel) => (sel === "[data-tree-pick]" ? {} : null) } });
+  eq(drawerOf(s.render()).props.open, false, "after a pick:");
+  // and Designer marks each row's own button (not its controls) as a pick
+  const html = designerHtml();
+  const picks = html.match(/<button[^>]*data-tree-pick[^>]*>/g) || [];
+  eq(picks.length, 3, "rows marked as picks (hero, announcement, 1 section):");
+  ok(!/data-tree-pick[^>]*aria-label="(Move|Hide|Show|Duplicate|Remove)/.test(html), "a row control is marked as a pick");
+});
+
+await t("the menu button opens the console navigation; with no console around it there is none", () => {
+  const openNav = () => {};
+  const s = shallow(Iso.EditorShell, shellProps, { nav: { openNav, editor: true, storeName: "Design Demo Co" } });
+  const menu = s.find((el) => el.props?.["data-console-menu"])?.el;
+  ok(menu && menu.props.onClick === openNav && menu.props.label === "Open menu", "menu button missing or not wired");
+  const name = s.find((el) => el.props?.["data-store-name"])?.el;
+  ok(name && name.props.children === "Design Demo Co" && name.props.className.includes("xl:inline") && name.props.className.includes("truncate"), "store name not in the bar from 1280");
+  const bare = shallow(Iso.EditorShell, shellProps);
+  ok(!bare.find((el) => el.props?.["data-console-menu"]) && !bare.find((el) => el.props?.["data-store-name"]), "a menu with nothing to open");
+});
+
+await t("on the designer, the console's menu really opens the store navigation drawer", () => {
+  pathname = "/admin/storefront/designer";
+  const s = shallow(IsoShell.ConsoleShell, { storeName: "Design Demo Co", host: "localhost", role: "owner", actorKind: "member", badges: {}, children: marker("page") });
+  const nav = s.tree.props.value;
+  ok(nav && typeof nav.openNav === "function" && nav.editor === true && nav.storeName === "Design Demo Co", `context: ${JSON.stringify(nav)}`);
+  const drawer = () => s.find((el) => el.type === Drawer && el.props.title === "Design Demo Co")?.el;
+  ok(drawer(), "the navigation drawer is not rendered on the designer");
+  eq(drawer().props.open, false, "closed at first:");
+  ok(drawer().props.children?.props?.onNavigate, "the drawer does not hold the navigation");
+  nav.openNav();
+  s.render();
+  eq(drawer().props.open, true, "after the menu button:");
+  drawer().props.onClose();
+  eq(drawerOf(s.render()).props.open, false, "after Close:");
+});
+
+await t("the preview's box positions and clips the page inside it, at the measured size", () => {
+  const frame = (style) => React.createElement("iframe", { "data-marker": "frame", style });
+  const s = shallow(Iso.PreviewCanvas, { device: "desktop", frame });
+  ok(!s.find(isMarker("frame")), "no frame before the space is measured");
+  let report = null;
+  globalThis.ResizeObserver = class {
+    constructor(cb) {
+      report = cb;
+    }
+    observe() {}
+    disconnect() {}
+  };
+  try {
+    s.refs[0].current = {}; // the canvas element
+    s.runEffects();
+  } finally {
+    delete globalThis.ResizeObserver;
+  }
+  ok(typeof report === "function", "the canvas does not measure its space");
+  report([{ contentRect: { width: 912, height: 700 } }]);
+  s.render();
+  const hit = s.find(isMarker("frame"));
+  ok(hit, "no frame after measuring");
+  const box = hit.parent;
+  const cls = box.props.className.split(/\s+/);
+  ok(cls.includes("relative"), `the box does not position the page (it is absolutely placed): ${box.props.className}`);
+  ok(cls.includes("overflow-hidden"), `the box does not clip the page: ${box.props.className}`);
+  eq(box.props.style, { width: 912, height: 700 }, "box:");
+  eq([hit.el.props.style.width, hit.el.props.style.position, hit.el.props.style.transform], [1280, "absolute", `scale(${912 / 1280})`], "page:");
+  const caption = s.find((el) => el.props?.["data-frame-caption"]).el;
+  eq(caption.props.children, "Desktop, 1280 px wide, shown at 71% to fit", "caption:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

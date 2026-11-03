@@ -1,6 +1,6 @@
 {
   "base": "http://localhost:3037",
-  "at": "2026-11-03T08:54:13.117Z",
+  "at": "2026-11-03T09:59:57.727Z",
   "pages": {
     "home": {
       "768": {
@@ -46,7 +46,12 @@
           "pageScrollX": 0,
           "pageScrollY": 206,
           "shellBottom": 1106,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         },
         "Tablet": {
           "tree": {
@@ -90,7 +95,12 @@
           "pageScrollX": 0,
           "pageScrollY": 206,
           "shellBottom": 1106,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         },
         "Desktop": {
           "tree": {
@@ -134,7 +144,12 @@
           "pageScrollX": 0,
           "pageScrollY": 206,
           "shellBottom": 1106,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         }
       },
       "900": {
@@ -180,7 +195,12 @@
           "pageScrollX": 0,
           "pageScrollY": 206,
           "shellBottom": 1106,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         },
         "Tablet": {
           "tree": {
@@ -224,7 +244,12 @@
           "pageScrollX": 0,
           "pageScrollY": 206,
           "shellBottom": 1106,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         },
         "Desktop": {
           "tree": {
@@ -268,7 +293,12 @@
           "pageScrollX": 0,
           "pageScrollY": 206,
           "shellBottom": 1106,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         }
       },
       "1024": {
@@ -314,7 +344,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": {
@@ -358,7 +393,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": {
@@ -402,7 +442,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1100": {
@@ -448,7 +493,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": {
@@ -492,7 +542,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": {
@@ -536,7 +591,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1279": {
@@ -582,7 +642,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": {
@@ -626,7 +691,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": {
@@ -670,7 +740,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1280": {
@@ -716,7 +791,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Tablet": {
           "tree": {
@@ -760,7 +840,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Desktop": {
           "tree": {
@@ -804,7 +889,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         }
       },
       "1440": {
@@ -850,7 +940,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Tablet": {
           "tree": {
@@ -894,7 +989,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Desktop": {
           "tree": {
@@ -938,7 +1038,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         }
       }
     },
@@ -981,7 +1086,12 @@
           "pageScrollX": 0,
           "pageScrollY": 718,
           "shellBottom": 1618,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         },
         "Tablet": {
           "tree": null,
@@ -1020,7 +1130,12 @@
           "pageScrollX": 0,
           "pageScrollY": 718,
           "shellBottom": 1618,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         },
         "Desktop": {
           "tree": null,
@@ -1059,7 +1174,12 @@
           "pageScrollX": 0,
           "pageScrollY": 718,
           "shellBottom": 1618,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         }
       },
       "900": {
@@ -1100,7 +1220,12 @@
           "pageScrollX": 0,
           "pageScrollY": 664,
           "shellBottom": 1564,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": null,
@@ -1139,7 +1264,12 @@
           "pageScrollX": 0,
           "pageScrollY": 664,
           "shellBottom": 1564,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": null,
@@ -1178,7 +1308,12 @@
           "pageScrollX": 0,
           "pageScrollY": 664,
           "shellBottom": 1564,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1024": {
@@ -1219,7 +1354,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": null,
@@ -1258,7 +1398,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": null,
@@ -1297,7 +1442,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1100": {
@@ -1338,7 +1488,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": null,
@@ -1377,7 +1532,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": null,
@@ -1416,7 +1576,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1279": {
@@ -1457,7 +1622,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": null,
@@ -1496,7 +1666,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": null,
@@ -1535,7 +1710,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1280": {
@@ -1576,7 +1756,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Tablet": {
           "tree": null,
@@ -1615,7 +1800,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Desktop": {
           "tree": null,
@@ -1654,7 +1844,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         }
       },
       "1440": {
@@ -1695,7 +1890,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Tablet": {
           "tree": null,
@@ -1734,7 +1934,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Desktop": {
           "tree": null,
@@ -1773,7 +1978,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         }
       }
     },
@@ -1816,7 +2026,12 @@
           "pageScrollX": 0,
           "pageScrollY": 444,
           "shellBottom": 1344,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         },
         "Tablet": {
           "tree": null,
@@ -1855,7 +2070,12 @@
           "pageScrollX": 0,
           "pageScrollY": 444,
           "shellBottom": 1344,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         },
         "Desktop": {
           "tree": null,
@@ -1894,7 +2114,12 @@
           "pageScrollX": 0,
           "pageScrollY": 444,
           "shellBottom": 1344,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 93,
+          "storeName": ""
         }
       },
       "900": {
@@ -1935,7 +2160,12 @@
           "pageScrollX": 0,
           "pageScrollY": 406,
           "shellBottom": 1306,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": null,
@@ -1974,7 +2204,12 @@
           "pageScrollX": 0,
           "pageScrollY": 406,
           "shellBottom": 1306,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": null,
@@ -2013,7 +2248,12 @@
           "pageScrollX": 0,
           "pageScrollY": 406,
           "shellBottom": 1306,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1024": {
@@ -2054,7 +2294,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": null,
@@ -2093,7 +2338,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": null,
@@ -2132,7 +2382,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1100": {
@@ -2173,7 +2428,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": null,
@@ -2212,7 +2472,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": null,
@@ -2251,7 +2516,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1279": {
@@ -2292,7 +2562,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Tablet": {
           "tree": null,
@@ -2331,7 +2606,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         },
         "Desktop": {
           "tree": null,
@@ -2370,7 +2650,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": ""
         }
       },
       "1280": {
@@ -2411,7 +2696,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Tablet": {
           "tree": null,
@@ -2450,7 +2740,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Desktop": {
           "tree": null,
@@ -2489,7 +2784,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         }
       },
       "1440": {
@@ -2530,7 +2830,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Tablet": {
           "tree": null,
@@ -2569,7 +2874,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         },
         "Desktop": {
           "tree": null,
@@ -2608,7 +2918,12 @@
           "pageScrollX": 0,
           "pageScrollY": 0,
           "shellBottom": 900,
-          "viewH": 900
+          "viewH": 900,
+          "scrollbar": 0,
+          "inspectorScrollX": 0,
+          "inspectorBar": 0,
+          "topBar": 55,
+          "storeName": "Design Demo Co"
         }
       }
     }
@@ -2669,6 +2984,20 @@
       "name": "console navigation folded away, menu button present",
       "ok": true,
       "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "the store's name is in the top bar, which stays one row",
+      "ok": true,
+      "detail": "name \"Design Demo Co\", top bar 55px tall"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
     },
     {
       "page": "home",
@@ -2841,6 +3170,20 @@
     {
       "page": "home",
       "width": 1280,
+      "name": "the store's name is in the top bar, which stays one row",
+      "ok": true,
+      "detail": "name \"Design Demo Co\", top bar 55px tall"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -2995,6 +3338,20 @@
     {
       "page": "home",
       "width": 1279,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "home",
+      "width": 1279,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -3145,6 +3502,20 @@
       "name": "console navigation folded away, menu button present",
       "ok": true,
       "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
     },
     {
       "page": "home",
@@ -3303,6 +3674,20 @@
     {
       "page": "home",
       "width": 1024,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -3436,6 +3821,20 @@
     {
       "page": "home",
       "width": 900,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "home",
+      "width": 900,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -3565,6 +3964,20 @@
       "name": "console navigation folded away, menu button present",
       "ok": true,
       "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
     },
     {
       "page": "home",
@@ -3723,6 +4136,20 @@
     {
       "page": "product",
       "width": 1440,
+      "name": "the store's name is in the top bar, which stays one row",
+      "ok": true,
+      "detail": "name \"Design Demo Co\", top bar 55px tall"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -3877,6 +4304,20 @@
     {
       "page": "product",
       "width": 1280,
+      "name": "the store's name is in the top bar, which stays one row",
+      "ok": true,
+      "detail": "name \"Design Demo Co\", top bar 55px tall"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -4020,6 +4461,20 @@
       "name": "console navigation folded away, menu button present",
       "ok": true,
       "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
     },
     {
       "page": "product",
@@ -4171,6 +4626,20 @@
     {
       "page": "product",
       "width": 1100,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "product",
+      "width": 1100,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -4318,6 +4787,20 @@
     {
       "page": "product",
       "width": 1024,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "product",
+      "width": 1024,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -4444,6 +4927,20 @@
     {
       "page": "product",
       "width": 900,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "product",
+      "width": 900,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -4566,6 +5063,20 @@
       "name": "console navigation folded away, menu button present",
       "ok": true,
       "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
     },
     {
       "page": "product",
@@ -4724,6 +5235,20 @@
     {
       "page": "collection",
       "width": 1440,
+      "name": "the store's name is in the top bar, which stays one row",
+      "ok": true,
+      "detail": "name \"Design Demo Co\", top bar 55px tall"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -4878,6 +5403,20 @@
     {
       "page": "collection",
       "width": 1280,
+      "name": "the store's name is in the top bar, which stays one row",
+      "ok": true,
+      "detail": "name \"Design Demo Co\", top bar 55px tall"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -5021,6 +5560,20 @@
       "name": "console navigation folded away, menu button present",
       "ok": true,
       "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
     },
     {
       "page": "collection",
@@ -5172,6 +5725,20 @@
     {
       "page": "collection",
       "width": 1100,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -5319,6 +5886,20 @@
     {
       "page": "collection",
       "width": 1024,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -5445,6 +6026,20 @@
     {
       "page": "collection",
       "width": 900,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
+    },
+    {
+      "page": "collection",
+      "width": 900,
       "name": "Mobile renders at 375px",
       "ok": true,
       "detail": "page inside is 375px wide"
@@ -5567,6 +6162,20 @@
       "name": "console navigation folded away, menu button present",
       "ok": true,
       "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "below 1280 the store's name is only in the menu",
+      "ok": true,
+      "detail": "name \"\""
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "the inspector's content fits its pane: nothing cut off sideways",
+      "ok": true,
+      "detail": "sideways overflow 0px, scrollbar 0px"
     },
     {
       "page": "collection",
@@ -5711,16 +6320,23 @@
     {
       "page": "home",
       "width": 1024,
-      "name": "picking a section in the drawer opens it in the inspector",
+      "name": "keyboard: Escape closes it and focus returns to the button",
       "ok": true,
-      "detail": ""
+      "detail": "{\"open\":false,\"focusBack\":true,\"expanded\":\"false\"}"
     },
     {
       "page": "home",
       "width": 1024,
-      "name": "keyboard: Escape closes it and focus returns to the button",
+      "name": "keyboard: picking a section in the drawer closes it and opens the section in the inspector, focus back on the button",
       "ok": true,
-      "detail": "{\"open\":false,\"focusBack\":true,\"expanded\":\"false\"}"
+      "detail": "{\"open\":false,\"focusBack\":true,\"expanded\":\"false\",\"hero\":true}"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "a tree control that is not a pick (Add section) keeps the drawer open",
+      "ok": true,
+      "detail": "{\"open\":true,\"button\":true,\"list\":true}"
     },
     {
       "page": "home",
@@ -5774,16 +6390,23 @@
     {
       "page": "home",
       "width": 1279,
-      "name": "picking a section in the drawer opens it in the inspector",
+      "name": "keyboard: Escape closes it and focus returns to the button",
       "ok": true,
-      "detail": ""
+      "detail": "{\"open\":false,\"focusBack\":true,\"expanded\":\"false\"}"
     },
     {
       "page": "home",
       "width": 1279,
-      "name": "keyboard: Escape closes it and focus returns to the button",
+      "name": "keyboard: picking a section in the drawer closes it and opens the section in the inspector, focus back on the button",
       "ok": true,
-      "detail": "{\"open\":false,\"focusBack\":true,\"expanded\":\"false\"}"
+      "detail": "{\"open\":false,\"focusBack\":true,\"expanded\":\"false\",\"hero\":true}"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "a tree control that is not a pick (Add section) keeps the drawer open",
+      "ok": true,
+      "detail": "{\"open\":true,\"button\":true,\"list\":true}"
     },
     {
       "page": "home",
@@ -5826,8 +6449,36 @@
       "name": "other console pages unchanged: sidebar shown, page capped at 1024px",
       "ok": true,
       "detail": "{\"main\":1024,\"maxWidth\":\"1024px\",\"sidebar\":240,\"menu\":false}"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "long tree (28 rows): the page itself does not scroll",
+      "ok": true,
+      "detail": "{\"pane\":true,\"drawer\":false,\"client\":767,\"scroll\":1151,\"bottom\":900,\"pageScrollY\":0,\"lastInView\":true,\"viewH\":900}"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "long tree: it scrolls inside its own pane, which ends inside the window, and the last section is reachable",
+      "ok": true,
+      "detail": "{\"pane\":true,\"drawer\":false,\"client\":767,\"scroll\":1151,\"bottom\":900,\"pageScrollY\":0,\"lastInView\":true,\"viewH\":900}"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "long tree (28 rows): the page itself does not scroll",
+      "ok": true,
+      "detail": "{\"pane\":true,\"drawer\":true,\"client\":848,\"scroll\":1151,\"bottom\":900,\"pageScrollY\":0,\"lastInView\":true,\"viewH\":900}"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "long tree: it scrolls inside its own drawer, which ends inside the window, and the last section is reachable",
+      "ok": true,
+      "detail": "{\"pane\":true,\"drawer\":true,\"client\":848,\"scroll\":1151,\"bottom\":900,\"pageScrollY\":0,\"lastInView\":true,\"viewH\":900}"
     }
   ],
-  "passed": 459,
+  "passed": 507,
   "failed": 0
 }

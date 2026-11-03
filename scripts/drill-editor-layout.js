@@ -10,6 +10,11 @@
 //   node scripts/dev-design.js seed
 //   (start Next on a free port with the same environment dev-design.js sets)
 //   node scripts/drill-editor-layout.js --base http://localhost:3037 [--shots docs/cms-reviews/drills/ED-01] [--shot-widths 1440,1280,1024,900] [--json out.json]
+// Other options: --widths 1440,1280 --height 900 --pages home,product,collection
+//   --classic-scrollbars  scrollbars that take room (15px), like Windows or a
+//                         Mac set to always show them, instead of hiding them
+// It signs in with a local test password, so it refuses any --base that is not
+// this machine (localhost, 127.0.0.1, [::1] or a *.localhost name).
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -29,13 +34,31 @@ if (!BASE) {
   console.error("Usage: node scripts/drill-editor-layout.js --base http://localhost:<port> [--shots <dir>] [--json <file>] [--pages home,product,collection]");
   process.exit(2);
 }
+// The local test password goes to whatever --base says: only ever this machine.
+const isLocalBase = (base) => {
+  try {
+    const u = new URL(base);
+    const h = u.hostname.toLowerCase();
+    return (u.protocol === "http:" || u.protocol === "https:") && (h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h.endsWith(".localhost"));
+  } catch {
+    return false;
+  }
+};
+if (!isLocalBase(BASE)) {
+  console.error(`Refusing --base ${BASE}: this drill signs in with the local test password, so it only runs against this machine (localhost, 127.0.0.1, [::1] or *.localhost).`);
+  process.exit(2);
+}
 const SHOTS = arg("shots");
 const SHOT_WIDTHS = new Set((arg("shot-widths") || "1440,1280,1024,900").split(",").map(Number));
 const JSON_OUT = arg("json");
 const PAGES = (arg("pages") || "home,product,collection").split(",");
 const PORT = Number(arg("cdp-port") || 9400 + Math.floor(Math.random() * 400));
 const WIDTHS = (arg("widths") || "1440,1280,1279,1100,1024,900,768").split(",").map(Number);
-const HEIGHT = 900;
+const HEIGHT = Number(arg("height") || 900);
+const CLASSIC = args.includes("--classic-scrollbars");
+// Chrome on a Mac uses overlay scrollbars that take no room. Styling the
+// scrollbar makes it a classic one, 15px wide, in every document and frame.
+const CLASSIC_CSS = "::-webkit-scrollbar{width:15px;height:15px;background:#eee}::-webkit-scrollbar-thumb{background:#999}";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- the acceptance numbers (spec ED-01) ---------------------------------------
@@ -46,7 +69,7 @@ const STATED = { Mobile: 375, Tablet: 768, Desktop: 1280 };
 const profile = mkdtempSync(join(tmpdir(), "drill-ed01-"));
 const chrome = spawn(
   CHROME,
-  ["--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--hide-scrollbars", "about:blank"],
+  ["--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "--disable-extensions", ...(CLASSIC ? [] : ["--hide-scrollbars"]), "about:blank"],
   { stdio: "ignore" }
 );
 let ws;
@@ -67,6 +90,8 @@ async function connect() {
   await new Promise((r, j) => ((ws.onopen = r), (ws.onerror = j)));
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
+    // the long-tree check leaves unsaved sections behind: leave without asking
+    if (m.method === "Page.javascriptDialogOpening") ws.send(JSON.stringify({ id: ++seq, method: "Page.handleJavaScriptDialog", params: { accept: true } }));
     if (m.id && pending.has(m.id)) {
       const { resolve, reject } = pending.get(m.id);
       pending.delete(m.id);
@@ -165,6 +190,11 @@ const MEASURE = `(() => {
     pageScrollY: se.scrollHeight - se.clientHeight,
     shellBottom: (() => { const e = document.querySelector('[data-editor-shell]'); return e ? Math.round(e.getBoundingClientRect().bottom) : null; })(),
     viewH: innerHeight,
+    scrollbar: (() => { const d = document.createElement('div'); d.style.cssText = 'position:absolute;top:-999px;width:100px;height:100px;overflow:scroll'; document.body.appendChild(d); const w = d.offsetWidth - d.clientWidth; d.remove(); return w; })(),
+    inspectorScrollX: (() => { const e = document.querySelector('[data-editor-pane="inspector"]'); return e ? e.scrollWidth - e.clientWidth : null; })(),
+    inspectorBar: (() => { const e = document.querySelector('[data-editor-pane="inspector"]'); if (!e) return null; const cs = getComputedStyle(e); return e.offsetWidth - e.clientWidth - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth); })(),
+    topBar: (() => { const h = document.querySelector('[data-editor-shell] > header'); return h ? Math.round(h.getBoundingClientRect().height) : null; })(),
+    storeName: (() => { const e = document.querySelector('[data-store-name]'); if (!e) return null; const r = e.getBoundingClientRect(); return r.width > 0 && getComputedStyle(e).display !== 'none' ? e.textContent.trim() : ''; })(),
   };
 })()`;
 
@@ -215,6 +245,10 @@ async function measurePage(page, width) {
   if (width >= 1024) check(page, width, "the editor fills the window down to its bottom edge", m.shellBottom != null && Math.abs(m.shellBottom - m.viewH) <= 2 && m.frame?.h >= m.viewH * 0.6, `editor ends at ${m.shellBottom}px of ${m.viewH}px, frame ${m.frame?.h}px tall`);
   if (width >= 1024) check(page, width, "inspector beside the preview", m.inspector?.shown && m.preview && m.inspector.x >= m.preview.x + m.preview.w - 1, `preview ends ${m.preview ? m.preview.x + m.preview.w : "?"}, inspector starts ${m.inspector?.x}`);
   check(page, width, "console navigation folded away, menu button present", !m.consoleNav?.shown && m.menuButton, `sidebar ${m.consoleNav?.shown ? `${m.consoleNav.w}px` : "hidden"}, menu ${m.menuButton}`);
+  if (CLASSIC) check(page, width, "classic scrollbars are on and take room", m.scrollbar >= 15, `scrollbar ${m.scrollbar}px`);
+  if (width >= 1280) check(page, width, "the store's name is in the top bar, which stays one row", !!m.storeName && m.topBar <= 60, `name "${m.storeName}", top bar ${m.topBar}px tall`);
+  else check(page, width, "below 1280 the store's name is only in the menu", m.storeName === "", `name ${JSON.stringify(m.storeName)}`);
+  check(page, width, "the inspector's content fits its pane: nothing cut off sideways", m.inspectorScrollX != null && m.inspectorScrollX <= 0, `sideways overflow ${m.inspectorScrollX}px, scrollbar ${m.inspectorBar}px`);
 
   for (const d of ["Mobile", "Tablet", "Desktop"]) {
     const x = per[d];
@@ -263,16 +297,31 @@ async function drawerByKeyboard(width) {
     if (where.startsWith("outside")) escaped++;
   }
   check("home", width, "keyboard: Tab never leaves the open drawer", escaped === 0, `${escaped} of 12 Tab presses landed outside`);
-  // pick Hero inside the drawer: the inspector behind it switches to Hero
-  await evaluate(`(() => { const d = document.querySelector('dialog[open]'); const b = [...d.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Hero'); b.focus(); return true; })()`);
-  await press("Enter");
-  await sleep(300);
-  const heroShown = await evaluate(`!!document.querySelector('[data-editor-pane="inspector"] #ins-hero-title')`);
-  check("home", width, "picking a section in the drawer opens it in the inspector", heroShown, "");
+  const state = `({ open: !!document.querySelector('dialog[open]'), focusBack: !!(document.activeElement && document.activeElement.matches('[data-tree-toggle]')), expanded: document.querySelector('[data-tree-toggle]').getAttribute('aria-expanded') })`;
   await press("Escape");
   await sleep(400);
-  const closed = await evaluate(`({ open: !!document.querySelector('dialog[open]'), focusBack: !!(document.activeElement && document.activeElement.matches('[data-tree-toggle]')), expanded: document.querySelector('[data-tree-toggle]').getAttribute('aria-expanded') })`);
+  const closed = await evaluate(state);
   check("home", width, "keyboard: Escape closes it and focus returns to the button", !closed.open && closed.focusBack && closed.expanded === "false", JSON.stringify(closed));
+
+  // pick Hero inside the drawer: the drawer closes and the inspector shows Hero
+  await press("Enter");
+  await sleep(400);
+  await evaluate(`(() => { const d = document.querySelector('dialog[open]'); const b = [...d.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Hero'); b.focus(); return true; })()`);
+  await press("Enter");
+  await sleep(400);
+  const picked = await evaluate(`(() => { const s = ${state}; return { ...s, hero: !!document.querySelector('[data-editor-pane="inspector"] #ins-hero-title') }; })()`);
+  check("home", width, "keyboard: picking a section in the drawer closes it and opens the section in the inspector, focus back on the button", picked.hero && !picked.open && picked.focusBack && picked.expanded === "false", JSON.stringify(picked));
+  await shot(`after-home-${width}-picked`);
+
+  // a control in the tree that is not a pick (Add section) keeps the drawer open
+  await press("Enter");
+  await sleep(400);
+  const added = await evaluate(`(() => { const d = document.querySelector('dialog[open]'); const b = d && [...d.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Add section'); if (!b) return { open: !!d, button: false }; b.click(); return new Promise((r) => setTimeout(() => r({ open: !!document.querySelector('dialog[open]'), button: true, list: !!document.querySelector('dialog[open] [aria-label="Section types"]') }), 300)); })()`);
+  check("home", width, "a tree control that is not a pick (Add section) keeps the drawer open", added.open && added.button && added.list, JSON.stringify(added));
+  await evaluate(`(() => { const d = document.querySelector('dialog[open]'); const b = d && [...d.querySelectorAll('button')].find((x) => x.textContent.trim() === 'Add section'); b && b.click(); return true; })()`);
+  await evaluate(`(() => { const d = document.querySelector('dialog[open]'); const c = d && d.querySelector('button[aria-label^="Close"]'); c && c.focus(); return !!c; })()`);
+  await press("Enter");
+  await sleep(400);
 
   // the close button works by keyboard too
   await press("Enter");
@@ -329,6 +378,51 @@ async function consoleMenu(width) {
   check("home", width, "keyboard: the menu button opens the navigation, Escape closes it, focus returns", onMenu && kb.open && kb.focusInside && !back.open && back.focusBack, `Tab presses ${tabs}, opened ${JSON.stringify(kb)}, after Escape ${JSON.stringify(back)}`);
 }
 
+// A store with many sections: the tree scrolls inside its own pane (or the
+// drawer, below 1280), the page itself never scrolls, and the last section is
+// reachable. The sections are added in the editor and never saved.
+async function longTree(width, count = 24) {
+  await viewport(width);
+  await navigate(`${BASE}${PAGE_URL.home}`);
+  await settleFrame();
+  const docked = width >= 1280;
+  if (!docked) {
+    await evaluate(`document.querySelector('[data-tree-toggle]').click(), true`);
+    await sleep(400);
+  }
+  const rows = await evaluate(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const root = () => document.querySelector('dialog[open]') || document.querySelector('[data-editor-pane="tree"]');
+    for (let i = 0; i < ${count}; i++) {
+      const add = root() && [...root().querySelectorAll('button')].find((b) => b.textContent.trim() === 'Add section');
+      if (!add) return -1;
+      add.click();
+      await wait(80);
+      const kind = root().querySelector('[aria-label="Section types"] button');
+      if (!kind) return -2;
+      kind.click();
+      await wait(80);
+    }
+    return root().querySelectorAll('[data-tree-pick]').length;
+  })()`);
+  await sleep(300);
+  const r = await evaluate(`(() => {
+    const se = document.scrollingElement;
+    const d = document.querySelector('dialog[open]');
+    const pane = d ? [...d.querySelectorAll('div')].find((x) => getComputedStyle(x).overflowY === 'auto') : document.querySelector('[data-editor-pane="tree"]');
+    if (!pane) return { pane: false };
+    const before = { client: pane.clientHeight, scroll: pane.scrollHeight, bottom: Math.round(pane.getBoundingClientRect().bottom) };
+    pane.scrollTop = pane.scrollHeight;
+    const picks = pane.querySelectorAll('[data-tree-pick]');
+    const last = picks[picks.length - 1].getBoundingClientRect();
+    const pr = pane.getBoundingClientRect();
+    return { pane: true, drawer: !!d, ...before, pageScrollY: se.scrollHeight - se.clientHeight, lastInView: last.top >= pr.top - 1 && last.bottom <= pr.bottom + 1, viewH: innerHeight };
+  })()`);
+  check("home", width, `long tree (${rows} rows): the page itself does not scroll`, r.pane && r.pageScrollY <= 0, JSON.stringify(r));
+  check("home", width, `long tree: it scrolls inside its own ${docked ? "pane" : "drawer"}, which ends inside the window, and the last section is reachable`, r.pane && r.drawer === !docked && r.scroll > r.client && r.bottom <= r.viewH + 1 && r.lastInView, JSON.stringify(r));
+  await shot(`after-home-${width}-long-tree`);
+}
+
 // Ordinary console pages keep their capped layout and the sidebar.
 async function ordinaryPage(width) {
   await viewport(width);
@@ -345,6 +439,12 @@ try {
   await connect();
   await send("Page.enable");
   await send("Runtime.enable");
+  if (CLASSIC) {
+    const css = JSON.stringify(CLASSIC_CSS);
+    await send("Page.addScriptToEvaluateOnNewDocument", {
+      source: `(() => { const add = () => { const s = document.createElement('style'); s.textContent = ${css}; (document.head || document.documentElement).appendChild(s); }; if (document.head) add(); else document.addEventListener('DOMContentLoaded', add); })()`,
+    });
+  }
   await viewport(1440);
   const pw = readFileSync(join(ROOT, ".design-env"), "utf8")
     .split("\n")
@@ -390,6 +490,14 @@ try {
       await ordinaryPage(1440);
     } catch (e) {
       check("home", 1440, "console menu", false, e.message);
+    }
+    // last: these leave unsaved sections in the editor
+    for (const w of [1280, 1024]) {
+      try {
+        await longTree(w);
+      } catch (e) {
+        check("home", w, "long tree", false, e.message);
+      }
     }
   }
 } catch (e) {

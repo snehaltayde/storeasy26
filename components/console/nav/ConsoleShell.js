@@ -21,13 +21,35 @@ import { isEditorRoute } from "@/components/admin/cms/editorLayout";
 // itself (components/admin/cms/EditorShell.js). The navigation folds into
 // the same drawer the phone layout uses, opened from the editor's own top
 // bar through useConsoleNav(). The founder's saved sidebar preference is
-// left as it was.
+// left as it was. Anything else shown on an editor route (the error page,
+// the loading skeleton) wraps itself in ConsolePageFrame, which gives it the
+// menu button and the console's usual page padding, so a page that fails to
+// load never leaves the founder without navigation or sign-out.
 
 const ConsoleNavContext = createContext(null);
 
-// → { openNav } inside the console shell, or null outside it.
+// → { openNav, editor: true, storeName } inside the console shell on an editor
+// route, or null anywhere else.
 export function useConsoleNav() {
   return useContext(ConsoleNavContext);
+}
+
+// On an editor route, lays out something that is not the editor: a small top
+// bar with the menu button and the store's name, then the content in the
+// console's usual padded, capped page. Anywhere else it renders its children
+// untouched (the normal shell already has the sidebar and the padding).
+export function ConsolePageFrame({ children }) {
+  const nav = useConsoleNav();
+  if (!nav?.editor) return children;
+  return (
+    <div data-console-page-frame>
+      <div className="flex items-center gap-2 border-b border-edge bg-surface px-3 py-2">
+        <IconButton data-console-menu label="Open menu" icon={<Menu size={17} aria-hidden />} onClick={nav.openNav} />
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-fg">{nav.storeName}</p>
+      </div>
+      <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">{children}</div>
+    </div>
+  );
 }
 
 function SignOut({ collapsed }) {
@@ -117,7 +139,7 @@ export function ConsoleShell({ storeName, host, role, actorKind, badges, childre
 
   if (editor) {
     return (
-      <ConsoleNavContext.Provider value={{ openNav: () => setDrawer(true) }}>
+      <ConsoleNavContext.Provider value={{ openNav: () => setDrawer(true), editor: true, storeName }}>
         {navDrawer}
         <main className="min-w-0">{children}</main>
       </ConsoleNavContext.Provider>
