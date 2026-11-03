@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
-import { simulateOffer, SAMPLE_CARTS } from "@/lib/offers/simulate";
+import { simulateOffer } from "@/lib/offers/simulate";
 import { tenantHandler } from "@/lib/tenant-request";
 
-// Offer simulator (S32 / BE07+MC14): POST {offer, enabled?, cartKey?, coupon?}
-// → deterministic sample-cart evaluation (alone + combined with active offers).
+// Offer simulator (S32 / BE07+MC14, COM-03): POST {offer, enabled?}
+// → example carts from this store's own products, each checked against the
+// offer's sentence (alone, and with the store's other live offers).
 // Read-only — no writes, so offers.read suffices (staff/support can preview).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,11 +17,6 @@ export const POST = tenantHandler(async (request) => {
   if (!body.offer || typeof body.offer !== "object") {
     return NextResponse.json({ error: "offer object required" }, { status: 400 });
   }
-  const result = await simulateOffer({
-    offer: body.offer,
-    enabled: body.enabled !== false,
-    cartKey: SAMPLE_CARTS[body.cartKey] ? body.cartKey : "medium",
-    coupon: body.coupon ?? null,
-  });
+  const result = await simulateOffer({ offer: body.offer, enabled: body.enabled !== false });
   return NextResponse.json(result, { status: result.ok ? 200 : 422 });
 });

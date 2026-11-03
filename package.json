@@ -24,6 +24,7 @@
     "test:hardening": "node scripts/test-hardening.js",
     "test:offers": "node scripts/test-offers.js",
     "test:offers-admin": "node scripts/test-offers-admin.js",
+    "test:offer-form": "node scripts/test-offer-form.js",
     "test:events": "node scripts/test-events.js",
     "events:stats": "node --env-file=.env.local scripts/events-stats.js",
     "search:report": "node --env-file=.env.local scripts/search-report.js",

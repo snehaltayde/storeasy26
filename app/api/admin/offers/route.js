@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
-import { listOffers, upsertOffer } from "@/lib/offers/store";
+import { listOffers, offerExists, upsertOffer } from "@/lib/offers/store";
+import { offerTargetNames, storeCurrency } from "@/lib/offers/catalog";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
 
@@ -13,13 +14,21 @@ const deny = (a) => NextResponse.json({ error: a.error }, { status: a.status });
 export const GET = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "offers.read");
   if (!auth.ok) return deny(auth);
-  return NextResponse.json({ ok: true, offers: await listOffers() });
+  const offers = await listOffers();
+  // COM-03: the console says each offer in plain words, in the store's currency
+  const [names, currency] = await Promise.all([offerTargetNames(offers.flatMap((o) => [o.config, o.previous?.config].filter(Boolean))), storeCurrency()]);
+  return NextResponse.json({ ok: true, offers, names, currency });
 });
 
 export const POST = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "offers.write");
   if (!auth.ok) return deny(auth);
   const body = await request.json().catch(() => ({}));
+  // COM-03: creating never replaces an offer that happens to share an id (the
+  // old form derived ids, so two codes with the same letters collided).
+  if (typeof body.offer?.id === "string" && (await offerExists(body.offer.id))) {
+    return NextResponse.json({ error: "An offer with this name already exists. Close this form and start the offer again.", code: "OFFER_EXISTS" }, { status: 409 });
+  }
   try {
     const saved = await upsertOffer({
       offer: body.offer,
