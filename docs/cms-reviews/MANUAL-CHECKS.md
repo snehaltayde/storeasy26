@@ -140,6 +140,14 @@ The full list goes to the owner when all six phases are done. Each entry names t
 - [ ] **On Vercel staging, compression:** the home page response carries `Content-Encoding: br` or `gzip`. (Locally it does not.)
 - (Library photos through `next/image` answering 400 locally is being fixed, not left for you.)
 
+## Phase 1, batch D
+
+### Two hard-to-read texts, and the colour pairs TOK missed (P1-CONTRAST)
+- [ ] **On your phone, on staging.** On a store with no brand, save a product that has no photo for later, open `/wishlist`, then open a policy page and, with an item in the cart, apply a working coupon. Pass: the "?" where the photo would be, the "Home" link at the top of the policy page, "Contact us" at its foot, and "Coupon" and "Remove" on the applied coupon are all easy to read in daylight. Chrome on the harness measured 4.8:1 or better on six looks.
+- [ ] **Decisions:**
+  - Every store, the default look included, now shows a darker grey for the wishlist's missing-photo "?" (#52525c, was #d4d4d8), the content pages' "Home" and "Contact us" links (#71717b, was #9f9fa9) and the words "Coupon" and "Remove" on an applied coupon (#52525c, was #71717b). These are the only default-look pixels this item changes. Keep?
+  - A store using the Pulse kit's own colours is still not pixel-equal to the same store with no brand: its lime surfaces are #a8eb43, not #a3e635, because a brand builds its own accent ladder. A shopper can't see it. It would take using the platform's built-in lime ladder whenever the accent is exactly #84cc16. Leave it?
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.

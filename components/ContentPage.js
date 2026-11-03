@@ -9,8 +9,11 @@ import FaqSection from "./FaqSection";
 export default function ContentPage({ page, legalName = "", children = null }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+      {/* P1-CONTRAST: the two links here (Home, Contact us) are subtle text,
+          4.5:1 or better on every look; the words around them stay faint.
+          They inherited the faint grey before (2.62:1 on white). */}
       <nav className="mb-6 text-sm text-sf-text-faint">
-        <Link href="/" className="hover:text-sf-text-muted">
+        <Link href="/" className="text-sf-text-subtle hover:text-sf-text-muted">
           Home
         </Link>{" "}
         / <span className="text-sf-text-muted">{page.title}</span>
@@ -62,7 +65,7 @@ export default function ContentPage({ page, legalName = "", children = null }) {
       {children}
       <p className="mt-12 border-t border-sf-border-soft pt-6 text-xs text-sf-text-faint">
         {legalName ? `Operated by ${legalName} · ` : ""}Questions?{" "}
-        <Link href="/contact" className="underline hover:text-sf-text-muted">
+        <Link href="/contact" className="text-sf-text-subtle underline hover:text-sf-text-muted">
           Contact us
         </Link>
       </p>

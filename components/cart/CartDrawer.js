@@ -259,7 +259,9 @@ export default function CartDrawer() {
               {couponStatus?.valid ? (
                 <div className="flex items-center justify-between rounded-sf-control border border-sf-accent-border bg-sf-accent-subtle px-3 py-2.5">
                   <span className="text-sm">
-                    <span className="text-sf-text-subtle">Coupon</span>{" "}
+                    {/* P1-CONTRAST: muted, not subtle: subtle grey is 4.08:1 on a blue
+                        accent's tint (white/#0a0a0b with #2563eb) */}
+                    <span className="text-sf-text-muted">Coupon</span>{" "}
                     <span className="font-semibold text-sf-on-accent-soft">{couponStatus.code}</span>
                     {couponStatus.applied ? (
                       <span className="text-sf-accent-text"> · −{formatMoney(couponStatus.applied, currency)}</span>
@@ -267,7 +269,7 @@ export default function CartDrawer() {
                   </span>
                   <button
                     onClick={() => setCoupon(null)}
-                    className="text-xs font-medium text-sf-text-subtle hover:text-sf-text-soft"
+                    className="text-xs font-medium text-sf-text-muted hover:text-sf-text-soft"
                   >
                     Remove
                   </button>

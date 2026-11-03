@@ -1,0 +1,78 @@
+{
+  "id": "CONTRAST",
+  "part": "c-pulse-brand",
+  "title": "P1-CONTRAST: the wishlist mark, content page links and the pairs TOK missed — c-pulse-brand",
+  "ranAt": "2026-11-03T17:26:54.621Z",
+  "harness": "http://localhost:3271",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 1,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "Theme: the Pulse kit applied with its brand",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "the Pulse kit's own brand publishes",
+      "detail": {
+        "status": 200,
+        "brand": {
+          "accent": "#84cc16",
+          "background": "#ffffff",
+          "foreground": "#0a0a0b",
+          "radius": "md",
+          "type_scale": "regular"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "links measure 4.5:1 or better",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "the footer wordmark measures 3:1 or better",
+      "detail": "the harness logo has no second word, so no accent part is drawn"
+    },
+    {
+      "ok": true,
+      "label": "the checkout wordmark measures 3:1 or better",
+      "detail": "no accent part drawn (one-word logo)"
+    },
+    {
+      "ok": false,
+      "label": "every screenshot equals the no-brand baseline on Pulse",
+      "detail": [
+        "home-375: 22556 px in [0,0,374,671]",
+        "product-375: 26455 px in [0,0,374,862]",
+        "collection-375: 10618 px in [0,0,374,57]",
+        "search-375: 11279 px in [0,0,374,247]",
+        "cms-page-375: 10618 px in [0,0,374,57]",
+        "checkout-375: 10618 px in [0,0,374,57]",
+        "home-1440: 55401 px in [0,0,1439,670]",
+        "product-1440: 63163 px in [0,0,1439,399]",
+        "collection-1440: 40370 px in [0,0,1439,58]",
+        "search-1440: 41031 px in [0,0,1439,195]",
+        "cms-page-1440: 40370 px in [0,0,1439,58]",
+        "checkout-1440: 40370 px in [0,0,1439,58]"
+      ]
+    }
+  ],
+  "notes": [
+    "the Pulse brand: {\"accent\":\"#84cc16\",\"background\":\"#ffffff\",\"foreground\":\"#0a0a0b\",\"radius\":\"md\",\"type_scale\":\"regular\"}",
+    "links on the CMS page: [{\"text\":\"Home\",\"fg\":\"#71717b\",\"bg\":\"#ffffff\",\"ratio\":4.83,\"need\":4.5},{\"text\":\"Contact us\",\"fg\":\"#71717b\",\"bg\":\"#ffffff\",\"ratio\":4.83,\"need\":4.5}]; home links: [{\"text\":\"View all →\",\"fg\":\"#456c09\",\"bg\":\"#ffffff\",\"ratio\":6.17,\"need\":4.5}]; footer: [{\"text\":\"All collections\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"Bestsellers\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"Night routine\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"Serums\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"Contact\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"Shipping policy\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"support@design.test\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5}]; checkout wordmark: []",
+    "the harness logo is one word, so the footer and checkout wordmarks have no accent part to measure; their colours are the page's own text",
+    "pixel differences, Pulse brand against no brand on Pulse: {\"home-375\":{\"pixels\":22556,\"box\":[0,0,374,671],\"topColourChanges\":[\"#a3e635→#a8eb43 ×16526\",\"#a2e535→#a7ea43 ×195\",\"#10140b→#a8eb43 ×65\",\"#10150b→#a8eb43 ×64\",\"#0f130b→#a8eb43 ×58\"]},\"product-375\":{\"pixels\":26455,\"box\":[0,0,374,862],\"topColourChanges\":[\"#a3e635→#a8eb43 ×22069\",\"#a2e535→#a7ea43 ×1443\",\"#a2e435→#a7e942 ×476\",\"#a1e334→#a6e842 ×441\",\"#435c1b→#455e20 ×35\"]},\"collection-375\":{\"pixels\":10618,\"box\":[0,0,374,57],\"topColourChanges\":[\"#a3e635→#a8eb43 ×9187\",\"#a2e535→#a7ea43 ×171\",\"#a2e435→#a7e942 ×46\",\"#a1e334→#a6e842 ×29\",\"#435c1b→#455e20 ×25\"]},\"search-375\":{\"pixels\":11279,\"box\":[0,0,374,247],\"topColourChanges\":[\"#a3e635→#a8eb43 ×9187\",\"#4d7c0f→#456c09 ×311\",\"#a2e535→#a7ea43 ×171\",\"#a2e435→#a7e942 ×46\",\"#a1e334→#a6e842 ×29\"]},\"cms-page-375\":{\"pixels\":10618,\"box\":[0,0,374,57],\"topColourChanges\":[\"#a3e635→#a8eb43 ×9187\",\"#a2e535→#a7ea43 ×171\",\"#a2e435→#a7e942 ×46\",\"#a1e334→#a6e842 ×29\",\"#435c1b→#455e20 ×25\"]},\"checkout-375\":{\"pixels\":10618,\"box\":[0,0,374,57],\"topColourChanges\":[\"#a3e635→#a8eb43 ×9187\",\"#a2e535→#a7ea43 ×171\",\"#a2e435→#a7e942 ×46\",\"#a1e334→#a6e842 ×29\",\"#435c1b→#455e20 ×25\"]},\"home-1440\":{\"pixels\":55401,\"box\":[0,0,1439,670],\"topColourChanges\":[\"#a3e635→#a8eb43 ×48984\",\"#09090b→#a8eb43 ×394\",\"#a2e535→#a7ea43 ×191\",\"#09090b→#ffffff ×74\",\"#09090b→#3a3a3c ×72\"]},\"product-1440\":{\"pixels\":63163,\"box\":[0,0,1439,399],\"topColourChanges\":[\"#a3e635→#a8eb43 ×61024\",\"#a2e535→#a7ea43 ×171\",\"#4d7c0f→#456c09 ×52\",\"#a2e435→#a7e942 ×46\",\"#658d24→#68902c ×34\"]},\"collection-1440\":{\"pixels\":40370,\"box\":[0,0,1439,58],\"topColourChanges\":[\"#a3e635→#a8eb43 ×38947\",\"#a2e535→#a7ea43 ×163\",\"#a2e435→#a7e942 ×46\",\"#658d24→#68902c ×33\",\"#a1e334→#a6e842 ×29\"]},\"search-1440\":{\"pixels\":41031,\"box\":[0,0,1439,195],\"topColourChanges\":[\"#a3e635→#a8eb43 ×38947\",\"#4d7c0f→#456c09 ×311\",\"#a2e535→#a7ea43 ×163\",\"#a2e435→#a7e942 ×46\",\"#658d24→#68902c ×33\"]},\"cms-page-1440\":{\"pixels\":40370,\"box\":[0,0,1439,58],\"topColourChanges\":[\"#a3e635→#a8eb43 ×38947\",\"#a2e535→#a7ea43 ×163\",\"#a2e435→#a7e942 ×46\",\"#658d24→#68902c ×33\",\"#a1e334→#a6e842 ×29\"]},\"checkout-1440\":{\"pixels\":40370,\"box\":[0,0,1439,58],\"topColourChanges\":[\"#a3e635→#a8eb43 ×38947\",\"#a2e535→#a7ea43 ×163\",\"#a2e435→#a7e942 ×46\",\"#658d24→#68902c ×33\",\"#a1e334→#a6e842 ×29\"]}}",
+    "brand and theme put back, live release back to rel_90423d83aae33bb2"
+  ],
+  "screenshots": [
+    {
+      "name": "c-pulse-brand/home-1440",
+      "bytes": 4987
+    }
+  ]
+}
