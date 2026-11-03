@@ -26,7 +26,9 @@ const hranaError = (e) => ({ message: String(e?.message || e), code: "SQLITE_ERR
 export function fakeTurso(backing) {
   const state = {
     outage: false, // drop every request unexecuted
-    faults: [], // { match: RegExp, mode: "drop_before" | "commit_then_drop", then?: fn }
+    // { match: RegExp, mode: "drop_before" | "commit_then_drop", before?, then? }: the
+    // hooks are awaited, `before` ahead of running anything and `then` ahead of the drop.
+    faults: [],
     received: [], // the SQL of each statement that arrived, including dropped ones
   };
   const stored = new Map();
@@ -101,13 +103,14 @@ export function fakeTurso(backing) {
         if (state.outage) return req.socket.destroy();
         const at = state.faults.findIndex((f) => sqls.some((s) => f.match.test(s)));
         const fault = at >= 0 ? state.faults.splice(at, 1)[0] : null;
+        await fault?.before?.();
         if (fault?.mode === "drop_before") {
-          fault.then?.();
+          await fault.then?.();
           return req.socket.destroy();
         }
         const results = await runPipeline(requests);
         if (fault?.mode === "commit_then_drop") {
-          fault.then?.();
+          await fault.then?.();
           return req.socket.destroy();
         }
         res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ baton: null, base_url: null, results }));

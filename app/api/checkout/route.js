@@ -102,6 +102,11 @@ function scheduleCodEffects(request, order) {
   after(() => runOrderEffects(order.id, { expUnit }));
 }
 
+// The order exists by now, so a failure here mustn't turn into "please try
+// again": the effects scheduled first clear the cart again.
+const clearPlacedCart = (cartId, orderId) =>
+  clearCart(cartId).catch((e) => console.error(`[checkout] cart ${orderId}: ${e?.message || e}`));
+
 export const POST = tenantHandler(async (request) => {
   // S32 (BE06): the per-tenant capability gate — checkout modes are explicit
   // configuration, never silently switched. Browsing and the cart stay up.
@@ -151,10 +156,10 @@ export const POST = tenantHandler(async (request) => {
       const dup = await dedupByKey(idempotencyKey, cart, (cart.total || 0) + shipping.total);
       if (dup instanceof NextResponse) return dup;
       if (dup) {
-        // Finish what the first request started if its cart clear didn't land.
-        if (cartId && cart.items.length) await clearCart(cartId);
-        // Same for its after() work: that request may have died before scheduling it.
+        // Finish what the first request started: it may have died before
+        // scheduling its after() work, or before its cart clear landed.
         scheduleCodEffects(request, dup);
+        if (cartId && cart.items.length) await clearPlacedCart(cartId, dup.id);
         return await codResponse(dup, true);
       }
 
@@ -182,8 +187,8 @@ export const POST = tenantHandler(async (request) => {
       // `recovered`: the insert's response was lost but it may be ours, so this
       // request still owes the follow-up work.
       if (!order.deduped || order.recovered) {
-        await clearCart(cartId);
         scheduleCodEffects(request, order);
+        await clearPlacedCart(cartId, order.id);
       }
       return await codResponse(order, order.deduped);
     }

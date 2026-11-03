@@ -46,6 +46,8 @@ delete process.env.ALERT_WEBHOOK_URL;
 const { NextRequest } = await import("next/server");
 const O = await import("../lib/orders.js");
 const C = await import("../lib/platform/control.js");
+const { pushOrderToShopify } = await import("../lib/shopify-push.js");
+const { withTenant } = await import("../lib/tenant-context.js");
 const checkout = await import("../app/api/checkout/route.js");
 const webhook = await import("../app/api/razorpay/webhook/route.js");
 
@@ -252,6 +254,33 @@ await t("verify: a real rejection stays a rejection", async () => {
   eq((await orderRow(o.orderId)).razorpay_payment_id, o.paymentId, "payment id kept");
 });
 
+await t("verify: paid write commits, response lost, order moved on before the re-read → still success", async () => {
+  const o = await pendingOrder();
+  turso.state.faults.push({
+    match: UPDATE_ORDER,
+    mode: "commit_then_drop",
+    // The webhook's Shopify push starts before this request gets to re-read.
+    then: () => backing.execute({ sql: "UPDATE orders SET status = 'syncing_shopify' WHERE id = ?", args: [o.orderId] }),
+  });
+  const r = await callVerify(o);
+  eq(r.status, 200, `status (${r.body.error})`);
+  eq(r.body.ok, true, "ok");
+  eq(await paidEvents(o.orderId), 1, "paid events");
+});
+
+await t("verify: paid write lost and the order cancelled meanwhile → the same refusal as without the blip", async () => {
+  const o = await pendingOrder();
+  turso.state.faults.push({
+    match: UPDATE_ORDER,
+    mode: "drop_before",
+    then: () => backing.execute({ sql: "UPDATE orders SET status = 'cancelled' WHERE id = ?", args: [o.orderId] }),
+  });
+  const r = await callVerify(o);
+  eq(r.status, 400, "status");
+  ok(/invalid order transition cancelled → paid/i.test(r.body.error), `error (${r.body.error})`);
+  eq(await paidEvents(o.orderId), 0, "paid events");
+});
+
 await t("verify then webhook: both fire, paid event and effects happen once", async () => {
   const o = await pendingOrder();
   eq((await callVerify(o)).status, 200, "verify");
@@ -294,6 +323,87 @@ await t("a late webhook replay doesn't wipe a cart the customer has since refill
   eq((await callWebhook(o)).status, 200, "replay");
   await drainAfter();
   eq(await cartItems(o.cartId), 1, "new cart kept");
+});
+
+await t("effects: a paid order records its experiment conversion and runs order_placed automations", async () => {
+  const at = new Date().toISOString();
+  await backing.batch([
+    { sql: "INSERT INTO experiments (id, slug, name, variants, status, created_at, updated_at) VALUES ('exp-pr', 'exp-pr', 'PR', '[]', 'running', ?, ?)", args: [at, at] },
+    { sql: "INSERT INTO experiment_exposures (experiment_id, unit_id, variant, first_exposed_at) VALUES ('exp-pr', 'unit-pr', 'a', ?)", args: [at] },
+    {
+      sql: "INSERT INTO automations (id, name, trigger, action, enabled, created_at, updated_at) VALUES ('aut-pr', 'PR', 'order_placed', ?, 1, ?, ?)",
+      args: [JSON.stringify({ kind: "notify_merchant", text: "new order" }), at, at],
+    },
+  ], "write");
+  try {
+    const o = await pendingOrder();
+    const r = await callVerify(o, { headers: { cookie: `cart_session=${o.cartId}; _unit=unit-pr` } });
+    eq(r.status, 200, "verify");
+    await drainAfter();
+    eq(Number((await one("SELECT count(*) AS n FROM experiment_conversions WHERE order_id = ?", o.orderId)).n), 1, "conversion");
+    eq(Number((await one("SELECT count(*) AS n FROM automation_runs WHERE event_key = ?", `order_placed:${o.orderId}`)).n), 1, "automation run");
+  } finally {
+    await backing.batch(["DELETE FROM automations WHERE id = 'aut-pr'", "DELETE FROM experiments WHERE id = 'exp-pr'"], "write");
+  }
+});
+
+// --- 2b. Shopify push: only the pusher that won the begin goes on ------------------
+
+// A fake Shopify that records each draft it creates in `creates`; `onFind` can hold
+// a pusher just after its begin.
+const fakeShopify = (creates, onFind) => async (query, variables) => {
+  if (query.includes("draftOrderCreate")) {
+    creates.push(variables.input.tags);
+    return { draftOrderCreate: { draftOrder: { id: `gid://shopify/DraftOrder/${creates.length}`, name: "#D" }, userErrors: [] } };
+  }
+  if (query.includes("draftOrderComplete")) {
+    const order = { id: "gid://shopify/Order/1", name: "#1", displayFinancialStatus: "PAID", totalPriceSet: { shopMoney: { amount: "2000" } } };
+    return { draftOrderComplete: { draftOrder: { id: variables.id, status: "COMPLETED", order }, userErrors: [] } };
+  }
+  await onFind?.();
+  return { orders: { nodes: [] }, draftOrders: { nodes: [] } };
+};
+
+// The other pusher's own connection, straight to the same SQLite file.
+const DIRECT = { id: "direct", dbUrl: "file:.test-payment-recovery.db" };
+
+await t("push: the begin race's loser loses its response too → it stands down, one Shopify order", async () => {
+  const o = await pendingOrder();
+  await O.markOrderPaid(o.orderId, { razorpayPaymentId: o.paymentId });
+  const creates = [];
+  let begunB, releaseB, pushB;
+  const begun = new Promise((r) => (begunB = r));
+  const released = new Promise((r) => (releaseB = r));
+  // B wins the compare-and-set while A's begin is at the server; A's write then
+  // applies nothing, and its response is lost.
+  turso.state.faults.push({
+    match: UPDATE_ORDER,
+    mode: "commit_then_drop",
+    before: async () => {
+      pushB = withTenant(DIRECT, () =>
+        pushOrderToShopify(o.orderId, { gql: fakeShopify(creates, async () => (begunB(), released)) }),
+      );
+      await begun;
+    },
+  });
+  const a = await pushOrderToShopify(o.orderId, { gql: fakeShopify(creates) });
+  releaseB();
+  const b = await pushB;
+  eq(a.inFlight, true, `A stands down (${JSON.stringify(a)})`);
+  eq(b.ok, true, `B pushes (${JSON.stringify(b)})`);
+  eq(creates.length, 1, "draftOrderCreate calls");
+  eq((await orderRow(o.orderId)).status, "synced", "status");
+});
+
+await t("push: begin commits, response lost → the same pusher goes on, one Shopify order", async () => {
+  const o = await pendingOrder();
+  await O.markOrderPaid(o.orderId, { razorpayPaymentId: o.paymentId });
+  const creates = [];
+  turso.state.faults.push({ match: UPDATE_ORDER, mode: "commit_then_drop" });
+  const r = await pushOrderToShopify(o.orderId, { gql: fakeShopify(creates) });
+  eq(r.ok, true, `pushed (${JSON.stringify(r)})`);
+  eq(creates.length, 1, "draftOrderCreate calls");
+  eq((await orderRow(o.orderId)).status, "synced", "status");
 });
 
 // --- 3. createOrder: never report success on an order with no lines -------------
@@ -342,13 +452,26 @@ await t("COD: order insert commits, response lost → one complete order, cart c
   const cartId = await seedCart();
   const key = uid("key");
   turso.state.faults.push({ match: INSERT_ORDER, mode: "commit_then_drop" });
-  const first = await placeCod(cartId, key);
-  const final = first.body.ok ? first : await placeCod(cartId, key);
-  eq(final.body.ok, true, "ok");
-  eq(await itemRows(final.body.orderId), 1, "lines");
+  // No retry: the same request re-reads, finds its order, and finishes the work.
+  const placed = await placeCod(cartId, key);
+  eq(placed.status, 200, `status (${placed.body.error})`);
+  eq(placed.body.ok, true, "ok");
+  eq(await itemRows(placed.body.orderId), 1, "lines");
   await drainAfter();
   eq(await cartItems(cartId), 0, "cart");
-  eq(Number((await one("SELECT count(*) AS n FROM order_events WHERE order_id = ? AND from_status IS NULL", final.body.orderId)).n), 1, "created event");
+  eq(await purchaseEvents(placed.body.orderId), 1, "purchase event");
+  eq(Number((await one("SELECT count(*) AS n FROM order_events WHERE order_id = ? AND from_status IS NULL", placed.body.orderId)).n), 1, "created event");
+});
+
+await t("COD: cart clear fails after the order is placed → success, and the cart still gets cleared", async () => {
+  const cartId = await seedCart();
+  turso.state.faults.push({ match: /^delete from "cart_items"/i, mode: "drop_before" });
+  const placed = await placeCod(cartId, uid("key"));
+  eq(placed.status, 200, `status (${placed.body.error})`);
+  eq(placed.body.ok, true, "ok");
+  await drainAfter();
+  eq(await cartItems(cartId), 0, "cleared by the follow-up work");
+  eq(await purchaseEvents(placed.body.orderId), 1, "purchase event");
 });
 
 await t("COD: order commits and the re-read fails too → the retry finishes the follow-up work", async () => {
@@ -371,7 +494,7 @@ await t("COD: blip with nothing written → no raw error, and the retry places t
   const key = uid("key");
   turso.state.faults.push({ match: INSERT_ORDER, mode: "drop_before" });
   const first = await placeCod(cartId, key);
-  ok(!first.body.ok, "first attempt reports failure");
+  eq(first.status, 503, `first attempt (${first.body.error})`);
   ok(!/fetch failed|socket|SERVER_ERROR/i.test(first.body.error), `no raw error text (${first.body.error})`);
   const retry = await placeCod(cartId, key);
   eq(retry.body.ok, true, "retry");
@@ -396,10 +519,9 @@ const M = await import("../lib/platform/migrate.js");
 await M.runMigrations(C.platformDb(), await M.loadMigrations("platform"));
 await C.upsertTenant({
   id: "pr", name: "Recovery", domains: ["pr.test"], dbUrl: `http://127.0.0.1:${port}`, config: { razorpay_key_id: "rzp_test_key" },
-  secrets: { razorpay_key_secret: KEY_SECRET },
+  secrets: { razorpay_key_secret: KEY_SECRET, razorpay_webhook_secret: WEBHOOK_SECRET },
 });
 const { runDueJobs } = await import("../lib/platform/worker.js");
-const { withTenant } = await import("../lib/tenant-context.js");
 const tenant = await C.getTenant("pr");
 const jobs = async () => (await C.platformDb().execute("SELECT type, status, payload FROM jobs WHERE type = 'payment_confirm'")).rows;
 
@@ -428,6 +550,19 @@ await t("platform: a job can't pay an order other than the one its payment belon
   await drainAfter();
   eq((await orderRow(victim.orderId)).payment_status, "pending", "victim untouched");
   eq((await orderRow(attacker.orderId)).razorpay_payment_id, attacker.paymentId, "the job settles the attacker's own order");
+});
+
+await t("platform: webhook's paid write commits into an outage → its queued replay finishes the effects", async () => {
+  const o = await withTenant(tenant, pendingOrder);
+  turso.state.faults.push({ match: UPDATE_ORDER, mode: "commit_then_drop", then: () => (turso.state.outage = true) });
+  const r = await callWebhook(o, { host: "pr.test" });
+  eq(r.status, 200, "acknowledged");
+  eq(r.body.queued, true, "queued its own retry");
+  turso.state.outage = false;
+  eq(await cartItems(o.cartId), 1, "nothing done yet");
+  await runDueJobs();
+  await drainAfter();
+  await assertFullyPaid(o, "after the replay");
 });
 
 // --- 5. the browser's side of the retry ------------------------------------------

@@ -29,7 +29,7 @@ globalThis.fetch = async (...args) => {
   }
 };
 
-const { libsql, db, isReadOnlySql, neverReachedServer } = await import("../lib/db.js");
+const { libsql, db, isReadOnlySql, neverReachedServer, isTransient } = await import("../lib/db.js");
 const { sql } = await import("kysely");
 
 // --- harness ---------------------------------------------------------------
@@ -141,7 +141,7 @@ const READS = {
 
 // --- 1. the core guarantee: unknown outcome on a write is never resent ------
 
-for (const failure of ["drop", "rst", 502, 503]) {
+for (const failure of ["drop", "rst", 500, 502, 503, 504]) {
   await t(`write + unknown outcome (${failure}): sent exactly once, error surfaces`, async () => {
     const s = await setup();
     for (const [name, op] of Object.entries(WRITES)) {
@@ -217,7 +217,7 @@ await t("write that never connects: gives up after 4 attempts", async () => {
 
 // --- 3. reads still retry on any transient failure ---------------------------
 
-for (const failure of ["drop", "rst", 502, 503]) {
+for (const failure of ["drop", "rst", 500, 502, 503, 504]) {
   await t(`read + transient (${failure}): retried until it succeeds`, async () => {
     const s = await setup();
     for (const [name, op] of Object.entries(READS)) {
@@ -246,6 +246,17 @@ await t("read: a SQL error is not transient, so it is not retried", async () => 
   s.state.sqlError = "no such table: t";
   await rejects(libsql.execute("select * from t"), "read");
   eq(s.state.requests, 1, "requests");
+  await s.close();
+});
+
+await t("read: a client-side HTTP status is not retried", async () => {
+  const s = await setup();
+  for (const status of [400, 401, 404]) {
+    s.state.requests = 0;
+    s.state.failures = [status];
+    await rejects(libsql.execute("select 1"), String(status));
+    eq(s.state.requests, 1, `${status} requests`);
+  }
   await s.close();
 });
 
@@ -327,6 +338,27 @@ await t("neverReachedServer: only proof of no connection qualifies", () => {
     null,
   ]) {
     eq(neverReachedServer(e), false, String(e?.cause?.code || e?.message || e));
+  }
+});
+
+await t("isTransient: an id that happens to contain 502/503 is not a blip", () => {
+  for (const m of [
+    "fetch failed",
+    "SERVER_ERROR: Server returned HTTP status 500",
+    "SERVER_ERROR: Server returned HTTP status 504: upstream",
+    "read ECONNRESET",
+    "connection closed",
+  ]) {
+    eq(isTransient(new Error(m)), true, m);
+  }
+  for (const m of [
+    "Order BL-50312AB0 not found",
+    "Invalid order transition cancelled → paid (PAV-1502AB33)",
+    "SERVER_ERROR: Server returned HTTP status 404",
+    "SERVER_ERROR: Server returned HTTP status 5031",
+    "UNIQUE constraint failed: orders.idempotency_key",
+  ]) {
+    eq(isTransient(new Error(m)), false, m);
   }
 });
 
