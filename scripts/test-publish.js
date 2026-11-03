@@ -596,12 +596,14 @@ await t("cms_state is seeded 'legacy' with one row; tenant-migrate --check's led
   const upTo20 = MIGRATIONS.filter((m) => m.id < "0021");
   await migrate(c, upTo20);
   const at20 = await checkLedger(c, MIGRATIONS);
-  eq(at20.missing, ["0021_documents"], "a 0020 tenant is missing exactly 0021:");
+  // P2-PREVIEW: 0022 (preview_sessions) follows 0021; a 0020 tenant misses both
+  eq(at20.missing, MIGRATIONS.filter((m) => m.id >= "0021").map((m) => m.id), "a 0020 tenant is missing exactly 0021 and later:");
+  eq(at20.missing[0], "0021_documents", "first missing:");
   // keep this tenant at 0020 for the export case below; check a fresh one at 0021
   const c21 = createClient({ url: "file:.test-pub-x21.db" });
   const ledger = await checkLedger(c21, MIGRATIONS);
   ok(ledger.current, `ledger not current: ${JSON.stringify(ledger)}`);
-  eq(MIGRATIONS[MIGRATIONS.length - 1].id, "0021_documents", "newest migration:");
+  ok(MIGRATIONS.some((m) => m.id === "0021_documents"), "0021_documents is shipped");
   const fresh = createClient({ url: "file::memory:" });
   await migrate(fresh);
   eq((await fresh.execute("SELECT id, mode FROM cms_state")).rows.map((x) => ({ ...x })), [{ id: 1, mode: "legacy" }], "seed:");
