@@ -80,6 +80,8 @@ await t("dangling '<' is neutralized; a with target gains rel", async () => {
   eq(sanitizeHtml("a < b"), "a &lt; b"); // can't open a tag downstream
   const out = sanitizeHtml('<a href="https://x.example" target="_blank">x</a>');
   includes(out, 'rel="noopener noreferrer"');
+  eq(sanitizeHtml(out), out); // sanitizing again doesn't add another rel (AU-05)
+  eq(sanitizeHtml('<a rel="opener" href="/x" target="_blank">x</a>'), '<a href="/x" target="_blank" rel="noopener noreferrer">x</a>');
 });
 
 await t("typical Shopify description markup passes through intact", async () => {

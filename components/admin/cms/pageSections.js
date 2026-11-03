@@ -20,6 +20,9 @@ export const toEdit = (s, id) => {
   if (kind === "faq") return { id, pid, kind, heading: s.heading || "", items: (s.items || []).map((it) => ({ q: it?.q || "", a: it?.a || "" })) };
   return { id, pid, kind: "text", heading: s?.heading || "", text: bodyToText(s?.body) };
 };
+// Stored sections → the form, on every load. Ids are deterministic (`s<i>`) so
+// SSR and hydration agree; sections added later get client-only ids.
+export const formSections = (sections) => (sections || []).map((s, i) => toEdit(s, `s${i}`));
 export const fromEdit = (s) => {
   const base = s.pid ? { id: s.pid } : {};
   if (s.kind === "rich") return { ...base, kind: "rich", heading: s.heading, html: s.html };

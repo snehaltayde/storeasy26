@@ -21,7 +21,7 @@ import { useDirtyGuard } from "./useDirtyGuard";
 import { MediaPicker } from "./MediaPicker";
 import { pageUrl, FAMILY_LABELS } from "./labels";
 import { pageStatus } from "./PagesList";
-import { toEdit, editEmpty, sectionsPayload, blankSection } from "./pageSections";
+import { toEdit, formSections, editEmpty, sectionsPayload, blankSection } from "./pageSections";
 
 // The page editor (S52): one screen for creating and editing content pages.
 // Sections keep the S38 data shapes exactly (text body = paragraphs split on
@@ -41,8 +41,7 @@ const suggestSlug = (title) =>
 
 const SECTION_LABELS = { text: "Text", rich: "Rich HTML", image: "Image", faq: "FAQ" };
 
-// Server page → editable form state. Section ids are deterministic (`s<i>`)
-// so SSR and hydration agree; sections added later get client-only ids.
+// Server page → editable form state.
 const formFrom = (page) => ({
   slug: page.slug || "",
   title: page.title || "",
@@ -53,7 +52,7 @@ const formFrom = (page) => ({
   windowStart: isoToLocalInput(page.window_start),
   windowEnd: isoToLocalInput(page.window_end),
   redirectFrom: "",
-  sections: (page.sections || []).map((s, i) => toEdit(s, `s${i}`)),
+  sections: formSections(page.sections),
 });
 
 // Dirty = the form (minus the client-only keys AND the durable pids — ids

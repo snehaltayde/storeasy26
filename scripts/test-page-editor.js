@@ -2,9 +2,12 @@
 // SAME conversions the editor uses (components/admin/cms/pageSections.js), the
 // real handler behind /api/admin/storefront, real requireAdmin and real
 // storage, then is read back the way the editor route and the storefront read
-// it. Proves that no save reports success while dropping founder content.
+// it. Proves that no save reports success while dropping founder content. The
+// two components run too, compiled with Next's own SWC (plain node has no JSX):
+// ContentPage renders to markup, PageEditor runs on small stand-in hooks.
 //   pnpm test:page-editor
 import { readFile, rm } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -32,7 +35,8 @@ const { getContentPage, validatePageSections } = await import("../lib/cms/store.
 const { normalizePageSections } = await import("../lib/cms/schemas.js");
 const { componentFor } = await import("../lib/cms/registry.js");
 const R = await import("../lib/releases.js");
-const { toEdit, sectionsPayload, editEmpty, blankSection } = await import("../components/admin/cms/pageSections.js");
+const pageSections = await import("../components/admin/cms/pageSections.js");
+const { toEdit, formSections, sectionsPayload, editEmpty, blankSection } = pageSections;
 const { PAGE_TEMPLATES } = await import("../lib/content/templates.js");
 const { PAGES } = await import("../lib/content/pages.js");
 
@@ -84,7 +88,7 @@ const save = (slug, sections, revision = null) => put({ page: { slug, title: `Pa
 const row = (slug) => inT(() => db.selectFrom("cms_pages").selectAll().where("slug", "=", slug).executeTakeFirst());
 // Reload = what app/(console)/admin/(authed)/storefront/pages/[slug]/page.js
 // hands the editor: the row, normalized, back through the form conversion.
-const reload = async (slug) => normalizePageSections(JSON.parse((await row(slug)).sections)).map((s, i) => toEdit(s, `s${i}`));
+const reload = async (slug) => formSections(normalizePageSections(JSON.parse((await row(slug)).sections)));
 const content = (sections) => sections.map(({ id, pid, ...rest }) => rest);
 
 // A founder should be able to act on the message. Internals are not plain.
@@ -286,6 +290,183 @@ await t("the payload always has one entry per section, so positions and new ids 
   ok(stored.every((s) => /^sec_/.test(s.id)), "each stored section has an id for the editor to adopt by position");
 });
 
+// --- words the sanitizer would remove ----------------------------------------
+console.log("— ordinary words typed into the two HTML fields");
+
+// Both HTML fields, same checks: rich content and an FAQ answer.
+const htmlField = (html) => [
+  ["rich", { kind: "rich", heading: "", html }],
+  ["faq", { kind: "faq", heading: "", items: [{ q: "A question", a: html }] }],
+];
+
+// [what the founder typed, the words the refusal must quote]
+const LOSES_WORDS = [
+  ["Free on orders <500 and >100 rupees.", "<500 and >"],
+  ["Write to Priya <priya@store.com> any day.", "<priya@store.com>"],
+  ["<p>Keep it at a<b and c>d always.</p>", "<b and c>"],
+  ["<p>Hello</p><noscript>Important founder words</noscript>", "Important founder words"],
+  ["Ask for the <founder> today.", "<founder>"],
+  ["Sizes: a < b and c > d.", "< b and c >"],
+  ["Visit <www.store.example/sale> now.", "<www.store.example/sale>"],
+  ['<p>Before</p><embed src="/x"><p>After the embed</p>', "After the embed"],
+  ["<p>Before</p><svg><text>Drawn words</text></svg>", "Drawn words"],
+  ['<p>Before</p><iframe src="/x"><p>Never closed</p>', "Never closed"],
+];
+
+await t(`stray brackets (${LOSES_WORDS.length} cases, both fields): refused, quoting the words, row untouched`, async () => {
+  let n = 0;
+  for (const [typed, words] of LOSES_WORDS) {
+    for (const [field, section] of htmlField(typed)) {
+      const slug = `stray-${n++}`;
+      const before = await seed(slug);
+      const res = await save(slug, form(section), before.revision);
+      const label = `${field} ${JSON.stringify(typed)}`;
+      await refused(slug, res, label);
+      ok(res.body.error.includes(`"${words}"`), `${label} quotes ${words}, got "${res.body.error}":`);
+      ok(res.body.error.startsWith(field === "rich" ? "section 1:" : "section 1, question 1:"), `${label} position, got "${res.body.error}":`);
+      eq(await row(slug), before, `${label} row unchanged:`);
+    }
+  }
+});
+
+await t("a very long stretch of lost words is quoted short, and the message stays usable", async () => {
+  const res = await save("stray-long", form({ kind: "rich", heading: "", html: `<${"w".repeat(500)}> and more` }));
+  eq(res.status, 422, "status:");
+  ok(res.body.error.length < 300, `length ${res.body.error.length}:`);
+});
+
+// HTML that needs no change, and words that aren't at risk: stored as typed.
+const KEPT_AS_TYPED = [
+  "Plain words with no tags at all.",
+  "5 > 3 is fine without its partner.",
+  "Tom &amp; Jerry &lt;3 this.",
+  '<p>Bold <b>word</b> and a <a href="/x" title="A title">link</a></p>',
+  "<ul><li>One</li><li>Two</li></ul><h3>Usage</h3>",
+  '<img src="/api/media/a" alt="Alt words" />',
+  'Line one<br />line two<hr /><a href="/x" target="_blank" rel="noopener noreferrer">x</a>',
+];
+
+await t(`clean words and HTML (${KEPT_AS_TYPED.length} cases, both fields): the reload shows exactly what was typed`, async () => {
+  let n = 0;
+  for (const typed of KEPT_AS_TYPED) {
+    for (const [field, section] of htmlField(typed)) {
+      const slug = `kept-${n++}`;
+      const res = await save(slug, form(section));
+      eq(res.status, 200, `${field} ${typed} status:`);
+      eq(content(await reload(slug)), [section], `${field} ${typed} reload:`);
+    }
+  }
+});
+
+// [typed, stored]: nothing a reader sees is gone. Telling the founder about the
+// removed parts is AU-06, and the form shows the typed version until a reload.
+const UNSAFE_NO_WORDS = [
+  ["<p>Hi</p><script>alert(1)</script>", "<p>Hi</p>"],
+  ["<style>.x{color:red}</style><p>Hi</p>", "<p>Hi</p>"],
+  ['<p>Hi</p><iframe src="https://video.example/a" allowfullscreen></iframe>', "<p>Hi</p>"],
+  ['<p onclick="x()" class="y" data-z>Hi</p>', "<p>Hi</p>"],
+  ['<a href="javascript:alert(1)">Hi</a>', "<a>Hi</a>"],
+  ["<!-- a note --><p>Hi</p>", "<p>Hi</p>"],
+  ["<p class=MsoNormal>Hi<o:p></o:p></p>", "<p>Hi</p>"],
+  ['<noscript><img src="/x"></noscript><p>Hi</p>', "<p>Hi</p>"],
+  ['<svg viewBox="0 0 1 1"><path d="M0 0"/></svg><p>Hi</p>', "<p>Hi</p>"],
+  ["<center>Hi</center>", "Hi"],
+  [`<meta charset='utf-8'><p dir="ltr" style="line-height:1.38;" id="docs-guid"><span style="font-size:11pt;">Hi</span></p>`, "<p><span>Hi</span></p>"],
+  ['<a href="/x"title="y">Hi</a>', '<a href="/x" title="y">Hi</a>'],
+  ["<P ALIGN=center>Hi<BR/></P >", "<p>Hi<br /></p>"],
+  ["Under 5 < 10", "Under 5 &lt; 10"],
+];
+
+await t(`unsafe parts with no words in them (${UNSAFE_NO_WORDS.length} cases, both fields) still save, every word kept`, async () => {
+  let n = 0;
+  for (const [typed, stored] of UNSAFE_NO_WORDS) {
+    for (const [field, section] of htmlField(typed)) {
+      const slug = `unsafe-${n++}`;
+      const res = await save(slug, form(section));
+      eq(res.status, 200, `${field} ${typed} status: "${res.body.error}"`);
+      const [back] = await reload(slug);
+      eq(field === "rich" ? back.html : back.items[0].a, stored, `${field} ${typed} stored:`);
+    }
+  }
+});
+
+await t("what was stored is never refused or changed by saving it again", async () => {
+  for (const [, stored] of UNSAFE_NO_WORDS) {
+    for (const [field, section] of htmlField(stored)) {
+      const [clean] = validatePageSections([section]);
+      eq(field === "rich" ? clean.html : clean.items[0].a, stored, `${field} ${stored}:`);
+    }
+  }
+});
+
+await t("a link near the limit stays accepted however many times it is saved, with no edit", async () => {
+  const link = '<a href="/x" target="_blank" rel="noopener noreferrer">x</a>';
+  const answer = `<p>${"a".repeat(8000 - link.length - "<p></p>".length)}${link}</p>`;
+  eq(answer.length, 8000, "fixture:");
+  let revision = null;
+  for (let i = 0; i < 4; i++) {
+    const res = await save("rel-grow", form({ kind: "faq", heading: "", items: [{ q: "Q", a: answer }] }), revision);
+    eq(res.status, 200, `save ${i + 1}: "${res.body.error}"`);
+    revision = (await row("rel-grow")).revision;
+    eq((await reload("rel-grow"))[0].items[0].a, answer, `reload ${i + 1}:`);
+  }
+});
+
+await t("a row already holding repeated rel attributes shrinks back on its next save", () => {
+  const doubled = '<a href="/x" target="_blank" rel="noopener noreferrer" rel="noopener noreferrer">x</a>';
+  eq(validatePageSections([{ kind: "rich", html: doubled }])[0].html, '<a href="/x" target="_blank" rel="noopener noreferrer">x</a>', "html:");
+});
+
+// --- invisible and unusable input --------------------------------------------
+console.log("— characters that show nothing, and image links");
+
+const INVISIBLE = ["\u200B", "\u200C", "\u200D", "\u2060", "\uFEFF", "\u00AD", "\u00A0", " \u200B \u200D "];
+
+await t(`a section holding only invisible characters (${INVISIBLE.length} kinds) counts as empty`, async () => {
+  const before = await seed("invisible");
+  for (const blank of INVISIBLE) {
+    const label = JSON.stringify(blank);
+    for (const section of [
+      { kind: "text", heading: blank, text: "" },
+      { kind: "text", heading: "", text: blank },
+      { kind: "rich", heading: "", html: blank },
+      { kind: "image", src: "/api/media/a", alt: blank, caption: "" },
+      { kind: "faq", heading: "", items: [{ q: blank, a: "<p>A</p>" }] },
+      { kind: "faq", heading: "", items: [{ q: "Q", a: blank }] },
+    ]) {
+      await refused("invisible", await save("invisible", form(section), before.revision), `${label} ${section.kind}`);
+    }
+  }
+  eq(await row("invisible"), before, "row unchanged:");
+});
+
+await t("an invisible heading beside real text is no heading, and an invisible paragraph is no paragraph", () => {
+  const [a, b] = validatePageSections([
+    { kind: "text", heading: "\u200B", body: ["Real words."] },
+    { kind: "text", heading: "Real heading", body: ["\u200B", "Real words."] },
+  ]);
+  eq([a.heading, a.body], ["", ["Real words."]], "invisible heading:");
+  eq([b.heading, b.body], ["Real heading", ["Real words."]], "invisible paragraph:");
+});
+
+await t("the same characters inside real words are stored untouched (scripts and emoji need them)", async () => {
+  const heading = "\u0915\u094D\u200D\u0937 family \u{1F468}\u200D\u{1F469}";
+  const text = "\u0936\u094D\u200C\u0930 words";
+  const res = await save("zwj-kept", form({ kind: "text", heading, text }));
+  eq(res.status, 200, "save:");
+  eq(content(await reload("zwj-kept")), [{ kind: "text", heading, text }], "reload:");
+});
+
+await t("an image link that isn't https or from the library is refused in plain words", async () => {
+  const before = await seed("img-link");
+  for (const src of ["http://cdn.example/a.jpg", "//cdn.example/a.jpg", "javascript:alert(1)", "a.jpg"]) {
+    const res = await save("img-link", form({ kind: "image", src, alt: "Alt", caption: "" }), before.revision);
+    await refused("img-link", res, src);
+    eq(res.body.error, "section 1: this image link isn't secure. Use a link that starts with https, or choose an image from your library.", `${src} message:`);
+  }
+  eq(await row("img-link"), before, "row unchanged:");
+});
+
 // --- over-limit text ---------------------------------------------------------
 console.log("— over-limit text is refused, never cut");
 
@@ -361,23 +542,189 @@ await t("every built-in template and default page saves through the form, whole"
   }
 });
 
-// --- guards on the two files plain node cannot import -------------------------
-console.log("— source guards (not a render: see the manual drill in the packet)");
-
+// --- the two components, compiled with Next's SWC ------------------------------
 const source = (rel) => readFile(join(here, "..", rel), "utf8");
+const require = createRequire(import.meta.url);
+const swc = require("next/dist/build/swc/index.js");
+await swc.loadBindings();
+const compile = async (rel, resolve) => {
+  const { code } = await swc.transform(await source(rel), {
+    filename: rel,
+    jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" },
+    module: { type: "commonjs" },
+  });
+  const mod = { exports: {} };
+  new Function("require", "module", "exports", code)(resolve, mod, mod.exports);
+  return mod.exports;
+};
+
+console.log("— ContentPage, rendered to markup from what the reader returns");
+
+const { createElement } = require("react");
+const { renderToStaticMarkup } = require("react-dom/server");
+const contentStubs = {
+  "next/link": { __esModule: true, default: ({ href, children }) => createElement("a", { href }, children) },
+  "./FaqSection": { __esModule: true, default: () => null },
+};
+const ContentPage = (await compile("components/ContentPage.js", (id) => contentStubs[id] ?? require(id))).default;
+const rendered = async (slug, sections) => {
+  eq((await save(slug, form(...sections))).status, 200, `${slug} save:`);
+  const page = await inT(() => getContentPage(slug));
+  const html = renderToStaticMarkup(createElement(ContentPage, { page }));
+  return html.slice(html.indexOf('<div class="mt-8'));
+};
+
+await t("paragraphs with no heading render, with no heading tag at all", async () => {
+  const html = await rendered("render-no-heading", [noHeading]);
+  ok(!html.includes("<h2"), `no h2: ${html}`);
+  ok(html.includes(">First paragraph.</p>") && html.includes(">Second paragraph.</p>"), `both paragraphs: ${html}`);
+});
+
+await t("with a heading, one h2 holds it and the paragraphs follow", async () => {
+  const html = await rendered("render-heading", [{ kind: "text", heading: H, text: "Words below." }]);
+  eq(html.match(/<h2\b[^>]*>[^<]*<\/h2>/g)?.map((h) => h.replace(/<[^>]*>/g, "")), [H], "h2s:");
+  ok(html.indexOf("<h2") < html.indexOf(">Words below.</p>"), `order: ${html}`);
+});
+
+await t("a heading alone renders, and a rich section with no heading has no heading tag", async () => {
+  ok((await rendered("render-heading-only", [{ kind: "text", heading: H, text: "" }])).includes(`>${H}</h2>`), "heading alone:");
+  const rich = await rendered("render-rich", [{ kind: "rich", heading: "", html: "<p>Rich words</p>" }]);
+  ok(!rich.includes("<h2") && rich.includes("<p>Rich words</p>"), `rich: ${rich}`);
+});
+
+// PageEditor runs for real on stand-ins: useState and useRef are small slots,
+// JSX builds plain objects, child components aren't expanded, and ./api is the
+// real client talking to the real handler through a stubbed fetch. This covers
+// its load and save logic. A browser (drills D1 and D2) still has to confirm it.
+console.log("— PageEditor, load and save logic on stand-in hooks");
+
+let hooks = null;
+const stubComponents = new Map();
+const stubModule = () =>
+  new Proxy({ __esModule: true }, {
+    get: (t, k) => {
+      if (k in t) return t[k];
+      if (!stubComponents.has(k)) stubComponents.set(k, Object.assign(() => null, { displayName: String(k) }));
+      return stubComponents.get(k);
+    },
+  });
+const element = (type, props) => ({ type, props });
+const toasts = [];
+const editorModules = {
+  react: { useState: (init) => hooks.useState(init), useRef: (init) => hooks.useRef(init), useMemo: (fn) => fn() },
+  "react/jsx-runtime": { jsx: element, jsxs: element, Fragment: "Fragment" },
+  "next/navigation": { useRouter: () => ({ push() {}, replace() {} }) },
+  "@/components/console/Toast": { useToast: () => ({ success: (m) => toasts.push(m), info() {}, error() {} }) },
+  "@/lib/admin/schedule": await import("../lib/admin/schedule.js"),
+  "@/lib/content/templates": { PAGE_TEMPLATES },
+  "./api": await import("../components/admin/cms/api.js"),
+  "./labels": await import("../components/admin/cms/labels.js"),
+  "./pageSections": pageSections,
+  "./PagesList": { pageStatus: () => ({ tone: "neutral", label: "Draft" }) },
+  "./useDirtyGuard": { useDirtyGuard() {} },
+};
+const { PageEditor } = await compile("components/admin/cms/PageEditor.js", (id) => editorModules[id] ?? stubModule());
+
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url, options) => {
+  if (url !== "/api/admin/storefront") return realFetch(url, options);
+  const res = await put(JSON.parse(options.body));
+  return { ok: res.status < 400, status: res.status, json: async () => res.body };
+};
+
+const walk = (node, visit) => {
+  if (Array.isArray(node)) node.forEach((n) => walk(n, visit));
+  else if (node?.props) {
+    visit(node);
+    Object.values(node.props).forEach((v) => walk(v, visit));
+  }
+};
+const textOf = (node) => (Array.isArray(node) ? node.map(textOf).join("") : node?.props ? textOf(node.props.children) : typeof node === "string" || typeof node === "number" ? String(node) : "");
+const mountEditor = (page, revision) => {
+  const slots = [];
+  let cursor = 0;
+  const instance = {
+    useState(init) {
+      const at = cursor++;
+      if (!(at in slots)) slots[at] = typeof init === "function" ? init() : init;
+      return [slots[at], (next) => (slots[at] = typeof next === "function" ? next(slots[at]) : next)];
+    },
+    useRef(init) {
+      const at = cursor++;
+      if (!(at in slots)) slots[at] = { current: init };
+      return slots[at];
+    },
+  };
+  const tree = () => {
+    hooks = instance;
+    cursor = 0;
+    return PageEditor({ mode: "edit", page, revision });
+  };
+  const all = (name, match = () => true) => {
+    const found = [];
+    walk(tree(), (n) => n.type?.displayName === name && match(n) && found.push(n));
+    return found;
+  };
+  return {
+    field: (label) => all("Textarea", (n) => n.props["aria-label"] === label)[0] ?? all("Input", (n) => n.props["aria-label"] === label)[0],
+    type: (label, value) => view.field(label).props.onChange({ target: { value } }),
+    save: () => all("Button", (n) => n.props.variant === "primary" && textOf(n) === "Save")[0].props.onClick(),
+    unsaved: () => all("Badge", (n) => textOf(n) === "Unsaved").length > 0,
+    problems: () => all("Banner", (n) => n.props.title === "Couldn't save").map(textOf),
+  };
+};
+let view = null;
+
+await t("a stored section with no heading loads into the form, and the form starts clean", () => {
+  view = mountEditor({ slug: "x", title: "X", sections: [{ kind: "text", heading: "", body: ["First.", "Second."] }] }, 1);
+  eq(view.field("Section paragraphs").props.value, "First.\n\nSecond.", "paragraphs:");
+  eq(view.field("Section heading").props.value, "", "heading:");
+  ok(!view.unsaved(), "clean:");
+});
+
+await t("a refused save shows the message, stays Unsaved and keeps the typing; fixing it saves and goes clean", async () => {
+  const before = await seed("ed-refuse");
+  view = mountEditor({ slug: "ed-refuse", title: "Page ed-refuse", sections: JSON.parse(before.sections) }, before.revision);
+  view.type("Section heading", "");
+  view.type("Section paragraphs", "");
+  ok(view.unsaved(), "typed:");
+  toasts.length = 0;
+  await view.save();
+  eq(view.problems(), ["section 1: add a heading or some text, or remove this section."], "banner:");
+  ok(view.unsaved(), "still unsaved after a refusal:");
+  eq(toasts, [], "no success toast:");
+  eq(await row("ed-refuse"), before, "row unchanged:");
+
+  view.type("Section paragraphs", "Better words.");
+  await view.save();
+  eq(view.problems(), [], "banner gone:");
+  ok(!view.unsaved(), "clean after a real save:");
+  eq(toasts.length, 1, "one success toast:");
+  eq(content(await reload("ed-refuse")), [{ kind: "text", heading: "", text: "Better words." }], "stored:");
+});
+
+await t("words the sanitizer would remove are refused in the editor too, and stay in the form", async () => {
+  const typed = "Free on orders <500 and >100 rupees.";
+  const seeded = await save("ed-stray", form({ kind: "rich", heading: "", html: "<p>Before</p>" }));
+  eq(seeded.status, 200, "seed:");
+  const before = await row("ed-stray");
+  view = mountEditor({ slug: "ed-stray", title: "Page ed-stray", sections: JSON.parse(before.sections) }, before.revision);
+  view.type("Section HTML", typed);
+  await view.save();
+  ok(view.problems()[0]?.includes('"<500 and >"'), `banner quotes the words, got ${JSON.stringify(view.problems())}:`);
+  ok(view.unsaved(), "still unsaved:");
+  eq(view.field("Section HTML").props.value, typed, "form keeps the typing:");
+  eq(await row("ed-stray"), before, "row unchanged:");
+});
+
+// --- guard on what the stand-ins can't see ------------------------------------
+console.log("— source guard");
 
 await t("PageEditor saves through sectionsPayload and keeps no filter of its own", async () => {
   const src = await source("components/admin/cms/PageEditor.js");
   ok(/sections: sectionsPayload\(form\.sections\)/.test(src), "buildPayload:");
   ok(/const sections = sectionsPayload\(form\.sections\);/.test(src), "save as template:");
   ok(!/sections\.filter\(\(s\) => !editEmpty/.test(src), "no local drop:");
-});
-
-await t("ContentPage renders a text heading only when there is one", async () => {
-  const src = await source("components/ContentPage.js");
-  const h2s = src.match(/.*<h2\b.*/g) || [];
-  eq(h2s.length, 2, "h2 count (rich + text):");
-  ok(h2s.every((l) => /\{s\.heading \? <h2 [^>]*>\{s\.heading\}<\/h2> : null\}/.test(l)), `every h2 is conditional: ${h2s.join(" | ")}`);
 });
 
 // ----------------------------------------------------------------------------
