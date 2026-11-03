@@ -218,6 +218,222 @@ await t("grant creation and revocation are audited", async () => {
   eq(actions, "support.grant_created,support.grant_revoked");
 });
 
+// ---------- HTML sanitizer: what a browser makes of its output ----------
+console.log("— HTML sanitizer: nothing it returns can open a tag on the page");
+
+const { sanitizeHtml } = await import("../lib/sanitize.js");
+
+// No HTML parser is a dependency of this repo, so this reads tags with the
+// HTML standard's own tag and comment states (tag open, tag name, attribute
+// name and value, self-closing, bogus comment). An attribute value ends only at
+// its own quote and a tag ends only at a ">" outside one, exactly as in a
+// browser. Text is kept so a swallowed "after" shows up.
+function htmlTokens(html) {
+  const tokens = [];
+  let text = "";
+  const flush = () => {
+    if (text) tokens.push({ type: "text", text });
+    text = "";
+  };
+  const space = (c) => c === " " || c === "\t" || c === "\n" || c === "\f" || c === "\r";
+  const letter = (c) => c !== undefined && /[a-zA-Z]/.test(c);
+  // i is at the first letter of the name. Returns null if the input ends first.
+  const readTag = (start) => {
+    let i = start;
+    while (i < html.length && !space(html[i]) && html[i] !== "/" && html[i] !== ">") i++;
+    const name = html.slice(start, i).toLowerCase();
+    const attrs = [];
+    for (;;) {
+      while (i < html.length && (space(html[i]) || (html[i] === "/" && html[i + 1] !== ">"))) i++;
+      if (i >= html.length) return null;
+      if (html[i] === "/") i++; // "/>"
+      if (html[i] === ">") return { name, attrs, end: i + 1 };
+      const nameStart = i;
+      i++; // a leading "=" belongs to the name
+      while (i < html.length && !space(html[i]) && html[i] !== "/" && html[i] !== ">" && html[i] !== "=") i++;
+      const attr = { name: html.slice(nameStart, i).toLowerCase(), value: "" };
+      attrs.push(attr);
+      while (i < html.length && space(html[i])) i++;
+      if (html[i] !== "=") continue;
+      i++;
+      while (i < html.length && space(html[i])) i++;
+      if (html[i] === '"' || html[i] === "'") {
+        const close = html.indexOf(html[i], i + 1);
+        if (close === -1) return null;
+        attr.value = html.slice(i + 1, close);
+        i = close + 1;
+      } else if (html[i] !== ">") {
+        const valueStart = i;
+        while (i < html.length && !space(html[i]) && html[i] !== ">") i++;
+        attr.value = html.slice(valueStart, i);
+      }
+    }
+  };
+  let i = 0;
+  while (i < html.length) {
+    if (html[i] !== "<") {
+      text += html[i++];
+      continue;
+    }
+    const next = html[i + 1];
+    if (next === "!" || next === "?" || (next === "/" && !letter(html[i + 2]) && html[i + 2] !== undefined)) {
+      // a comment, doctype or bogus comment: nothing the sanitizer may return
+      flush();
+      const opener = html.startsWith("<!--", i);
+      const closer = opener ? /--!?>/g : />/g;
+      closer.lastIndex = opener ? i + 4 : i + 2;
+      const m = closer.exec(html);
+      tokens.push({ type: "comment" });
+      i = m ? closer.lastIndex : html.length;
+    } else if (letter(next) || (next === "/" && letter(html[i + 2]))) {
+      flush();
+      const closing = next === "/";
+      const tag = readTag(i + (closing ? 2 : 1));
+      if (!tag) {
+        tokens.push({ type: "unterminated", at: html.slice(i, i + 40) });
+        break;
+      }
+      tokens.push({ type: closing ? "end" : "start", name: tag.name, attrs: tag.attrs });
+      i = tag.end;
+    } else {
+      text += html[i++];
+    }
+  }
+  flush();
+  return tokens;
+}
+
+// The test's own copy of what may reach a shopper, so a wider sanitizer fails.
+const SHOPPER_TAGS = {
+  a: ["href", "title", "target", "rel"], ol: ["start"], th: ["colspan", "rowspan"], td: ["colspan", "rowspan"],
+  img: ["src", "alt", "width", "height", "loading"],
+  ...Object.fromEntries("b strong i em u s small sub sup p br hr span div h1 h2 h3 h4 h5 h6 ul li blockquote pre code table thead tbody tfoot tr figure figcaption".split(" ").map((tag) => [tag, []])),
+};
+
+// What the page does with the output: the next ">" on it closes anything left open.
+function assertHarmlessOnAPage(input) {
+  const out = sanitizeHtml(input);
+  const label = `${JSON.stringify(input)} -> ${JSON.stringify(out)}:`;
+  const tokens = htmlTokens(`${out}</div><p>after</p>`);
+  for (const token of tokens) {
+    if (token.type === "comment" || token.type === "unterminated") throw new Error(`${label} ${token.type} ${token.at ?? ""}`);
+    if (token.type !== "start") continue;
+    if (!Object.hasOwn(SHOPPER_TAGS, token.name)) throw new Error(`${label} tag <${token.name}> survived`);
+    for (const attr of token.attrs) {
+      if (!SHOPPER_TAGS[token.name].includes(attr.name)) throw new Error(`${label} attribute ${attr.name} on <${token.name}> survived`);
+      if ((attr.name === "href" || attr.name === "src") && /^\s*(javascript|vbscript|data):/i.test(attr.value)) throw new Error(`${label} address ${attr.value} survived`);
+    }
+  }
+  // the page after it is untouched: nothing swallowed what follows
+  const tail = tokens.slice(-4).map((x) => (x.type === "text" ? x.text : `${x.type}:${x.name}`)).join(" ");
+  eq(tail, "end:div start:p after end:p", `${label} the rest of the page:`);
+  // nothing left open on its own either, and cleaning twice is no worse
+  if (htmlTokens(out).some((x) => x.type === "unterminated")) throw new Error(`${label} left a tag open`);
+  if (sanitizeHtml(out) !== out) throw new Error(`${label} changed again to ${JSON.stringify(sanitizeHtml(out))}`);
+}
+
+const HANDLERS = [
+  "<img src=x onerror=alert(1) ",
+  "<svg onload=alert(1) ",
+  "<img src=x onerror=alert(1)//",
+  "<IMG SRC=x ONERROR=alert(1) ",
+  "<ImG\tsRc=x\tOnErRoR=alert(1)\t",
+  "<img\nsrc=x\nonerror=alert(1)\n",
+  "<img\r\nsrc=x\r\nonerror=alert(1)\r\n",
+  "<img\fsrc=x\fonerror=alert(1)\f",
+  "<img/src=x/onerror=alert(1)/",
+  "<svg/onload=alert(1)",
+  "<svg/onload=alert(1)//",
+  "<SVG/ONLOAD=alert(1)",
+  "<img src=x onerror='alert(1)'",
+  '<img src=x onerror="alert(1)"',
+  '<img src="x" onerror=alert(1) alt="',
+  "<img src='x onerror=alert(1) ",
+  "<a href=javascript:alert(1) ",
+  '<a href="javascript:alert(1)"',
+  "<a onclick=alert(1) href=/x ",
+  "<p onmouseover=alert(1) ",
+  "<div style=background:url(x) onfocus=alert(1) autofocus tabindex=0 ",
+  "<body onload=alert(1) ",
+  "<details open ontoggle=alert(1) ",
+  "<video src=x onerror=alert(1) ",
+  "<script>alert(1)",
+  "<script src=//evil.example/x.js ",
+  "<SCRIPT\nSRC=//evil.example/x.js ",
+  "</script ",
+  "</p onclick=alert(1) ",
+  "<iframe src=javascript:alert(1) ",
+  "<object data=x ",
+  "<embed src=x ",
+  "<style>*{}",
+  "<math><mi xlink:href=x ",
+  "<form action=x ",
+  "<input autofocus onfocus=alert(1) ",
+  "<!-- <img src=x onerror=alert(1) ",
+  "<!-- note --><img src=x onerror=alert(1) ",
+  "<!doctype html><img src=x onerror=alert(1) ",
+  "<?xml <img src=x onerror=alert(1) ",
+  "<![CDATA[<img src=x onerror=alert(1) ",
+  "<img src=x onerror=alert(1) >",
+  "<a title=\"<img src=x onerror=alert(1)>\">x</a>",
+  "<img alt=\"><img src=x onerror=alert(1)>",
+  "<p title=\"x><img src=y onerror=alert(1)>",
+  "<b <img src=x onerror=alert(1) ",
+  "<b <img src=x onerror=alert(1)>",
+];
+const LEAD_INS = ["", "< ", "<", "<<", "a < b ", "a<b ", "<\t", "<\n", "</ ", "<3 ", "<p>ok</p>", "<p>ok</p>< ", "text ", "\n", "<b>", "<a href=\"/x\" title=\"", "<!-- open "];
+
+await t(`unclosed tags: ${HANDLERS.length * LEAD_INS.length} inputs leave no handler or removed tag, whatever follows on the page`, () => {
+  for (const lead of LEAD_INS) for (const payload of HANDLERS) assertHarmlessOnAPage(lead + payload);
+});
+
+await t("the three reported inputs come back as plain text", () => {
+  eq(sanitizeHtml("< <img src=x onerror=alert(1) "), "&lt; &lt;img src=x onerror=alert(1) ");
+  eq(sanitizeHtml("a < b <svg onload=alert(1) "), "a &lt; b &lt;svg onload=alert(1) ");
+  eq(sanitizeHtml("<<img src=x onerror=alert(1)//"), "&lt;&lt;img src=x onerror=alert(1)//");
+});
+
+await t("the checker itself catches the old output", () => {
+  const closed = (html) => htmlTokens(`${html}</div><p>after</p>`).filter((x) => x.type === "start")[0];
+  eq(closed("&lt; <img src=x onerror=alert(1) ").attrs.map((a) => a.name).join(), "src,onerror,<,div", "handler seen:");
+  eq(htmlTokens("&lt; &lt;img src=x onerror=alert(1) ").length, 1, "encoded is one piece of text:");
+  eq(htmlTokens('<img alt="x').at(-1).type, "unterminated", "open quote:");
+});
+
+await t("20,000 seeded random mixes of brackets, quotes and tag pieces stay harmless", () => {
+  const pieces = ["<", "<", ">", "/", '"', "'", "=", " ", "\t", "\n", "!", "--", "-->", "<!--", "<?", "<![", "]]>", "img", "IMG", "svg", "script", "</script", "style", "</style", "iframe", "a", "p", "b", "noscript", "</noscript", "src=x", "alt=", "title=", "href=", "href=javascript:alert(1)", "onerror=alert(1)", "ONLOAD=alert(1)", "words", "&lt;", "&#60;"];
+  let seed = 20261103;
+  const next = (n) => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed % n;
+  };
+  for (let run = 0; run < 20000; run++) {
+    let input = "";
+    for (let k = next(14) + 1; k > 0; k--) input += pieces[next(pieces.length)];
+    assertHarmlessOnAPage(input);
+  }
+});
+
+await t("a comment ends at its own end, so a private note with a > in it stays private", () => {
+  eq(sanitizeHtml("a <!-- private note > do not show --> d"), "a  d");
+  eq(sanitizeHtml("a <!-- one > two > three --> b <!-- four > five --> c"), "a  b  c");
+  eq(sanitizeHtml("<!--[if gte mso 9]><xml><o:p>Word's own notes</o:p></xml><![endif]--><p>Hi</p>"), "<p>Hi</p>");
+  eq(sanitizeHtml("<p>a</p><!-- never closed > still private"), "<p>a</p>", "never closed: hidden, as a browser hides it:");
+  eq(sanitizeHtml("<!-- never closed"), "");
+  eq(sanitizeHtml("<!-->shown"), "shown", "the short forms a browser ends at once:");
+  eq(sanitizeHtml("<!--->shown"), "shown");
+  eq(sanitizeHtml("<!---->shown"), "shown");
+  eq(sanitizeHtml("<!-- a --!>shown"), "shown");
+  eq(sanitizeHtml("<!--!>hidden"), "", "this form does not end a comment:");
+});
+
+await t("text inside a dropped element is still dropped, with or without a comment in it", () => {
+  eq(sanitizeHtml("<svg><!-- </svg> --><text>x</text></svg><p>Hi</p>"), "<p>Hi</p>");
+  eq(sanitizeHtml("<style><!-- a > b --></style><p>Hi</p>"), "<p>Hi</p>");
+  eq(sanitizeHtml("<script><!-- never closed"), "");
+  eq(sanitizeHtml("<style><!-- > </style><p>Hi</p>"), "<p>Hi</p>", "a comment opener inside a style doesn't hide what follows:");
+});
+
 console.log(`\nSecurity gate: ${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(root, f), { force: true });
 process.exit(fail ? 1 : 0);

@@ -183,7 +183,7 @@ await t("typed sections: rich sanitized at save, image needs alt + safe src", as
     await inShop(() => S.upsertContentPage({ slug: "bad", title: "Bad", sections: [{ kind: "image", src: "javascript:x", alt: "a" }] }));
     throw new Error("expected refusal");
   } catch (e) {
-    includes(e.message, "image src");
+    includes(e.message, "image link");
   }
   try {
     await inShop(() => S.upsertContentPage({ slug: "bad", title: "Bad", effective_at: "01/10/2026", sections: [] }));

@@ -21,6 +21,7 @@ import { useDirtyGuard } from "./useDirtyGuard";
 import { MediaPicker } from "./MediaPicker";
 import { pageUrl, FAMILY_LABELS } from "./labels";
 import { pageStatus } from "./PagesList";
+import { toEdit, formSections, editEmpty, sectionsPayload, blankSection } from "./pageSections";
 
 // The page editor (S52): one screen for creating and editing content pages.
 // Sections keep the S38 data shapes exactly (text body = paragraphs split on
@@ -38,49 +39,9 @@ const suggestSlug = (title) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 61);
 
-// ---- section edit shapes (same conversions as the old StorefrontAdmin, so
-// ---- the stored data shapes are preserved byte-for-byte) ------------------
-const bodyToText = (body) => (body || []).join("\n\n");
-const textToBody = (text) =>
-  text
-    .split(/\n\s*\n/)
-    .map((p) => p.replace(/\s*\n\s*/g, " ").trim())
-    .filter(Boolean);
-
-// S54: `pid` is the DURABLE server-side instance id (sec_…) riding alongside
-// the client-only list key `id` — it goes back out on save so section
-// identity survives edits; new/duplicated sections send none (server mints).
-const toEdit = (s, id) => {
-  const kind = s?.kind || "text";
-  const pid = typeof s?.id === "string" ? s.id : undefined;
-  if (kind === "rich") return { id, pid, kind, heading: s.heading || "", html: s.html || "" };
-  if (kind === "image") return { id, pid, kind, src: s.src || "", alt: s.alt || "", caption: s.caption || "" };
-  if (kind === "faq") return { id, pid, kind, heading: s.heading || "", items: (s.items || []).map((it) => ({ q: it?.q || "", a: it?.a || "" })) };
-  return { id, pid, kind: "text", heading: s?.heading || "", text: bodyToText(s?.body) };
-};
-const fromEdit = (s) => {
-  const base = s.pid ? { id: s.pid } : {};
-  if (s.kind === "rich") return { ...base, kind: "rich", heading: s.heading, html: s.html };
-  if (s.kind === "image") return { ...base, kind: "image", src: s.src, alt: s.alt, caption: s.caption };
-  if (s.kind === "faq") return { ...base, kind: "faq", heading: s.heading, items: s.items.filter((it) => it.q.trim()) };
-  return { ...base, kind: "text", heading: s.heading, body: textToBody(s.text) };
-};
-const editEmpty = (s) =>
-  s.kind === "rich" ? !s.html.trim() : s.kind === "image" ? !s.src.trim() : s.kind === "faq" ? !s.items.some((it) => it.q.trim()) : !s.heading.trim();
-
-const blankSection = (kind, id) =>
-  kind === "rich"
-    ? { id, kind, heading: "", html: "" }
-    : kind === "image"
-      ? { id, kind, src: "", alt: "", caption: "" }
-      : kind === "faq"
-        ? { id, kind, heading: "", items: [{ q: "", a: "" }] }
-        : { id, kind: "text", heading: "", text: "" };
-
 const SECTION_LABELS = { text: "Text", rich: "Rich HTML", image: "Image", faq: "FAQ" };
 
-// Server page → editable form state. Section ids are deterministic (`s<i>`)
-// so SSR and hydration agree; sections added later get client-only ids.
+// Server page → editable form state.
 const formFrom = (page) => ({
   slug: page.slug || "",
   title: page.title || "",
@@ -91,7 +52,7 @@ const formFrom = (page) => ({
   windowStart: isoToLocalInput(page.window_start),
   windowEnd: isoToLocalInput(page.window_end),
   redirectFrom: "",
-  sections: (page.sections || []).map((s, i) => toEdit(s, `s${i}`)),
+  sections: formSections(page.sections),
 });
 
 // Dirty = the form (minus the client-only keys AND the durable pids — ids
@@ -236,7 +197,7 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
     window_start: form.family !== "page" ? localInputToIso(form.windowStart) : null,
     window_end: form.family !== "page" ? localInputToIso(form.windowEnd) : null,
     redirect_from: !isNew && form.family === "journal" && form.redirectFrom.trim() ? form.redirectFrom.trim().toLowerCase() : undefined,
-    sections: form.sections.filter((s) => !editEmpty(s)).map(fromEdit),
+    sections: sectionsPayload(form.sections),
   });
 
   async function save({ overwrite = false } = {}) {
@@ -422,7 +383,7 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
             </Card>
 
             <Card>
-              <CardHeader title="Sections" description="The page body, top to bottom. Empty sections are dropped on save." />
+              <CardHeader title="Sections" description="The page body, top to bottom. A section can't be saved empty, so remove any you don't need." />
               {form.sections.length === 0 ? (
                 <EmptyState title="No sections yet" body="Add a text, rich HTML, image or FAQ section below." />
               ) : (
@@ -430,11 +391,13 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
                   {form.sections.map((s, i) => (
                     <Card as="div" key={s.id} padded={false} className="p-3">
                       <div className="flex items-center gap-2">
-                        <Badge tone="neutral">{SECTION_LABELS[s.kind] || s.kind}</Badge>
+                        <Badge tone="neutral">
+                          {i + 1}. {SECTION_LABELS[s.kind] || s.kind}
+                        </Badge>
                         {s.kind !== "image" && (
                           <Input
                             aria-label="Section heading"
-                            placeholder={s.kind === "text" ? "Section heading (required)" : "Heading (optional)"}
+                            placeholder="Heading (optional)"
                             value={s.heading}
                             onChange={(e) => patchSection(s.id, { heading: e.target.value })}
                           />
@@ -676,7 +639,7 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
         body={
           <div className="space-y-2">
             <p>
-              Saves the current sections (empty ones are skipped) as a reusable starting point for new {FAMILY_LABELS[form.family]?.toLowerCase() || "page"}s.
+              Saves the current sections as a reusable starting point for new {FAMILY_LABELS[form.family]?.toLowerCase() || "page"}s.
               New pages get an independent copy — editing the template later never changes existing pages.
             </p>
             <Field label="Template name" htmlFor="pe-tpl-name">
@@ -685,7 +648,7 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
           </div>
         }
         onConfirm={async () => {
-          const sections = form.sections.filter((s) => !editEmpty(s)).map(fromEdit);
+          const sections = sectionsPayload(form.sections);
           const r = await saveTemplateApi({ name: templateName, family: form.family, sections });
           if (!r.ok) throw new Error(r.error || (r.errors || []).join("; ") || "Couldn’t save the template");
           toast.success(`Template “${r.template.name}” saved — it’s in “Start from a template” on new pages`);
