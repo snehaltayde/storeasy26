@@ -151,3 +151,7 @@ The full list goes to the owner when all six phases are done. Each entry names t
   - On a phone and an installed PWA, with a tab open when maintenance starts, tap a product. Decide whether what it shows until reload is acceptable.
   - During a real maintenance window, watch Google Search Console and Merchant Center. Pages answer 200 with the closed page, and the sitemap answers 404.
   - Agency members signed in only with the `_agency` cookie still see the closed page. Is that intended?
+  - Decision: closed pages answer HTTP 200 with no Retry-After and no noindex (as before this branch). During a long closure Google may index the "will be right back" page in place of products. Should the curtain answer 503 with Retry-After, or at least send noindex? (The shopper APIs already answer 503 with Retry-After.)
+  - The re-review checked the closed-store title ("<Store> will be right back") and curtain contrast on light and dark brands, and both passed.
+  - On a real https staging host, click "Store team sign-in" on the closed page with a verified staff session. Pass: the `_mx` pass cookie is stored (it is Secure, so local http can't show this) and the real site shows.
+  - Check the curtain in Safari and on a phone. Only headless desktop Chrome was used.
