@@ -68,6 +68,11 @@ export const ALLOWLIST = [
     path: ["app/(storefront)/pricing/", "app/(storefront)/templates/", "app/(storefront)/trust/", "app/(storefront)/integrations/", "app/(storefront)/customers/", "app/(storefront)/verticals/", "app/(storefront)/legal/"],
     reason: "Storeasy's own marketing pages. They answer 404 on every store's host (isPlatformSiteHost) and wear Storeasy's look, not a store's brand.",
   },
+  {
+    path: "components/preview/ExperimentNote.js",
+    reason:
+      "PV-08's purple preview note on a section a running test changes. It is preview chrome, matching the Draft preview bar, not the store's brand, and it renders only in a founder's preview, never for a shopper.",
+  },
 ];
 const allowed = (rel) => ALLOWLIST.find((a) => [].concat(a.path).some((p) => rel === p || (p.endsWith("/") && rel.startsWith(p))));
 
@@ -251,6 +256,16 @@ await t("the allowlist is short, every entry has a reason, and every entry is st
       `entry ${JSON.stringify(a.path)} no longer hides anything: remove it`,
     );
   }
+});
+
+await t("preview chrome on the allowlist is one file that renders only with a preview notice; the rest of components/preview is still linted", () => {
+  const entry = ALLOWLIST.find((a) => [].concat(a.path).includes("components/preview/ExperimentNote.js"));
+  ok(entry, "the preview note has no allowlist entry");
+  ok([].concat(entry.path).every((p) => p === "components/preview/ExperimentNote.js"), "the preview note's entry must name that one file, not a folder");
+  const src = readFileSync(join(ROOT, "components/preview/ExperimentNote.js"), "utf8");
+  ok(/if \(!notice\) return null;/.test(src), "ExperimentNote must render nothing without a notice (shoppers never get one)");
+  const files = storefrontFiles();
+  ok(files.includes("components/preview/PreviewBridge.js") && !allowed("components/preview/PreviewBridge.js"), "the rest of components/preview must stay in the lint");
 });
 
 await t("the lint scans the storefront files that matter (cart, checkout, product card, footer, home)", () => {
