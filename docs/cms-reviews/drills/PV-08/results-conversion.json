@@ -1,0 +1,72 @@
+{
+  "id": "PV-08",
+  "part": "conversion",
+  "title": "PV-08 experiments are inert in preview — conversion",
+  "ranAt": "2026-11-03T13:05:52.893Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "shopper: exposed once as a shopper first",
+      "detail": [
+        {
+          "variant": "b"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "shopper: the COD order counts as a conversion for the test",
+      "detail": {
+        "unit": "pv08-conv-shopper-mw0pap0l-1",
+        "order": "DES-8F91B3BB",
+        "conversions": [
+          {
+            "order_id": "DES-8F91B3BB"
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "previewing: exposed once as a shopper first",
+      "detail": [
+        {
+          "variant": "b"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "previewing: the browser holds the preview cookie",
+      "detail": true
+    },
+    {
+      "ok": true,
+      "label": "previewing: the COD order placed in a preview session counts as no conversion",
+      "detail": {
+        "unit": "pv08-conv-previewing-mw0patyw-2",
+        "order": "DES-D74B0D82",
+        "conversions": []
+      }
+    }
+  ],
+  "notes": [
+    "conversions: {\"shopper\":{\"unit\":\"pv08-conv-shopper-mw0pap0l-1\",\"order\":\"DES-8F91B3BB\",\"conversions\":[{\"order_id\":\"DES-8F91B3BB\"}]},\"previewing\":{\"unit\":\"pv08-conv-previewing-mw0patyw-2\",\"order\":\"DES-D74B0D82\",\"conversions\":[]}} (harness orders; re-seed afterwards)"
+  ],
+  "screenshots": [
+    {
+      "name": "conversion-preview-order",
+      "file": "docs/cms-reviews/drills/PV-08/conversion-preview-order.png",
+      "bytes": 21445,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/DES-D74B0D82"
+    }
+  ]
+}

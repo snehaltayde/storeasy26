@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { recordExposure, UNIT_COOKIE } from "@/lib/experiments";
+import { recordExposure, isPreviewRequest, UNIT_COOKIE } from "@/lib/experiments";
 import { rateLimit } from "@/lib/rate-limit";
 import { tenantHandler } from "@/lib/tenant-request";
 
@@ -13,6 +13,9 @@ export const dynamic = "force-dynamic";
 export const POST = tenantHandler(async (request) => {
   const limited = rateLimit(request, { name: "exp", limit: 60 });
   if (limited) return limited;
+  // PV-08: a browser in a preview session is the founder, never a visitor.
+  // The preview never pings; this refuses one that arrives anyway.
+  if (isPreviewRequest(request)) return NextResponse.json({ ok: true, recorded: false });
   const unit = request.cookies.get(UNIT_COOKIE)?.value;
   if (!unit || !/^[a-z0-9-]{8,64}$/.test(unit)) return NextResponse.json({ ok: true, recorded: false });
   const body = await request.json().catch(() => ({}));

@@ -1,0 +1,86 @@
+{
+  "id": "PV-08",
+  "part": "preview-tab",
+  "title": "PV-08 experiments are inert in preview — preview-tab",
+  "ranAt": "2026-11-03T13:05:26.969Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "preview tab at 1440: the founder's saved title",
+      "detail": "Winter repair, started."
+    },
+    {
+      "ok": true,
+      "label": "preview tab at 1440: the note in the hero",
+      "detail": "A test is running on this section: “Hero promise test”. Some visitors see a different version; the preview shows yours. See the test"
+    },
+    {
+      "ok": true,
+      "label": "preview tab at 1440: no sideways scroll, the note fits",
+      "detail": {
+        "h1": "Winter repair, started.",
+        "note": "A test is running on this section: “Hero promise test”. Some visitors see a different version; the preview shows yours. See the test",
+        "fits": true,
+        "sw": 1440,
+        "vw": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "preview tab at 375: the founder's saved title",
+      "detail": "Winter repair, started."
+    },
+    {
+      "ok": true,
+      "label": "preview tab at 375: the note in the hero",
+      "detail": "A test is running on this section: “Hero promise test”. Some visitors see a different version; the preview shows yours. See the test"
+    },
+    {
+      "ok": true,
+      "label": "preview tab at 375: no sideways scroll, the note fits",
+      "detail": {
+        "h1": "Winter repair, started.",
+        "note": "A test is running on this section: “Hero promise test”. Some visitors see a different version; the preview shows yours. See the test",
+        "fits": true,
+        "sw": 375,
+        "vw": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "no POST /api/exp from the preview tab",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "no exposure row for this unit",
+      "detail": []
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "preview-tab-1440",
+      "file": "docs/cms-reviews/drills/PV-08/preview-tab-1440.png",
+      "bytes": 27878,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "preview-tab-375",
+      "file": "docs/cms-reviews/drills/PV-08/preview-tab-375.png",
+      "bytes": 32415,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    }
+  ]
+}

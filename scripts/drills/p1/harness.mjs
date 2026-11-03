@@ -86,7 +86,7 @@ async function designerFlow(drill, prefix, { known } = {}) {
   drill.check(tb != null, prefix + ": the typed button label shows in the preview before saving", tb != null ? tb + " ms" : "not within 15 s");
   const tt = await waitFrame(page, TITLE, 4_000);
   const ts = await waitFrame(page, SUB, 1_000);
-  drill.check(tt != null && ts != null, prefix + ": the typed title and subtitle show in the preview before saving", { title: tt, subtitle: ts, hero: (await frameText(page)).split("\n").filter((l) => /Visibly|Drill hero|Edited in/.test(l)) }, k);
+  drill.check(tt != null && ts != null, prefix + ": the typed title and subtitle show in the preview before saving", { title: tt, subtitle: ts, hero: (await frameText(page)).split("\n").filter((l) => /Visibly|Drill hero|Edited in/.test(l)) }); // PV-08: the preview is never a test visitor
   await drill.shoot(page, prefix + "-designer-typed");
   const saved = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/admin/storefront" && r.request().method() === "PUT", { timeout: 30_000 });
   await page.getByRole("button", { name: "Save", exact: true }).first().click();
@@ -96,7 +96,7 @@ async function designerFlow(drill, prefix, { known } = {}) {
   await seen(page, "Preview shows your last save", 20_000);
   const after = await frameText(page);
   drill.check(after.includes(BTN), prefix + ": after Save the preview shows the saved button label", after.slice(0, 160));
-  drill.check(after.includes(TITLE) && after.includes(SUB), prefix + ": after Save the preview shows the saved title and subtitle", after.split("\n").filter((l) => /Visibly|Drill hero|Edited in|money back/.test(l)), k);
+  drill.check(after.includes(TITLE) && after.includes(SUB), prefix + ": after Save the preview shows the saved title and subtitle", after.split("\n").filter((l) => /Visibly|Drill hero|Edited in|money back/.test(l))); // PV-08
   await drill.shoot(page, prefix + "-designer-saved");
 
   await drill.open(page, "/admin/releases", { width: 1440 });
@@ -143,12 +143,13 @@ async function designerFlow(drill, prefix, { known } = {}) {
 
 export const parts = {
   // S57/S59 with the seeded hero-promise experiment still running: its variant b
-  // replaces the hero's title, highlight and subtitle for some visitors, the
-  // Designer preview included (finding 1). The button label is never replaced,
-  // so it tells the founder's words apart; title and subtitle are recorded as
-  // known (finding 1).
+  // replaces the hero's title, highlight and subtitle for some visitors. Since
+  // PV-08 the Designer preview never does (finding 1 fixed), so the preview's
+  // title and subtitle checks are plain checks. Signed-out visitors in variant
+  // b still see b's words, as a running test should: that one check stays
+  // known. The button label is never replaced, so it tells the founder's words apart.
   async designer(drill) {
-    await designerFlow(drill, "S57", { known: "finding 1" });
+    await designerFlow(drill, "S57", { known: "the running hero test shows variant b to some visitors, as it should" });
   },
 
   // The same flow after completing the hero experiment in the console.

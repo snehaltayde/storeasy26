@@ -44,6 +44,7 @@ import DesignerTabs from "./DesignerTabs";
 import { DeviceSwitch, EditorShell, PreviewCanvas } from "./EditorShell";
 import { MediaPicker } from "./MediaPicker";
 import { CollectionPicker } from "./RefPicker";
+import { TestRunningNote } from "./TestRunningNote";
 import { useDirtyGuard } from "./useDirtyGuard";
 
 // The HOME-PAGE DESIGNER (S55 / audit slice 3): section tree · real-storefront
@@ -187,7 +188,8 @@ function HistoryDialog({ blockKey, onClose, onLoad }) {
   );
 }
 
-export default function Designer({ initial }) {
+// `tests`: the running tests by section ({ hero: { slug, name } }), PV-08.
+export default function Designer({ initial, tests = {} }) {
   const toast = useToast();
   const [customized, setCustomized] = useState(initial.customized);
   const [revisions, setRevisions] = useState(initial.revisions);
@@ -589,12 +591,13 @@ export default function Designer({ initial }) {
       </Banner>
     );
 
-  const treeRow = ({ key, icon: Icon, title, hidden, isSelected, onSelect, controls }) => (
+  const treeRow = ({ key, icon: Icon, title, hidden, testing, isSelected, onSelect, controls }) => (
     <li key={key} className={cx("rounded-ctl border", isSelected ? "border-edge-strong bg-surface-sunken" : "border-transparent")}>
       <button
         type="button"
         data-tree-pick
         aria-current={isSelected || undefined}
+        aria-describedby={testing ? `tree-${key}-test` : undefined}
         onClick={onSelect}
         className={cx(
           "flex w-full items-center gap-2 rounded-ctl px-2 py-1.5 text-left text-sm focus-ring",
@@ -604,6 +607,12 @@ export default function Designer({ initial }) {
         <Icon size={14} aria-hidden className="shrink-0 text-fg-subtle" />
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {hidden && <Badge tone="warning">Hidden</Badge>}
+        {/* PV-08: read as the row's description, so its name stays the section's title */}
+        {testing && (
+          <span id={`tree-${key}-test`} aria-hidden="true">
+            <Badge tone="info">Test running</Badge>
+          </span>
+        )}
       </button>
       {isSelected && controls && <div className="flex flex-wrap items-center gap-0.5 px-1.5 pb-1.5">{controls}</div>}
     </li>
@@ -622,6 +631,7 @@ export default function Designer({ initial }) {
           icon: Home,
           title: "Hero",
           hidden: false,
+          testing: !!tests?.hero,
           isSelected: selected === "hero",
           onSelect: () => selectNode("hero"),
           controls: null,
@@ -815,6 +825,7 @@ export default function Designer({ initial }) {
             </div>
             <IconButton label="History" icon={<History size={14} aria-hidden />} onClick={() => setHistFor("hero")} />
           </div>
+          <TestRunningNote test={tests?.hero} />
           <Field label="Title" htmlFor="ins-hero-title" required>
             <Input id="ins-hero-title" value={hero.title} invalid={!hero.title.trim()} onChange={(e) => setHero({ ...hero, title: e.target.value })} />
           </Field>

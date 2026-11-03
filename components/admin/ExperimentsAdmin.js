@@ -147,7 +147,7 @@ export default function ExperimentsAdmin({ initial }) {
 
       <ul className="space-y-3">
         {experiments.map((e) => (
-          <Card as="li" key={e.id}>
+          <Card as="li" key={e.id} id={`exp-${e.slug}`}>
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <StatusBadge status={e.status} />
               <span className="font-semibold text-fg">{e.name}</span>

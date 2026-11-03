@@ -1,0 +1,81 @@
+caught   M1 page passes preview:false — 20 passed, 7 failed
+    THE BUG: in a preview, a visitor bucketed into variant b still sees the founder's own saved hero
+    THE BUG, typing: an unsaved title in the preview shows while the hero test runs
+    THE BUG, exposure: a preview render never mounts the exposure ping, for any bucket or no unit at all
+    a preview of every bucket: 80 units, each shows the founder's hero, none pings
+    … 3 more
+caught   M2 heroVariantFor ignores preview — 20 passed, 7 failed
+    THE BUG: in a preview, a visitor bucketed into variant b still sees the founder's own saved hero
+    THE BUG, typing: an unsaved title in the preview shows while the hero test runs
+    THE BUG, exposure: a preview render never mounts the exposure ping, for any bucket or no unit at all
+    a preview of every bucket: 80 units, each shows the founder's hero, none pings
+    … 3 more
+caught   M3 preview keeps an assignment (pings) — 23 passed, 4 failed
+    THE BUG, exposure: a preview render never mounts the exposure ping, for any bucket or no unit at all
+    a preview of every bucket: 80 units, each shows the founder's hero, none pings
+    REGRESSION: on a store that has never published, shoppers get drafts and are still bucketed (drafts are not a preview)
+    unit: heroVariantFor in a preview applies nothing and returns the note; outside it matches 8968db3 for 2,000 units
+caught   M4 /api/exp refusal removed — 25 passed, 2 failed
+    THE BUG: an exposure ping from a preview session is refused by the server, and no row is written
+    NEGATIVE: any preview cookie is refused, even an expired, forged or other store's one
+caught   M5 isPreviewRequest always false — 24 passed, 3 failed
+    THE BUG: an exposure ping from a preview session is refused by the server, and no row is written
+    NEGATIVE: any preview cookie is refused, even an expired, forged or other store's one
+    a preview session's order converts nothing; a shopper's still converts
+caught   M6 isPreviewRequest only token-shaped cookies — 25 passed, 2 failed
+    NEGATIVE: any preview cookie is refused, even an expired, forged or other store's one
+    a preview session's order converts nothing; a shopper's still converts
+caught   M7 conversionUnit ignores preview — 26 passed, 1 failed
+    a preview session's order converts nothing; a shopper's still converts
+caught   M8 checkout online payment reads the raw cookie — 25 passed, 2 failed
+    guard: the checkout route takes every conversion unit through conversionUnit, never the raw cookie
+    guard: only the known, gated places pick, apply or count a variant (a new one must be gated, then listed here)
+caught   M9 page drops the preview note — 25 passed, 2 failed
+    the note: in a preview the hero says a test is running, names it, and links to it
+    REGRESSION: on a store that has never published, shoppers get drafts and are still bucketed (drafts are not a preview)
+caught   M10 shoppers get a notice too — 23 passed, 4 failed
+    NEGATIVE: shoppers never see the note, in either bucket, and a preview with no test running has none
+    REGRESSION: on a store that has never published, shoppers get drafts and are still bucketed (drafts are not a preview)
+    a forged or expired preview cookie is not a preview: the live page serves as for any shopper
+    unit: heroVariantFor in a preview applies nothing and returns the note; outside it matches 8968db3 for 2,000 units
+caught   M11 Designer drops the settings note — 26 passed, 1 failed
+    Designer: the hero's settings say a test is running, name it, and link to its row
+caught   M12 Designer page doesn't pass tests — 26 passed, 1 failed
+    the Designer page loads the running tests and hands them to the Designer
+caught   M13 Experiments row loses its anchor — 26 passed, 1 failed
+    Experiments: each test's row carries the anchor the notes link to
+caught   M14 runningTestsBySection finds nothing — 25 passed, 2 failed
+    runningTestsBySection names the running hero test, and nothing on a store with none
+    the Designer page loads the running tests and hands them to the Designer
+caught   M15 tree mark off — 26 passed, 1 failed
+    Designer: the tree marks the hero while a test runs on it
+caught   M16 shopper control loses its assignment — 23 passed, 4 failed
+    REGRESSION: signed-out shoppers are bucketed and served exactly as at 8968db3 (80 units, frozen oracle)
+    REGRESSION: on a store that has never published, shoppers get drafts and are still bucketed (drafts are not a preview)
+    REGRESSION: a first-time shopper (no unit cookie) is still bucketed and still pings
+    unit: heroVariantFor in a preview applies nothing and returns the note; outside it matches 8968db3 for 2,000 units
+caught   M17 bucketing boundary < to <= — 26 passed, 1 failed
+    unit: heroVariantFor in a preview applies nothing and returns the note; outside it matches 8968db3 for 2,000 units
+caught   M18 page treats 'draft mode' as preview — 25 passed, 2 failed
+    REGRESSION: on a store that has never published, shoppers get drafts and are still bucketed (drafts are not a preview)
+    guard: the home page passes the preview state to the hero test, and pings only with an assignment
+caught   M19 settings note links to the list only — 26 passed, 1 failed
+    Designer: the hero's settings say a test is running, name it, and link to its row
+caught   M20 preview note wording drifts — 26 passed, 1 failed
+    the note: in a preview the hero says a test is running, names it, and links to it
+caught   M21 preview note even with no test — 25 passed, 2 failed
+    NEGATIVE: shoppers never see the note, in either bucket, and a preview with no test running has none
+    unit: heroVariantFor in a preview applies nothing and returns the note; outside it matches 8968db3 for 2,000 units
+caught   M22 bucketing salt dropped — 23 passed, 4 failed
+    REGRESSION: signed-out shoppers are bucketed and served exactly as at 8968db3 (80 units, frozen oracle)
+    REGRESSION: on a store that has never published, shoppers get drafts and are still bucketed (drafts are not a preview)
+    unit: heroVariantFor in a preview applies nothing and returns the note; outside it matches 8968db3 for 2,000 units
+    REGRESSION: a shopper's ping is counted, with the variant re-derived on the server, once
+caught   M23 tree mark becomes part of the button's name — 26 passed, 1 failed
+    Designer: the tree marks the hero while a test runs on it
+caught   M24 note renders with no notice — 24 passed, 3 failed
+    NEGATIVE: shoppers never see the note, in either bucket, and a preview with no test running has none
+    REGRESSION: on a store that has never published, shoppers get drafts and are still bucketed (drafts are not a preview)
+    a forged or expired preview cookie is not a preview: the live page serves as for any shopper
+
+24 of 24 caught
