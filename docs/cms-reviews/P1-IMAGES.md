@@ -107,6 +107,17 @@ Each break was made by hand, the suite run, the file put back:
 4. The harness has one store, so the cross-store check uses a host that resolves to no store rather than a second real store. The route itself is unchanged. No suite tests `/api/media` with two real stores; that was true before this item too, and owner check 2 covers it on staging.
 5. The quiz, bundle and order pages also use the wrapper, but the drill didn't open them. They're covered by the source check in `test:images` only.
 
+### From review
+
+Non-blocking findings from the independent review, added at merge.
+
+- Library photos are now sent at full size with no srcset, so the product gallery and cards download the original bytes at every width. Before this change they were broken (400), so nothing got worse. Matching the uploader's smaller copies to each width belongs in PERF-06, as the builder says.
+- The perf fixture has only library photos, so no Shopify CDN photo was checked in a browser after the change. The only proof that Shopify photos still go through /_next/image with a srcset is the unit render in test:images (StoreImage and ProductGallery). That test passed, and the builder did not change next.config.mjs.
+- In single-tenant mode (PLATFORM_DB_URL unset), resolveHost returns 'legacy' and the optimizer's host-less request would have worked. In that mode library photos now also skip resizing. This is harmless, but the report's root-cause text only describes platform mode.
+- My drill:edge run on the production build gave 137 passed, 1 failed. The builder reported 134 passed, 4 failed. The one failure left is the same stop at the product picker seen in batch C ('locator.click: Timeout 30000ms'). The 3 home hero failures the builder listed did not happen in my run. Both runs agree that the console-error and failed-request checks now pass. The difference is in checks that have nothing to do with images, so the report's counts are slightly stale and nothing more.
+- 'Edge runtime compatible' holds for the storefront pages and the new code (lib/image-src.js is pure, and the product page answers with x-edge-runtime: 1). The /api/media route itself still runs as runtime 'nodejs', as it did before. The report could say this more clearly.
+- isLibraryMedia trims leading spaces, so a src like ' /api/media/x' is treated as a library photo but passed to `<img>` with the space still in it. No test covers this case. It is cosmetic only and has no security effect.
+
 ## Owner checks
 
 These belong in `docs/cms-reviews/MANUAL-CHECKS.md` when this branch merges (not added there here, to keep this branch from clashing with the other batch D branches).
