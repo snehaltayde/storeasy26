@@ -5,6 +5,7 @@ import { audit } from "@/lib/platform/audit";
 import { listPlacements, upsertPlacement, deletePlacement } from "@/lib/cms/placements";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
+import { legacyWritesRefusal } from "@/lib/cms-mode";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,9 @@ export const PUT = tenantHandler(async (request, { params }) => {
   if (!auth.ok) return deny(auth);
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
+  // P2-GUARD: a store on the new editor refuses this write (409 STORE_USES_DOCUMENTS)
+  const refused = await legacyWritesRefusal({ route: "admin/upsells/[id]" });
+  if (refused) return NextResponse.json(refused.body, { status: refused.status });
   const row = (await listPlacements()).find((p) => p.id === id);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   try {
@@ -44,6 +48,9 @@ export const DELETE = tenantHandler(async (request, { params }) => {
   const auth = await requireAdmin(request, "upsells.write");
   if (!auth.ok) return deny(auth);
   const { id } = await params;
+  // P2-GUARD: a store on the new editor refuses this write (409 STORE_USES_DOCUMENTS)
+  const refused = await legacyWritesRefusal({ route: "admin/upsells/[id]" });
+  if (refused) return NextResponse.json(refused.body, { status: refused.status });
   await deletePlacement(id);
   slog("placement_deleted", { id });
   await audit({ actor: auth.actor, action: "upsells.write", resource: `placement:${id}`, diff: { deleted: true } });

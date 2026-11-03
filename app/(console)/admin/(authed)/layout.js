@@ -28,10 +28,11 @@ export default async function AdminAuthedLayout({ children }) {
       if (c?.supported && !c.launched) badges.setup = `${c.doneCount}/${c.total}`;
     } catch {}
     try {
-      // S52: unpublished-changes dot on Publishing (hash compare, cheap)
-      const { snapshotContent, getLiveRelease } = await import("@/lib/releases");
-      const [snap, live] = await Promise.all([snapshotContent(), getLiveRelease()]);
-      if (!live || live.content_hash !== snap.hash) badges.publish = "•";
+      // S52: unpublished-changes dot on Publishing (hash compare, cheap).
+      // P2-GUARD: in documents mode, one count over documents_dirty instead.
+      const { publishingBadge } = await import("@/lib/releases");
+      const publish = await publishingBadge();
+      if (publish) badges.publish = publish;
     } catch {}
     return [siteName(), currentTenant()?.domains?.[0] || null, badges];
   }).catch(() => ["Store", null, {}]);

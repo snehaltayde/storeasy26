@@ -10,6 +10,7 @@ import { effectiveSurfaceTemplate } from "@/lib/cms/defaults";
 import { numericId } from "@/lib/ids";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
+import { legacyWritesRefusal } from "@/lib/cms-mode";
 
 // Catalog browser API (S39 / MC05 + MC06). Shopify owns catalog VALUES —
 // this surface is read-only on them (the console labels + links to Shopify
@@ -92,6 +93,9 @@ export const POST = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.write");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
+  // P2-GUARD: a store on the new editor refuses this write (409 STORE_USES_DOCUMENTS)
+  const refused = await legacyWritesRefusal({ route: "admin/catalog" });
+  if (refused) return NextResponse.json(refused.body, { status: refused.status });
   try {
     if (body.product) {
       const p = await db.selectFrom("products").select(["id", "handle"]).where("handle", "=", String(body.product.handle || "")).executeTakeFirst();

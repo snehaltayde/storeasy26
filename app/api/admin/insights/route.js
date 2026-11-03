@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { listInsights, generateInsights, setInsightStatus, applyInsightDraft, aiBudget, aiConfigured, AI_MODEL } from "@/lib/ai/insights";
 import { tenantHandler } from "@/lib/tenant-request";
+import { legacyWritesRefusal } from "@/lib/cms-mode";
 
 // AI insights admin API (S47 / BE32 + MC19). Honest states throughout: no
 // key = "not configured" (never a mock), budget spent = refused with the
@@ -26,6 +27,13 @@ export const POST = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.write");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
+  if (body.apply && !body.generate && !body.dismiss && !body.restore) {
+    // P2-GUARD: applying writes a hero or announcement draft. Until
+    // P2-WRITERS routes it through a mode-aware facade, a store on the new
+    // editor refuses it.
+    const refused = await legacyWritesRefusal({ route: "admin/insights" });
+    if (refused) return NextResponse.json(refused.body, { status: refused.status });
+  }
   try {
     if (body.generate) {
       const r = await generateInsights();

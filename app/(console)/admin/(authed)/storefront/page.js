@@ -41,7 +41,9 @@ export default async function StorefrontOverviewPage() {
 
   const [view, diff, live, validation] = await tfetch(async () => {
     const [view, diff, live, snap] = await Promise.all([storefrontView(), releaseDiff(), getLiveRelease(), snapshotContent()]);
-    return [view, diff, live, await validateRelease(snap.content)];
+    // P2-GUARD: a v4 live release has no legacy diff or brand check to show
+    if (diff.documents) return [view, diff, live, { ok: true, documents: true, issues: [], errors: [], warnings: [], sections: [] }];
+    return [view, diff, live, await validateRelease(snap.content, { live: live?.content ?? null })];
   });
 
   // Recent edits: customized blocks + pages, newest first.
@@ -80,7 +82,9 @@ export default async function StorefrontOverviewPage() {
           <CardHeader
             title="Published state"
             badge={
-              diff.firstPublish ? (
+              diff.documents ? (
+                <Badge tone="info">{diff.message}</Badge>
+              ) : diff.firstPublish ? (
                 <Badge tone="warning">Never published — drafts serve directly</Badge>
               ) : diff.dirty ? (
                 <Badge tone="info">{diff.items.length} unpublished change{diff.items.length === 1 ? "" : "s"}</Badge>
@@ -89,7 +93,9 @@ export default async function StorefrontOverviewPage() {
               )
             }
             description={
-              live
+              diff.documents
+                ? "Changes go live when you publish them from the editor."
+                : live
                 ? `Live release ${live.content_hash.slice(0, 12)}${live.note ? ` — “${live.note}”` : ""}`
                 : "Until the first publish, every saved draft is immediately visible to shoppers."
             }
@@ -124,7 +130,7 @@ export default async function StorefrontOverviewPage() {
               })}
             </ul>
           ) : (
-            !diff.firstPublish && <p className="text-sm text-fg-muted">No draft changes — the live release matches your drafts exactly.</p>
+            !diff.firstPublish && !diff.documents && <p className="text-sm text-fg-muted">No draft changes — the live release matches your drafts exactly.</p>
           )}
         </Card>
 

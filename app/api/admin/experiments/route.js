@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { listExperiments, upsertExperiment, startExperiment, setExperimentStatus, analyzeExperiment, adoptVariant } from "@/lib/experiments";
 import { tenantHandler } from "@/lib/tenant-request";
+import { legacyWritesRefusal } from "@/lib/cms-mode";
 
 // Experiments admin API (S47 / BE22 + MC18). The analysis endpoint is the
 // ONLY reader of results, and it blocks winner interpretation while running
@@ -34,6 +35,12 @@ export const POST = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.write");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
+  if (body.adopt && !body.experiment && !body.start && !body.pause && !body.complete) {
+    // P2-GUARD: adopting writes the hero draft. Until P2-WRITERS routes it
+    // through a mode-aware facade, a store on the new editor refuses it.
+    const refused = await legacyWritesRefusal({ route: "admin/experiments" });
+    if (refused) return NextResponse.json(refused.body, { status: refused.status });
+  }
   try {
     if (body.experiment) {
       const saved = await upsertExperiment(body.experiment);

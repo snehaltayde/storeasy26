@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { KITS, applyKit, kitUpgradeAvailable } from "@/lib/themes/kits";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { tenantHandler } from "@/lib/tenant-request";
+import { legacyWritesRefusal } from "@/lib/cms-mode";
 
 // Theme library API (S37 / MC07).
 //   GET → kit catalog + the tenant's pin (+ upgrade availability)
@@ -31,8 +32,12 @@ export const POST = tenantHandler(async (request) => {
   const body = await request.json().catch(() => ({}));
   const auth = await requireAdmin(request, "storefront.write");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if (body.action !== "apply") return NextResponse.json({ error: "action must be apply" }, { status: 400 });
+  // P2-GUARD: applyKit writes the theme pin, brand and hero preset as legacy
+  // drafts; a store on the new editor refuses it (409 STORE_USES_DOCUMENTS)
+  const refused = await legacyWritesRefusal({ route: "admin/theme" });
+  if (refused) return NextResponse.json(refused.body, { status: refused.status });
   try {
-    if (body.action !== "apply") return NextResponse.json({ error: "action must be apply" }, { status: 400 });
     const r = await applyKit(String(body.kit || ""), { actor: auth.actor, withPresets: body.withPresets !== false, withBrand: body.withBrand !== false });
     // this request's tenant context predates the patch — answer with the pin we just wrote
     return NextResponse.json({ ok: true, applied: r, ...view(), theme: r.theme, upgradeAvailable: false });
