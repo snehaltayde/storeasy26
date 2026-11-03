@@ -962,9 +962,33 @@ const { createElement } = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const contentStubs = {
   "next/link": { __esModule: true, default: ({ href, children }) => createElement("a", { href }, children) },
-  "./FaqSection": { __esModule: true, default: () => null },
+  "@/components/FaqSection": { __esModule: true, default: () => null },
 };
-const ContentPage = (await compile("components/ContentPage.js", (id) => contentStubs[id] ?? require(id))).default;
+// P2-SECTIONS: ContentPage renders through the renderer map
+// (components/sections/*). Those files compile here too; "@/lib/…" modules are
+// the real ones (loaded with require, which takes these plain ES modules).
+const compiledTree = new Map();
+async function compileTree(rel) {
+  if (compiledTree.has(rel)) return compiledTree.get(rel);
+  const { code } = await swc.transform(await source(rel), {
+    filename: rel,
+    jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" },
+    module: { type: "commonjs" },
+  });
+  const deps = new Map();
+  for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
+    if (id in contentStubs || deps.has(id)) continue;
+    const local = id.startsWith("@/") ? id.slice(2) : id.startsWith(".") ? join(dirname(rel), id) : null;
+    if (local && /^(components|app)\//.test(local)) deps.set(id, await compileTree(local.endsWith(".js") ? local : `${local}.js`));
+    else if (local) deps.set(id, require(join(here, "..", local.endsWith(".js") ? local : `${local}.js`)));
+  }
+  const mod = { exports: {} };
+  compiledTree.set(rel, mod.exports);
+  new Function("require", "module", "exports", code)((id) => contentStubs[id] ?? deps.get(id) ?? require(id), mod, mod.exports);
+  compiledTree.set(rel, mod.exports);
+  return mod.exports;
+}
+const ContentPage = (await compileTree("components/ContentPage.js")).default;
 const rendered = async (slug, sections) => {
   eq((await save(slug, form(...sections))).status, 200, `${slug} save:`);
   const page = await inT(() => getContentPage(slug));

@@ -15,7 +15,9 @@ export const faqAnchor = (q) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
 
-export default function FaqSection({ heading, items }) {
+// Any other prop (P2-SECTIONS: data-section-id and data-section-kind) goes on
+// the root element.
+export default function FaqSection({ heading, items, ...rootProps }) {
   const rootRef = useRef(null);
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export default function FaqSection({ heading, items }) {
   }
 
   return (
-    <section ref={rootRef}>
+    <section ref={rootRef} {...rootProps}>
       {heading ? <h2 className="text-lg font-bold text-sf-text">{heading}</h2> : null}
       <div className="mt-2 divide-y divide-sf-border-soft rounded-sf-card border border-sf-border">
         {items.map((it) => {
