@@ -97,6 +97,16 @@ On the design harness (`DESIGN_PORT=3420 DESIGN_SQLD_PORT=4420`), with this bran
 - `getLiveRelease()` (console pages, `releaseDiff`, `brandReadability`) still returns a v4 row as if it were a snapshot. No v4 row can exist until P2-ATOM's writer, and P2-READ and P2-PUBLISH own those readers.
 - Unit counts only. Real Next per-request counts come from P2-PERF's `perf-dbcount` runs.
 
+### From review
+
+Non-blocking findings from the independent review, added at merge.
+
+- The earlier blocker is fixed, and I checked it. At c10506a the closed-store page (app/(storefront)/layout.js:228-240) works out the kit once, builds the brand CSS with { kit } even when the store has no brand, and the pill and its dot use text-sf-hero-accent / bg-sf-hero-accent. I computed contrast on the glow-1 hero (#fff1ee) for no brand (#3f6212, 6.43:1) and for accents #7c3aed (5.17), #facc15 (6.35), #0ea5e9 (5.12), #111111 (7.21) and #ffffff (5.21). Every one is 4.5:1 or better. On pulse-1, --sf-hero-accent falls back to accent-400 (globals.css:89), so the dark closed page looks the same as before.
+- The new test catches the bug. I made six deliberate breaks to the fix lines and test-releases caught every one: pill text put back to text-accent-400; dot put back to bg-accent-400; { kit } removed; the CSS skipped when there is no brand; the kit forced to glow-1; resolvedTheme no longer awaited. test:releases gives 35 passed, 0 failed. pnpm test, after a frozen offline install in a fresh worktree, gives 57 of 57 suites passed in 106.2 s.
+- The packet's browser evidence was not redone for fix round 1. The glow closed page was checked only by the rendered SWC test, not in a browser on the harness. The owner check added in the packet (look at a glow store's closed page) covers this.
+- The packet still says 'Nine deliberate breaks, eight caught'. That count does not include the fix-round break described under Tests (the pill text put back to text-accent-400 makes the new test fail). This is a small bookkeeping gap, not a false claim.
+- Edge runtime: none of the changes in lib/, app/ or components/ since 4992670 use node: APIs. node: imports appear only in scripts/ tests and support files.
+
 ## Tests
 
 `scripts/test-releases.js` (P2-VGATE block, 10 tests). Fix round 1 added "rendered: a glow store's maintenance pill is readable on the light hero, with and without a brand": it renders the real layout for a closed glow store with the test brand and with no brand, checks kit `glow-1`, that the pill and dot use the hero accent role, that `--sf-hero-accent` is in the curtain's CSS and reaches 4.5:1 on the glow hero, and that no brand gives #3f6212. It failed before the fix (pill text was `text-accent-400`). It now imports `scripts/support/request-cache.js` first and stubs `next/headers` per simulated request. One existing test changed: "expectedDraftHash binds the publish …" counted rows through `listReleases`. That now hides unstamped rows, which would have made the check weaker, so it counts the `releases` table directly.
