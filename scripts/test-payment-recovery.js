@@ -284,22 +284,25 @@ await t("verify: paid write lost and the order cancelled meanwhile → the same 
   eq(await paidEvents(o.orderId), 0, "paid events");
 });
 
-// The webhook pays the order and its follow-up work starts the Shopify push while the
-// browser's paid write is at the server: on its own connection, as it would be live.
-const webhookPaysAndPushBegins = (o, paymentId = o.paymentId) => () =>
+// The webhook pays the order, and with `push` its follow-up work starts the Shopify
+// push, while the browser's paid write is at the server: on its own connection, as
+// it would be live.
+const webhookPays = (o, { paymentId = o.paymentId, push = true } = {}) => () =>
   withTenant(DIRECT, async () => {
     await O.markOrderPaid(o.orderId, { razorpayPaymentId: paymentId, source: "webhook" });
-    await O.beginShopifySync(o.orderId);
+    if (push) await O.beginShopifySync(o.orderId);
   });
 
-for (const [mode, how] of [
+const RACES = [
   ["commit_then_drop", "paid write lost after running"],
   ["drop_before", "paid write lost before running"],
   [undefined, "no blip, between the read and the write"],
-]) {
+];
+
+for (const [mode, how] of RACES) {
   await t(`verify: webhook pays and starts the push meanwhile (${how}) → success, not a refusal`, async () => {
     const o = await pendingOrder();
-    turso.state.faults.push({ match: UPDATE_ORDER, mode, before: webhookPaysAndPushBegins(o) });
+    turso.state.faults.push({ match: UPDATE_ORDER, mode, before: webhookPays(o) });
     const r = await callVerify(o);
     eq(r.status, 200, `status (${r.body.error})`);
     eq(r.body.ok, true, "ok");
@@ -310,13 +313,31 @@ for (const [mode, how] of [
   });
 }
 
-await t("verify: a different payment lands meanwhile → still the different-payment refusal", async () => {
+// A second captured payment is refused whether or not the push has started yet:
+// one of the two needs a refund either way.
+for (const [mode, how] of RACES) {
+  for (const push of [false, true]) {
+    await t(`verify: a different payment lands meanwhile (${how}${push ? ", push started" : ""}) → the different-payment refusal`, async () => {
+      const o = await pendingOrder();
+      turso.state.faults.push({ match: UPDATE_ORDER, mode, before: webhookPays(o, { paymentId: "pay_other", push }) });
+      const r = await callVerify(o);
+      eq(r.status, 400, `status (${JSON.stringify(r.body)})`);
+      ok(/different payment/i.test(r.body.error), `error (${r.body.error})`);
+      eq((await orderRow(o.orderId)).razorpay_payment_id, "pay_other", "payment id kept");
+    });
+  }
+}
+
+await t("webhook: the browser applies a different payment meanwhile → flagged, not acknowledged as paid", async () => {
   const o = await pendingOrder();
-  turso.state.faults.push({ match: UPDATE_ORDER, mode: "drop_before", before: webhookPaysAndPushBegins(o, "pay_other") });
-  const r = await callVerify(o);
-  eq(r.status, 400, "status");
-  ok(/different payment/i.test(r.body.error), `error (${r.body.error})`);
-  eq((await orderRow(o.orderId)).razorpay_payment_id, "pay_other", "payment id kept");
+  turso.state.faults.push({
+    match: UPDATE_ORDER,
+    before: () => withTenant(DIRECT, () => O.markOrderPaid(o.orderId, { razorpayPaymentId: o.paymentId, source: "browser_callback" })),
+  });
+  const r = await callWebhook({ ...o, paymentId: "pay_other" });
+  eq(r.status, 200, "status");
+  ok(/different payment/i.test(r.body.flagged), `flagged (${JSON.stringify(r.body)})`);
+  eq((await orderRow(o.orderId)).razorpay_payment_id, o.paymentId, "payment id kept");
 });
 
 await t("verify then webhook: both fire, paid event and effects happen once", async () => {

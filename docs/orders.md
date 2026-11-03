@@ -88,10 +88,12 @@ what stops two Shopify pushers both going on after `beginShopifySync`. If our wr
 and the order has already moved on, the call still reports it as ours.
 
 `markOrderPaid` treats an order that's paid or further along as a repeat (`already: true`),
-unless it holds a different payment id. It checks once before writing and again if
-`transitionOrder` refuses the move, because the webhook can pay the order and start its
-Shopify push (`paid → syncing_shopify`) between the two. Without that second check the
-shopper who'd paid would get "Invalid order transition syncing_shopify → paid".
+unless it holds a different payment id, which throws "already paid with a different
+payment" (a 400 on verify, a flagged dead receipt on the webhook). It checks once before
+writing, and again whenever `transitionOrder` finds someone else got there first. That can
+be an `already: true` (the other path paid it) or a refused move (it paid it and started
+the Shopify push, `paid → syncing_shopify`). Either way the second check decides, so a
+second captured payment is refused however far the order has got.
 
 If the database stays down during `razorpay_verify`, the customer has paid, so the route
 answers `202 {pending:true}` rather than an error. The browser retries (see
