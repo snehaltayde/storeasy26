@@ -329,4 +329,209 @@ export const parts = {
   async after(drill) {
     await withLive(drill, { seeded: SEEDED, default: DEFAULT_LOOK }, (set) => captureSet(drill, "after", set));
   },
+
+  // The same two negatives on the new build: readable now.
+  async "negatives-after"(drill) {
+    const out = await measureNegatives(drill, "after-tok02");
+    const dark = out.dark.measured;
+    drill.check(dark.length > 0 && dark.every((r) => r.ratio >= 4.5), "after: with a dark background, product titles are light and pass 4.5:1", dark);
+    const black = out.black.measured;
+    drill.check(black.length > 0 && black.every((r) => r.ratio >= r.need && r.ratio >= 4.5), "after: with a black accent, the hero highlight and badge pass 4.5:1 (a lighter shade of the accent)", black);
+  },
+
+  // Rich text links follow the accent (they were lime on every store).
+  async rte(drill) {
+    const [p] = await rows("tenant", "SELECT description_html d FROM products WHERE handle = 'glow-serum'");
+    const html = '<p>Part of the <a href="/collections/serums">serum routine</a>, with <strong>vitamin C</strong>.</p>';
+    await sql("tenant", "UPDATE products SET description_html = ? WHERE handle = 'glow-serum'", [html]);
+    const orig = await liveRelease();
+    const out = {};
+    try {
+      const sets = { default: DEFAULT_LOOK, seeded: null, light: TEST_THEMES.light, dark: TEST_THEMES.dark };
+      for (const [name, s] of Object.entries(sets)) {
+        if (s) await publishCopy(orig.content, s);
+        else await pointLiveAt(orig.id);
+        const ctx = await shopper(drill, 1440);
+        const page = await ctx.newPage();
+        await page.goto("/products/glow-serum", { waitUntil: "load" });
+        await settle(page);
+        const a = (await audit(page, ".rte")).find((r) => r.tag === "a");
+        out[name] = a;
+        drill.note(`rte link on ${name}: ${JSON.stringify(a)}`);
+        await ctx.close();
+      }
+    } finally {
+      await pointLiveAt(orig.id);
+      await sql("tenant", "UPDATE products SET description_html = ? WHERE handle = 'glow-serum'", [p.d ?? null]);
+    }
+    drill.check(out.default?.fg === "#4d7c0f", "rich text link on the default look is unchanged (#4d7c0f, lime-700)", out.default);
+    drill.check(out.seeded && out.seeded.fg !== "#4d7c0f", "rich text link on the seeded teal brand is no longer lime", out.seeded);
+    for (const k of ["seeded", "light", "dark"]) drill.check(out[k]?.ratio >= 4.5, `rich text link on ${k} passes 4.5:1`, out[k]);
+    writeFileSync(join(drill.dir, "rte-links.json"), JSON.stringify(out, null, 2) + "\n");
+  },
+
+  // TOK-02 through the founder's own screens: Brand (save warns with a
+  // suggestion, never fails), Publishing (refuses the changed failing pair in
+  // plain words), the suggestion publishes, and a black accent saves with a
+  // note and shows a readable hero highlight to shoppers.
+  async publish(drill) {
+    const orig = await liveRelease();
+    const [row] = await rows("platform", "SELECT json_extract(config,'$.brand') b FROM tenants WHERE id = 'design'");
+    const savedBrand = JSON.parse(row?.b || "null");
+    const ctx = await drill.context({ width: 1440 });
+    const page = await drill.signIn(ctx);
+    const putBrand = (body) => page.evaluate(async (b) => {
+      const r = await fetch("/api/admin/brand", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
+      return { status: r.status, json: await r.json().catch(() => ({})) };
+    }, body);
+    const publishApi = () => page.evaluate(async () => {
+      const r = await fetch("/api/admin/releases", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "publish", note: "TOK drill" }) });
+      return { status: r.status, json: await r.json().catch(() => ({})) };
+    });
+    // the console reads the store's settings through a 30-second cache
+    // (P1-DRILLS finding 1), so a publish right after a save can still see the
+    // old brand: wait until the Publishing screen lists the change
+    const waitPublishing = async (needle, ms = 45_000) => {
+      const t0 = Date.now();
+      while (Date.now() - t0 < ms) {
+        await drill.open(page, "/admin/releases", { width: 1440 });
+        const txt = await page.evaluate(() => document.body.innerText);
+        if (txt.includes(needle)) return Date.now() - t0;
+        await page.waitForTimeout(3000);
+      }
+      return null;
+    };
+    const DARK = { ...(savedBrand || {}), background: "#0a0a0b", foreground: "#18181b" };
+    try {
+      // 1. The Brand screen: type the colours, the preview warns, Save keeps them.
+      await drill.open(page, "/admin/brand", { width: 1440 });
+      await page.locator("#brand-background").fill("#0a0a0b");
+      await page.locator("#brand-foreground").fill("#18181b");
+      const warned = await page.getByText("Hard to read").first().waitFor({ timeout: 15_000 }).then(() => true).catch(() => false);
+      drill.check(warned, 'brand screen: typing a dark text colour on a dark background shows "Hard to read" before saving');
+      await drill.shoot(page, "publish-1-brand-preview-warning");
+      const saved = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/admin/brand" && r.request().method() === "PUT" && r.request().postData()?.includes('"brand"'), { timeout: 30_000 });
+      await page.getByRole("button", { name: "Save brand", exact: true }).click();
+      const res = await saved;
+      const body = await res.json().catch(() => ({}));
+      drill.check(res.status() === 200, "brand screen: Save brand answers 200 (a save never fails on readability)", res.status());
+      const warning = (body.warnings || []).find((w) => /Product titles/.test(w));
+      drill.check(Boolean(warning && /Try text colour #[0-9a-f]{6}/.test(warning)), "brand screen: the answer names the pair and the nearest colour that fixes it", body.warnings);
+      await page.waitForTimeout(800);
+      await drill.shoot(page, "publish-2-brand-saved-warning");
+      const suggestion = /Try text colour (#[0-9a-f]{6})/.exec(warning || "")?.[1];
+
+      // 2. Publishing refuses it, in plain words.
+      const waited = await waitPublishing("Product titles, prices and body text");
+      drill.check(waited != null, "publishing: the screen names the failing pair before publishing", waited == null ? "not within 45 s" : `${waited} ms`);
+      await drill.shoot(page, "publish-3-publishing-refused");
+      const btn = page.getByRole("button", { name: "Publish now", exact: true }).first();
+      drill.check(!(await btn.isEnabled()), "publishing: Publish now is disabled while the pair fails");
+      const refused = await publishApi();
+      const refusedMsg = (refused.json.errors || []).join(" ");
+      drill.check(refused.status === 422 && /Product titles, prices and body text: #18181b on #0a0a0b has a contrast of 1\.12 to 1/.test(refusedMsg), "publishing: the publish call itself is refused (422) with the pair and its contrast", { status: refused.status, errors: refused.json.errors });
+      drill.note(`refused with: ${refusedMsg}`);
+
+      // 3. The suggestion publishes.
+      const fixed = await putBrand({ brand: { ...DARK, foreground: suggestion } });
+      drill.check(fixed.status === 200 && !(fixed.json.warnings || []).some((w) => /Product titles/.test(w)), `the suggested text colour ${suggestion} saves with no warning about product titles`, fixed.json.warnings);
+      await waitPublishing(suggestion.slice(1), 5_000).catch(() => null);
+      let ok2 = null;
+      for (let i = 0; i < 12 && ok2?.status !== 200; i++) {
+        ok2 = await publishApi();
+        if (ok2.status !== 200) await page.waitForTimeout(4000);
+      }
+      drill.check(ok2?.status === 200, "the suggested colour publishes (200)", { status: ok2?.status, errors: ok2?.json?.errors });
+
+      // 4. A black accent, typed on the Brand screen: a note before saving,
+      // the save answers 200 with the note; shoppers see a readable highlight.
+      // (All three colours are typed: the screen may still show the earlier
+      // brand for up to 30 s.)
+      await drill.open(page, "/admin/brand", { width: 1440 });
+      await page.locator("#brand-background").fill(savedBrand?.background || "#ffffff");
+      await page.locator("#brand-foreground").fill(savedBrand?.foreground || "#0a0a0b");
+      await page.locator("#brand-accent").fill("#000000");
+      const noted = await page.getByText(/hero highlight and badge would be/i).first().waitFor({ timeout: 15_000 }).then(() => true).catch(() => false);
+      drill.check(noted, "brand screen: typing a black accent shows a note that the hero uses a lighter shade of it");
+      await drill.shoot(page, "publish-4-brand-black-accent");
+      const savedBlack = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/admin/brand" && r.request().method() === "PUT" && r.request().postData()?.includes('"brand"'), { timeout: 30_000 });
+      await page.getByRole("button", { name: "Save brand", exact: true }).click();
+      const blackRes = await savedBlack;
+      const black = { status: blackRes.status(), json: await blackRes.json().catch(() => ({})) };
+      const note = (black.json.notes || []).find((n) => /hero highlight/i.test(n));
+      drill.check(black.status === 200 && Boolean(note), "a black accent saves with a note that the hero uses a lighter shade of it", black.json.notes);
+      // publish until the live release carries the black accent (the console
+      // may still see the earlier brand for up to 30 s)
+      const liveAccent = async () => JSON.parse((await rows("tenant", "SELECT content FROM releases WHERE id = (SELECT live_release_id FROM release_state WHERE id = 1)"))[0].content).brand?.accent;
+      let ok3 = null;
+      for (let i = 0; i < 12; i++) {
+        ok3 = await publishApi();
+        if (ok3.status === 200 && (await liveAccent()) === "#000000") break;
+        await page.waitForTimeout(4000);
+      }
+      drill.check(ok3?.status === 200 && (await liveAccent()) === "#000000", "the black accent publishes", ok3?.status);
+      const shopperCtx = await shopper(drill, 1440);
+      const sp = await shopperCtx.newPage();
+      await sp.goto("/", { waitUntil: "load" });
+      await settle(sp);
+      const hero = (await audit(sp, '[data-sec="hero"]')).filter((r) => /sf-hero-accent/.test(r.cls));
+      drill.check(hero.length > 0 && hero.every((r) => r.ratio >= 4.5), "shoppers: the hero highlight and badge pass 4.5:1 with a black accent (2.08:1 before)", hero.map(({ text, fg, bg, ratio }) => ({ text, fg, bg, ratio })));
+      await sp.mouse.move(1, 1);
+      await drill.shoot(sp, "publish-5-storefront-black-accent");
+      await shopperCtx.close();
+    } finally {
+      await putBrand({ brand: savedBrand }).catch(() => {});
+      await pointLiveAt(orig.id);
+      drill.note(`brand put back to ${JSON.stringify(savedBrand)}, live release back to ${orig.id}`);
+      await ctx.close();
+    }
+  },
+
+  // TOK exit check: the two test themes, every text and icon on home, product,
+  // collection, cart and checkout, measured from computed styles.
+  async themes(drill) {
+    const orig = await liveRelease();
+    const report = {};
+    try {
+      for (const [name, th] of Object.entries(TEST_THEMES)) {
+        await publishCopy(orig.content, th);
+        report[name] = { brand: th.brand, theme: th.theme, pages: {} };
+        for (const width of [375, 1440]) {
+          const ctx = await shopper(drill, width);
+          const page = await ctx.newPage();
+          const visit = async (key, path, rootSel = null, prep = null) => {
+            if (path) {
+              await page.goto(path, { waitUntil: "load" });
+              await settle(page);
+            }
+            if (prep) await prep();
+            await page.mouse.move(1, 1);
+            await page.waitForTimeout(300);
+            const all = await audit(page, rootSel);
+            const exempt = all.filter((r) => r.overMedia || r.disabled);
+            const checked = all.filter((r) => !r.overMedia && !r.disabled);
+            const failing = checked.filter((r) => !r.pass);
+            report[name].pages[`${key}-${width}`] = { checked: checked.length, exempt: exempt.map(({ text, fg, bg, ratio, overMedia, disabled }) => ({ text, fg, bg, ratio, why: overMedia ? `over media: ${overMedia}` : "disabled control" })), failing, rows: checked.map(({ text, tag, fg, bg, ratio, need, large, icon }) => ({ text, tag, fg, bg, ratio, need, kind: icon ? "icon (3:1)" : large ? "large text (3:1)" : "text (4.5:1)" })) };
+            drill.check(!failing.length, `${name} theme, ${key} at ${width}: every one of ${checked.length} text and icon pairs passes (4.5:1 text, 3:1 large text and icons)`, failing.slice(0, 6));
+            const raw = await page.screenshot({ fullPage: false, animations: "disabled", caret: "hide" });
+            mkdirSync(join(drill.dir, "themes"), { recursive: true });
+            writeFileSync(join(drill.dir, "themes", `${name}-${key}-${width}.png`), await smallCopy(raw, { maxBytes: 45 * 1024 }));
+          };
+          await visit("home", "/");
+          await visit("product", "/products/glow-serum");
+          await visit("collection", "/collections/serums");
+          await visit("cart", null, '[role="dialog"][aria-label="Shopping cart"]', async () => {
+            await page.goto("/products/glow-serum", { waitUntil: "load" });
+            await settle(page);
+            await addToCart(page);
+          });
+          await visit("checkout", "/checkout");
+          await ctx.close();
+        }
+      }
+    } finally {
+      await pointLiveAt(orig.id);
+    }
+    writeFileSync(join(drill.dir, "themes", "contrast.json"), JSON.stringify(report, null, 2) + "\n");
+  },
 };

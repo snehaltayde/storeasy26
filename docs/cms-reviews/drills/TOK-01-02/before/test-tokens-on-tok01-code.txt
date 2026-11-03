@@ -1,0 +1,67 @@
+— the lint: no hard-coded colours, radii or pixel sizes in storefront code
+  ✓ the lint catches each kind of hard-coded value, with variants and opacity
+  ✓ NEGATIVE: role classes, rounded-full, comments and visible copy are not flagged
+  ✓ THE LINT: no storefront component hard-codes a colour, radius or pixel size (outside the allowlist)
+  ✓ the allowlist is short, every entry has a reason, and every entry is still needed
+  ✓ the lint scans the storefront files that matter (cart, checkout, product card, footer, home)
+  ✓ rich text styles use roles: no fixed colour or radius left in the .rte block (links were lime on every store)
+— the role table
+  ✓ the spec's roles exist: surface, muted surface, text, muted text, border, accent, text on accent, sale, success, danger, header, hero
+  ✓ every role has its CSS variable in globals.css :root with the table's default, and a Tailwind colour
+  ✓ the default palette values are Tailwind's own (tailwindcss/theme.css), so a role renders exactly as its class did
+  ✓ the kit surfaces in lib/brand.js match the [data-kit] blocks and :root defaults in globals.css
+  ✓ the default accent ladder in lib/brand.js is the one globals.css carries
+— the default look is unchanged
+  ✓ no brand config: every role is today's value, nothing corrected
+  ✓ a brand with exactly the platform's colours (the Pulse kit's brand) writes no role variable
+  ✓ an accent-only brand rewrites only accent roles that had to move, never the neutral greys
+  ✓ radius roles are multiples of the brand radius that give today's Tailwind steps at the default md
+— a brand's own colours reach every role
+  ✓ a dark brand makes product titles light: the title role is the brand's text colour (was zinc-900 everywhere)
+  ✓ derived text roles keep today's order (strong to faint) and each passes on every surface it sits on
+  ✓ brandCssVars writes every derived role for a brand with its own colours, and nothing for kit or photo roles
+  ✓ roles are derived from the kit too: the same brand on Glow corrects the accent for Glow's light header
+— every role pair a renderer draws is in the matrix
+  ✓ every role used as a text colour by a storefront component is the foreground of a pair in PAIRS
+  ✓ every role used as a background by a storefront component is in PAIRS, or named as carrying no text
+  ✓ every pair names roles that exist, a known kind, and a renderer file that exists and uses its foreground
+— scripts/pixel-diff.js
+  ✓ comparePixels counts every changed pixel and its box; identical images give 0
+— TOK-02: the matrix (pure)
+  ✓ every pair a renderer uses passes on both test themes (light on Glow, dark on Pulse)
+  ✓ hero and header pairs are in the matrix and measured against the theme kit's own surfaces
+  ✗ a failing hero pair in a theme's look is reported in plain words (a stand-in kit with a pale subtitle)
+    lib/brand.js has no checkBrand: only the single text-on-background check exists
+  ✓ every theme kit's own brand passes the whole matrix on its own kit
+  ✓ the platform default look's own failing pairs are exactly the known list (an owner decision, not fixed here)
+  ✗ THE BUG: the old single check passes a brand whose other pairs fail; the matrix finds them
+    lib/brand.js has no checkBrand: only the single text-on-background check exists
+  ✗ NEGATIVE: dark background with dark product titles: refused, naming the pair and a suggestion that passes
+    lib/brand.js has no checkBrand: only the single text-on-background check exists
+  ✗ the suggestion is the NEAREST passing colour: one step closer to the chosen colour fails
+    lib/brand.js has no checkBrand: only the single text-on-background check exists
+  ✗ NEGATIVE: a black accent never gives a 2.08:1 hero highlight: corrected, and the save answer says so
+    lib/brand.js has no checkBrand: only the single text-on-background check exists
+  ✗ unchanged failing pairs warn; changed ones block (comparison is by the colours the shopper sees)
+    lib/brand.js has no checkBrand: only the single text-on-background check exists
+  ✗ a failing pair's group is one plain message, not one per pair
+    lib/brand.js has no checkBrand: only the single text-on-background check exists
+  ✗ a malformed colour is still refused at save; readability never is
+    dark titles at save: expected true, got false
+— TOK-02: save and publish through the real code
+  ✗ save never fails midway through a custom colour: dark text on a dark background is SAVED, with a warning and a suggestion
+    status (body {"error":"Validation failed","errors":["Body text contrast is 1.12:1 — WCAG AA needs 4.5:1. Pick a darker foreground or lighter background."],"warnings":[]}): expected 200, got 422
+  ✗ the read-only preview call answers the same warnings and stores nothing
+    []
+  ✓ before the first publish, a saved brand that fails a pair is not shown to shoppers (drafts are the live store then)
+  ✗ NEGATIVE: publishing a dark background with dark product titles is refused, in plain words naming the pair
+    status 200 {"ok":true,"published":{"id":"rel_db0e64add982044e","hash":"6cd788f269d6659bd3990803687f203db194beaa51b346b38c68c4da7aa24bcb","publishedAt":"2026-11-03T13:50:13.821Z","warnings":["No enabled privacy policy page — add one before launch (checkout links to it)","No enabled terms/refund page — add one b: expected 422, got 200
+  ✓ the suggested colour publishes
+  ✗ THE BUG, at publish: the old single check let a brand through whose dark-button hover and grey chips fail
+    publish answered 200 expected 422, got 200
+  ✗ a pair that already failed on the live store and wasn't changed warns but does not block
+    no warning: undefined
+  ✗ NEGATIVE: a black accent saves with a note that the hero highlight uses a readable shade, and publishes
+    notes: undefined
+
+29 passed, 14 failed

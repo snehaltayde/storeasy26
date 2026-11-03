@@ -1,0 +1,62 @@
+{
+  "dark": {
+    "path": "/collections/serums",
+    "brand": {
+      "accent": "#0d9488",
+      "background": "#0a0a0b",
+      "foreground": "#fafafa",
+      "radius": "xl",
+      "type_scale": "large"
+    },
+    "measured": [
+      {
+        "text": "Radiance Glow Serum 30ml",
+        "fg": "#fafafa",
+        "bg": "#0a0a0b",
+        "ratio": 18.96,
+        "need": 4.5,
+        "large": false,
+        "cls": "line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text"
+      },
+      {
+        "text": "Vitamin C Booster 15ml",
+        "fg": "#fafafa",
+        "bg": "#0a0a0b",
+        "ratio": 18.96,
+        "need": 4.5,
+        "large": false,
+        "cls": "line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text"
+      }
+    ]
+  },
+  "black": {
+    "path": "/",
+    "brand": {
+      "accent": "#000000",
+      "background": "#fffdf8",
+      "foreground": "#1c1917",
+      "radius": "xl",
+      "type_scale": "large"
+    },
+    "measured": [
+      {
+        "text": "14 days",
+        "fg": "#818181",
+        "bg": "#09090b",
+        "ratio": 5.11,
+        "need": 3,
+        "large": true,
+        "cls": "text-sf-hero-accent"
+      },
+      {
+        "text": "8 products · 3 collections",
+        "fg": "#818181",
+        "bg": "#09090b",
+        "ratio": 5.11,
+        "need": 4.5,
+        "large": false,
+        "cls": "mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-sf-hero-acc"
+      }
+    ]
+  }
+}

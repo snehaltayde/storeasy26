@@ -289,6 +289,18 @@ body {
   text-align: left;
 }
 
+/* TOK-02: placeholder text follows the brand. With no brand config
+   --sf-placeholder is unset and this is exactly Tailwind's own default (half
+   the field's text colour), behind the same Safari guard; a brand with its
+   own colours sets a readable --sf-placeholder (lib/brand.js). */
+@layer base {
+  @supports (not (-webkit-appearance: -apple-pay-button)) or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: var(--sf-placeholder, color-mix(in oklab, currentcolor 50%, transparent));
+    }
+  }
+}
+
 /* Hide scrollbars on horizontal scrollers */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

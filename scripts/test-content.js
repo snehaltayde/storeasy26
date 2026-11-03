@@ -181,12 +181,18 @@ await t("S55 composition tokens: button_shape + section_spacing validate, defaul
   includes(d, "--section-pad-y:3.5rem");
 });
 
-await t("WCAG gate: unreadable body text BLOCKS; readable passes with the ratio computed", async () => {
+// TOK-02: readability moved from the save to the publish. A save keeps any
+// well-formed colour (with a warning); the pairing matrix refuses it at publish.
+await t("readability: unreadable body text SAVES with a warning, and the matrix refuses it (ratio computed)", async () => {
   const bad = B.validateBrand({ foreground: "#cccccc", background: "#ffffff" });
-  eq(bad.ok, false);
-  includes(bad.errors.join(" "), "4.5:1");
+  eq(bad.ok, true);
+  const check = B.checkBrand(bad.value);
+  eq(check.ok, false);
+  includes(check.errors[0].message, "1.61 to 1");
+  includes(check.errors[0].message, "4.5 to 1");
   const good = B.validateBrand({ foreground: "#0a0a0b", background: "#ffffff" });
   eq(good.ok, true);
+  eq(B.checkBrand(good.value).errors.length, 0);
 });
 
 await t("accent ladder: 10 steps, input IS the 500, strictly light→dark even for extreme picks", async () => {

@@ -283,6 +283,12 @@ await t("the spec's roles exist: surface, muted surface, text, muted text, borde
 await t("every role has its CSS variable in globals.css :root with the table's default, and a Tailwind colour", () => {
   for (const r of B.ROLES) {
     if (r.from.startsWith("kit:") || r.from === "brandfg") continue; // the kit's --header-*/--hero-*, and --foreground
+    if (r.css === null) {
+      // placeholder: unset by default, so Tailwind's own placeholder colour applies (see ::placeholder in globals.css)
+      eq(decl(rootBlock, `--sf-${r.id}`), null, `--sf-${r.id} must not be set by default:`);
+      ok(css.includes(`var(--sf-${r.id}, color-mix(in oklab, currentcolor 50%, transparent))`), "the ::placeholder rule must fall back to Tailwind's default");
+      continue;
+    }
     eq(decl(rootBlock, `--sf-${r.id}`), r.css, `--sf-${r.id}:`);
     eq(decl(themeBlock, `--color-sf-${r.id}`), `var(--sf-${r.id})`, `--color-sf-${r.id}:`);
   }
@@ -341,10 +347,11 @@ await t("no brand config: every role is today's value, nothing corrected", () =>
   eq(roles["accent-text"], B.DEFAULT_ACCENT_LADDER[700], "accent-text (and so .rte links) on the default look:");
 });
 
-await t("a brand with exactly the platform's colours (the Pulse kit's brand) writes no role variable", () => {
-  eq(B.roleCssLines(B.resolveBrand({ accent: "#84cc16", background: "#ffffff", foreground: "#0a0a0b" }), "pulse-1").length, 0);
+await t("a brand with the platform's own colours (the Pulse kit's brand) keeps today's greys; only accent roles that read badly move", () => {
+  const lines = B.roleCssLines(B.resolveBrand({ accent: "#84cc16", background: "#ffffff", foreground: "#0a0a0b" }), "pulse-1");
+  for (const l of lines) ok(/^--sf-accent-(text|strong|mark):/.test(l), `unexpected ${l}`);
   const css = B.brandCssVars(B.resolveBrand({ accent: "#84cc16", background: "#ffffff", foreground: "#0a0a0b", radius: "xl" }));
-  ok(!css.includes("--sf-"), `role variables written: ${css}`);
+  ok(!/--sf-(surface|text|border|inverse|success|warning|danger)/.test(css), `neutral or status role written: ${css}`);
   ok(css.includes("--brand-radius:1.5rem"), "the radius still applies");
 });
 
@@ -482,6 +489,262 @@ await t("comparePixels counts every changed pixel and its box; identical images 
   eq(comparePixels(a, b, { tolerance: 1 }).differing, 0, "tolerance 1:");
   eq(comparePixels(a, img(4, 4, () => 200)).sameSize, false);
 });
+
+// ---------------------------------------------------------------------------
+// TOK-02: the pairing matrix at save and at publish
+// ---------------------------------------------------------------------------
+console.log("— TOK-02: the matrix (pure)");
+
+const hasMatrix = typeof B.checkBrand === "function";
+const needMatrix = () => ok(hasMatrix, "lib/brand.js has no checkBrand: only the single text-on-background check exists");
+const TEST_THEMES = {
+  light: { brand: { accent: "#c2410c", background: "#fffdf8", foreground: "#1c1917" }, kit: "glow-1" },
+  dark: { brand: { accent: "#2dd4bf", background: "#0b0f17", foreground: "#f1f5f9" }, kit: "pulse-1" },
+};
+// a brand the old check passes (text 4.61:1 on white) while other pairs it
+// draws fail: text on the light panels and grey chips
+const BORDERLINE = { accent: "#0d9488", background: "#ffffff", foreground: "#757575" };
+const DARK_TITLES = { accent: "#0d9488", background: "#0a0a0b", foreground: "#18181b" };
+const BLACK_ACCENT = { accent: "#000000", background: "#fffdf8", foreground: "#1c1917" };
+
+// The platform default look (no brand) keeps today's colours, so it keeps
+// today's failing pairs. Pinned here so a change to it is a decision.
+const PLATFORM_DEFAULT_FAILS = new Set(["text-subtle-sunken", "text-subtle-strong", "text-faint", "text-faint-panel", "text-faint-sunken", "mark", "placeholder", "placeholder-muted", "accent-strong", "accent-mark", "danger", "accent-text", "accent-text-panel", "accent-text-soft"]);
+await t("every pair a renderer uses passes on both test themes (light on Glow, dark on Pulse)", () => {
+  for (const [name, th] of Object.entries(TEST_THEMES)) {
+    const bad = B.pairMatrix(th.brand, th.kit).filter((p) => p.enforced && !p.pass);
+    ok(!bad.length, `${name}: ${bad.map((p) => `${p.id} ${p.fgHex}/${p.bgHex} ${p.ratio}<${p.need}`).join(", ")}`);
+  }
+});
+
+await t("hero and header pairs are in the matrix and measured against the theme kit's own surfaces", () => {
+  for (const id of ["hero-fg", "hero-muted", "hero-accent", "header-fg", "header-muted", "header-accent"]) ok(B.PAIRS.some((p) => p.id === id), `no ${id} pair`);
+  const glow = B.pairMatrix(TEST_THEMES.light.brand, "glow-1").find((p) => p.id === "hero-muted");
+  eq(glow.bgHex, B.KIT_SURFACES["glow-1"].hero.bg, "glow hero bg:");
+  eq(glow.fgHex, B.KIT_SURFACES["glow-1"].hero.muted, "glow hero muted:");
+});
+
+await t("a failing hero pair in a theme's look is reported in plain words (a stand-in kit with a pale subtitle)", () => {
+  needMatrix();
+  B.KIT_SURFACES["tok-test-1"] = { header: { ...B.KIT_SURFACES["pulse-1"].header }, hero: { bg: "#ffffff", fg: "#111111", muted: "#dddddd" } };
+  try {
+    const r = B.checkBrand(TEST_THEMES.light.brand, { kit: "tok-test-1" });
+    const i = r.issues.find((x) => x.pairs.includes("hero-muted"));
+    ok(i && i.severity === "error", `no blocking hero-muted issue: ${JSON.stringify(r.issues)}`);
+    ok(/Hero subtitle/.test(i.message) && /theme's look/.test(i.message), i.message);
+  } finally {
+    delete B.KIT_SURFACES["tok-test-1"];
+  }
+});
+
+await t("every theme kit's own brand passes the whole matrix on its own kit", () => {
+  const kits = { pulse: { kit: "pulse-1", brand: { accent: "#84cc16", background: "#ffffff", foreground: "#0a0a0b" } }, glow: { kit: "glow-1", brand: { accent: "#e11d48", background: "#fffbf7", foreground: "#1c1917" } } };
+  for (const [name, k] of Object.entries(kits)) {
+    const bad = B.pairMatrix(k.brand, k.kit).filter((p) => p.enforced && !p.pass && !PLATFORM_DEFAULT_FAILS.has(p.id));
+    ok(!bad.length, `${name}: ${bad.map((p) => `${p.id} ${p.ratio}`).join(", ")}`);
+  }
+});
+
+await t("the platform default look's own failing pairs are exactly the known list (an owner decision, not fixed here)", () => {
+  const failing = B.pairMatrix(null).filter((p) => p.enforced && !p.pass).map((p) => p.id);
+  for (const id of failing) ok(PLATFORM_DEFAULT_FAILS.has(id), `new failing pair on the default look: ${id}`);
+  eq(failing.includes("text-faint"), true, "faint text at 2.6:1 is the known one:");
+});
+
+await t("THE BUG: the old single check passes a brand whose other pairs fail; the matrix finds them", () => {
+  ok(B.contrastRatio(BORDERLINE.foreground, BORDERLINE.background) >= 4.5, "the borderline brand passes text-on-background");
+  needMatrix();
+  const r = B.checkBrand(BORDERLINE);
+  ok(!r.ok, "the matrix must refuse it");
+  ok(r.failing.some((f) => !/^(body|inherited)$/.test(f.pair)), `only the text-on-background pair was caught: ${JSON.stringify(r.failing.map((f) => f.pair))}`);
+});
+
+await t("NEGATIVE: dark background with dark product titles: refused, naming the pair and a suggestion that passes", () => {
+  needMatrix();
+  const r = B.checkBrand(DARK_TITLES);
+  eq(r.ok, false);
+  const i = r.errors[0];
+  ok(/^Product titles, prices and body text: #18181b on #0a0a0b has a contrast of 1\.12 to 1, and small text needs at least 4\.5 to 1/.test(i.message), i.message);
+  ok(i.suggestion && i.suggestion.token === "foreground", JSON.stringify(i.suggestion));
+  ok(i.message.includes(`Try text colour ${i.suggestion.value}.`), i.message);
+  ok(B.checkBrand({ ...DARK_TITLES, foreground: i.suggestion.value }).ok, `the suggestion ${i.suggestion.value} still fails`);
+});
+
+await t("the suggestion is the NEAREST passing colour: one step closer to the chosen colour fails", () => {
+  needMatrix();
+  const s = B.suggestFix(DARK_TITLES, "pulse-1", "foreground");
+  const hsl = (hex) => {
+    const [r, g, b] = B.hexToRgb(hex).map((v) => v / 255);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    return (max + min) / 2;
+  };
+  const l0 = hsl(DARK_TITLES.foreground);
+  const l1 = hsl(s.value);
+  ok(l1 > l0, "suggests lighter text on a dark background");
+  // the same hue at 0.02 less lightness must still fail somewhere
+  const closer = B.mixHex(DARK_TITLES.foreground, s.value, 0.9);
+  ok(!B.checkBrand({ ...DARK_TITLES, foreground: closer }).ok, `${closer} (closer) already passes, so ${s.value} isn't the nearest`);
+});
+
+await t("NEGATIVE: a black accent never gives a 2.08:1 hero highlight: corrected, and the save answer says so", () => {
+  // before: the hero highlight was the accent's 400 shade on the hero
+  const raw400 = B.accentShades("#000000")[400];
+  ok(Math.abs(B.contrastRatio(raw400, B.KIT_SURFACES["pulse-1"].hero.bg) - 2.08) < 0.01, `raw ${raw400}`);
+  const hero = B.pairMatrix(BLACK_ACCENT).find((p) => p.id === "hero-accent");
+  ok(hero.ratio >= 4.5, `hero highlight ${hero.fgHex} at ${hero.ratio}`);
+  needMatrix();
+  const r = B.checkBrand(BLACK_ACCENT);
+  ok(r.notes.some((n) => /hero highlight/i.test(n) && n.includes(hero.fgHex)), `no note: ${JSON.stringify(r.notes)}`);
+});
+
+await t("unchanged failing pairs warn; changed ones block (comparison is by the colours the shopper sees)", () => {
+  needMatrix();
+  const live = DARK_TITLES;
+  const same = B.checkBrand({ ...DARK_TITLES, radius: "lg" }, { live });
+  eq(same.ok, true, "same colours as live:");
+  ok(same.warnings.length > 0 && same.warnings.every((w) => /already shows this/.test(w.message)), JSON.stringify(same.warnings));
+  const moved = B.checkBrand({ ...DARK_TITLES, foreground: "#202020" }, { live });
+  eq(moved.ok, false, "a changed text colour that still fails:");
+});
+
+await t("a failing pair's group is one plain message, not one per pair", () => {
+  needMatrix();
+  const r = B.checkBrand(DARK_TITLES);
+  eq(r.errors.length, 1);
+  ok(r.failing.length > 10, `${r.failing.length} pairs fail`);
+  ok(/\(\d+ more colour pairs on your store have the same problem\)/.test(r.errors[0].message), r.errors[0].message);
+});
+
+await t("a malformed colour is still refused at save; readability never is", () => {
+  eq(B.validateBrand({ accent: "green" }).ok, false);
+  eq(B.validateBrand(DARK_TITLES).ok, true, "dark titles at save:");
+});
+
+// ---------------------------------------------------------------------------
+// TOK-02 through the real routes, on a real tenant database
+// ---------------------------------------------------------------------------
+console.log("— TOK-02: save and publish through the real code");
+
+const { registerHooks } = await import("node:module");
+const { pathToFileURL } = await import("node:url");
+const { rm, readFile } = await import("node:fs/promises");
+registerHooks({
+  resolve(spec, ctx, next) {
+    if (spec.startsWith("@/")) return next(pathToFileURL(join(ROOT, spec.slice(2).endsWith(".js") ? spec.slice(2) : `${spec.slice(2)}.js`)).href, ctx);
+    if (/^next\/(server|headers|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
+    return next(spec, ctx);
+  },
+});
+process.env.TURSO_DB_URL = "";
+process.env.TURSO_DB_AUTH_TOKEN = "";
+process.env.DATABASE_URL = "file:.test-tokens-default.db";
+process.env.PLATFORM_DB_URL = "file:.test-tokens-platform.db";
+process.env.PLATFORM_DB_TOKEN = "";
+process.env.PLATFORM_SECRET = "test-platform-secret";
+process.env.PLATFORM_CACHE_MS = "0";
+const DBS = [".test-tokens-default.db", ".test-tokens-platform.db", ".test-tokens-tenant.db"];
+for (const f of DBS) await rm(join(ROOT, f), { force: true });
+
+const C = await import("../lib/platform/control.js");
+const Sess = await import("../lib/platform/sessions.js");
+const Id = await import("../lib/platform/identity.js");
+const { withTenant } = await import("../lib/tenant-context.js");
+const { createClient } = await import("@libsql/client");
+const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+const brandRoute = await import("../app/api/admin/brand/route.js");
+const RelApi = await import("../lib/admin/releases-api.js");
+const Resolve = await import("../lib/content/resolve.js");
+
+await C.migratePlatform(await readFile(join(ROOT, "lib/platform/schema.sql"), "utf8"));
+await runMigrations(C.platformDb(), await loadMigrations("platform"), {});
+await C.upsertTenant({ id: "tk", name: "Token Store", domains: ["tk.test"], dbUrl: "file:.test-tokens-tenant.db", config: {}, secrets: { order_link_secret: "tk-secret" } });
+const tdb = createClient({ url: "file:.test-tokens-tenant.db" });
+await tdb.executeMultiple(await readFile(join(ROOT, "lib/schema.sql"), "utf8"));
+await runMigrations(tdb, await loadMigrations("tenant"));
+const owner = await Id.createUser({ email: "owner@tk.test", password: "owner-pass-tok" });
+await Id.addMembership(owner.id, "tk", "owner");
+const tok = (await Sess.createSession({ userId: owner.id, kind: "merchant", ttlMs: 600_000 })).token;
+const inTk = async (fn) => withTenant(await C.getTenant("tk"), fn);
+const req = (body) => ({
+  headers: { get: (k) => ({ host: "tk.test", origin: "http://tk.test" })[k.toLowerCase()] ?? null },
+  cookies: { get: (name) => (name === "_admin" ? { value: tok } : undefined) },
+  json: async () => body,
+});
+const putBrand = async (body) => {
+  const res = await inTk(() => brandRoute.PUT(req(body)));
+  return { status: res.status, json: await res.json() };
+};
+const publish = async () => inTk(() => RelApi.handleReleasesPost(req({ action: "publish", note: "tok test" })));
+const storedBrand = async () => (await C.getTenant("tk")).config?.brand || null;
+
+await t("save never fails midway through a custom colour: dark text on a dark background is SAVED, with a warning and a suggestion", async () => {
+  const r = await putBrand({ brand: DARK_TITLES });
+  eq(r.status, 200, `status (body ${JSON.stringify(r.json).slice(0, 300)}):`);
+  eq((await storedBrand())?.foreground, DARK_TITLES.foreground, "stored foreground:");
+  const w = (r.json.warnings || []).join(" ");
+  ok(/Product titles, prices and body text/.test(w) && /Try text colour #[0-9a-f]{6}/.test(w), `warnings: ${w}`);
+});
+
+await t("the read-only preview call answers the same warnings and stores nothing", async () => {
+  const before = JSON.stringify(await storedBrand());
+  const r = await putBrand({ preview: { ...DARK_TITLES, foreground: "#222222" } });
+  eq(r.status, 200);
+  ok((r.json.warnings || []).some((m) => /Product titles/.test(m)), JSON.stringify(r.json.warnings));
+  eq(JSON.stringify(await storedBrand()), before, "nothing stored:");
+});
+
+await t("before the first publish, a saved brand that fails a pair is not shown to shoppers (drafts are the live store then)", async () => {
+  const shown = await inTk(() => Resolve.resolvedBrand());
+  eq(shown, null, "shoppers get the platform default look:");
+});
+
+await t("NEGATIVE: publishing a dark background with dark product titles is refused, in plain words naming the pair", async () => {
+  const r = await publish();
+  eq(r.status, 422, `status ${r.status} ${JSON.stringify(r.body).slice(0, 300)}:`);
+  const msg = (r.body.errors || []).join(" ");
+  ok(/Product titles, prices and body text: #18181b on #0a0a0b has a contrast of 1\.12 to 1/.test(msg), msg);
+  ok(/Try text colour #[0-9a-f]{6}/.test(msg), msg);
+  const i = r.body.issues.find((x) => x.code === "BRAND_PAIR");
+  ok(i && i.documentId === "doc_design" && i.severity === "error", JSON.stringify(r.body.issues));
+});
+
+await t("the suggested colour publishes", async () => {
+  const fix = B.checkBrand ? B.checkBrand(DARK_TITLES).errors[0].suggestion.value : "#888895";
+  eq((await putBrand({ brand: { ...DARK_TITLES, foreground: fix } })).status, 200);
+  const r = await publish();
+  eq(r.status, 200, `status ${r.status} ${JSON.stringify(r.body).slice(0, 300)}:`);
+});
+
+await t("THE BUG, at publish: the old single check let a brand through whose text on light panels and grey chips fails", async () => {
+  eq((await putBrand({ brand: BORDERLINE })).status, 200);
+  const r = await publish();
+  eq(r.status, 422, `publish answered ${r.status}`);
+});
+
+await t("a pair that already failed on the live store and wasn't changed warns but does not block", async () => {
+  // put a failing brand live the way an old release could carry one
+  const live = { ...BORDERLINE };
+  await inTk(async () => {
+    const id = "rel_toktestlive01";
+    const content = { v: 3, blocks: {}, pages: [], brand: B.resolveBrand(live), theme: null, product_overrides: [], collection_pins: [], placements: [], redirects: [] };
+    await tdb.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES (?, ?, ?, 'old', NULL, ?, NULL, ?)", args: [id, JSON.stringify(content), "x".repeat(64), new Date().toISOString(), new Date().toISOString()] });
+    await tdb.execute({ sql: "UPDATE release_state SET live_release_id = ? WHERE id = 1", args: [id] });
+  });
+  eq((await putBrand({ brand: { ...live, radius: "lg" } })).status, 200);
+  const r = await publish();
+  eq(r.status, 200, `publish answered ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+  ok((r.body.published?.warnings || []).some((w) => /already shows this/.test(w)), `no warning: ${JSON.stringify(r.body.published)}`);
+});
+
+await t("NEGATIVE: a black accent saves with a note that the hero highlight uses a readable shade, and publishes", async () => {
+  const r = await putBrand({ brand: BLACK_ACCENT });
+  eq(r.status, 200);
+  ok((r.json.notes || []).some((n) => /hero highlight/i.test(n)), `notes: ${JSON.stringify(r.json.notes)}`);
+  const p = await publish();
+  eq(p.status, 200, `publish ${p.status} ${JSON.stringify(p.body).slice(0, 200)}`);
+});
+
+for (const f of DBS) await rm(join(ROOT, f), { force: true });
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

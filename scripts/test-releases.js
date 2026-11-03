@@ -140,7 +140,8 @@ await t("brand contrast failure blocks a publish even if it slipped into drafts"
   eq(r.ok, false);
   // DOC-04: the issue names its document; "Brand:" is the reader's wording, not the server's
   const brand = r.issues.find((i) => i.severity === "error");
-  if (brand?.documentId !== "doc_design" || brand.code !== "BRAND_INVALID") throw new Error(`wrong issue: ${JSON.stringify(r.issues)}`);
+  // TOK-02: readability is the pairing matrix (BRAND_PAIR); BRAND_INVALID is a malformed value
+  if (brand?.documentId !== "doc_design" || brand.code !== "BRAND_PAIR") throw new Error(`wrong issue: ${JSON.stringify(r.issues)}`);
   if (!/contrast/i.test(r.errors[0])) throw new Error(`wrong error: ${r.errors}`);
   const { issueText } = await import("../lib/cms/issues.js");
   if (!/^Brand: /.test(issueText(brand))) throw new Error(`worded: ${issueText(brand)}`);

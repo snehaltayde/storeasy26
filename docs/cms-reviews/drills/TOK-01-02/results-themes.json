@@ -1,0 +1,115 @@
+{
+  "id": "TOK-01-02",
+  "part": "themes",
+  "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — themes",
+  "ranAt": "2026-11-03T14:03:00.331Z",
+  "harness": "http://localhost:3204",
+  "chrome": "156.0.8078.80",
+  "passed": 20,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "light theme, home at 375: every one of 63 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light theme, product at 375: every one of 45 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light theme, collection at 375: every one of 39 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light theme, cart at 375: every one of 18 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light theme, checkout at 375: every one of 50 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light theme, home at 1440: every one of 64 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light theme, product at 1440: every one of 46 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light theme, collection at 1440: every one of 40 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light theme, cart at 1440: every one of 18 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light theme, checkout at 1440: every one of 51 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark theme, home at 375: every one of 63 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark theme, product at 375: every one of 45 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark theme, collection at 375: every one of 39 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark theme, cart at 375: every one of 18 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark theme, checkout at 375: every one of 50 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark theme, home at 1440: every one of 64 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark theme, product at 1440: every one of 46 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark theme, collection at 1440: every one of 40 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark theme, cart at 1440: every one of 18 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark theme, checkout at 1440: every one of 51 text and icon pairs passes (4.5:1 text, 3:1 large text and icons)",
+      "detail": []
+    }
+  ],
+  "notes": [],
+  "screenshots": []
+}

@@ -3,14 +3,21 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { currentTenant } from "@/lib/tenant-context";
 import { patchTenant } from "@/lib/platform/control.js";
 import { validateBrand, resolveBrand, accentShades, DEFAULT_BRAND } from "@/lib/brand";
+import { brandReadability as readability } from "@/lib/admin/brand-readability";
 import { audit } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
 
-// Brand tokens console API (S35 / MC10).
+// Brand tokens console API (S35 / MC10, TOK-02).
 //   GET                      → effective brand + customized flag + derived shades
-//   PUT {brand}              → validate (contrast gate) + store config.brand
-//   PUT {preview: brand}     → validation/shades only, nothing stored
+//   PUT {brand}              → store config.brand (a draft). Only a malformed
+//                              value is refused (422). Readability never blocks
+//                              a save: the answer carries `warnings` (plain
+//                              words, each naming the colour pair and the
+//                              nearest colour that fixes it) and `notes` (where
+//                              the store uses a readable shade of the accent).
+//                              Publishing refuses a changed pair that fails.
+//   PUT {preview: brand}     → the same check, nothing stored
 //   PUT {reset: true}        → back to the platform default look
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +40,8 @@ export const PUT = tenantHandler(async (request) => {
 
   if (body.preview) {
     const r = validateBrand(body.preview);
-    return NextResponse.json({ ok: r.ok, errors: r.errors, warnings: r.warnings, value: r.value, shades: r.ok ? accentShades(r.value.accent) : null });
+    if (!r.ok) return NextResponse.json({ ok: false, errors: r.errors, warnings: [], value: r.value, shades: null });
+    return NextResponse.json({ ok: true, errors: [], value: r.value, shades: accentShades(r.value.accent), ...(await readability(r.value)) });
   }
 
   const tenant = currentTenant();
@@ -52,5 +60,5 @@ export const PUT = tenantHandler(async (request) => {
   await patchTenant(tenant.id, { config: { brand: r.value } });
   slog("brand_saved", { accent: r.value.accent });
   await audit({ actor: auth.actor, action: "storefront.write", resource: "brand", diff: r.value });
-  return NextResponse.json({ ok: true, warnings: r.warnings, ...view(r.value) });
+  return NextResponse.json({ ok: true, ...(await readability(r.value)), ...view(r.value) });
 });

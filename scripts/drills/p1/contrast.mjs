@@ -10,8 +10,8 @@
 //   need   4.5 for text, 3 for large text and for icons (non-text marks)
 // Text over a photo or a gradient (an ancestor with a background-image, or
 // an <img> painted under it) is reported apart as `overMedia`: its backdrop
-// isn't one colour. Hidden, zero-size, aria-hidden decorative and
-// visually-hidden (sr-only) elements are skipped.
+// isn't one colour. Hidden, zero-size and visually-hidden (sr-only) elements
+// are skipped; aria-hidden text is still measured (sighted shoppers see it).
 export function auditInPage(rootSelector) {
   const ctx = Object.assign(document.createElement("canvas"), { width: 1, height: 1 }).getContext("2d", { willReadFrequently: true });
   const rgba = (s) => {
@@ -39,7 +39,6 @@ export function auditInPage(rootSelector) {
     for (let e = el; e; e = e.parentElement) {
       const cs = getComputedStyle(e);
       if (cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) === 0) return false;
-      if (e.getAttribute("aria-hidden") === "true" && e !== el) return false;
       if (cs.position === "absolute" && cs.clip === "rect(0px, 0px, 0px, 0px)") return false; // sr-only
     }
     // off-canvas (a closed drawer slid out of the window)

@@ -1,0 +1,66 @@
+{
+  "id": "TOK-01-02",
+  "part": "negatives-after",
+  "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — negatives-after",
+  "ranAt": "2026-11-03T14:03:02.815Z",
+  "harness": "http://localhost:3204",
+  "chrome": "156.0.8078.80",
+  "passed": 2,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "after: with a dark background, product titles are light and pass 4.5:1",
+      "detail": [
+        {
+          "text": "Radiance Glow Serum 30ml",
+          "fg": "#fafafa",
+          "bg": "#0a0a0b",
+          "ratio": 18.96,
+          "need": 4.5,
+          "large": false,
+          "cls": "line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text"
+        },
+        {
+          "text": "Vitamin C Booster 15ml",
+          "fg": "#fafafa",
+          "bg": "#0a0a0b",
+          "ratio": 18.96,
+          "need": 4.5,
+          "large": false,
+          "cls": "line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after: with a black accent, the hero highlight and badge pass 4.5:1 (a lighter shade of the accent)",
+      "detail": [
+        {
+          "text": "14 days",
+          "fg": "#818181",
+          "bg": "#09090b",
+          "ratio": 5.11,
+          "need": 3,
+          "large": true,
+          "cls": "text-sf-hero-accent"
+        },
+        {
+          "text": "8 products · 3 collections",
+          "fg": "#818181",
+          "bg": "#09090b",
+          "ratio": 5.11,
+          "need": 4.5,
+          "large": false,
+          "cls": "mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-sf-hero-acc"
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "after-tok02/dark: [{\"text\":\"Radiance Glow Serum 30ml\",\"fg\":\"#fafafa\",\"bg\":\"#0a0a0b\",\"ratio\":18.96,\"need\":4.5,\"large\":false,\"cls\":\"line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text\"},{\"text\":\"Vitamin C Booster 15ml\",\"fg\":\"#fafafa\",\"bg\":\"#0a0a0b\",\"ratio\":18.96,\"need\":4.5,\"large\":false,\"cls\":\"line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text\"}]",
+    "after-tok02/black: [{\"text\":\"14 days\",\"fg\":\"#818181\",\"bg\":\"#09090b\",\"ratio\":5.11,\"need\":3,\"large\":true,\"cls\":\"text-sf-hero-accent\"},{\"text\":\"8 products · 3 collections\",\"fg\":\"#818181\",\"bg\":\"#09090b\",\"ratio\":5.11,\"need\":4.5,\"large\":false,\"cls\":\"mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-sf-hero-acc\"}]"
+  ],
+  "screenshots": []
+}

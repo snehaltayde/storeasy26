@@ -1,0 +1,698 @@
+{
+  "before": "after1/seeded",
+  "after": "after2/seeded",
+  "compared": 30,
+  "identical": 0,
+  "results": [
+    {
+      "name": "account-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        900
+      ],
+      "sizeAfter": [
+        1440,
+        900
+      ],
+      "differing": 9060,
+      "total": 1296000,
+      "share": 0.006991,
+      "box": {
+        "x": 26,
+        "y": 54,
+        "width": 1159,
+        "height": 825
+      },
+      "diffBytes": 4622,
+      "diffImage": "diff-tok02-seeded-vs-tok01/account-1440-diff.png"
+    },
+    {
+      "name": "account-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1225
+      ],
+      "sizeAfter": [
+        375,
+        1225
+      ],
+      "differing": 9064,
+      "total": 459375,
+      "share": 0.019731,
+      "box": {
+        "x": 16,
+        "y": 106,
+        "width": 320,
+        "height": 1069
+      },
+      "diffBytes": 12131,
+      "diffImage": "diff-tok02-seeded-vs-tok01/account-375-diff.png"
+    },
+    {
+      "name": "account-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1024
+      ],
+      "sizeAfter": [
+        768,
+        1024
+      ],
+      "differing": 9060,
+      "total": 786432,
+      "share": 0.01152,
+      "box": {
+        "x": 24,
+        "y": 54,
+        "width": 542,
+        "height": 949
+      },
+      "diffBytes": 11647,
+      "diffImage": "diff-tok02-seeded-vs-tok01/account-768-diff.png"
+    },
+    {
+      "name": "cart-drawer-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1733
+      ],
+      "sizeAfter": [
+        1440,
+        1733
+      ],
+      "differing": 9132,
+      "total": 2495520,
+      "share": 0.003659,
+      "box": {
+        "x": 26,
+        "y": 24,
+        "width": 1390,
+        "height": 1659
+      },
+      "diffBytes": 9238,
+      "diffImage": "diff-tok02-seeded-vs-tok01/cart-drawer-1440-diff.png"
+    },
+    {
+      "name": "cart-drawer-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        2225
+      ],
+      "sizeAfter": [
+        375,
+        2225
+      ],
+      "differing": 8244,
+      "total": 834375,
+      "share": 0.00988,
+      "box": {
+        "x": 16,
+        "y": 219,
+        "width": 335,
+        "height": 1956
+      },
+      "diffBytes": 15703,
+      "diffImage": "diff-tok02-seeded-vs-tok01/cart-drawer-375-diff.png"
+    },
+    {
+      "name": "cart-drawer-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        2500
+      ],
+      "sizeAfter": [
+        768,
+        2500
+      ],
+      "differing": 8990,
+      "total": 1920000,
+      "share": 0.004682,
+      "box": {
+        "x": 24,
+        "y": 167,
+        "width": 720,
+        "height": 2283
+      },
+      "diffBytes": 23796,
+      "diffImage": "diff-tok02-seeded-vs-tok01/cart-drawer-768-diff.png"
+    },
+    {
+      "name": "checkout-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1193
+      ],
+      "sizeAfter": [
+        1440,
+        1193
+      ],
+      "differing": 9092,
+      "total": 1717920,
+      "share": 0.005292,
+      "box": {
+        "x": 26,
+        "y": 54,
+        "width": 1246,
+        "height": 1089
+      },
+      "diffBytes": 6672,
+      "diffImage": "diff-tok02-seeded-vs-tok01/checkout-1440-diff.png"
+    },
+    {
+      "name": "checkout-375",
+      "sameSize": true,
+      "sizeBefore": [
+        398,
+        1802
+      ],
+      "sizeAfter": [
+        398,
+        1802
+      ],
+      "differing": 8948,
+      "total": 717196,
+      "share": 0.012476,
+      "box": {
+        "x": 16,
+        "y": 106,
+        "width": 382,
+        "height": 1646
+      },
+      "diffBytes": 16699,
+      "diffImage": "diff-tok02-seeded-vs-tok01/checkout-375-diff.png"
+    },
+    {
+      "name": "checkout-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1518
+      ],
+      "sizeAfter": [
+        768,
+        1518
+      ],
+      "differing": 9049,
+      "total": 1165824,
+      "share": 0.007762,
+      "box": {
+        "x": 24,
+        "y": 54,
+        "width": 720,
+        "height": 1414
+      },
+      "diffBytes": 16530,
+      "diffImage": "diff-tok02-seeded-vs-tok01/checkout-768-diff.png"
+    },
+    {
+      "name": "cms-page-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        900
+      ],
+      "sizeAfter": [
+        1440,
+        900
+      ],
+      "differing": 6947,
+      "total": 1296000,
+      "share": 0.00536,
+      "box": {
+        "x": 26,
+        "y": 54,
+        "width": 1159,
+        "height": 825
+      },
+      "diffBytes": 5046,
+      "diffImage": "diff-tok02-seeded-vs-tok01/cms-page-1440-diff.png"
+    },
+    {
+      "name": "cms-page-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1254
+      ],
+      "sizeAfter": [
+        375,
+        1254
+      ],
+      "differing": 6938,
+      "total": 470250,
+      "share": 0.014754,
+      "box": {
+        "x": 16,
+        "y": 106,
+        "width": 295,
+        "height": 1098
+      },
+      "diffBytes": 12637,
+      "diffImage": "diff-tok02-seeded-vs-tok01/cms-page-375-diff.png"
+    },
+    {
+      "name": "cms-page-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1024
+      ],
+      "sizeAfter": [
+        768,
+        1024
+      ],
+      "differing": 6947,
+      "total": 786432,
+      "share": 0.008834,
+      "box": {
+        "x": 24,
+        "y": 54,
+        "width": 509,
+        "height": 949
+      },
+      "diffBytes": 12651,
+      "diffImage": "diff-tok02-seeded-vs-tok01/cms-page-768-diff.png"
+    },
+    {
+      "name": "collection-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1167
+      ],
+      "sizeAfter": [
+        1440,
+        1167
+      ],
+      "differing": 7497,
+      "total": 1680480,
+      "share": 0.004461,
+      "box": {
+        "x": 26,
+        "y": 54,
+        "width": 1159,
+        "height": 1063
+      },
+      "diffBytes": 5519,
+      "diffImage": "diff-tok02-seeded-vs-tok01/collection-1440-diff.png"
+    },
+    {
+      "name": "collection-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1394
+      ],
+      "sizeAfter": [
+        375,
+        1394
+      ],
+      "differing": 7520,
+      "total": 522750,
+      "share": 0.014385,
+      "box": {
+        "x": 16,
+        "y": 106,
+        "width": 292,
+        "height": 1238
+      },
+      "diffBytes": 13280,
+      "diffImage": "diff-tok02-seeded-vs-tok01/collection-375-diff.png"
+    },
+    {
+      "name": "collection-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1212
+      ],
+      "sizeAfter": [
+        768,
+        1212
+      ],
+      "differing": 7518,
+      "total": 930816,
+      "share": 0.008077,
+      "box": {
+        "x": 24,
+        "y": 54,
+        "width": 560,
+        "height": 1108
+      },
+      "diffBytes": 13765,
+      "diffImage": "diff-tok02-seeded-vs-tok01/collection-768-diff.png"
+    },
+    {
+      "name": "collections-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1067
+      ],
+      "sizeAfter": [
+        1440,
+        1067
+      ],
+      "differing": 5802,
+      "total": 1536480,
+      "share": 0.003776,
+      "box": {
+        "x": 26,
+        "y": 54,
+        "width": 1159,
+        "height": 963
+      },
+      "diffBytes": 6082,
+      "diffImage": "diff-tok02-seeded-vs-tok01/collections-1440-diff.png"
+    },
+    {
+      "name": "collections-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1911
+      ],
+      "sizeAfter": [
+        375,
+        1911
+      ],
+      "differing": 5793,
+      "total": 716625,
+      "share": 0.008084,
+      "box": {
+        "x": 16,
+        "y": 106,
+        "width": 244,
+        "height": 1755
+      },
+      "diffBytes": 20260,
+      "diffImage": "diff-tok02-seeded-vs-tok01/collections-375-diff.png"
+    },
+    {
+      "name": "collections-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1423
+      ],
+      "sizeAfter": [
+        768,
+        1423
+      ],
+      "differing": 5802,
+      "total": 1092864,
+      "share": 0.005309,
+      "box": {
+        "x": 24,
+        "y": 54,
+        "width": 509,
+        "height": 1319
+      },
+      "diffBytes": 20011,
+      "diffImage": "diff-tok02-seeded-vs-tok01/collections-768-diff.png"
+    },
+    {
+      "name": "home-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        2394
+      ],
+      "sizeAfter": [
+        1440,
+        2394
+      ],
+      "differing": 9655,
+      "total": 3447360,
+      "share": 0.002801,
+      "box": {
+        "x": 26,
+        "y": 54,
+        "width": 1192,
+        "height": 2290
+      },
+      "diffBytes": 17457,
+      "diffImage": "diff-tok02-seeded-vs-tok01/home-1440-diff.png"
+    },
+    {
+      "name": "home-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        3502
+      ],
+      "sizeAfter": [
+        375,
+        3502
+      ],
+      "differing": 9771,
+      "total": 1313250,
+      "share": 0.00744,
+      "box": {
+        "x": 16,
+        "y": 106,
+        "width": 292,
+        "height": 3346
+      },
+      "diffBytes": 54062,
+      "diffImage": "diff-tok02-seeded-vs-tok01/home-375-diff.png"
+    },
+    {
+      "name": "home-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        3016
+      ],
+      "sizeAfter": [
+        768,
+        3016
+      ],
+      "differing": 9714,
+      "total": 2316288,
+      "share": 0.004194,
+      "box": {
+        "x": 24,
+        "y": 54,
+        "width": 636,
+        "height": 2912
+      },
+      "diffBytes": 60800,
+      "diffImage": "diff-tok02-seeded-vs-tok01/home-768-diff.png"
+    },
+    {
+      "name": "not-found-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        937
+      ],
+      "sizeAfter": [
+        1440,
+        937
+      ],
+      "differing": 5416,
+      "total": 1349280,
+      "share": 0.004014,
+      "box": {
+        "x": 26,
+        "y": 54,
+        "width": 1159,
+        "height": 833
+      },
+      "diffBytes": 5809,
+      "diffImage": "diff-tok02-seeded-vs-tok01/not-found-1440-diff.png"
+    },
+    {
+      "name": "not-found-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1393
+      ],
+      "sizeAfter": [
+        375,
+        1393
+      ],
+      "differing": 5407,
+      "total": 522375,
+      "share": 0.010351,
+      "box": {
+        "x": 16,
+        "y": 106,
+        "width": 244,
+        "height": 1237
+      },
+      "diffBytes": 16507,
+      "diffImage": "diff-tok02-seeded-vs-tok01/not-found-375-diff.png"
+    },
+    {
+      "name": "not-found-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1049
+      ],
+      "sizeAfter": [
+        768,
+        1049
+      ],
+      "differing": 5229,
+      "total": 805632,
+      "share": 0.006491,
+      "box": {
+        "x": 12,
+        "y": 54,
+        "width": 521,
+        "height": 957
+      },
+      "diffBytes": 14843,
+      "diffImage": "diff-tok02-seeded-vs-tok01/not-found-768-diff.png"
+    },
+    {
+      "name": "product-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1733
+      ],
+      "sizeAfter": [
+        1440,
+        1733
+      ],
+      "differing": 6759,
+      "total": 2495520,
+      "share": 0.002708,
+      "box": {
+        "x": 26,
+        "y": 54,
+        "width": 1159,
+        "height": 1629
+      },
+      "diffBytes": 8176,
+      "diffImage": "diff-tok02-seeded-vs-tok01/product-1440-diff.png"
+    },
+    {
+      "name": "product-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        2167
+      ],
+      "sizeAfter": [
+        375,
+        2167
+      ],
+      "differing": 6771,
+      "total": 812625,
+      "share": 0.008332,
+      "box": {
+        "x": 16,
+        "y": 106,
+        "width": 292,
+        "height": 2011
+      },
+      "diffBytes": 22271,
+      "diffImage": "diff-tok02-seeded-vs-tok01/product-375-diff.png"
+    },
+    {
+      "name": "product-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        2442
+      ],
+      "sizeAfter": [
+        768,
+        2442
+      ],
+      "differing": 6759,
+      "total": 1875456,
+      "share": 0.003604,
+      "box": {
+        "x": 24,
+        "y": 54,
+        "width": 574,
+        "height": 2338
+      },
+      "diffBytes": 19945,
+      "diffImage": "diff-tok02-seeded-vs-tok01/product-768-diff.png"
+    },
+    {
+      "name": "search-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1065
+      ],
+      "sizeAfter": [
+        1440,
+        1065
+      ],
+      "differing": 6761,
+      "total": 1533600,
+      "share": 0.004409,
+      "box": {
+        "x": 26,
+        "y": 54,
+        "width": 1159,
+        "height": 961
+      },
+      "diffBytes": 5011,
+      "diffImage": "diff-tok02-seeded-vs-tok01/search-1440-diff.png"
+    },
+    {
+      "name": "search-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1292
+      ],
+      "sizeAfter": [
+        375,
+        1292
+      ],
+      "differing": 6557,
+      "total": 484500,
+      "share": 0.013534,
+      "box": {
+        "x": 13,
+        "y": 106,
+        "width": 295,
+        "height": 1136
+      },
+      "diffBytes": 12085,
+      "diffImage": "diff-tok02-seeded-vs-tok01/search-375-diff.png"
+    },
+    {
+      "name": "search-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1110
+      ],
+      "sizeAfter": [
+        768,
+        1110
+      ],
+      "differing": 6782,
+      "total": 852480,
+      "share": 0.007956,
+      "box": {
+        "x": 24,
+        "y": 54,
+        "width": 509,
+        "height": 1006
+      },
+      "diffBytes": 12518,
+      "diffImage": "diff-tok02-seeded-vs-tok01/search-768-diff.png"
+    }
+  ]
+}
