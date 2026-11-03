@@ -162,6 +162,19 @@ The full list goes to the owner when all six phases are done. Each entry names t
   - About 1 in 1,000 unusual brands (a coloured background) that published before would now be refused at publish, because the applied-coupon words read under 4.5:1 on them. Stores already live with such a brand get a warning, not a refusal. Also, about 1 in 100 accent-only brands get a slightly different link colour on every page from the added pairs. Fine?
   - A store using the Pulse kit's own colours is still not pixel-equal to the same store with no brand: its lime surfaces are #a8eb43, not #a3e635, because a brand builds its own accent ladder. A shopper can't see it. It would take using the platform's built-in lime ladder whenever the accent is exactly #84cc16. Leave it?
 
+## Phase 2, batch 1
+
+### One publish is all or nothing (P2-ATOM)
+- [ ] Approve the CI sqld download before anyone adds it to `.github/workflows/test.yml`: the source (tursodatabase/libsql release `libsql-server-v0.24.32`, asset `libsql-server-x86_64-unknown-linux-gnu.tar.xz`) and the SHA-256 you compute yourself. The exact step is in `docs/cms-reviews/P2-ATOM.md`. Until it is added, a pushed CI run fails on `test:publish`, because that suite never skips when sqld is missing.
+- [ ] Hosted Turso, on a staging tenant: one publish; two concurrent publishes; a publish while another connection holds `BEGIN IMMEDIATE`; a lost answer after commit (the retry must report ok with single rows); replica read consistency right after a publish.
+- [ ] DR-3: run `pnpm tenant:migrate -- --all` and then `-- --check`, so that 0021 is on every tenant before code that needs it deploys. 0021 seeds every tenant 'legacy'.
+- [ ] DOC-12: restoring an export of a documents-mode tenant is not verified; only the export side is tested.
+- [ ] Decide on the new `{failed}` outcome of `commitPublishBatch` (a refused statement with nothing written). P2-PUBLISH must handle it, for example as a 500 saying "Publish failed; nothing changed", never as a 409 rebuild.
+
+### The reader version gate and the closed-store label (P2-VGATE)
+- [ ] After deploy, look at the closed-store page of a closed glow-kit test store: the "Scheduled maintenance" label should be easy to read on the light background.
+- [ ] Check that a closed pulse-1 (dark) store's page looks the same as before (the label falls back to accent-400).
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
