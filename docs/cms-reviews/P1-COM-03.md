@@ -2,15 +2,71 @@
 
 Branch `cms/p1-com03`, cut from `bdbe1a7`. Spec: `docs/CMS_FULL_BUILD_SPEC.md:1403-1421` (COM-03), with OQ-03 (`:3183`, offers stay live on save), PUB-04 (`:478-500`), PUB-10 (`:571-576`), the planned column (`:2487`) and the test strategy (8.15, `:2845`).
 
+This packet covers the build (`ef26961`, `339f669`) and **fix round 1** (the commit after `339f669`), which answers an independent review. The round-1 changes are described in "Fix round 1" just below; the rest of the packet is updated to match.
+
 ## Status by stage
 
 | Stage | Status |
 |---|---|
-| Implemented | Yes, on this branch. The code is in `ef26961`. The stale-example fix, its tests, this packet and the drill screenshots are in the commit after it |
-| Locally tested | Yes. `pnpm test`: 45 of 45 suites, 874 tests passed, 0 failed. The new suite `test:offer-form`: 44 passed, 0 failed. `test:offers` (27) and `test:offers-admin` (8) pass with neither file changed. `next build` passes. The mutation check caught 53 of 56; the 3 survivors are explained below |
-| Browser verified | **Yes, on the local design harness only**: desktop Chrome, headless, 1280 and 375 wide, on port 3019. Twelve journeys passed with no console errors. See "Browser drill" for the screenshots. Not Safari, not a phone, not the storefront cart |
+| Implemented | Yes, on this branch. The build is in `ef26961` and `339f669`. Fix round 1 is in the commit after `339f669` |
+| Locally tested | Yes. `pnpm test`: 45 of 45 suites, 891 tests passed, 0 failed. `test:offer-form`: 61 passed, 0 failed (44 before fix round 1). `test:offers` (27) and `test:offers-admin` (8) pass with neither file changed. `next build` passes. Fix round 1's mutation check: 37 deliberate breakages, 35 caught; the 2 survivors were already disclosed and are explained below |
+| Browser verified | **Yes, on the local design harness only**: desktop Chrome, headless, 1280 and 375 wide, on port 3019. The build's twelve journeys and fix round 1's nine journeys passed with no console errors. See "Browser drill". Not Safari, not a phone, not the storefront cart |
 | Staging verified | **NOT DONE.** Migration 0019 has not run on any hosted database, and nothing is on staging |
 | Production enabled | **NOT DONE.** Nothing pushed, merged, deployed or migrated |
+
+## Fix round 1
+
+### The blocking finding: a blank name froze, and could over-promise. Confirmed and fixed
+
+The reviewer was right. When the founder left "Name in the cart" blank, the form saved the default name (the sentence, `Free X on orders over ₹N`, or `CODE · 10% off`) as the offer's title. On the next edit, `formFromOffer` put that saved name back into the field as if the founder had typed it, so `offerFromForm` kept it. The rules changed, the name didn't. The cart drawer shows `appliedOffers[].label`, which is the title for Buy some, get some free and for a free gift, and `lib/shopify-push.js` sends those labels as the Shopify draft order's discount description. So a cart could read "get 2 free" while freeing 1.
+
+Reproduced first, through the real `formFromOffer` → `updateForm` → `offerFromForm` → `store.upsertOffer` → `lib/cart.js getCart`, against the code at `339f669`:
+
+```
+✗ a blank name follows the rules on edit: Buy some, get some free (get 2 free → get 1 free)
+    the saved name follows the new rules: expected ["Buy 1 of Night Repair Cream, get 1 free", …], got ["Buy 1 of Night Repair Cream, get 2 free", …]
+✗ a blank name follows the rules on edit: Free gift over a spend (₹2,000 → ₹3,000)
+    the saved name follows the new amount: expected ["Free Lip Sleeping Mask on orders over ₹3,000", …], got ["Free Lip Sleeping Mask on orders over ₹2,000", …]
+✗ a blank name follows the rules on edit: Discount code (10% → 25%)
+    the saved name follows; the code itself is kept: expected ["NAMES10 · 25% off", …], got ["NAMES10 · 10% off", …]
+✗ a blank name follows the rules on edit: Buy more, save more (another product)
+    the saved name names the new product: expected "Buy more Gentle Oat Cleanser, save more", got "Buy more Night Repair Cream, save more"
+✗ the form: a blank name stays blank on edit, and the hint, the side-by-side and the save use the new rules
+    the name field is blank, not the saved sentence: expected "", got "Buy 2 of Gentle Oat Cleanser, get 1 free"
+✗ the form: a typed name that still has the old numbers is flagged; a name without numbers isn't
+    flagged once the rules change
+✗ the model: a saved name equal to the default is treated as automatic, a typed one is kept
+```
+
+The full run on the unfixed code was 48 passed, 12 failed: the seven above plus the five non-blocking reproductions below. The 44 tests from the build passed.
+
+**The fix** (`components/admin/offerFormModel.js`, `components/admin/OfferForm.js`, `lib/offers/plain.js`):
+
+- A blank name is saved with a mark, `titleAuto: true`, in the offer's settings. The engine and the validator ignore it.
+- `formFromOffer(existing, { names, currency })` opens an automatic name as a **blank field**. "Automatic" means the mark, or, for an offer saved without one, a name exactly equal to the default (built with the catalog's current name, or with the name saved at the pick). So every save rebuilds the name from the new rules.
+- The hint names the new default as the founder edits ("Leave it blank to use “…”. It changes when the rules do."), and the side-by-side compare now shows **"Name in the cart"** under both the live and the new sentence.
+- A name the founder **typed** is kept as typed. If it mentions a number, product, gift or code the edit just changed, the form warns under "Check this is right": `The name shoppers see in the cart, “Oat: buy 2 get 2 free”, mentions something you just changed. Check it still matches, or clear it to use “Buy 2 of Gentle Oat Cleanser 150ml, get 1 free”.` It compares each rule by its place (buy, free, each step, the spend, the percent, the minimum), so "buy 2 get **2**" edited to get 1 is caught even though "buy 2" still has a 2. That case was found by the browser drill (J2) after a first version that compared all the sentence's numbers as one set missed it. It is a warning, not a block.
+- The update button on an untouched form stays disabled: the mark itself never counts as a change.
+
+**Tests that now cover it** (`scripts/test-offer-form.js`): one per kind, each started with a blank name and then edited, checking the saved title and the label from the next `getCart` (free 2→1, gift ₹2,000→₹3,000, code 10%→25%, and Buy more, save more moved to another product); the form on the hook driver (blank field, hint, names side by side, the PUT body, then the cart label: `Buy 2 of Gentle Oat Cleanser, get 2 free`, 1,298 off); the typed-name warning, including the cases that must not warn; and the model's detection rules, including a name in older wording that only the mark can identify. Browser drill J1 repeats the reviewer's exact journey, and J2b the typed-name warning.
+
+### The non-blocking items
+
+| # | Reviewer's item | What I found | Status |
+|---|---|---|---|
+| 1 | Going back from a stale page restores settings the dialog never named | Confirmed: the route took nothing from the page, so the guard only covered the server's own read-to-write gap | **Fixed.** The form sends `{ expect: previous.replaced_at }`. `revertOffer(id, { expect })` refuses with `CHANGED` (409) when the earlier settings on the server aren't the ones the page showed. The message is plain: "This offer changed while you were looking at it. Close it and open it again to see its settings now." Test: page loaded at 20% (way back 10%), another save makes it 30%, then Go back from the page is refused by the store, the route and the form, with 30% still live and no success message; a fresh page then goes back. Browser J3 |
+| 2 | The go-back dialog promises "next cart" for settings whose dates ended | Confirmed | **Fixed.** The dialog says "Going back to:" and, in amber, "Its dates ended 4 Oct, 03:34 pm, so shoppers won't get it after you go back. You can change the dates afterwards." An offer that's off says it's off; settings that start later say "Shoppers get this from …". The message after going back says the same. Test, and browser J4 |
+| 3 | M15 and M16 survived: the free-item warning for Buy some, get some free was untested | Confirmed | **Fixed (test).** A ₹3,200 product is added for one test: the simulator route returns exactly `A free item here can be worth ₹3,200, which is more than ₹2,000.`, and the form shows it once the example arrives. Both mutations are now caught. The earlier packet's claim that the simulator's `warnings` survivor "became a test" was true only for the tiered warning |
+| 4 | M26 survived: an edit save that always sends `enabled: true` | Confirmed (the code was right) | **Fixed (test).** An off code is edited and saved: the PUT asks for `enabled: false` and the row stays off |
+| 5 | M27, M28, M31, M3, M22 survived | M27, M28 and M31 confirmed | **Fixed (tests)** for M27 (editing a code doesn't flag its own code), M28 (a store with 520 untagged products before a tagged one: the tag's product is still found, and the example uses it) and M31 (going back writes an audit row). **M3 and M22 remain**, as already disclosed (see "Mutation check") |
+| 6 | "Engine unchanged" rested on `match.js` being byte-identical, not on `test:offers`; M24 survived | Confirmed. `git show bdbe1a7:lib/offers/engine.js` has the same `matchesTarget` body as `lib/offers/match.js`, character for character | **Fixed (test).** A new test pins the exact rule: tags and types match case-sensitively, a handle must match whole, an unknown kind matches nothing, and the real engine gives a "glow" offer nothing on a "Glow" product. M24 is now caught. Acceptance 5 below now says what the negative rests on |
+| 7 | Default names showed the store's internal tags and types to shoppers | Confirmed | **Fixed.** A tag or type offer's default name no longer names the tag: `Buy 2, get 1 free`, and `Buy more, save more` (the cart adds ` · 10% off`). Products keep their name. The founder's sentence still names the tag. Test, and browser J7 |
+| 8 | Bundle rows: the list's switch still toggled a bundle's offer row | Confirmed: it bypassed `setBundleEnabled` (which also checks the bundle before turning it on) | **Fixed.** The list shows the bundle's switch disabled, labelled "Drill duo: turn it on or off in Catalog". The offer route refuses to turn on or off, change or delete a bundle's row (409 `NOT_HERE`); only the console calls it. Test, and browser J6 |
+| 9 | Going back silently dropped unsaved edits in the form | Confirmed | **Fixed.** When the form has unsaved changes, the dialog adds "The changes you haven't saved here will be lost." "Your current settings are kept" now reads "Your saved settings are kept". Test, and browser J4 |
+| 10 | A future start toasted "has started" | Confirmed | **Fixed.** `doneMessage` (in the model) words every toast by when shoppers really get the offer: `“DRILLSOON · 10% off” starts 10 Nov, 10:00 am.`, dates already ended, or off. Tests for the message and for the list showing it; browser J5 |
+| 11 | The test table said `test:offer-form 40/0`, the totals 44/0 | Confirmed (the table was wrong) | **Fixed** in "Test results" |
+| 12 | Accepted known limits | No change | Kept in Known limits |
+| 13 | Edge runtime and `next build` | Re-checked on the final code: `plain.js`, `match.js`, `store.js`, `engine.js` and the model use no `node:` APIs, `require`, `process` or `Buffer`. `next build` compiled successfully, exit 0; its two NFT-trace warnings come from `lib/platform/migrate.js` through `app/api/platform/*`, not from this branch | No change needed |
 
 ## The bugs, reproduced first
 
@@ -47,7 +103,8 @@ Editing a live offer adds the safety the spec asks for:
 
 - **The old and new sentences side by side** ("Live now" and "After you update"), with the schedule under each. The button reads **Update live offer** and stays disabled until something changes.
 - **Turn off is at the top of the edit view** for a live offer (Turn on for one that's off), with a Live or Off badge. The list keeps its switch, now labelled "Turn off …" and "Turn on …".
-- **"Before your last change"** shows the previous settings as a sentence, with **Go back to previous offer settings**. It asks once, naming exactly what shoppers will get. Going back is a swap, so going back again returns to where the founder started.
+- **"Before your last change"** shows the previous settings as a sentence, with **Go back to previous offer settings**. It asks once, naming exactly what shoppers will get, and says so when they won't get it (dates ended, or the offer is off) or will get it later. It warns when unsaved edits in the form will be lost, and it is refused if the offer changed after the page loaded (fix round 1). Going back is a swap, so going back again returns to where the founder started.
+- **The name in the cart** is shown under both sentences. A name left blank follows the rules on every save; a typed one is kept and flagged if it mentions something the edit changed (fix round 1).
 - **Form-level warnings, not validator changes**: more than 50% off (a step, a percent code, buy 1 get 2, or an amount off without a minimum of at least twice the amount), a free item worth more than the threshold, a gift worth more than the spend needed to get it, and a code another offer already uses. A warning never disables the button.
 
 ### The free-item threshold and where it lives
@@ -81,6 +138,20 @@ Editing a live offer adds the safety the spec asks for:
 - `scripts/test-copy.js`: dropped the blanket allowance for `lib/offers/simulate.js` ("console offer simulator fixtures"), since the fixtures are gone and the file now gets scanned like the rest. The suite stays green.
 
 Not changed: `lib/offers/validate.js`, `scripts/test-offers.js` and `scripts/test-offers-admin.js`. `git diff bdbe1a7 --stat -- lib/offers/validate.js scripts/test-offers.js scripts/test-offers-admin.js` prints nothing.
+
+### Changed in fix round 1
+
+- `components/admin/offerFormModel.js`: `isAutoTitle`; `formFromOffer(existing, { names, currency })` opens an automatic name blank; `offerFromForm` marks a blank name `titleAuto: true`; `sameSettings` ignores the mark; new `when`, `reachOf` (do shoppers get these settings, and from when) and `doneMessage` (the toast after a save or going back).
+- `components/admin/OfferForm.js`: passes names and currency to `formFromOffer`; the hint; "Name in the cart" under both sentences; the typed-name warning; Go back sends `expect`; the dialog's wording for dates that ended, an offer that's off, a later start, and unsaved edits.
+- `components/admin/OffersAdmin.js`: toasts through `doneMessage`; a bundle's switch is shown disabled.
+- `lib/offers/plain.js`: default names never show a tag or type; `staleNameWarning`.
+- `lib/offers/store.js`: `revertOffer(id, { expect })`, with a plainer `CHANGED` message.
+- `app/api/admin/offers/[id]/revert/route.js`: reads `{ expect }` from the body.
+- `app/api/admin/offers/[id]/route.js`: refuses to turn on or off, change or delete a bundle's offer row (409 `NOT_HERE`).
+- `scripts/test-offer-form.js`: 17 new tests (61 in all).
+- `docs/cms-reviews/drills/COM-03/18` to `27`: the round-1 drill screenshots.
+
+Still not changed: `lib/offers/validate.js`, `lib/offers/engine.js` (since `339f669`), `lib/offers/match.js`, `lib/offers/simulate.js`, `lib/offers/catalog.js`, `scripts/test-offers.js`, `scripts/test-offers-admin.js`. No migration: the mark lives inside the existing `config` JSON, so 0019 stays this branch's only migration.
 
 ### Changes made by another agent in this worktree
 
@@ -144,11 +215,24 @@ Unless noted, the command is `node scripts/test-offer-form.js`, against real ten
 - `✓ 'Go back to previous offer settings' shows the earlier sentence, asks once, and is live on the next cart read` (form).
 - `✓ a store whose database predates migration 0019 still saves offers, with nothing to go back to`
 - `✓ a bundle's offer row has no way back here, so it can't drift from its bundle record` (other agent)
-- Browser: D5 and D6, screenshots 11, 12 and 13.
+- Fix round 1: `✓ going back from a page that is out of date is refused, and nothing changes` (store, route and form; also checks the audit row), `✓ the go-back dialog says when shoppers won't get the earlier settings, and that unsaved edits are dropped`, `✓ the message after saving says when shoppers really get the offer`, `✓ the list shows that message after the form closes`.
+- Browser: D5 and D6, screenshots 11, 12 and 13. Fix round 1: J3 (out-of-date page refused, screenshot 22) and J4 (dates ended and unsaved edits, screenshot 23).
+
+### Fix round 1: the name shoppers see matches the offer
+
+**Tag: unit (store and real cart, hook driver), plus browser. Status: pass.** Not a spec bullet; it is the review's blocking finding.
+- `✓ a blank name follows the rules on edit: Buy some, get some free (get 2 free → get 1 free)`, `… Free gift over a spend (₹2,000 → ₹3,000)`, `… Discount code (10% → 25%)`, `… Buy more, save more (another product)`: each saved title and each label from the next `getCart` match the new rules (for a code, the cart's label is `Coupon CODE`, so the saved name and the 25% discount are checked).
+- `✓ the form: a blank name stays blank on edit, and the hint, the side-by-side and the save use the new rules`, including an older offer by web address, unmarked, that the form only recognises with the store's names.
+- `✓ the form: a typed name that still has the old numbers is flagged; a name without numbers isn't`, with the cases that must and must not warn.
+- `✓ the model: a saved name equal to the default is treated as automatic, a typed one is kept`.
+- `✓ default names never show a store's internal tags or types to shoppers`.
+- Browser: J1 (screenshots 18, 19, 20), J2b (21), J7 (26), J8 (27).
 
 ### 5. Negative: validation and engine behaviour are unchanged, proved by `test-offers` and `test-offers-admin`
 
-**Tag: unit. Status: pass.** `pnpm -s run test:offers`: 27 passed, 0 failed. `pnpm -s run test:offers-admin`: 8 passed, 0 failed. Neither file is changed, and neither is `lib/offers/validate.js` (the `git diff` above prints nothing). `test-offers.js` was already wired into the gate as `test:offers`. The engine changed in two ways only. The minimum-spend message is now worded in the cart's currency; for rupee amounts under 1,000 it is word for word what it was (`Minimum spend ₹999 for this code`, by test). And `matchesTarget` moved to `match.js`; the guard test checks that the engine and the console use the same function. Validator messages are translated in the form, not changed (`✓ validation messages reach the founder in plain words, …`). The warnings are only in the form: `✓ warnings, one by one: …` checks the offers that warn still pass `validateOffer`.
+**Tag: unit. Status: pass.** `pnpm -s run test:offers`: 27 passed, 0 failed. `pnpm -s run test:offers-admin`: 8 passed, 0 failed. Neither file is changed, and neither is `lib/offers/validate.js` (the `git diff` above prints nothing). `test-offers.js` was already wired into the gate as `test:offers`.
+
+What this negative rests on, stated plainly (the review was right that the first version overstated it): `test:offers` does not by itself prove the matching rule unchanged, since a case-insensitive tag match passed it (mutation M24). The rule is unchanged because `lib/offers/match.js` holds the old `matchesTarget` body character for character (compare `git show bdbe1a7:lib/offers/engine.js`), and since fix round 1 `✓ the engine's matching rule is exact, as it always was (tags and types are case-sensitive)` pins it, so M24 is now caught. The engine changed in two ways only. The minimum-spend message is now worded in the cart's currency; for rupee amounts under 1,000 it is word for word what it was (`Minimum spend ₹999 for this code`, by test). And `matchesTarget` moved to `match.js`; the guard test checks that the engine and the console use the same function. Validator messages are translated in the form, not changed (`✓ validation messages reach the founder in plain words, …`). The warnings are only in the form: `✓ warnings, one by one: …` checks the offers that warn still pass `validateOffer`.
 
 ### 6. Negative: money messages do not hard-code the rupee sign where the store's currency differs
 
@@ -166,7 +250,7 @@ Unless noted, the command is `node scripts/test-offer-form.js`, against real ten
 | Editing a live offer shows old and new sentences side by side | `✓ editing a live offer: …` and browser D5 (side by side at 1280, stacked at 375) | unit, browser | pass |
 | The last previous config is kept per offer, with "Go back to previous offer settings" | acceptance 4 | unit, browser | pass |
 | "Turn off" is always visible | `✓ 'Turn off' is always at the top …` (shown on open, still shown while the form has problems, takes the offer out of the next cart) and browser D5 and D7 | unit, browser | pass |
-| Form-level warning, not a validator change, over 50% off or a free item over a threshold | `✓ form-level warnings: …`, `✓ warnings, one by one: …`, browser E2 | unit, browser | pass |
+| Form-level warning, not a validator change, over 50% off or a free item over a threshold | `✓ form-level warnings: …`, `✓ warnings, one by one: …`, and since fix round 1 `✓ Buy some, get some free on a dear product warns about the free item, in the form and the simulator`; browser E2 | unit, browser | pass |
 | Offer changes appear in "Recently published" (PUB-04) | **Deferred to phase 3**, as the brief says. Hook: `listRecentOfferChanges()` and `POST /api/admin/offers/:id/revert`, tested by `✓ PUB-04 hook: …` | unit (hook only) | deferred |
 
 ## Browser drill
@@ -189,12 +273,31 @@ Local design harness on port 3019, freshly seeded with `node scripts/dev-design.
 
 Screenshot 17 also shows the duplicate-code warning and the one-code-per-order note. D4 had already started a SAVE10 offer, and E3 suggested SAVE10 again.
 
+### Fix round 1 drill
+
+Same harness and port (3019), freshly seeded with `node scripts/dev-design.js seed`, on the final code; desktop Chrome, headless, over the DevTools protocol, 1280 wide unless noted. The dev server and Chrome were stopped afterwards. No local fixture was needed: the bundle in J6 and the codes in J4 and J5 were made through the console's own API from the signed-in page. 0 console errors.
+
+Two runs failed for reasons in the drill script, not the app, and were rerun: the first used `[role=dialog]` (the console's dialogs are native `<dialog>` elements), and a wait returned a page element, which never reads as true over the protocol. J2 failed for a real reason: my first version of the name check compared all of the sentence's numbers as one set, so a typed "buy 2 get 2 free" edited to get 1 wasn't flagged ("buy 2" still had a 2). The check now compares each rule by its place, a unit test covers that case, and J2b passed. J2 and J3 ran on the oat offer in the state the earlier journeys left it.
+
+| Journey | Result | Screenshot |
+|---|---|---|
+| J1 The reviewer's journey | Started `Buy 2 of Gentle Oat Cleanser 150ml, get 1 free` with the name blank. On Edit, the name field is **blank** (it held the old sentence before the fix). Set "And gets free" to 2: the hint reads `Leave it blank to use “Buy 2 of Gentle Oat Cleanser 150ml, get 2 free”. It changes when the rules do.` and "Name in the cart" reads get 1 under Live now and get 2 under After you update. After Update live offer, the API returns `free: 2`, `title: "Buy 2 of Gentle Oat Cleanser 150ml, get 2 free"`, `titleAuto: true`, and the list row's name matches its sentence | [18](drills/COM-03/18-edit-blank-name.png), [19](drills/COM-03/19-edit-names-side-by-side.png), [20](drills/COM-03/20-list-after-update.png) |
+| J2b A typed name | Typed `Oat: buy 2 get 2 free`, then edited get 2 to get 1: "Check this is right" flags the name and offers the new default; Update live offer stays enabled. No flag before the change; none after clearing the name, when the new name reads `… get 1 free` | [21](drills/COM-03/21-typed-name-flagged.png) |
+| J3 Going back from an out-of-date page | With the edit page open, a save from the same browser (standing in for another tab) set get 3 free. Go back was refused in the dialog: "This offer changed while you were looking at it. Close it and open it again to see its settings now." The API still showed `free: 3` | [22](drills/COM-03/22-go-back-out-of-date-refused.png) |
+| J4 Earlier settings whose dates ended | A code that ran two months ago to one month ago, then saved with no dates. With an unsaved edit in the form, Go back's dialog read "Going back to:", the dates-ended warning and the unsaved-edits warning, and did not promise the next cart | [23](drills/COM-03/23-go-back-dates-ended.png) |
+| J5 A start next week | The toast read `“DRILLSOON · 10% off” starts 10 Nov, 10:00 am.`, not "has started" | [24](drills/COM-03/24-toast-future-start.png) |
+| J6 A bundle in the Offers list | A bundle made through `/api/admin/bundles`. Its switch is disabled and labelled `Drill duo: turn it on or off in Catalog`; a direct `PUT { enabled: true }` to its offer row got 409 `NOT_HERE` | [25](drills/COM-03/25-bundle-row-switch.png) |
+| J7 A tag's default name | Buy some, get some free on the tag "gentle": the founder's sentence reads `Buy 2 products tagged “gentle”, get 1 free`; the name shoppers would see is `Buy 2, get 1 free` | [26](drills/COM-03/26-tag-default-name.png) |
+| J8 Phone width (375) | The edit view with both names: they stack, and the page is 375 wide with no sideways scroll | [27](drills/COM-03/27-phone-edit-names.png) |
+
+Screenshot 19 also shows the note that another live offer already covers this product: the oat offer J2 and J3 had used was still live when J1 was rerun for clean screenshots. That is the simulator being right, not a problem.
+
 ## Deviations from the spec, and decisions to check
 
 1. **Collections can't be picked.** The engine can't match a collection, and the engine may not change here (Known limits). Tags and types are offered as the group picks instead. Owner decision.
 2. **An existing offer that's off reads "Save changes"**, not "Update live offer", because it isn't live. New offers read "Start offer" and live ones "Update live offer", as specified.
 3. **New offers always start on.** The old form's "Enabled" switch on create is gone, because the button says Start offer. A founder preparing one ahead sets a start date. Owner to confirm.
-4. **The name shoppers see is optional.** Left blank, it becomes a plain default (the sentence for Buy some, get some free; `Buy more of X, save more`; `Free X on orders over ₹N`; `CODE · 10% off`). This name also reaches Shopify as the draft order's discount description, as titles always have (`test-shopify-boundary` SHOP-04).
+4. **The name shoppers see is optional.** Left blank, it becomes a plain default (the sentence for Buy some, get some free on a product; `Buy 2, get 1 free` on a tag or type; `Buy more X, save more`, or `Buy more, save more` on a tag or type; `Free X on orders over ₹N`; `CODE · 10% off`) and, since fix round 1, it is rebuilt from the rules on every save. This name also reaches Shopify as the draft order's discount description, as titles always have (`test-shopify-boundary` SHOP-04).
 5. **Create refuses an id that exists (409).** Before, it replaced the live offer. Only the console calls this route.
 6. **The simulator's API changed.** `cartKey` and the fixture baskets are gone, the line titles now include the size, and the notes are reworded. `scripts/test-commerce.js` changed two tests to match: the coupon example is the store's cheapest product (`Gift Sticker — OS`, 10 off ₹99), the gift example crosses its threshold while the near miss doesn't, and the one-code note reads "one code per order".
 7. **`scripts/test-copy.js` lost one allowance** (the simulator's fixtures). The file is scanned like the rest now.
@@ -202,6 +305,9 @@ Screenshot 17 also shows the duplicate-code warning and the one-code-per-order n
 9. **The engine's shopper message changed wording for rupee amounts of 1,000 or more** (digit grouping, `₹1,499`).
 10. **New suite `test:offer-form`**, and three new files the spec didn't name: `offerFormModel.js`, `catalog.js` and `match.js`.
 11. **The suite compiles with Next's SWC** instead of the runner in spec 8.15, as AU-05 did. No new dependency.
+12. **A blank name is stored with a mark, `titleAuto: true`, inside the offer's settings** (fix round 1). It isn't something the engine reads, so the settings are no longer purely "engine-shaped". The mark is what lets a name made for the founder keep following the rules even after the default wording or a product's name changes.
+13. **The offer route refuses every write to a bundle's offer row** (turn on or off, change, delete; 409 `NOT_HERE`), not only the way back. The bundle editor writes those rows through `lib/bundles.js`, never through this route.
+14. **Going back takes `{ expect }`** (the time of the change the page showed). The form always sends it. A caller that leaves it out (none exists today) gets only the read-to-write check; PUB-04's Undo should send the `changedAt` it lists.
 
 ## Merge notes
 
@@ -228,8 +334,14 @@ Deliberately left, or outside what COM-03 may change. Each was read from the cod
 **Previous settings.**
 - **Only the last previous settings are kept**, as the spec says: name, rules and schedule, not on/off.
 - **A database without 0019 saves offers without a way back.** The store spots the missing column by the `previous_config` text in the error.
-- **Two people editing one offer at once: the last save wins**, as before (there is no revision check on PUT). Each save captures what it replaces in the same statement, and going back refuses if the offer changed since it was read.
-- **Bundle rows have no way back in the offer console.** They follow their bundle record.
+- **Two people editing one offer at once: the last save wins**, as before (there is no revision check on PUT). Each save captures what it replaces in the same statement. Going back is refused when the earlier settings changed after the page loaded (fix round 1, `expect`), or between the server's read and its write. It is not refused when only the on/off switch changed, since going back leaves the switch alone.
+- **Going back to settings whose dates have ended is allowed**, and the dialog says shoppers won't get them. The founder changes the dates afterwards; going back doesn't offer to.
+- **Bundle rows have no way back, and no switch, edit or delete, in the offer console.** They follow their bundle record, changed in Catalog.
+
+**The name shoppers see.**
+- **A typed name is never rewritten.** The form only flags it when it mentions a number, product, gift or code the edit just changed. It can miss a typed name that describes the offer without those (for example "half price") and can flag a number that meant something else; it is a check, not a block.
+- **An automatic name follows the catalog's names only when the offer is saved.** If a product is renamed in Shopify, the cart keeps the old name until the founder next saves the offer (the list's sentence uses the new name at once).
+- **An unmarked name equal to the default counts as automatic.** An offer saved before fix round 1 whose typed name happens to equal the default is treated as automatic. That is harmless: the name it would rebuild says the same thing about the same rules.
 
 **The form and simulator.**
 - **The example is one product on one cart line.** "The cheapest are the free ones" is in the fine print, not shown with a mixed cart.
@@ -241,7 +353,7 @@ Deliberately left, or outside what COM-03 may change. Each was read from the cod
 - **The hook driver and rendered tests aren't a browser.** Layout, dialogs and real clicks were checked only in the headless Chrome drill on the local harness.
 
 **Not built or not checked here.**
-- **"Recently published" (PUB-04) is deferred to phase 3.** The hook is `listRecentOfferChanges()` (newest first, before and after, time of change), and Undo is `POST /api/admin/offers/:id/revert`.
+- **"Recently published" (PUB-04) is deferred to phase 3.** The hook is `listRecentOfferChanges()` (newest first, before and after, time of change), and Undo is `POST /api/admin/offers/:id/revert` with `{ expect: <changedAt> }`.
 - **The storefront cart wasn't opened in a browser after going back.** The suite reads the real `getCart`. The storefront runs on the edge runtime, which this harness doesn't serve against file databases (spec 8.15, the harness fix).
 - **No Safari, no real phone, no staging, and no real Shopify gift variant.** See the owner's checks.
 
@@ -253,6 +365,9 @@ These are for an agent with desktop Chrome on the design harness.
 - **B2, keyboard only.** Do the New offer journey without a mouse: choose the kind, open the product picker, pick, Start offer. Focus is visible throughout, Escape closes each dialog, and focus returns to the button that opened it.
 - **B3, a slow or failed example.** Throttle the network to Slow 3G and change a number: "Checking on your store's products…" shows until the new example arrives (E1 checked this at full speed only). Then go offline and change a number: the example area says it couldn't load, and the Start offer button still works once you're back online.
 - **B4, a large catalog.** Seed 2,000 products with 50 tags, open "Choose a tag" and search. The list opens within about a second and searching works.
+- **B5, the storefront cart's label after an edit (fix round 1).** Needs the edge-runtime harness fix, like B1. Start a Buy 2 get 1 offer on a product with no other offer, with the name blank. Add 3 to the storefront cart: the cart drawer's discount line reads `Buy 2 of <product>, get 1 free`. Edit the offer to get 2 free and reload the cart with 4: the line reads `… get 2 free`, and the amount is 2 free. The checkout summary reads the same.
+- **B6, two real tabs (fix round 1).** Open the same live offer's edit view in two tabs. In tab A, change a number and Update live offer. In tab B, without reloading, press Go back to previous offer settings, then Go back: the dialog shows "This offer changed while you were looking at it…", and the list (reloaded) still shows tab A's settings. J3 stood in for tab A with a save from the same page.
+- **B7, going back to settings that start later (fix round 1).** Save an offer with a start date next week, then change it to no dates. Press Go back: the dialog's first line reads "Shoppers get this from <date>:", and after going back the toast reads "Back to the earlier settings. Shoppers get them from <date>." (unit-tested; not seen in a browser).
 
 ## Owner's checks (manual)
 
@@ -263,15 +378,18 @@ These are for an agent with desktop Chrome on the design harness.
 - **On a real phone (Safari on iPhone)**, start a discount code and edit it. Pass: no sideways scroll, the pickers open and close, and the button is below the example.
 - **On a real Shopify store**, make a free-gift offer with a real product and place a real test order over the threshold. Pass: the gift appears in the cart, and the Shopify draft order's discount description reads the plain name. Cancel the test order afterwards.
 - **Decide on whole-unit rounding for non-rupee stores.** Pass: a decision, since it would be an engine change.
+- **Confirm the default names for tag and type offers** (fix round 1): `Buy 2, get 1 free` and `Buy more, save more`, which never show the tag. Pass: agreed, or other wording given.
+- **Confirm the typed-name warning** (fix round 1): "The name shoppers see in the cart, “…”, mentions something you just changed. Check it still matches, or clear it to use “…”." It warns and never blocks. Pass: agreed, or you'd rather a typed name be blocked until it's changed.
+- **On a real Shopify store, after editing a free-gift offer whose name was left blank** (fix round 1): move its spend from one amount to another, then place a real test order over the new amount. Pass: the Shopify draft order's discount description names the new amount, not the old one. Cancel the test order afterwards.
 
 ## Test results
 
-`pnpm test` on the final code: `45 of 45 suites passed`. Counts are passed/failed per suite, from `node scripts/run-tests.js --verbose`:
+`pnpm test` on the final code of fix round 1: `45 of 45 suites passed`. Counts are passed/failed per suite, from `node scripts/run-tests.js --verbose`:
 
 ```
 test:orders 27/0            test:shipping 12/0          test:shopify-push 13/0
 test:shopify-boundary 41/0  test:hardening 11/0         test:offers 27/0
-test:offers-admin 8/0       test:offer-form 40/0        test:events 16/0
+test:offers-admin 8/0       test:offer-form 61/0        test:events 16/0
 test:tenancy 9/0            test:platform-sync 15/0     test:admin-console 9/0
 test:cms-api 20/0           test:page-editor 53/0       test:refs 8/0
 test:sections 15/0          test:cms 11/0               test:platform-ops 9/0
@@ -286,7 +404,7 @@ test:commerce-exp 18/0      test:growth 21/0            test:agency 16/0
 test:w6 16/0                test:copy 52/0              test:media-upload 119/0
 ```
 
-Total: 874 passed, 0 failed (`test:offer-form` 44/0). The baseline at `bdbe1a7` was 44 of 44 suites; `test:offer-form` is the forty-fifth. `test:perf` was not run, as it is a measurement. `test:offer-form` has passed on every run on code no other process was touching: 3 solo runs before the other agent's edits, and every solo and gate run since. `next build` passed on the final code, listing `/api/admin/offers/[id]/revert` and `/api/admin/offers/targets`.
+Total: 891 passed, 0 failed (`test:offer-form` 61/0). Before fix round 1 it was 874 passed with `test:offer-form` at 44/0; the build's per-suite line wrongly said 40/0 (the review caught it). The baseline at `bdbe1a7` was 44 of 44 suites; `test:offer-form` is the forty-fifth. `test:perf` was not run, as it is a measurement. `next build` passed on fix round 1's final code ("Compiled successfully", exit 0), listing `/api/admin/offers/[id]/revert` and `/api/admin/offers/targets`; its two NFT-trace warnings come from `lib/platform/migrate.js` through the platform routes.
 
 **A note on runs that overlapped other agents.** Twice during this run, other processes touched this worktree: another agent's command ran my first mutation runner, and another agent edited files (above). The suite failed while that was happening, with `SQLITE_READONLY` from two runs sharing the suite's database files, and with mutated code. Those runs are not counted. Every result above came after both had stopped, with each mutation site checked back to its original text.
 
@@ -294,4 +412,8 @@ Total: 874 passed, 0 failed (`test:offer-form` 44/0). The baseline at `bdbe1a7` 
 
 - `example: code minimum ignored` (`const valid = true` in the code example). This is equivalent by construction: the example cart is built to meet the minimum, so `valid` is only false if the price times the quantity lands a float hair under it. It's kept as a guard.
 - `catalog: tag matched loosely` (dropping the exact-tag filter after SQL). This is equivalent in practice: the SQL already matches the tag with its JSON quotes, and the example builder filters again with the engine's own rule.
-- `store: going back has no change check` (dropping `previous_config = <read>` from the revert's update). The other condition (`config = <read>`) still refuses a revert racing a rules change (by test). The dropped one only matters for a name-only or schedule-only save landing between the revert's read and its write. That interleaving can't be forced without test hooks in the store, so it was left as code-reading only.
+- `store: going back has no change check` (dropping `previous_config = <read>` from the revert's update). The other condition (`config = <read>`) still refuses a revert racing a rules change (by test). The dropped one only matters for a schedule-only save landing between the revert's read and its write (a name change alters `config` too, since the name is stored there; the first version of this note said otherwise). That interleaving can't be forced without test hooks in the store, so it was left as code-reading only.
+
+The review's own mutation pass on the build had 8 survivors (M15, M16, M26, M27, M28, M31, M3, M22), and separately showed a case-insensitive tag match (M24) passing both offer suites. Fix round 1 answers all of them but M3 and M22; see the next paragraph.
+
+**Mutation check, fix round 1 (scratch runner, not committed; run alone on the final code, one breakage at a time against `test:offer-form`, each file restored and checked after).** 37 breakages: 28 in the round-1 code (automatic names, the typed-name check, going back with `expect`, the dialog's wording, the toasts, the bundle guards, default names for tags and types) and the review's 9 (M3, M15, M16, M22, M24, M26, M27, M28, M31). **35 caught.** The first pass caught 30 of 35; its three survivors (the mark ignored, the saved-pick-name fallback dropped, the form not passing the store's names) showed the model tests didn't separate the three ways a name is recognised as automatic, so those tests were sharpened, and the typed-name check was rewritten after the browser drill (its five breakages were added then). The two that survive are the build's own, explained above: M3 (`previous_config` guard) and M22 (the code example's `valid`).

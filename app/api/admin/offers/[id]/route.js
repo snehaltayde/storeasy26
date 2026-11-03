@@ -10,6 +10,12 @@ export const dynamic = "force-dynamic";
 
 const deny = (a) => NextResponse.json({ error: a.error }, { status: a.status });
 
+// A bundle's offer row follows its bundle record (lib/bundles.js, which also
+// checks the bundle before turning it on). Turning it on or off, changing or
+// deleting it here would leave the two disagreeing (COM-03).
+const notHere = () =>
+  NextResponse.json({ error: "This offer belongs to a bundle. Change it where you edit the bundle.", code: "NOT_HERE" }, { status: 409 });
+
 export const GET = tenantHandler(async (request, { params }) => {
   const auth = await requireAdmin(request, "offers.read");
   if (!auth.ok) return deny(auth);
@@ -24,10 +30,11 @@ export const PUT = tenantHandler(async (request, { params }) => {
   if (!auth.ok) return deny(auth);
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
+  const existing = await getOfferRow(id);
+  if (existing?.type === "BUNDLE" || body.offer?.type === "BUNDLE") return notHere();
 
   // enable/disable fast path
   if (body.offer === undefined && typeof body.enabled === "boolean") {
-    const existing = await getOfferRow(id);
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const saved = await setOfferEnabled(id, body.enabled);
     slog("offer_toggled", { offer_id: id, enabled: body.enabled });
@@ -57,6 +64,7 @@ export const DELETE = tenantHandler(async (request, { params }) => {
   const auth = await requireAdmin(request, "offers.write");
   if (!auth.ok) return deny(auth);
   const { id } = await params;
+  if ((await getOfferRow(id))?.type === "BUNDLE") return notHere();
   await deleteOffer(id);
   slog("offer_deleted", { offer_id: id });
   await audit({ actor: auth.actor, action: "offers.write", resource: `offer:${id}`, diff: { deleted: true } });

@@ -5,7 +5,7 @@
 // the offer's id is made here, and a code is suggested.
 import { defaultOfferTitle, offerTerms, plainErrors, suggestCode } from "../../lib/offers/plain.js";
 import { validateOffer } from "../../lib/offers/validate.js";
-import { isoToLocalInput, localInputToIso } from "../../lib/admin/schedule.js";
+import { isoToLocalInput, localInputToIso, offerScheduleStatus } from "../../lib/admin/schedule.js";
 
 // What an offer can be for, in the founder's words. A saved "handle" target
 // (older offers) shows as One product; picking again saves the product id.
@@ -24,11 +24,22 @@ const TYPE_SLUG = { BXGY: "bxgy", TIERED_QTY: "tiered", FREE_GIFT: "gift", COUPO
 const str = (v) => (v == null ? "" : String(v));
 const num = (v) => (str(v).trim() === "" ? NaN : Number(str(v).trim()));
 
-export function formFromOffer(existing) {
+// Was the saved name made for the founder (the field was left blank)? Saves
+// from this form mark it (`titleAuto`); an older save counts when its name is
+// exactly the default, with the catalog's current name or the one saved at
+// the pick. An automatic name is shown as a blank field, so it is rebuilt
+// from the rules on every save and never keeps numbers the rules no longer have.
+export function isAutoTitle(cfg, { names = {}, currency = "INR" } = {}) {
+  if (!cfg?.title) return false;
+  if (cfg.titleAuto === true) return true;
+  return [names, {}].some((n) => defaultOfferTitle(cfg, { names: n, currency }) === cfg.title);
+}
+
+export function formFromOffer(existing, { names = {}, currency = "INR" } = {}) {
   const cfg = existing?.config || {};
   return {
     type: existing?.type || null,
-    title: cfg.title || "",
+    title: isAutoTitle(cfg, { names, currency }) ? "" : cfg.title || "",
     target: cfg.target ? { ...cfg.target } : null,
     choice: choiceOf(cfg.target),
     buy: str(cfg.buy ?? 2),
@@ -58,7 +69,9 @@ export function updateForm(form, patch) {
 }
 
 // The engine-shaped offer, exactly as the API stores it. A blank title
-// becomes the plain default (what shoppers see in the cart).
+// becomes the plain default (what shoppers see in the cart), marked
+// `titleAuto` so the next edit rebuilds it from the rules (the engine and the
+// validator ignore the mark).
 export function offerFromForm(form, { id, names = {}, currency = "INR" } = {}) {
   const type = form.type;
   const base = { id, type, scope: SCOPE[type], priority: form.priority ?? PRIORITY[type] };
@@ -74,7 +87,9 @@ export function offerFromForm(form, { id, names = {}, currency = "INR" } = {}) {
       combinable: Boolean(form.combinable),
     };
   const offer = { ...base, ...rules };
-  offer.title = str(form.title).trim() || defaultOfferTitle(offer, { names, currency });
+  const typed = str(form.title).trim();
+  offer.title = typed || defaultOfferTitle(offer, { names, currency });
+  if (!typed) offer.titleAuto = true;
   return offer;
 }
 
@@ -120,7 +135,8 @@ export function newOfferId(offer, { names = {}, suffix = randomSuffix() } = {}) 
 
 // Same settings? Key order doesn't count, and a value left out means what the
 // engine reads it as (scope and priority defaults, a code works with other
-// offers unless it says it doesn't).
+// offers unless it says it doesn't). The automatic-name mark isn't a setting:
+// the name itself is compared.
 const comparable = (o) =>
   o && typeof o === "object"
     ? {
@@ -128,6 +144,7 @@ const comparable = (o) =>
         scope: o.scope ?? SCOPE[o.type],
         priority: o.priority ?? PRIORITY[o.type],
         ...(o.type === "COUPON" ? { combinable: o.combinable !== false } : {}),
+        titleAuto: undefined,
       }
     : o;
 const stable = (v) =>
@@ -141,3 +158,39 @@ const stable = (v) =>
           .join(",")}}`
       : JSON.stringify(v ?? null);
 export const sameSettings = (a, b) => stable(comparable(a)) === stable(comparable(b));
+
+export const when = (iso) =>
+  iso ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
+
+// Will shoppers get these settings, and from when? For a saved row or the
+// earlier settings: { enabled, starts_at, ends_at }. Null when they get it on
+// their next cart; otherwise the reason they don't (yet).
+export function reachOf({ enabled, starts_at = null, ends_at = null }, now = new Date()) {
+  const status = offerScheduleStatus({ enabled, starts_at, ends_at }, now);
+  if (status === "expired") return { why: "ended", text: `Its dates ended ${when(ends_at)}, so shoppers don't get it. Change the dates to run it again.` };
+  if (status === "draft" || status === "paused") return { why: "off", text: "This offer is off, so shoppers don't get it until you turn it on." };
+  if (status === "scheduled") return { why: "later", text: `Shoppers get it from ${when(starts_at)}.` };
+  return null;
+}
+
+// The message after a save or going back, true to when shoppers get it.
+export function doneMessage({ offer, created = false, reverted = false } = {}, now = new Date()) {
+  const name = offer?.label || "Your offer";
+  const reach = offer ? reachOf(offer, now) : null;
+  if (reverted) {
+    if (!reach) return "Back to the earlier settings. Shoppers get them on their next cart.";
+    if (reach.why === "ended") return `Back to the earlier settings. Their dates ended ${when(offer.ends_at)}, so shoppers don't get the offer.`;
+    if (reach.why === "off") return "Back to the earlier settings. The offer is off, so shoppers don't get it.";
+    return `Back to the earlier settings. Shoppers get them from ${when(offer.starts_at)}.`;
+  }
+  if (created) {
+    if (!reach) return `“${name}” has started.`;
+    if (reach.why === "ended") return `“${name}” is saved, but its dates have already ended, so shoppers don't get it.`;
+    if (reach.why === "off") return `“${name}” is saved and off.`;
+    return `“${name}” starts ${when(offer.starts_at)}.`;
+  }
+  if (!reach) return "Updated. Shoppers get it on their next cart.";
+  if (reach.why === "ended") return `Saved. Its dates ended ${when(offer.ends_at)}, so shoppers don't get it.`;
+  if (reach.why === "off") return "Saved. The offer is off, so shoppers don't get it.";
+  return `Saved. Shoppers get it from ${when(offer.starts_at)}.`;
+}

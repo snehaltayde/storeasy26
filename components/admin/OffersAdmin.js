@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import OfferForm from "./OfferForm";
+import { doneMessage } from "./offerFormModel";
 import { offerScheduleStatus } from "@/lib/admin/schedule";
 import { OFFER_TYPE_NAMES, offerSentence } from "@/lib/offers/plain";
 import { PageHeader } from "@/components/console/PageHeader";
@@ -106,9 +107,8 @@ export default function OffersAdmin({ initialOffers, initialNames = {}, currency
         onChanged={() => refresh({ silent: true })}
         onDone={async (result = {}) => {
           setEditing(null);
-          if (result.reverted) toast.success("Back to the earlier settings. Shoppers get them on their next cart.");
-          else if (result.created) toast.success(`“${result.offer?.label || "Your offer"}” has started.`);
-          else toast.success("Updated. Shoppers get it on their next cart.");
+          // true to when shoppers get it: a future start, dates that ended, or off
+          toast.success(doneMessage(result));
           await refresh();
         }}
         onCancel={() => setEditing(null)}
@@ -159,12 +159,18 @@ export default function OffersAdmin({ initialOffers, initialNames = {}, currency
           <ul className="divide-y divide-edge">
             {offers.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4">
-                <Switch
-                  checked={!!o.enabled}
-                  pending={togglingId === o.id}
-                  label={`${o.enabled ? "Turn off" : "Turn on"} ${o.label}`}
-                  onChange={() => toggle(o)}
-                />
+                {o.type === "BUNDLE" ? (
+                  // shows the bundle's state; turning it on or off here would
+                  // leave the offer and its bundle record disagreeing
+                  <Switch checked={!!o.enabled} disabled label={`${o.label}: turn it on or off in Catalog`} />
+                ) : (
+                  <Switch
+                    checked={!!o.enabled}
+                    pending={togglingId === o.id}
+                    label={`${o.enabled ? "Turn off" : "Turn on"} ${o.label}`}
+                    onChange={() => toggle(o)}
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-fg">
                     <span className="truncate">{o.label}</span>

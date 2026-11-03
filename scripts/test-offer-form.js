@@ -1126,6 +1126,368 @@ await t("the model: new ids never collide, edits keep the id, and a saved 'handl
   ok(MODEL.sameSettings({ type: "COUPON", code: "A", discount: { kind: "percent", value: 1 } }, { type: "COUPON", scope: "order", priority: 50, combinable: true, code: "A", discount: { value: 1, kind: "percent" } }), "defaults and key order don't count as a change");
 });
 
+// ---- review fix round 1 ---------------------------------------------------------------------
+// The reproductions below were run first against the code before the fix
+// (docs/cms-reviews/P1-COM-03.md, "Fix round 1").
+console.log("— a name left blank follows the rules when the offer is edited");
+
+// Start an offer the way the form does with the name left blank, then edit it
+// the way the form does: formFromOffer → updateForm → offerFromForm → save.
+async function startBlankThenEdit(id, start, patch) {
+  let f = MODEL.updateForm(MODEL.formFromOffer(null), { type: start.type });
+  f = MODEL.updateForm(f, start.form);
+  ok(!f.title, "the name is left blank");
+  await inIN(() => STORE.upsertOffer({ offer: MODEL.offerFromForm(f, { id, currency: "INR" }) }));
+  const { row, names } = await liveRow(id);
+  eq(row.config.titleAuto, true, "a blank name is saved marked as automatic:");
+  const startedAs = row.label;
+  const edit =MODEL.updateForm(MODEL.formFromOffer(row, { names, currency: "INR" }), patch);
+  const offer = MODEL.offerFromForm(edit, { id, names, currency: "INR" });
+  await inIN(() => STORE.upsertOffer({ offer }));
+  const saved = await inIN(() => STORE.getOfferRow(id));
+  return { startedAs, offer, saved, names, sentence: PLAIN.offerSentence(offer, { names, currency: "INR" }), fresh: PLAIN.defaultOfferTitle(offer, { names, currency: "INR" }) };
+}
+
+await t("a blank name follows the rules on edit: Buy some, get some free (get 2 free → get 1 free)", async () => {
+  const id = "bxgy-blank-cream";
+  const r = await startBlankThenEdit(id, { type: "BXGY", form: { target: { kind: "productId", value: G(102), label: "Night Repair Cream" }, buy: "1", free: "2" } }, { free: "1" });
+  eq(r.startedAs, "Buy 1 of Night Repair Cream, get 2 free", "started with the default name:");
+  eq(r.sentence, "Buy 1 of Night Repair Cream, get 1 free", "the founder's new sentence:");
+  eq([r.saved.label, r.saved.config.title], [r.sentence, r.sentence], "the saved name follows the new rules:");
+  const cart = await cartDiscount(IN, [[V(1021), 2]]);
+  eq(cart.appliedOffers.find((o) => o.id === id), { id, type: "BXGY", label: r.sentence, amount: 1799 }, "the shopper's next cart reads what it gives:");
+  await inIN(() => STORE.deleteOffer(id));
+});
+
+await t("a blank name follows the rules on edit: Free gift over a spend (₹2,000 → ₹3,000)", async () => {
+  const id = "gift-blank-mask";
+  const gift = { variantId: V(1051), productId: G(105), handle: "lip-mask", title: "Lip Sleeping Mask", value: 549 };
+  const r = await startBlankThenEdit(id, { type: "FREE_GIFT", form: { threshold: "2000", gift } }, { threshold: "3000" });
+  eq(r.startedAs, "Free Lip Sleeping Mask on orders over ₹2,000", "started with the default name:");
+  eq([r.saved.label, r.saved.config.title], ["Free Lip Sleeping Mask on orders over ₹3,000", "Free Lip Sleeping Mask on orders over ₹3,000"], "the saved name follows the new amount:");
+  eq((await cartDiscount(IN, [[V(1021), 1], [V(1041), 1]])).gifts.length, 0, "a ₹2,448 cart no longer gets it:");
+  const cart = await cartDiscount(IN, [[V(1021), 2]]);
+  eq(cart.appliedOffers.find((o) => o.id === id)?.label, "Free Lip Sleeping Mask on orders over ₹3,000", "the next cart (and the Shopify discount description) reads the new amount:");
+  await inIN(() => STORE.deleteOffer(id));
+});
+
+await t("a blank name follows the rules on edit: Discount code (10% → 25%)", async () => {
+  const id = "coupon-blank-names";
+  const r = await startBlankThenEdit(id, { type: "COUPON", form: { code: "NAMES10" } }, { discValue: "25" });
+  eq(r.startedAs, "NAMES10 · 10% off", "started with the default name:");
+  eq([r.saved.label, r.saved.config.title, r.saved.config.code], ["NAMES10 · 25% off", "NAMES10 · 25% off", "NAMES10"], "the saved name follows; the code itself is kept:");
+  const cart = await cartDiscount(IN, [[V(1041), 1]], "NAMES10");
+  eq([cart.couponStatus?.valid, cart.discountTotal], [true, 162], "the next cart takes 25%:");
+  await inIN(() => STORE.deleteOffer(id));
+});
+
+await t("a blank name follows the rules on edit: Buy more, save more (another product)", async () => {
+  const id = "tiered-blank-names";
+  const r = await startBlankThenEdit(
+    id,
+    { type: "TIERED_QTY", form: { target: { kind: "productId", value: G(102), label: "Night Repair Cream" }, tiers: [{ minQty: "2", percent: "10" }] } },
+    { target: { kind: "productId", value: G(104), label: "Gentle Oat Cleanser" } },
+  );
+  eq(r.startedAs, "Buy more Night Repair Cream, save more", "started with the default name:");
+  eq(r.saved.label, "Buy more Gentle Oat Cleanser, save more", "the saved name names the new product:");
+  const cart = await cartDiscount(IN, [[V(1041), 2]]);
+  eq(cart.appliedOffers.find((o) => o.id === id)?.label, "Buy more Gentle Oat Cleanser, save more · 10% off", "the next cart:");
+  await inIN(() => STORE.deleteOffer(id));
+});
+
+await t("the form: a blank name stays blank on edit, and the hint, the side-by-side and the save use the new rules", async () => {
+  const id = "bxgy-blank-oat";
+  let f = MODEL.updateForm(MODEL.formFromOffer(null), { type: "BXGY" });
+  f = MODEL.updateForm(f, { target: { kind: "productId", value: G(104), label: "Gentle Oat Cleanser" }, buy: "2", free: "1" });
+  await inIN(() => STORE.upsertOffer({ offer: MODEL.offerFromForm(f, { id, currency: "INR" }) }));
+  const { row, names } = await liveRow(id);
+  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
+  const field = () => v.find((n) => n.props?.id === "offer-title", "the name field");
+  const hint = () => v.find((n) => n.type?.name === "Field" && n.props.htmlFor === "offer-title", "the name's hint").props.hint || "";
+  const nameIn = (which) => v.textOf(v.find((n) => n.props?.["data-name"] === which, `${which} name`).props.children);
+  const submit = () => v.find((n) => n.type?.name === "Button" && n.props.type === "submit", "submit");
+  eq(field().props.value, "", "the name field is blank, not the saved sentence:");
+  eq(submit().props.disabled, true, "opening it changes nothing:");
+  eq([nameIn("old"), nameIn("new")], ["Buy 2 of Gentle Oat Cleanser, get 1 free", "Buy 2 of Gentle Oat Cleanser, get 1 free"], "names before any change:");
+  v.type("offer-free", "2");
+  ok(hint().includes("“Buy 2 of Gentle Oat Cleanser, get 2 free”"), `the hint names the new default: ${hint()}`);
+  eq([nameIn("old"), nameIn("new")], ["Buy 2 of Gentle Oat Cleanser, get 1 free", "Buy 2 of Gentle Oat Cleanser, get 2 free"], "the name shoppers see, old and new, side by side:");
+  await v.submit();
+  eq(v.calls.find((c) => c.method === "PUT")?.body.offer.title, "Buy 2 of Gentle Oat Cleanser, get 2 free", "the update saves the new name:");
+  const cart = await cartDiscount(IN, [[V(1041), 4]]);
+  eq(cart.appliedOffers.find((o) => o.id === id), { id, type: "BXGY", label: "Buy 2 of Gentle Oat Cleanser, get 2 free", amount: 1298 }, "the next cart's label matches what it gives:");
+  v.unmount();
+  await inIN(() => STORE.deleteOffer(id));
+  // an older offer by web address, no mark, its name the default from the
+  // catalog's name: the form needs the store's names to see that
+  const legacy = { id: "tiered-oat-legacy", type: "TIERED_QTY", label: "Buy more Gentle Oat Cleanser, save more", enabled: true, starts_at: null, ends_at: null, previous: null, config: base("TIERED_QTY", { id: "tiered-oat-legacy", target: { kind: "handle", value: "oat-cleanser" }, tiers: [{ minQty: 2, percent: 10 }], title: "Buy more Gentle Oat Cleanser, save more" }) };
+  const l = await mountForm({ existing: legacy, currency: "INR", names: { "oat-cleanser": "Gentle Oat Cleanser" }, offers: [] });
+  eq(l.find((n) => n.props?.id === "offer-title", "the name field").props.value, "", "opens blank with the store's names:");
+  l.unmount();
+});
+
+await t("the form: a typed name that still has the old numbers is flagged; a name without numbers isn't", async () => {
+  const id = "bxgy-typed-oat";
+  const offer = base("BXGY", { id, title: "Oat: buy 2 get 1 free", target: { kind: "productId", value: G(104), label: "Gentle Oat Cleanser" }, buy: 2, free: 1 });
+  await inIN(() => STORE.upsertOffer({ offer }));
+  const { row, names } = await liveRow(id);
+  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
+  const warning = () => v.nodes().find((n) => n.type?.name === "Banner" && n.props.title === "Check this is right");
+  const stale = () => (warning() ? v.textOf(warning()) : "").includes("mentions something you just changed");
+  eq(v.find((n) => n.props?.id === "offer-title", "the name field").props.value, "Oat: buy 2 get 1 free", "a typed name is kept:");
+  ok(!stale(), "no flag before any change");
+  v.type("offer-free", "2");
+  ok(stale(), "flagged once the rules change");
+  ok(v.textOf(warning()).includes("“Buy 2 of Gentle Oat Cleanser, get 2 free”"), "and offers the new default");
+  eq(v.find((n) => n.type?.name === "Button" && n.props.type === "submit", "submit").props.disabled, false, "a warning, not a block:");
+  v.type("offer-title", "Oat deal");
+  ok(!stale(), "a name without numbers isn't flagged");
+  v.type("offer-title", "Oat: buy 2 more");
+  ok(!stale(), "nor one whose numbers the new rules still have");
+  v.type("offer-title", "Diwali 2026 oat deal");
+  ok(!stale(), "nor one whose numbers were never in the rules");
+  v.type("offer-title", "");
+  ok(!stale(), "nor a blank one");
+  v.unmount();
+  await inIN(() => STORE.deleteOffer(id));
+  // the other way round: the old number is still used elsewhere (buy 2)
+  const w = (title, before, after) => PLAIN.staleNameWarning(title, before, after, { currency: "INR" });
+  const oat = (buy, free, extra = {}) => base("BXGY", { target: { kind: "productId", value: G(104), label: "Gentle Oat Cleanser" }, buy, free, ...extra });
+  ok(w("Oat: buy 2 get 2 free", oat(2, 2), oat(2, 1)), "get 2 free → get 1 free, with buy 2 kept");
+  ok(w("Oat: buy 2, get some free", oat(2, 2), oat(3, 2)), "buy 2 → buy 3 flags a name with 2");
+  ok(w("Night Repair Cream deal", oat(2, 1, { target: { kind: "productId", value: G(102), label: "Night Repair Cream" } }), oat(2, 1)), "a name with the product moved away from");
+  const gift = (threshold) => base("FREE_GIFT", { threshold, gift: { variantId: V(1051), title: "Lip Sleeping Mask", value: 549 } });
+  ok(w("Free mask over ₹2,000", gift(2000), gift(3000)), "a gift's old amount, written with a sign and a comma");
+  const code = (value, c = "SAVE10") => base("COUPON", { code: c, discount: { kind: "percent", value } });
+  ok(w("SAVE10 · 10% off", code(10), code(25)), "a code's old percent, not confused with the code's own digits");
+  ok(!w("SAVE10 · 25% off", code(10), code(25)), "the new percent is fine");
+  ok(w("Use SAVE10 today", code(10), code(10, "SAVE15")), "an old code");
+});
+
+await t("the model: a saved name equal to the default is treated as automatic, a typed one is kept", () => {
+  const cfg = base("BXGY", { target: { kind: "productId", value: G(104), label: "Gentle Oat Cleanser" }, buy: 2, free: 1, title: "Buy 2 of Gentle Oat Cleanser, get 1 free" });
+  eq(MODEL.formFromOffer({ type: "BXGY", config: cfg }, { names: { [G(104)]: "Gentle Oat Cleanser" } }).title, "", "matches the default with the catalog's name:");
+  eq(MODEL.formFromOffer({ type: "BXGY", config: cfg }, { names: {} }).title, "", "matches the default with the name saved at the pick:");
+  eq(MODEL.formFromOffer({ type: "BXGY", config: { ...cfg, title: "Oat deal" } }, { names: {} }).title, "Oat deal", "typed:");
+  eq(MODEL.formFromOffer({ type: "BXGY", config: cfg }, { names: { [G(104)]: "Oat Cleanser 150ml" } }).title, "", "unmarked, product renamed since: the name saved at the pick still matches:");
+  const byHandle = base("TIERED_QTY", { target: { kind: "handle", value: "oat-cleanser" }, tiers: [{ minQty: 2, percent: 10 }], title: "Buy more Gentle Oat Cleanser, save more" });
+  eq(MODEL.formFromOffer({ type: "TIERED_QTY", config: byHandle }, { names: { "oat-cleanser": "Gentle Oat Cleanser" } }).title, "", "unmarked, no saved pick name: the catalog's name matches:");
+  // marked automatic, in wording an older version used (the tag in the name):
+  // only the mark can tell, so it alone must count
+  const older = base("BXGY", { target: { kind: "tag", value: "glow" }, buy: 2, free: 1, title: "Buy 2 products tagged “glow”, get 1 free", titleAuto: true });
+  eq(MODEL.formFromOffer({ type: "BXGY", config: older }, { names: {} }).title, "", "marked automatic, in older wording:");
+  eq(MODEL.formFromOffer({ type: "BXGY", config: { ...older, titleAuto: undefined } }, { names: {} }).title, older.title, "the same name unmarked is kept as typed:");
+  const back = MODEL.offerFromForm(MODEL.formFromOffer({ type: "BXGY", config: cfg }, { names: {} }), { id: cfg.id, names: {} });
+  ok(MODEL.sameSettings(back, cfg), "an untouched form saves exactly what was there");
+  eq(MODEL.offerFromForm(MODEL.updateForm(MODEL.formFromOffer(null), { type: "COUPON", title: "Big sale" }), { id: "x-y-z" }).titleAuto, undefined, "a typed name isn't marked automatic:");
+  eq(MODEL.offerFromForm(MODEL.updateForm(MODEL.formFromOffer(null), { type: "COUPON" }), { id: "x-y-z" }).titleAuto, true, "a blank one is:");
+});
+
+await t("default names never show a store's internal tags or types to shoppers", () => {
+  const dt = (target, extra) => PLAIN.defaultOfferTitle(base(extra.tiers ? "TIERED_QTY" : "BXGY", { target, ...extra }), { names: { [G(104)]: "Gentle Oat Cleanser" } });
+  eq(dt({ kind: "tag", value: "clearance-hidden" }, { buy: 2, free: 1 }), "Buy 2, get 1 free", "tag, buy some get some:");
+  eq(dt({ kind: "productType", value: "INT-SKU-TYPE" }, { buy: 3, free: 1 }), "Buy 3, get 1 free", "type, buy some get some:");
+  eq(dt({ kind: "tag", value: "clearance-hidden" }, { tiers: [{ minQty: 2, percent: 10 }] }), "Buy more, save more", "tag, buy more save more:");
+  eq(dt({ kind: "productId", value: G(104) }, { buy: 2, free: 1 }), "Buy 2 of Gentle Oat Cleanser, get 1 free", "a product keeps its name:");
+  eq(PLAIN.offerSentence(base("BXGY", { target: { kind: "tag", value: "glow" }, buy: 2, free: 1 })), "Buy 2 products tagged “glow”, get 1 free", "the founder's sentence still names the tag:");
+});
+
+console.log("— going back, safely");
+
+await t("going back from a page that is out of date is refused, and nothing changes", async () => {
+  const id = "coupon-stale-page";
+  const c = (value) => base("COUPON", { id, title: "Stale page code", code: "STALE", discount: { kind: "percent", value } });
+  await inIN(() => STORE.upsertOffer({ offer: c(10) }));
+  await sleep(5);
+  await inIN(() => STORE.upsertOffer({ offer: c(20) }));
+  const { row: page, names } = await liveRow(id); // the page: live 20%, way back 10%
+  await sleep(5);
+  await inIN(() => STORE.upsertOffer({ offer: c(30) })); // another tab saves 30%
+  const err = await inIN(() => STORE.revertOffer(id, { expect: page.previous.replaced_at })).catch((e) => e);
+  eq(err?.code, "CHANGED", "the store refuses:");
+  const res = await json(await route("of-in", "POST", `/api/admin/offers/${id}/revert`, { expect: page.previous.replaced_at }));
+  eq([res.status, res.body.code], [409, "CHANGED"], "the route refuses:");
+  eq((await inIN(() => STORE.getOfferRow(id))).config.discount.value, 30, "still 30%:");
+  const v = await mountForm({ existing: page, currency: "INR", names, offers: [page] });
+  v.click("Go back to previous offer settings");
+  const said = await v.find((n) => n.type?.name === "ConfirmDialog", "confirm").props.onConfirm().then(() => null, (e) => e.message);
+  ok(said && /changed/i.test(said), `the dialog says why: ${said}`);
+  eq(v.done.length, 0, "no success message:");
+  eq((await inIN(() => STORE.getOfferRow(id))).config.discount.value, 30, "the form didn't change it either:");
+  v.unmount();
+  const fresh = (await liveRow(id)).row; // a fresh page goes back as promised
+  const okRes = await json(await route("of-in", "POST", `/api/admin/offers/${id}/revert`, { expect: fresh.previous.replaced_at }));
+  eq([okRes.status, okRes.body.offer.config.discount.value], [200, 20], "a fresh page goes back:");
+  const rows = await C.platformDb().execute({ sql: "SELECT diff FROM audit_log WHERE resource = ? AND diff LIKE ?", args: [`offer:${id}`, "%reverted%"] });
+  eq(rows.rows.length, 1, "going back is in the audit log:");
+  await inIN(() => STORE.deleteOffer(id));
+});
+
+await t("the go-back dialog says when shoppers won't get the earlier settings, and that unsaved edits are dropped", async () => {
+  const id = "coupon-ended-dates";
+  const day = 86_400_000;
+  const ended = { startsAt: new Date(Date.now() - 60 * day).toISOString(), endsAt: new Date(Date.now() - 30 * day).toISOString() };
+  const c = (value) => base("COUPON", { id, title: "Ended dates code", code: "ENDED", discount: { kind: "percent", value } });
+  await inIN(() => STORE.upsertOffer({ offer: c(10), ...ended }));
+  await inIN(() => STORE.upsertOffer({ offer: c(15) }));
+  const { row, names } = await liveRow(id);
+  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
+  const body = () => v.textOf(v.find((n) => n.type?.name === "ConfirmDialog", "confirm").props.body);
+  ok(!body().includes("Shoppers get this on their next cart"), `doesn't promise the next cart: ${body()}`);
+  ok(body().includes("dates ended"), `says the dates ended: ${body()}`);
+  ok(!body().includes("haven't saved"), "nothing unsaved yet");
+  v.type("offer-disc-value", "12");
+  ok(body().includes("The changes you haven't saved here will be lost."), `unsaved edits: ${body()}`);
+  v.unmount();
+  await inIN(() => STORE.revertOffer(id));
+  ok(!(await inIN(() => STORE.getActiveOffers())).some((o) => o.id === id), "and indeed shoppers don't get it");
+  await inIN(() => STORE.upsertOffer({ offer: c(15) }));
+  await inIN(() => STORE.upsertOffer({ offer: c(20) })); // the way back is now 15%, with no dates
+  await inIN(() => STORE.setOfferEnabled(id, false));
+  const off = await mountForm({ existing: (await liveRow(id)).row, currency: "INR", names, offers: [] });
+  const offBody = off.textOf(off.find((n) => n.type?.name === "ConfirmDialog", "confirm").props.body);
+  ok(offBody.includes("This offer is off") && !offBody.includes("Shoppers get this on their next cart"), `an offer that's off: ${offBody}`);
+  off.unmount();
+  const live = await mountForm({ existing: { ...row, previous: { ...row.previous, starts_at: null, ends_at: null } }, currency: "INR", names, offers: [] });
+  ok(live.textOf(live.find((n) => n.type?.name === "ConfirmDialog", "confirm").props.body).includes("Shoppers get this on their next cart"), "a live offer going back to running settings");
+  live.unmount();
+  await inIN(() => STORE.deleteOffer(id));
+});
+
+await t("the message after saving says when shoppers really get the offer", () => {
+  const at = new Date("2026-06-01T00:00:00.000Z");
+  const o = (extra) => ({ label: "Glow deal", enabled: true, starts_at: null, ends_at: null, ...extra });
+  eq(MODEL.doneMessage({ created: true, offer: o() }, at), "“Glow deal” has started.", "now:");
+  const later = MODEL.doneMessage({ created: true, offer: o({ starts_at: "2026-07-01T00:00:00.000Z" }) }, at);
+  ok(/^“Glow deal” starts \d/.test(later) && !later.includes("has started"), `a future start: ${later}`);
+  ok(MODEL.doneMessage({ created: true, offer: o({ starts_at: "2026-01-01T00:00:00.000Z", ends_at: "2026-02-01T00:00:00.000Z" }) }, at).includes("dates have already ended"), "dates in the past");
+  eq(MODEL.doneMessage({ offer: o() }, at), "Updated. Shoppers get it on their next cart.", "update:");
+  ok(MODEL.doneMessage({ offer: o({ enabled: false }) }, at).includes("off"), "an update to an offer that's off");
+  eq(MODEL.doneMessage({ reverted: true, offer: o() }, at), "Back to the earlier settings. Shoppers get them on their next cart.", "going back:");
+  ok(MODEL.doneMessage({ reverted: true, offer: o({ ends_at: "2026-02-01T00:00:00.000Z" }) }, at).includes("ended"), "going back to dates that ended");
+});
+
+await t("the list shows that message after the form closes", async () => {
+  const toasts = [];
+  const slots = [];
+  let cursor = 0;
+  const hooks = {
+    useState(init) {
+      const k = cursor++;
+      if (!(k in slots)) slots[k] = typeof init === "function" ? init() : init;
+      return [slots[k], (v) => void (slots[k] = typeof v === "function" ? v(slots[k]) : v)];
+    },
+  };
+  const savedFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ offers: [] }) });
+  try {
+    const { default: OffersAdmin } = await load("components/admin/OffersAdmin.js", { react: hooks, "@/components/console/Toast": { useToast: () => ({ success: (m) => toasts.push(m), error() {} }) } });
+    const render = () => {
+      cursor = 0;
+      return OffersAdmin({ initialOffers: [], initialNames: {}, currency: "INR" });
+    };
+    const page = render();
+    const newOffer = [];
+    const walk = (n) => (Array.isArray(n) ? n.forEach(walk) : React.isValidElement(n) && (n.type?.name === "Button" && n.props.variant === "primary" && newOffer.push(n), Object.values(n.props).forEach(walk)));
+    walk(page);
+    newOffer[0].props.onClick();
+    const form = render();
+    ok(form.type?.name === "OfferForm", "the form opens");
+    const later = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    await form.props.onDone({ created: true, offer: { label: "Weekend code", enabled: true, starts_at: later, ends_at: null } });
+    ok(toasts.length === 1 && /^“Weekend code” starts /.test(toasts[0]), `a future start isn't called started: ${toasts[0]}`);
+  } finally {
+    globalThis.fetch = savedFetch;
+  }
+});
+
+console.log("— cases the mutation check found untested");
+
+await t("Buy some, get some free on a dear product warns about the free item, in the form and the simulator", async () => {
+  await inIN(async () => {
+    await db.insertInto("products").values({ id: G(106), handle: "luxe-oil", title: "Luxe Face Oil", available: 1, currency: "INR", price_min: 3200, price_max: 3200, product_type: "Oils", tags: '["luxe"]' }).execute();
+    await db.insertInto("variants").values({ id: V(1061), product_id: G(106), title: "Default Title", price: 3200, currency: "INR", available: 1, position: 0 }).execute();
+  });
+  const said = "A free item here can be worth ₹3,200, which is more than ₹2,000.";
+  try {
+    const sim = await json(await route("of-in", "POST", "/api/admin/offers/simulate", { offer: base("BXGY", { target: { kind: "productId", value: G(106) }, buy: 2, free: 1 }) }));
+    eq(sim.body.warnings, [said], "the simulator:");
+    const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
+    v.choose("Buy some, get some free");
+    v.click("Choose a product");
+    v.picker("Choose the product").props.onConfirm([{ id: G(106), title: "Luxe Face Oil" }]);
+    await v.idle();
+    const warning = v.nodes().find((n) => n.type?.name === "Banner" && n.props.title === "Check this is right");
+    ok(warning && v.textOf(warning).includes(said), "the form shows it once the example arrives");
+    v.unmount();
+  } finally {
+    await inIN(async () => {
+      await db.deleteFrom("variants").where("id", "=", V(1061)).execute();
+      await db.deleteFrom("products").where("id", "=", G(106)).execute();
+    });
+  }
+});
+
+await t("saving an offer that's off keeps it off, and editing a code doesn't flag its own code", async () => {
+  const id = "coupon-kept-off";
+  await inIN(() => STORE.upsertOffer({ offer: base("COUPON", { id, title: "Kept off", code: "KEPTOFF", discount: { kind: "percent", value: 10 } }), enabled: false }));
+  const { row, names } = await liveRow(id);
+  const v = await mountForm({ existing: row, currency: "INR", names, offers: [row] });
+  ok(!v.text().includes("Another offer already uses the code"), "its own code isn't 'taken'");
+  v.type("offer-disc-value", "15");
+  await v.submit();
+  eq(v.calls.find((c) => c.method === "PUT")?.body.enabled, false, "the save asks to stay off:");
+  const saved = await inIN(() => STORE.getOfferRow(id));
+  eq([saved.enabled, saved.config.discount.value], [false, 15], "saved, still off:");
+  v.unmount();
+  await inIN(() => STORE.deleteOffer(id));
+});
+
+await t("a big catalog: a tag's products are found even when 500 other products come first", async () => {
+  const BIG = await C.getTenant("of-big");
+  await withTenant(BIG, async () => {
+    const n = (i) => String(i).padStart(3, "0");
+    const ids = Array.from({ length: 520 }, (_, i) => i);
+    await db.insertInto("products").values(ids.map((i) => ({ id: G(`7${n(i)}`), handle: `aa-${n(i)}`, title: `Aa filler ${n(i)}`, available: 1, currency: "INR", price_min: 20, price_max: 20, tags: '["other"]' }))).execute();
+    await db.insertInto("variants").values(ids.map((i) => ({ id: V(`7${n(i)}`), product_id: G(`7${n(i)}`), title: "Default Title", price: 20, currency: "INR", available: 1, position: 0 }))).execute();
+    await db.insertInto("products").values({ id: G(8888), handle: "zz-rare", title: "Zz Rare Oil", available: 1, currency: "INR", price_min: 900, price_max: 900, tags: '["rare"]' }).execute();
+    await db.insertInto("variants").values({ id: V(8888), product_id: G(8888), title: "Default Title", price: 900, currency: "INR", available: 1, position: 0 }).execute();
+  });
+  const offer = base("BXGY", { target: { kind: "tag", value: "rare" }, buy: 2, free: 1 });
+  const rows = await withTenant(BIG, () => CAT.exampleCatalog(offer));
+  eq(rows.map((r) => r.title), ["Zz Rare Oil"], "the tagged product:");
+  const sim = await withTenant(BIG, () => SIM.simulateOffer({ offer }));
+  ok(sim.example?.agrees && /Zz Rare Oil/.test(sim.example.text), `the example: ${sim.example?.text || sim.missing}`);
+});
+
+await t("the engine's matching rule is exact, as it always was (tags and types are case-sensitive)", () => {
+  const item = { variantId: "v1", productId: "p1", handle: "glow-serum", tags: ["Glow"], productType: "Serums" };
+  const m = ENGINE.matchesTarget;
+  eq([m(item, { kind: "tag", value: "Glow" }), m(item, { kind: "tag", value: "glow" }), m(item, { kind: "tag", value: "Glo" })], [true, false, false], "tag:");
+  eq([m(item, { kind: "productType", value: "Serums" }), m(item, { kind: "productType", value: "serums" })], [true, false], "type:");
+  eq([m(item, { kind: "handle", value: "glow-serum" }), m(item, { kind: "handle", value: "glow" })], [true, false], "handle:");
+  eq([m({ ...item, tags: "Glow" }, { kind: "tag", value: "Glow" }), m(item, null), m(item, { kind: "collection", value: "x" })], [false, false, false], "no tags list, no target, unknown kind:");
+  const r = ENGINE.evaluateOffers([{ ...item, price: 100, quantity: 3 }], { offers: [base("BXGY", { target: { kind: "tag", value: "glow" }, buy: 2, free: 1 })] });
+  eq(r.discountTotal, 0, "a 'glow' offer doesn't apply to a 'Glow' product in the cart:");
+});
+
+await t("a bundle's offer can't be turned on, off, changed or deleted from Offers", async () => {
+  const bundleOffer = { id: "bundle-b-trio", type: "BUNDLE", scope: "line", priority: 5, title: "Trio", items: [{ variantId: V(1011), quantity: 1 }, { variantId: V(1031), quantity: 1 }], price: 1800 };
+  await inIN(() => STORE.upsertOffer({ offer: bundleOffer }));
+  const path = "/api/admin/offers/bundle-b-trio";
+  const toggle = await json(await route("of-in", "PUT", path, { enabled: false }));
+  eq([toggle.status, toggle.body.code], [409, "NOT_HERE"], "turn off:");
+  eq((await json(await route("of-in", "PUT", path, { offer: { ...bundleOffer, price: 1 } }))).status, 409, "change:");
+  eq((await json(await route("of-in", "DELETE", path))).status, 409, "delete:");
+  const row = await inIN(() => STORE.getOfferRow("bundle-b-trio"));
+  eq([row.enabled, row.config.price], [true, 1800], "unchanged:");
+  const { default: OffersAdmin } = await load("components/admin/OffersAdmin.js", { "@/components/console/Toast": { useToast: () => ({ success() {}, error() {} }) } });
+  const html = renderToStaticMarkup(React.createElement(OffersAdmin, { initialOffers: [row], currency: "INR", initialNames: {} }));
+  const sw = /<button[^>]*role="switch"[^>]*>/.exec(html)?.[0] || "";
+  ok(/disabled=""/.test(sw) && sw.includes("in Catalog"), `the list's switch can't be pressed and says where to go: ${sw}`);
+  await inIN(() => STORE.deleteOffer("bundle-b-trio"));
+});
+
 // ---- rendered with react-dom/server ---------------------------------------------------------------
 console.log("— rendered");
 // one live offer of each kind, and one that's off

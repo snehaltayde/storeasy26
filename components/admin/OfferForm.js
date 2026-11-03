@@ -13,8 +13,8 @@ import { Field, Input, Select } from "@/components/console/fields";
 import { SkeletonText, EmptyState } from "@/components/console/bits";
 import { cx } from "@/components/console/cx";
 import { ProductPicker, VariantPicker } from "@/components/admin/cms/RefPicker";
-import { OFFER_KINDS, OFFER_TYPE_NAMES, currencySign, defaultOfferTitle, money, offerDetails, offerSentence, offerWarnings, plainErrors } from "@/lib/offers/plain";
-import { TARGET_CHOICES, formFromOffer, formProblems, newOfferId, offerFromForm, randomSuffix, sameSettings, schedulePayload, updateForm } from "./offerFormModel";
+import { OFFER_KINDS, OFFER_TYPE_NAMES, currencySign, defaultOfferTitle, money, offerDetails, offerSentence, offerWarnings, plainErrors, staleNameWarning } from "@/lib/offers/plain";
+import { TARGET_CHOICES, formFromOffer, formProblems, newOfferId, offerFromForm, randomSuffix, reachOf, sameSettings, schedulePayload, updateForm, when } from "./offerFormModel";
 
 // Start an offer in plain words, safely (COM-03). The founder picks what the
 // offer is for, sees it as one sentence and as an example cart built from the
@@ -24,8 +24,6 @@ import { TARGET_CHOICES, formFromOffer, formProblems, newOfferId, offerFromForm,
 // settings from before the last change are one click away. No raw target
 // kinds and no identifiers: every product, size, tag, type and gift is picked.
 
-const when = (iso) =>
-  iso ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
 const scheduleText = (startsAt, endsAt) => {
   if (!startsAt && !endsAt) return "Runs whenever it's on.";
   if (startsAt && endsAt) return `Runs from ${when(startsAt)} to ${when(endsAt)}.`;
@@ -33,7 +31,8 @@ const scheduleText = (startsAt, endsAt) => {
 };
 
 export default function OfferForm({ existing, onDone, onCancel, onChanged, currency = "INR", names = {}, offers = [] }) {
-  const [form, setForm] = useState(() => formFromOffer(existing));
+  // an automatic name opens blank, so it follows the rules the founder changes
+  const [form, setForm] = useState(() => formFromOffer(existing, { names, currency }));
   const set = (patch) => setForm((f) => updateForm(f, patch));
   const [suffix] = useState(() => randomSuffix());
   const [picked, setPicked] = useState({}); // names of things picked in this form
@@ -100,20 +99,26 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
 
   const codeTaken =
     offer?.type === "COUPON" && offer.code && offers.some((o) => o.id !== id && o.type === "COUPON" && String(o.config?.code || "").toUpperCase() === offer.code);
-  const warnings = offer
-    ? [
-        ...offerWarnings(offer, { currency, freeItemValue: simFresh && sim.ok ? sim.facts?.maxTargetPrice : null }),
-        ...(codeTaken ? [`Another offer already uses the code ${offer.code}. Shoppers can only get one of them.`] : []),
-      ]
-    : [];
-
   // editing: the live settings against the new ones
   const oldSentence = existing ? offerSentence(existing.config, say) || existing.label : null;
+  const oldName = existing ? existing.config?.title || existing.label : null;
   const changed =
     existing &&
     offer &&
     !(sameSettings(offer, existing.config) && (schedule.startsAt || null) === (existing.starts_at || null) && (schedule.endsAt || null) === (existing.ends_at || null));
   const previousSentence = existing?.previous ? offerSentence(existing.previous.config, say) || existing.previous.label : null;
+  // going back: do shoppers really get the earlier settings, and when?
+  const previousReach = existing?.previous ? reachOf({ enabled: live, starts_at: existing.previous.starts_at, ends_at: existing.previous.ends_at }) : null;
+
+  // a name the founder typed that mentions a number, product, gift or code the edit changed
+  const staleName = existing && changed && form.title.trim() ? staleNameWarning(form.title, existing.config, offer, say) : null;
+  const warnings = offer
+    ? [
+        ...offerWarnings(offer, { currency, freeItemValue: simFresh && sim.ok ? sim.facts?.maxTargetPrice : null }),
+        ...(codeTaken ? [`Another offer already uses the code ${offer.code}. Shoppers can only get one of them.`] : []),
+        ...(staleName ? [staleName] : []),
+      ]
+    : [];
 
   const primaryLabel = !existing ? "Start offer" : live ? "Update live offer" : "Save changes";
 
@@ -180,7 +185,13 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
   }
 
   async function revert() {
-    const res = await fetch(`/api/admin/offers/${existing.id}/revert`, { method: "POST" });
+    // the earlier settings this page shows; the server refuses if they've
+    // changed since, so shoppers never get something the dialog didn't name
+    const res = await fetch(`/api/admin/offers/${existing.id}/revert`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expect: existing.previous?.replaced_at ?? null }),
+    });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "That didn't work. Try again.");
     onChanged?.();
@@ -429,7 +440,7 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
                 <Field
                   label="Name in the cart (optional)"
                   htmlFor="offer-title"
-                  hint={!form.title.trim() && offer?.title ? `Leave it blank to use “${offer.title}”.` : undefined}
+                  hint={!form.title.trim() && offer?.title ? `Leave it blank to use “${offer.title}”. It changes when the rules do.` : undefined}
                 >
                   <Input id="offer-title" value={form.title} onChange={(e) => set({ title: e.target.value })} placeholder={(offer && defaultOfferTitle(offer, say)) || "Filled in for you"} />
                 </Field>
@@ -466,6 +477,9 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
                       <p className="mt-1 text-sm text-fg" data-sentence="old">
                         {oldSentence}
                       </p>
+                      <p className="mt-1 text-xs text-fg-muted">
+                        Name in the cart: <span data-name="old">{oldName}</span>
+                      </p>
                       <p className="mt-1 text-xs text-fg-muted">{scheduleText(existing.starts_at, existing.ends_at)}</p>
                     </div>
                     <div className={cx("rounded-ctl border p-3", changed ? "border-primary" : "border-edge")}>
@@ -473,6 +487,11 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
                       <p className="mt-1 text-sm font-medium text-fg" data-sentence="new">
                         {sentence || "Finish the rules to see this."}
                       </p>
+                      {offer?.title && (
+                        <p className={cx("mt-1 text-xs", offer.title !== oldName ? "font-medium text-fg" : "text-fg-muted")}>
+                          Name in the cart: <span data-name="new">{offer.title}</span>
+                        </p>
+                      )}
                       <p className="mt-1 text-xs text-fg-muted">{changed ? scheduleText(schedule.startsAt, schedule.endsAt) : "No changes yet."}</p>
                     </div>
                   </div>
@@ -609,9 +628,19 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
         confirmLabel="Go back"
         body={
           <>
-            <span className="block">Shoppers get this on their next cart:</span>
+            <span className="block">
+              {!previousReach ? "Shoppers get this on their next cart:" : previousReach.why === "later" ? `Shoppers get this from ${when(existing.previous.starts_at)}:` : "Going back to:"}
+            </span>
             <span className="mt-1 block font-medium text-fg">{previousSentence}</span>
-            <span className="mt-2 block">Your current settings are kept, so you can switch back the same way.</span>
+            {previousReach && previousReach.why !== "later" && (
+              <span className="mt-2 block text-warning">
+                {previousReach.why === "ended"
+                  ? `Its dates ended ${when(existing.previous.ends_at)}, so shoppers won't get it after you go back. You can change the dates afterwards.`
+                  : "This offer is off, so shoppers won't get it until you turn it on."}
+              </span>
+            )}
+            {changed && <span className="mt-2 block text-warning">The changes you haven't saved here will be lost.</span>}
+            <span className="mt-2 block">Your saved settings are kept, so you can switch back the same way.</span>
           </>
         }
         onConfirm={revert}
