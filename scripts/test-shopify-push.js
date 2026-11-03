@@ -238,6 +238,7 @@ await t("transient failure retries via sweep and succeeds", async () => {
   eq(r1.ok, false, "first attempt fails");
   eq((await orderRow(id)).status, "sync_failed", "sync_failed");
   ok((await orderRow(id)).sync_error.includes("simulated Shopify 502"), "error recorded");
+  await new Promise((r) => setTimeout(r, 10)); // clear the (1ms-base) backoff window
   const sweep = await P.runSyncSweep({ gql: mockShopify() });
   const mine = sweep.pushed.find((p) => p.orderId === id);
   ok(mine?.ok, `sweep retry: ${JSON.stringify(sweep)}`);
@@ -297,6 +298,7 @@ await t("sweep recovers stale syncing_shopify from a crashed worker", async () =
   process.env.SHOPIFY_SYNC_STALE_MS = "999999999";
   eq(s1.stale_recovered, 1, "reclaimed");
   eq((await orderRow(id)).status, "sync_failed", "converted for retry");
+  await new Promise((r) => setTimeout(r, 10)); // clear the (1ms-base) backoff window
   const s2 = await P.runSyncSweep({ gql: mockShopify() });
   ok(s2.pushed.find((p) => p.orderId === id)?.ok, "retried next sweep");
   eq((await orderRow(id)).status, "synced", "recovered to synced");
@@ -311,6 +313,7 @@ await t("backoff gates retries: not-yet-due order is deferred, then runs", async
   ok(!s1.pushed.find((p) => p.orderId === id), "not pushed early");
   eq((await orderRow(id)).status, "sync_failed", "unchanged");
   process.env.SHOPIFY_SYNC_BACKOFF_MS = "1";
+  await new Promise((r) => setTimeout(r, 10)); // clear the (1ms-base) backoff window
   const s2 = await P.runSyncSweep({ gql: mockShopify() });
   ok(s2.pushed.find((p) => p.orderId === id)?.ok, "pushed once due");
 });

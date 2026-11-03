@@ -73,6 +73,20 @@ bounded backoff. Reads retry on any transient failure. Writes retry only when th
 request never reached Turso (DNS or TCP connect failed). A write whose outcome is
 unknown (timeout, reset, gateway 5xx) throws, because it may already have committed.
 
+`createOrder` and `transitionOrder` reconcile that themselves. Each writes in one atomic
+batch (an order always has its lines and first event, a status flip always has its event
+row), and after an unknown outcome each re-reads before doing anything else. The CAS means
+a resent transition can't apply twice.
+
+If the database stays down during `razorpay_verify`, the customer has paid, so the route
+answers `202 {pending:true}` rather than an error. The browser retries (see
+`lib/checkout/confirm-payment.js`), and in platform mode a durable `payment_confirm` job
+finishes it if the browser never comes back. Legacy mode has no job queue, so a customer
+who leaves mid-outage depends on the webhook.
+
+"Already paid" doesn't prove the follow-up work ran, so `runOrderEffects` in
+`lib/payment-settle.js` runs on replays too, and every step is safe to repeat.
+
 Legacy Phase-0 rows (`status='confirmed'`) were mapped by `pnpm migrate`:
 razorpay → `paid`, cod → `cod_pending`.
 

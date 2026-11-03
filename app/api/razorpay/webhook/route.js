@@ -1,9 +1,8 @@
 import { NextResponse, after } from "next/server";
-import { clearCart } from "@/lib/cart";
 import { markOrderPaid, findOrderByRazorpayOrderId } from "@/lib/orders";
+import { clearPaidCart, runOrderEffects } from "@/lib/payment-settle";
 import { webhookConfigured, verifyRazorpayWebhookSignature } from "@/lib/razorpay";
-import { enqueueShopifyPush, runSyncSweep } from "@/lib/shopify-push";
-import { enqueuePurchaseAndForward } from "@/lib/events";
+import { runSyncSweep } from "@/lib/shopify-push";
 import { recordWebhook, markInbox, enqueueJob } from "@/lib/platform/jobs.js";
 import { platformConfigured } from "@/lib/platform/control.js";
 import { currentTenant } from "@/lib/tenant-context";
@@ -105,16 +104,14 @@ export const POST = tenantHandler(async (request) => {
       webhook_event_id: eventId,
     });
     // Kill the lost-callback leftovers: the user's cart still holds the items.
-    if (!paid.already && order.cart_id) await clearCart(order.cart_id);
+    // The payment is recorded, so a failure here isn't worth a redelivery.
+    await clearPaidCart(order.id).catch((e) => console.error(`[rz-webhook] cart ${order.id}: ${e?.message || e}`));
     // Async Shopify push AFTER the response: immediate attempt for this order,
     // then a tiny sweep so failed pushes retry on payment traffic instead of
-    // waiting for the daily cron.
+    // waiting for the daily cron. The effects run on a replay too: "already paid"
+    // doesn't prove whoever paid it got as far as running them.
     after(async () => {
-      if (!paid.already) {
-        await enqueueShopifyPush(order.id);
-        // durable server-side purchase event — the browser may never come back
-        await enqueuePurchaseAndForward(order.id);
-      }
+      await runOrderEffects(order.id);
       await runSyncSweep({ limit: 2 }).catch((e) =>
         console.error(`[sync-sweep] ${e?.message || e}`),
       );

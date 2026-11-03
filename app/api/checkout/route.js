@@ -2,23 +2,21 @@ import { NextResponse, after } from "next/server";
 import { CART_COOKIE, getCart, clearCart } from "@/lib/cart";
 import { computeShipping } from "@/lib/shipping";
 import { tenantShippingConfig } from "@/lib/tenant-context";
-import { enqueueShopifyPush } from "@/lib/shopify-push";
-import { enqueuePurchaseAndForward } from "@/lib/events";
 import { CONSENT_COOKIE } from "@/lib/track/names";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import {
   createOrder,
-  markOrderPaid,
-  getOrderRazorpayId,
   findOrderByIdempotencyKey,
   orderConfirmationPath,
   ORDER_STATUS,
 } from "@/lib/orders";
-import { razorpayConfigured, razorpayKeyId, createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
+import { verifyBrowserPayment, runOrderEffects } from "@/lib/payment-settle";
+import { razorpayConfigured, razorpayKeyId, createRazorpayOrder } from "@/lib/razorpay";
 import { toMinor, sameAmount } from "@/lib/money";
 import { checkoutCapability } from "@/lib/commerce/adapter";
 import { tenantHandler } from "@/lib/tenant-request";
+import { isTransient } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -95,6 +93,15 @@ async function razorpayResponse(order, razorpayOrderId, deduped = false) {
   });
 }
 
+// Async after the response: Shopify push (payment-pending) + the server-side
+// purchase event (durable, browser-independent), the S47 (BE22) experiment
+// conversion join, and S49 (MC28) bounded merchant automations. Post-money,
+// best-effort, and safe to repeat.
+function scheduleCodEffects(request, order) {
+  const expUnit = request.cookies.get("_unit")?.value || null;
+  after(() => runOrderEffects(order.id, { expUnit }));
+}
+
 export const POST = tenantHandler(async (request) => {
   // S32 (BE06): the per-tenant capability gate — checkout modes are explicit
   // configuration, never silently switched. Browsing and the cart stay up.
@@ -146,6 +153,8 @@ export const POST = tenantHandler(async (request) => {
       if (dup) {
         // Finish what the first request started if its cart clear didn't land.
         if (cartId && cart.items.length) await clearCart(cartId);
+        // Same for its after() work: that request may have died before scheduling it.
+        scheduleCodEffects(request, dup);
         return await codResponse(dup, true);
       }
 
@@ -170,24 +179,11 @@ export const POST = tenantHandler(async (request) => {
         total: order.total,
         cart_id: cartId,
       });
-      if (!order.deduped) {
+      // `recovered`: the insert's response was lost but it may be ours, so this
+      // request still owes the follow-up work.
+      if (!order.deduped || order.recovered) {
         await clearCart(cartId);
-        // Async after the response: Shopify push (payment-pending) + the
-        // server-side purchase event (durable, browser-independent).
-        // S47 (BE22): experiment conversion join — best-effort, AFTER the
-        // money committed, idempotent per (experiment, order).
-        const expUnit = request.cookies.get("_unit")?.value || null;
-        after(async () => {
-          await enqueueShopifyPush(order.id);
-          await enqueuePurchaseAndForward(order.id);
-          const { recordConversions } = await import("@/lib/experiments");
-          await recordConversions(expUnit, order.id, order.total).catch(() => {});
-          // S49 (MC28): bounded merchant automations — post-money, best-effort
-          const { runAutomationsFor } = await import("@/lib/automations");
-          const { db } = await import("@/lib/db");
-          const row = await db.selectFrom("orders").selectAll().where("id", "=", order.id).executeTakeFirst().catch(() => null);
-          await runAutomationsFor("order_placed", { key: `order_placed:${order.id}`, order: row }).catch(() => {});
-        });
+        scheduleCodEffects(request, order);
       }
       return await codResponse(order, order.deduped);
     }
@@ -249,51 +245,21 @@ export const POST = tenantHandler(async (request) => {
     }
 
     if (action === "razorpay_verify") {
-      const { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
-      if (!verifyRazorpaySignature({ razorpay_order_id, razorpay_payment_id, razorpay_signature }))
-        return NextResponse.json({ error: "Payment signature verification failed" }, { status: 400 });
-      // tie the verified Razorpay order back to our pending order
-      const stored = await getOrderRazorpayId(orderId);
-      if (!stored || stored.razorpay_order_id !== razorpay_order_id)
-        return NextResponse.json({ error: "Order mismatch" }, { status: 400 });
-
-      // Idempotent: a duplicate callback for the same payment is a no-op. The
-      // webhook (/api/razorpay/webhook) is the source of truth; this browser
-      // callback is optimistic UX — whichever lands first wins, the other no-ops.
-      const paid = await markOrderPaid(orderId, {
-        razorpayPaymentId: razorpay_payment_id,
-        source: "browser_callback",
-      });
-      slog("payment_verified", {
-        order_id: orderId,
-        source: "browser_callback",
-        already: !!paid.already,
-        razorpay_payment_id: razorpay_payment_id,
-      });
-      if (cartId) await clearCart(cartId);
-      if (!paid.already) {
-        const expUnit = request.cookies.get("_unit")?.value || null;
-        after(async () => {
-          await enqueueShopifyPush(orderId);
-          await enqueuePurchaseAndForward(orderId);
-          const { recordConversions } = await import("@/lib/experiments");
-          const { db } = await import("@/lib/db");
-          const row = await db.selectFrom("orders").selectAll().where("id", "=", orderId).executeTakeFirst().catch(() => null);
-          await recordConversions(expUnit, orderId, row?.total ?? 0).catch(() => {});
-          const { runAutomationsFor } = await import("@/lib/automations");
-          await runAutomationsFor("order_placed", { key: `order_placed:${orderId}`, order: row }).catch(() => {});
-        });
-      }
-      return NextResponse.json({
-        ok: true,
-        orderId,
-        confirmationPath: await orderConfirmationPath(orderId),
-        ...(paid.already ? { already: true } : {}),
-      });
+      const expUnit = request.cookies.get("_unit")?.value || null;
+      const result = await verifyBrowserPayment(body, { expUnit });
+      if (result.settled) after(() => runOrderEffects(body.orderId, { expUnit }));
+      return NextResponse.json(result.body, { status: result.status });
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (e) {
+    // Nothing was charged on these actions, and the same idempotency key is safe to
+    // resend. The raw driver error means nothing to a customer.
+    if (isTransient(e))
+      return NextResponse.json(
+        { error: "We hit a temporary problem placing your order. Please try again. You won't be charged or get a duplicate order." },
+        { status: 503 },
+      );
     const status = e?.code === "IDEMPOTENCY_CONFLICT" ? 409 : 400;
     return NextResponse.json(
       { error: String(e?.message || e), ...(e?.code ? { code: e.code } : {}) },
