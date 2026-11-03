@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Image as ImageIcon, Loader2, Trash2 } from "lucide-react";
+import { Image as ImageIcon, Trash2 } from "lucide-react";
 import { Card } from "@/components/console/Card";
 import { Banner } from "@/components/console/Banner";
 import { IconButton } from "@/components/console/Button";
@@ -10,49 +10,24 @@ import { CopyButton } from "@/components/console/Copy";
 import { Input } from "@/components/console/fields";
 import { EmptyState, PermissionNote } from "@/components/console/bits";
 import { useToast } from "@/components/console/Toast";
+import { MediaUploadStatus } from "@/components/admin/MediaUploadStatus";
+import { uploadImage } from "@/lib/media-upload";
+import { UPLOAD_ACCEPT } from "@/lib/media-upload-plan";
 
 // Media library console (S38 / MC12, redesigned S50). Uploads go through
-// /api/admin/media as multipart; for raster images (not gif/svg) a THUMB
-// derivative is generated here with a canvas (no native image library exists
-// server-side) and rides the same request. Deletes are usage-guarded: every
-// delete confirms in a dialog first, and a 409 lists what still references
-// the file in a second "delete anyway" dialog (same force semantics as
-// before). S50 fixes: blur-saving alt text now toasts (it was silent), and
-// read-only support actors see an honest PermissionNote instead of nothing.
+// lib/media-upload.js, the one path shared with MediaPicker (MED-01): resize,
+// dimensions and the THUMB derivative all happen there. Deletes are
+// usage-guarded: every delete confirms in a dialog first, and a 409 lists what
+// still references the file in a second "delete anyway" dialog (same force
+// semantics as before). S50 fixes: blur-saving alt text now toasts (it was
+// silent), and read-only support actors see an honest PermissionNote instead
+// of nothing.
 
 const fmtSize = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`);
 
-// Resize to ≤480px wide (keeping aspect) → webp blob. Returns null when the
-// browser can't (svg/gif/tiny files skip — the original serves everywhere).
-async function makeThumb(file) {
-  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return null;
-  try {
-    const bitmap = await createImageBitmap(file);
-    if (bitmap.width <= 480) return null;
-    const scale = 480 / bitmap.width;
-    const canvas = document.createElement("canvas");
-    canvas.width = 480;
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
-    return blob ? { blob, width: canvas.width, height: canvas.height } : null;
-  } catch {
-    return null;
-  }
-}
-
-async function imageDims(file) {
-  try {
-    const bitmap = await createImageBitmap(file);
-    return { width: bitmap.width, height: bitmap.height };
-  } catch {
-    return { width: null, height: null };
-  }
-}
-
 export default function MediaAdmin({ initial, readOnly = false }) {
   const [media, setMedia] = useState(initial);
-  const [uploading, setUploading] = useState(null); // filename in flight
+  const [uploading, setUploading] = useState(null); // progress of the file in flight
   const [error, setError] = useState(null);
   const [deleting, setDeleting] = useState(null); // media row
   const [usageGuard, setUsageGuard] = useState(null); // {media, usage}
@@ -69,30 +44,14 @@ export default function MediaAdmin({ initial, readOnly = false }) {
     setError(null);
     try {
       for (const file of files) {
-        setUploading(file.name);
-        const form = new FormData();
-        form.set("file", file);
-        const dims = await imageDims(file);
-        if (dims.width) {
-          form.set("width", String(dims.width));
-          form.set("height", String(dims.height));
-        }
-        const thumb = await makeThumb(file);
-        if (thumb) {
-          form.set("thumb", thumb.blob, `thumb.webp`);
-          form.set("thumbWidth", String(thumb.width));
-          form.set("thumbHeight", String(thumb.height));
-        }
-        const res = await fetch("/api/admin/media", { method: "POST", body: form });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok || !json.ok) {
-          setError((json.errors || [json.error || `Upload failed (${res.status})`]).join(" · "));
+        const r = await uploadImage(file, { onProgress: setUploading });
+        if (!r.ok) {
+          setError(r.message);
           return;
         }
-        toast.success(json.media.deduped ? `${file.name} was already in the library — reused` : `${file.name} uploaded`);
+        if (r.media.deduped) toast.success(`${file.name} was already in the library — reused`);
+        else toast.success(r.reduced ? `${file.name} uploaded (made a little smaller so it fits)` : `${file.name} uploaded`);
       }
-    } catch (e) {
-      setError(String(e?.message || e));
     } finally {
       setUploading(null);
       await refresh();
@@ -138,24 +97,17 @@ export default function MediaAdmin({ initial, readOnly = false }) {
           <input
             ref={fileRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+            accept={UPLOAD_ACCEPT}
             multiple
             disabled={!!uploading}
             onChange={(e) => e.target.files?.length && upload([...e.target.files])}
             className="mx-auto block rounded text-sm text-fg-muted focus-ring file:mr-3 file:rounded-ctl file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary-fg hover:file:bg-primary-hover disabled:opacity-50"
           />
-          <p className="mt-2 text-xs text-fg-subtle">PNG, JPEG, WebP, GIF up to 1.5MB · SVG up to 300KB (sanitized). Duplicates are detected and reused.</p>
+          <p className="mt-2 text-xs text-fg-subtle">Photos are made smaller for you before they upload. GIFs can be up to 1.5MB and SVGs up to 300KB. Duplicates are detected and reused.</p>
         </Card>
       )}
 
-      {uploading && (
-        <Banner tone="info">
-          <span className="inline-flex items-center gap-2">
-            <Loader2 size={13} className="motion-safe:animate-spin" aria-hidden />
-            Uploading {uploading}…
-          </span>
-        </Banner>
-      )}
+      <MediaUploadStatus progress={uploading} />
 
       {error && <Banner tone="danger">{error}</Banner>}
 
