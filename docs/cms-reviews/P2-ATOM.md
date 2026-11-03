@@ -119,7 +119,7 @@ Also proven, beyond the list:
 - `✓ sqld: the proxy forwards the version probe untouched and counts only pipeline requests`.
 - `✓ sqld, the pointer moved on after our commit and before the reconcile: still ok, rows written once`.
 
-The version-count term of the flip (`count(*) … = :nv`) is defence in depth: with `ON CONFLICT(id) DO NOTHING` a version row can only be missing if its insert raised, which already fails the batch. No test can remove it alone and see a wrong result. With it removed **and** the versions insert changed to `INSERT OR IGNORE`, the null-body cases fail (the statement-shape case also catches `OR IGNORE`).
+(Superseded by P2-HARDEN: the version-count term now matches id, document and body, and is tested; see "Hardening (P2-HARDEN)" below.) The version-count term of the flip (`count(*) … = :nv`) is defence in depth: with `ON CONFLICT(id) DO NOTHING` a version row can only be missing if its insert raised, which already fails the batch. No test can remove it alone and see a wrong result. With it removed **and** the versions insert changed to `INSERT OR IGNORE`, the null-body cases fail (the statement-shape case also catches `OR IGNORE`).
 
 ## Tests
 
@@ -153,6 +153,18 @@ Non-blocking findings from the independent review, added at merge.
 - Once this is pushed, CI will fail on test:publish, because CI has no sqld and the suite is required to fail rather than skip. The plan accepts this, and the packet lists the pinned sqld install step as owner check 1. The owner has to approve the source and fill in the checksum before the branch's CI can go green.
 - Small test gaps: cleanPage's `enabled` normalisation has no test (mutation survived). The documents_entity and documents_dirty indexes are created but never exercised. The proxy listens on a system-chosen free port instead of a fixed range, which is fine for isolation.
 - Reproduced: test:publish passed 44/0 in about 4.8s on file: and on sqld 0.24.32. My own mutations that broke the guard-abort classification, `IS` -> `=` on the pointer, the {failed} branch, `revision >=`, the WHEN clause on the delete trigger, the cms_state seed (OR REPLACE), the journal-index null, the route id length, and the `OR live_release_id = :new` retry check were each caught. Full `pnpm test`: 66/66 in 114.3s (run after an offline frozen-lockfile install in the review worktree). lib/releases.js, lib/content/*, the existing readers and writers and .github/ are untouched, and nothing outside the tests calls commitPublishBatch. release-list.js imports releases.js, which the edge storefront layout already imports, so no new edge incompatibility. The review worktree was removed and no sqld or proxy process was left running.
+
+## Hardening (P2-HARDEN)
+
+Branch `cms/p2-harden` closed four of the "From review" findings above. Full packet: `docs/cms-reviews/P2-HARDEN.md`. What changed in `lib/documents/commit.js`:
+
+- **Reused version ids.** The flip guard now counts only version rows whose id, `document_id` and `body_hash` all match this build, so a row kept by `ON CONFLICT(id) DO NOTHING` that belongs to another document or body makes the flip miss. The reconcile's list check now compares slots (`documents:<id>`, `indexes:<name>`, via the new `listSlots` in `release-list.js`) and their `{version, hash}`, not bare ids. Result: `{failed, code: "VERSION_ID_CLASH"}`, nothing written.
+- **Reused release ids.** The reconcile's pointer check and release-row proof (`oursPresent`) now also require this build's list hash. A reused release id ends `{failed, code: "RELEASE_ID_CLASH"}`, never ok.
+- **Caller bugs.** The build is checked before any database call (ids set and of the right type, revisions whole numbers, no duplicates, every argument storable). A malformed build returns `{failed, code: "BAD_BUILD"}` and the client is never called. A build naming a document missing from `documents` ends `{failed, code: "MISSING_DOCUMENT"}`, told apart from a revision race by the read-back. A real revision race is still `{lost}`.
+- **Untested guards now pinned.** New sqld case: a later publish replaces our document before the reconcile runs, so only `oursPresent` proves the commit (removing it fails the case). New case on file and sqld: reusing a release id; removing `AND content_hash = ?` from the flip fails it.
+- `{failed}` now always carries a `code`: `BAD_BUILD`, `VERSION_ID_CLASH`, `RELEASE_ID_CLASH`, `MISSING_DOCUMENT` or `DB_REFUSED`. The null-body, null-hash and late log-row cases above are unchanged and end `DB_REFUSED`.
+
+`pnpm test:publish`: 52 passed (the 44 above plus 8). The version-count term is no longer only defence in depth: it now has its own tests. Still open from the review list, unchanged: the `{lost}`-after-transport limit, the CI sqld step, the plan's outcome list (P2-PLAN.md still names three outcomes), and the `cleanPage` and index test gaps.
 
 ## Owner checks
 
