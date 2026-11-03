@@ -210,6 +210,59 @@ await t("magic-byte sniffing still decides what a file really is", () => {
   includes(lie.errors.join(), "doesn't match");
 });
 
+await t("magic-byte sniffing checks every byte of each signature, and each format's shortest length", () => {
+  const signatures = [
+    ["image/png", [[0, [0x89, 0x50, 0x4e, 0x47]]], 8],
+    ["image/jpeg", [[0, [0xff, 0xd8, 0xff]]], 3],
+    ["image/gif", [[0, [0x47, 0x49, 0x46, 0x38]]], 6],
+    ["image/webp", [[0, ascii("RIFF")], [8, ascii("WEBP")]], 12],
+  ];
+  for (const [mime, parts, shortest] of signatures) {
+    const whole = new Uint8Array(16);
+    for (const [at, values] of parts) whole.set(values, at);
+    eq(M.sniffMime(whole), mime, `${mime} whole:`);
+    for (const [at, values] of parts) {
+      for (let i = 0; i < values.length; i++) {
+        const wrong = whole.slice();
+        wrong[at + i] ^= 1;
+        eq(M.sniffMime(wrong), null, `${mime} byte ${at + i} wrong:`);
+      }
+    }
+    eq(M.sniffMime(whole.slice(0, shortest)), mime, `${mime} at its shortest:`);
+    eq(M.sniffMime(whole.slice(0, shortest - 1)), null, `${mime} one byte short:`);
+  }
+});
+
+await t("route: a PNG signature with nothing after it is refused and nothing is stored", async () => {
+  const before = await mediaCount();
+  const r = await postDirect({ file: new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "a.png", { type: "image/png" }) });
+  eq(r.status, 422);
+  includes(r.json.errors.join(), "doesn't match");
+  eq(await mediaCount(), before);
+});
+
+await t("route: the stored file name is cleaned, and a useless one becomes 'upload'", async () => {
+  const stem = `name-${seed}`;
+  const r = await postDirect({ file: new File([bytesOf("image/jpeg", 64)], `${stem} (final)!$/../x.jpg`, { type: "image/jpeg" }) });
+  eq(r.status, 200);
+  eq((await stored(r.json.media.id)).filename, `${stem} final..x.jpg`);
+  eq(M.validateUpload({ filename: "!!!", mime: "image/jpeg", bytes: bytesOf("image/jpeg", 64) }).filename, "upload", "nothing left:");
+  eq(M.validateUpload({ filename: "a".repeat(200), mime: "image/jpeg", bytes: bytesOf("image/jpeg", 64) }).filename.length, 120, "cut short:");
+});
+
+await t("route: a bad preview never costs the photo", async () => {
+  const r = await postDirect({
+    file: photoFile("keeps.jpg", 2048),
+    thumb: new File([bytesOf("image/png", 64)], "thumb.webp", { type: "image/webp" }),
+    thumbWidth: "480",
+    thumbHeight: "360",
+  });
+  eq(r.status, 200);
+  eq(r.json.thumb, null);
+  eq((await stored(r.json.media.id)).filename, "keeps.jpg");
+  eq(await thumbOf(r.json.media.id), undefined, "no preview row:");
+});
+
 await t("route: a raw 5MB photo sent past the browser step is still refused", async () => {
   const r = await postDirect({ file: photoFile("raw.jpg", 5_000_000) });
   eq(r.status, 422);
@@ -241,7 +294,8 @@ await t("route: an SVG uploaded through the shared path is sanitized before it i
 });
 
 // The rest of the sanitizer and sniffer, through the real route. These compare the
-// exact stored bytes, so any weakening of lib/media.js shows up here.
+// exact stored bytes for the cases listed. That catches a weakening of those cases,
+// not every possible change to lib/media.js.
 const SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg">';
 const svgThroughRoute = async (inner) => {
   const r = await postDirect({ file: new File([`${SVG_OPEN}${inner}</svg>`], "logo.svg", { type: "image/svg+xml" }) });
@@ -291,6 +345,26 @@ await t("route: files that only look like an image are refused and nothing is st
   }
 });
 
+await t("route: an SVG is measured and sniffed after cleaning, not before", async () => {
+  const limit = M.MEDIA_MIME["image/svg+xml"].max;
+  const send = (text) => postDirect({ file: new File([text], "logo.svg", { type: "image/svg+xml" }) });
+  const clean = `${SVG_OPEN}<rect width="${++seed}"/></svg>`;
+  const fat = await send(`${SVG_OPEN}<script>${"x".repeat(limit)}</script><rect width="${seed}"/></svg>`);
+  eq(fat.status, 200, "over the limit only before cleaning:");
+  eq(await storedText(fat.json.media.id), clean);
+  const big = await send(`${SVG_OPEN}<desc>${"x".repeat(limit)}</desc></svg>`);
+  eq(big.status, 422, "still over the limit after cleaning:");
+  includes(big.json.errors.join(), "the limit for svg");
+  const late = await send(`<script>${"x".repeat(2000)}</script>${SVG_OPEN}<circle r="${++seed}"/></svg>`);
+  eq(late.status, 200, "past the sniff window only before cleaning:");
+  eq(await storedText(late.json.media.id), `${SVG_OPEN}<circle r="${seed}"/></svg>`);
+  const before = await mediaCount();
+  const hollow = await send("<script><svg></script>just some text");
+  eq(hollow.status, 422, "an SVG only before cleaning:");
+  includes(hollow.json.errors.join(), "doesn't match");
+  eq(await mediaCount(), before, "nothing stored:");
+});
+
 await t("route: read-only support is still refused, in plain words", async () => {
   const r = await U.uploadImage(photoFile("a.jpg", 2048), { codec: fakeCodec({ width: 800, height: 600 }), send: realSend(supportTok) });
   eq(r.ok, false);
@@ -316,18 +390,49 @@ await t("classify: what happens to each kind of file", () => {
     ["application/pdf", "a.pdf", "refuse"],
     ["text/plain", "photo.jpg", "refuse"], // the browser's word beats the name
     ["video/mp4", "a.mp4", "refuse"],
-    ["", "notes.txt", "refuse"],
-    ["", "noextension", "refuse"],
   ];
   for (const [type, name, action] of cases) eq(P.classifyUpload({ type, name }).action, action, `${type} ${name}:`);
 });
 
 await t("classify: an empty type falls back to the file name; HEIC is named as HEIC", () => {
+  const byName = { jpg: "image/jpeg", JPEG: "image/jpeg", JFIF: "image/jpeg", png: "image/png", apng: "image/png", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml", heic: "image/heic", heif: "image/heif", avif: "image/avif" };
+  for (const [ext, mime] of Object.entries(byName)) {
+    eq(P.classifyUpload({ type: "", name: `a.${ext}` }).mime, mime, `${ext}:`);
+    eq(P.classifyUpload({ type: "application/octet-stream", name: `a.${ext}` }).mime, mime, `${ext} octet-stream:`);
+  }
   eq(P.classifyUpload({ type: "", name: "IMG_1.JPG" }), { action: "resize", mime: "image/jpeg" });
   eq(P.classifyUpload({ type: "application/octet-stream", name: "a.png" }), { action: "resize", mime: "image/png" });
   eq(P.classifyUpload({ type: "", name: "IMG_2.heic" }), { action: "convert", mime: "image/heic", heic: true });
   eq(P.classifyUpload({ type: "image/heif", name: "x" }).heic, true);
   eq(P.classifyUpload({ type: "image/avif", name: "x" }).heic, false);
+});
+
+await t("classify: older type names count as the standard ones", () => {
+  for (const type of ["image/jpg", "image/pjpeg", "IMAGE/JPG"]) eq(P.classifyUpload({ type, name: "a" }), { action: "resize", mime: "image/jpeg" }, `${type}:`);
+  for (const type of ["image/x-png", "image/apng"]) eq(P.classifyUpload({ type, name: "a" }), { action: "resize", mime: "image/png" }, `${type}:`);
+});
+
+await t("classify: no type and no name we know is left for the file itself to answer", () => {
+  for (const name of ["camera_upload", "notes.txt", ""]) eq(P.classifyUpload({ type: "", name }), { action: "convert", mime: "", heic: false, unnamed: true }, `"${name}":`);
+});
+
+await t("sniffImage agrees with the server's check on every case the server test uses", () => {
+  const whole = (values, at = 0) => {
+    const b = new Uint8Array(16);
+    b.set(values, at);
+    return b;
+  };
+  const samples = [...Object.keys(MAGIC).map((mime) => bytesOf(mime, 16)), new Uint8Array(16), new Uint8Array(0)];
+  for (const b of [whole([0x89, 0x50, 0x4e, 0x47]), whole([0xff, 0xd8, 0xff]), whole([0x47, 0x49, 0x46, 0x38]), bytesOf("image/webp", 16)]) {
+    for (const end of [16, 12, 11, 8, 7, 6, 5, 4, 3, 2]) samples.push(b.slice(0, end));
+    for (let i = 0; i < 12; i++) {
+      const wrong = b.slice();
+      wrong[i] ^= 1;
+      samples.push(wrong);
+    }
+  }
+  for (const b of samples) eq(P.sniffImage(b), M.sniffMime(b), `[${[...b.slice(0, 12)]}]:`);
+  eq(P.sniffImage(new TextEncoder().encode("<svg></svg>")), null, "svg isn't its job:");
 });
 
 await t("when to skip: only small in bytes AND in size", () => {
@@ -356,6 +461,7 @@ await t("steps: a photo starts at 1920 and holds it through every quality step b
   eq(steps.slice(0, 5).map((s) => s.quality), [0.85, 0.78, 0.7, 0.62, 0.55]);
   ok(edges.every((e, i) => i === 0 || e <= edges[i - 1]), "never grows again:");
   eq(Math.min(...edges), 1280, "lowest photo size:");
+  eq(steps.slice(5).map((s) => [s.width, s.quality]), [[1600, 0.7], [1600, 0.6], [1280, 0.7], [1280, 0.6]], "the last resorts:");
 });
 
 await t("steps: a transparent image never gets a JPEG step", () => {
@@ -364,6 +470,7 @@ await t("steps: a transparent image never gets a JPEG step", () => {
   eq(steps[0].mime, "image/webp");
   eq(steps[steps.length - 1], { mime: "image/png", width: 800, height: 800 });
   ok(steps.filter((s) => s.mime === "image/png").every((s) => !("quality" in s)), "png has no quality:");
+  eq(steps.filter((s) => s.mime === "image/png").map((s) => s.width), [1920, 1600, 1280, 1024, 800], "every PNG size:");
 });
 
 await t("steps: a small source is never upscaled and repeats nothing", () => {
@@ -473,6 +580,28 @@ await t("over the limit but already small: not called smaller unless it really s
   eq([same.width, same.height, same.reduced], [1000, 800, false], "kept its size:");
   const shrunk = await U.prepareImage(photoFile("logo.png", 2_000_000, "image/png"), fakeCodec({ width: 1000, height: 1000, alpha: true, writesWebp: false }));
   eq([shrunk.width, shrunk.reduced], [800, true], "fell below its own size:");
+});
+
+await t("an encode landing exactly on the limit is used, not retried", async () => {
+  const codec = fakeCodec({ encodedSize: LIMIT });
+  const r = await U.uploadImage(photoFile("edge.jpg", 5_000_000), { codec, send: realSend() });
+  ok(r.ok, `uploaded (${r.message}):`);
+  eq((await stored(r.media.id)).size, LIMIT);
+  eq(codec.calls.encode.filter((s) => s.quality !== 0.82).length, 1, "first step accepted:");
+});
+
+await t("what goes up the wire: the file, its size, and a named preview with its size", async () => {
+  let form;
+  const r = await U.uploadImage(photoFile("a.jpg", 5_000_000), {
+    codec: fakeCodec(),
+    send: async (f) => {
+      form = f;
+      return { status: 200, json: { ok: true, media: {} } };
+    },
+  });
+  ok(r.ok);
+  eq([form.get("file").name, form.get("width"), form.get("height")], ["a.jpg", "1920", "1440"]);
+  eq([form.get("thumb").name, form.get("thumbWidth"), form.get("thumbHeight")], ["thumb.webp", "480", "360"]);
 });
 
 await t("an image that can't fit gets a plain message and never reaches the server", async () => {
@@ -652,15 +781,161 @@ await t("a browser with no way to try opening images: the server still decides, 
   eq(big.message, P.uploadMessage.unreadable("big.jpg"), "can't be made smaller, so not sent:");
 });
 
-await t("a real image with the wrong name: the server's magic-byte check refuses it, in plain words", async () => {
+await t("a real image with the wrong name, small in bytes and size: the server's magic-byte check refuses it, in plain words", async () => {
+  const before = await mediaCount();
   const r = await U.uploadImage(new File([bytesOf("image/png", 2048)], "photo.jpg", { type: "image/jpeg" }), { codec: fakeCodec({ width: 800, height: 600 }), send: realSend() });
   eq(r.message, P.uploadMessage.notWhatItSays("photo.jpg"));
+  eq(await mediaCount(), before);
+});
+
+// The two ways a wrongly named file ends up re-encoded: over the bytes, and over 1920.
+const OVERSIZED = [
+  { label: "over the limit", size: 4_000_000, width: 2600, height: 2600 },
+  { label: "over the limit, small in pixels", size: 4_000_000, width: 1000, height: 800 },
+  { label: "within the limit, over 1920", size: 900_000, width: 2600, height: 2600 },
+];
+
+await t("wrong name, see-through picture: the bytes decide, so it stays see-through and never touches JPEG", async () => {
+  for (const { label, size, width, height } of OVERSIZED) {
+    for (const [from, type, name] of [["image/png", "image/jpeg", "cutout.jpg"], ["image/webp", "image/jpeg", "cutout.jpeg"], ["image/png", "", "cutout.jpg"]]) {
+      const codec = fakeCodec({ alpha: true, width, height, detail: 0.2 });
+      const r = await U.uploadImage(new File([bytesOf(from, size)], name, { type }), { codec, send: realSend() });
+      ok(r.ok, `${label} ${from} (${r.message}):`);
+      eq(codec.calls.hasAlpha, 1, `${label} ${from} looked at:`);
+      eq((await stored(r.media.id)).mime, "image/webp", `${label} ${from}:`);
+      ok(!codec.calls.encode.some((s) => s.mime === "image/jpeg"), `${label} ${from} no jpeg encode:`);
+    }
+    const safari = fakeCodec({ alpha: true, width, height, detail: 0.05, writesWebp: false });
+    const r = await U.uploadImage(new File([bytesOf("image/png", size)], "cutout.jpg", { type: "image/jpeg" }), { codec: safari, send: realSend() });
+    ok(r.ok, `${label} Safari (${r.message}):`);
+    eq((await stored(r.media.id)).mime, "image/png", `${label} Safari:`);
+    ok(!safari.calls.encode.some((s) => s.mime === "image/jpeg"), `${label} Safari no jpeg encode:`);
+  }
+});
+
+await t("wrong name, solid picture: still uploads as a JPEG, as it did before", async () => {
+  for (const { label, size, width, height } of OVERSIZED) {
+    const codec = fakeCodec({ width, height, detail: 0.2 });
+    const r = await U.uploadImage(new File([bytesOf("image/png", size)], "shot.jpg", { type: "image/jpeg" }), { codec, send: realSend() });
+    ok(r.ok, `${label} (${r.message}):`);
+    eq(codec.calls.hasAlpha, 1, `${label} looked at:`);
+    eq((await stored(r.media.id)).mime, "image/jpeg", `${label}:`);
+  }
+});
+
+await t("wrong name, moving picture or GIF: refused in plain words whatever its size, never made still", async () => {
+  const movers = [
+    ["animated PNG called .jpg", (size) => padded(ANIMATED_PNG, size), "anim.jpg", "image/jpeg"],
+    ["animated WebP called .jpg", (size) => padded(ANIMATED_WEBP, size), "anim.jpg", "image/jpeg"],
+    ["animated WebP called .png", (size) => padded(ANIMATED_WEBP, size), "anim.png", "image/png"],
+    ["animated PNG called .webp", (size) => padded(ANIMATED_PNG, size), "anim.webp", "image/webp"],
+    ["GIF called .jpg", (size) => bytesOf("image/gif", size), "party.jpg", "image/jpeg"],
+    ["GIF called .png", (size) => bytesOf("image/gif", size), "party.png", "image/png"],
+    ["GIF with no type but a .jpg name", (size) => bytesOf("image/gif", size), "party.jpg", ""],
+    ["animated PNG called .avif", (size) => padded(ANIMATED_PNG, size), "anim.avif", "image/avif"],
+    ["GIF called .heic", (size) => bytesOf("image/gif", size), "party.heic", "image/heic"],
+  ];
+  for (const { label, size, width, height } of OVERSIZED) {
+    for (const [what, bytes, name, type] of movers) {
+      const codec = fakeCodec({ width, height });
+      const r = await U.uploadImage(new File([bytes(size)], name, { type }), { codec, send: neverSend });
+      eq(r.message, P.uploadMessage.notWhatItSays(name), `${what}, ${label}:`);
+      eq(codec.calls.encode, [], `${what}, ${label} nothing encoded:`);
+      eq(codec.calls.closed, 1, `${what}, ${label} decoded image released:`);
+    }
+  }
+});
+
+await t("wrong name, JPEG bytes: no transparency check, because JPEG can't be transparent", async () => {
+  const codec = fakeCodec({ alpha: true, width: 2600, height: 2600 });
+  const r = await U.prepareImage(new File([bytesOf("image/jpeg", 4_000_000)], "photo.png", { type: "image/png" }), codec);
+  eq(codec.calls.hasAlpha, 0);
+  eq(r.file.type, "image/jpeg");
+});
+
+await t("bytes we don't recognise under a photo's name get the transparency check too", async () => {
+  const codec = fakeCodec({ alpha: true, width: 2600, height: 2600, detail: 0.2 });
+  const r = await U.prepareImage(new File([new Uint8Array(4_000_000)], "really-avif.jpg", { type: "image/jpeg" }), codec);
+  eq(codec.calls.hasAlpha, 1);
+  eq(r.file.type, "image/webp");
+});
+
+await t("older type names: a small real JPEG or PNG goes up with its bytes unchanged", async () => {
+  for (const [type, from, name] of [["image/jpg", "image/jpeg", "a1.jpg"], ["image/pjpeg", "image/jpeg", "a2.jpg"], ["image/x-png", "image/png", "a3.png"]]) {
+    const body = bytesOf(from, 300_000);
+    const codec = fakeCodec({ width: 800, height: 600 });
+    const r = await U.uploadImage(new File([body], name, { type }), { codec, send: realSend() });
+    ok(r.ok, `${type} (${r.message}):`);
+    const row = await stored(r.media.id);
+    eq([row.mime, row.size, row.filename], [from, 300_000, name], `${type}:`);
+    eq((await inT(() => M.getMediaFile(r.media.id))).data.toString(), body.toString(), `${type} same bytes:`);
+    eq(codec.calls.hasAlpha, 0, `${type} never re-encoded:`);
+    eq(codec.calls.encode.map((s) => s.quality), [0.82], `${type} only the preview:`);
+  }
+});
+
+await t("an animated PNG the browser calls image/apng, or with no type and a .apng name, keeps moving", async () => {
+  for (const type of ["image/apng", ""]) {
+    const codec = fakeCodec({ width: 2400, height: 1200 });
+    const r = await U.uploadImage(new File([padded(ANIMATED_PNG, 16_300)], "anim.apng", { type }), { codec, send: realSend() });
+    ok(r.ok, `type "${type}" (${r.message}):`);
+    const row = await stored(r.media.id);
+    eq([row.mime, row.filename, row.size, row.width], ["image/png", "anim.apng", 16_300, 2400], `type "${type}":`);
+    eq(codec.calls.encode.map((s) => s.quality), [0.82], `type "${type}" only the preview:`);
+    const big = await U.uploadImage(new File([padded(ANIMATED_PNG, LIMIT + 1)], "anim.apng", { type }), { codec: fakeCodec(), send: neverSend });
+    eq(big.message, P.uploadMessage.animatedTooBig("anim.apng"), `type "${type}" too big:`);
+  }
 });
 
 await t("an empty browser type: the inferred type travels with the file so the server accepts it", async () => {
-  const r = await U.uploadImage(new File([bytesOf("image/jpeg", 2048)], "IMG_3.JPG", { type: "" }), { codec: fakeCodec({ width: 800, height: 600 }), send: realSend() });
-  ok(r.ok, `uploaded (${r.message}):`);
-  eq((await stored(r.media.id)).mime, "image/jpeg");
+  for (const name of ["IMG_3.JPG", "IMG_4.jpeg", "IMG_5.JFIF"]) {
+    const r = await U.uploadImage(new File([bytesOf("image/jpeg", 2048)], name, { type: "" }), { codec: fakeCodec({ width: 800, height: 600 }), send: realSend() });
+    ok(r.ok, `${name} (${r.message}):`);
+    eq((await stored(r.media.id)).mime, "image/jpeg", `${name}:`);
+  }
+});
+
+await t("no type and no useful name: a real image is told by its bytes and uploads", async () => {
+  for (const [mime, name] of [["image/jpeg", "camera_upload"], ["image/png", "export"], ["image/webp", "picture.dat"], ["image/gif", "party"]]) {
+    const r = await U.uploadImage(new File([bytesOf(mime, 2048)], name, { type: "" }), { codec: fakeCodec({ width: 800, height: 600 }), send: realSend() });
+    ok(r.ok, `${name} (${r.message}):`);
+    eq((await stored(r.media.id)).mime, mime, `${name}:`);
+  }
+});
+
+await t("no type and no useful name: a damaged photo isn't called 'not an image' just for its name", async () => {
+  const r = await U.uploadImage(new File([bytesOf("image/jpeg", 2048)], "camera_upload", { type: "" }), { codec: fakeCodec({ undecodable: true }), send: neverSend });
+  eq(r.message, P.uploadMessage.unreadable("camera_upload"));
+});
+
+await t("no type and bytes we don't know: if it opens it becomes a JPEG; if not, it isn't an image", async () => {
+  const opens = await U.uploadImage(new File([new Uint8Array(4096)], "camera_upload", { type: "" }), { codec: fakeCodec({ width: 800, height: 600 }), send: realSend() });
+  ok(opens.ok, `uploaded (${opens.message}):`);
+  eq([opens.media.filename, opens.media.mime], ["camera_upload.jpg", "image/jpeg"]);
+  for (const name of ["notes.txt", "noextension", "invoice.pdf"]) {
+    const r = await U.uploadImage(new File(["some words"], name, { type: "" }), { codec: fakeCodec({ undecodable: true }), send: neverSend });
+    eq(r.message, P.uploadMessage.notImage(name), `${name}:`);
+  }
+  const noDecoder = await U.uploadImage(new File(["some words"], "noextension", { type: "" }), { codec: fakeCodec({ cannotTry: true }), send: neverSend });
+  eq(noDecoder.message, P.uploadMessage.notImage("noextension"), "no way to try:");
+});
+
+await t("an AVIF with no browser type follows the same path as one with a type", async () => {
+  const can = await U.prepareImage(new File([new Uint8Array(4096)], "a.avif", { type: "" }), fakeCodec({ width: 800, height: 600 }));
+  eq([can.file.type, can.file.name], ["image/jpeg", "a.jpg"]);
+  const cannot = await U.prepareImage(new File([new Uint8Array(4096)], "a.avif", { type: "" }), fakeCodec({ undecodable: true }));
+  eq(cannot.message, P.uploadMessage.unreadable("a.avif"));
+});
+
+await t("an empty file says it's empty, not damaged, and nothing runs", async () => {
+  for (const [name, type] of [["empty.jpg", "image/jpeg"], ["empty.png", "image/png"], ["empty.webp", "image/webp"], ["empty.gif", "image/gif"], ["empty.svg", "image/svg+xml"], ["empty.heic", "image/heic"], ["empty.jpg", ""], ["empty", ""]]) {
+    const codec = fakeCodec({ undecodable: true });
+    const r = await U.uploadImage(new File([], name, { type }), { codec, send: neverSend });
+    eq(r.message, P.uploadMessage.empty(name), `${name} "${type}":`);
+    eq(codec.calls.decode, 0, `${name} "${type}" not opened:`);
+  }
+  const pdf = await U.uploadImage(new File([], "empty.pdf", { type: "application/pdf" }), { codec: fakeCodec(), send: neverSend });
+  eq(pdf.message, P.uploadMessage.notImage("empty.pdf"), "still not an image:");
 });
 
 await t("a canvas that fails or runs out of memory: smaller sizes are tried, then plain words", async () => {
@@ -839,14 +1114,20 @@ await t("xhrSend posts to the route, reports percent, and survives bad answers",
 console.log("— one upload path");
 
 const source = (rel) => readFile(join(root, rel), "utf8");
+// Source with its comments gone, so a commented-out line can't pass a scan.
+const code = async (rel) =>
+  (await source(rel))
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
 
 await t("MediaAdmin and MediaPicker both upload through uploadImage and hold no copy of their own", async () => {
   for (const rel of ["components/admin/MediaAdmin.js", "components/admin/cms/MediaPicker.js"]) {
-    const s = await source(rel);
+    const s = await code(rel);
     includes(s, 'import { uploadImage } from "@/lib/media-upload"', `${rel}:`);
     includes(s, "uploadImage(file, { onProgress: setUploading })", `${rel}:`);
     includes(s, "accept={UPLOAD_ACCEPT}", `${rel}:`);
-    includes(s, "<MediaUploadStatus progress={uploading} />", `${rel}:`);
+    ok(/^\s*<MediaUploadStatus progress=\{uploading\} \/>$/m.test(s), `${rel} shows the progress banner on a line of its own, with no condition around it:`);
     for (const bad of ["createImageBitmap", "FormData", 'method: "POST"', "toBlob", "image/png,image/jpeg"]) ok(!s.includes(bad), `${rel} still has ${bad}:`);
   }
 });
@@ -854,7 +1135,7 @@ await t("MediaAdmin and MediaPicker both upload through uploadImage and hold no 
 // Components are JSX, which plain node can't import, but these handlers are plain
 // JS. So take their real source text and run it with stand-ins for the React parts.
 async function sliceOf(rel, from, to) {
-  const s = await source(rel);
+  const s = await code(rel);
   const start = s.indexOf(from);
   const end = s.indexOf(to, start);
   ok(start >= 0 && end > start, `${rel} no longer has ${from}:`);
@@ -885,17 +1166,26 @@ async function libraryUpload({ result, fetch = async () => ({ json: async () => 
   return state;
 }
 
-async function pickerUpload({ result }) {
-  const state = { uploading: "in flight", error: "old error", selected: [], loads: 0, toasts: [], input: { value: "C:\\fakepath\\IMG_0042.jpg" } };
+async function pickerUpload({ result, closeDuringUpload = false, closeDuringLoad = false }) {
+  const state = { uploading: "in flight", error: "old error", selected: [], loads: 0, toasts: [], errorToasts: [], input: { value: "C:\\fakepath\\IMG_0042.jpg" } };
   const body = await sliceOf("components/admin/cms/MediaPicker.js", "async function upload(file)", "const filtered = useMemo");
-  const make = new Function("uploadImage", "setUploading", "setUploadErr", "load", "onSelect", "toast", "fileRef", `${body}\nreturn upload;`);
+  const make = new Function("uploadImage", "uploadMessage", "session", "setUploading", "setUploadErr", "load", "onSelect", "toast", "fileRef", `${body}\nreturn upload;`);
+  const session = { current: 1 };
   const upload = make(
-    async () => result,
+    async () => {
+      if (closeDuringUpload) session.current++;
+      return result;
+    },
+    P.uploadMessage,
+    session,
     (v) => (state.uploading = v),
     (v) => (state.error = v),
-    async () => state.loads++,
+    async () => {
+      state.loads++;
+      if (closeDuringLoad) session.current++;
+    },
     (v) => state.selected.push(v),
-    { info: (m) => state.toasts.push(m) },
+    { info: (m) => state.toasts.push(m), error: (m) => state.errorToasts.push(m) },
     { current: state.input }
   );
   await upload({ name: "IMG_0042.jpg" });
@@ -933,6 +1223,46 @@ await t("picker, uploaded: the new image is picked, and a shrunk one says so", a
   eq(smaller.selected, [media]);
 });
 
+await t("picker closed during an upload: nothing is placed, the library is updated, and the founder is told", async () => {
+  const media = { url: "/api/media/med_1", alt: "Hero", id: "med_1" };
+  const placedWords = [P.uploadMessage.notPlaced("IMG_0042.jpg")];
+  for (const when of ["closeDuringUpload", "closeDuringLoad"]) {
+    const s = await pickerUpload({ result: { ok: true, media, notice: null }, [when]: true });
+    eq([s.selected, s.loads, s.toasts, s.uploading], [[], 1, placedWords, null], `${when}:`);
+  }
+  const smaller = await pickerUpload({ result: { ok: true, media, notice: "made smaller" }, closeDuringUpload: true });
+  eq(smaller.toasts, ["made smaller", ...placedWords], "still told it shrank:");
+});
+
+await t("picker closed during an upload that fails: a toast says so, not a banner in a closed dialog", async () => {
+  const s = await pickerUpload({ result: FAILED_UPLOAD, closeDuringUpload: true });
+  eq([s.errorToasts, s.error, s.selected, s.uploading], [[FAILED_UPLOAD.message], null, [], null]);
+});
+
+await t("picker: every open and every close counts, so reopening for another spot doesn't catch an old upload", async () => {
+  const body = await sliceOf("components/admin/cms/MediaPicker.js", "useEffect(() => {\n    session.current++", "async function upload(file)");
+  includes(body, "}, [open]);");
+  const session = { current: 0 };
+  const opened = [];
+  const run = new Function("useEffect", "session", "open", "setQ", "setItems", "load", body);
+  const effect = (open) => run((fn) => fn(), session, open, () => opened.push("q"), () => opened.push("items"), () => opened.push("load"));
+  effect(true);
+  const started = session.current;
+  effect(false);
+  ok(session.current !== started, "closing moved it:");
+  const closed = session.current;
+  effect(true);
+  ok(session.current !== closed && session.current !== started, "reopening moved it again:");
+  eq(opened.length, 6, "each open still resets and loads:");
+});
+
+await t("the progress banner draws nothing while idle, and something while uploading", async () => {
+  const body = await sliceOf("components/admin/MediaUploadStatus.js", "if (!progress)", "return (\n");
+  const status = new Function("progress", `${body}\nreturn "banner";`);
+  eq(status(null), null, "idle:");
+  eq(status({ name: "a.jpg", stage: "preparing" }), "banner", "uploading:");
+});
+
 await t("picker grid shows the preview when there is one", async () => {
   const body = await sliceOf("components/admin/cms/MediaPicker.js", "const thumbOf =", "return (\n    <Dialog");
   const thumbOf = new Function(`${body}\nreturn thumbOf;`)();
@@ -941,13 +1271,17 @@ await t("picker grid shows the preview when there is one", async () => {
 });
 
 await t("the JSX shows what the handlers set", async () => {
-  const admin = await source("components/admin/MediaAdmin.js");
+  const admin = await code("components/admin/MediaAdmin.js");
   includes(admin, '{error && <Banner tone="danger">{error}</Banner>}');
   includes(admin, "onChange={(e) => e.target.files?.length && upload([...e.target.files])}");
-  const picker = await source("components/admin/cms/MediaPicker.js");
+  includes(admin, "disabled={!!uploading}", "library input waits for the upload:");
+  const picker = await code("components/admin/cms/MediaPicker.js");
   includes(picker, '{uploadErr && <Banner tone="danger">{uploadErr}</Banner>}');
   includes(picker, "onChange={(e) => upload(e.target.files?.[0])}");
-  includes(await source("components/admin/MediaUploadStatus.js"), "{progressLabel(progress)}");
+  includes(picker, "busy={!!uploading}", "picker button waits for the upload:");
+  const input = await sliceOf("components/admin/cms/MediaPicker.js", "<input\n", "/>");
+  ok(!input.includes("disabled"), "the picker's hidden input stays usable, the button opens it:");
+  includes(await code("components/admin/MediaUploadStatus.js"), "{progressLabel(progress)}");
 });
 
 await t("nothing else in the console posts files to the media route", async () => {

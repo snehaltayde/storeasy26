@@ -11,7 +11,7 @@ import { cx } from "@/components/console/cx";
 import { useToast } from "@/components/console/Toast";
 import { MediaUploadStatus } from "@/components/admin/MediaUploadStatus";
 import { uploadImage } from "@/lib/media-upload";
-import { UPLOAD_ACCEPT } from "@/lib/media-upload-plan";
+import { UPLOAD_ACCEPT, uploadMessage } from "@/lib/media-upload-plan";
 
 // THE media picker (S52): every place content takes an image opens this
 // dialog instead of asking for a pasted URL. Lists the library with search,
@@ -23,6 +23,7 @@ export function MediaPicker({ open, onClose, onSelect }) {
   const [uploading, setUploading] = useState(null); // progress of the file in flight
   const [uploadErr, setUploadErr] = useState(null);
   const fileRef = useRef(null);
+  const session = useRef(0); // moves on every open and close, so an upload can tell its dialog went away
   const toast = useToast();
 
   async function load() {
@@ -37,6 +38,7 @@ export function MediaPicker({ open, onClose, onSelect }) {
     }
   }
   useEffect(() => {
+    session.current++;
     if (open) {
       setQ("");
       setItems(null);
@@ -46,13 +48,19 @@ export function MediaPicker({ open, onClose, onSelect }) {
 
   async function upload(file) {
     if (!file) return;
+    const started = session.current;
     setUploadErr(null);
     const r = await uploadImage(file, { onProgress: setUploading });
     if (fileRef.current) fileRef.current.value = "";
     if (r.ok) {
       await load();
       if (r.notice) toast.info(r.notice); // a toast, because picking closes this dialog
-      if (r.media?.url) onSelect?.({ url: r.media.url, alt: r.media.alt || "", id: r.media.id });
+      // Closed since it started: the founder changed their mind, and onSelect belongs
+      // to the spot they opened it for, so the image stays in the library, unplaced.
+      if (session.current !== started) toast.info(uploadMessage.notPlaced(file.name));
+      else if (r.media?.url) onSelect?.({ url: r.media.url, alt: r.media.alt || "", id: r.media.id });
+    } else if (session.current !== started) {
+      toast.error(r.message); // a banner would sit in a closed dialog
     } else {
       setUploadErr(r.message);
     }
