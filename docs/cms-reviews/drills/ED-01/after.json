@@ -1,0 +1,5833 @@
+{
+  "base": "http://localhost:3037",
+  "at": "2026-11-03T08:54:13.117Z",
+  "pages": {
+    "home": {
+      "768": {
+        "Mobile": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 768,
+            "h": 755,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 768,
+            "h": 181,
+            "shown": true
+          },
+          "frame": {
+            "x": 197,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 197,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 206,
+          "shellBottom": 1106,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 768,
+            "h": 755,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 768,
+            "h": 181,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 752,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 752,
+          "frameBox": {
+            "x": 8,
+            "w": 752,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, shown at 98% to fit",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 206,
+          "shellBottom": 1106,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 768,
+            "h": 755,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 768,
+            "h": 181,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 752,
+            "h": 674,
+            "shown": true
+          },
+          "seen": 752,
+          "frameBox": {
+            "x": 8,
+            "w": 752,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 59% to fit",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 206,
+          "shellBottom": 1106,
+          "viewH": 900
+        }
+      },
+      "900": {
+        "Mobile": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 900,
+            "h": 755,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 900,
+            "h": 181,
+            "shown": true
+          },
+          "frame": {
+            "x": 263,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 263,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 206,
+          "shellBottom": 1106,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 900,
+            "h": 755,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 900,
+            "h": 181,
+            "shown": true
+          },
+          "frame": {
+            "x": 66,
+            "w": 768,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 66,
+            "w": 768,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 206,
+          "shellBottom": 1106,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 900,
+            "h": 755,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 900,
+            "h": 181,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 884,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 884,
+          "frameBox": {
+            "x": 8,
+            "w": 884,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 69% to fit",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 206,
+          "shellBottom": 1106,
+          "viewH": 900
+        }
+      },
+      "1024": {
+        "Mobile": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 736,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 736,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 181,
+            "w": 375,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 181,
+            "w": 375,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 736,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 736,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 720,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 720,
+          "frameBox": {
+            "x": 8,
+            "w": 720,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, shown at 94% to fit",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 736,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 736,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 720,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 720,
+          "frameBox": {
+            "x": 8,
+            "w": 720,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 56% to fit",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1100": {
+        "Mobile": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 812,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 812,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 219,
+            "w": 375,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 219,
+            "w": 375,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 812,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 812,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 22,
+            "w": 768,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 22,
+            "w": 768,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 812,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 812,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 796,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 796,
+          "frameBox": {
+            "x": 8,
+            "w": 796,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 62% to fit",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1279": {
+        "Mobile": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 991,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 991,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 308,
+            "w": 375,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 308,
+            "w": 375,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 991,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 991,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 112,
+            "w": 768,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 112,
+            "w": 768,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": {
+            "x": 0,
+            "w": 0,
+            "h": 0,
+            "shown": false
+          },
+          "preview": {
+            "x": 0,
+            "w": 991,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 991,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 975,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 975,
+          "frameBox": {
+            "x": 8,
+            "w": 975,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 76% to fit",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": true,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1280": {
+        "Mobile": {
+          "tree": {
+            "x": 0,
+            "w": 224,
+            "h": 767,
+            "shown": true
+          },
+          "preview": {
+            "x": 224,
+            "w": 768,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 992,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 421,
+            "w": 375,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 421,
+            "w": 375,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": {
+            "x": 0,
+            "w": 224,
+            "h": 767,
+            "shown": true
+          },
+          "preview": {
+            "x": 224,
+            "w": 768,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 992,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 232,
+            "w": 752,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 752,
+          "frameBox": {
+            "x": 232,
+            "w": 752,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, shown at 98% to fit",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": {
+            "x": 0,
+            "w": 224,
+            "h": 767,
+            "shown": true
+          },
+          "preview": {
+            "x": 224,
+            "w": 768,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 992,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 232,
+            "w": 752,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 752,
+          "frameBox": {
+            "x": 232,
+            "w": 752,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 59% to fit",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1440": {
+        "Mobile": {
+          "tree": {
+            "x": 0,
+            "w": 224,
+            "h": 767,
+            "shown": true
+          },
+          "preview": {
+            "x": 224,
+            "w": 928,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 1152,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 501,
+            "w": 375,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 501,
+            "w": 375,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": {
+            "x": 0,
+            "w": 224,
+            "h": 767,
+            "shown": true
+          },
+          "preview": {
+            "x": 224,
+            "w": 928,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 1152,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 304,
+            "w": 768,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 304,
+            "w": 768,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": {
+            "x": 0,
+            "w": 224,
+            "h": 767,
+            "shown": true
+          },
+          "preview": {
+            "x": 224,
+            "w": 928,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 1152,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 232,
+            "w": 912,
+            "h": 687,
+            "shown": true
+          },
+          "seen": 912,
+          "frameBox": {
+            "x": 232,
+            "w": 912,
+            "h": 687,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 71% to fit",
+          "consoleNav": null,
+          "treeToggle": true,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      }
+    },
+    "product": {
+      "768": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 768,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 768,
+            "h": 671,
+            "shown": true
+          },
+          "frame": {
+            "x": 197,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 197,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 718,
+          "shellBottom": 1618,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 768,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 768,
+            "h": 671,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 752,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 752,
+          "frameBox": {
+            "x": 8,
+            "w": 752,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, shown at 98% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 718,
+          "shellBottom": 1618,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 768,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 768,
+            "h": 671,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 752,
+            "h": 674,
+            "shown": true
+          },
+          "seen": 752,
+          "frameBox": {
+            "x": 8,
+            "w": 752,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 59% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 718,
+          "shellBottom": 1618,
+          "viewH": 900
+        }
+      },
+      "900": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 900,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 900,
+            "h": 655,
+            "shown": true
+          },
+          "frame": {
+            "x": 263,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 263,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 664,
+          "shellBottom": 1564,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 900,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 900,
+            "h": 655,
+            "shown": true
+          },
+          "frame": {
+            "x": 66,
+            "w": 768,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 66,
+            "w": 768,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 664,
+          "shellBottom": 1564,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 900,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 900,
+            "h": 655,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 884,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 884,
+          "frameBox": {
+            "x": 8,
+            "w": 884,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 69% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 664,
+          "shellBottom": 1564,
+          "viewH": 900
+        }
+      },
+      "1024": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 736,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 736,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 181,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 181,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 736,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 736,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 720,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 720,
+          "frameBox": {
+            "x": 8,
+            "w": 720,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, shown at 94% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 736,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 736,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 720,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 720,
+          "frameBox": {
+            "x": 8,
+            "w": 720,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 56% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1100": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 812,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 812,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 219,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 219,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 812,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 812,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 22,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 22,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 812,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 812,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 796,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 796,
+          "frameBox": {
+            "x": 8,
+            "w": 796,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 62% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1279": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 991,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 991,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 308,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 308,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 991,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 991,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 112,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 112,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 991,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 991,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 975,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 975,
+          "frameBox": {
+            "x": 8,
+            "w": 975,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 76% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1280": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 992,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 992,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 309,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 309,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 992,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 992,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 112,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 112,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 992,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 992,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 976,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 976,
+          "frameBox": {
+            "x": 8,
+            "w": 976,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 76% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1440": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 1152,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 1152,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 389,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 389,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 1152,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 1152,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 192,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 192,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 1152,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 1152,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 1136,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 1136,
+          "frameBox": {
+            "x": 8,
+            "w": 1136,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 89% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      }
+    },
+    "collection": {
+      "768": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 768,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 768,
+            "h": 397,
+            "shown": true
+          },
+          "frame": {
+            "x": 197,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 197,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 444,
+          "shellBottom": 1344,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 768,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 768,
+            "h": 397,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 752,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 752,
+          "frameBox": {
+            "x": 8,
+            "w": 752,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, shown at 98% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 444,
+          "shellBottom": 1344,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 768,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 768,
+            "h": 397,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 752,
+            "h": 674,
+            "shown": true
+          },
+          "seen": 752,
+          "frameBox": {
+            "x": 8,
+            "w": 752,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 59% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 444,
+          "shellBottom": 1344,
+          "viewH": 900
+        }
+      },
+      "900": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 900,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 900,
+            "h": 397,
+            "shown": true
+          },
+          "frame": {
+            "x": 263,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 263,
+            "w": 375,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 406,
+          "shellBottom": 1306,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 900,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 900,
+            "h": 397,
+            "shown": true
+          },
+          "frame": {
+            "x": 66,
+            "w": 768,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 66,
+            "w": 768,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 406,
+          "shellBottom": 1306,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 900,
+            "h": 777,
+            "shown": true
+          },
+          "inspector": {
+            "x": 0,
+            "w": 900,
+            "h": 397,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 884,
+            "h": 675,
+            "shown": true
+          },
+          "seen": 884,
+          "frameBox": {
+            "x": 8,
+            "w": 884,
+            "h": 675,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 69% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 406,
+          "shellBottom": 1306,
+          "viewH": 900
+        }
+      },
+      "1024": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 736,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 736,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 181,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 181,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 736,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 736,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 720,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 720,
+          "frameBox": {
+            "x": 8,
+            "w": 720,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, shown at 94% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 736,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 736,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 720,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 720,
+          "frameBox": {
+            "x": 8,
+            "w": 720,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 56% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1100": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 812,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 812,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 219,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 219,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 812,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 812,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 22,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 22,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 812,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 812,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 796,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 796,
+          "frameBox": {
+            "x": 8,
+            "w": 796,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 62% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1279": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 991,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 991,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 308,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 308,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 991,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 991,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 112,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 112,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 991,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 991,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 975,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 975,
+          "frameBox": {
+            "x": 8,
+            "w": 975,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 76% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1280": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 992,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 992,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 309,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 309,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 992,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 992,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 112,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 112,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 992,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 992,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 976,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 976,
+          "frameBox": {
+            "x": 8,
+            "w": 976,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 76% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      },
+      "1440": {
+        "Mobile": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 1152,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 1152,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 389,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 375,
+          "frameBox": {
+            "x": 389,
+            "w": 375,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 375,
+          "frameCss": 375,
+          "caption": "Mobile, 375 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Tablet": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 1152,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 1152,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 192,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 768,
+          "frameBox": {
+            "x": 192,
+            "w": 768,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 768,
+          "frameCss": 768,
+          "caption": "Tablet, 768 px wide, actual size",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        },
+        "Desktop": {
+          "tree": null,
+          "preview": {
+            "x": 0,
+            "w": 1152,
+            "h": 767,
+            "shown": true
+          },
+          "inspector": {
+            "x": 1152,
+            "w": 288,
+            "h": 767,
+            "shown": true
+          },
+          "frame": {
+            "x": 8,
+            "w": 1136,
+            "h": 665,
+            "shown": true
+          },
+          "seen": 1136,
+          "frameBox": {
+            "x": 8,
+            "w": 1136,
+            "h": 665,
+            "shown": true
+          },
+          "frameInner": 1280,
+          "frameCss": 1280,
+          "caption": "Desktop, 1280 px wide, shown at 89% to fit",
+          "consoleNav": null,
+          "treeToggle": false,
+          "treeToggleShown": false,
+          "menuButton": true,
+          "pageScrollX": 0,
+          "pageScrollY": 0,
+          "shellBottom": 900,
+          "viewH": 900
+        }
+      }
+    }
+  },
+  "results": [
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Desktop preview at least 900px on screen",
+      "ok": true,
+      "detail": "frame 912px seen, preview pane 928px"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "tree docked, at least 220px",
+      "ok": true,
+      "detail": "tree 224"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "no Sections drawer button while the tree is docked",
+      "ok": true,
+      "detail": "button shown false"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "inspector at least 280px",
+      "ok": true,
+      "detail": "inspector 288px"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 687px tall"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 1152, inspector starts 1152"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 224+928, frame 501+375, its box 501+375"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 224+928, frame 304+768, its box 304+768"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 912px, caption \"Desktop, 1280 px wide, shown at 71% to fit\""
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 912px, in view 912px"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 224+928, frame 232+912, its box 232+912"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 912px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "tree docked, at least 220px",
+      "ok": true,
+      "detail": "tree 224"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "no Sections drawer button while the tree is docked",
+      "ok": true,
+      "detail": "button shown false"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "inspector at least 280px",
+      "ok": true,
+      "detail": "inspector 288px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 752px seen, pane 768px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 687px tall"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 992, inspector starts 992"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 224+768, frame 421+375, its box 421+375"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 752px, caption \"Tablet, 768 px wide, shown at 98% to fit\""
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 752px, in view 752px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 224+768, frame 232+752, its box 232+752"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 752px, caption \"Desktop, 1280 px wide, shown at 59% to fit\""
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 752px, in view 752px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 224+768, frame 232+752, its box 232+752"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1280,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 752px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 975px seen, pane 991px"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "tree is a drawer, not a pane",
+      "ok": true,
+      "detail": "tree hidden, drawer button true"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 687px tall"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 991, inspector starts 991"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+991, frame 308+375, its box 308+375"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+991, frame 112+768, its box 112+768"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 975px, caption \"Desktop, 1280 px wide, shown at 76% to fit\""
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 975px, in view 975px"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+991, frame 8+975, its box 8+975"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 975px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 796px seen, pane 812px"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "tree is a drawer, not a pane",
+      "ok": true,
+      "detail": "tree hidden, drawer button true"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 687px tall"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 812, inspector starts 812"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+812, frame 219+375, its box 219+375"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+812, frame 22+768, its box 22+768"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 796px, caption \"Desktop, 1280 px wide, shown at 62% to fit\""
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 796px, in view 796px"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+812, frame 8+796, its box 8+796"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1100,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 796px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 720px seen, pane 736px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "tree is a drawer, not a pane",
+      "ok": true,
+      "detail": "tree hidden, drawer button true"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 687px tall"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 736, inspector starts 736"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+736, frame 181+375, its box 181+375"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 720px, caption \"Tablet, 768 px wide, shown at 94% to fit\""
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 720px, in view 720px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+736, frame 8+720, its box 8+720"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 720px, caption \"Desktop, 1280 px wide, shown at 56% to fit\""
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 720px, in view 720px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+736, frame 8+720, its box 8+720"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 720px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 884px seen, pane 900px"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "tree is a drawer, not a pane",
+      "ok": true,
+      "detail": "tree hidden, drawer button true"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+900, frame 263+375, its box 263+375"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+900, frame 66+768, its box 66+768"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 884px, caption \"Desktop, 1280 px wide, shown at 69% to fit\""
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 884px, in view 884px"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+900, frame 8+884, its box 8+884"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 900,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 884px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 752px seen, pane 768px"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "tree is a drawer, not a pane",
+      "ok": true,
+      "detail": "tree hidden, drawer button true"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+768, frame 197+375, its box 197+375"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 752px, caption \"Tablet, 768 px wide, shown at 98% to fit\""
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 752px, in view 752px"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+768, frame 8+752, its box 8+752"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 752px, caption \"Desktop, 1280 px wide, shown at 59% to fit\""
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 752px, in view 752px"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+768, frame 8+752, its box 8+752"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "home",
+      "width": 768,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 752px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Desktop preview at least 900px on screen",
+      "ok": true,
+      "detail": "frame 1136px seen, preview pane 1152px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "inspector at least 280px",
+      "ok": true,
+      "detail": "inspector 288px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 665px tall"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 1152, inspector starts 1152"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+1152, frame 389+375, its box 389+375"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+1152, frame 192+768, its box 192+768"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 1136px, caption \"Desktop, 1280 px wide, shown at 89% to fit\""
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 1136px, in view 1136px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+1152, frame 8+1136, its box 8+1136"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1440,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 1136px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "inspector at least 280px",
+      "ok": true,
+      "detail": "inspector 288px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 976px seen, pane 992px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 665px tall"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 992, inspector starts 992"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+992, frame 309+375, its box 309+375"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+992, frame 112+768, its box 112+768"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 976px, caption \"Desktop, 1280 px wide, shown at 76% to fit\""
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 976px, in view 976px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+992, frame 8+976, its box 8+976"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1280,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 976px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 975px seen, pane 991px"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 665px tall"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 991, inspector starts 991"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+991, frame 308+375, its box 308+375"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+991, frame 112+768, its box 112+768"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 975px, caption \"Desktop, 1280 px wide, shown at 76% to fit\""
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 975px, in view 975px"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+991, frame 8+975, its box 8+975"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1279,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 975px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 796px seen, pane 812px"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 665px tall"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 812, inspector starts 812"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+812, frame 219+375, its box 219+375"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+812, frame 22+768, its box 22+768"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 796px, caption \"Desktop, 1280 px wide, shown at 62% to fit\""
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 796px, in view 796px"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+812, frame 8+796, its box 8+796"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1100,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 796px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 720px seen, pane 736px"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 665px tall"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 736, inspector starts 736"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+736, frame 181+375, its box 181+375"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 720px, caption \"Tablet, 768 px wide, shown at 94% to fit\""
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 720px, in view 720px"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+736, frame 8+720, its box 8+720"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 720px, caption \"Desktop, 1280 px wide, shown at 56% to fit\""
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 720px, in view 720px"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+736, frame 8+720, its box 8+720"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 1024,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 720px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 884px seen, pane 900px"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+900, frame 263+375, its box 263+375"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+900, frame 66+768, its box 66+768"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 884px, caption \"Desktop, 1280 px wide, shown at 69% to fit\""
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 884px, in view 884px"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+900, frame 8+884, its box 8+884"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 900,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 884px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 752px seen, pane 768px"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+768, frame 197+375, its box 197+375"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 752px, caption \"Tablet, 768 px wide, shown at 98% to fit\""
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 752px, in view 752px"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+768, frame 8+752, its box 8+752"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 752px, caption \"Desktop, 1280 px wide, shown at 59% to fit\""
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 752px, in view 752px"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+768, frame 8+752, its box 8+752"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "product",
+      "width": 768,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 752px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Desktop preview at least 900px on screen",
+      "ok": true,
+      "detail": "frame 1136px seen, preview pane 1152px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "inspector at least 280px",
+      "ok": true,
+      "detail": "inspector 288px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 665px tall"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 1152, inspector starts 1152"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+1152, frame 389+375, its box 389+375"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+1152, frame 192+768, its box 192+768"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 1136px, caption \"Desktop, 1280 px wide, shown at 89% to fit\""
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 1136px, in view 1136px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+1152, frame 8+1136, its box 8+1136"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1440,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 1136px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "inspector at least 280px",
+      "ok": true,
+      "detail": "inspector 288px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 976px seen, pane 992px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 665px tall"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 992, inspector starts 992"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+992, frame 309+375, its box 309+375"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+992, frame 112+768, its box 112+768"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 976px, caption \"Desktop, 1280 px wide, shown at 76% to fit\""
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 976px, in view 976px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+992, frame 8+976, its box 8+976"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1280,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 976px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 975px seen, pane 991px"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 665px tall"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 991, inspector starts 991"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+991, frame 308+375, its box 308+375"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+991, frame 112+768, its box 112+768"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 975px, caption \"Desktop, 1280 px wide, shown at 76% to fit\""
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 975px, in view 975px"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+991, frame 8+975, its box 8+975"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1279,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 975px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 796px seen, pane 812px"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 665px tall"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 812, inspector starts 812"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+812, frame 219+375, its box 219+375"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+812, frame 22+768, its box 22+768"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 796px, caption \"Desktop, 1280 px wide, shown at 62% to fit\""
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 796px, in view 796px"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+812, frame 8+796, its box 8+796"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1100,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 796px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 720px seen, pane 736px"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "the editor fits the window: the page itself does not scroll",
+      "ok": true,
+      "detail": "page scrolls 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "the editor fills the window down to its bottom edge",
+      "ok": true,
+      "detail": "editor ends at 900px of 900px, frame 665px tall"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "inspector beside the preview",
+      "ok": true,
+      "detail": "preview ends 736, inspector starts 736"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+736, frame 181+375, its box 181+375"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 720px, caption \"Tablet, 768 px wide, shown at 94% to fit\""
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 720px, in view 720px"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+736, frame 8+720, its box 8+720"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 720px, caption \"Desktop, 1280 px wide, shown at 56% to fit\""
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 720px, in view 720px"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+736, frame 8+720, its box 8+720"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 1024,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 720px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 884px seen, pane 900px"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+900, frame 263+375, its box 263+375"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 768px, caption \"Tablet, 768 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 768px, in view 768px"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+900, frame 66+768, its box 66+768"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 884px, caption \"Desktop, 1280 px wide, shown at 69% to fit\""
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 884px, in view 884px"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+900, frame 8+884, its box 8+884"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 900,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 884px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Desktop preview at least 600px",
+      "ok": true,
+      "detail": "frame 752px seen, pane 768px"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "console navigation folded away, menu button present",
+      "ok": true,
+      "detail": "sidebar hidden, menu true"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Mobile renders at 375px",
+      "ok": true,
+      "detail": "page inside is 375px wide"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Mobile actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 375px, caption \"Mobile, 375 px wide, actual size\""
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Mobile: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 375px, in view 375px"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Mobile: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+768, frame 197+375, its box 197+375"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Mobile: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Tablet renders at 768px",
+      "ok": true,
+      "detail": "page inside is 768px wide"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Tablet actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 752px, caption \"Tablet, 768 px wide, shown at 98% to fit\""
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Tablet: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 752px, in view 752px"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Tablet: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+768, frame 8+752, its box 8+752"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Tablet: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Desktop renders at 1280px",
+      "ok": true,
+      "detail": "page inside is 1280px wide"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Desktop actual size, or scaled and labelled",
+      "ok": true,
+      "detail": "on screen 752px, caption \"Desktop, 1280 px wide, shown at 59% to fit\""
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Desktop: the page's whole width is in view, not cut off",
+      "ok": true,
+      "detail": "frame box 752px, in view 752px"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Desktop: the frame stays inside the preview pane",
+      "ok": true,
+      "detail": "pane 0+768, frame 8+752, its box 8+752"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "Desktop: no sideways page scroll",
+      "ok": true,
+      "detail": "scroll 0px"
+    },
+    {
+      "page": "collection",
+      "width": 768,
+      "name": "negative: Desktop never narrower than Mobile",
+      "ok": true,
+      "detail": "Desktop 752px on screen / 1280px page, Mobile 375px / 375px"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "keyboard: Tab reaches the Sections button",
+      "ok": true,
+      "detail": "after 2 Tab presses"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "keyboard: Enter opens the drawer with the tree, focus inside",
+      "ok": true,
+      "detail": "{\"open\":true,\"focusInside\":true,\"hasTree\":true,\"hasAdd\":true,\"expanded\":\"true\",\"treesInPage\":1}"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "the open drawer holds the only copy of the tree",
+      "ok": true,
+      "detail": "1 trees in the page"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "keyboard: Tab never leaves the open drawer",
+      "ok": true,
+      "detail": "0 of 12 Tab presses landed outside"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "picking a section in the drawer opens it in the inspector",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "keyboard: Escape closes it and focus returns to the button",
+      "ok": true,
+      "detail": "{\"open\":false,\"focusBack\":true,\"expanded\":\"false\"}"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "keyboard: the drawer opens on its close button, which closes it, focus returns",
+      "ok": true,
+      "detail": "first focus in drawer: \"Close sections\", after: {\"open\":false,\"focusBack\":true}"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "widening past 1280 with the drawer open: drawer closes, tree docks, one tree",
+      "ok": true,
+      "detail": "{\"open\":false,\"treeShown\":true,\"sectionsHeadings\":1}"
+    },
+    {
+      "page": "home",
+      "width": 1024,
+      "name": "resizing the window refits the frame without reloading the page in it",
+      "ok": true,
+      "detail": "{\"mark\":true,\"inner\":1280,\"caption\":\"Desktop, 1280 px wide, shown at 71% to fit\"}"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "keyboard: Tab reaches the Sections button",
+      "ok": true,
+      "detail": "after 2 Tab presses"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "keyboard: Enter opens the drawer with the tree, focus inside",
+      "ok": true,
+      "detail": "{\"open\":true,\"focusInside\":true,\"hasTree\":true,\"hasAdd\":true,\"expanded\":\"true\",\"treesInPage\":1}"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "the open drawer holds the only copy of the tree",
+      "ok": true,
+      "detail": "1 trees in the page"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "keyboard: Tab never leaves the open drawer",
+      "ok": true,
+      "detail": "0 of 12 Tab presses landed outside"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "picking a section in the drawer opens it in the inspector",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "keyboard: Escape closes it and focus returns to the button",
+      "ok": true,
+      "detail": "{\"open\":false,\"focusBack\":true,\"expanded\":\"false\"}"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "keyboard: the drawer opens on its close button, which closes it, focus returns",
+      "ok": true,
+      "detail": "first focus in drawer: \"Close sections\", after: {\"open\":false,\"focusBack\":true}"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "widening past 1280 with the drawer open: drawer closes, tree docks, one tree",
+      "ok": true,
+      "detail": "{\"open\":false,\"treeShown\":true,\"sectionsHeadings\":1}"
+    },
+    {
+      "page": "home",
+      "width": 1279,
+      "name": "resizing the window refits the frame without reloading the page in it",
+      "ok": true,
+      "detail": "{\"mark\":true,\"inner\":1280,\"caption\":\"Desktop, 1280 px wide, shown at 71% to fit\"}"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "console menu opens the store navigation",
+      "ok": true,
+      "detail": "{\"open\":true,\"links\":23,\"designer\":true}"
+    },
+    {
+      "page": "home",
+      "width": 1440,
+      "name": "keyboard: the menu button opens the navigation, Escape closes it, focus returns",
+      "ok": true,
+      "detail": "Tab presses 1, opened {\"open\":true,\"focusInside\":true}, after Escape {\"open\":false,\"focusBack\":true}"
+    },
+    {
+      "page": "storefront",
+      "width": 1440,
+      "name": "other console pages unchanged: sidebar shown, page capped at 1024px",
+      "ok": true,
+      "detail": "{\"main\":1024,\"maxWidth\":\"1024px\",\"sidebar\":240,\"menu\":false}"
+    }
+  ],
+  "passed": 459,
+  "failed": 0
+}
