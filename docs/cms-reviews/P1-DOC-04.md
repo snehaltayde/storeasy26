@@ -364,3 +364,25 @@ Before fix round 1 (`0b98649`): the same 45 suites passed, 898 tests, with `test
 - Only desktop Chrome. No Safari, no phone, no staging.
 
 **The reviewer's own browser measurements of fix round 0** (headless Chrome, harness, port 3048), kept here because they cover screens I did not drill: the Home editor, adding a blank Banner / CTA as row 3 and saving, showed "Section 3 (Banner / CTA): needs a title or text", and after Move up "Section 2 (Banner / CTA): …", matching the row labels. The Designer under a database lock showed "Couldn't save the homepage sections — We couldn't reach your store's data…", with no conflict banner (server log: `saveBlock` 503 `SQLITE_BUSY`). PDP and Navigation wording were not drilled by either of us.
+
+### From review
+
+Non-blocking findings from the independent reviews, added at merge. The first nine came from the first review and are answered in "Fix round 1" above; they are kept here so the list is complete. The rest came from the review of fix round 1 and are still open.
+
+**First review (answered in "Fix round 1").**
+- **Published, then the panel's refresh failed, and the answer said nothing was published.** The live pointer had moved, but the founder read "nothing was published. Your live store hasn't changed". Saves had the same shape: a save that went through could answer "nothing was saved", and the next Save then hit a conflict with the founder's own save. Fix round 1 says publish now answers `RELOAD_NEEDED` and saves answer `SAVED_RELOAD_FAILED`.
+- **The packet overclaimed that "editor load returned 200 with defaults" was fixed.** With the page reads broken, the storefront view still answered 200 with no pages while a page existed. Fix round 1 says those reads are strict now.
+- **Mutation gaps.** The reviewer's runner found that the accordion field path, the "nothing was saved" wording on publish and preview failures, and the announcement issue filed under the wrong document all went untested. Fix round 1 says R2, R6, R7, R10 and R9 are caught now. R4 and R5 (Home editor and Designer not minting ids) still have no test; already listed above.
+- **A comment in `lib/cms/issues.js` described `failure()` wrongly.** Fix round 1 says `failure()` now does what the comment says.
+- **A NOT NULL or CHECK failure on a first save read as "edited by someone else".** Fix round 1 says only a UNIQUE or PRIMARY KEY failure counts as a race now.
+- **The AI provider failing blamed the store's database.** Fix round 1 says it now answers `AI_UNAVAILABLE` and names the AI service.
+- **Publishing copy had two colons in a row** ("Hero: Primary button: …"). Fix round 1 says it reads with one colon now.
+- **`next build` was not run by the builder.** The reviewer ran it with local file databases and it passed. The only warning was the existing trace warning from `lib/platform/migrate.js`. The changed storefront modules use no `node:` APIs, and no shopper-facing change was found.
+- **The reviewer's own browser checks** of the Home editor renumbering and the Designer under a database lock are recorded in the last paragraph above.
+
+**Review of fix round 1 (still open).**
+- **One harmless mutation survives.** Making `createRelease` return every issue instead of only warnings fails no test. It makes no difference, because `createRelease` only gets that far when there are no errors.
+- **The order scan in `test:failure-matrix` is weaker than the packet says.** A known answer moved after the database check is caught only through a count of at least 11 known answers, and there are exactly 11 today. If a route adds one, one known answer could be moved after the database check unnoticed. That is harmless now, because the classifier no longer reads our own error words. The line "The source scan now checks that order" says more than the scan does.
+- **A wrong or revoked database token is treated as "try again in a minute".** A hosted database answering 401 comes back as `DATABASE_UNAVAILABLE` with `retryable: true`. Retrying won't fix a bad token. Probed through `@libsql/client` 0.17.4 against a local fake server: 401, 500 and 502 all come back the same way. This narrows "Hosted Turso errors were not exercised" a little (the HTTP error shapes match), but real Turso is still untested.
+- **A database failure during a media delete says "nothing was saved. Your changes are still here."** That wording is off for a delete. It falls under the known limit that "nothing was saved" is a default in the other `/api/admin` routes.
+- **Not done, for the owner's list:** real hosted Turso or staging failure shapes; Safari and a real phone for the Publishing warnings banner and the Media "Still referenced" dialog. The reviewer also did not repeat these builder drills in a browser: saved-then-refresh-failed in an editor (`SAVED_RELOAD_FAILED` under the "Couldn't save" title), publish-then-refresh-failed (the `RELOAD_NEEDED` notice), the page editor load with the page reads broken, the Navigation and product page accordion wording, the Home editor renumbering, and the Storefront overview section number.
