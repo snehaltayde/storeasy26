@@ -1,0 +1,25 @@
+
+== RATES c-rates
+  · before the change: drawer {"subtotal":"₹1,299","shipping":"FREE","total":"₹1,299","nudge":null}; review {"shipping":"₹208","total":"₹1,507"}
+  · the warm review shows ₹208, not the current rates' ₹49: waiting 32 s for the caches to expire
+  · warmed again: review {"shipping":"₹49","total":"₹1,348"}
+ok   setup: the shopper's checkout holds the rates being changed from
+ok   Save settings answers 200
+  · rates {"flat":"79","free":"999","cod":"49"} → {"flat":"149","free":"4999","cod":"59"}
+  · within 30 s: {"drawer":{"at":1889,"shipping":"FREE","total":"₹1,299","rates":"old"},"review":{"at":3473,"shipping":"₹49","total":"₹1,348","rates":"old"},"payment":{"at":3987,"placeOrder":"₹1,348","rates":"old"}}
+ok   the drawer, review and payment steps were read within 30 s of the save
+ok   the drawer's shipping and the review step's shipping come from the same rates
+ok   the review step's shipping and total and the payment step's total come from the same rates
+  · first press at 4240 ms on "Place order · ₹1,348": 409 {"code":"PRICE_CHANGED","error":"Shipping changed — your new total is ₹1,507. Review and place order.","total":1507}
+ok   a refused press stores no order
+  · after the refusal: {"alert":"Shipping changed — your new total is ₹1,507. Review and place order.","button":"₹1,507","shipping":"₹208","total":"₹1,507"}
+ok   the shopper is told shipping changed and the new total
+ok   the button, the summary's shipping and its total are redrawn to the new amount
+  · second press at 4883 ms on "Place order · ₹1,507": 200 {}
+ok   the order goes through on the press after any refusal
+  · order stored: {"id":"DES-5D41103A","subtotal":1299,"shipping_total":208,"total":1507,"payment_method":"cod"}; the button pressed said "Place order · ₹1,507"
+ok   the order's stored total is the amount on the button that was pressed
+  · after 35 s: {"drawer":{"at":37520,"shipping":"₹149","total":"₹1,448","rates":"new"},"review":{"at":39121,"shipping":"₹208","total":"₹1,507","rates":"new"},"payment":{"at":39637,"placeOrder":"₹1,507","rates":"new"}}
+ok   after 35 s the drawer, review and payment all use the new rates
+  · rates put back: 200
+-- c-rates: 11 passed, 0 failed

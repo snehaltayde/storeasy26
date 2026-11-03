@@ -1,0 +1,190 @@
+{
+  "id": "RATES",
+  "part": "c-rates",
+  "title": "P1-RATES: the amount charged is the amount on the button pressed — c-rates",
+  "ranAt": "2026-11-03T17:15:57.887Z",
+  "harness": "http://localhost:3251",
+  "chrome": "156.0.8078.80",
+  "passed": 11,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: the shopper's checkout holds the rates being changed from",
+      "detail": {
+        "review": "₹49",
+        "expected": 49
+      }
+    },
+    {
+      "ok": true,
+      "label": "Save settings answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "the drawer, review and payment steps were read within 30 s of the save",
+      "detail": {
+        "drawer": 1858,
+        "review": 3442,
+        "payment": 3959
+      }
+    },
+    {
+      "ok": true,
+      "label": "the drawer's shipping and the review step's shipping come from the same rates",
+      "detail": {
+        "drawer": {
+          "at": 1858,
+          "shipping": "FREE",
+          "total": "₹1,299",
+          "rates": "old"
+        },
+        "review": {
+          "at": 3442,
+          "shipping": "₹49",
+          "total": "₹1,348",
+          "rates": "old"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the review step's shipping and total and the payment step's total come from the same rates",
+      "detail": {
+        "review": {
+          "at": 3442,
+          "shipping": "₹49",
+          "total": "₹1,348",
+          "rates": "old"
+        },
+        "payment": {
+          "at": 3959,
+          "placeOrder": "₹1,348",
+          "rates": "old"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "a refused press stores no order",
+      "detail": {
+        "newOrders": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "the shopper is told shipping changed and the new total",
+      "detail": "Shipping changed — your new total is ₹1,507. Review and place order."
+    },
+    {
+      "ok": true,
+      "label": "the button, the summary's shipping and its total are redrawn to the new amount",
+      "detail": {
+        "after": {
+          "alert": "Shipping changed — your new total is ₹1,507. Review and place order.",
+          "button": "₹1,507",
+          "shipping": "₹208",
+          "total": "₹1,507"
+        },
+        "server": {
+          "total": 1507,
+          "shipping": 208
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the order goes through on the press after any refusal",
+      "detail": {
+        "status": 200,
+        "confirmed": true,
+        "error": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "the order's stored total is the amount on the button that was pressed",
+      "detail": {
+        "stored": 1507,
+        "pressed": "₹1,507",
+        "storedRates": "new"
+      }
+    },
+    {
+      "ok": true,
+      "label": "after 35 s the drawer, review and payment all use the new rates",
+      "detail": {
+        "drawer": {
+          "at": 37374,
+          "shipping": "₹149",
+          "total": "₹1,448",
+          "rates": "new"
+        },
+        "review": {
+          "at": 38975,
+          "shipping": "₹208",
+          "total": "₹1,507",
+          "rates": "new"
+        },
+        "payment": {
+          "at": 39491,
+          "placeOrder": "₹1,507",
+          "rates": "new"
+        }
+      }
+    }
+  ],
+  "notes": [
+    "before the change: drawer {\"subtotal\":\"₹1,299\",\"shipping\":\"FREE\",\"total\":\"₹1,299\",\"nudge\":null}; review {\"shipping\":\"₹208\",\"total\":\"₹1,507\"}",
+    "the warm review shows ₹208, not the current rates' ₹49: waiting 32 s for the caches to expire",
+    "warmed again: review {\"shipping\":\"₹49\",\"total\":\"₹1,348\"}",
+    "rates {\"flat\":\"79\",\"free\":\"999\",\"cod\":\"49\"} → {\"flat\":\"149\",\"free\":\"4999\",\"cod\":\"59\"}",
+    "within 30 s: {\"drawer\":{\"at\":1858,\"shipping\":\"FREE\",\"total\":\"₹1,299\",\"rates\":\"old\"},\"review\":{\"at\":3442,\"shipping\":\"₹49\",\"total\":\"₹1,348\",\"rates\":\"old\"},\"payment\":{\"at\":3959,\"placeOrder\":\"₹1,348\",\"rates\":\"old\"}}",
+    "first press at 4119 ms on \"Place order · ₹1,348\": 409 {\"code\":\"PRICE_CHANGED\",\"error\":\"Shipping changed — your new total is ₹1,507. Review and place order.\",\"total\":1507}",
+    "after the refusal: {\"alert\":\"Shipping changed — your new total is ₹1,507. Review and place order.\",\"button\":\"₹1,507\",\"shipping\":\"₹208\",\"total\":\"₹1,507\"}",
+    "second press at 4718 ms on \"Place order · ₹1,507\": 200 {}",
+    "order stored: {\"id\":\"DES-A6AA19E2\",\"subtotal\":1299,\"shipping_total\":208,\"total\":1507,\"payment_method\":\"cod\"}; the button pressed said \"Place order · ₹1,507\"",
+    "after 35 s: {\"drawer\":{\"at\":37374,\"shipping\":\"₹149\",\"total\":\"₹1,448\",\"rates\":\"new\"},\"review\":{\"at\":38975,\"shipping\":\"₹208\",\"total\":\"₹1,507\",\"rates\":\"new\"},\"payment\":{\"at\":39491,\"placeOrder\":\"₹1,507\",\"rates\":\"new\"}}",
+    "rates put back: 200"
+  ],
+  "screenshots": [
+    {
+      "name": "c-rates-payment-within-30s",
+      "file": "docs/cms-reviews/drills/RATES/c-rates-payment-within-30s.png",
+      "bytes": 24676,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "c-rates-refused-within-30s",
+      "file": "docs/cms-reviews/drills/RATES/c-rates-refused-within-30s.png",
+      "bytes": 25902,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "c-rates-confirmation-within-30s",
+      "file": "docs/cms-reviews/drills/RATES/c-rates-confirmation-within-30s.png",
+      "bytes": 20222,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/DES-A6AA19E2"
+    },
+    {
+      "name": "c-rates-payment-after-35s",
+      "file": "docs/cms-reviews/drills/RATES/c-rates-payment-after-35s.png",
+      "bytes": 24742,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    }
+  ]
+}

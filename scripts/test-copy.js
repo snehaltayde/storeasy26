@@ -517,6 +517,7 @@ const tenantContext = await import("../lib/tenant-context.js");
 const commerceAdapter = await import("../lib/commerce/adapter.js");
 const settingsLib = await import("../lib/admin/settings.js");
 const shopperErrors = await import("../lib/shopper-errors.js");
+const checkoutPrice = await import("../lib/checkout-price.js");
 const cmsDefaults = await import("../lib/cms/defaults.js");
 
 const OWN_RATES = { currency: "INR", basis: "net", freeThreshold: 5000, flatRate: 50, codFee: 0, codFeeWaivedAt: null, zones: [] };
@@ -767,6 +768,7 @@ const flowStubs = {
   "@/lib/format": format,
   "@/lib/shipping": shippingLib,
   "@/lib/shopper-errors": shopperErrors,
+  "@/lib/checkout-price": checkoutPrice,
   "@/lib/track/client": { track() {} },
 };
 const realFlow = () => loadComponent(sources.get("components/checkout/CheckoutFlow.js"), flowStubs);
@@ -1066,6 +1068,43 @@ await t("checkout (clicked): the payment step names no vendor or setup step", as
   const off = (await checkoutAtPayment({ razorpayEnabled: false })).text();
   ok(off.includes("Online payment isn't available for this store right now."), "the disabled note");
   for (const text of [live, off]) ok(!/razorpay|test mode|NEXT_PUBLIC|shopify|storeasy/i.test(text), `the payment step says: ${text}`);
+});
+
+// P1-RATES: the clicked checkout. The button's own amount goes to the server; a
+// refusal redraws the summary and the button from the server's cart and rates,
+// says the new total, never retries on its own, and the next press sends the
+// redrawn amount.
+await t("checkout (clicked, P1-RATES): a refused total redraws the page, and the next press sends the redrawn amount", async () => {
+  const OLD = { ...OWN_RATES, flatRate: 79, freeThreshold: 999, codFee: 49 };
+  const NEW = { ...OWN_RATES, flatRate: 149, freeThreshold: 4999, codFee: 59 };
+  const button = (app, online) => app.textOf(app.find((e) => e.type === "button" && /^(Place order|Pay) ₹?·?/.test(app.textOf(e)) && e.props.className?.includes("bg-sf-accent"), "the pay button"));
+  for (const online of [false, true]) {
+    const app = await checkoutAtPayment({ shippingConfig: OLD });
+    if (online) payOnline(app);
+    // ₹500 of goods: cash ₹500 + ₹79 + ₹49, online ₹500 + ₹79; then ₹149 and ₹59
+    const [was, now, shipWas, shipNow] = online ? [579, 649, 79, 149] : [628, 708, 128, 208];
+    eq(button(app, online), online ? `Pay ₹${was}` : `Place order · ₹${was}`, "before:");
+    const message = `Shipping changed — your new total is ₹${now}. Review and place order.`;
+    const refusal = { status: 409, ok: false, code: "PRICE_CHANGED", error: message, total: now, shippingTotal: shipNow, currency: "INR", cart: checkoutFixture, shippingConfig: NEW };
+    const first = await withBrowser([refusal], {}, async (calls) => {
+      await app.click(online ? "Pay " : "Place order");
+      return calls;
+    });
+    eq(first.length, 1, `requests on one press (${online ? "online" : "cash"}), no silent retry:`);
+    eq(first[0].body.expectedTotal, was, "total sent with the press:");
+    eq(first[0].body.expectedShipping, shipWas, "shipping sent with the press:");
+    eq(shownError(app), message, "said:");
+    eq(button(app, online), online ? `Pay ₹${now}` : `Place order · ₹${now}`, "redrawn button:");
+    ok(app.text().includes(`₹${shipNow}`), `the summary's shipping is not redrawn to ₹${shipNow}`);
+    if (online) continue;
+    const second = await withBrowser([{ ok: true, orderId: "ORD-2", confirmationPath: "/checkout/confirmation/ORD-2?t=x" }], {}, async (calls) => {
+      await app.click("Place order");
+      return calls;
+    });
+    eq(second[0].body.expectedTotal, now, "total sent with the second press:");
+    eq(second[0].body.expectedShipping, shipNow, "shipping sent with the second press:");
+    ok(second[0].body.idempotencyKey !== first[0].body.idempotencyKey, "the second press reuses the refused attempt's key");
+  }
 });
 
 // ---- the founder's Settings form
