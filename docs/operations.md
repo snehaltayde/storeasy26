@@ -93,6 +93,33 @@ never written back to Shopify). If it fails on a change you meant to make, read
 its message before touching its lists: a new mutation, write scope or field sent
 to Shopify is a product decision, not a test fix.
 
+## Deploying code that needs a new migration (MIG-05)
+
+Tenant migrations run per tenant and one tenant can fail while the rest
+succeed. Code that expects the new schema would then break for that one store,
+in the cart or when an order is saved. So a release that needs new tenant schema
+goes out in this order:
+
+1. `pnpm tenant:migrate -- --all` exits 0. Use `--canary <slug>` to try one store
+   first; a canary failure stops the rollout before any other store is touched.
+2. `pnpm tenant:migrate -- --check` exits 0. This changes nothing. It reads every
+   tenant's migration ledger, suspended tenants included, and prints one line per
+   tenant. It exits 1 if any tenant is missing a migration this code ships, holds
+   one whose file was edited after it ran, or can't be read, and also if the
+   control plane lists no tenants (a wrong `PLATFORM_DB_URL` looks exactly like
+   that). `--check --tenant <slug>` checks one store.
+3. Deploy.
+
+If step 1 or 2 fails, don't deploy. Fix the tenant it names, then run both again.
+Run `--check` from the same commit you are about to deploy, because it compares
+the ledgers with that commit's `migrations/tenant/` folder.
+
+As a second line of defence, code tolerates a tenant one migration behind: new
+columns are left out on that tenant until it is migrated (`lib/schema-compat.js`,
+rule 7 in [migrations/README.md](../migrations/README.md)), and
+`pnpm test:schema-compat` proves cart, product page data, search and order
+creation still work there.
+
 ## Related runbooks
 
 [docs/refunds.md](./refunds.md) — manual refund/cancel flows (Razorpay + Shopify + ledger).

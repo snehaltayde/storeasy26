@@ -1968,6 +1968,7 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 | `pnpm dev` / `build` / `start` | Next.js (dev on :3007 via launch.json) |
 | `pnpm migrate` / `db:reset` | Run the VERSIONED tenant migrations on the env DB (S28 ledger: baseline=lib/schema.sql + migrations/tenant/NNNN_*.sql, checksum-locked in `schema_migrations`; +orders back-fill, offer seed) / also drop the 5 catalog tables |
 | `pnpm tenant:migrate -- --all \| --tenant <slug>` | S28: run tenant migrations on every registered tenant DB, failure-isolated per tenant (suspended included); applied files audited |
+| `pnpm tenant:migrate -- --check [--tenant <slug>]` | MIG-05 deploy gate, read only: exits 0 only if every tenant ledger holds every migration this code ships. Order: `--all` exits 0, then `--check`, then deploy (docs/operations.md) |
 | `pnpm rotate:secrets` | S28: re-encrypt all stored secret blobs under the current write key (step 2 of the rotation runbook); safe to re-run |
 | `pnpm domain -- claim\|verify\|remove\|primary\|list` | S28 domain registry: unique hosts, DNS-TXT ownership challenge (`--pre-verified` for operator-asserted dev hosts), activation into tenants.domains |
 | `pnpm sync` / `sync:search` | Full catalog sync (env tenant) / Typesense reindex only |
