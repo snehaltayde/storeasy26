@@ -87,11 +87,13 @@
     "test:failure-matrix": "node scripts/test-failure-matrix.js",
     "test:schema-compat": "node scripts/test-schema-compat.js",
     "test:order-catalog": "node scripts/test-order-catalog.js",
+    "test:editor-layout": "node scripts/test-editor-layout.js",
     "test:perf": "node scripts/perf-report.js",
     "seed:design": "node scripts/dev-design.js seed",
     "dev:design": "node scripts/dev-design.js",
     "drill:smoke": "node scripts/drill.js smoke",
-    "drill:edge": "node scripts/drill.js harness-edge"
+    "drill:edge": "node scripts/drill.js harness-edge",
+    "drill:editor-layout": "node scripts/drill-editor-layout.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

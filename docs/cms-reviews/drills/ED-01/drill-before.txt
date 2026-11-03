@@ -1,0 +1,444 @@
+✗ home @1440: Desktop preview at least 900px on screen — frame 342px seen, preview pane 368px
+✓ home @1440: tree docked, at least 220px — tree 256
+✓ home @1440: no Sections drawer button while the tree is docked — button shown false
+✓ home @1440: inspector at least 280px — inspector 320px
+✗ home @1440: the editor fits the window: the page itself does not scroll — page scrolls 80px
+✗ home @1440: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✓ home @1440: inspector beside the preview — preview ends 992, inspector starts 1008
+✗ home @1440: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ home @1440: Mobile renders at 375px — page inside is 373px wide
+✗ home @1440: Mobile actual size, or scaled and labelled — on screen 355px, caption "none"
+✗ home @1440: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 355px
+✗ home @1440: Mobile: the frame stays inside the preview pane — pane 624+368, frame 637+375, its box 624+368
+✓ home @1440: Mobile: no sideways page scroll — scroll 0px
+✗ home @1440: Tablet renders at 768px — page inside is 766px wide
+✗ home @1440: Tablet actual size, or scaled and labelled — on screen 355px, caption "none"
+✗ home @1440: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 355px
+✗ home @1440: Tablet: the frame stays inside the preview pane — pane 624+368, frame 637+768, its box 624+368
+✓ home @1440: Tablet: no sideways page scroll — scroll 0px
+✗ home @1440: Desktop renders at 1280px — page inside is 340px wide
+✗ home @1440: Desktop actual size, or scaled and labelled — on screen 342px, caption "none"
+✓ home @1440: Desktop: the page's whole width is in view, not cut off — frame box 342px, in view 342px
+✓ home @1440: Desktop: the frame stays inside the preview pane — pane 624+368, frame 637+342, its box 624+368
+✓ home @1440: Desktop: no sideways page scroll — scroll 0px
+✗ home @1440: negative: Desktop never narrower than Mobile — Desktop 342px on screen / 340px page, Mobile 355px / 373px
+✓ home @1280: tree docked, at least 220px — tree 256
+✓ home @1280: no Sections drawer button while the tree is docked — button shown false
+✓ home @1280: inspector at least 280px — inspector 320px
+✗ home @1280: Desktop preview at least 600px — frame 342px seen, pane 368px
+✗ home @1280: the editor fits the window: the page itself does not scroll — page scrolls 80px
+✗ home @1280: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✓ home @1280: inspector beside the preview — preview ends 912, inspector starts 928
+✗ home @1280: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ home @1280: Mobile renders at 375px — page inside is 373px wide
+✗ home @1280: Mobile actual size, or scaled and labelled — on screen 355px, caption "none"
+✗ home @1280: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 355px
+✗ home @1280: Mobile: the frame stays inside the preview pane — pane 544+368, frame 557+375, its box 544+368
+✓ home @1280: Mobile: no sideways page scroll — scroll 0px
+✗ home @1280: Tablet renders at 768px — page inside is 766px wide
+✗ home @1280: Tablet actual size, or scaled and labelled — on screen 355px, caption "none"
+✗ home @1280: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 355px
+✗ home @1280: Tablet: the frame stays inside the preview pane — pane 544+368, frame 557+768, its box 544+368
+✓ home @1280: Tablet: no sideways page scroll — scroll 0px
+✗ home @1280: Desktop renders at 1280px — page inside is 340px wide
+✗ home @1280: Desktop actual size, or scaled and labelled — on screen 342px, caption "none"
+✓ home @1280: Desktop: the page's whole width is in view, not cut off — frame box 342px, in view 342px
+✓ home @1280: Desktop: the frame stays inside the preview pane — pane 544+368, frame 557+342, its box 544+368
+✓ home @1280: Desktop: no sideways page scroll — scroll 0px
+✗ home @1280: negative: Desktop never narrower than Mobile — Desktop 342px on screen / 340px page, Mobile 355px / 373px
+✓ home @1279: Desktop preview at least 600px — frame 950px seen, pane 976px
+✗ home @1279: tree is a drawer, not a pane — tree shown 976px, drawer button false
+✗ home @1279: the editor fits the window: the page itself does not scroll — page scrolls 551px
+✗ home @1279: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✗ home @1279: inspector beside the preview — preview ends 1248, inspector starts 272
+✗ home @1279: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ home @1279: Mobile renders at 375px — page inside is 373px wide
+✓ home @1279: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ home @1279: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ home @1279: Mobile: the frame stays inside the preview pane — pane 272+976, frame 572+375, its box 272+976
+✓ home @1279: Mobile: no sideways page scroll — scroll 0px
+✗ home @1279: Tablet renders at 768px — page inside is 766px wide
+✓ home @1279: Tablet actual size, or scaled and labelled — on screen 768px, caption "none"
+✓ home @1279: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✓ home @1279: Tablet: the frame stays inside the preview pane — pane 272+976, frame 376+768, its box 272+976
+✓ home @1279: Tablet: no sideways page scroll — scroll 0px
+✗ home @1279: Desktop renders at 1280px — page inside is 948px wide
+✗ home @1279: Desktop actual size, or scaled and labelled — on screen 950px, caption "none"
+✓ home @1279: Desktop: the page's whole width is in view, not cut off — frame box 950px, in view 950px
+✓ home @1279: Desktop: the frame stays inside the preview pane — pane 272+976, frame 285+950, its box 272+976
+✓ home @1279: Desktop: no sideways page scroll — scroll 0px
+✓ home @1279: negative: Desktop never narrower than Mobile — Desktop 950px on screen / 948px page, Mobile 375px / 373px
+✓ home @1100: Desktop preview at least 600px — frame 786px seen, pane 812px
+✗ home @1100: tree is a drawer, not a pane — tree shown 812px, drawer button false
+✗ home @1100: the editor fits the window: the page itself does not scroll — page scrolls 593px
+✗ home @1100: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✗ home @1100: inspector beside the preview — preview ends 1076, inspector starts 264
+✗ home @1100: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ home @1100: Mobile renders at 375px — page inside is 373px wide
+✓ home @1100: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ home @1100: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ home @1100: Mobile: the frame stays inside the preview pane — pane 264+812, frame 483+375, its box 264+812
+✓ home @1100: Mobile: no sideways page scroll — scroll 0px
+✗ home @1100: Tablet renders at 768px — page inside is 766px wide
+✓ home @1100: Tablet actual size, or scaled and labelled — on screen 768px, caption "none"
+✓ home @1100: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✓ home @1100: Tablet: the frame stays inside the preview pane — pane 264+812, frame 286+768, its box 264+812
+✓ home @1100: Tablet: no sideways page scroll — scroll 0px
+✗ home @1100: Desktop renders at 1280px — page inside is 784px wide
+✗ home @1100: Desktop actual size, or scaled and labelled — on screen 786px, caption "none"
+✓ home @1100: Desktop: the page's whole width is in view, not cut off — frame box 786px, in view 786px
+✓ home @1100: Desktop: the frame stays inside the preview pane — pane 264+812, frame 277+786, its box 264+812
+✓ home @1100: Desktop: no sideways page scroll — scroll 0px
+✓ home @1100: negative: Desktop never narrower than Mobile — Desktop 786px on screen / 784px page, Mobile 375px / 373px
+✓ home @1024: Desktop preview at least 600px — frame 710px seen, pane 736px
+✗ home @1024: tree is a drawer, not a pane — tree shown 736px, drawer button false
+✗ home @1024: the editor fits the window: the page itself does not scroll — page scrolls 593px
+✗ home @1024: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✗ home @1024: inspector beside the preview — preview ends 1000, inspector starts 264
+✗ home @1024: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ home @1024: Mobile renders at 375px — page inside is 373px wide
+✓ home @1024: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ home @1024: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ home @1024: Mobile: the frame stays inside the preview pane — pane 264+736, frame 445+375, its box 264+736
+✓ home @1024: Mobile: no sideways page scroll — scroll 0px
+✗ home @1024: Tablet renders at 768px — page inside is 766px wide
+✗ home @1024: Tablet actual size, or scaled and labelled — on screen 723px, caption "none"
+✗ home @1024: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 723px
+✗ home @1024: Tablet: the frame stays inside the preview pane — pane 264+736, frame 277+768, its box 264+736
+✓ home @1024: Tablet: no sideways page scroll — scroll 0px
+✗ home @1024: Desktop renders at 1280px — page inside is 708px wide
+✗ home @1024: Desktop actual size, or scaled and labelled — on screen 710px, caption "none"
+✓ home @1024: Desktop: the page's whole width is in view, not cut off — frame box 710px, in view 710px
+✓ home @1024: Desktop: the frame stays inside the preview pane — pane 264+736, frame 277+710, its box 264+736
+✓ home @1024: Desktop: no sideways page scroll — scroll 0px
+✓ home @1024: negative: Desktop never narrower than Mobile — Desktop 710px on screen / 708px page, Mobile 375px / 373px
+✗ home @900: Desktop preview at least 600px — frame 586px seen, pane 612px
+✗ home @900: tree is a drawer, not a pane — tree shown 612px, drawer button false
+✗ home @900: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ home @900: Mobile renders at 375px — page inside is 373px wide
+✓ home @900: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ home @900: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ home @900: Mobile: the frame stays inside the preview pane — pane 264+612, frame 383+375, its box 264+612
+✓ home @900: Mobile: no sideways page scroll — scroll 0px
+✗ home @900: Tablet renders at 768px — page inside is 766px wide
+✗ home @900: Tablet actual size, or scaled and labelled — on screen 599px, caption "none"
+✗ home @900: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 599px
+✗ home @900: Tablet: the frame stays inside the preview pane — pane 264+612, frame 277+768, its box 264+612
+✓ home @900: Tablet: no sideways page scroll — scroll 0px
+✗ home @900: Desktop renders at 1280px — page inside is 584px wide
+✗ home @900: Desktop actual size, or scaled and labelled — on screen 586px, caption "none"
+✓ home @900: Desktop: the page's whole width is in view, not cut off — frame box 586px, in view 586px
+✓ home @900: Desktop: the frame stays inside the preview pane — pane 264+612, frame 277+586, its box 264+612
+✓ home @900: Desktop: no sideways page scroll — scroll 0px
+✓ home @900: negative: Desktop never narrower than Mobile — Desktop 586px on screen / 584px page, Mobile 375px / 373px
+✗ home @768: Desktop preview at least 600px — frame 454px seen, pane 480px
+✗ home @768: tree is a drawer, not a pane — tree shown 480px, drawer button false
+✗ home @768: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ home @768: Mobile renders at 375px — page inside is 373px wide
+✓ home @768: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ home @768: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ home @768: Mobile: the frame stays inside the preview pane — pane 264+480, frame 317+375, its box 264+480
+✓ home @768: Mobile: no sideways page scroll — scroll 0px
+✗ home @768: Tablet renders at 768px — page inside is 766px wide
+✗ home @768: Tablet actual size, or scaled and labelled — on screen 467px, caption "none"
+✗ home @768: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 467px
+✗ home @768: Tablet: the frame stays inside the preview pane — pane 264+480, frame 277+768, its box 264+480
+✓ home @768: Tablet: no sideways page scroll — scroll 0px
+✗ home @768: Desktop renders at 1280px — page inside is 452px wide
+✗ home @768: Desktop actual size, or scaled and labelled — on screen 454px, caption "none"
+✓ home @768: Desktop: the page's whole width is in view, not cut off — frame box 454px, in view 454px
+✓ home @768: Desktop: the frame stays inside the preview pane — pane 264+480, frame 277+454, its box 264+480
+✓ home @768: Desktop: no sideways page scroll — scroll 0px
+✓ home @768: negative: Desktop never narrower than Mobile — Desktop 454px on screen / 452px page, Mobile 375px / 373px
+✗ product @1440: Desktop preview at least 900px on screen — frame 608px seen, preview pane 608px
+✓ product @1440: inspector at least 280px — inspector 352px
+✗ product @1440: the editor fits the window: the page itself does not scroll — page scrolls 96px
+✗ product @1440: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✓ product @1440: inspector beside the preview — preview ends 960, inspector starts 976
+✗ product @1440: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ product @1440: Mobile renders at 375px — page inside is 373px wide
+✓ product @1440: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ product @1440: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ product @1440: Mobile: the frame stays inside the preview pane — pane 352+608, frame 469+375, its box 352+608
+✓ product @1440: Mobile: no sideways page scroll — scroll 0px
+✗ product @1440: Tablet renders at 768px — page inside is 766px wide
+✓ product @1440: Tablet actual size, or scaled and labelled — on screen 768px, caption "none"
+✓ product @1440: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✗ product @1440: Tablet: the frame stays inside the preview pane — pane 352+608, frame 352+768, its box 352+608
+✓ product @1440: Tablet: no sideways page scroll — scroll 0px
+✗ product @1440: Desktop renders at 1280px — page inside is 606px wide
+✗ product @1440: Desktop actual size, or scaled and labelled — on screen 608px, caption "none"
+✓ product @1440: Desktop: the page's whole width is in view, not cut off — frame box 608px, in view 608px
+✓ product @1440: Desktop: the frame stays inside the preview pane — pane 352+608, frame 352+608, its box 352+608
+✓ product @1440: Desktop: no sideways page scroll — scroll 0px
+✓ product @1440: negative: Desktop never narrower than Mobile — Desktop 608px on screen / 606px page, Mobile 375px / 373px
+✓ product @1280: inspector at least 280px — inspector 352px
+✓ product @1280: Desktop preview at least 600px — frame 608px seen, pane 608px
+✗ product @1280: the editor fits the window: the page itself does not scroll — page scrolls 96px
+✗ product @1280: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✓ product @1280: inspector beside the preview — preview ends 880, inspector starts 896
+✗ product @1280: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ product @1280: Mobile renders at 375px — page inside is 373px wide
+✓ product @1280: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ product @1280: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ product @1280: Mobile: the frame stays inside the preview pane — pane 272+608, frame 389+375, its box 272+608
+✓ product @1280: Mobile: no sideways page scroll — scroll 0px
+✗ product @1280: Tablet renders at 768px — page inside is 766px wide
+✓ product @1280: Tablet actual size, or scaled and labelled — on screen 768px, caption "none"
+✓ product @1280: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✗ product @1280: Tablet: the frame stays inside the preview pane — pane 272+608, frame 272+768, its box 272+608
+✓ product @1280: Tablet: no sideways page scroll — scroll 0px
+✗ product @1280: Desktop renders at 1280px — page inside is 606px wide
+✗ product @1280: Desktop actual size, or scaled and labelled — on screen 608px, caption "none"
+✓ product @1280: Desktop: the page's whole width is in view, not cut off — frame box 608px, in view 608px
+✓ product @1280: Desktop: the frame stays inside the preview pane — pane 272+608, frame 272+608, its box 272+608
+✓ product @1280: Desktop: no sideways page scroll — scroll 0px
+✓ product @1280: negative: Desktop never narrower than Mobile — Desktop 608px on screen / 606px page, Mobile 375px / 373px
+✓ product @1279: Desktop preview at least 600px — frame 976px seen, pane 976px
+✗ product @1279: the editor fits the window: the page itself does not scroll — page scrolls 740px
+✗ product @1279: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✗ product @1279: inspector beside the preview — preview ends 1248, inspector starts 272
+✗ product @1279: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ product @1279: Mobile renders at 375px — page inside is 373px wide
+✓ product @1279: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ product @1279: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ product @1279: Mobile: the frame stays inside the preview pane — pane 272+976, frame 572+375, its box 272+976
+✓ product @1279: Mobile: no sideways page scroll — scroll 0px
+✗ product @1279: Tablet renders at 768px — page inside is 766px wide
+✓ product @1279: Tablet actual size, or scaled and labelled — on screen 768px, caption "none"
+✓ product @1279: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✓ product @1279: Tablet: the frame stays inside the preview pane — pane 272+976, frame 376+768, its box 272+976
+✓ product @1279: Tablet: no sideways page scroll — scroll 0px
+✗ product @1279: Desktop renders at 1280px — page inside is 974px wide
+✗ product @1279: Desktop actual size, or scaled and labelled — on screen 976px, caption "none"
+✓ product @1279: Desktop: the page's whole width is in view, not cut off — frame box 976px, in view 976px
+✓ product @1279: Desktop: the frame stays inside the preview pane — pane 272+976, frame 272+976, its box 272+976
+✓ product @1279: Desktop: no sideways page scroll — scroll 0px
+✓ product @1279: negative: Desktop never narrower than Mobile — Desktop 976px on screen / 974px page, Mobile 375px / 373px
+✓ product @1100: Desktop preview at least 600px — frame 812px seen, pane 812px
+✗ product @1100: the editor fits the window: the page itself does not scroll — page scrolls 740px
+✗ product @1100: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✗ product @1100: inspector beside the preview — preview ends 1076, inspector starts 264
+✗ product @1100: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ product @1100: Mobile renders at 375px — page inside is 373px wide
+✓ product @1100: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ product @1100: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ product @1100: Mobile: the frame stays inside the preview pane — pane 264+812, frame 483+375, its box 264+812
+✓ product @1100: Mobile: no sideways page scroll — scroll 0px
+✗ product @1100: Tablet renders at 768px — page inside is 766px wide
+✓ product @1100: Tablet actual size, or scaled and labelled — on screen 768px, caption "none"
+✓ product @1100: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✓ product @1100: Tablet: the frame stays inside the preview pane — pane 264+812, frame 286+768, its box 264+812
+✓ product @1100: Tablet: no sideways page scroll — scroll 0px
+✗ product @1100: Desktop renders at 1280px — page inside is 810px wide
+✗ product @1100: Desktop actual size, or scaled and labelled — on screen 812px, caption "none"
+✓ product @1100: Desktop: the page's whole width is in view, not cut off — frame box 812px, in view 812px
+✓ product @1100: Desktop: the frame stays inside the preview pane — pane 264+812, frame 264+812, its box 264+812
+✓ product @1100: Desktop: no sideways page scroll — scroll 0px
+✓ product @1100: negative: Desktop never narrower than Mobile — Desktop 812px on screen / 810px page, Mobile 375px / 373px
+✓ product @1024: Desktop preview at least 600px — frame 736px seen, pane 736px
+✗ product @1024: the editor fits the window: the page itself does not scroll — page scrolls 798px
+✗ product @1024: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✗ product @1024: inspector beside the preview — preview ends 1000, inspector starts 264
+✗ product @1024: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ product @1024: Mobile renders at 375px — page inside is 373px wide
+✓ product @1024: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ product @1024: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ product @1024: Mobile: the frame stays inside the preview pane — pane 264+736, frame 445+375, its box 264+736
+✓ product @1024: Mobile: no sideways page scroll — scroll 0px
+✗ product @1024: Tablet renders at 768px — page inside is 766px wide
+✗ product @1024: Tablet actual size, or scaled and labelled — on screen 760px, caption "none"
+✗ product @1024: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 760px
+✗ product @1024: Tablet: the frame stays inside the preview pane — pane 264+736, frame 264+768, its box 264+736
+✗ product @1024: Tablet: no sideways page scroll — scroll 8px
+✗ product @1024: Desktop renders at 1280px — page inside is 734px wide
+✗ product @1024: Desktop actual size, or scaled and labelled — on screen 736px, caption "none"
+✓ product @1024: Desktop: the page's whole width is in view, not cut off — frame box 736px, in view 736px
+✓ product @1024: Desktop: the frame stays inside the preview pane — pane 264+736, frame 264+736, its box 264+736
+✓ product @1024: Desktop: no sideways page scroll — scroll 0px
+✓ product @1024: negative: Desktop never narrower than Mobile — Desktop 736px on screen / 734px page, Mobile 375px / 373px
+✓ product @900: Desktop preview at least 600px — frame 612px seen, pane 612px
+✗ product @900: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ product @900: Mobile renders at 375px — page inside is 373px wide
+✓ product @900: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ product @900: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ product @900: Mobile: the frame stays inside the preview pane — pane 264+612, frame 383+375, its box 264+612
+✓ product @900: Mobile: no sideways page scroll — scroll 0px
+✗ product @900: Tablet renders at 768px — page inside is 766px wide
+✗ product @900: Tablet actual size, or scaled and labelled — on screen 636px, caption "none"
+✗ product @900: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 636px
+✗ product @900: Tablet: the frame stays inside the preview pane — pane 264+612, frame 264+768, its box 264+612
+✗ product @900: Tablet: no sideways page scroll — scroll 132px
+✗ product @900: Desktop renders at 1280px — page inside is 610px wide
+✗ product @900: Desktop actual size, or scaled and labelled — on screen 612px, caption "none"
+✓ product @900: Desktop: the page's whole width is in view, not cut off — frame box 612px, in view 612px
+✓ product @900: Desktop: the frame stays inside the preview pane — pane 264+612, frame 264+612, its box 264+612
+✓ product @900: Desktop: no sideways page scroll — scroll 0px
+✓ product @900: negative: Desktop never narrower than Mobile — Desktop 612px on screen / 610px page, Mobile 375px / 373px
+✗ product @768: Desktop preview at least 600px — frame 480px seen, pane 480px
+✗ product @768: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ product @768: Mobile renders at 375px — page inside is 373px wide
+✓ product @768: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ product @768: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ product @768: Mobile: the frame stays inside the preview pane — pane 264+480, frame 317+375, its box 264+480
+✓ product @768: Mobile: no sideways page scroll — scroll 0px
+✗ product @768: Tablet renders at 768px — page inside is 766px wide
+✗ product @768: Tablet actual size, or scaled and labelled — on screen 504px, caption "none"
+✗ product @768: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 504px
+✗ product @768: Tablet: the frame stays inside the preview pane — pane 264+480, frame 264+768, its box 264+480
+✗ product @768: Tablet: no sideways page scroll — scroll 264px
+✗ product @768: Desktop renders at 1280px — page inside is 478px wide
+✗ product @768: Desktop actual size, or scaled and labelled — on screen 480px, caption "none"
+✓ product @768: Desktop: the page's whole width is in view, not cut off — frame box 480px, in view 480px
+✓ product @768: Desktop: the frame stays inside the preview pane — pane 264+480, frame 264+480, its box 264+480
+✓ product @768: Desktop: no sideways page scroll — scroll 0px
+✓ product @768: negative: Desktop never narrower than Mobile — Desktop 480px on screen / 478px page, Mobile 375px / 373px
+✗ collection @1440: Desktop preview at least 900px on screen — frame 608px seen, preview pane 608px
+✓ collection @1440: inspector at least 280px — inspector 352px
+✗ collection @1440: the editor fits the window: the page itself does not scroll — page scrolls 94px
+✗ collection @1440: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✓ collection @1440: inspector beside the preview — preview ends 960, inspector starts 976
+✗ collection @1440: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ collection @1440: Mobile renders at 375px — page inside is 373px wide
+✓ collection @1440: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ collection @1440: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ collection @1440: Mobile: the frame stays inside the preview pane — pane 352+608, frame 469+375, its box 352+608
+✓ collection @1440: Mobile: no sideways page scroll — scroll 0px
+✗ collection @1440: Tablet renders at 768px — page inside is 766px wide
+✓ collection @1440: Tablet actual size, or scaled and labelled — on screen 768px, caption "none"
+✓ collection @1440: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✗ collection @1440: Tablet: the frame stays inside the preview pane — pane 352+608, frame 352+768, its box 352+608
+✓ collection @1440: Tablet: no sideways page scroll — scroll 0px
+✗ collection @1440: Desktop renders at 1280px — page inside is 606px wide
+✗ collection @1440: Desktop actual size, or scaled and labelled — on screen 608px, caption "none"
+✓ collection @1440: Desktop: the page's whole width is in view, not cut off — frame box 608px, in view 608px
+✓ collection @1440: Desktop: the frame stays inside the preview pane — pane 352+608, frame 352+608, its box 352+608
+✓ collection @1440: Desktop: no sideways page scroll — scroll 0px
+✓ collection @1440: negative: Desktop never narrower than Mobile — Desktop 608px on screen / 606px page, Mobile 375px / 373px
+✓ collection @1280: inspector at least 280px — inspector 352px
+✓ collection @1280: Desktop preview at least 600px — frame 608px seen, pane 608px
+✗ collection @1280: the editor fits the window: the page itself does not scroll — page scrolls 94px
+✗ collection @1280: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✓ collection @1280: inspector beside the preview — preview ends 880, inspector starts 896
+✗ collection @1280: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ collection @1280: Mobile renders at 375px — page inside is 373px wide
+✓ collection @1280: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ collection @1280: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ collection @1280: Mobile: the frame stays inside the preview pane — pane 272+608, frame 389+375, its box 272+608
+✓ collection @1280: Mobile: no sideways page scroll — scroll 0px
+✗ collection @1280: Tablet renders at 768px — page inside is 766px wide
+✓ collection @1280: Tablet actual size, or scaled and labelled — on screen 768px, caption "none"
+✓ collection @1280: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✗ collection @1280: Tablet: the frame stays inside the preview pane — pane 272+608, frame 272+768, its box 272+608
+✓ collection @1280: Tablet: no sideways page scroll — scroll 0px
+✗ collection @1280: Desktop renders at 1280px — page inside is 606px wide
+✗ collection @1280: Desktop actual size, or scaled and labelled — on screen 608px, caption "none"
+✓ collection @1280: Desktop: the page's whole width is in view, not cut off — frame box 608px, in view 608px
+✓ collection @1280: Desktop: the frame stays inside the preview pane — pane 272+608, frame 272+608, its box 272+608
+✓ collection @1280: Desktop: no sideways page scroll — scroll 0px
+✓ collection @1280: negative: Desktop never narrower than Mobile — Desktop 608px on screen / 606px page, Mobile 375px / 373px
+✓ collection @1279: Desktop preview at least 600px — frame 976px seen, pane 976px
+✗ collection @1279: the editor fits the window: the page itself does not scroll — page scrolls 482px
+✗ collection @1279: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✗ collection @1279: inspector beside the preview — preview ends 1248, inspector starts 272
+✗ collection @1279: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ collection @1279: Mobile renders at 375px — page inside is 373px wide
+✓ collection @1279: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ collection @1279: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ collection @1279: Mobile: the frame stays inside the preview pane — pane 272+976, frame 572+375, its box 272+976
+✓ collection @1279: Mobile: no sideways page scroll — scroll 0px
+✗ collection @1279: Tablet renders at 768px — page inside is 766px wide
+✓ collection @1279: Tablet actual size, or scaled and labelled — on screen 768px, caption "none"
+✓ collection @1279: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✓ collection @1279: Tablet: the frame stays inside the preview pane — pane 272+976, frame 376+768, its box 272+976
+✓ collection @1279: Tablet: no sideways page scroll — scroll 0px
+✗ collection @1279: Desktop renders at 1280px — page inside is 974px wide
+✗ collection @1279: Desktop actual size, or scaled and labelled — on screen 976px, caption "none"
+✓ collection @1279: Desktop: the page's whole width is in view, not cut off — frame box 976px, in view 976px
+✓ collection @1279: Desktop: the frame stays inside the preview pane — pane 272+976, frame 272+976, its box 272+976
+✓ collection @1279: Desktop: no sideways page scroll — scroll 0px
+✓ collection @1279: negative: Desktop never narrower than Mobile — Desktop 976px on screen / 974px page, Mobile 375px / 373px
+✓ collection @1100: Desktop preview at least 600px — frame 812px seen, pane 812px
+✗ collection @1100: the editor fits the window: the page itself does not scroll — page scrolls 482px
+✗ collection @1100: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✗ collection @1100: inspector beside the preview — preview ends 1076, inspector starts 264
+✗ collection @1100: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ collection @1100: Mobile renders at 375px — page inside is 373px wide
+✓ collection @1100: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ collection @1100: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ collection @1100: Mobile: the frame stays inside the preview pane — pane 264+812, frame 483+375, its box 264+812
+✓ collection @1100: Mobile: no sideways page scroll — scroll 0px
+✗ collection @1100: Tablet renders at 768px — page inside is 766px wide
+✓ collection @1100: Tablet actual size, or scaled and labelled — on screen 768px, caption "none"
+✓ collection @1100: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✓ collection @1100: Tablet: the frame stays inside the preview pane — pane 264+812, frame 286+768, its box 264+812
+✓ collection @1100: Tablet: no sideways page scroll — scroll 0px
+✗ collection @1100: Desktop renders at 1280px — page inside is 810px wide
+✗ collection @1100: Desktop actual size, or scaled and labelled — on screen 812px, caption "none"
+✓ collection @1100: Desktop: the page's whole width is in view, not cut off — frame box 812px, in view 812px
+✓ collection @1100: Desktop: the frame stays inside the preview pane — pane 264+812, frame 264+812, its box 264+812
+✓ collection @1100: Desktop: no sideways page scroll — scroll 0px
+✓ collection @1100: negative: Desktop never narrower than Mobile — Desktop 812px on screen / 810px page, Mobile 375px / 373px
+✓ collection @1024: Desktop preview at least 600px — frame 736px seen, pane 736px
+✗ collection @1024: the editor fits the window: the page itself does not scroll — page scrolls 524px
+✗ collection @1024: the editor fills the window down to its bottom edge — editor ends at nullpx of 900px, frame 630px tall
+✗ collection @1024: inspector beside the preview — preview ends 1000, inspector starts 264
+✗ collection @1024: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ collection @1024: Mobile renders at 375px — page inside is 373px wide
+✓ collection @1024: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ collection @1024: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ collection @1024: Mobile: the frame stays inside the preview pane — pane 264+736, frame 445+375, its box 264+736
+✓ collection @1024: Mobile: no sideways page scroll — scroll 0px
+✗ collection @1024: Tablet renders at 768px — page inside is 766px wide
+✗ collection @1024: Tablet actual size, or scaled and labelled — on screen 760px, caption "none"
+✗ collection @1024: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 760px
+✗ collection @1024: Tablet: the frame stays inside the preview pane — pane 264+736, frame 264+768, its box 264+736
+✗ collection @1024: Tablet: no sideways page scroll — scroll 8px
+✗ collection @1024: Desktop renders at 1280px — page inside is 734px wide
+✗ collection @1024: Desktop actual size, or scaled and labelled — on screen 736px, caption "none"
+✓ collection @1024: Desktop: the page's whole width is in view, not cut off — frame box 736px, in view 736px
+✓ collection @1024: Desktop: the frame stays inside the preview pane — pane 264+736, frame 264+736, its box 264+736
+✓ collection @1024: Desktop: no sideways page scroll — scroll 0px
+✓ collection @1024: negative: Desktop never narrower than Mobile — Desktop 736px on screen / 734px page, Mobile 375px / 373px
+✓ collection @900: Desktop preview at least 600px — frame 612px seen, pane 612px
+✗ collection @900: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ collection @900: Mobile renders at 375px — page inside is 373px wide
+✓ collection @900: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ collection @900: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ collection @900: Mobile: the frame stays inside the preview pane — pane 264+612, frame 383+375, its box 264+612
+✓ collection @900: Mobile: no sideways page scroll — scroll 0px
+✗ collection @900: Tablet renders at 768px — page inside is 766px wide
+✗ collection @900: Tablet actual size, or scaled and labelled — on screen 636px, caption "none"
+✗ collection @900: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 636px
+✗ collection @900: Tablet: the frame stays inside the preview pane — pane 264+612, frame 264+768, its box 264+612
+✗ collection @900: Tablet: no sideways page scroll — scroll 132px
+✗ collection @900: Desktop renders at 1280px — page inside is 610px wide
+✗ collection @900: Desktop actual size, or scaled and labelled — on screen 612px, caption "none"
+✓ collection @900: Desktop: the page's whole width is in view, not cut off — frame box 612px, in view 612px
+✓ collection @900: Desktop: the frame stays inside the preview pane — pane 264+612, frame 264+612, its box 264+612
+✓ collection @900: Desktop: no sideways page scroll — scroll 0px
+✓ collection @900: negative: Desktop never narrower than Mobile — Desktop 612px on screen / 610px page, Mobile 375px / 373px
+✗ collection @768: Desktop preview at least 600px — frame 480px seen, pane 480px
+✗ collection @768: console navigation folded away, menu button present — sidebar 240px, menu false
+✗ collection @768: Mobile renders at 375px — page inside is 373px wide
+✓ collection @768: Mobile actual size, or scaled and labelled — on screen 375px, caption "none"
+✓ collection @768: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ collection @768: Mobile: the frame stays inside the preview pane — pane 264+480, frame 317+375, its box 264+480
+✓ collection @768: Mobile: no sideways page scroll — scroll 0px
+✗ collection @768: Tablet renders at 768px — page inside is 766px wide
+✗ collection @768: Tablet actual size, or scaled and labelled — on screen 504px, caption "none"
+✗ collection @768: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 504px
+✗ collection @768: Tablet: the frame stays inside the preview pane — pane 264+480, frame 264+768, its box 264+480
+✗ collection @768: Tablet: no sideways page scroll — scroll 264px
+✗ collection @768: Desktop renders at 1280px — page inside is 478px wide
+✗ collection @768: Desktop actual size, or scaled and labelled — on screen 480px, caption "none"
+✓ collection @768: Desktop: the page's whole width is in view, not cut off — frame box 480px, in view 480px
+✓ collection @768: Desktop: the frame stays inside the preview pane — pane 264+480, frame 264+480, its box 264+480
+✓ collection @768: Desktop: no sideways page scroll — scroll 0px
+✓ collection @768: negative: Desktop never narrower than Mobile — Desktop 480px on screen / 478px page, Mobile 375px / 373px
+✗ home @1024: keyboard: Tab reaches the Sections button — after 40 Tab presses
+✗ home @1279: keyboard: Tab reaches the Sections button — after 40 Tab presses
+✗ home @1440: console menu opens the store navigation — no menu button
+✓ storefront @1440: other console pages unchanged: sidebar shown, page capped at 1024px — {"main":1024,"maxWidth":"1024px","sidebar":240,"menu":false}
+
+231 passed, 211 failed

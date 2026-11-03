@@ -7,8 +7,9 @@ import { IconButton } from "./Button";
 
 // Slide-in panel (S50) on the same native <dialog> base as Dialog.js —
 // focus trap, Escape and top-layer for free. Used for the mobile nav
-// drawer; available for detail panels.
-export function Drawer({ open, onClose, side = "left", title, children, width = "18rem" }) {
+// drawer; available for detail panels. ED-01 also opens the editor's section
+// tree in one below 1280px wide, so the close button's name can be set.
+export function Drawer({ open, onClose, side = "left", title, children, width = "18rem", closeLabel = "Close menu" }) {
   const ref = useRef(null);
   useEffect(() => {
     const el = ref.current;
@@ -51,7 +52,7 @@ export function Drawer({ open, onClose, side = "left", title, children, width = 
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-edge px-4 py-3">
             <p className="text-sm font-semibold">{title}</p>
-            <IconButton label="Close menu" icon={<X size={15} aria-hidden />} onClick={onClose} />
+            <IconButton label={closeLabel} icon={<X size={15} aria-hidden />} onClick={onClose} />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         </div>

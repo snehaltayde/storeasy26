@@ -28,13 +28,11 @@ import {
   Undo2,
 } from "lucide-react";
 import { cx } from "@/components/console/cx";
-import { PageHeader } from "@/components/console/PageHeader";
 import { Badge } from "@/components/console/Badge";
 import { Banner } from "@/components/console/Banner";
 import { Button, IconButton } from "@/components/console/Button";
-import { Card } from "@/components/console/Card";
 import { ConfirmDialog, Dialog } from "@/components/console/Dialog";
-import { EmptyState, Skeleton, SkeletonText } from "@/components/console/bits";
+import { EmptyState, SkeletonText } from "@/components/console/bits";
 import { Field, Input, Select, Textarea } from "@/components/console/fields";
 import { Switch } from "@/components/console/Switch";
 import { useToast } from "@/components/console/Toast";
@@ -43,6 +41,7 @@ import { issueText, HERO_SECTION_ID } from "@/lib/cms/issues";
 import { getStorefrontView, saveBlock, resetBlock, startPreview, getHistory, saveCandidate } from "./api";
 import { ConflictBanner } from "./ConflictBanner";
 import DesignerTabs from "./DesignerTabs";
+import { DeviceSwitch, EditorShell, PreviewCanvas } from "./EditorShell";
 import { MediaPicker } from "./MediaPicker";
 import { CollectionPicker } from "./RefPicker";
 import { useDirtyGuard } from "./useDirtyGuard";
@@ -68,12 +67,6 @@ import { useDirtyGuard } from "./useDirtyGuard";
 const HISTORY_CAP = 30;
 
 const KIND_ICONS = { collections: LayoutGrid, new: Sparkles, banner: Megaphone, rich_text: TextQuote, image_with_text: ImageIcon, product_rail: ShoppingBag };
-
-const DEVICES = [
-  { key: "mobile", label: "Mobile", width: 375 },
-  { key: "tablet", label: "Tablet", width: 768 },
-  { key: "desktop", label: "Desktop", width: "100%" },
-];
 
 // ---- shape helpers (HomeEditor's, unchanged) ---------------------------------
 
@@ -600,6 +593,7 @@ export default function Designer({ initial }) {
     <li key={key} className={cx("rounded-ctl border", isSelected ? "border-edge-strong bg-surface-sunken" : "border-transparent")}>
       <button
         type="button"
+        data-tree-pick
         aria-current={isSelected || undefined}
         onClick={onSelect}
         className={cx(
@@ -616,7 +610,7 @@ export default function Designer({ initial }) {
   );
 
   const tree = (
-    <Card padded={false} className="p-3">
+    <div className="p-3">
       <div className="mb-2 flex items-center gap-1.5 px-1">
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-fg">Sections</h2>
         <IconButton label="Undo" icon={<Undo2 size={14} aria-hidden />} onClick={undo} disabled={!history.length} />
@@ -699,7 +693,7 @@ export default function Designer({ initial }) {
           </ul>
         )}
       </div>
-    </Card>
+    </div>
   );
 
   // Inspector controls are GENERATED from the registry's settings contract.
@@ -807,7 +801,7 @@ export default function Designer({ initial }) {
     );
 
   const inspector = (
-    <Card padded={false} className="p-4">
+    <div className="p-4">
       {selected === "hero" ? (
         <div className="space-y-3">
           <div className="flex items-start gap-2">
@@ -904,21 +898,13 @@ export default function Designer({ initial }) {
       ) : (
         <EmptyState icon={<MousePointerClick size={20} aria-hidden />} title="Nothing selected" body="Click a section in the preview or the tree to edit it here." />
       )}
-    </Card>
+    </div>
   );
 
-  const width = DEVICES.find((d) => d.key === device)?.width ?? "100%";
-
   const previewPane = (
-    <div className="min-w-0">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="flex items-center rounded-ctl border border-edge p-0.5" role="group" aria-label="Preview width">
-          {DEVICES.map((d) => (
-            <Button key={d.key} size="sm" variant={device === d.key ? "primary" : "ghost"} aria-pressed={device === d.key} onClick={() => setDevice(d.key)}>
-              {d.label}
-            </Button>
-          ))}
-        </span>
+    <>
+      <div className="flex flex-wrap items-center gap-2 border-b border-edge bg-surface px-3 py-1.5">
+        <DeviceSwitch device={device} onChange={setDevice} />
         <IconButton label="Refresh preview" icon={<RefreshCw size={14} aria-hidden />} onClick={postRefresh} disabled={mint.phase !== "up"} />
         <IconButton
           label="Open preview in a new tab"
@@ -944,7 +930,7 @@ export default function Designer({ initial }) {
         <Banner
           tone="danger"
           title="Preview couldn't start"
-          className="mb-2"
+          className="m-2 mb-0"
           actions={
             <Button size="sm" onClick={mintPreview}>
               Retry
@@ -954,32 +940,30 @@ export default function Designer({ initial }) {
           {mint.error}
         </Banner>
       )}
-      <div className="overflow-auto rounded-card border border-edge bg-surface-sunken p-3">
-        {mint.phase === "up" ? (
-          <iframe
-            key={nonce}
-            ref={iframeRef}
-            src="/"
-            title="Home page preview (your last save)"
-            onLoad={onFrameLoad}
-            style={{ width: typeof width === "number" ? `${width}px` : width }}
-            className="mx-auto block min-h-[70vh] rounded-card border border-edge bg-surface shadow-card"
-          />
-        ) : (
-          <Skeleton className="min-h-[70vh] w-full rounded-card" />
-        )}
-      </div>
-    </div>
+      <PreviewCanvas
+        device={device}
+        frame={
+          mint.phase === "up"
+            ? (style) => (
+                <iframe key={nonce} ref={iframeRef} src="/" title="Home page preview (your last save)" onLoad={onFrameLoad} style={style} className="block bg-surface" />
+              )
+            : null
+        }
+      />
+    </>
   );
 
   // -------------------------------------------------------------------------------
 
+  // ED-01: the editor's own full-width layout (./EditorShell.js). The notices
+  // below are its children and sit above the panes, unchanged.
   return (
     <>
-      <PageHeader
+      <EditorShell
         title="Designer"
         description="Compose the home page visually. Everything saves as a draft — publish from Publishing."
         breadcrumb={[{ label: "Storefront", href: "/admin/storefront" }, { label: "Designer" }]}
+        tabs={<DesignerTabs />}
         actions={
           <>
             <span
@@ -1000,10 +984,10 @@ export default function Designer({ initial }) {
             </Button>
           </>
         }
-      />
-      <DesignerTabs />
-
-      <div className="space-y-3">
+        tree={tree}
+        preview={previewPane}
+        inspector={inspector}
+      >
         {errs.hero?.kind === "conflict" && (
           <ConflictBanner what={BLOCK_LABELS.hero} busy={!!saving.hero} onTakeTheirs={() => takeTheirs("hero")} onOverwrite={() => overwrite("hero")} />
         )}
@@ -1026,16 +1010,7 @@ export default function Designer({ initial }) {
         {errorBanner("hero")}
         {errorBanner("announcement")}
         {errorBanner("home_sections")}
-
-        {/* three panes from xl up — the console shell caps <main> at max-w-5xl
-            with a w-60 sidebar, so at lg the center pane would be ~140px; the
-            stacked order (tree → preview → inspector) stays usable instead */}
-        <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[16rem_minmax(0,1fr)_20rem] xl:items-start">
-          {tree}
-          {previewPane}
-          {inspector}
-        </div>
-      </div>
+      </EditorShell>
 
       {/* remove-section confirm */}
       <ConfirmDialog

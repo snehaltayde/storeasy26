@@ -1,0 +1,84 @@
+✓ home @1440: Desktop preview at least 900px on screen — frame 912px seen, preview pane 928px
+✓ home @1440: tree docked, at least 220px — tree 224
+✓ home @1440: no Sections drawer button while the tree is docked — button shown false
+✓ home @1440: inspector at least 280px — inspector 288px
+✓ home @1440: the editor fits the window: the page itself does not scroll — page scrolls 0px
+✓ home @1440: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 687px tall
+✓ home @1440: inspector beside the preview — preview ends 1152, inspector starts 1152
+✓ home @1440: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ home @1440: classic scrollbars are on and take room — scrollbar 15px
+✓ home @1440: the store's name is in the top bar, which stays one row — name "Design Demo Co", top bar 55px tall
+✓ home @1440: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
+✓ home @1440: Mobile renders at 375px — page inside is 375px wide
+✓ home @1440: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
+✓ home @1440: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ home @1440: Mobile: the frame stays inside the preview pane — pane 224+928, frame 501+375, its box 501+375
+✓ home @1440: Mobile: no sideways page scroll — scroll 0px
+✓ home @1440: Tablet renders at 768px — page inside is 768px wide
+✓ home @1440: Tablet actual size, or scaled and labelled — on screen 768px, caption "Tablet, 768 px wide, actual size"
+✓ home @1440: Tablet: the page's whole width is in view, not cut off — frame box 768px, in view 768px
+✓ home @1440: Tablet: the frame stays inside the preview pane — pane 224+928, frame 304+768, its box 304+768
+✓ home @1440: Tablet: no sideways page scroll — scroll 0px
+✓ home @1440: Desktop renders at 1280px — page inside is 1280px wide
+✓ home @1440: Desktop actual size, or scaled and labelled — on screen 912px, caption "Desktop, 1280 px wide, shown at 71% to fit"
+✓ home @1440: Desktop: the page's whole width is in view, not cut off — frame box 912px, in view 912px
+✓ home @1440: Desktop: the frame stays inside the preview pane — pane 224+928, frame 232+912, its box 232+912
+✓ home @1440: Desktop: no sideways page scroll — scroll 0px
+✓ home @1440: negative: Desktop never narrower than Mobile — Desktop 912px on screen / 1280px page, Mobile 375px / 375px
+✓ home @1280: tree docked, at least 220px — tree 224
+✓ home @1280: no Sections drawer button while the tree is docked — button shown false
+✓ home @1280: inspector at least 280px — inspector 288px
+✓ home @1280: Desktop preview at least 600px — frame 752px seen, pane 768px
+✓ home @1280: the editor fits the window: the page itself does not scroll — page scrolls 0px
+✓ home @1280: the editor fills the window down to its bottom edge — editor ends at 900px of 900px, frame 687px tall
+✓ home @1280: inspector beside the preview — preview ends 992, inspector starts 992
+✓ home @1280: console navigation folded away, menu button present — sidebar hidden, menu true
+✓ home @1280: classic scrollbars are on and take room — scrollbar 15px
+✓ home @1280: the store's name is in the top bar, which stays one row — name "Design Demo Co", top bar 55px tall
+✓ home @1280: the inspector's content fits its pane: nothing cut off sideways — sideways overflow 0px, scrollbar 0px
+✓ home @1280: Mobile renders at 375px — page inside is 375px wide
+✓ home @1280: Mobile actual size, or scaled and labelled — on screen 375px, caption "Mobile, 375 px wide, actual size"
+✓ home @1280: Mobile: the page's whole width is in view, not cut off — frame box 375px, in view 375px
+✓ home @1280: Mobile: the frame stays inside the preview pane — pane 224+768, frame 421+375, its box 421+375
+✓ home @1280: Mobile: no sideways page scroll — scroll 0px
+✓ home @1280: Tablet renders at 768px — page inside is 768px wide
+✓ home @1280: Tablet actual size, or scaled and labelled — on screen 752px, caption "Tablet, 768 px wide, shown at 98% to fit"
+✓ home @1280: Tablet: the page's whole width is in view, not cut off — frame box 752px, in view 752px
+✓ home @1280: Tablet: the frame stays inside the preview pane — pane 224+768, frame 232+752, its box 232+752
+✓ home @1280: Tablet: no sideways page scroll — scroll 0px
+✓ home @1280: Desktop renders at 1280px — page inside is 1280px wide
+✓ home @1280: Desktop actual size, or scaled and labelled — on screen 752px, caption "Desktop, 1280 px wide, shown at 59% to fit"
+✓ home @1280: Desktop: the page's whole width is in view, not cut off — frame box 752px, in view 752px
+✓ home @1280: Desktop: the frame stays inside the preview pane — pane 224+768, frame 232+752, its box 232+752
+✓ home @1280: Desktop: no sideways page scroll — scroll 0px
+✓ home @1280: negative: Desktop never narrower than Mobile — Desktop 752px on screen / 1280px page, Mobile 375px / 375px
+✓ home @1024: keyboard: Tab reaches the Sections button — after 2 Tab presses
+✓ home @1024: keyboard: Enter opens the drawer with the tree, focus inside — {"open":true,"focusInside":true,"hasTree":true,"hasAdd":true,"expanded":"true","treesInPage":1}
+✓ home @1024: the open drawer holds the only copy of the tree — 1 trees in the page
+✓ home @1024: keyboard: Tab never leaves the open drawer — 0 of 12 Tab presses landed outside
+✓ home @1024: keyboard: Escape closes it and focus returns to the button — {"open":false,"focusBack":true,"expanded":"false"}
+✓ home @1024: keyboard: picking a section in the drawer closes it and opens the section in the inspector, focus back on the button — {"open":false,"focusBack":true,"expanded":"false","hero":true}
+✓ home @1024: a tree control that is not a pick (Add section) keeps the drawer open — {"open":true,"button":true,"list":true}
+✓ home @1024: keyboard: the drawer opens on its close button, which closes it, focus returns — first focus in drawer: "Close sections", after: {"open":false,"focusBack":true}
+✓ home @1024: widening past 1280 with the drawer open: drawer closes, tree docks, one tree — {"open":false,"treeShown":true,"sectionsHeadings":1}
+✓ home @1024: resizing the window refits the frame without reloading the page in it — {"mark":true,"inner":1280,"caption":"Desktop, 1280 px wide, shown at 71% to fit"}
+✓ home @1279: keyboard: Tab reaches the Sections button — after 2 Tab presses
+✓ home @1279: keyboard: Enter opens the drawer with the tree, focus inside — {"open":true,"focusInside":true,"hasTree":true,"hasAdd":true,"expanded":"true","treesInPage":1}
+✓ home @1279: the open drawer holds the only copy of the tree — 1 trees in the page
+✓ home @1279: keyboard: Tab never leaves the open drawer — 0 of 12 Tab presses landed outside
+✓ home @1279: keyboard: Escape closes it and focus returns to the button — {"open":false,"focusBack":true,"expanded":"false"}
+✓ home @1279: keyboard: picking a section in the drawer closes it and opens the section in the inspector, focus back on the button — {"open":false,"focusBack":true,"expanded":"false","hero":true}
+✓ home @1279: a tree control that is not a pick (Add section) keeps the drawer open — {"open":true,"button":true,"list":true}
+✓ home @1279: keyboard: the drawer opens on its close button, which closes it, focus returns — first focus in drawer: "Close sections", after: {"open":false,"focusBack":true}
+✓ home @1279: widening past 1280 with the drawer open: drawer closes, tree docks, one tree — {"open":false,"treeShown":true,"sectionsHeadings":1}
+✓ home @1279: resizing the window refits the frame without reloading the page in it — {"mark":true,"inner":1280,"caption":"Desktop, 1280 px wide, shown at 71% to fit"}
+✓ home @1440: console menu opens the store navigation — {"open":true,"links":23,"designer":true}
+✓ home @1440: keyboard: the menu button opens the navigation, Escape closes it, focus returns — Tab presses 1, opened {"open":true,"focusInside":true}, after Escape {"open":false,"focusBack":true}
+✓ storefront @1440: other console pages unchanged: sidebar shown, page capped at 1024px — {"main":1024,"maxWidth":"1024px","sidebar":240,"menu":false}
+✓ home @1280: long tree (28 rows): the page itself does not scroll — {"pane":true,"drawer":false,"client":767,"scroll":1151,"bottom":900,"pageScrollY":0,"lastInView":true,"viewH":900}
+✓ home @1280: long tree: it scrolls inside its own pane, which ends inside the window, and the last section is reachable — {"pane":true,"drawer":false,"client":767,"scroll":1151,"bottom":900,"pageScrollY":0,"lastInView":true,"viewH":900}
+✓ home @1024: long tree (28 rows): the page itself does not scroll — {"pane":true,"drawer":true,"client":848,"scroll":1151,"bottom":900,"pageScrollY":0,"lastInView":true,"viewH":900}
+✓ home @1024: long tree: it scrolls inside its own drawer, which ends inside the window, and the last section is reachable — {"pane":true,"drawer":true,"client":848,"scroll":1151,"bottom":900,"pageScrollY":0,"lastInView":true,"viewH":900}
+
+81 passed, 0 failed
+exit 0

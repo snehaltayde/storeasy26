@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { cx } from "@/components/console/cx";
 
 // S59: the Designer edits more than the home page now — one surface strip
-// shared by all designer routes.
+// shared by all designer routes. ED-01: it sits in the editor's top bar, so it
+// carries no margin of its own.
 const TABS = [
   { href: "/admin/storefront/designer", label: "Home page" },
   { href: "/admin/storefront/designer/product", label: "Product page" },
@@ -15,7 +16,7 @@ const TABS = [
 export default function DesignerTabs() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Designer surfaces" className="mb-4 flex gap-1 rounded-ctl border border-edge bg-surface-sunken p-1 w-fit">
+    <nav aria-label="Designer surfaces" className="flex w-fit gap-1 rounded-ctl border border-edge bg-surface-sunken p-1">
       {TABS.map((t) => {
         const active = pathname === t.href;
         return (

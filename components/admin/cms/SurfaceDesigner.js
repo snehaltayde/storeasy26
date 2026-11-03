@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Loader2, Plus, RefreshCw, X } from "lucide-react";
 import { cx } from "@/components/console/cx";
-import { PageHeader } from "@/components/console/PageHeader";
 import { Badge } from "@/components/console/Badge";
 import { Banner } from "@/components/console/Banner";
 import { Button, IconButton } from "@/components/console/Button";
@@ -16,6 +15,7 @@ import { effectiveSurfaceTemplate, SURFACE_ENTITY_KEYS } from "@/lib/cms/default
 import { saveBlock, startPreview } from "./api";
 import { ConflictBanner } from "./ConflictBanner";
 import DesignerTabs from "./DesignerTabs";
+import { DeviceSwitch, EditorShell, PreviewCanvas } from "./EditorShell";
 import { ProductPicker, CollectionPicker, refLabel } from "./RefPicker";
 
 // S59 (audit slice 3, PDP + collection path): the SURFACE DESIGNER — pick a
@@ -27,6 +27,8 @@ import { ProductPicker, CollectionPicker, refLabel } from "./RefPicker";
 //   · pointers to the editors that own the rest (accordions, pairs, pins)
 // Preview is the SAVED draft via the same cookie-gated bridge as the home
 // Designer; [data-sec] clicks in the page select the matching card here.
+// ED-01: laid out by the same full-width EditorShell as the home Designer,
+// with no tree (preview in the centre, these cards on the right).
 const SURFACE_META = {
   pdp: {
     title: "Designer — Product page",
@@ -49,12 +51,6 @@ const SURFACE_META = {
     ],
   },
 };
-
-const DEVICES = [
-  { key: "mobile", label: "Mobile", width: 375 },
-  { key: "tablet", label: "Tablet", width: 768 },
-  { key: "desktop", label: "Desktop", width: "100%" },
-];
 
 const SOURCE_COPY = { entity: null, family: "your store default", platform: "the platform default" };
 
@@ -242,7 +238,6 @@ export default function SurfaceDesigner({ surface, initial }) {
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  const width = DEVICES.find((d) => d.key === device)?.width ?? "100%";
   const cardCls = (key) => cx("rounded-card transition-shadow", flash === key && "ring-2 ring-[var(--c-accent)] shadow-card");
   const setCardRef = (key) => (el) => {
     cardRefs.current[key] = el;
@@ -252,12 +247,258 @@ export default function SurfaceDesigner({ surface, initial }) {
 
   const Picker = surface === "pdp" ? ProductPicker : CollectionPicker;
 
+  const previewPane = !ctx ? (
+    <div className="flex flex-1 items-start justify-center p-6 lg:items-center">
+      <Card className="w-full max-w-md">
+        <EmptyState
+          title={`Pick a ${meta.entityNoun} to design`}
+          body={`The designer previews a real ${meta.entityNoun} page and edits what governs it.`}
+          className="py-10"
+          action={
+            <Button variant="primary" icon={<Plus size={14} aria-hidden />} onClick={() => setPickerOpen(true)}>
+              Choose a {meta.entityNoun}…
+            </Button>
+          }
+        />
+      </Card>
+    </div>
+  ) : (
+    <>
+      <div className="flex flex-wrap items-center gap-2 border-b border-edge bg-surface px-3 py-1.5">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium text-fg">
+          <span className="truncate">{ctx.title}</span>
+          <span className="font-mono text-xs text-fg-subtle">/{ctx.handle}</span>
+        </span>
+        <Button size="sm" onClick={() => setPickerOpen(true)}>
+          Change…
+        </Button>
+        <span className="ml-auto flex items-center gap-1">
+          <DeviceSwitch device={device} onChange={setDevice} />
+          <IconButton label="Refresh preview" icon={<RefreshCw size={14} aria-hidden />} onClick={postRefresh} disabled={mint.phase !== "up"} />
+          <IconButton
+            label="Open preview in a new tab"
+            icon={<ExternalLink size={14} aria-hidden />}
+            onClick={() => window.open(previewPath, "_blank", "noopener")}
+            disabled={mint.phase !== "up"}
+          />
+        </span>
+      </div>
+      <p role="status" className="px-3 pt-1.5 text-xs text-fg-muted">
+        {mint.phase === "minting" && (
+          <span className="inline-flex items-center gap-1">
+            <Loader2 size={12} className="motion-safe:animate-spin" aria-hidden /> Starting the draft preview…
+          </span>
+        )}
+        {mint.phase === "up" && !connected && "Connecting the preview…"}
+        {mint.phase === "up" && connected && "Preview shows your last save — click a tagged region to jump to its editor"}
+      </p>
+      {mint.phase === "error" && (
+        <Banner
+          tone="danger"
+          title="Preview couldn't start"
+          className="m-2 mb-0"
+          actions={
+            <Button size="sm" onClick={() => setMintTry((n) => n + 1)}>
+              Retry
+            </Button>
+          }
+        >
+          {mint.error}
+        </Banner>
+      )}
+      <PreviewCanvas
+        device={device}
+        placeholder={mint.phase !== "error"}
+        frame={
+          mint.phase === "up"
+            ? (style) => (
+                <iframe
+                  key={nonce}
+                  ref={iframeRef}
+                  src={previewPath}
+                  title={`${meta.entityNoun} page preview (your last save)`}
+                  onLoad={onFrameLoad}
+                  style={style}
+                  className="block bg-surface"
+                />
+              )
+            : null
+        }
+      />
+    </>
+  );
+
+  // the cards beside the preview; nothing to show until a product or collection is picked
+  const inspector = ctx && (
+    <div className="space-y-4 p-3">
+      <div ref={setCardRef("template")} className={cardCls("template")}>
+        <Card>
+          <CardHeader
+            title="Template"
+            badge={<Badge tone={assigned ? "accent" : "neutral"}>{assigned ? "Assigned" : "Default"}</Badge>}
+            description={
+              effective
+                ? `Renders ${optionLabel(effective.template)} — ${
+                    effective.source === "entity" ? `assigned to this ${meta.entityNoun}` : SOURCE_COPY[effective.source]
+                  }.`
+                : ""
+            }
+          />
+          {tplConflict && (
+            <ConflictBanner
+              what="the page templates"
+              busy={tplBusy}
+              onTakeTheirs={() => window.location.reload()}
+              onOverwrite={() => saveTemplate(assigned || null, { force: true })}
+            />
+          )}
+          {tplErr && (
+            <Banner tone="danger" className="mb-3">
+              {tplErr}
+            </Banner>
+          )}
+          <Field label={`Template for this ${meta.entityNoun}`} htmlFor={`sd-tpl-${surface}`} hint="Saved immediately as a draft. “Follow store default” removes the assignment.">
+            <Select
+              id={`sd-tpl-${surface}`}
+              value={assigned}
+              disabled={tplBusy}
+              onChange={(e) => saveTemplate(e.target.value || null)}
+            >
+              <option value="">Follow store default ({optionLabel(effectiveSurfaceTemplate(tplValue, surface, null).template)})</option>
+              {meta.options.map(([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <p className="mt-2 text-xs text-fg-subtle">
+            Store defaults live on <Link href="/admin/theme#page-templates" className="font-medium text-fg hover:underline">Theme → Page templates</Link>.
+          </p>
+        </Card>
+      </div>
+
+      {surface === "pdp" && (
+        <div ref={setCardRef("modules")} className={cardCls("modules")}>
+          <Card>
+            <CardHeader
+              title="Modules & badge"
+              description="This product's accordions and card badge (the catalog presentation override). Drafts — shoppers see them after you publish."
+              actions={
+                mod.phase === "ready" && (
+                  <Button variant="primary" size="sm" busy={modBusy} onClick={saveModules}>
+                    Save
+                  </Button>
+                )
+              }
+            />
+            {mod.phase === "loading" && <Skeleton className="h-24 w-full rounded-ctl" />}
+            {mod.error && (
+              <Banner tone="danger" className="mb-3">
+                {mod.error}
+              </Banner>
+            )}
+            {mod.phase === "ready" && (
+              <>
+                <Field label="Badge" htmlFor="sd-badge" hint="Shown on the product card — blank = none." className="max-w-xs">
+                  <Input
+                    id="sd-badge"
+                    placeholder='e.g. "Lab tested"'
+                    value={mod.badge}
+                    onChange={(e) => {
+                      modDirtyRef.current = true;
+                      setMod((m) => ({ ...m, badge: e.target.value }));
+                    }}
+                  />
+                </Field>
+                <p className="mt-4 text-xs font-medium text-fg-muted">Product-page modules (accordions on this PDP)</p>
+                {mod.modules.map((m, i) => (
+                  <div key={i} className="mt-2 rounded-ctl border border-edge p-3">
+                    <div className="flex items-start gap-2">
+                      <Input aria-label={`Module ${i + 1} title`} placeholder="Module title (e.g. Ingredients)" value={m.title} onChange={(e) => patchModule(i, { title: e.target.value })} />
+                      <IconButton
+                        label={`Remove module ${i + 1}`}
+                        icon={<X size={14} aria-hidden />}
+                        onClick={() => {
+                          modDirtyRef.current = true;
+                          setMod((mm) => ({ ...mm, modules: mm.modules.filter((_, j) => j !== i) }));
+                        }}
+                      />
+                    </div>
+                    <Textarea mono aria-label={`Module ${i + 1} HTML`} className="mt-2" placeholder="<p>HTML — sanitized on save</p>" value={m.html} onChange={(e) => patchModule(i, { html: e.target.value })} />
+                  </div>
+                ))}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Plus size={13} aria-hidden />}
+                  className="mt-2"
+                  onClick={() => {
+                    modDirtyRef.current = true;
+                    setMod((m) => ({ ...m, modules: [...m.modules, { title: "", html: "" }] }));
+                  }}
+                >
+                  Add module
+                </Button>
+              </>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {surface === "pdp" && (
+        <div ref={setCardRef("pairs")} className={cardCls("pairs")}>
+          <Card>
+            <CardHeader title="Also on this page" />
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link href="/admin/storefront/product-pages" className="font-medium text-fg hover:underline">
+                  Accordions on every product page →
+                </Link>
+                <p className="text-xs text-fg-subtle">The store-wide PDP accordions (shipping, returns…).</p>
+              </li>
+              <li>
+                <Link href="/admin/upsells" className="font-medium text-fg hover:underline">
+                  “Pairs well with” →
+                </Link>
+                <p className="text-xs text-fg-subtle">Manual pairings override the same-collection automatic picks.</p>
+              </li>
+            </ul>
+          </Card>
+        </div>
+      )}
+
+      {surface === "collection" && (
+        <div ref={setCardRef("pins")} className={cardCls("pins")}>
+          <Card>
+            <CardHeader title="Also on this page" />
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link href="/admin/catalog" className="font-medium text-fg hover:underline">
+                  Pinned product order →
+                </Link>
+                <p className="text-xs text-fg-subtle">Pin products to the top of this collection's “Featured” order (Catalog → Collection merchandising).</p>
+              </li>
+              <li>
+                <Link href="/admin/storefront/home#collections" className="font-medium text-fg hover:underline">
+                  Collections page curation →
+                </Link>
+                <p className="text-xs text-fg-subtle">Which collections are featured, ordered and hidden on /collections.</p>
+              </li>
+            </ul>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
-      <PageHeader
+      <EditorShell
         title={meta.title}
         description={meta.description}
         breadcrumb={[{ label: "Storefront", href: "/admin/storefront" }, { label: "Designer" }]}
+        tabs={<DesignerTabs />}
         actions={
           <Link
             href="/admin/releases"
@@ -266,249 +507,9 @@ export default function SurfaceDesigner({ surface, initial }) {
             Publishing <ArrowRight size={13} aria-hidden />
           </Link>
         }
+        preview={previewPane}
+        inspector={inspector}
       />
-      <DesignerTabs />
-
-      {!ctx ? (
-        <Card>
-          <EmptyState
-            title={`Pick a ${meta.entityNoun} to design`}
-            body={`The designer previews a real ${meta.entityNoun} page and edits what governs it.`}
-            className="py-10"
-            action={
-              <Button variant="primary" icon={<Plus size={14} aria-hidden />} onClick={() => setPickerOpen(true)}>
-                Choose a {meta.entityNoun}…
-              </Button>
-            }
-          />
-        </Card>
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-[1fr_22rem]">
-          {/* ---- preview ---- */}
-          <div className="min-w-0">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium text-fg">
-                <span className="truncate">{ctx.title}</span>
-                <span className="font-mono text-xs text-fg-subtle">/{ctx.handle}</span>
-              </span>
-              <Button size="sm" onClick={() => setPickerOpen(true)}>
-                Change…
-              </Button>
-              <span className="ml-auto flex items-center gap-1">
-                {DEVICES.map((d) => (
-                  <Button key={d.key} size="sm" variant={device === d.key ? "primary" : "ghost"} onClick={() => setDevice(d.key)}>
-                    {d.label}
-                  </Button>
-                ))}
-                <IconButton label="Refresh preview" icon={<RefreshCw size={14} aria-hidden />} onClick={postRefresh} disabled={mint.phase !== "up"} />
-                <IconButton
-                  label="Open preview in a new tab"
-                  icon={<ExternalLink size={14} aria-hidden />}
-                  onClick={() => window.open(previewPath, "_blank", "noopener")}
-                  disabled={mint.phase !== "up"}
-                />
-              </span>
-            </div>
-            <p role="status" className="mb-2 text-xs text-fg-muted">
-              {mint.phase === "minting" && (
-                <span className="inline-flex items-center gap-1">
-                  <Loader2 size={12} className="motion-safe:animate-spin" aria-hidden /> Starting the draft preview…
-                </span>
-              )}
-              {mint.phase === "up" && !connected && "Connecting the preview…"}
-              {mint.phase === "up" && connected && "Preview shows your last save — click a tagged region to jump to its editor"}
-            </p>
-            {mint.phase === "error" && (
-              <Banner
-                tone="danger"
-                title="Preview couldn't start"
-                actions={
-                  <Button size="sm" onClick={() => setMintTry((n) => n + 1)}>
-                    Retry
-                  </Button>
-                }
-              >
-                {mint.error}
-              </Banner>
-            )}
-            {mint.phase === "up" ? (
-              <iframe
-                key={nonce}
-                ref={iframeRef}
-                src={previewPath}
-                title={`${meta.entityNoun} page preview (your last save)`}
-                onLoad={onFrameLoad}
-                style={{ width: typeof width === "number" ? `${width}px` : width }}
-                className="mx-auto block min-h-[70vh] rounded-card border border-edge bg-surface shadow-card"
-              />
-            ) : (
-              mint.phase !== "error" && <Skeleton className="min-h-[70vh] w-full rounded-card" />
-            )}
-          </div>
-
-          {/* ---- inspector ---- */}
-          <div className="space-y-4">
-            <div ref={setCardRef("template")} className={cardCls("template")}>
-              <Card>
-                <CardHeader
-                  title="Template"
-                  badge={<Badge tone={assigned ? "accent" : "neutral"}>{assigned ? "Assigned" : "Default"}</Badge>}
-                  description={
-                    effective
-                      ? `Renders ${optionLabel(effective.template)} — ${
-                          effective.source === "entity" ? `assigned to this ${meta.entityNoun}` : SOURCE_COPY[effective.source]
-                        }.`
-                      : ""
-                  }
-                />
-                {tplConflict && (
-                  <ConflictBanner
-                    what="the page templates"
-                    busy={tplBusy}
-                    onTakeTheirs={() => window.location.reload()}
-                    onOverwrite={() => saveTemplate(assigned || null, { force: true })}
-                  />
-                )}
-                {tplErr && (
-                  <Banner tone="danger" className="mb-3">
-                    {tplErr}
-                  </Banner>
-                )}
-                <Field label={`Template for this ${meta.entityNoun}`} htmlFor={`sd-tpl-${surface}`} hint="Saved immediately as a draft. “Follow store default” removes the assignment.">
-                  <Select
-                    id={`sd-tpl-${surface}`}
-                    value={assigned}
-                    disabled={tplBusy}
-                    onChange={(e) => saveTemplate(e.target.value || null)}
-                  >
-                    <option value="">Follow store default ({optionLabel(effectiveSurfaceTemplate(tplValue, surface, null).template)})</option>
-                    {meta.options.map(([v, label]) => (
-                      <option key={v} value={v}>
-                        {label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <p className="mt-2 text-xs text-fg-subtle">
-                  Store defaults live on <Link href="/admin/theme#page-templates" className="font-medium text-fg hover:underline">Theme → Page templates</Link>.
-                </p>
-              </Card>
-            </div>
-
-            {surface === "pdp" && (
-              <div ref={setCardRef("modules")} className={cardCls("modules")}>
-                <Card>
-                  <CardHeader
-                    title="Modules & badge"
-                    description="This product's accordions and card badge (the catalog presentation override). Drafts — shoppers see them after you publish."
-                    actions={
-                      mod.phase === "ready" && (
-                        <Button variant="primary" size="sm" busy={modBusy} onClick={saveModules}>
-                          Save
-                        </Button>
-                      )
-                    }
-                  />
-                  {mod.phase === "loading" && <Skeleton className="h-24 w-full rounded-ctl" />}
-                  {mod.error && (
-                    <Banner tone="danger" className="mb-3">
-                      {mod.error}
-                    </Banner>
-                  )}
-                  {mod.phase === "ready" && (
-                    <>
-                      <Field label="Badge" htmlFor="sd-badge" hint="Shown on the product card — blank = none." className="max-w-xs">
-                        <Input
-                          id="sd-badge"
-                          placeholder='e.g. "Lab tested"'
-                          value={mod.badge}
-                          onChange={(e) => {
-                            modDirtyRef.current = true;
-                            setMod((m) => ({ ...m, badge: e.target.value }));
-                          }}
-                        />
-                      </Field>
-                      <p className="mt-4 text-xs font-medium text-fg-muted">Product-page modules (accordions on this PDP)</p>
-                      {mod.modules.map((m, i) => (
-                        <div key={i} className="mt-2 rounded-ctl border border-edge p-3">
-                          <div className="flex items-start gap-2">
-                            <Input aria-label={`Module ${i + 1} title`} placeholder="Module title (e.g. Ingredients)" value={m.title} onChange={(e) => patchModule(i, { title: e.target.value })} />
-                            <IconButton
-                              label={`Remove module ${i + 1}`}
-                              icon={<X size={14} aria-hidden />}
-                              onClick={() => {
-                                modDirtyRef.current = true;
-                                setMod((mm) => ({ ...mm, modules: mm.modules.filter((_, j) => j !== i) }));
-                              }}
-                            />
-                          </div>
-                          <Textarea mono aria-label={`Module ${i + 1} HTML`} className="mt-2" placeholder="<p>HTML — sanitized on save</p>" value={m.html} onChange={(e) => patchModule(i, { html: e.target.value })} />
-                        </div>
-                      ))}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        icon={<Plus size={13} aria-hidden />}
-                        className="mt-2"
-                        onClick={() => {
-                          modDirtyRef.current = true;
-                          setMod((m) => ({ ...m, modules: [...m.modules, { title: "", html: "" }] }));
-                        }}
-                      >
-                        Add module
-                      </Button>
-                    </>
-                  )}
-                </Card>
-              </div>
-            )}
-
-            {surface === "pdp" && (
-              <div ref={setCardRef("pairs")} className={cardCls("pairs")}>
-                <Card>
-                  <CardHeader title="Also on this page" />
-                  <ul className="space-y-2 text-sm">
-                    <li>
-                      <Link href="/admin/storefront/product-pages" className="font-medium text-fg hover:underline">
-                        Accordions on every product page →
-                      </Link>
-                      <p className="text-xs text-fg-subtle">The store-wide PDP accordions (shipping, returns…).</p>
-                    </li>
-                    <li>
-                      <Link href="/admin/upsells" className="font-medium text-fg hover:underline">
-                        “Pairs well with” →
-                      </Link>
-                      <p className="text-xs text-fg-subtle">Manual pairings override the same-collection automatic picks.</p>
-                    </li>
-                  </ul>
-                </Card>
-              </div>
-            )}
-
-            {surface === "collection" && (
-              <div ref={setCardRef("pins")} className={cardCls("pins")}>
-                <Card>
-                  <CardHeader title="Also on this page" />
-                  <ul className="space-y-2 text-sm">
-                    <li>
-                      <Link href="/admin/catalog" className="font-medium text-fg hover:underline">
-                        Pinned product order →
-                      </Link>
-                      <p className="text-xs text-fg-subtle">Pin products to the top of this collection's “Featured” order (Catalog → Collection merchandising).</p>
-                    </li>
-                    <li>
-                      <Link href="/admin/storefront/home#collections" className="font-medium text-fg hover:underline">
-                        Collections page curation →
-                      </Link>
-                      <p className="text-xs text-fg-subtle">Which collections are featured, ordered and hidden on /collections.</p>
-                    </li>
-                  </ul>
-                </Card>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <Picker
         open={pickerOpen}
