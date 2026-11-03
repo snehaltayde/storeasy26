@@ -264,6 +264,13 @@ await t("the real libSQL client through the proxy: every statement, round trip, 
     const dup = DB.repeatedReads(n);
     eq(dup.map((d) => d.times), [2], "one statement ran twice with the same arguments");
     eq(dup[0].shape, "SELECT * FROM products WHERE handle = ?", "named by its shape");
+    // P2-PERF fix round 2: each shape's own result bytes, so a route's parsed
+    // bytes can be split by statement; the split never exceeds what was parsed
+    const per = Object.values(n.shapeBytes);
+    eq(Object.keys(n.shapeBytes).length, Object.keys(n.shapes).length, "a byte count for every shape");
+    ok(per.every((b) => b > 0), "every shape returned some bytes");
+    ok(per.reduce((a, b) => a + b, 0) <= n.bytesDownDecoded, "the split adds up to no more than the bytes parsed");
+    ok(n.shapeBytes["READ SELECT * FROM products WHERE handle = ?"] > n.shapeBytes["READ SELECT ?"], "two runs of a two-row read weigh more than one SELECT 1");
     eq(proxy.take().roundTrips, 0, "take() starts again from zero");
     ok(up.seen.some((s) => s.body.includes("store_sql")), "the batch used stored SQL, resolved by id");
   } finally {
