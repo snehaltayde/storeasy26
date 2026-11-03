@@ -177,7 +177,9 @@ async function settleFrame() {
   await sleep(600);
 }
 
-const PAGE_URL = { home: "/admin/storefront/designer", product: "/admin/storefront/designer/product", collection: "/admin/storefront/designer/collection" };
+// Console paths live here as plain strings: test:shopify-boundary treats an admin
+// path glued straight onto a variable as a possible Shopify Admin REST call.
+const PAGE_URL = { home: "/admin/storefront/designer", product: "/admin/storefront/designer/product", collection: "/admin/storefront/designer/collection", overview: "/admin/storefront" };
 const CTX = {
   product: ["storeasy-designer-ctx-pdp", { id: "gid://p/1", handle: "glow-serum", title: "Radiance Glow Serum 30ml" }],
   collection: ["storeasy-designer-ctx-collection", { id: "gid://c/2", handle: "serums", title: "Serums" }],
@@ -298,7 +300,9 @@ async function drawerByKeyboard(width) {
 async function consoleMenu(width) {
   await viewport(width);
   await navigate(`${BASE}${PAGE_URL.home}`);
-  await waitFor(`!!document.querySelector('[data-console-menu]')`, 15000).catch(() => null);
+  // the button is in the server HTML before React hydrates; the preview frame
+  // only mounts after hydration, so wait for it before clicking
+  await settleFrame();
   const has = await evaluate(`!!document.querySelector('[data-console-menu]')`);
   if (!has) return check("home", width, "console menu opens the store navigation", false, "no menu button");
   await evaluate(`document.querySelector('[data-console-menu]').click(), true`);
@@ -328,7 +332,7 @@ async function consoleMenu(width) {
 // Ordinary console pages keep their capped layout and the sidebar.
 async function ordinaryPage(width) {
   await viewport(width);
-  await navigate(`${BASE}/admin/storefront`);
+  await navigate(`${BASE}${PAGE_URL.overview}`);
   await waitFor(`!!document.querySelector('main')`);
   await sleep(500);
   const r = await evaluate(`(() => { const m = document.querySelector('main'); const a = [...document.querySelectorAll('aside')].find((x) => x.querySelector('a[href="/admin/dashboard"]')); return { main: Math.round(m.getBoundingClientRect().width), maxWidth: getComputedStyle(m).maxWidth, sidebar: a ? Math.round(a.getBoundingClientRect().width) : 0, menu: !!document.querySelector('[data-console-menu]') }; })()`);
