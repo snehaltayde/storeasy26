@@ -249,6 +249,29 @@ No owner checks for this item.
 - [ ] CI sqld install (carried from P2-ATOM): .github/ was not touched. Approve the libsql-server release and its SHA-256, then add the step from docs/cms-reviews/P2-ATOM.md owner check 1.
 - [ ] Hosted Turso, on a staging tenant in documents mode: create a page while the network drops the answer (it must answer 200, never 'Another page already uses ...'), and check that rows read per autosave stay flat as publish_log grows.
 
+## Phase 2, batch 5
+
+### The hero is a real section, and every section renders through one map (P2-SECTIONS)
+- [ ] In the Designer preview of a documents-mode store (harness only), leave a banner or rail unfinished. Check that the 'not finished yet' note shows and that clicking it selects the section. The rendered test covers this, but it was not checked in a browser.
+- [ ] A hero image off the Shopify CDN is shown unresized (the full file goes to the browser). Decide later whether to restrict hero media in the validator instead.
+- [ ] CI sqld download in .github/ still needs the owner's approval of its source and checksum (unchanged).
+
+### Fewer and smaller storefront reads (P2-PERF)
+- [ ] Review the round 2 catalog changes as their owners would: app/(storefront)/layout.js, lib/repo.js, lib/cms/section-data.js, lib/experiments.js.
+- [ ] Optional: in desktop Chrome, open home, a collection page and a policy page on a store with both menus and on one without, and check the header and footer look as before.
+- [ ] Hosted numbers (OQ-19): a store without its own header or footer menu now starts the nav collections read one database trip later. The harness store has both menus, so no local run measured this.
+- [ ] Home's margin under 50 KB is about 680 bytes on the test store only. Decide whether the next cut (merging the five rails into one statement, about 2 KB) is wanted.
+- [ ] The CI sqld download is still pending your approval of its source and checksum. .github/ was not touched.
+
+### Publish, preview redirect and theme race fixes (P2-FIX4)
+- [ ] OC-F1 (security, desktop Chrome on the design harness, own ports): /api/preview?to=/%5Cevil.com, ?to=/%09/evil.com and ?token=bad&to=/%5Cevil.com each land on the store's home page; ?to=/collections lands on /collections. Not run.
+- [ ] OC-F2: confirm that structure problems in hidden or inherited sections block the document's publish (PUB-03 as written), including for migrated documents.
+- [ ] OC-F3: confirm the hero-race words, then have components/admin/ThemeAdmin.js show the API's `note` (it shows its own toast today).
+- [ ] OC-F4: confirm the pinned preview behaviour: when a store's mode can't be read, a founder's preview shows live content, not drafts.
+- [ ] OC-F5: CI sqld download (source and checksum) still needs owner approval; nothing under .github/ was changed.
+- [ ] OC-F6: hosted Turso staging documents store: a publish whose response is dropped after commit answers success with single rows.
+- [ ] DR-1, DR-2, DR-3 stand; no real store is in documents mode.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
