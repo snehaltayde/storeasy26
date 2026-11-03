@@ -1,4 +1,5 @@
 import { NextResponse, after } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { roleAllows } from "@/lib/platform/authz";
 import { audit } from "@/lib/platform/audit";
@@ -58,6 +59,11 @@ export const POST = tenantHandler(async (request) => {
     const { view } = await catalogSyncProgress();
     return NextResponse.json({ ok: true, action, sync: view }, { status: 202 });
   } catch (e) {
+    // DOC-04: a database failure is never a 4xx, and is named as the store's
+    // data, not as Shopify. Shopify itself is only called in the slices after
+    // the response, so what lands here is the database or a missing link.
+    const infra = infraResponse(e, { route: "admin/sync", doing: "load" });
+    if (infra) return NextResponse.json({ ok: false, ...infra.body }, { status: infra.status });
     const raw = String(e?.message || e).slice(0, 300);
     slog("admin_sync_failed", { error: raw });
     return NextResponse.json({ ok: false, error: plainSyncError(raw) }, { status: /credentials/i.test(raw) ? 409 : 500 });

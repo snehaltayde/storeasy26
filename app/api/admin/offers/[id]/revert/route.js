@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
+import { infraMessage } from "@/lib/cms/issues";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { revertOffer } from "@/lib/offers/store";
@@ -14,8 +16,6 @@ import { tenantHandler } from "@/lib/tenant-request";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const STATUS = { NOT_FOUND: 404, NOT_HERE: 409, NO_PREVIOUS: 409, CHANGED: 409, OFFER_INVALID: 422 };
-
 export const POST = tenantHandler(async (request, { params }) => {
   const auth = await requireAdmin(request, "offers.write");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -28,7 +28,16 @@ export const POST = tenantHandler(async (request, { params }) => {
     await audit({ actor: auth.actor, action: "offers.write", resource: `offer:${id}`, diff: { reverted: true } });
     return NextResponse.json({ ok: true, offer });
   } catch (e) {
-    if (!STATUS[e?.code]) throw e;
-    return NextResponse.json({ error: e.message, code: e.code }, { status: STATUS[e.code] });
+    // The store's own refusals first, then the database check (DOC-04: a
+    // database failure is never a 4xx), then the catch-all.
+    // scripts/test-failure-matrix.js checks this order.
+    if (e?.code === "NOT_FOUND") return NextResponse.json({ error: e.message, code: e.code }, { status: 404 });
+    if (e?.code === "NOT_HERE" || e?.code === "NO_PREVIOUS") return NextResponse.json({ error: e.message, code: e.code }, { status: 409 });
+    if (e?.code === "CHANGED") return NextResponse.json({ error: e.message, code: e.code }, { status: 409 });
+    if (e?.code === "OFFER_INVALID") return NextResponse.json({ error: e.message, code: e.code }, { status: 422 });
+    const infra = infraResponse(e, { route: "admin/offers/[id]/revert" });
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
+    slog("offer_revert_failed", { offer_id: id, error: String(e?.message || e).slice(0, 300) });
+    return NextResponse.json({ error: infraMessage("internal"), code: "INTERNAL_ERROR" }, { status: 500 });
   }
 });
