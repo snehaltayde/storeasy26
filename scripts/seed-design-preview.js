@@ -13,8 +13,17 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { HarnessError, assertLocalDbUrl } from "./design-harness.js";
+import { FIXTURE_NAMES } from "./perf-fixture.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+// PERF-04: `node scripts/dev-design.js seed --fixture perf` adds a store sized
+// like a mid-size D2C brand on top of the demo data (scripts/perf-fixture.js).
+const FIXTURE = String(process.env.DESIGN_FIXTURE || "").trim();
+if (FIXTURE && !FIXTURE_NAMES.includes(FIXTURE)) {
+  console.error(`✗ There is no "${FIXTURE}" fixture. The fixtures are: ${FIXTURE_NAMES.join(", ")}.`);
+  process.exit(1);
+}
 
 const ADMIN_PW = process.env.DESIGN_ADMIN_PASSWORD;
 if (!ADMIN_PW) {
@@ -298,6 +307,14 @@ await A.addAgencyMember(agency.id, partner.id, "owner");
 const inv = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@design.test", role: "staff" });
 await A.acceptGrant(inv.token, { tenantId: "design", actorEmail: "owner@design.test" });
 await A.createClientApproval({ agencyId: agency.id, tenantId: "design", note: "Homepage refresh for the winter drop" });
+
+if (FIXTURE === "perf") {
+  console.log("• adding the perf fixture (PERF-04): a mid-size store, local only, nothing from Shopify");
+  const { seedPerfFixture } = await import("./perf-fixture.js");
+  const started = Date.now();
+  const { summary } = await withTenant(await C.getTenant("design"), () => seedPerfFixture({ libsql, log: console.log }));
+  console.log(`  perf fixture: ${Object.entries(summary).map(([k, v]) => `${k} ${v}`).join(", ")} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
+}
 
 console.log("✓ design-preview seeded: tenant 'design' on the harness's local databases (.design-data/)");
 // The origin is a variable so the Shopify boundary scan (test:shopify-boundary)

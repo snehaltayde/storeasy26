@@ -1,0 +1,1978 @@
+{
+  "kind": "storeasy-perf-baseline",
+  "version": 1,
+  "takenAt": "2026-11-03T13:12:31.922Z",
+  "environment": {
+    "kind": "local",
+    "machine": {
+      "os": "Darwin 25.5.0 (macOS 26.5.1)",
+      "cpu": "Apple M5 Pro",
+      "cores": 15,
+      "memoryGB": 24,
+      "loadAverageAtStart": [
+        4.16,
+        3.92,
+        3.66
+      ],
+      "loadAverageAtEnd": [
+        4.22,
+        3.95,
+        3.68
+      ]
+    },
+    "node": "v26.0.0",
+    "next": "16.2.9",
+    "sqld": "sqld sqld 0.24.32 (40c272de 2025-02-14)",
+    "git": {
+      "commit": "8968db3",
+      "appCodeChangedSinceCommit": false
+    },
+    "build": {
+      "id": "nOsn1pbejWya3uI8uIgb6",
+      "builtAt": "2026-11-03T13:02:01.797Z",
+      "how": "next build, then next start (production), the design harness env"
+    },
+    "runtime": "storefront pages and /api/cart on the edge runtime (Next's local edge sandbox, not Vercel's)",
+    "databases": "local sqld over http://127.0.0.1, one per database (platform, tenant, env default)",
+    "platformCacheMs": 30000
+  },
+  "fixture": {
+    "name": "perf",
+    "sizes": {
+      "products": 400,
+      "variants": 1142,
+      "productImages": 1764,
+      "collections": 30,
+      "collectionMemberships": 1253,
+      "contentPages": 21,
+      "journalPosts": 60,
+      "campaigns": 4,
+      "offers": 12,
+      "bundles": 4,
+      "placements": 42,
+      "media": 32,
+      "mediaBytes": 4100174,
+      "liveReleaseBytes": 607929,
+      "homeSections": 12,
+      "contentDigest": "331b3929e7a67fe9"
+    },
+    "seededAt": "2026-11-03T13:11:30.575Z"
+  },
+  "method": {
+    "warmRuns": 50,
+    "warmup": 5,
+    "countedRuns": 5,
+    "order": "warm runs go round the routes in turn, one request at a time, over one kept-alive connection",
+    "cold": "a fresh next start per route, then that route's first request on a new connection",
+    "ttfb": "from sending the request to receiving the response headers",
+    "total": "from sending the request to the last byte of the body",
+    "percentile": "nearest rank (p95 of 50 runs is the 48th fastest)",
+    "bytes": "response body as sent (gzip when offered), median; headers counted apart; firstVisitStatic is the /_next/static files the HTML names, fetched once each",
+    "db": "counted on the wire by a proxy in front of each sqld (scripts/perf-dbcount.js) and checked against sqld's own query counter; warm = the middle counted run, first = the first request that route's code served after next start (collection-all shares its code with collection, and cart-update with cart-get, so theirs is already warm); rowsRead is sqld's own rows_read; bytesDown is the database's answers as sent (sqld gzips them when the client asks), bytesDownDecoded what the page had to parse",
+    "shopper": "no cookies except the cart cookie on the cart and checkout routes, so the home page sees a first-time visitor; each request carries its own x-forwarded-for"
+  },
+  "notMeasured": [
+    "Edge memory: Next's local edge sandbox runs inside one Node process, so no per-request or per-isolate memory figure exists locally. It needs the hosted runtime (OQ-19).",
+    "Hosted latency: Turso and the hosted edge add network time between the page and its database; here every database call stays on this Mac.",
+    "Images: product and page photos (/_next/image, /api/media) are not fetched."
+  ],
+  "budgets": "None. Budgets wait for hosted numbers (PERF-04, OQ-19). These local numbers are a baseline, not a budget.",
+  "routes": [
+    {
+      "key": "home",
+      "label": "Home",
+      "method": "GET",
+      "path": "/",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "transfer-encoding": "chunked",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+        "x-edge-runtime": "1"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 56.2,
+        "p95": 83,
+        "min": 46,
+        "max": 97.2
+      },
+      "total": {
+        "runs": 50,
+        "p50": 57.4,
+        "p95": 85.3,
+        "min": 47.8,
+        "max": 99.5
+      },
+      "cold": {
+        "ttfb": 709.1,
+        "total": 710.8
+      },
+      "bytes": {
+        "wire": 228079,
+        "decoded": 228079,
+        "gzipEstimate": 20908,
+        "headers": 769,
+        "firstVisitStatic": {
+          "files": 15,
+          "compressed": 11,
+          "wire": 313549,
+          "decoded": 842818
+        }
+      },
+      "db": {
+        "warm": {
+          "reads": 24,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 24,
+          "roundTrips": 24,
+          "rowsRead": 5346,
+          "rowsReturned": 102,
+          "bytesDown": 64179,
+          "bytesDownDecoded": 664223,
+          "queryMs": 1.84,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 24,
+              "writes": 0,
+              "roundTrips": 24,
+              "rowsRead": 5346,
+              "bytesDown": 64179
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "first": {
+          "reads": 26,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 26,
+          "roundTrips": 26,
+          "rowsRead": 5348,
+          "rowsReturned": 104,
+          "bytesDown": 65192,
+          "bytesDownDecoded": 666409,
+          "queryMs": 2.02,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 2,
+              "writes": 0,
+              "roundTrips": 2,
+              "rowsRead": 2,
+              "bytesDown": 1013
+            },
+            "tenant": {
+              "reads": 24,
+              "writes": 0,
+              "roundTrips": 24,
+              "rowsRead": 5346,
+              "bytesDown": 64179
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [],
+        "statements": [
+          {
+            "times": 1,
+            "rowsRead": 1342,
+            "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1342,
+            "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"description\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" inner join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c"
+          },
+          {
+            "times": 5,
+            "rowsRead": 802,
+            "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+          },
+          {
+            "times": 1,
+            "rowsRead": 800,
+            "shape": "READ select \"handle\", \"title\", \"product_type\", \"price_min\", \"price_max\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" order by \"available\" desc, \"created_at\" desc limit ?"
+          },
+          {
+            "times": 5,
+            "rowsRead": 604,
+            "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 400,
+            "shape": "READ select count(\"id\") as \"n\" from \"products\""
+          },
+          {
+            "times": 1,
+            "rowsRead": 30,
+            "shape": "READ select count(\"id\") as \"n\" from \"collections\""
+          },
+          {
+            "times": 1,
+            "rowsRead": 15,
+            "shape": "READ select \"id\", \"handle\" from \"collections\" where \"id\" in (?, ?, ?, ?, ?)"
+          },
+          {
+            "times": 5,
+            "rowsRead": 7,
+            "shape": "READ select \"co\".\"pinned\" from \"collection_overrides\" as \"co\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"co\".\"collection_id\" where \"c\".\"handle\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 2,
+            "shape": "READ select * from \"experiments\" where \"target_kind\" = ? and \"status\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"live_release_id\" from \"release_state\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select * from \"releases\" where \"id\" = ?"
+          }
+        ]
+      }
+    },
+    {
+      "key": "product",
+      "label": "Product page",
+      "method": "GET",
+      "path": "/products/micronised-creatine-12",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "transfer-encoding": "chunked",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+        "x-edge-runtime": "1"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 32,
+        "p95": 46.8,
+        "min": 25.5,
+        "max": 51.3
+      },
+      "total": {
+        "runs": 50,
+        "p50": 37.6,
+        "p95": 54.8,
+        "min": 29.1,
+        "max": 59.6
+      },
+      "cold": {
+        "ttfb": 401.6,
+        "total": 417.7
+      },
+      "bytes": {
+        "wire": 86908,
+        "decoded": 86908,
+        "gzipEstimate": 13266,
+        "headers": 769,
+        "firstVisitStatic": {
+          "files": 15,
+          "compressed": 12,
+          "wire": 315761,
+          "decoded": 850263
+        }
+      },
+      "db": {
+        "warm": {
+          "reads": 10,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 10,
+          "roundTrips": 10,
+          "rowsRead": 1407,
+          "rowsReturned": 61,
+          "bytesDown": 60354,
+          "bytesDownDecoded": 652995,
+          "queryMs": 0.56,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 10,
+              "writes": 0,
+              "roundTrips": 10,
+              "rowsRead": 1407,
+              "bytesDown": 60354
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 3
+        },
+        "first": {
+          "reads": 12,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 12,
+          "roundTrips": 12,
+          "rowsRead": 1409,
+          "rowsReturned": 63,
+          "bytesDown": 61366,
+          "bytesDownDecoded": 655180,
+          "queryMs": 0.72,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 2,
+              "writes": 0,
+              "roundTrips": 2,
+              "rowsRead": 2,
+              "bytesDown": 1013
+            },
+            "tenant": {
+              "reads": 10,
+              "writes": 0,
+              "roundTrips": 10,
+              "rowsRead": 1407,
+              "bytesDown": 60353
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 3
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [
+          {
+            "times": 2,
+            "shape": "select * from \"products\" where \"handle\" = ?"
+          },
+          {
+            "times": 2,
+            "shape": "select * from \"product_images\" where \"product_id\" = ? order by \"position\" asc"
+          },
+          {
+            "times": 2,
+            "shape": "select * from \"variants\" where \"product_id\" = ? order by \"position\" asc"
+          }
+        ],
+        "statements": [
+          {
+            "times": 1,
+            "rowsRead": 1342,
+            "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          },
+          {
+            "times": 2,
+            "rowsRead": 26,
+            "shape": "READ select * from \"product_images\" where \"product_id\" = ? order by \"position\" asc"
+          },
+          {
+            "times": 2,
+            "rowsRead": 26,
+            "shape": "READ select * from \"variants\" where \"product_id\" = ? order by \"position\" asc"
+          },
+          {
+            "times": 1,
+            "rowsRead": 9,
+            "shape": "READ select \"id\", \"handle\", \"title\", \"price_min\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" where \"id\" in (?, ?, ?) and \"available\" = ?"
+          },
+          {
+            "times": 2,
+            "rowsRead": 2,
+            "shape": "READ select * from \"products\" where \"handle\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"live_release_id\" from \"release_state\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select * from \"releases\" where \"id\" = ?"
+          }
+        ]
+      }
+    },
+    {
+      "key": "collection",
+      "label": "Collection page (one category)",
+      "method": "GET",
+      "path": "/collections/protein",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "transfer-encoding": "chunked",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+        "x-edge-runtime": "1"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 28.2,
+        "p95": 43.7,
+        "min": 23.8,
+        "max": 47.1
+      },
+      "total": {
+        "runs": 50,
+        "p50": 37.7,
+        "p95": 60.7,
+        "min": 32.6,
+        "max": 65
+      },
+      "cold": {
+        "ttfb": 437.2,
+        "total": 461
+      },
+      "bytes": {
+        "wire": 177517,
+        "decoded": 177517,
+        "gzipEstimate": 14575,
+        "headers": 769,
+        "firstVisitStatic": {
+          "files": 15,
+          "compressed": 12,
+          "wire": 313474,
+          "decoded": 843450
+        }
+      },
+      "db": {
+        "warm": {
+          "reads": 9,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 9,
+          "roundTrips": 9,
+          "rowsRead": 1794,
+          "rowsReturned": 77,
+          "bytesDown": 58420,
+          "bytesDownDecoded": 651952,
+          "queryMs": 0.7,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 9,
+              "writes": 0,
+              "roundTrips": 9,
+              "rowsRead": 1794,
+              "bytesDown": 58420
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 1
+        },
+        "first": {
+          "reads": 11,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 11,
+          "roundTrips": 11,
+          "rowsRead": 1796,
+          "rowsReturned": 79,
+          "bytesDown": 59432,
+          "bytesDownDecoded": 654136,
+          "queryMs": 0.75,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 2,
+              "writes": 0,
+              "roundTrips": 2,
+              "rowsRead": 2,
+              "bytesDown": 1013
+            },
+            "tenant": {
+              "reads": 9,
+              "writes": 0,
+              "roundTrips": 9,
+              "rowsRead": 1794,
+              "bytesDown": 58419
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 1
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [
+          {
+            "times": 2,
+            "shape": "select * from \"collections\" where \"handle\" = ?"
+          }
+        ],
+        "statements": [
+          {
+            "times": 1,
+            "rowsRead": 1342,
+            "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          },
+          {
+            "times": 1,
+            "rowsRead": 163,
+            "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+          },
+          {
+            "times": 1,
+            "rowsRead": 162,
+            "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+          },
+          {
+            "times": 1,
+            "rowsRead": 122,
+            "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+          },
+          {
+            "times": 2,
+            "rowsRead": 2,
+            "shape": "READ select * from \"collections\" where \"handle\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"live_release_id\" from \"release_state\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select * from \"releases\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"id\" from \"collections\" where \"handle\" = ?"
+          }
+        ]
+      }
+    },
+    {
+      "key": "collection-all",
+      "label": "Collection page (shop all, 400 products)",
+      "method": "GET",
+      "path": "/collections/shop-all",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "transfer-encoding": "chunked",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+        "x-edge-runtime": "1"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 27.9,
+        "p95": 45.4,
+        "min": 24.5,
+        "max": 46.6
+      },
+      "total": {
+        "runs": 50,
+        "p50": 40,
+        "p95": 62.8,
+        "min": 34.5,
+        "max": 65.6
+      },
+      "cold": {
+        "ttfb": 371,
+        "total": 392.9
+      },
+      "bytes": {
+        "wire": 203705,
+        "decoded": 203705,
+        "gzipEstimate": 19604,
+        "headers": 769,
+        "firstVisitStatic": {
+          "files": 15,
+          "compressed": 12,
+          "wire": 313474,
+          "decoded": 843450
+        }
+      },
+      "db": {
+        "warm": {
+          "reads": 9,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 9,
+          "roundTrips": 9,
+          "rowsRead": 5766,
+          "rowsReturned": 100,
+          "bytesDown": 59433,
+          "bytesDownDecoded": 654370,
+          "queryMs": 1.07,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 9,
+              "writes": 0,
+              "roundTrips": 9,
+              "rowsRead": 5766,
+              "bytesDown": 59433
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 1
+        },
+        "first": {
+          "reads": 9,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 9,
+          "roundTrips": 9,
+          "rowsRead": 5766,
+          "rowsReturned": 100,
+          "bytesDown": 59433,
+          "bytesDownDecoded": 654370,
+          "queryMs": 1.19,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 9,
+              "writes": 0,
+              "roundTrips": 9,
+              "rowsRead": 5766,
+              "bytesDown": 59433
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 1
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [
+          {
+            "times": 2,
+            "shape": "select * from \"collections\" where \"handle\" = ?"
+          }
+        ],
+        "statements": [
+          {
+            "times": 1,
+            "rowsRead": 1617,
+            "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+          },
+          {
+            "times": 1,
+            "rowsRead": 1601,
+            "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1342,
+            "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1201,
+            "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+          },
+          {
+            "times": 2,
+            "rowsRead": 2,
+            "shape": "READ select * from \"collections\" where \"handle\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"live_release_id\" from \"release_state\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select * from \"releases\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"id\" from \"collections\" where \"handle\" = ?"
+          }
+        ]
+      }
+    },
+    {
+      "key": "collections",
+      "label": "/collections",
+      "method": "GET",
+      "path": "/collections",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "transfer-encoding": "chunked",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+        "x-edge-runtime": "1"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 30.4,
+        "p95": 43.4,
+        "min": 26.3,
+        "max": 46.7
+      },
+      "total": {
+        "runs": 50,
+        "p50": 31.3,
+        "p95": 45,
+        "min": 27.9,
+        "max": 48.3
+      },
+      "cold": {
+        "ttfb": 390.4,
+        "total": 391.5
+      },
+      "bytes": {
+        "wire": 116960,
+        "decoded": 116960,
+        "gzipEstimate": 12458,
+        "headers": 769,
+        "firstVisitStatic": {
+          "files": 14,
+          "compressed": 11,
+          "wire": 312280,
+          "decoded": 841946
+        }
+      },
+      "db": {
+        "warm": {
+          "reads": 4,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 4,
+          "roundTrips": 4,
+          "rowsRead": 2686,
+          "rowsReturned": 62,
+          "bytesDown": 56388,
+          "bytesDownDecoded": 638328,
+          "queryMs": 0.94,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 4,
+              "writes": 0,
+              "roundTrips": 4,
+              "rowsRead": 2686,
+              "bytesDown": 56388
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 1
+        },
+        "first": {
+          "reads": 6,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 6,
+          "roundTrips": 6,
+          "rowsRead": 2688,
+          "rowsReturned": 64,
+          "bytesDown": 57401,
+          "bytesDownDecoded": 640514,
+          "queryMs": 0.56,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 2,
+              "writes": 0,
+              "roundTrips": 2,
+              "rowsRead": 2,
+              "bytesDown": 1012
+            },
+            "tenant": {
+              "reads": 4,
+              "writes": 0,
+              "roundTrips": 4,
+              "rowsRead": 2686,
+              "bytesDown": 56389
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 1
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [
+          {
+            "times": 2,
+            "shape": "select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          }
+        ],
+        "statements": [
+          {
+            "times": 2,
+            "rowsRead": 2684,
+            "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"live_release_id\" from \"release_state\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select * from \"releases\" where \"id\" = ?"
+          }
+        ]
+      }
+    },
+    {
+      "key": "search",
+      "label": "Search",
+      "method": "GET",
+      "path": "/search?q=protein",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "transfer-encoding": "chunked",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+        "x-edge-runtime": "1"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 31.8,
+        "p95": 42.1,
+        "min": 26.8,
+        "max": 50
+      },
+      "total": {
+        "runs": 50,
+        "p50": 33.6,
+        "p95": 42.7,
+        "min": 28.5,
+        "max": 51.7
+      },
+      "cold": {
+        "ttfb": 417.7,
+        "total": 419
+      },
+      "bytes": {
+        "wire": 160886,
+        "decoded": 160886,
+        "gzipEstimate": 15042,
+        "headers": 769,
+        "firstVisitStatic": {
+          "files": 15,
+          "compressed": 12,
+          "wire": 313357,
+          "decoded": 843090
+        }
+      },
+      "db": {
+        "warm": {
+          "reads": 4,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 4,
+          "roundTrips": 4,
+          "rowsRead": 1797,
+          "rowsReturned": 68,
+          "bytesDown": 56535,
+          "bytesDownDecoded": 643021,
+          "queryMs": 0.69,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 4,
+              "writes": 0,
+              "roundTrips": 4,
+              "rowsRead": 1797,
+              "bytesDown": 56535
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "first": {
+          "reads": 6,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 6,
+          "roundTrips": 6,
+          "rowsRead": 1799,
+          "rowsReturned": 70,
+          "bytesDown": 57548,
+          "bytesDownDecoded": 645206,
+          "queryMs": 0.77,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 2,
+              "writes": 0,
+              "roundTrips": 2,
+              "rowsRead": 2,
+              "bytesDown": 1012
+            },
+            "tenant": {
+              "reads": 4,
+              "writes": 0,
+              "roundTrips": 4,
+              "rowsRead": 1797,
+              "bytesDown": 56536
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [],
+        "statements": [
+          {
+            "times": 1,
+            "rowsRead": 1342,
+            "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          },
+          {
+            "times": 1,
+            "rowsRead": 453,
+            "shape": "READ select \"handle\", \"title\", \"featured_image\" as \"image\", \"price_min\" as \"price\", \"currency\", \"product_type\", \"available\" from \"products\" where (\"title\" like ? or \"product_type\" like ? or \"vendor\" like ? or \"tags\" like ?) order by \"available\" "
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"live_release_id\" from \"release_state\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select * from \"releases\" where \"id\" = ?"
+          }
+        ]
+      }
+    },
+    {
+      "key": "cms-page",
+      "label": "CMS page (a policy)",
+      "method": "GET",
+      "path": "/policies/refund-policy",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "transfer-encoding": "chunked",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+        "x-edge-runtime": "1"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 27.4,
+        "p95": 35.1,
+        "min": 24.1,
+        "max": 45.5
+      },
+      "total": {
+        "runs": 50,
+        "p50": 28.8,
+        "p95": 36.8,
+        "min": 25.5,
+        "max": 46
+      },
+      "cold": {
+        "ttfb": 369.8,
+        "total": 370.9
+      },
+      "bytes": {
+        "wire": 54818,
+        "decoded": 54818,
+        "gzipEstimate": 9444,
+        "headers": 769,
+        "firstVisitStatic": {
+          "files": 15,
+          "compressed": 12,
+          "wire": 313808,
+          "decoded": 843930
+        }
+      },
+      "db": {
+        "warm": {
+          "reads": 3,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 3,
+          "roundTrips": 3,
+          "rowsRead": 1344,
+          "rowsReturned": 32,
+          "bytesDown": 55355,
+          "bytesDownDecoded": 631928,
+          "queryMs": 0.36,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 3,
+              "writes": 0,
+              "roundTrips": 3,
+              "rowsRead": 1344,
+              "bytesDown": 55355
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "first": {
+          "reads": 5,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 5,
+          "roundTrips": 5,
+          "rowsRead": 1346,
+          "rowsReturned": 34,
+          "bytesDown": 56368,
+          "bytesDownDecoded": 634114,
+          "queryMs": 0.4,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 2,
+              "writes": 0,
+              "roundTrips": 2,
+              "rowsRead": 2,
+              "bytesDown": 1013
+            },
+            "tenant": {
+              "reads": 3,
+              "writes": 0,
+              "roundTrips": 3,
+              "rowsRead": 1344,
+              "bytesDown": 55355
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [],
+        "statements": [
+          {
+            "times": 1,
+            "rowsRead": 1342,
+            "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"live_release_id\" from \"release_state\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select * from \"releases\" where \"id\" = ?"
+          }
+        ]
+      }
+    },
+    {
+      "key": "journal",
+      "label": "Journal index (60 posts)",
+      "method": "GET",
+      "path": "/journal",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "transfer-encoding": "chunked",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+        "x-edge-runtime": "1"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 28.4,
+        "p95": 34,
+        "min": 25.3,
+        "max": 42.8
+      },
+      "total": {
+        "runs": 50,
+        "p50": 29.7,
+        "p95": 35.7,
+        "min": 26.9,
+        "max": 44.9
+      },
+      "cold": {
+        "ttfb": 383.1,
+        "total": 384.1
+      },
+      "bytes": {
+        "wire": 92572,
+        "decoded": 92572,
+        "gzipEstimate": 12396,
+        "headers": 769,
+        "firstVisitStatic": {
+          "files": 14,
+          "compressed": 11,
+          "wire": 312280,
+          "decoded": 841946
+        }
+      },
+      "db": {
+        "warm": {
+          "reads": 3,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 3,
+          "roundTrips": 3,
+          "rowsRead": 1344,
+          "rowsReturned": 32,
+          "bytesDown": 55355,
+          "bytesDownDecoded": 631928,
+          "queryMs": 0.49,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 3,
+              "writes": 0,
+              "roundTrips": 3,
+              "rowsRead": 1344,
+              "bytesDown": 55355
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "first": {
+          "reads": 5,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 5,
+          "roundTrips": 5,
+          "rowsRead": 1346,
+          "rowsReturned": 34,
+          "bytesDown": 56367,
+          "bytesDownDecoded": 634114,
+          "queryMs": 0.41,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 2,
+              "writes": 0,
+              "roundTrips": 2,
+              "rowsRead": 2,
+              "bytesDown": 1012
+            },
+            "tenant": {
+              "reads": 3,
+              "writes": 0,
+              "roundTrips": 3,
+              "rowsRead": 1344,
+              "bytesDown": 55355
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [],
+        "statements": [
+          {
+            "times": 1,
+            "rowsRead": 1342,
+            "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"live_release_id\" from \"release_state\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select * from \"releases\" where \"id\" = ?"
+          }
+        ]
+      }
+    },
+    {
+      "key": "cart-get",
+      "label": "Cart API, read (3 lines)",
+      "method": "GET",
+      "path": "/api/cart",
+      "status": 200,
+      "contentType": "application/json",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "application/json",
+        "transfer-encoding": "chunked"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 4.6,
+        "p95": 6.8,
+        "min": 3.6,
+        "max": 7
+      },
+      "total": {
+        "runs": 50,
+        "p50": 4.7,
+        "p95": 6.8,
+        "min": 3.7,
+        "max": 7.1
+      },
+      "cold": {
+        "ttfb": 383,
+        "total": 383.5
+      },
+      "bytes": {
+        "wire": 1614,
+        "decoded": 1614,
+        "gzipEstimate": 650,
+        "headers": 213,
+        "firstVisitStatic": null
+      },
+      "db": {
+        "warm": {
+          "reads": 3,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 3,
+          "roundTrips": 3,
+          "rowsRead": 29,
+          "rowsReturned": 14,
+          "bytesDown": 2249,
+          "bytesDownDecoded": 9925,
+          "queryMs": 0.14,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 3,
+              "writes": 0,
+              "roundTrips": 3,
+              "rowsRead": 29,
+              "bytesDown": 2249
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "first": {
+          "reads": 5,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 5,
+          "roundTrips": 5,
+          "rowsRead": 31,
+          "rowsReturned": 16,
+          "bytesDown": 3261,
+          "bytesDownDecoded": 12110,
+          "queryMs": 0.2,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 2,
+              "writes": 0,
+              "roundTrips": 2,
+              "rowsRead": 2,
+              "bytesDown": 1012
+            },
+            "tenant": {
+              "reads": 3,
+              "writes": 0,
+              "roundTrips": 3,
+              "rowsRead": 29,
+              "bytesDown": 2249
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [],
+        "statements": [
+          {
+            "times": 1,
+            "rowsRead": 18,
+            "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+          },
+          {
+            "times": 1,
+            "rowsRead": 10,
+            "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+          }
+        ]
+      }
+    },
+    {
+      "key": "cart-update",
+      "label": "Cart API, change a quantity",
+      "method": "POST",
+      "path": "/api/cart",
+      "status": 200,
+      "contentType": "application/json",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "application/json",
+        "transfer-encoding": "chunked"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 5.7,
+        "p95": 7.9,
+        "min": 4.5,
+        "max": 10
+      },
+      "total": {
+        "runs": 50,
+        "p50": 5.8,
+        "p95": 8,
+        "min": 4.5,
+        "max": 10
+      },
+      "cold": {
+        "ttfb": 327.3,
+        "total": 328
+      },
+      "bytes": {
+        "wire": 1614,
+        "decoded": 1614,
+        "gzipEstimate": 650,
+        "headers": 213,
+        "firstVisitStatic": null
+      },
+      "db": {
+        "warm": {
+          "reads": 3,
+          "writes": 2,
+          "txStatements": 0,
+          "statements": 5,
+          "roundTrips": 5,
+          "rowsRead": 31,
+          "rowsReturned": 14,
+          "bytesDown": 2621,
+          "bytesDownDecoded": 10506,
+          "queryMs": 0.2,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 3,
+              "writes": 2,
+              "roundTrips": 5,
+              "rowsRead": 31,
+              "bytesDown": 2621
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "first": {
+          "reads": 3,
+          "writes": 2,
+          "txStatements": 0,
+          "statements": 5,
+          "roundTrips": 5,
+          "rowsRead": 31,
+          "rowsReturned": 14,
+          "bytesDown": 2623,
+          "bytesDownDecoded": 10507,
+          "queryMs": 0.23,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 3,
+              "writes": 2,
+              "roundTrips": 5,
+              "rowsRead": 31,
+              "bytesDown": 2623
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 0
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [],
+        "statements": [
+          {
+            "times": 1,
+            "rowsRead": 18,
+            "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+          },
+          {
+            "times": 1,
+            "rowsRead": 10,
+            "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "WRITE update \"cart_items\" set \"quantity\" = ? where \"cart_id\" = ? and \"variant_id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "WRITE update \"carts\" set \"updated_at\" = ? where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+          }
+        ]
+      }
+    },
+    {
+      "key": "checkout",
+      "label": "Checkout, first step",
+      "method": "GET",
+      "path": "/checkout",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "contentEncoding": null,
+      "responseHeaders": {
+        "content-type": "text/html; charset=utf-8",
+        "transfer-encoding": "chunked",
+        "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+        "x-edge-runtime": "1"
+      },
+      "ttfb": {
+        "runs": 50,
+        "p50": 35.7,
+        "p95": 51.3,
+        "min": 28.9,
+        "max": 54.2
+      },
+      "total": {
+        "runs": 50,
+        "p50": 37.3,
+        "p95": 52.9,
+        "min": 30.4,
+        "max": 54.7
+      },
+      "cold": {
+        "ttfb": 426.2,
+        "total": 427.3
+      },
+      "bytes": {
+        "wire": 56367,
+        "decoded": 56367,
+        "gzipEstimate": 9899,
+        "headers": 769,
+        "firstVisitStatic": {
+          "files": 15,
+          "compressed": 12,
+          "wire": 317440,
+          "decoded": 856397
+        }
+      },
+      "db": {
+        "warm": {
+          "reads": 9,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 9,
+          "roundTrips": 9,
+          "rowsRead": 1402,
+          "rowsReturned": 60,
+          "bytesDown": 59850,
+          "bytesDownDecoded": 651777,
+          "queryMs": 0.68,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            },
+            "tenant": {
+              "reads": 9,
+              "writes": 0,
+              "roundTrips": 9,
+              "rowsRead": 1402,
+              "bytesDown": 59850
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 3
+        },
+        "first": {
+          "reads": 11,
+          "writes": 0,
+          "txStatements": 0,
+          "statements": 11,
+          "roundTrips": 11,
+          "rowsRead": 1404,
+          "rowsReturned": 62,
+          "bytesDown": 60865,
+          "bytesDownDecoded": 653963,
+          "queryMs": 1.05,
+          "unparsed": 0,
+          "errors": 0,
+          "byDb": {
+            "platform": {
+              "reads": 2,
+              "writes": 0,
+              "roundTrips": 2,
+              "rowsRead": 2,
+              "bytesDown": 1013
+            },
+            "tenant": {
+              "reads": 9,
+              "writes": 0,
+              "roundTrips": 9,
+              "rowsRead": 1402,
+              "bytesDown": 59852
+            },
+            "default": {
+              "reads": 0,
+              "writes": 0,
+              "roundTrips": 0,
+              "rowsRead": 0,
+              "bytesDown": 0
+            }
+          },
+          "duplicateReads": 3
+        },
+        "stableAcrossRuns": true,
+        "sqldAgrees": true,
+        "repeatedStatements": [
+          {
+            "times": 2,
+            "shape": "select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+          },
+          {
+            "times": 2,
+            "shape": "select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+          },
+          {
+            "times": 2,
+            "shape": "select * from \"offers\" where \"enabled\" = ?"
+          }
+        ],
+        "statements": [
+          {
+            "times": 1,
+            "rowsRead": 1342,
+            "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          },
+          {
+            "times": 2,
+            "rowsRead": 36,
+            "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+          },
+          {
+            "times": 2,
+            "rowsRead": 20,
+            "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+          },
+          {
+            "times": 2,
+            "rowsRead": 2,
+            "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select \"live_release_id\" from \"release_state\" where \"id\" = ?"
+          },
+          {
+            "times": 1,
+            "rowsRead": 1,
+            "shape": "READ select * from \"releases\" where \"id\" = ?"
+          }
+        ]
+      }
+    }
+  ],
+  "candidatesForPerf06": {
+    "slowestWarm": [
+      {
+        "route": "home",
+        "totalP50": 57.4,
+        "totalP95": 85.3
+      },
+      {
+        "route": "collection-all",
+        "totalP50": 40,
+        "totalP95": 62.8
+      },
+      {
+        "route": "collection",
+        "totalP50": 37.7,
+        "totalP95": 60.7
+      }
+    ],
+    "slowestCold": [
+      {
+        "route": "home",
+        "coldTotal": 710.8
+      },
+      {
+        "route": "collection",
+        "coldTotal": 461
+      },
+      {
+        "route": "checkout",
+        "coldTotal": 427.3
+      }
+    ],
+    "mostReads": [
+      {
+        "route": "home",
+        "reads": 24,
+        "roundTrips": 24,
+        "rowsRead": 5346
+      },
+      {
+        "route": "product",
+        "reads": 10,
+        "roundTrips": 10,
+        "rowsRead": 1407
+      },
+      {
+        "route": "collection",
+        "reads": 9,
+        "roundTrips": 9,
+        "rowsRead": 1794
+      }
+    ],
+    "repeatedReads": [
+      {
+        "route": "product",
+        "repeated": [
+          {
+            "times": 2,
+            "shape": "select * from \"products\" where \"handle\" = ?"
+          },
+          {
+            "times": 2,
+            "shape": "select * from \"product_images\" where \"product_id\" = ? order by \"position\" asc"
+          },
+          {
+            "times": 2,
+            "shape": "select * from \"variants\" where \"product_id\" = ? order by \"position\" asc"
+          }
+        ]
+      },
+      {
+        "route": "collection",
+        "repeated": [
+          {
+            "times": 2,
+            "shape": "select * from \"collections\" where \"handle\" = ?"
+          }
+        ]
+      },
+      {
+        "route": "collection-all",
+        "repeated": [
+          {
+            "times": 2,
+            "shape": "select * from \"collections\" where \"handle\" = ?"
+          }
+        ]
+      },
+      {
+        "route": "collections",
+        "repeated": [
+          {
+            "times": 2,
+            "shape": "select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+          }
+        ]
+      },
+      {
+        "route": "checkout",
+        "repeated": [
+          {
+            "times": 2,
+            "shape": "select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+          },
+          {
+            "times": 2,
+            "shape": "select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+          },
+          {
+            "times": 2,
+            "shape": "select * from \"offers\" where \"enabled\" = ?"
+          }
+        ]
+      }
+    ],
+    "mostRowsRead": [
+      {
+        "route": "collection-all",
+        "rowsRead": 5766,
+        "bytesFromDb": 59433,
+        "bytesFromDbDecoded": 654370,
+        "topStatement": {
+          "times": 1,
+          "rowsRead": 1617,
+          "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+        }
+      },
+      {
+        "route": "home",
+        "rowsRead": 5346,
+        "bytesFromDb": 64179,
+        "bytesFromDbDecoded": 664223,
+        "topStatement": {
+          "times": 1,
+          "rowsRead": 1342,
+          "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+        }
+      },
+      {
+        "route": "collections",
+        "rowsRead": 2686,
+        "bytesFromDb": 56388,
+        "bytesFromDbDecoded": 638328,
+        "topStatement": {
+          "times": 2,
+          "rowsRead": 2684,
+          "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+        }
+      }
+    ]
+  }
+}

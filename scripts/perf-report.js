@@ -1,17 +1,33 @@
-// Perf budgets + load fixtures (Session 42 / BE35).  pnpm test:perf
+// Perf report + load fixtures (Session 42 / BE35; PERF-04).
 //
-// Measures the hot paths against a LARGE catalog (5,000 products / 120
-// collections / ~30k memberships), queue drain throughput, snapshot/publish
-// with 50 pages, and a noisy-neighbor check (tenant A's search latency while
-// tenant B hammers writes). Budgets are deliberately generous for local
-// SQLite + CI variance — they catch ORDER-OF-MAGNITUDE regressions (a missing
-// index, an accidental N+1), not micro-drift. Numbers print as a report; the
-// measured set goes into IMPLEMENTATION_STATUS per session.
+//   pnpm test:perf                          library mode (below), unchanged
+//   node scripts/perf-report.js http …      PERF-04: real HTTP requests against
+//                                           a production build of the design
+//                                           harness, perf fixture, edge runtime
+//                                           (scripts/perf-http.js)
+//   node scripts/perf-report.js check <run.json> --budget <file>
+//                                           compare a run with a budget file
+//   node scripts/perf-report.js fixture     sizes and content digest of the
+//                                           seeded harness data
+//
+// Library mode measures the hot paths against a LARGE catalog (5,000 products
+// / 120 collections / ~30k memberships), queue drain throughput,
+// snapshot/publish with 50 pages, and a noisy-neighbor check (tenant A's
+// search latency while tenant B hammers writes). Its thresholds are
+// deliberately generous LOCAL GUARDS for local SQLite + CI variance — they
+// catch ORDER-OF-MAGNITUDE regressions (a missing index, an accidental N+1),
+// not micro-drift. They are not budgets: PERF-04 sets budgets only from hosted
+// numbers (docs/perf/budgets.json). Numbers print as a report.
 import { readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+if (["http", "check", "fixture"].includes(process.argv[2])) {
+  const { main } = await import("./perf-http.js");
+  process.exit(await main(process.argv.slice(2)));
+}
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -87,7 +103,8 @@ console.log(`  seeded in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 // ---- measurement harness -----------------------------------------------------
 const results = [];
 let fail = 0;
-async function measure(name, budgetMs, fn, { runs = 5 } = {}) {
+// guardMs: a local order-of-magnitude guard, not a budget (see the header).
+async function measure(name, guardMs, fn, { runs = 5 } = {}) {
   await fn(); // warm (connection, statement cache)
   const times = [];
   for (let i = 0; i < runs; i++) {
@@ -98,10 +115,10 @@ async function measure(name, budgetMs, fn, { runs = 5 } = {}) {
   times.sort((a, b) => a - b);
   const p50 = times[Math.floor(times.length / 2)];
   const worst = times[times.length - 1];
-  const ok = worst <= budgetMs;
+  const ok = worst <= guardMs;
   if (!ok) fail++;
-  results.push({ name, p50: +p50.toFixed(1), worst: +worst.toFixed(1), budgetMs, ok });
-  console.log(`  ${ok ? "✓" : "✗"} ${name}: p50 ${p50.toFixed(1)}ms · worst ${worst.toFixed(1)}ms (budget ${budgetMs}ms)`);
+  results.push({ name, p50: +p50.toFixed(1), worst: +worst.toFixed(1), guard: `${guardMs}ms`, ok });
+  console.log(`  ${ok ? "✓" : "✗"} ${name}: p50 ${p50.toFixed(1)}ms · worst ${worst.toFixed(1)}ms (local guard ${guardMs}ms)`);
   return { p50, worst };
 }
 
@@ -143,8 +160,8 @@ console.log("— jobs queue drain");
   const rate = done / secs;
   const ok = rate >= 25;
   if (!ok) fail++;
-  results.push({ name: "queue drain (200 noop jobs)", p50: +rate.toFixed(0), worst: +rate.toFixed(0), budgetMs: "≥25/s", ok });
-  console.log(`  ${ok ? "✓" : "✗"} queue drain: ${done} jobs in ${secs.toFixed(2)}s = ${rate.toFixed(0)} jobs/s (budget ≥25/s)`);
+  results.push({ name: "queue drain (200 noop jobs)", p50: +rate.toFixed(0), worst: +rate.toFixed(0), unit: " jobs/s", guard: "≥25/s", ok });
+  console.log(`  ${ok ? "✓" : "✗"} queue drain: ${done} jobs in ${secs.toFixed(2)}s = ${rate.toFixed(0)} jobs/s (local guard ≥25/s)`);
 }
 
 console.log("— noisy neighbor (tenant B hammers writes while A searches)");
@@ -165,8 +182,8 @@ console.log("— noisy neighbor (tenant B hammers writes while A searches)");
   console.log(`  (B completed ${writes} interleaved writes; A worst ${noisy.worst.toFixed(1)}ms vs quiet ${solo.worst.toFixed(1)}ms — separate DB files isolate I/O)`);
 }
 
-console.log("\n=== PERF REPORT (BE35) ===");
-for (const r of results) console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name}: p50 ${r.p50}ms worst ${r.worst}ms (budget ${r.budgetMs})`);
+console.log("\n=== PERF REPORT (BE35): local guards, not budgets ===");
+for (const r of results) console.log(`${r.ok ? "PASS" : "FAIL"}  ${r.name}: p50 ${r.p50}${r.unit || "ms"} worst ${r.worst}${r.unit || "ms"} (local guard ${r.guard})`);
 console.log(`\n${results.length - fail} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 process.exit(fail ? 1 : 0);

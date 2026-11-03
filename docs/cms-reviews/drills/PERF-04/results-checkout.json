@@ -1,0 +1,65 @@
+{
+  "id": "PERF-04",
+  "part": "checkout",
+  "title": "PERF-04: the measured pages, perf fixture, production build — checkout",
+  "ranAt": "2026-11-03T13:15:45.307Z",
+  "harness": "http://localhost:3203",
+  "chrome": "156.0.8078.80",
+  "passed": 7,
+  "failed": 0,
+  "knownFailures": 1,
+  "checks": [
+    {
+      "ok": true,
+      "label": "checkout at 1440: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "checkout at 1440: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 1440: not an error page"
+    },
+    {
+      "ok": false,
+      "label": "checkout at 1440: no broken images",
+      "detail": [
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_db4c43f623b0f0943a&w=96&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_bb4fefefb069ed6999&w=96&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_34792eae1d0d7e34d7&w=96&q=75"
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 1440: shows \"shipping address\""
+    },
+    {
+      "ok": true,
+      "label": "checkout lists \"Creatine Monohydrate\" from the measured cart"
+    },
+    {
+      "ok": true,
+      "label": "checkout lists \"Triple Strength Omega\" from the measured cart"
+    },
+    {
+      "ok": true,
+      "label": "checkout lists \"Gentle Face Wash\" from the measured cart"
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "checkout-1440",
+      "file": "docs/cms-reviews/drills/PERF-04/checkout-1440.png",
+      "bytes": 20772,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    }
+  ]
+}

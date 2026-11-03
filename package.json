@@ -89,6 +89,7 @@
     "test:order-catalog": "node scripts/test-order-catalog.js",
     "test:editor-layout": "node scripts/test-editor-layout.js",
     "test:perf": "node scripts/perf-report.js",
+    "test:perf-tools": "node scripts/test-perf-tools.js",
     "seed:design": "node scripts/dev-design.js seed",
     "dev:design": "node scripts/dev-design.js",
     "drill:smoke": "node scripts/drill.js smoke",

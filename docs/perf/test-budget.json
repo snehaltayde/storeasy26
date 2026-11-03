@@ -1,0 +1,10 @@
+{
+  "note": "TEST ONLY. Proves that node scripts/perf-report.js check fails when a number is over its budget. Not a budget: the home page TTFB limit of 1 ms is impossible on purpose. Real budgets wait for hosted numbers (OQ-19) and go in budgets.json.",
+  "basis": "test",
+  "runKind": "local",
+  "budgets": [
+    { "route": "home", "metric": "ttfb.p95", "max": 1 },
+    { "route": "product", "metric": "db.reads", "max": 1000 },
+    { "route": "cart-get", "metric": "db.roundTrips", "max": 1000 }
+  ]
+}
