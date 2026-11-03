@@ -190,11 +190,27 @@ Scratch runner, not committed: each mutation replaces one exact string, runs `te
 
 ## Test results
 
-`pnpm test` on the final code, before this packet was written: **45 of 45 suites passed in 61.0s**. Per suite, from `node scripts/run-tests.js --verbose` on the committed branch (passed/failed):
+`pnpm test` on the final code: **45 of 45 suites passed in 61.0s**. A second run, `node scripts/run-tests.js --verbose` on commit `5bc8066`, gave 45 of 45 in 61.2s: **898 tests passed, 0 failed**. Per suite (passed/failed):
 
 ```
-RESULTS_PLACEHOLDER
+test:orders 27/0            test:shipping 12/0          test:shopify-push 13/0
+test:shopify-boundary 41/0  test:hardening 11/0         test:offers 27/0
+test:offers-admin 8/0       test:events 16/0            test:tenancy 9/0
+test:platform-sync 15/0     test:admin-console 9/0      test:cms-api 20/0
+test:page-editor 61/0       test:refs 8/0               test:sections 15/0
+test:cms 11/0               test:platform-ops 9/0       test:tenant-boundary 24/0
+test:identity 22/0          test:authz 14/0             test:platform-core 15/0
+test:jobs 12/0              test:sync-generations 8/0   test:order-projection 14/0
+test:commerce 10/0          test:privacy 11/0           test:security 19/0
+test:content 19/0           test:releases 25/0          test:themes 10/0
+test:storefront 15/0        test:surfaces 15/0          test:billing 14/0
+test:provision 9/0          test:reporting 6/0          test:tenant-ops 9/0
+test:marketing 4/0          test:customers 9/0          test:commerce-exp 18/0
+test:growth 21/0            test:agency 16/0            test:w6 16/0
+test:copy 52/0              test:media-upload 119/0     test:failure-matrix 60/0
 ```
+
+Baseline `bdbe1a7` before any change: `pnpm test` 44 of 44 suites passed. `test:page-editor` was 53/0 there, and `test:failure-matrix` did not exist.
 
 `test:perf` was not run (a measurement). `next build` was not run.
 
