@@ -39,7 +39,7 @@ export function shape(sql) {
 }
 
 export function emptyCounts() {
-  return { roundTrips: 0, otherRequests: 0, unparsed: 0, statements: Object.fromEntries(KINDS.map((k) => [k, 0])), rowsRead: 0, rowsWritten: 0, rowsReturned: 0, queryMs: 0, bytesUp: 0, bytesDown: 0, bytesDownDecoded: 0, errors: 0, shapes: {}, shapeRows: {}, exact: {} };
+  return { roundTrips: 0, otherRequests: 0, unparsed: 0, statements: Object.fromEntries(KINDS.map((k) => [k, 0])), rowsRead: 0, rowsWritten: 0, rowsReturned: 0, queryMs: 0, bytesUp: 0, bytesDown: 0, bytesDownDecoded: 0, errors: 0, shapes: {}, shapeRows: {}, shapeBytes: {}, exact: {} };
 }
 
 // Read one Hrana v2/v3 JSON pipeline (or cursor) request and its response,
@@ -89,6 +89,9 @@ export function countExchange(counts, { path, reqBody, resBody, status, encoding
       const key = `${kind.toUpperCase()} ${shape(sql)}`;
       counts.shapes[key] = (counts.shapes[key] || 0) + 1;
       counts.shapeRows[key] = (counts.shapeRows[key] || 0) + (Number(res?.rows_read) || 0);
+      // P2-PERF: the bytes of this statement's own result in the answer (its
+      // columns and rows as JSON), so a route's parsed bytes can be split by statement
+      counts.shapeBytes[key] = (counts.shapeBytes[key] || 0) + (res ? Buffer.byteLength(JSON.stringify(res)) : 0);
       // the same statement with the same arguments: a true repeat
       const exactKey = `${key}\u0000${JSON.stringify(args)}`;
       counts.exact[exactKey] = (counts.exact[exactKey] || 0) + 1;
@@ -165,6 +168,7 @@ export function addCounts(into, from) {
   for (const k of KINDS) into.statements[k] += from.statements[k];
   for (const [s, n] of Object.entries(from.shapes)) into.shapes[s] = (into.shapes[s] || 0) + n;
   for (const [s, n] of Object.entries(from.shapeRows)) into.shapeRows[s] = (into.shapeRows[s] || 0) + n;
+  for (const [s, n] of Object.entries(from.shapeBytes || {})) into.shapeBytes[s] = (into.shapeBytes[s] || 0) + n;
   for (const [s, n] of Object.entries(from.exact)) into.exact[s] = (into.exact[s] || 0) + n;
   return into;
 }

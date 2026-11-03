@@ -237,6 +237,50 @@ await t("pins must belong to the collection; featured order puts pins first", as
   eq(back.products[0].handle, "alpha-whey", "empty pins restore Shopify order:");
 });
 
+// P2-PERF fix round 2: the home rails read every rail's pins in one statement
+// (collectionPinsByHandles) and skip the count they never show. The rail must
+// order its products exactly as the per-collection read does.
+await t("P2-PERF: home rails read all pins in one statement and keep the pinned order; no count is read", async () => {
+  const { resolveHomeSectionData } = await import("../lib/cms/section-data.js");
+  const rails = [
+    { id: "sec_a", kind: "product_rail", collection: "all", limit: 4, enabled: true },
+    { id: "sec_b", kind: "product_rail", collection: "nope", limit: 4, enabled: true },
+    { id: "sec_c", kind: "product_rail", collection: "all", limit: 2, enabled: true },
+  ];
+  const watched = async (fn) => {
+    const seen = [];
+    const client = (await import("../lib/db.js")).currentDatabase().libsql;
+    const execute = client.execute;
+    client.execute = async (stmt, ...rest) => {
+      seen.push(typeof stmt === "string" ? stmt : String(stmt?.sql ?? ""));
+      return execute.call(client, stmt, ...rest);
+    };
+    try {
+      return { result: await fn(), seen };
+    } finally {
+      delete client.execute;
+    }
+  };
+  await inT(() => O.setCollectionPins("gid://c/1", ["gid://p/2"]));
+  try {
+    const batch = await inT(() => repo.collectionPinsByHandles(["all", "nope", "all"]));
+    eq(JSON.stringify([...batch]), JSON.stringify([["all", await inT(() => repo.collectionPinsByHandle("all"))], ["nope", []]]), "batch pins = per-collection pins:");
+    const { result: data, seen } = await inT(() => watched(() => resolveHomeSectionData(rails)));
+    eq(data.get("sec_a").products.map((p) => p.handle).join(","), "beta-bar,alpha-whey", "pinned first on the rail:");
+    eq(data.get("sec_c").products.map((p) => p.handle).join(","), "beta-bar,alpha-whey", "the second rail on the same collection:");
+    eq(data.get("sec_b").products.length, 0, "a collection that doesn't exist:");
+    eq(seen.filter((s) => /collection_overrides/.test(s)).length, 1, "pins statements for three rails:");
+    eq(seen.filter((s) => /count\(/i.test(s)).length, 0, "count statements on the rails:");
+    // the per-collection read is unchanged: the collection page still counts
+    const page = await inT(() => repo.getProductsInCollection("all", {}));
+    eq(page.total, 2, "the collection page's total:");
+  } finally {
+    await inT(() => O.setCollectionPins("gid://c/1", []));
+  }
+  const { result: plain } = await inT(() => watched(() => resolveHomeSectionData(rails)));
+  eq(plain.get("sec_a").products[0].handle, "alpha-whey", "no pins, Shopify order:");
+});
+
 console.log("— nested nav (MC11)");
 
 await t("one level of children validates; unsafe child URL and two-level nesting refused", async () => {

@@ -65,7 +65,7 @@ process.env.PLATFORM_CACHE_MS = "50";
 process.env.PLATFORM_SITE_HOSTS = "";
 
 const COUNTS = [0, 200, 1000];
-const TENANTS = ["d0", "d200", "d1000", "lr", "ln"];
+const TENANTS = ["d0", "d200", "d1000", "lr", "ln", "lh"];
 const dbs = [".test-pd-default.db", ".test-pd-platform.db", ...TENANTS.map((t) => `.test-pd-${t}.db`)];
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
@@ -178,6 +178,15 @@ for (const T of [LR, LN]) {
 await withTenant(LR, async () => {
   const rel = await R.createRelease({ note: "perf", actor: "test" });
   await R.publishReleaseById(rel.id);
+});
+// P2-PERF fix round 2: a legacy store with a header menu of its own and no
+// footer menu, so its footer still lists the catalog's collections
+const LH = await tenant("lh");
+await withTenant(LH, async () => {
+  const { validateBlock } = await import("../lib/cms/validate.js");
+  const v = validateBlock("nav_header", [{ label: "Shop all", href: "/collections/shop-all" }]);
+  ok(v.ok, `nav_header: ${(v.errors || []).join("; ")}`);
+  await S.setBlock("nav_header", v.value);
 });
 
 async function liveList(T) {
@@ -593,6 +602,50 @@ await t("REPORTED: route handlers (/api/upsell, offline, manifest) run outside c
       eq(cmsStateReads(c).length, label === "legacy, no release" ? 2 : 0, `${name} on ${label}: cms_state reads over two calls:`);
     }
     facts.handlers[label] = row;
+  }
+});
+
+// =====================================================================================
+console.log("— 6. home's catalog reads (acceptance 5b, fix round 2)");
+// =====================================================================================
+// Acceptance 5b counts everything home parses, the catalog included. Fix round 2
+// cuts the catalog statements home made but never needed. Unit stores have a
+// one-product catalog, so the bytes are proven through real Next; here each
+// statement is pinned.
+const NAV_COLLECTIONS = /left join "collection_products"[\s\S]*having/i; // getAllCollections
+const RAIL_COUNT = /select count\("cp"\."product_id"\) as "n"/i; // getProductsInCollection's total
+const catalogOf = (st) => st.filter((s) => !CONTENT_SQL.test(s.sql) && !/\bcarts?\b|cart_items/i.test(s.sql));
+await t("home on v4 reads no catalog it doesn't show: no nav collections when both menus are the store's own, no rail counts, one pins read for all rails, one statement for the stats, and only the experiment columns it serves", async () => {
+  facts.homeCatalog = {};
+  for (const n of COUNTS) {
+    const { statements, result } = homeAt[n];
+    const cat = catalogOf(statements);
+    facts.homeCatalog[n] = cat.length;
+    eq(cat.filter((s) => NAV_COLLECTIONS.test(s.sql)).length, 0, `nav collections reads at ${n} posts (header and footer menus are custom):`);
+    ok(result.layout.includes('href="/collections/shop-all"'), `the header menu is shown at ${n} posts`);
+    ok(result.layout.includes('href="/policies/privacy-policy"'), `the footer menu is shown at ${n} posts`);
+    eq(cat.filter((s) => RAIL_COUNT.test(s.sql)).length, 0, `rail count statements at ${n} posts:`);
+    eq(cat.filter((s) => /collection_overrides/.test(s.sql)).length, 1, `pins statements for 5 rails at ${n} posts:`);
+    eq(cat.filter((s) => /count\("id"\)/.test(s.sql)).length, 1, `catalog stats statements at ${n} posts:`);
+    const exp = cat.filter((s) => /from "experiments"/.test(s.sql));
+    eq(exp.length, 1, `experiment reads at ${n} posts:`);
+    ok(!/select \*/i.test(exp[0].sql) && !/hypothesis/.test(exp[0].sql), `the experiment read selects only what serving needs at ${n} posts: ${exp[0].sql}`);
+    ok(!cat.some((s) => /"c"\."description"/.test(s.sql)), `no collection description is read at ${n} posts`);
+  }
+});
+
+await t("a store without its own menus still lists the catalog's collections: legacy with no menus reads them once (header and footer), and a header menu alone still reads them for the footer", async () => {
+  for (const [label, T, header, footer] of [
+    ["legacy, no release", LN, true, true],
+    ["legacy, live v3", LR, true, true],
+    ["legacy, header menu only", LH, false, true],
+  ]) {
+    const { statements, result } = await homeRequest(T);
+    eq(catalogOf(statements).filter((s) => NAV_COLLECTIONS.test(s.sql)).length, 1, `nav collections reads on ${label}:`);
+    // the catalog's one collection, in the header strip and/or the footer list
+    const links = (result.layout.match(/href="\/collections\/protein"/g) || []).length;
+    eq(links, (header ? 1 : 0) + (footer ? 1 : 0), `collection links on ${label}:`);
+    if (!header) ok(result.layout.includes('href="/collections/shop-all"'), `${label}: the header menu is shown`);
   }
 });
 

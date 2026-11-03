@@ -471,6 +471,7 @@ export async function runHttp(argv) {
           duplicateReads: repeatedReads(all).reduce((a, x) => a + x.times - 1, 0),
           shapes: all.shapes,
           shapeRows: all.shapeRows,
+          shapeBytes: all.shapeBytes,
           duplicates: repeatedReads(all),
         };
       };
@@ -481,12 +482,12 @@ export async function runHttp(argv) {
       const sqldAgrees = c.runs.every((x) => DATABASES.every((d) => Object.values(x.byDb[d.key].statements).reduce((a, b) => a + b, 0) === x.sqldDelta[d.key]));
       const repeated = mid.duplicates.slice(0, 6);
       const top = Object.entries(mid.shapes)
-        .map(([shape, times]) => ({ times, rowsRead: mid.shapeRows[shape] || 0, shape }))
+        .map(([shape, times]) => ({ times, rowsRead: mid.shapeRows[shape] || 0, bytes: mid.shapeBytes[shape] || 0, shape }))
         .sort((a, b) => b.rowsRead - a.rowsRead || b.times - a.times);
       const firstFlat = flat(c.first.byDb);
-      for (const k of ["shapes", "shapeRows", "duplicates"]) delete firstFlat[k];
+      for (const k of ["shapes", "shapeRows", "shapeBytes", "duplicates"]) delete firstFlat[k];
       const warm = { ...mid };
-      for (const k of ["shapes", "shapeRows", "duplicates"]) delete warm[k];
+      for (const k of ["shapes", "shapeRows", "shapeBytes", "duplicates"]) delete warm[k];
       const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
       return {
         key: route.key,

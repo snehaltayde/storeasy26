@@ -255,7 +255,14 @@ export default async function RootLayout({ children }) {
     }
   }
 
-  const [collections, cart, chrome] = await Promise.all([navCollections(), initialCart(), chromeData()]);
+  // P2-PERF: the catalog's collections are only the Header's and Footer's
+  // fallback when the store has no menu of its own (nav null). A store whose
+  // header and footer menus are both set never shows them, so it doesn't read
+  // them (about 6 KB on the perf fixture). The cost: a store without its own
+  // menus starts this read once its chrome is known, not alongside it.
+  const chromeRead = chromeData();
+  const collectionsRead = chromeRead.then((c) => (Array.isArray(c.navHeader) && Array.isArray(c.navFooter) ? [] : navCollections()));
+  const [collections, cart, chrome] = await Promise.all([collectionsRead, initialCart(), chromeRead]);
   return (
     <html lang="en" data-kit={chrome.kitAttr} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
       {/* Brand variables: values come from lib/brand.js (validated hex/enum
