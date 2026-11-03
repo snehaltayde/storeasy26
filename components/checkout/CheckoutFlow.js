@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import Image from "@/components/StoreImage";
 import Link from "next/link";
 import { formatMoney } from "@/lib/format";
 import { computeShipping } from "@/lib/shipping";

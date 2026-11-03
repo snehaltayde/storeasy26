@@ -93,6 +93,7 @@
     "test:tokens": "node scripts/test-tokens.js",
     "test:perf": "node scripts/perf-report.js",
     "test:perf-tools": "node scripts/test-perf-tools.js",
+    "test:images": "node scripts/test-images.js",
     "seed:design": "node scripts/dev-design.js seed",
     "dev:design": "node scripts/dev-design.js",
     "drill:smoke": "node scripts/drill.js smoke",

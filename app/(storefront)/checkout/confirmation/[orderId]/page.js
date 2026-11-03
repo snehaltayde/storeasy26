@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/StoreImage";
 import { notFound } from "next/navigation";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import { getOrder, orderStatusPath, verifyOrderStatusToken } from "@/lib/orders";

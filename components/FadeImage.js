@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import Image from "@/components/StoreImage";
 
 // next/image that fades in once decoded — kills the hard "pop" as product
 // imagery loads (the bg placeholder already reserves space, so no layout shift).

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/StoreImage";
 import { formatMoney } from "@/lib/format";
 
 // Quiz runner (S46 / SF19): steps through the questions client-side, sends
