@@ -1,0 +1,211 @@
+{
+  "id": "TOK-01-02",
+  "part": "c-checkout-steps",
+  "title": "P1-DRILLS-C: TOK-01/02 drills still needed — c-checkout-steps",
+  "ranAt": "2026-11-03T15:53:00.030Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 15,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "checkout address at 320: no sideways scroll",
+      "detail": {
+        "vw": 320,
+        "sw": 320,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout review at 320: no sideways scroll",
+      "detail": {
+        "vw": 320,
+        "sw": 320,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout payment at 320: no sideways scroll",
+      "detail": {
+        "vw": 320,
+        "sw": 320,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout address at 360: no sideways scroll",
+      "detail": {
+        "vw": 360,
+        "sw": 360,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout review at 360: no sideways scroll",
+      "detail": {
+        "vw": 360,
+        "sw": 360,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout payment at 360: no sideways scroll",
+      "detail": {
+        "vw": 360,
+        "sw": 360,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout address at 375: no sideways scroll",
+      "detail": {
+        "vw": 375,
+        "sw": 375,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout review at 375: no sideways scroll",
+      "detail": {
+        "vw": 375,
+        "sw": 375,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout payment at 375: no sideways scroll",
+      "detail": {
+        "vw": 375,
+        "sw": 375,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout address at 390: no sideways scroll",
+      "detail": {
+        "vw": 390,
+        "sw": 390,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout review at 390: no sideways scroll",
+      "detail": {
+        "vw": 390,
+        "sw": 390,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout payment at 390: no sideways scroll",
+      "detail": {
+        "vw": 390,
+        "sw": 390,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout address at 414: no sideways scroll",
+      "detail": {
+        "vw": 414,
+        "sw": 414,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout review at 414: no sideways scroll",
+      "detail": {
+        "vw": 414,
+        "sw": 414,
+        "wide": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout payment at 414: no sideways scroll",
+      "detail": {
+        "vw": 414,
+        "sw": 414,
+        "wide": []
+      }
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "c-checkout-steps/address-320",
+      "bytes": 10312
+    },
+    {
+      "name": "c-checkout-steps/review-320",
+      "bytes": 12758
+    },
+    {
+      "name": "c-checkout-steps/payment-320",
+      "bytes": 13007
+    },
+    {
+      "name": "c-checkout-steps/address-360",
+      "bytes": 11761
+    },
+    {
+      "name": "c-checkout-steps/review-360",
+      "bytes": 10658
+    },
+    {
+      "name": "c-checkout-steps/payment-360",
+      "bytes": 15461
+    },
+    {
+      "name": "c-checkout-steps/address-375",
+      "bytes": 22972
+    },
+    {
+      "name": "c-checkout-steps/review-375",
+      "bytes": 18136
+    },
+    {
+      "name": "c-checkout-steps/payment-375",
+      "bytes": 28141
+    },
+    {
+      "name": "c-checkout-steps/address-390",
+      "bytes": 14162
+    },
+    {
+      "name": "c-checkout-steps/review-390",
+      "bytes": 28812
+    },
+    {
+      "name": "c-checkout-steps/payment-390",
+      "bytes": 28847
+    },
+    {
+      "name": "c-checkout-steps/address-414",
+      "bytes": 13466
+    },
+    {
+      "name": "c-checkout-steps/review-414",
+      "bytes": 24757
+    },
+    {
+      "name": "c-checkout-steps/payment-414",
+      "bytes": 25465
+    }
+  ]
+}

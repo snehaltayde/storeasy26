@@ -1,0 +1,42 @@
+{
+  "320": {
+    "vw": 320,
+    "sw": 320,
+    "stepsRight": 286,
+    "paymentRight": 286,
+    "paymentVisible": true,
+    "wide": []
+  },
+  "360": {
+    "vw": 360,
+    "sw": 360,
+    "stepsRight": 286,
+    "paymentRight": 286,
+    "paymentVisible": true,
+    "wide": []
+  },
+  "375": {
+    "vw": 375,
+    "sw": 375,
+    "stepsRight": 286,
+    "paymentRight": 286,
+    "paymentVisible": true,
+    "wide": []
+  },
+  "390": {
+    "vw": 390,
+    "sw": 390,
+    "stepsRight": 286,
+    "paymentRight": 286,
+    "paymentVisible": true,
+    "wide": []
+  },
+  "414": {
+    "vw": 414,
+    "sw": 414,
+    "stepsRight": 286,
+    "paymentRight": 286,
+    "paymentVisible": true,
+    "wide": []
+  }
+}

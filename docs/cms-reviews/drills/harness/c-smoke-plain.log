@@ -1,0 +1,41 @@
+Smoke: product page at three widths, add to cart, open the drawer
+harness http://localhost:3231, Chrome 156.0.8078.80
+
+ok   375px: product page answers 200
+ok   375px: rendered on the edge runtime (x-edge-runtime: 1)
+ok   375px: the heading is "Radiance Glow Serum 30ml"
+ok   375px: the price ₹1,299 shows
+ok   375px: not an error page
+ok   375px: no sideways scroll
+ok   768px: product page answers 200
+ok   768px: rendered on the edge runtime (x-edge-runtime: 1)
+ok   768px: the heading is "Radiance Glow Serum 30ml"
+ok   768px: the price ₹1,299 shows
+ok   768px: not an error page
+ok   768px: no sideways scroll
+ok   1440px: product page answers 200
+ok   1440px: rendered on the edge runtime (x-edge-runtime: 1)
+ok   1440px: the heading is "Radiance Glow Serum 30ml"
+ok   1440px: the price ₹1,299 shows
+ok   1440px: not an error page
+ok   1440px: no sideways scroll
+ok   the cart drawer starts closed
+ok   the header says "Open cart, 0 items"
+ok   adding to cart: POST /api/cart answers 200
+ok   adding to cart opens the drawer
+ok   the drawer lists "Radiance Glow Serum 30ml"
+  · 1440px, cookie banner not yet answered: a tap on the drawer's "Checkout →" hits something else on top of it: <div> "We use analytics and advertising cookies to understand shopp"
+ok   Close cart closes the drawer
+ok   the header now says "Open cart, 1 item"
+ok   the header cart button opens the drawer
+ok   the reopened drawer still lists the item
+ok   768px: adding to cart, POST /api/cart answers 200
+ok   768px: adding to cart opens the drawer
+  · 768px, cookie banner not yet answered: a tap on the drawer's "Checkout →" hits something else on top of it: <div> "Settings
+No thanks
+Allow all"
+ok   375px: adding to cart, POST /api/cart answers 200
+ok   375px: adding to cart opens the drawer
+  · 375px, cookie banner not yet answered: a tap on the drawer's "Checkout →" hits something else on top of it: <div> "We use analytics and advertising cookies to understand shopp"
+
+31 passed, 0 failed. Screenshots and results.json in docs/cms-reviews/drills/smoke/

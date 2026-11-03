@@ -1,0 +1,80 @@
+{
+  "id": "TOK-01-02",
+  "part": "c-never-published",
+  "title": "P1-DRILLS-C: TOK-01/02 drills still needed — c-never-published",
+  "ranAt": "2026-11-03T15:53:40.542Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "Save brand answers 200 for the unreadable brand",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "Brand shows the \"Hard to read\" warning after a reload"
+    },
+    {
+      "ok": true,
+      "label": "a signed-out shopper does not get the unreadable colours",
+      "detail": {
+        "body": "rgb(255, 255, 255)",
+        "text": "rgb(10, 10, 11)",
+        "draftBar": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "a signed-out shopper sees the platform default look (white page)",
+      "detail": {
+        "body": "rgb(255, 255, 255)",
+        "text": "rgb(10, 10, 11)",
+        "draftBar": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "the founder's preview shows the saved colours (#0a0a0b page)",
+      "detail": {
+        "body": "rgb(10, 10, 11)",
+        "text": "rgb(24, 24, 27)",
+        "draftBar": true
+      }
+    }
+  ],
+  "notes": [
+    "setup: release_state.live_release_id set to NULL locally (was rel_0aff92cb615d214d): the store has nothing live",
+    "save warnings: [\"Product titles, prices and body text: #18181b on #0a0a0b has a contrast of 1.12 to 1, and small text needs at least 4.5 to 1 (26 more colour pairs on your store have the same problem). Try text colour #80808e.\"]",
+    "signed-out shopper: {\"body\":\"rgb(255, 255, 255)\",\"text\":\"rgb(10, 10, 11)\",\"draftBar\":false}",
+    "the founder's preview: {\"body\":\"rgb(10, 10, 11)\",\"text\":\"rgb(24, 24, 27)\",\"draftBar\":true}",
+    "brand put back, live release back to rel_0aff92cb615d214d"
+  ],
+  "screenshots": [
+    {
+      "name": "c-never-published-brand-warning",
+      "file": "docs/cms-reviews/drills/TOK-01-02/c-never-published-brand-warning.png",
+      "bytes": 31039,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/brand"
+    },
+    {
+      "name": "c-never-published/shopper-1440",
+      "bytes": 4927
+    },
+    {
+      "name": "c-never-published-designer",
+      "file": "docs/cms-reviews/drills/TOK-01-02/c-never-published-designer.png",
+      "bytes": 31943,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

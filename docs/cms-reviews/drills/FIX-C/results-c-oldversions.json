@@ -1,0 +1,90 @@
+{
+  "id": "FIX-C",
+  "part": "c-oldversions",
+  "title": "P1-DRILLS-C: FIX-C drills still needed — c-oldversions",
+  "ranAt": "2026-11-03T15:43:35.013Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: cms_pages has a revision column to take away",
+      "detail": [
+        "slug",
+        "title",
+        "description",
+        "sections",
+        "enabled",
+        "updated_at",
+        "revision",
+        "schema_version",
+        "effective_at",
+        "family",
+        "window_start",
+        "window_end"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "setup: cms_pages is now a view without revision",
+      "detail": [
+        "slug",
+        "title",
+        "description",
+        "sections",
+        "enabled",
+        "updated_at",
+        "schema_version",
+        "effective_at",
+        "family",
+        "window_start",
+        "window_end"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the Pages list opens and lists the pages",
+      "detail": {
+        "status": 200,
+        "text": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDesign Demo Co\n\nlocalhost\n\nOVERVIEW\n\nDashboard\nAnalytics\nSetup\n2/9\n\nORDERS\n\nOrders\n1\n\nCATALOG\n\nCat"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the page editor opens the page",
+      "detail": {
+        "status": 200,
+        "text": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDesign Demo Co\n\nlocalhost\n\nOVERVIEW\n\nDashboard\nAnalytics\nSetup\n2/9\n\nORDERS\n\nOrders\n1\n\nCATALOG\n\nCat"
+      }
+    },
+    {
+      "ok": true,
+      "label": "not a 404",
+      "detail": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDesign Demo Co\n\nlo"
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "c-oldversions-pages-list",
+      "file": "docs/cms-reviews/drills/FIX-C/c-oldversions-pages-list.png",
+      "bytes": 23934,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages"
+    },
+    {
+      "name": "c-oldversions-page-editor",
+      "file": "docs/cms-reviews/drills/FIX-C/c-oldversions-page-editor.png",
+      "bytes": 37580,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/shipping"
+    }
+  ]
+}

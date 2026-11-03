@@ -1,0 +1,78 @@
+{
+  "id": "PERF-04",
+  "part": "c-images-dev",
+  "title": "P1-DRILLS-C: PERF-04 drills still needed (perf fixture) — c-images-dev",
+  "ranAt": "2026-11-03T16:47:41.185Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 1,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "product: /products/micronised-creatine-12 answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": false,
+      "label": "product: every photo shows under next dev",
+      "detail": [
+        {
+          "src": "http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=750&q=75",
+          "ok": false,
+          "w": 0
+        },
+        {
+          "src": "http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=64&q=75",
+          "ok": false,
+          "w": 0
+        },
+        {
+          "src": "http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_81f5305783e0365e88&w=64&q=75",
+          "ok": false,
+          "w": 0
+        },
+        {
+          "src": "http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_db4c43f623b0f0943a&w=64&q=75",
+          "ok": false,
+          "w": 0
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "content-page: /policies/terms-of-service answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "content-page: every photo shows under next dev",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "product /products/micronised-creatine-12: 200; 0 of 10 images drawn; image requests [{\"path\":\"/_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=750&q=75\",\"status\":400,\"type\":\"\"},{\"path\":\"/_next/image?url=%2Fapi%2Fmedia%2Fmed_1bf5a2b4a539209813&w=64&q=75\",\"status\":400,\"type\":\"\"},{\"path\":\"/_next/image?url=%2Fapi%2Fmedia%2Fmed_db4c43f623b0f0943a&w=64&q=75\",\"status\":400,\"type\":\"\"},{\"path\":\"/_next/image?url=%2Fapi%2Fmedia%2Fmed_071151cca28a37d069&w=64&q=75\",\"status\":400,\"type\":\"\"},{\"path\":\"/_next/image?url=%2Fapi%2Fmedia%2Fmed_ae137168a308647587&w=64&q=75\",\"status\":400,\"type\":\"\"},{\"path\":\"/_next/image?url=%2Fapi%2Fmedia%2Fmed_81f5305783e0365e88&w=64&q=75\",\"status\":400,\"type\":\"\"},{\"path\":\"/_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=64&q=75\",\"status\":400,\"type\":\"\"},{\"path\":\"/_next/image?url=%2Fapi%2Fmedia%2Fmed_c12b0a48887ebb6162&w=384&q=75\",\"status\":400,\"type\":\"\"}]",
+    "content-page /policies/terms-of-service: 200; 1 of 1 images drawn; image requests [{\"path\":\"/api/media/med_bac7d9594de8dc2c9b\",\"status\":200,\"type\":\"image/webp\"}]"
+  ],
+  "screenshots": [
+    {
+      "name": "c-images-dev-product",
+      "file": "docs/cms-reviews/drills/PERF-04/c-images-dev-product.png",
+      "bytes": 30179,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "c-images-dev-content-page",
+      "file": "docs/cms-reviews/drills/PERF-04/c-images-dev-content-page.png",
+      "bytes": 50155,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/terms-of-service"
+    }
+  ]
+}

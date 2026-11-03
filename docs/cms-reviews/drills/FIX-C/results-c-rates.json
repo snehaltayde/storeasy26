@@ -1,0 +1,131 @@
+{
+  "id": "FIX-C",
+  "part": "c-rates",
+  "title": "P1-DRILLS-C: FIX-C drills still needed — c-rates",
+  "ranAt": "2026-11-03T15:48:00.710Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 1,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "Save settings answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "the drawer, review and payment steps were read within 30 s of the save",
+      "detail": {
+        "drawer": 1878,
+        "review": 3481,
+        "payment": 4024
+      }
+    },
+    {
+      "ok": true,
+      "label": "the drawer's shipping and the review step's shipping come from the same rates",
+      "detail": {
+        "drawer": {
+          "at": 1878,
+          "shipping": "FREE",
+          "total": "₹1,299",
+          "rates": "old"
+        },
+        "review": {
+          "at": 3481,
+          "shipping": "₹49",
+          "total": "₹1,348",
+          "rates": "old"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the review step's shipping and total and the payment step's total come from the same rates",
+      "detail": {
+        "review": {
+          "at": 3481,
+          "shipping": "₹49",
+          "total": "₹1,348",
+          "rates": "old"
+        },
+        "payment": {
+          "at": 4024,
+          "placeOrder": "₹1,348",
+          "rates": "old"
+        }
+      }
+    },
+    {
+      "ok": false,
+      "label": "the order's stored total is the amount the payment step showed",
+      "detail": {
+        "stored": 1507,
+        "shown": "₹1,348",
+        "storedRates": "new"
+      }
+    },
+    {
+      "ok": true,
+      "label": "after 35 s the drawer, review and payment all use the new rates",
+      "detail": {
+        "drawer": {
+          "at": 36964,
+          "shipping": "₹149",
+          "total": "₹1,448",
+          "rates": "new"
+        },
+        "review": {
+          "at": 38597,
+          "shipping": "₹208",
+          "total": "₹1,507",
+          "rates": "new"
+        },
+        "payment": {
+          "at": 39139,
+          "placeOrder": "₹1,507",
+          "rates": "new"
+        }
+      }
+    }
+  ],
+  "notes": [
+    "before the change: drawer {\"subtotal\":\"₹1,299\",\"shipping\":\"FREE\",\"total\":\"₹1,299\",\"nudge\":null}; review {\"shipping\":\"₹49\",\"total\":\"₹1,348\"}",
+    "rates {\"flat\":\"79\",\"free\":\"999\",\"cod\":\"49\"} → {\"flat\":\"149\",\"free\":\"4999\",\"cod\":\"59\"}",
+    "within 30 s: {\"drawer\":{\"at\":1878,\"shipping\":\"FREE\",\"total\":\"₹1,299\",\"rates\":\"old\"},\"review\":{\"at\":3481,\"shipping\":\"₹49\",\"total\":\"₹1,348\",\"rates\":\"old\"},\"payment\":{\"at\":4024,\"placeOrder\":\"₹1,348\",\"rates\":\"old\"}}",
+    "order placed at 4160 ms: 200 {\"id\":\"DES-269216C3\",\"subtotal\":1299,\"shipping_total\":208,\"total\":1507,\"payment_method\":\"cod\"}; the payment step showed \"Place order · ₹1,348\"",
+    "after 35 s: {\"drawer\":{\"at\":36964,\"shipping\":\"₹149\",\"total\":\"₹1,448\",\"rates\":\"new\"},\"review\":{\"at\":38597,\"shipping\":\"₹208\",\"total\":\"₹1,507\",\"rates\":\"new\"},\"payment\":{\"at\":39139,\"placeOrder\":\"₹1,507\",\"rates\":\"new\"}}",
+    "rates put back: 200"
+  ],
+  "screenshots": [
+    {
+      "name": "c-rates-payment-within-30s",
+      "file": "docs/cms-reviews/drills/FIX-C/c-rates-payment-within-30s.png",
+      "bytes": 24676,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "c-rates-confirmation-within-30s",
+      "file": "docs/cms-reviews/drills/FIX-C/c-rates-confirmation-within-30s.png",
+      "bytes": 20398,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/DES-269216C3"
+    },
+    {
+      "name": "c-rates-payment-after-35s",
+      "file": "docs/cms-reviews/drills/FIX-C/c-rates-payment-after-35s.png",
+      "bytes": 24742,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    }
+  ]
+}

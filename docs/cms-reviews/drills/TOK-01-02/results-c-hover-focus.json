@@ -1,0 +1,242 @@
+{
+  "id": "TOK-01-02",
+  "part": "c-hover-focus",
+  "title": "P1-DRILLS-C: TOK-01/02 drills still needed — c-hover-focus",
+  "ranAt": "2026-11-03T16:53:58.591Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 12,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "light, hovered dark-button-continue-to-review: text still 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Continue to review",
+          "fg": "#fffdf8",
+          "bg": "#373432",
+          "ratio": 12.15,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light, hovered accent-button-add-to-cart: text still 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Add to cart",
+          "fg": "#0a0a0b",
+          "bg": "#f6966e",
+          "ratio": 8.96,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light, hovered accent-button-hero: text still 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Shop bestsellers",
+          "fg": "#0a0a0b",
+          "bg": "#f6966e",
+          "ratio": 8.96,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light, hovered link-footer: text still 4.5:1 or better",
+      "detail": [
+        {
+          "text": "All collections",
+          "fg": "#1c1917",
+          "bg": "#faf8f3",
+          "ratio": 16.48,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light, hovered filter-chip: text still 4.5:1 or better",
+      "detail": [
+        {
+          "text": "In stock",
+          "fg": "#4f4c4a",
+          "bg": "#fffdf8",
+          "ratio": 8.38,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light, a field reached by Tab (): typed text 4.5:1 or better",
+      "detail": {
+        "focused": {
+          "name": "",
+          "placeholder": "Search products…"
+        },
+        "ring": {
+          "outline": "none 1px rgb(0, 95, 204)",
+          "border": "rgb(169, 166, 162)",
+          "boxShadow": "none"
+        },
+        "measured": [
+          {
+            "text": "Pune",
+            "fg": "#1c1917",
+            "bg": "#fffdf8",
+            "ratio": 17.2,
+            "need": 4.5
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "dark, hovered dark-button-continue-to-review: text still 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Continue to review",
+          "fg": "#0b0f17",
+          "bg": "#d5d9de",
+          "ratio": 13.53,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark, hovered accent-button-add-to-cart: text still 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Add to cart",
+          "fg": "#0a0a0b",
+          "bg": "#94e9de",
+          "ratio": 14.11,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark, hovered accent-button-hero: text still 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Shop bestsellers",
+          "fg": "#0a0a0b",
+          "bg": "#94e9de",
+          "ratio": 14.11,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark, hovered link-footer: text still 4.5:1 or better",
+      "detail": [
+        {
+          "text": "All collections",
+          "fg": "#f1f5f9",
+          "bg": "#10141c",
+          "ratio": 16.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark, hovered filter-chip: text still 4.5:1 or better",
+      "detail": [
+        {
+          "text": "In stock",
+          "fg": "#bdc1c6",
+          "bg": "#0b0f17",
+          "ratio": 10.6,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark, a field reached by Tab (): typed text 4.5:1 or better",
+      "detail": {
+        "focused": {
+          "name": "",
+          "placeholder": "Search products…"
+        },
+        "ring": {
+          "outline": "none 1px rgb(0, 95, 204)",
+          "border": "rgb(99, 103, 109)",
+          "boxShadow": "none"
+        },
+        "measured": [
+          {
+            "text": "Pune",
+            "fg": "#f1f5f9",
+            "bg": "#0b0f17",
+            "ratio": 17.51,
+            "need": 4.5
+          }
+        ]
+      }
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "c-hover-focus/light-dark-button-continue-to-review",
+      "bytes": 3886
+    },
+    {
+      "name": "c-hover-focus/light-accent-button-add-to-cart",
+      "bytes": 3550
+    },
+    {
+      "name": "c-hover-focus/light-accent-button-hero",
+      "bytes": 5072
+    },
+    {
+      "name": "c-hover-focus/light-link-footer",
+      "bytes": 5597
+    },
+    {
+      "name": "c-hover-focus/light-filter-chip",
+      "bytes": 3007
+    },
+    {
+      "name": "c-hover-focus/light-tab-field",
+      "bytes": 4432
+    },
+    {
+      "name": "c-hover-focus/dark-dark-button-continue-to-review",
+      "bytes": 2999
+    },
+    {
+      "name": "c-hover-focus/dark-accent-button-add-to-cart",
+      "bytes": 2677
+    },
+    {
+      "name": "c-hover-focus/dark-accent-button-hero",
+      "bytes": 6314
+    },
+    {
+      "name": "c-hover-focus/dark-link-footer",
+      "bytes": 2864
+    },
+    {
+      "name": "c-hover-focus/dark-filter-chip",
+      "bytes": 2136
+    },
+    {
+      "name": "c-hover-focus/dark-tab-field",
+      "bytes": 2958
+    }
+  ]
+}

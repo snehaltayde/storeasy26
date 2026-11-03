@@ -1,0 +1,108 @@
+{
+  "id": "TOK-01-02",
+  "part": "c-reset-screens",
+  "title": "P1-DRILLS-C: TOK-01/02 drills still needed — c-reset-screens",
+  "ranAt": "2026-11-03T15:53:30.201Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: the store has its own colours saved",
+      "detail": {
+        "accent": "#2563eb",
+        "background": "#fffdf8",
+        "foreground": "#1c1917",
+        "radius": "xl",
+        "type_scale": "large",
+        "button_shape": "pill",
+        "section_spacing": "regular",
+        "accent_label": "#0a0a0b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "setup: the store's own colours are live",
+      "detail": {
+        "accent": "#2563eb",
+        "accent_label": "#0a0a0b",
+        "background": "#fffdf8",
+        "button_shape": "pill",
+        "foreground": "#1c1917",
+        "radius": "xl",
+        "section_spacing": "regular",
+        "type_scale": "large"
+      }
+    },
+    {
+      "ok": true,
+      "label": "Brand: Reset answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "Publishing never shows a \"Fix before publishing\" about colours after Reset",
+      "detail": [
+        {
+          "at": 1341,
+          "fix": "",
+          "colourFix": false,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "Publish now is enabled within 30 s of Reset",
+      "detail": {
+        "at": 1341,
+        "fix": "",
+        "colourFix": false,
+        "enabled": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "Publish now answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "the live release has no brand (the platform default look)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "no 422 at any point",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "setup publish (own colours live): 200 \"\"",
+    "Publishing after Reset: [{\"at\":1341,\"fix\":\"\",\"colourFix\":false,\"enabled\":true}]",
+    "brand put back to {\"accent\":\"#2563eb\",\"background\":\"#fffdf8\",\"foreground\":\"#1c1917\",\"radius\":\"xl\",\"type_scale\":\"large\",\"button_shape\":\"pill\",\"section_spacing\":\"regular\",\"accent_label\":\"#0a0a0b\"}, live release back to rel_0aff92cb615d214d"
+  ],
+  "screenshots": [
+    {
+      "name": "c-reset-publishing",
+      "file": "docs/cms-reviews/drills/TOK-01-02/c-reset-publishing.png",
+      "bytes": 41819,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "c-reset-published",
+      "file": "docs/cms-reviews/drills/TOK-01-02/c-reset-published.png",
+      "bytes": 41916,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    }
+  ]
+}

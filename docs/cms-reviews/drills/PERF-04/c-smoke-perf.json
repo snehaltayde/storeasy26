@@ -1,0 +1,225 @@
+{
+  "id": "smoke",
+  "title": "Smoke: product page at three widths, add to cart, open the drawer",
+  "ranAt": "2026-11-03T16:49:21.983Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 31,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "375px: product page answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "375px: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "375px: the heading is \"Radiance Glow Serum 30ml\"",
+      "detail": [
+        "Radiance Glow Serum 30ml"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "375px: the price ₹1,299 shows"
+    },
+    {
+      "ok": true,
+      "label": "375px: not an error page"
+    },
+    {
+      "ok": true,
+      "label": "375px: no sideways scroll",
+      "detail": "page is 375px wide in a 375px window"
+    },
+    {
+      "ok": true,
+      "label": "768px: product page answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "768px: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "768px: the heading is \"Radiance Glow Serum 30ml\"",
+      "detail": [
+        "Radiance Glow Serum 30ml"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "768px: the price ₹1,299 shows"
+    },
+    {
+      "ok": true,
+      "label": "768px: not an error page"
+    },
+    {
+      "ok": true,
+      "label": "768px: no sideways scroll",
+      "detail": "page is 768px wide in a 768px window"
+    },
+    {
+      "ok": true,
+      "label": "1440px: product page answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "1440px: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "1440px: the heading is \"Radiance Glow Serum 30ml\"",
+      "detail": [
+        "Radiance Glow Serum 30ml"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "1440px: the price ₹1,299 shows"
+    },
+    {
+      "ok": true,
+      "label": "1440px: not an error page"
+    },
+    {
+      "ok": true,
+      "label": "1440px: no sideways scroll",
+      "detail": "page is 1440px wide in a 1440px window"
+    },
+    {
+      "ok": true,
+      "label": "the cart drawer starts closed"
+    },
+    {
+      "ok": true,
+      "label": "the header says \"Open cart, 0 items\""
+    },
+    {
+      "ok": true,
+      "label": "adding to cart: POST /api/cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "adding to cart opens the drawer"
+    },
+    {
+      "ok": true,
+      "label": "the drawer lists \"Radiance Glow Serum 30ml\""
+    },
+    {
+      "ok": true,
+      "label": "Close cart closes the drawer"
+    },
+    {
+      "ok": true,
+      "label": "the header now says \"Open cart, 1 item\""
+    },
+    {
+      "ok": true,
+      "label": "the header cart button opens the drawer"
+    },
+    {
+      "ok": true,
+      "label": "the reopened drawer still lists the item"
+    },
+    {
+      "ok": true,
+      "label": "768px: adding to cart, POST /api/cart answers 200"
+    },
+    {
+      "ok": true,
+      "label": "768px: adding to cart opens the drawer"
+    },
+    {
+      "ok": true,
+      "label": "375px: adding to cart, POST /api/cart answers 200"
+    },
+    {
+      "ok": true,
+      "label": "375px: adding to cart opens the drawer"
+    }
+  ],
+  "notes": [
+    "1440px, cookie banner not yet answered: a tap on the drawer's \"Checkout →\" hits something else on top of it: <div> \"We use analytics and advertising cookies to understand shopp\"",
+    "768px, cookie banner not yet answered: a tap on the drawer's \"Checkout →\" hits something else on top of it: <div> \"Settings\nNo thanks\nAllow all\"",
+    "375px, cookie banner not yet answered: a tap on the drawer's \"Checkout →\" hits something else on top of it: <div> \"We use analytics and advertising cookies to understand shopp\""
+  ],
+  "screenshots": [
+    {
+      "name": "product-375",
+      "file": "docs/cms-reviews/drills/smoke/product-375.png",
+      "bytes": 24345,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "product-768",
+      "file": "docs/cms-reviews/drills/smoke/product-768.png",
+      "bytes": 35131,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "product-1440",
+      "file": "docs/cms-reviews/drills/smoke/product-1440.png",
+      "bytes": 22612,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "drawer-after-add",
+      "file": "docs/cms-reviews/drills/smoke/drawer-after-add.png",
+      "bytes": 28510,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "drawer-from-header",
+      "file": "docs/cms-reviews/drills/smoke/drawer-from-header.png",
+      "bytes": 28510,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "drawer-after-add-768",
+      "file": "docs/cms-reviews/drills/smoke/drawer-after-add-768.png",
+      "bytes": 64182,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "drawer-after-add-375",
+      "file": "docs/cms-reviews/drills/smoke/drawer-after-add-375.png",
+      "bytes": 25317,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/products/glow-serum"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "id": "GEN-03",
+  "part": "c-brand",
+  "title": "P1-DRILLS-C: GEN-03 drill 6 again (Settings and Brand, at once) — c-brand",
+  "ranAt": "2026-11-03T15:48:39.847Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 7,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "brand: before the save, Publishing has nothing to publish"
+    },
+    {
+      "ok": true,
+      "label": "brand: Save brand answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "brand: right after Save brand, Publishing has something to publish (Publish now enabled)"
+    },
+    {
+      "ok": true,
+      "label": "brand: the change list names the brand",
+      "detail": "What will publish\nUnpublished changes\n\nEach chip links to its editor. This is the item-level draft-vs-live difference — exactly what the next publish changes.\n\nPreview draft\nNo enabled privacy policy page — add one before launch (checkout links to it)\nNo enabled terms/refund page — add one before la"
+    },
+    {
+      "ok": true,
+      "label": "brand: Publish now answers 200, not 409",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "brand: the toast says it is live",
+      "detail": [
+        "Published — live now."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "brand: the live release holds the saved accent",
+      "detail": [
+        {
+          "a": "#2563eb"
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "brand: baseline publish: {\"status\":\"nothing to publish\"}"
+  ],
+  "screenshots": [
+    {
+      "name": "brand-publishing-at-once",
+      "file": "docs/cms-reviews/drills/GEN-03/brand-publishing-at-once.png",
+      "bytes": 41098,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "brand-published",
+      "file": "docs/cms-reviews/drills/GEN-03/brand-published.png",
+      "bytes": 41896,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    }
+  ]
+}
