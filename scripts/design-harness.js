@@ -19,6 +19,7 @@ import net from "node:net";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { FIXTURE_NAMES } from "./perf-fixture.js";
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const DEFAULT_NEXT_PORT = 3017;
@@ -245,12 +246,14 @@ export async function waitForHealth(url, child, { timeoutMs = 20_000, logFile, l
   throw new HarnessError(`The local database server for ${label} didn't answer within ${Math.round(timeoutMs / 1000)} seconds. Its log is ${logFile}.`);
 }
 
-function startSqld({ bin, key, port, dataDir }) {
+// extraArgs: PERF-04's report adds sqld's own admin listener, to read its
+// query counters. The harness itself passes none.
+export function startSqld({ bin, key, port, dataDir, extraArgs = [] }) {
   const logFile = join(dataDir, `${key}.log`);
   const out = openSync(logFile, "a");
   // Same process group as the harness: a Ctrl-C in the terminal reaches sqld
   // even if this process is gone. The harness also stops it on purpose.
-  const child = spawn(bin, ["--no-welcome", "--disable-metrics", "--http-listen-addr", `127.0.0.1:${port}`, "--db-path", join(dataDir, `${key}.sqld`)], {
+  const child = spawn(bin, ["--no-welcome", "--disable-metrics", "--http-listen-addr", `127.0.0.1:${port}`, "--db-path", join(dataDir, `${key}.sqld`), ...extraArgs], {
     stdio: ["ignore", out, out],
   });
   closeSync(out);
@@ -319,8 +322,10 @@ export function readPidfile(dataDir) {
     return null;
   }
 }
-const writePidfile = (dataDir, info) => writeFileSync(join(dataDir, PIDFILE), JSON.stringify(info, null, 2));
-const clearPidfile = (dataDir) => rmSync(join(dataDir, PIDFILE), { force: true });
+// Exported for PERF-04's report, which runs the same databases and records
+// them the same way, so a harness started meanwhile is refused.
+export const writePidfile = (dataDir, info) => writeFileSync(join(dataDir, PIDFILE), JSON.stringify(info, null, 2));
+export const clearPidfile = (dataDir) => rmSync(join(dataDir, PIDFILE), { force: true });
 
 // A harness is running if the launcher recorded in the pid file is still the
 // same live process. Returns the pid file's contents, or null.
@@ -471,8 +476,12 @@ const runChild = (cmd, args, opts) =>
 //              there is none), then `next dev`, until Ctrl-C or Next exits.
 // nextCmd and seedCmd are [command, args], and repoint updates the tenant
 // row; tests swap them for stand-ins.
-export async function runHarness({ mode, root = ROOT, env = process.env, log = console.log, nextCmd, seedCmd, repoint = pointTenantAtThisRun, script = process.argv[1] } = {}) {
+// fixture: PERF-04's "perf" store on top of the demo data (seeding only; see
+// scripts/perf-fixture.js). Recorded in seeded.json.
+export const FIXTURES = FIXTURE_NAMES;
+export async function runHarness({ mode, root = ROOT, env = process.env, log = console.log, nextCmd, seedCmd, repoint = pointTenantAtThisRun, script = process.argv[1], fixture = null } = {}) {
   if (mode !== "seed" && mode !== "dev") throw new HarnessError(`Unknown harness mode "${mode}". Use seed or dev.`);
+  if (fixture != null && !FIXTURES.includes(fixture)) throw new HarnessError(`There is no "${fixture}" fixture. The fixtures are: ${FIXTURES.join(", ")}.`);
   const ports = harnessPorts(env);
   const sqld = findSqld({ env });
   const dataDir = join(root, DATA_DIR_NAME);
@@ -486,6 +495,7 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
 
   const fileEnv = ensureCredentials(root, log);
   const childEnv = harnessEnv(env, fileEnv, ports);
+  const seedEnv = { ...childEnv, DESIGN_FIXTURE: fixture || "" };
   const seed = seedCmd || [process.execPath, [join(root, "scripts/seed-design-preview.js")]];
   const next = nextCmd || [process.execPath, [join(root, "node_modules/next/dist/bin/next"), "dev", "-p", String(ports.next)]];
 
@@ -565,8 +575,8 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
   const doSeed = async () => {
     rmSync(dataDir, { recursive: true, force: true });
     await startDatabases();
-    log(`• seeding the design store over http (databases on ports ${Object.values(ports.sqld).join(", ")})`);
-    const r = await runChild(seed[0], seed[1], { cwd: root, env: childEnv, stdio: "inherit" });
+    log(`• seeding the design store over http (databases on ports ${Object.values(ports.sqld).join(", ")})${fixture ? `, with the ${fixture} fixture` : ""}`);
+    const r = await runChild(seed[0], seed[1], { cwd: root, env: seedEnv, stdio: "inherit" });
     await stopAll();
     stopping = null;
     if (r.code !== 0) {
@@ -574,19 +584,21 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
         `${died ? `${diedMessage(died)}\n` : ""}Seeding failed${r.error ? `: ${r.error.message}` : ""}. The harness data is incomplete, so the next pnpm dev:design seeds again. Fix the error above, then run pnpm seed:design.`,
       );
     }
-    writeFileSync(join(dataDir, SEEDED), JSON.stringify({ at: new Date().toISOString(), ports: ports.sqld, migrations: migrationNames(root) }, null, 2));
+    writeFileSync(join(dataDir, SEEDED), JSON.stringify({ at: new Date().toISOString(), ports: ports.sqld, migrations: migrationNames(root), fixture: fixture || null }, null, 2));
   };
 
   try {
     if (mode === "seed") {
       await doSeed();
-      log(`✓ design harness seeded. Start it with pnpm dev:design (http://localhost:${ports.next}).`);
+      log(`✓ design harness seeded${fixture ? ` with the ${fixture} fixture` : ""}. Start it with pnpm dev:design (http://localhost:${ports.next}).`);
       return 0;
     }
 
     if (!readSeeded(dataDir)) {
-      log("• no harness data yet, so seeding first (the same as pnpm seed:design)");
+      log(`• no harness data yet, so seeding first (the same as pnpm seed:design${fixture ? ` --fixture ${fixture}` : ""})`);
       await doSeed();
+    } else if (fixture && readSeeded(dataDir)?.fixture !== fixture) {
+      log(`! The harness data wasn't seeded with the ${fixture} fixture. Run node scripts/dev-design.js seed --fixture ${fixture} first to get it.`);
     }
     const added = newMigrations(readSeeded(dataDir)?.migrations, migrationNames(root));
     if (added.length) {

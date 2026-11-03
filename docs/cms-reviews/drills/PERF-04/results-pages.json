@@ -1,0 +1,472 @@
+{
+  "id": "PERF-04",
+  "part": "pages",
+  "title": "PERF-04: the measured pages, perf fixture, production build — pages",
+  "ranAt": "2026-11-03T13:15:43.959Z",
+  "harness": "http://localhost:3203",
+  "chrome": "156.0.8078.80",
+  "passed": 54,
+  "failed": 0,
+  "knownFailures": 9,
+  "checks": [
+    {
+      "ok": true,
+      "label": "home at 1440: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: not an error page"
+    },
+    {
+      "ok": false,
+      "label": "home at 1440: no broken images",
+      "detail": [
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_1a674bf3736b8437aa&w=640&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_bac7d9594de8dc2c9b&w=640&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_e987d4358218801ca4&w=640&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_6ff6b329953b97992f&w=640&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_1bdab88f2cb2a7afbd&w=640&q=75"
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: shows \"Shop by category\""
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: shows \"Top rated\""
+    },
+    {
+      "ok": true,
+      "label": "home: the hero and all 12 fixture sections render",
+      "detail": "14 [data-sec] elements"
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: not an error page"
+    },
+    {
+      "ok": false,
+      "label": "product at 1440: no broken images",
+      "detail": [
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=750&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=64&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_81f5305783e0365e88&w=64&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_db4c43f623b0f0943a&w=64&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_071151cca28a37d069&w=64&q=75"
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: shows \"Micronised Creatine\""
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: shows \"Pairs well with\""
+    },
+    {
+      "ok": true,
+      "label": "product: the pairs list shows"
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: not an error page"
+    },
+    {
+      "ok": false,
+      "label": "collection at 1440: no broken images",
+      "detail": [
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_75768f3b65781d963d&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_e3feda25d495d07b90&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_c45b4710f1135e4736&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_c12b0a48887ebb6162&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_c12b0a48887ebb6162&w=384&q=75"
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: shows \"Protein\""
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 1440: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 1440: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 1440: not an error page"
+    },
+    {
+      "ok": false,
+      "label": "collection-all at 1440: no broken images",
+      "detail": [
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_c12b0a48887ebb6162&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_db4c43f623b0f0943a&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_a90b5569b19cf92f5e&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_e219b3ef874156c3dc&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_8b9f1aeffff0a92bee&w=384&q=75"
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 1440: shows \"Shop all\""
+    },
+    {
+      "ok": true,
+      "label": "shop all: a full first page of products",
+      "detail": "48 product links"
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: not an error page"
+    },
+    {
+      "ok": false,
+      "label": "collections at 1440: no broken images",
+      "detail": [
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_1bdab88f2cb2a7afbd&w=640&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_194a107989db40261d&w=640&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_8061d17e070a59d264&w=640&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_194a107989db40261d&w=640&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_1bdab88f2cb2a7afbd&w=640&q=75"
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: shows \"Shop all\""
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: shows \"Protein\""
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: not an error page"
+    },
+    {
+      "ok": false,
+      "label": "search at 1440: no broken images",
+      "detail": [
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_9db6f4e8468684cf14&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_a90b5569b19cf92f5e&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_4c3fa2441e5d251422&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_071151cca28a37d069&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_e9450a1c88da28a21b&w=384&q=75"
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: shows \"Results for\""
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: not an error page"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: no broken images",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: shows \"Refund Policy\""
+    },
+    {
+      "ok": true,
+      "label": "journal at 1440: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "journal at 1440: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "journal at 1440: not an error page"
+    },
+    {
+      "ok": true,
+      "label": "journal at 1440: no broken images",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "journal at 1440: shows \"Journal\""
+    },
+    {
+      "ok": true,
+      "label": "home at 375: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "home at 375: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "home at 375: not an error page"
+    },
+    {
+      "ok": false,
+      "label": "home at 375: no broken images",
+      "detail": [
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_1a674bf3736b8437aa&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_bac7d9594de8dc2c9b&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_e987d4358218801ca4&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_6ff6b329953b97992f&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_1bdab88f2cb2a7afbd&w=384&q=75"
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "home at 375: shows \"Shop by category\""
+    },
+    {
+      "ok": true,
+      "label": "home at 375: shows \"Top rated\""
+    },
+    {
+      "ok": true,
+      "label": "product at 375: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "product at 375: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "product at 375: not an error page"
+    },
+    {
+      "ok": false,
+      "label": "product at 375: no broken images",
+      "detail": [
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=384&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=64&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_81f5305783e0365e88&w=64&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_db4c43f623b0f0943a&w=64&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_071151cca28a37d069&w=64&q=75"
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "product at 375: shows \"Micronised Creatine\""
+    },
+    {
+      "ok": true,
+      "label": "product at 375: shows \"Pairs well with\""
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 375: answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 375: rendered on the edge runtime",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 375: not an error page"
+    },
+    {
+      "ok": false,
+      "label": "collection-all at 375: no broken images",
+      "detail": [
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_c12b0a48887ebb6162&w=256&q=75",
+        "http://localhost:3203/_next/image?url=%2Fapi%2Fmedia%2Fmed_db4c43f623b0f0943a&w=256&q=75"
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 375: shows \"Shop all\""
+    }
+  ],
+  "notes": [
+    "home at 1440: 58 images, 1440px wide in a 1440px window",
+    "product at 1440: 10 images, 1440px wide in a 1440px window",
+    "collection at 1440: 40 images, 1440px wide in a 1440px window",
+    "shop all at 1440: 48 product links on the first page",
+    "collection-all at 1440: 40 images, 1440px wide in a 1440px window",
+    "collections at 1440: 27 images, 1440px wide in a 1440px window",
+    "search at 1440: 36 images, 1440px wide in a 1440px window",
+    "cms-page at 1440: 0 images, 1440px wide in a 1440px window",
+    "journal at 1440: 0 images, 1440px wide in a 1440px window"
+  ],
+  "screenshots": [
+    {
+      "name": "home-1440",
+      "file": "docs/cms-reviews/drills/PERF-04/home-1440.png",
+      "bytes": 27275,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "product-1440",
+      "file": "docs/cms-reviews/drills/PERF-04/product-1440.png",
+      "bytes": 27982,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "collection-1440",
+      "file": "docs/cms-reviews/drills/PERF-04/collection-1440.png",
+      "bytes": 19764,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/protein"
+    },
+    {
+      "name": "collection-all-1440",
+      "file": "docs/cms-reviews/drills/PERF-04/collection-all-1440.png",
+      "bytes": 25939,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/shop-all"
+    },
+    {
+      "name": "collections-1440",
+      "file": "docs/cms-reviews/drills/PERF-04/collections-1440.png",
+      "bytes": 29023,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections"
+    },
+    {
+      "name": "search-1440",
+      "file": "docs/cms-reviews/drills/PERF-04/search-1440.png",
+      "bytes": 17306,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/search"
+    },
+    {
+      "name": "cms-page-1440",
+      "file": "docs/cms-reviews/drills/PERF-04/cms-page-1440.png",
+      "bytes": 42925,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/refund-policy"
+    },
+    {
+      "name": "journal-1440",
+      "file": "docs/cms-reviews/drills/PERF-04/journal-1440.png",
+      "bytes": 30098,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/journal"
+    },
+    {
+      "name": "home-375",
+      "file": "docs/cms-reviews/drills/PERF-04/home-375.png",
+      "bytes": 34545,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "product-375",
+      "file": "docs/cms-reviews/drills/PERF-04/product-375.png",
+      "bytes": 20353,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "collection-all-375",
+      "file": "docs/cms-reviews/drills/PERF-04/collection-all-375.png",
+      "bytes": 28544,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/collections/shop-all"
+    }
+  ]
+}

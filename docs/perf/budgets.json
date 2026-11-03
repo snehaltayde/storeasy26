@@ -1,0 +1,6 @@
+{
+  "note": "No budgets yet. PERF-04 sets budgets only from numbers measured on the hosted runtime, which needs a private staging deploy of one test tenant (OQ-19, the owner's decision). The local baselines in this folder are a starting point to compare against, not budgets.",
+  "basis": null,
+  "runKind": null,
+  "budgets": []
+}
