@@ -1,19 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { createContext, useContext, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, Store } from "lucide-react";
 import { cx } from "../cx";
 import { Drawer } from "../Drawer";
 import { IconButton } from "../Button";
 import { SidebarNav } from "./SidebarNav";
 import StoreSwitcher from "@/components/admin/StoreSwitcher";
+import { isEditorRoute } from "@/components/admin/cms/editorLayout";
 
 // Merchant console shell (S50): fixed role-aware sidebar (collapsible,
 // persisted), store context pinned at top, role + sign-out pinned at
 // bottom, and a mobile top bar + drawer under 768px. Mounted ONCE by the
 // (authed) layout — the old per-page AdminNav re-mount (and StoreSwitcher
 // flicker) is gone.
+//
+// ED-01: on editor routes (isEditorRoute) the shell steps aside. No sidebar,
+// no 1024px cap and no page padding: the editor lays out the full window
+// itself (components/admin/cms/EditorShell.js). The navigation folds into
+// the same drawer the phone layout uses, opened from the editor's own top
+// bar through useConsoleNav(). The founder's saved sidebar preference is
+// left as it was.
+
+const ConsoleNavContext = createContext(null);
+
+// → { openNav } inside the console shell, or null outside it.
+export function useConsoleNav() {
+  return useContext(ConsoleNavContext);
+}
 
 function SignOut({ collapsed }) {
   const router = useRouter();
@@ -76,6 +91,8 @@ function SidebarBody({ storeName, host, role, actorKind, badges, collapsed, onNa
 }
 
 export function ConsoleShell({ storeName, host, role, actorKind, badges, children }) {
+  const pathname = usePathname();
+  const editor = isEditorRoute(pathname);
   const [collapsed, setCollapsed] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [ready, setReady] = useState(false);
@@ -92,6 +109,20 @@ export function ConsoleShell({ storeName, host, role, actorKind, badges, childre
       localStorage.setItem("console.nav", next ? "collapsed" : "open");
     } catch {}
   };
+  const navDrawer = (
+    <Drawer open={drawer} onClose={() => setDrawer(false)} side="left" title={storeName}>
+      <SidebarBody storeName={storeName} host={host} role={role} actorKind={actorKind} badges={badges} collapsed={false} onNavigate={() => setDrawer(false)} />
+    </Drawer>
+  );
+
+  if (editor) {
+    return (
+      <ConsoleNavContext.Provider value={{ openNav: () => setDrawer(true) }}>
+        {navDrawer}
+        <main className="min-w-0">{children}</main>
+      </ConsoleNavContext.Provider>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -115,9 +146,7 @@ export function ConsoleShell({ storeName, host, role, actorKind, badges, childre
       </aside>
 
       {/* mobile top bar + drawer */}
-      <Drawer open={drawer} onClose={() => setDrawer(false)} side="left" title={storeName}>
-        <SidebarBody storeName={storeName} host={host} role={role} actorKind={actorKind} badges={badges} collapsed={false} onNavigate={() => setDrawer(false)} />
-      </Drawer>
+      {navDrawer}
 
       <div className="min-w-0 flex-1">
         <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-edge bg-surface px-4 py-2.5 md:hidden">
