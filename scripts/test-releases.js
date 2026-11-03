@@ -583,7 +583,9 @@ console.log("— P2-VGATE: the reader version gate");
     placements: [],
     redirects: [],
   };
-  // a v4 row as P2-ATOM's writer will store it: a list of document versions
+  // a v4 row that is not a v4 list (the shape P2-VGATE guessed before P2-ATOM
+  // fixed it). P2-READ reads real v4 lists (scripts/test-release-readers.js);
+  // this one must still fail closed, now as BAD_LIST.
   const V4 = { v: 4, list: { doc_header: "dv_1", doc_announcement: "dv_2" }, hash: "x" };
   // every getter the storefront has, with arguments
   const GETTERS = [
@@ -635,7 +637,7 @@ console.log("— P2-VGATE: the reader version gate");
     }
   });
 
-  await t("a v4 release is live with v 4, contentSource throws ContentUnavailableError (READER_NOT_READY), and no getter returns anything", async () => {
+  await t("a v4 release that is not a v4 list is live with v 4, contentSource throws ContentUnavailableError (BAD_LIST, P2-READ), and no getter returns anything", async () => {
     const id = await putLive(VG, V4);
     const s = await inVg(() => R.getLiveReleaseState());
     eq(s.state, "live", "state:");
@@ -643,7 +645,7 @@ console.log("— P2-VGATE: the reader version gate");
     eq(s.release.id, id, "release:");
     const src = await inVg(() => Res.contentSource().then(() => null, (e) => e));
     if (!(src instanceof Res.ContentUnavailableError)) throw new Error(`contentSource: expected ContentUnavailableError, got ${src ? src.message : "an answer"}`);
-    eq(src.detail?.code, "READER_NOT_READY", "detail.code:");
+    eq(src.detail?.code, "BAD_LIST", "detail.code:");
     eq(Res.isContentUnavailable(src), true, "isContentUnavailable:");
     for (const [fn, args] of GETTERS) {
       const got = await inVg(() => Res[fn](...args).then((v) => ({ v }), (e) => ({ e })));

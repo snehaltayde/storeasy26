@@ -1,8 +1,7 @@
 import { db } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
-import { resolvedContentPage, resolvedContentPageList } from "@/lib/content/resolve";
-import { campaignVisible } from "@/lib/cms/store";
+import { resolvedContentPageList, resolvedJournalEntries } from "@/lib/content/resolve";
 
 // Full-catalog sitemap (Session 16): every product + collection from Turso,
 // plus the content pages. Regenerated per request (catalog syncs mutate it).
@@ -23,13 +22,12 @@ async function buildSitemap() {
   // Content pages per tenant (S23): defaults + merchant-added, enabled only.
   // S39: campaign pages are EXCLUDED (noindex, windowed). S46: journal posts
   // ARE listed at /journal/<slug> — but only once their publish window opens.
+  // P2-READ (PERF-01): the posts come from resolvedJournalEntries(), which on
+  // a documents store reads the journal index once (no per-post read) and on
+  // a legacy store runs the same per-post loop as before.
   const all = (await resolvedContentPageList()).filter((p) => p.enabled);
   const pages = all.filter((p) => (p.family || "page") === "page");
-  const journalPaths = [];
-  for (const p of all.filter((x) => x.family === "journal")) {
-    const page = await resolvedContentPage(p.slug);
-    if (page && campaignVisible(page)) journalPaths.push(`/journal/${p.slug}`);
-  }
+  const journalPaths = (await resolvedJournalEntries()).map((p) => `/journal/${p.slug}`);
   const statics = [
     "/",
     "/collections",

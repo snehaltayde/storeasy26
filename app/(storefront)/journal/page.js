@@ -1,22 +1,18 @@
 import Link from "next/link";
-import { resolvedContentPage, resolvedContentPageList } from "@/lib/content/resolve";
-import { campaignVisible } from "@/lib/cms/store";
+import { resolvedJournalEntries } from "@/lib/content/resolve";
 import { tfetch } from "@/lib/tenant-request";
 
 // Journal index (S46 / SF20): published, release-governed journal posts —
 // scheduled ones (window_start in the future) stay invisible until their
-// moment, exactly like every other windowed page.
+// moment, exactly like every other windowed page. P2-READ (PERF-01): the
+// posts come from resolvedJournalEntries(): one journal index read on a
+// documents store, today's per-post loop on a legacy one.
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Journal", alternates: { canonical: "/journal" } };
 
 export default async function JournalIndex() {
   const posts = await tfetch(async () => {
-    const list = (await resolvedContentPageList()).filter((p) => p.enabled && p.family === "journal");
-    const out = [];
-    for (const p of list) {
-      const page = await resolvedContentPage(p.slug);
-      if (page && campaignVisible(page)) out.push({ slug: page.slug, title: page.title, description: page.description, published: page.window_start || null });
-    }
+    const out = (await resolvedJournalEntries()).map((page) => ({ slug: page.slug, title: page.title, description: page.description, published: page.window_start || null }));
     return out.sort((a, b) => String(b.published || "").localeCompare(String(a.published || "")));
   });
 
