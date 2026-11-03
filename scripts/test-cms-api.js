@@ -4,12 +4,31 @@
 // payload can NEVER mutate, read-only actors stay read-only, and denied
 // requests leave storage unchanged — by re-reading rows, not by grepping
 // source.
+// P2-GUARD adds the side-by-side guard: with cms_state 'documents' every old
+// content writer (this API, catalog, upsells, brand, theme, experiment adopt,
+// insight apply, agency kit apply) answers 409 STORE_USES_DOCUMENTS and the
+// rows are unchanged; /api/admin/releases refuses every action and its GET is
+// the documents marker; a cms_state that can't be read is a 5xx, never a
+// go-ahead.
 //   pnpm test:cms-api
 import { readFile, rm } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { registerHooks } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(here, "..");
+
+// The real route files use the app's "@/…" alias and next/server, which plain
+// Node can't resolve on its own (the P2-GUARD route checks below call them).
+registerHooks({
+  resolve(spec, ctx, next) {
+    if (spec.startsWith("@/")) return next(pathToFileURL(join(ROOT, spec.slice(2) + (/\.\w+$/.test(spec) ? "" : ".js"))).href, ctx);
+    if (/^next\/(headers|server|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
+    return next(spec, ctx);
+  },
+});
+process.env.RATE_LIMIT_DISABLED = "1";
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -19,7 +38,7 @@ process.env.PLATFORM_DB_TOKEN = "";
 process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
-const dbs = [".test-cmsapi-default.db", ".test-cmsapi-platform.db", ".test-cmsapi-tenant.db"];
+const dbs = [".test-cmsapi-default.db", ".test-cmsapi-platform.db", ".test-cmsapi-tenant.db", ".test-cmsapi-docs.db", ".test-cmsapi-badmode.db"];
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 
 const { createClient } = await import("@libsql/client");
@@ -333,6 +352,214 @@ await t("candidate: unknown block → 400; invalid value → 422; publishing NEV
   const after = await inT(() => snapshotContent());
   eq(after.hash, before.hash, "snapshot hash untouched by a candidate");
 });
+
+// --- P2-GUARD: old writers next to documents --------------------------------
+{
+  const { runMigrations: runM, loadMigrations: loadM } = await import("../lib/platform/migrate.js");
+  await runM(C.platformDb(), await loadM("platform"), {});
+  const A = await import("../lib/platform/agency.js");
+  const { previewToken } = await import("../lib/releases.js");
+  const { handleReleasesGet, handleReleasesPost } = await import("../lib/admin/releases-api.js");
+  const M = await import("../lib/cms-mode.js");
+
+  // "zd": a store whose content the new editor owns (cms_state 'documents')
+  await C.upsertTenant({ id: "zd", name: "Docs store", domains: ["zd.test"], dbUrl: "file:.test-cmsapi-docs.db", config: { brand: { accent: "#7c3aed" } }, secrets: { order_link_secret: "zd-secret" } });
+  const ZD = await C.getTenant("zd");
+  const zdb = createClient({ url: "file:.test-cmsapi-docs.db" });
+  await zdb.executeMultiple(await readFile(join(here, "../lib/schema.sql"), "utf8"));
+  await runMigrations(zdb, await loadMigrations("tenant"));
+  await I.addMembership(ownerU.id, "zd", "owner");
+  const inD = (fn) => withTenant(ZD, fn);
+  const reqD = (body, { cookies = {}, path = "/api/admin/x" } = {}) => {
+    const url = new URL(`http://zd.test${path}`);
+    const jar = { _admin: ownerTok, ...cookies };
+    return {
+      url: url.href,
+      nextUrl: url,
+      cookies: { get: (n) => (jar[n] != null ? { name: n, value: jar[n] } : undefined) },
+      headers: { get: (k) => ({ host: "zd.test" })[k.toLowerCase()] ?? null },
+      json: async () => body,
+    };
+  };
+  const route = async (path, method, body, { params, cookies } = {}) => {
+    const mod = await import(`../app/api/${path}/route.js`);
+    const res = await mod[method](reqD(body, { cookies, path: `/api/${path}` }), { params: Promise.resolve(params || {}) });
+    return { status: res.status, body: await res.json() };
+  };
+  const setMode = (mode) => zdb.execute({ sql: "UPDATE cms_state SET mode = ? WHERE id = 1", args: [mode] });
+
+  // fixtures, written while the store is still on legacy
+  const NOW = "2026-11-01T00:00:00.000Z";
+  await zdb.executeMultiple(`
+    INSERT INTO products (id, handle, title, available) VALUES ('gid://shopify/Product/9', 'tee', 'Tee', 1);
+    INSERT INTO collections (id, handle, title, synced_at) VALUES ('gid://shopify/Collection/9', 'all', 'All', '${NOW}');
+    INSERT INTO placements (id, kind, target_product_ids, title, enabled, position, updated_at) VALUES ('pl-1', 'cart_upsell', '["gid://shopify/Product/9"]', 'Pairs well', 1, 0, '${NOW}');
+    INSERT INTO experiments (id, slug, name, target_kind, variants, status, created_at, updated_at) VALUES ('exp-1', 'hero-test', 'Hero test', 'hero', '[{"key":"control","weight":50,"payload":null},{"key":"b","weight":50,"payload":{"title":"Variant B"}}]', 'completed', '${NOW}', '${NOW}');
+    INSERT INTO ai_insights (id, status, proposals, facts, created_at, updated_at) VALUES ('ins-1', 'proposed', '[{"component":"hero","draft":{"title":"AI hero"}}]', '{}', '${NOW}', '${NOW}');
+  `);
+  const heroSave = await inD(() => handleStorefrontPut(reqD({ block: "hero", value: { title: "Legacy hero" }, revision: null })));
+  eq(heroSave.status, 200, "fixture hero:");
+  const pageSave = await inD(() => handleStorefrontPut(reqD({ page: { slug: "about-zd", title: "About", sections: [] }, revision: null })));
+  eq(pageSave.status, 200, "fixture page:");
+  const tplSave = await inD(() => handleStorefrontPut(reqD({ saveTemplate: { name: "Kept", family: "page", sections: [{ kind: "text", heading: "H", body: ["x"] }] } })));
+  eq(tplSave.status, 200, "fixture template:");
+  const tplId = tplSave.body.template.id;
+  const heroRev = heroSave.body.revisions.hero;
+  const pageRev = pageSave.body.pageRevisions["about-zd"];
+  const ptok = await inD(() => previewToken());
+  const pub = await inD(() => handleReleasesPost(reqD({ action: "publish", note: "legacy release" })));
+  eq(pub.status, 200, `fixture release: ${JSON.stringify(pub.body).slice(0, 200)}`);
+  const relId = pub.body.published.id;
+  // an agency with a staff grant on zd and a kit
+  const agency = await A.createAgency({ name: "Guard Studio" });
+  const agent = await I.createUser({ email: "agent@studio.test", password: "agent-pass-53" });
+  await A.addAgencyMember(agency.id, agent.id, "owner");
+  const agentTok = (await S.createSession({ userId: agent.id, kind: "agency", ttlMs: 60_000 })).token;
+  const inv = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@zc.test", role: "staff" });
+  ok(await A.acceptGrant(inv.token, { tenantId: "zd", actorEmail: "owner@zc.test" }), "grant accepted");
+  await C.platformDb().execute({
+    sql: "INSERT INTO agency_kits (id, agency_id, name, source_note, payload, created_at) VALUES ('akit_guard', ?, 'Guard kit', 'x', ?, ?)",
+    args: [agency.id, JSON.stringify({ hero: { title: "Kit hero" }, announcement: { enabled: true, text: "Kit announcement" } }), NOW],
+  });
+
+  // every row an old writer could touch, plus the store's brand and theme
+  const TABLES = ["cms_blocks", "cms_pages", "cms_templates", "cms_preview_candidates", "cms_history", "product_overrides", "collection_overrides", "placements", "experiments", "ai_insights", "releases", "release_state"];
+  const dump = async () => {
+    const out = {};
+    for (const tb of TABLES) out[tb] = (await zdb.execute(`SELECT * FROM ${tb} ORDER BY 1`)).rows.map((r) => JSON.stringify(r));
+    out.config = (await C.platformDb().execute("SELECT config FROM tenants WHERE id = 'zd'")).rows[0].config;
+    return JSON.stringify(out);
+  };
+
+  const WRITES = [
+    ["saveBlock", () => inD(() => handleStorefrontPut(reqD({ block: "hero", value: { title: "Overwrite" }, revision: heroRev })))],
+    ["saveBlock (force)", () => inD(() => handleStorefrontPut(reqD({ block: "announcement", value: { enabled: true, text: "Forced", href: "" }, force: true })))],
+    ["savePage", () => inD(() => handleStorefrontPut(reqD({ page: { slug: "about-zd", title: "Changed", sections: [] }, revision: pageRev })))],
+    ["resetBlock", () => inD(() => handleStorefrontPut(reqD({ block: "hero", reset: true, revision: heroRev })))],
+    ["resetBlock (no revision)", () => inD(() => handleStorefrontPut(reqD({ block: "hero", reset: true })))],
+    ["deletePage", () => inD(() => handleStorefrontPut(reqD({ deletePage: "about-zd", revision: pageRev })))],
+    ["saveTemplate", () => inD(() => handleStorefrontPut(reqD({ saveTemplate: { name: "New", family: "page", sections: [] } })))],
+    ["deleteTemplate", () => inD(() => handleStorefrontPut(reqD({ deleteTemplate: tplId })))],
+    ["previewCandidate", () => inD(() => handleStorefrontPut(reqD({ previewCandidate: { hero: { title: "Candidate" } } }, { cookies: { _preview: ptok } })))],
+    ["catalog POST (product)", () => route("admin/catalog", "POST", { product: { handle: "tee", modules: [], badge: "New" } })],
+    ["catalog POST (collection pins)", () => route("admin/catalog", "POST", { collection: { handle: "all", pinnedHandles: ["tee"] } })],
+    ["upsells POST", () => route("admin/upsells", "POST", { kind: "cart_upsell", targetHandles: ["tee"], title: "Another" })],
+    ["upsells/[id] PUT", () => route("admin/upsells/[id]", "PUT", { enabled: false }, { params: { id: "pl-1" } })],
+    ["upsells/[id] DELETE", () => route("admin/upsells/[id]", "DELETE", {}, { params: { id: "pl-1" } })],
+    ["brand PUT", () => route("admin/brand", "PUT", { brand: { accent: "#0f766e" } })],
+    ["brand reset", () => route("admin/brand", "PUT", { reset: true })],
+    ["theme POST (applyKit)", () => route("admin/theme", "POST", { action: "apply", kit: "glow" })],
+    ["experiments adopt", () => route("admin/experiments", "POST", { adopt: { slug: "hero-test", variant: "b" } })],
+    ["insights apply", () => route("admin/insights", "POST", { apply: { id: "ins-1", index: 0 } })],
+    ["partners agency kit apply", () => route("partners", "POST", { kit_apply: { kit: "akit_guard", tenant: "zd" } }, { cookies: { _agency: agentTok } })],
+  ];
+
+  await t("P2-GUARD: with cms_state 'documents', every old content writer answers 409 STORE_USES_DOCUMENTS and the re-read rows are unchanged", async () => {
+    await setMode("documents");
+    const before = await dump();
+    const wrong = [];
+    for (const [name, run] of WRITES) {
+      const r = await run();
+      if (r.status !== 409 || r.body.code !== "STORE_USES_DOCUMENTS") wrong.push(`${name}: ${r.status} ${JSON.stringify(r.body).slice(0, 160)}`);
+      else if (!/new editor/.test(r.body.error) || /SQLITE|cms_state/i.test(r.body.error)) wrong.push(`${name}: not plain words: ${r.body.error}`);
+    }
+    eq(wrong.join("\n"), "", "answers:");
+    eq(await dump(), before, "rows after the refused writes:");
+  });
+
+  await t("P2-GUARD: reads are unchanged in documents mode (view, getPage, templates, history, brand preview)", async () => {
+    eq((await inD(() => handleStorefrontGet(reqD(null)))).status, 200, "GET view:");
+    eq((await inD(() => handleStorefrontPut(reqD({ getPage: "about-zd" })))).body.page?.title, "About", "getPage:");
+    eq((await inD(() => handleStorefrontPut(reqD({ listTemplates: true })))).body.templates.length, 1, "listTemplates:");
+    eq((await inD(() => handleStorefrontPut(reqD({ history: { kind: "block", key: "hero" } })))).status, 200, "history:");
+    eq((await route("admin/brand", "PUT", { preview: { accent: "#0f766e" } })).status, 200, "brand preview (stores nothing):");
+    eq((await route("admin/catalog", "GET", null)).status, 200, "catalog GET:");
+  });
+
+  await t("P2-GUARD: 'migrating' refuses the same way, with its own plain words", async () => {
+    await setMode("migrating");
+    const before = await dump();
+    const r = await inD(() => handleStorefrontPut(reqD({ block: "hero", value: { title: "Mid-move" }, revision: heroRev })));
+    eq(r.status, 409, "status:");
+    eq(r.body.code, "STORE_USES_DOCUMENTS", "code:");
+    ok(/moving to the new editor/.test(r.body.error), `words: ${r.body.error}`);
+    eq((await route("admin/theme", "POST", { action: "apply", kit: "glow" })).status, 409, "theme:");
+    eq(await dump(), before, "rows:");
+  });
+
+  await t("P2-GUARD: in documents mode /api/admin/releases refuses publish, schedule, rollback, cancel, preview and approve (409), and GET is the documents marker", async () => {
+    await setMode("documents");
+    const before = await dump();
+    const at = new Date(Date.now() + 3_600_000).toISOString();
+    const wrong = [];
+    for (const body of [
+      { action: "publish", note: "x" },
+      { action: "schedule", note: "x", at },
+      { action: "rollback", id: relId },
+      { action: "cancel", id: relId },
+      { action: "preview", to: "/" },
+      { action: "approve", note: "x" },
+    ]) {
+      const r = await inD(() => handleReleasesPost(reqD(body)));
+      if (r.status !== 409 || r.body.code !== "STORE_USES_DOCUMENTS" || !/new editor/.test(r.body.error)) wrong.push(`${body.action}: ${r.status} ${JSON.stringify(r.body).slice(0, 160)}`);
+      if (r.body.url) wrong.push(`${body.action}: minted a preview URL`);
+    }
+    eq(wrong.join("\n"), "", "answers:");
+    eq(await dump(), before, "rows:");
+    const g = await inD(() => handleReleasesGet(reqD(null)));
+    eq(g.status, 200, "GET:");
+    eq(JSON.stringify([g.body.documents, g.body.mode, g.body.live]), JSON.stringify([true, "documents", relId]), "marker:");
+    ok(/This store publishes with the new editor/.test(g.body.message), `message: ${g.body.message}`);
+    ok(!("diff" in g.body) && !("validation" in g.body) && !("draftHash" in g.body), `no legacy diff: ${Object.keys(g.body)}`);
+  });
+
+  await t("P2-GUARD: back on legacy, the same writers work again (the guard keys on the mode, read fresh)", async () => {
+    await setMode("legacy");
+    const a = await route("admin/experiments", "POST", { adopt: { slug: "hero-test", variant: "b" } });
+    eq(a.status, 200, `adopt: ${JSON.stringify(a.body)}`);
+    eq(JSON.parse((await zdb.execute("SELECT value FROM cms_blocks WHERE key = 'hero'")).rows[0].value).title, "Variant B", "hero draft:");
+    const g = await inD(() => handleReleasesGet(reqD(null)));
+    eq(JSON.stringify([g.status, g.body.documents ?? null, typeof g.body.diff]), JSON.stringify([200, null, "object"]), "legacy GET:");
+  });
+
+  // "zx": a store whose cms_state can't be read (a view over a table that's gone)
+  await C.upsertTenant({ id: "zx", name: "Bad mode", domains: ["zx.test"], dbUrl: "file:.test-cmsapi-badmode.db", config: {}, secrets: {} });
+  const ZX = await C.getTenant("zx");
+  const xdb = createClient({ url: "file:.test-cmsapi-badmode.db" });
+  await xdb.executeMultiple(await readFile(join(here, "../lib/schema.sql"), "utf8"));
+  await runMigrations(xdb, await loadMigrations("tenant"));
+  await xdb.executeMultiple("ALTER TABLE cms_state RENAME TO cms_state_data; CREATE VIEW cms_state AS SELECT * FROM cms_state_gone;");
+  await I.addMembership(ownerU.id, "zx", "owner");
+
+  await t("P2-GUARD: a cms_state read error other than a missing table is infrastructure (5xx), never a go-ahead", async () => {
+    const thrown = await withTenant(ZX, () => M.assertLegacyContentWrites().then(() => null, (e) => e));
+    ok(thrown instanceof M.CmsModeUnavailableError, `assert: ${thrown ? thrown.message : "allowed the write"}`);
+    const reqX = (body) => ({ cookies: { get: (n) => (n === "_admin" ? { value: ownerTok } : undefined) }, headers: { get: (k) => ({ host: "zx.test" })[k.toLowerCase()] ?? null }, json: async () => body });
+    const r = await withTenant(ZX, () => handleStorefrontPut(reqX({ block: "hero", value: { title: "Should not land" }, revision: null })));
+    ok(r.status >= 500, `save answered ${r.status} ${JSON.stringify(r.body)}`);
+    ok(!/cms_state|SQLITE/i.test(r.body.error), `plain words: ${r.body.error}`);
+    eq((await xdb.execute("SELECT count(*) AS n FROM cms_blocks")).rows[0].n, 0, "nothing written:");
+    const mod = await import("../app/api/admin/catalog/route.js");
+    const res = await mod.POST({ url: "http://zx.test/api/admin/catalog", nextUrl: new URL("http://zx.test/api/admin/catalog"), ...reqX({ product: { handle: "nope", modules: [], badge: "" } }) });
+    ok(res.status >= 500, `catalog answered ${res.status}`);
+    const pub = await withTenant(ZX, () => handleReleasesPost(reqX({ action: "publish" })));
+    ok(pub.status >= 500, `publish answered ${pub.status}`);
+    eq((await xdb.execute("SELECT count(*) AS n FROM releases")).rows[0].n, 0, "no release:");
+  });
+
+  await t("P2-GUARD: a store with no cms_state table (before 0021), or a table with no row, reads as legacy", async () => {
+    await withTenant(ZX, async () => {
+      await xdb.executeMultiple("DROP VIEW cms_state;");
+      eq(await M.getCmsMode(), "legacy", "no table:");
+      await xdb.executeMultiple("ALTER TABLE cms_state_data RENAME TO cms_state; DELETE FROM cms_state;");
+      eq(await M.getCmsMode(), "legacy", "no row:");
+      await xdb.execute("INSERT INTO cms_state (id, mode, updated_at) VALUES (1, 'Documents', 'x')");
+      eq((await M.assertLegacyContentWrites().then(() => "allowed", (e) => e.code)), "STORE_USES_DOCUMENTS", "an unknown mode is not legacy:");
+    });
+  });
+  zdb.close();
+  xdb.close();
+}
 
 // ----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);

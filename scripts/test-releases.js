@@ -8,6 +8,10 @@
 // one statement per request for pointer plus release (request-cache stub),
 // listReleases hiding lost-race rows, and the storefront layout's chrome and
 // maintenance page rendered (Next's SWC) on ContentUnavailableError.
+// P2-GUARD adds the guarded flip: one write batch per publish, rollback and
+// scheduled flip, so a lost race or a failed stamp leaves nothing behind; the
+// scheduled job re-reads and retries; v4 targets are refused; the documents
+// marker for every legacy surface; the documents-mode Publishing badge.
 //   pnpm test:releases
 // request-cache must load before any app module that imports react.
 import "./support/request-cache.js";
@@ -58,7 +62,7 @@ process.env.PLATFORM_CACHE_MS = "50";
 
 process.env.PLATFORM_SITE_HOSTS = "";
 
-const dbs = [".test-rel-default.db", ".test-rel-platform.db", ".test-rel-t1.db", ".test-rel-vg.db", ".test-rel-vgbare.db", ".test-rel-vgl.db"];
+const dbs = [".test-rel-default.db", ".test-rel-platform.db", ".test-rel-t1.db", ".test-rel-vg.db", ".test-rel-vgbare.db", ".test-rel-vgl.db", ".test-rel-gd.db", ".test-rel-gd4.db"];
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 
 const C = await import("../lib/platform/control.js");
@@ -928,6 +932,225 @@ console.log("— P2-VGATE: the reader version gate");
     } finally {
       await putTenant("vg", ".test-rel-vg.db");
     }
+  });
+}
+
+console.log("— P2-GUARD: the guarded flip and the documents marker");
+{
+  const { runRequest, watchStatements } = await import("./support/request-cache.js");
+  const { currentDatabase } = await import("../lib/db.js");
+  const ok = (v, m) => {
+    if (!v) throw new Error(m);
+  };
+  const mk = async (id, file) => {
+    await C.upsertTenant({ id, name: `Guard ${id}`, domains: [`${id}.test`], dbUrl: `file:${file}`, config: { site: { name: `Guard ${id}` } }, secrets: { order_link_secret: `${id}-secret` } });
+    const T = await C.getTenant(id);
+    await withTenant(T, async () => {
+      await libsql.executeMultiple(schema);
+      await runMigrations(libsql, tenantMigrations);
+    });
+    return T;
+  };
+  const GD = await mk("gd", ".test-rel-gd.db");
+  const inGd = (fn) => withTenant(GD, fn);
+  const actor = { kind: "merchant", id: "u1" };
+  const pointer = () => inGd(async () => (await libsql.execute("SELECT live_release_id AS id FROM release_state WHERE id = 1")).rows[0].id ?? null);
+  const rows = () => inGd(async () => (await libsql.execute("SELECT id, note, published_at FROM releases ORDER BY created_at")).rows.map((r) => ({ ...r })));
+  const hooked = async (hook, fn) => {
+    R.__releaseTestHooks.beforeFlip = hook;
+    try {
+      return await fn();
+    } finally {
+      R.__releaseTestHooks.beforeFlip = null;
+    }
+  };
+  // a v4 row (a documents list), never live
+  const putV4 = (id) =>
+    inGd(() =>
+      libsql.execute({
+        sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES (?, ?, ?, 'v4', NULL, ?, NULL, NULL)",
+        args: [id, R.stableStringify({ v: 4, list: { doc_header: "dv_1" } }), `h_${id}`, new Date().toISOString()],
+      }),
+    );
+
+  await inGd(() => S.setBlock("hero", { title: "Guard hero" }));
+  const first = await inGd(() => R.createRelease({ note: "base", actor }));
+
+  await t("two legacy publishes from the same pointer, interleaved: one goes live, the other is a 409 and leaves no releases row; the pointer is the winner", async () => {
+    eq(await pointer(), first.id, "start:");
+    const before = await rows();
+    await inGd(() => S.setBlock("hero", { title: "Raced hero" }));
+    let winner = null;
+    let fired = false;
+    const loser = await hooked(
+      async (info) => {
+        if (fired || info.kind !== "publish") return;
+        fired = true;
+        // B reads the same pointer and goes live inside A's window
+        winner = await R.createRelease({ note: "B wins", actor });
+      },
+      () => inGd(() => R.createRelease({ note: "A loses", actor }).then(() => null, (e) => e)),
+    );
+    ok(winner?.id, "B did not publish");
+    ok(loser, "A did not fail: both went live (the old two-statement flip)");
+    eq(loser.status, 409, "A status:");
+    eq(loser.code, "PUBLISH_RACE", "A code:");
+    eq(loser.message, "Another publish just went live, review again", "A message:");
+    eq(await pointer(), winner.id, "pointer:");
+    const after = await rows();
+    eq(after.length, before.length + 1, "one new row:");
+    ok(!after.some((r) => r.note === "A loses"), "the loser left a row");
+    ok(after.find((r) => r.id === winner.id)?.published_at, "the winner is stamped");
+  });
+
+  await t("a forced failure of the published_at stamp inside the batch leaves the pointer and the releases table unchanged", async () => {
+    await inGd(() => S.setBlock("hero", { title: "Stamp fails" }));
+    const p0 = await pointer();
+    const r0 = JSON.stringify(await rows());
+    await inGd(() => libsql.execute("CREATE TRIGGER gd_stamp_fails BEFORE UPDATE OF published_at ON releases BEGIN SELECT RAISE(ABORT, 'stamp failed on purpose'); END"));
+    try {
+      const err = await inGd(() => R.createRelease({ note: "stamp fails", actor }).then(() => null, (e) => e));
+      ok(err, "the publish reported success");
+      ok(/stamp failed on purpose/.test(String(err?.message) + String(err?.cause?.message)), `wrong error: ${err?.message}`);
+    } finally {
+      await inGd(() => libsql.execute("DROP TRIGGER gd_stamp_fails"));
+    }
+    eq(await pointer(), p0, "pointer:");
+    eq(JSON.stringify(await rows()), r0, "releases:");
+  });
+
+  await t("a scheduled legacy release whose job races a manual publish still goes live (re-read, then retry)", async () => {
+    await inGd(() => S.setBlock("hero", { title: "Scheduled hero" }));
+    const future = new Date(Date.now() + 60_000).toISOString();
+    const sched = await inGd(() => R.createRelease({ note: "scheduled", actor, scheduledFor: future }));
+    await inGd(() => S.setBlock("hero", { title: "Manual hero" }));
+    const job = (await C.platformDb().execute({ sql: "SELECT id FROM jobs WHERE idempotency_key = ?", args: [`publish_${sched.id}`] })).rows[0];
+    await C.platformDb().execute({ sql: "UPDATE jobs SET run_after = ? WHERE id = ?", args: [new Date(Date.now() - 1000).toISOString(), job.id] });
+    const attempts = [];
+    let manual = null;
+    const res = await hooked(
+      async (info) => {
+        if (info.kind !== "scheduled") return;
+        attempts.push(info.attempt);
+        if (info.attempt === 1) manual = await R.createRelease({ note: "manual", actor }); // lands between the job's read and its flip
+      },
+      () => W.runJobById(job.id),
+    );
+    eq(res.ok, true, `job: ${JSON.stringify(res)}`);
+    ok(manual?.id, "the manual publish did not go live");
+    eq(attempts.join(), "1,2", "flip attempts:");
+    eq(await pointer(), sched.id, "the scheduled release won:");
+    ok((await rows()).find((r) => r.id === sched.id)?.published_at, "stamped");
+  });
+
+  await t("rollbackRelease to a v4 row is a 409 and the pointer stays; the scheduled job for a v4 row fails without flipping", async () => {
+    await putV4("rel_gd_v4");
+    const p0 = await pointer();
+    const e = await inGd(() => R.rollbackRelease("rel_gd_v4", { actor }).then(() => null, (x) => x));
+    ok(e, "rollback to a v4 row went through");
+    eq([e.status, e.code].join(), "409,STORE_USES_DOCUMENTS", "rollback:");
+    eq(await pointer(), p0, "pointer after rollback:");
+    const j = await inGd(() => R.publishReleaseById("rel_gd_v4").then(() => null, (x) => x));
+    ok(j, "the job flipped a v4 row");
+    eq(j.code, "STORE_USES_DOCUMENTS", "job:");
+    eq(await pointer(), p0, "pointer after the job:");
+    // and a legacy rollback still works, through the same guarded flip
+    await inGd(() => R.rollbackRelease(first.id, { actor }));
+    eq(await pointer(), first.id, "legacy rollback:");
+  });
+
+  await t("rollback and the scheduled job refuse a store not on legacy, without flipping", async () => {
+    const p0 = await pointer();
+    await inGd(() => libsql.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1"));
+    try {
+      const rb = await inGd(() => R.rollbackRelease(first.id, { actor }).then(() => null, (x) => x));
+      eq(rb?.code, "STORE_USES_DOCUMENTS", "rollback:");
+      const job = await inGd(() => R.publishReleaseById(first.id).then(() => null, (x) => x));
+      eq(job?.code, "STORE_USES_DOCUMENTS", "job:");
+      const pub = await inGd(() => R.createRelease({ actor }).then(() => null, (x) => x));
+      eq(pub?.code, "STORE_USES_DOCUMENTS", "publish:");
+    } finally {
+      await inGd(() => libsql.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1"));
+    }
+    eq(await pointer(), p0, "pointer:");
+  });
+
+  // gd4: a store whose live release is a documents list (v4)
+  const GD4 = await mk("gd4", ".test-rel-gd4.db");
+  const inGd4 = (fn) => withTenant(GD4, fn);
+  await inGd4(async () => {
+    await S.setBlock("hero", { title: "Legacy draft" });
+    await S.setBlock("announcement", { enabled: true, text: "Legacy announcement" });
+    await libsql.execute({
+      sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES ('rel_gd4', ?, 'h_gd4', 'v4', NULL, ?, NULL, ?)",
+      args: [R.stableStringify({ v: 4, list: { doc_header: "dv_1" } }), new Date().toISOString(), new Date().toISOString()],
+    });
+    await libsql.execute("UPDATE release_state SET live_release_id = 'rel_gd4' WHERE id = 1");
+  });
+
+  await t("with a v4 pointer: getLiveRelease, releaseDiff, validateRelease and brandReadability give the documents marker, never 'every block customized'", async () => {
+    const live = await inGd4(() => R.getLiveRelease());
+    eq(JSON.stringify([live.id, live.v, live.documents, live.content]), JSON.stringify(["rel_gd4", 4, true, null]), "getLiveRelease:");
+    const d = await inGd4(() => R.releaseDiff());
+    eq(d.documents, true, "diff marker:");
+    eq(d.message, "This store publishes with the new editor", "diff message:");
+    eq(d.items.length, 0, `diff items: ${JSON.stringify(d.items)}`);
+    eq(d.dirty, false, "diff dirty:");
+    const snap = await inGd4(() => R.snapshotContent());
+    const v = await inGd4(() => R.validateRelease({ ...snap.content, brand: { foreground: "#cccccc", background: "#ffffff" } }));
+    eq(JSON.stringify([v.documents, v.ok, v.issues.length]), JSON.stringify([true, true, 0]), "validateRelease:");
+    const { brandReadability } = await import("../lib/admin/brand-readability.js");
+    const b = await inGd4(() => brandReadability({ foreground: "#cccccc", background: "#ffffff" }));
+    eq(JSON.stringify([b.documents, b.blocking, b.warnings.length]), JSON.stringify([true, false, 0]), "brandReadability:");
+    eq(b.message, "This store publishes with the new editor", "brand message:");
+    // a legacy publish can't flip a v4 pointer back to old content
+    const e = await inGd4(() => R.createRelease({ actor }).then(() => null, (x) => x));
+    eq(e?.code, "STORE_USES_DOCUMENTS", "createRelease over a v4 pointer:");
+  });
+
+  await t("with a v4 pointer the platform overview gives the documents marker for that store", async () => {
+    process.env.PLATFORM_ADMIN_PASSWORD = "guard-operator-pass";
+    try {
+      const { platformSessionToken } = await import("../lib/platform/admin-auth.js");
+      const tok = await platformSessionToken();
+      const route = await import("../app/api/platform/overview/route.js");
+      const res = await route.GET({ cookies: { get: (n) => (n === "_platform" ? { value: tok } : undefined) }, headers: { get: () => null } });
+      const body = await res.json();
+      eq(res.status, 200, `overview: ${JSON.stringify(body).slice(0, 200)}`);
+      const gd4 = body.fleet.find((f) => f.tenant === "gd4");
+      ok(gd4?.reachable, `gd4: ${JSON.stringify(gd4)}`);
+      eq(JSON.stringify([gd4.release?.id, gd4.release?.documents]), JSON.stringify(["rel_gd4", true]), "release:");
+      eq(gd4.release.message, "This store publishes with the new editor", "message:");
+      const gd = body.fleet.find((f) => f.tenant === "gd");
+      ok(gd?.release && !gd.release.documents && /^[0-9a-f]{12}$/.test(gd.release.hash), `a legacy store keeps its hash: ${JSON.stringify(gd?.release)}`);
+    } finally {
+      delete process.env.PLATFORM_ADMIN_PASSWORD;
+    }
+  });
+
+  await t("the documents-mode Publishing badge is one statement and counts draft_hash IS NOT published_hash", async () => {
+    await inGd4(async () => {
+      await libsql.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+      const doc = (id, type, draft, published, archived = null) =>
+        libsql.execute({
+          sql: "INSERT INTO documents (id, type, label, draft, draft_hash, schema_version, published_hash, archived_at, created_at, updated_at) VALUES (?, ?, ?, '{}', ?, 1, ?, ?, 'x', 'x')",
+          args: [id, type, id, draft, published, archived],
+        });
+      await doc("doc_home", "home", "h1", "h0"); // dirty
+      await doc("doc_header", "header", "h2", "h2"); // clean
+      await doc("doc_footer", "footer", "h3", null); // never published: dirty
+      await doc("doc_p_old", "page", "h4", "h0", "2026-01-01"); // archived: not counted
+      await doc("doc_bp", "blueprint", "h5", "h0"); // blueprint: not counted
+    });
+    const one = await inGd4(() => runRequest(() => watchStatements(currentDatabase().libsql, () => R.publishingBadge())));
+    eq(one.result, 2, "badge:");
+    eq(one.statements.length, 1, `statements: ${JSON.stringify(one.statements)}`);
+    ok(/documents/.test(one.statements[0]) && /draft_hash IS NOT published_hash/.test(one.statements[0]), `the statement: ${one.statements[0]}`);
+    await inGd4(() => libsql.execute("UPDATE documents SET published_hash = draft_hash"));
+    eq(await inGd4(() => R.publishingBadge()), null, "all published:");
+    // a legacy store keeps today's dot
+    await inGd(() => S.setBlock("hero", { title: "Unpublished edit" }));
+    eq(await inGd(() => R.publishingBadge()), "•", "legacy dirty:");
   });
 }
 

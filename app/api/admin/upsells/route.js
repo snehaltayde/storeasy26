@@ -6,6 +6,7 @@ import { listPlacements, upsertPlacement, resolveHandles } from "@/lib/cms/place
 import { db } from "@/lib/db";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
+import { legacyWritesRefusal } from "@/lib/cms-mode";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +46,9 @@ export const POST = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "upsells.write");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
+  // P2-GUARD: a store on the new editor refuses this write (409 STORE_USES_DOCUMENTS)
+  const refused = await legacyWritesRefusal({ route: "admin/upsells" });
+  if (refused) return NextResponse.json(refused.body, { status: refused.status });
   try {
     const targets = await resolveHandles(body.targetHandles || []);
     if (targets.missing.length)

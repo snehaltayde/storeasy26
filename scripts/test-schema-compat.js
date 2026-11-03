@@ -7,6 +7,8 @@
 //   3. Cart, product page data, search and order creation against a tenant at
 //      the older schema (OLDER_SCHEMA), side by side with a tenant at the current
 //      schema. Cart and search go through their real API routes.
+//   4. P2-GUARD: a tenant at BEFORE_DOCUMENTS (no cms_state table) still saves
+//      legacy content and publishes through the real console handlers.
 //   pnpm test:schema-compat
 import { readFile, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -20,6 +22,11 @@ const ROOT = join(here, "..");
 // The tenant at the older schema stops here. Move it to the migration before
 // yours when you add one that cart, product page, search or orders depend on.
 const OLDER_SCHEMA = "0017_cms_approvals";
+
+// P2-GUARD's own pin, kept apart from OLDER_SCHEMA so moving that one never
+// drops this check: the last migration before 0021 (documents, cms_state).
+// A store here has no cms_state table and must read as legacy.
+const BEFORE_DOCUMENTS = "0020_sync_runs_resumable";
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -45,6 +52,7 @@ const dbs = [
   ".test-compat-old.db",
   ".test-compat-cur.db",
   ".test-compat-spare.db",
+  ".test-compat-pre21.db",
 ];
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
@@ -683,6 +691,52 @@ await t("a tenant migrated while the instance is warm: orders get the columns on
     __schemaCompat.forget();
   }
 });
+
+// =============================================================================
+// 4. P2-GUARD: a tenant at BEFORE_DOCUMENTS saves legacy content and publishes
+// =============================================================================
+console.log(`— a tenant at ${BEFORE_DOCUMENTS} (no cms_state): legacy saves and publishes`);
+{
+  const I = await import("../lib/platform/identity.js");
+  const Sess = await import("../lib/platform/sessions.js");
+  const { handleStorefrontPut } = await import("../lib/admin/cms-api.js");
+  const { handleReleasesGet, handleReleasesPost } = await import("../lib/admin/releases-api.js");
+  const { getCmsMode } = await import("../lib/cms-mode.js");
+  await C.upsertTenant({ id: "pre21", name: "PRE21", domains: ["pre21.test"], dbUrl: "file:.test-compat-pre21.db", config: {}, secrets: { order_link_secret: "pre21-secret" } });
+  await inT("pre21", () => runMigrations(libsql, upTo(BEFORE_DOCUMENTS)));
+  const u = await I.createUser({ email: "owner@pre21.test", password: "pre21-owner-pass" });
+  await I.addMembership(u.id, "pre21", "owner");
+  const tok = (await Sess.createSession({ userId: u.id, kind: "merchant", ttlMs: 60_000 })).token;
+  const req = (body) => ({
+    cookies: { get: (n) => (n === "_admin" ? { value: tok } : undefined) },
+    headers: { get: (k) => ({ host: "pre21.test" })[k.toLowerCase()] ?? null },
+    json: async () => body,
+  });
+
+  await t(`the tenant really is at ${BEFORE_DOCUMENTS}, with no cms_state table`, async () => {
+    ok(MIGRATIONS.some((m) => m.id === BEFORE_DOCUMENTS), `${BEFORE_DOCUMENTS} is not in migrations/tenant`);
+    ok(MIGRATIONS.some((m) => m.id > BEFORE_DOCUMENTS), `nothing after ${BEFORE_DOCUMENTS}: move the pin`);
+    const ids = await inT("pre21", async () => (await libsql.execute("SELECT id FROM schema_migrations ORDER BY id")).rows.map((r) => r.id));
+    eq(ids[ids.length - 1], BEFORE_DOCUMENTS, "newest in its ledger:");
+    const t = await inT("pre21", async () => (await libsql.execute("SELECT name FROM sqlite_master WHERE name = 'cms_state'")).rows.length);
+    eq(t, 0, "cms_state tables:");
+    eq(await inT("pre21", () => getCmsMode()), "legacy", "mode:");
+  });
+
+  await t(`at ${BEFORE_DOCUMENTS}: a legacy block and page save, then a publish, all through the real handlers`, async () => {
+    const b = await inT("pre21", () => handleStorefrontPut(req({ block: "hero", value: { title: "Pre-0021 hero" }, revision: null })));
+    eq(b.status, 200, `save block: ${JSON.stringify(b.body).slice(0, 200)}`);
+    const p = await inT("pre21", () => handleStorefrontPut(req({ page: { slug: "about", title: "About", sections: [] }, revision: null })));
+    eq(p.status, 200, `save page: ${JSON.stringify(p.body).slice(0, 200)}`);
+    const pub = await inT("pre21", () => handleReleasesPost(req({ action: "publish", note: "pre-0021" })));
+    eq(pub.status, 200, `publish: ${JSON.stringify(pub.body).slice(0, 200)}`);
+    const live = await inT("pre21", async () => (await libsql.execute("SELECT live_release_id AS id FROM release_state WHERE id = 1")).rows[0].id);
+    eq(live, pub.body.published.id, "live pointer:");
+    const g = await inT("pre21", () => handleReleasesGet(req(null)));
+    eq(g.status, 200, "GET:");
+    ok(!g.body.documents && g.body.dirty === false, `legacy view after publish: ${JSON.stringify({ documents: g.body.documents, dirty: g.body.dirty })}`);
+  });
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(ROOT, f), { force: true });

@@ -7,6 +7,7 @@ import { brandReadability as readability } from "@/lib/admin/brand-readability";
 import { audit } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
+import { legacyWritesRefusal } from "@/lib/cms-mode";
 
 // Brand tokens console API (S35 / MC10, TOK-02).
 //   GET                      → effective brand + customized flag + derived shades
@@ -47,6 +48,12 @@ export const PUT = tenantHandler(async (request) => {
   const tenant = currentTenant();
   if (!tenant || tenant.id === "_default")
     return NextResponse.json({ error: "This store runs on environment config — brand is read-only here" }, { status: 409 });
+
+  // P2-GUARD: save and reset write config.brand, which a store on the new
+  // editor keeps in its design document (TOK-03): refused with a 409. The
+  // preview above stores nothing and stays open.
+  const refused = await legacyWritesRefusal({ route: "admin/brand" });
+  if (refused) return NextResponse.json(refused.body, { status: refused.status });
 
   if (body.reset) {
     await patchTenant(tenant.id, { config: { brand: null } });

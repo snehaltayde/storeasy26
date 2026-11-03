@@ -6,6 +6,7 @@ import { loadMigrations } from "@/lib/platform/migrate";
 import { billingOverview } from "@/lib/platform/billing";
 import { salesRollup } from "@/lib/reporting";
 import { getLiveRelease } from "@/lib/releases";
+import { DOCUMENTS_MESSAGE } from "@/lib/cms-mode";
 import { kitAttr } from "@/lib/themes/kits";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/tenant-context";
@@ -56,7 +57,12 @@ export async function GET(request) {
           reachable: true,
           migrationHead: head?.head || null,
           behind: (head?.head || "") < repoHead,
-          release: live ? { id: live.id, hash: live.content_hash.slice(0, 12), published_at: live.published_at } : null,
+          // P2-GUARD: a v4 live release is the documents marker, not a legacy snapshot
+          release: live
+            ? live.documents
+              ? { id: live.id, documents: true, message: DOCUMENTS_MESSAGE, hash: String(live.content_hash || "").slice(0, 12), published_at: live.published_at }
+              : { id: live.id, hash: live.content_hash.slice(0, 12), published_at: live.published_at }
+            : null,
           kit: kitAttr(tenant.config?.theme || null),
         };
       });

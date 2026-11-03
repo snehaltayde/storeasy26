@@ -18,6 +18,8 @@ import {
 import { platformDb } from "@/lib/platform/control";
 import { sameOrigin } from "@/lib/origin-check";
 import { rateLimit } from "@/lib/rate-limit";
+import { runAsTenant } from "@/lib/platform/ops";
+import { legacyWritesRefusal } from "@/lib/cms-mode";
 
 // Agency workspace API (S48 / AG01–06). EVERY tenant-touching action
 // re-checks the accepted grant on this request — revocation is immediate,
@@ -83,7 +85,14 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, kit: { id: r.id, name: r.name, payload: r.payload } });
     }
     if (body.kit_apply) {
-      const r = await applyAgencyKit({ agencyId, kitId: String(body.kit_apply.kit || ""), tenantId: String(body.kit_apply.tenant || "") });
+      const tenant = String(body.kit_apply.tenant || "");
+      // P2-GUARD: the grant first (no probing other stores), then the store's
+      // own mode: a store on the new editor refuses the kit's legacy drafts.
+      // P2-WRITERS replaces this with a mode-aware facade.
+      if (!(await activeGrant(agencyId, tenant))) return fail(422, "no accepted grant for that store");
+      const refused = await runAsTenant(tenant, () => legacyWritesRefusal({ route: "partners" }));
+      if (refused) return NextResponse.json(refused.body, { status: refused.status });
+      const r = await applyAgencyKit({ agencyId, kitId: String(body.kit_apply.kit || ""), tenantId: tenant });
       return NextResponse.json({ ok: true, ...r });
     }
     if (body.approval) {
