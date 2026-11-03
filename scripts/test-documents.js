@@ -286,6 +286,35 @@ await t("a save whose answer was lost after it committed is reported saved (200)
   made.post = r.body.document;
 });
 
+// P2-DOCFIX (1): the same lost answer on a create of a page with an address.
+// lib/db.js sends the committed batch again, and SQLite reports the slug clash
+// with the founder's own new row first.
+await t("a create of a page with an address whose answer was lost and resent answers 200 for the founder's own page, never SLUG_TAKEN naming itself", async () => {
+  const inst = await inT(() => currentDatabase());
+  const send = inst.libsql.batch;
+  let sent = 0;
+  inst.libsql.batch = async (stmts, mode) => {
+    sent++;
+    await send.call(inst.libsql, stmts, mode);
+    throw Object.assign(new TypeError("fetch failed"), {});
+  };
+  let r;
+  try {
+    r = await create({ type: "page", meta: { slug: "lost-sale", title: "Sale page" } });
+  } finally {
+    delete inst.libsql.batch;
+  }
+  ok(sent >= 2, `lib/db.js sent the batch again (${sent} sends):`);
+  eq([r.status, r.body.code ?? null], [200, null], `answer ${JSON.stringify(r.body).slice(0, 200)}:`);
+  const rows = await sql("SELECT id FROM documents WHERE slug = 'lost-sale'");
+  eq(rows.map((x) => x.id), [r.body.document.id], "one row, the one the founder was told about:");
+  eq(r.body.document.body.meta.title, "Sale page", "their page:");
+  eq((await sql("SELECT count(*) AS n FROM document_versions WHERE document_id = ?", [r.body.document.id]))[0].n, 1, "one 'Created' checkpoint:");
+  // a real clash at the same address is still a 409 naming the other page
+  const clash = await create({ type: "page", meta: { slug: "lost-sale", title: "Another" } });
+  eq([clash.status, clash.body.code, clash.body.error], [409, "SLUG_TAKEN", "Another page already uses /lost-sale: Sale page"], "a real clash:");
+});
+
 await t("API: archive, discardDraft and restoreVersion (and saveDraft) with no revision return 428, and storage is unchanged", async () => {
   const before = await dump();
   const vid = (await sql("SELECT id FROM document_versions WHERE document_id = 'doc_home' LIMIT 1"))[0].id;
@@ -639,6 +668,166 @@ await t("no issue text reaching the API matches /Section \\d+ \\(/ (as sent, and
     ok(!/Section \d+ \(/.test(i.message), `message: ${i.message}`);
     ok(!/Section \d+ \(/.test(issueText(i)), `worded: ${issueText(i)}`);
   }
+});
+
+// --- P2-DOCFIX: review findings on P2-DOCS ---------------------------------------------------
+console.log("— review fixes (P2-DOCFIX)");
+
+// (2) the prune looks only at this document's rows
+await t("the checkpoint prune's query plan uses the indexes: no SCAN of publish_log or documents (publish_log_doc and the documents primary key)", async () => {
+  const st = V.pruneStatement("doc_plan");
+  // its own connection, closed after: an EXPLAIN of a DELETE can hold the write lock
+  const c = createClient({ url: "file:.test-documents-docs.db" });
+  let plan;
+  try {
+    plan = (await c.execute({ sql: `EXPLAIN QUERY PLAN ${st.sql}`, args: st.args })).rows.map((r) => String(r.detail));
+  } finally {
+    c.close();
+  }
+  const scans = plan.filter((d) => /^SCAN\b/.test(d));
+  eq(scans, [], `no table scans in:\n      ${plan.join("\n      ")}\n     `);
+  ok(plan.filter((d) => /^SEARCH p USING INDEX publish_log_doc \(document_id=\?\)/.test(d)).length === 3, `publish_log by document, in all three subqueries: ${plan.join(" | ")}`);
+  ok(plan.filter((d) => /^SEARCH d USING (?:INDEX sqlite_autoindex_documents_1|INTEGER PRIMARY KEY|PRIMARY KEY) \(id=\?\)/.test(d)).length === 3, `documents by id, in all three subqueries: ${plan.join(" | ")}`);
+});
+
+await t("pruning still never removes a checkpoint a document row points at (published or undone), nor one another document's log row would name only by version id", async () => {
+  V.setCheckpointInterval(0);
+  try {
+    let d = (await create({ type: "page", meta: { slug: "pointed-at", title: "Pointed at" } })).body.document;
+    for (let i = 0; i < 3; i++) d = (await save(d.id, d.revision, { ...d.body, sections: [textSection("sec_pa1", `Early ${i}`)] })).body.document;
+    const [a, b] = (await sql("SELECT id FROM document_versions WHERE document_id = ? AND kind = 'checkpoint' ORDER BY created_at, rowid LIMIT 2", [d.id])).map((r) => r.id);
+    // stand-ins: Undo pointed this document at one checkpoint, publish at another
+    await raw.docs.execute({ sql: "UPDATE documents SET undone_version_id = ?, published_version_id = ? WHERE id = ?", args: [a, b, d.id] });
+    for (let i = 0; i < 25; i++) d = (await save(d.id, d.revision, { ...d.body, sections: [textSection("sec_pa1", `Later ${i}`)] })).body.document;
+    eq((await sql("SELECT id FROM document_versions WHERE id IN (?, ?) ORDER BY id", [a, b])).map((r) => r.id), [a, b].sort(), "both kept:");
+    eq((await sql("SELECT count(*) AS n FROM document_versions WHERE document_id = ? AND kind = 'checkpoint'", [d.id]))[0].n, 20, "still capped at 20 in all:");
+  } finally {
+    V.setCheckpointInterval(null);
+  }
+});
+
+// (3) archived documents
+await t("saving or restoring into an archived document is refused (409 DOCUMENT_ARCHIVED), storage unchanged", async () => {
+  let d = (await create({ type: "page", meta: { slug: "archived-one", title: "Archived one" } })).body.document;
+  d = (await save(d.id, d.revision, { ...d.body, sections: [textSection("sec_ar1", "Before archive")] })).body.document;
+  const vid = (await sql("SELECT id FROM document_versions WHERE document_id = ? ORDER BY created_at, rowid LIMIT 1", [d.id]))[0].id;
+  const arch = await api({ archive: d.id, revision: d.revision });
+  eq(arch.status, 200, "archived:");
+  const rev = arch.body.document.revision;
+  const before = await dump();
+  const s = await save(d.id, rev, { ...d.body, sections: [textSection("sec_ar1", "After archive")] });
+  eq([s.status, s.body.code], [409, "DOCUMENT_ARCHIVED"], "save:");
+  const r = await api({ restoreVersion: { id: d.id, versionId: vid }, revision: rev });
+  eq([r.status, r.body.code], [409, "DOCUMENT_ARCHIVED"], "restore:");
+  await unchanged(before, "writes into an archived document");
+});
+
+await t("an archive that lands between the read and the batch still refuses the save and the restore (the batch's own archived_at guard), storage unchanged", async () => {
+  for (const op of ["save", "restore"]) {
+    let d = (await create({ type: "page", meta: { slug: `archived-race-${op}`, title: "Race" } })).body.document;
+    d = (await save(d.id, d.revision, { ...d.body, sections: [textSection("sec_ar2", "First")] })).body.document;
+    const vid = (await sql("SELECT id FROM document_versions WHERE document_id = ? ORDER BY created_at, rowid LIMIT 1", [d.id]))[0].id;
+    const inst = await inT(() => currentDatabase());
+    const send = inst.libsql.batch;
+    let snap = null;
+    inst.libsql.batch = async (stmts, mode) => {
+      delete inst.libsql.batch;
+      // archived elsewhere, at the same revision, so only archived_at can stop the write
+      await raw.docs.execute({ sql: "UPDATE documents SET archived_at = 'elsewhere' WHERE id = ?", args: [d.id] });
+      snap = await dump();
+      return send.call(inst.libsql, stmts, mode);
+    };
+    let r;
+    try {
+      r = op === "save" ? await save(d.id, d.revision, { ...d.body, sections: [textSection("sec_ar2", "Mine")] }) : await api({ restoreVersion: { id: d.id, versionId: vid }, revision: d.revision });
+    } finally {
+      delete inst.libsql.batch;
+    }
+    ok(snap, `${op}: the archive landed between the read and the batch:`);
+    eq([r.status, r.body.code], [409, "DOCUMENT_ARCHIVED"], `${op}:`);
+    await unchanged(snap, `${op} into a document archived meanwhile`);
+  }
+});
+
+// (3) team names stay inside the store
+await t("teamMemberNames never returns another store's member names; their versions read 'Someone on your team'", async () => {
+  const otherU = await I.createUser({ email: "other@zl.test", name: "Other Store Owner", password: "other-pass-docs" });
+  await I.addMembership(otherU.id, "zl", "owner");
+  const zd = await I.teamMemberNames("zd");
+  ok(!zd.has(otherU.id), "the other store's owner is not in this store's names:");
+  ok(![...zd.values()].includes("Other Store Owner"), "nor their name:");
+  eq((await I.teamMemberNames("zl")).get(otherU.id), "Other Store Owner", "they are in their own store's names:");
+  const d = (await create({ type: "page", meta: { slug: "names-two-stores", title: "Two stores" } })).body.document;
+  await raw.docs.execute(V.versionStatement(await V.versionRow({ documentId: d.id, kind: "undo_saved", body: { schema: 1 }, schemaVersion: 1, createdBy: `merchant:${otherU.id}`, createdAt: new Date().toISOString(), note: "other-store" })));
+  const h = await api({ listHistory: d.id });
+  eq(h.body.versions.find((v) => v.note === "other-store")?.by, "Someone on your team", "listed without their name:");
+  ok(!JSON.stringify(h.body).includes("Other Store Owner"), "the name never reaches the answer:");
+});
+
+// (3) a version belongs to its own document
+await t("restoring page A from page B's version id is refused (404), storage unchanged", async () => {
+  const a = (await create({ type: "page", meta: { slug: "page-a-own", title: "Page A" } })).body.document;
+  const b = (await create({ type: "page", meta: { slug: "page-b-own", title: "Page B" }, body: { ...route("page-b-own", "Page B"), sections: [textSection("sec_pb1", "B's words")] } })).body.document;
+  const bVer = (await sql("SELECT id FROM document_versions WHERE document_id = ? LIMIT 1", [b.id]))[0].id;
+  eq(await inT(() => V.getVersion(a.id, bVer)), null, "getVersion with another document's version:");
+  const before = await dump();
+  const r = await api({ restoreVersion: { id: a.id, versionId: bVer }, revision: a.revision });
+  eq([r.status, r.body.code], [404, "NOT_FOUND"], `answer ${JSON.stringify(r.body).slice(0, 160)}:`);
+  ok(/no longer exists/.test(r.body.error), `plain words: ${r.body.error}`);
+  await unchanged(before, "restore from another page's version");
+});
+
+// (4) doc_cart waits for the owner's capability ruling
+await t("API: create or save of doc_cart answers 409 with a plain message until the owner rules on its capability, storage unchanged", async () => {
+  const before = await dump();
+  const c = await create({ type: "cart" });
+  eq([c.status, c.body.code], [409, "CART_NOT_AVAILABLE"], "create:");
+  eq(c.body.error, "Cart suggestions can't be changed here yet, so nothing was saved. Change them on the Upsells screen for now.", "plain words:");
+  await unchanged(before, "cart create");
+  // a doc_cart row made some other way (a later backfill): saves and restores are refused too
+  const at = new Date().toISOString();
+  const cartBody = R.emptyBody("cart");
+  await raw.docs.execute({ sql: "INSERT INTO documents (id, type, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES ('doc_cart', 'cart', 'Cart', ?, 'dh_cart', 1, 1, ?, ?)", args: [JSON.stringify(cartBody), at, at] });
+  const cp = await V.versionRow({ documentId: "doc_cart", kind: "checkpoint", body: cartBody, schemaVersion: 1, createdAt: at });
+  await raw.docs.execute(V.versionStatement(cp));
+  const before2 = await dump();
+  const s = await save("doc_cart", 1, { ...cartBody, settings: { ...cartBody.settings, title: "Changed" } });
+  eq([s.status, s.body.code], [409, "CART_NOT_AVAILABLE"], "save:");
+  const r = await api({ restoreVersion: { id: "doc_cart", versionId: cp.id }, revision: 1 });
+  eq([r.status, r.body.code], [409, "CART_NOT_AVAILABLE"], "restore:");
+  await unchanged(before2, "cart save and restore");
+  // reads still work
+  eq((await api({ getDocument: "doc_cart" })).status, 200, "read:");
+});
+
+// (5) the media usage preview
+await t("PUT /api/admin/media (usage preview): a failing document scan answers a 5xx with a code and plain words, not a generic error", async () => {
+  const media = await import("../app/api/admin/media/route.js");
+  const put = (body) =>
+    inT(async () => {
+      const res = await media.PUT(req(TEN.docs, OWNER, body));
+      return { status: res.status, body: await res.json() };
+    });
+  const m = await inT(() => M.saveMedia({ filename: "usage.png", mime: "image/png", bytes: PNG(13) }));
+  const fine = await put({ id: m.id });
+  eq([fine.status, fine.body.ok, fine.body.usage], [200, true, []], "a working scan:");
+  const inst = await inT(() => currentDatabase());
+  const send = inst.libsql.execute;
+  inst.libsql.execute = (stmt, ...rest) =>
+    /FROM documents WHERE archived_at IS NULL AND \(instr/.test(typeof stmt === "string" ? stmt : stmt?.sql || "")
+      ? Promise.reject(Object.assign(new Error("SQLITE_ERROR: disk I/O error"), { name: "LibsqlError", code: "SQLITE_IOERR" }))
+      : send.call(inst.libsql, stmt, ...rest);
+  let r;
+  try {
+    r = await put({ id: m.id });
+  } finally {
+    delete inst.libsql.execute;
+  }
+  ok(r.status >= 500 && r.status < 600, `status ${r.status}: ${JSON.stringify(r.body)}`);
+  ok(/^(DATABASE_[A-Z_]+|INTERNAL_ERROR)$/.test(String(r.body.code || "")), `a code: ${JSON.stringify(r.body)}`);
+  eq(r.body.error, "We couldn't reach your store's data just now, so this couldn't load. Try again in a minute.", "plain words:");
+  ok(!/SQLITE|disk I\/O/i.test(JSON.stringify(r.body)), "no raw database text:");
+  ok(!("usage" in r.body), "no usage list that could read as 'not used':");
 });
 
 // --- the write guard -----------------------------------------------------------------------

@@ -62,7 +62,7 @@ process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 process.env.PLATFORM_SITE_HOSTS = "";
 
-const TENANTS = ["dv", "dz", "lg", "pre", "brk", "dm", "p0", "p1k", "sm", "lag"];
+const TENANTS = ["dv", "dz", "lg", "pre", "brk", "dm", "p0", "p1k", "sm", "lag", "bg"];
 const dbs = [".test-rr-default.db", ".test-rr-platform.db", ".test-rr-legacy-outputs.json", ".test-rr-journal-outputs.json", ...TENANTS.map((t) => `.test-rr-${t}.db`)];
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
@@ -769,6 +769,69 @@ await t("a list that is not a v4 list, or whose m is not a whole number, fails c
   await unavailable(inDz(() => Res.contentSource()), "BAD_LIST", "m 0:");
   await putLive(DZ, { ...L.emptyList(1, Reg.singletonTypes()), documents: { ...L.emptyList(1, Reg.singletonTypes()).documents, doc_home: { version: "dv_1", hash: "x" } } });
   await unavailable(inDz(() => Res.contentSource()), "BAD_LIST", "a bad entry:");
+});
+
+// P2-DOCFIX (6): review gaps on P2-READ, each pinned by its own test.
+await t("a custom menu with zero items renders an empty menu on v4, never the automatic catalog menu", async () => {
+  await publish(DZ, [{ id: "doc_header", body: body("header", { settings: { mode: "custom", items: [] } }), check: false }, { id: "doc_footer", body: body("footer", { settings: { mode: "custom", items: [] } }), check: false }], { from: L.emptyList(1, Reg.singletonTypes()) });
+  same(await inDz(() => Res.resolvedNav("header")), [], "header:");
+  same(await inDz(() => Res.resolvedNav("footer")), [], "footer:");
+  // and "auto" is still the catalog menu (null)
+  await publish(DZ, [{ id: "doc_header", body: body("header", { settings: { mode: "auto", items: [] } }) }], { from: L.emptyList(1, Reg.singletonTypes()) });
+  eq(await inDz(() => Res.resolvedNav("header")), null, "auto:");
+});
+
+await t("hidden page sections and hidden PDP accordion sections never render on v4", async () => {
+  await publish(
+    DZ,
+    [
+      { id: "doc_hide", body: body("page", { meta: { slug: "hide-some", title: "Hide some" }, sections: [sec("text", "sec_show", { title: "Shown words", body: ["Visible."] }), sec("text", "sec_hid", { title: "HIDDEN WORDS", body: ["Secret."] }, { enabled: false }), sec("faq", "sec_hfaq", { title: "HIDDEN FAQ", items: [{ q: "Q?", a: "<p>A</p>" }] }, { enabled: false })] }) },
+      { id: "doc_product_layout", body: body("product_layout", { sections: [sec("product_main", "sec_main"), sec("rich_text", "sec_vis", { title: "How to use", html: "<p>Daily</p>" }), sec("rich_text", "sec_hacc", { title: "HIDDEN ACCORDION", html: "<p>Secret</p>" }, { enabled: false }), sec("text", "sec_htxt", { title: "HIDDEN TEXT", body: ["Secret."] }, { enabled: false }), sec("faq", "sec_hq", { title: "x", items: [{ q: "HIDDEN QUESTION", a: "<p>Secret</p>" }] }, { enabled: false })] }) },
+    ],
+    { from: L.emptyList(1, Reg.singletonTypes()) },
+  );
+  const page = await inDz(() => Res.resolvedContentPage("hide-some"));
+  same(page.sections.map((x) => x.id), ["sec_show"], "page sections:");
+  ok(!JSON.stringify(page).includes("HIDDEN"), `no hidden words on the page: ${JSON.stringify(page).slice(0, 300)}`);
+  const pdp = await inDz(() => Res.resolvedPdpExtras());
+  same(pdp, [{ title: "How to use", html: "<p>Daily</p>" }], "PDP accordions:");
+});
+
+await t("a listed page whose documents entry is null throws MISSING_PAGE_VERSION, never the code default page", async () => {
+  const b = await publish(DZ, [{ id: "doc_privacy2", body: body("page", { meta: { slug: "privacy-two", title: "Our privacy" }, sections: [sec("text", "sec_p2", { title: "Data" })] }) }], { from: L.emptyList(1, Reg.singletonTypes()) });
+  eq((await inDz(() => Res.resolvedContentPage("privacy-two"))).title, "Our privacy", "listed and present:");
+  await putLive(DZ, { ...b.list, documents: { ...b.list.documents, doc_privacy2: null } });
+  const e = await unavailable(inDz(() => Res.resolvedContentPage("privacy-two")), "MISSING_PAGE_VERSION", "entry null:");
+  same([e.detail.document, e.detail.slug], ["doc_privacy2", "privacy-two"], "names the page:");
+});
+
+await t("on v4 a journal post beats a redirect at the same slug", async () => {
+  const entries = await journalPosts(DZ, [{ slug: "jp-wins", title: "Journal wins", window_start: "2025-01-01T00:00:00.000Z" }]);
+  await publish(DZ, [{ id: "doc_pd", body: body("page", { meta: { slug: "page-d", title: "D" }, sections: [sec("text", "sec_pd", { title: "D" })] }), redirects: [{ from_slug: "jp-wins", to_slug: "page-d" }, { from_slug: "no-post", to_slug: "page-d" }] }], { journal: entries, from: L.emptyList(1, Reg.singletonTypes()) });
+  eq((await inDz(() => Res.resolvedContentPage("jp-wins")))?.title, "Journal wins", "the post renders:");
+  eq(await inDz(() => Res.resolvedSlugRedirect("jp-wins")), null, "the post wins:");
+  eq(await inDz(() => Res.resolvedSlugRedirect("no-post")), "page-d", "a redirect with no post still applies:");
+});
+
+await t("a version row whose schema_version column is newer than this code is an error (UNKNOWN_SCHEMA), even when its body says schema 1", async () => {
+  await publish(DZ, [{ id: "doc_announcement", body: body("announcement", { settings: { enabled: true, text: "NEWER CODE BAR", link: null } }), schemaVersion: Reg.SCHEMA_VERSION + 1 }], { from: L.emptyList(1, Reg.singletonTypes()) });
+  const row = (await inDz(() => libsql.execute("SELECT v.body, v.schema_version FROM document_versions v JOIN releases r ON instr(r.content, v.id) > 0 JOIN release_state s ON s.live_release_id = r.id WHERE v.document_id = 'doc_announcement'"))).rows[0];
+  same([JSON.parse(String(row.body)).schema, Number(row.schema_version)], [1, Reg.SCHEMA_VERSION + 1], "the stored row:");
+  await unavailable(inDz(() => Res.resolvedAnnouncement()), "UNKNOWN_SCHEMA", "schema_version column:");
+  // leave a readable list for the tests after this one
+  await publish(DZ, [{ id: "doc_announcement", body: body("announcement", { settings: { enabled: false, text: "", link: null } }) }], { from: L.emptyList(1, Reg.singletonTypes()) });
+});
+
+await t("cms_state.mode 'bogus' with no release fails closed (UNKNOWN_CMS_MODE), never legacy drafts", async () => {
+  const BG = await tenant("bg");
+  await withTenant(BG, () => S.setBlock("hero", { title: "BOGUS DRAFT HERO" }));
+  await setMode(BG, "bogus");
+  const e = await unavailable(withTenant(BG, () => Res.contentSource()), "UNKNOWN_CMS_MODE", "contentSource:");
+  eq(e.detail.mode, "bogus", "names the mode:");
+  for (const [fn, args] of GETTERS) {
+    const r = await settle(withTenant(BG, () => Res[fn](...args)));
+    if (!r.e || !Res.isContentUnavailable(r.e)) throw new Error(`${keyOf(fn, args)}: ${r.e ? r.e.message : JSON.stringify(r.v).slice(0, 120)}`);
+  }
 });
 
 // =====================================================================================
