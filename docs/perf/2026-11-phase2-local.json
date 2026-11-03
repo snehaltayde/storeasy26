@@ -2131,8 +2131,8 @@
       "label": "v4, 0 posts",
       "store": "documents store, v4 list",
       "posts": 0,
-      "build": "es8ihdvIYpyRLktsdJvbC",
-      "commit": "f893710",
+      "build": "5l1hOEW_X9jdtP97Qs80k",
+      "commit": "5e5fa58",
       "fixture": {
         "name": "perf",
         "sizes": {
@@ -2158,7 +2158,7 @@
           "homeSections": 12,
           "contentDigest": "331b3929e7a67fe9"
         },
-        "seededAt": "2026-11-03T22:01:54.118Z"
+        "seededAt": "2026-11-03T22:28:33.130Z"
       },
       "routes": [
         {
@@ -2167,21 +2167,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 41.7,
-            "p95": 55.9,
-            "min": 35.3,
-            "max": 157.9
+            "p50": 40.8,
+            "p95": 46.2,
+            "min": 35.8,
+            "max": 52.6
           },
           "total": {
             "runs": 50,
-            "p50": 43.4,
-            "p95": 58.2,
-            "min": 36.9,
-            "max": 160.1
+            "p50": 41.8,
+            "p95": 46.8,
+            "min": 37.6,
+            "max": 53.4
           },
           "cold": {
-            "ttfb": 636.3,
-            "total": 637.8
+            "ttfb": 444.2,
+            "total": 445.8
           },
           "sentBytes": 174867,
           "db": {
@@ -2189,8 +2189,8 @@
             "readsFirst": 27,
             "roundTrips": 25,
             "rowsRead": 5364,
-            "bytesDown": 16376,
-            "bytesDownDecoded": 61289,
+            "bytesDown": 16389,
+            "bytesDownDecoded": 61290,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -2269,21 +2269,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 14.9,
-            "p95": 20.4,
+            "p50": 14.5,
+            "p95": 16.6,
             "min": 12.5,
-            "max": 59.3
+            "max": 19.9
           },
           "total": {
             "runs": 50,
-            "p50": 25,
-            "p95": 35.5,
-            "min": 21,
-            "max": 102
+            "p50": 24.9,
+            "p95": 29.2,
+            "min": 20.9,
+            "max": 32.8
           },
           "cold": {
-            "ttfb": 435.3,
-            "total": 461.4
+            "ttfb": 377.3,
+            "total": 402.8
           },
           "sentBytes": 76989,
           "db": {
@@ -2291,8 +2291,8 @@
             "readsFirst": 13,
             "roundTrips": 11,
             "rowsRead": 3757,
-            "bytesDown": 11475,
-            "bytesDownDecoded": 46322,
+            "bytesDown": 11482,
+            "bytesDownDecoded": 46323,
             "repeated": 3,
             "stable": true,
             "sqldAgrees": true,
@@ -2346,21 +2346,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 16,
-            "p95": 22.7,
-            "min": 12.3,
-            "max": 31.5
+            "p50": 15.8,
+            "p95": 17.9,
+            "min": 12.9,
+            "max": 19.5
           },
           "total": {
             "runs": 50,
-            "p50": 22.6,
-            "p95": 32.3,
-            "min": 19.6,
-            "max": 46.8
+            "p50": 23.3,
+            "p95": 25.7,
+            "min": 20,
+            "max": 28.6
           },
           "cold": {
-            "ttfb": 472.3,
-            "total": 489.6
+            "ttfb": 383.4,
+            "total": 400.7
           },
           "sentBytes": 140401,
           "db": {
@@ -2368,8 +2368,8 @@
             "readsFirst": 11,
             "roundTrips": 9,
             "rowsRead": 1806,
-            "bytesDown": 9152,
-            "bytesDownDecoded": 44070,
+            "bytesDown": 9157,
+            "bytesDownDecoded": 44069,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -2423,21 +2423,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 15.7,
-            "p95": 22.8,
-            "min": 12.5,
-            "max": 24.8
+            "p50": 15.3,
+            "p95": 18.1,
+            "min": 13.1,
+            "max": 19
           },
           "total": {
             "runs": 50,
-            "p50": 26.7,
-            "p95": 34,
-            "min": 23.6,
-            "max": 39.5
+            "p50": 26.4,
+            "p95": 30.1,
+            "min": 22.7,
+            "max": 32.1
           },
           "cold": {
-            "ttfb": 423.4,
-            "total": 450.5
+            "ttfb": 400.2,
+            "total": 424.3
           },
           "sentBytes": 171320,
           "db": {
@@ -2445,8 +2445,8 @@
             "readsFirst": 9,
             "roundTrips": 9,
             "rowsRead": 5778,
-            "bytesDown": 10164,
-            "bytesDownDecoded": 46485,
+            "bytesDown": 10171,
+            "bytesDownDecoded": 46486,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -2500,21 +2500,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 17.4,
-            "p95": 21.7,
-            "min": 15.4,
-            "max": 27.2
+            "p50": 17.7,
+            "p95": 19.5,
+            "min": 15.1,
+            "max": 19.9
           },
           "total": {
             "runs": 50,
-            "p50": 18.9,
-            "p95": 23.4,
-            "min": 16.9,
-            "max": 29.4
+            "p50": 19.2,
+            "p95": 20.9,
+            "min": 16.6,
+            "max": 21.4
           },
           "cold": {
-            "ttfb": 393.2,
-            "total": 398.4
+            "ttfb": 390.2,
+            "total": 395
           },
           "sentBytes": 94913,
           "db": {
@@ -2522,8 +2522,8 @@
             "readsFirst": 7,
             "roundTrips": 5,
             "rowsRead": 2704,
-            "bytesDown": 8584,
-            "bytesDownDecoded": 35395,
+            "bytesDown": 8593,
+            "bytesDownDecoded": 35394,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -2557,21 +2557,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 18.8,
-            "p95": 26.6,
-            "min": 15.5,
-            "max": 36.5
+            "p50": 18.6,
+            "p95": 20.7,
+            "min": 15.9,
+            "max": 38.1
           },
           "total": {
             "runs": 50,
-            "p50": 19.7,
-            "p95": 27.9,
-            "min": 17.1,
-            "max": 38.1
+            "p50": 19.8,
+            "p95": 22.4,
+            "min": 16.8,
+            "max": 38.5
           },
           "cold": {
-            "ttfb": 442.3,
-            "total": 443.6
+            "ttfb": 391,
+            "total": 392.3
           },
           "sentBytes": 126727,
           "db": {
@@ -2579,7 +2579,7 @@
             "readsFirst": 6,
             "roundTrips": 4,
             "rowsRead": 1809,
-            "bytesDown": 7151,
+            "bytesDown": 7157,
             "bytesDownDecoded": 34809,
             "repeated": 0,
             "stable": true,
@@ -2614,21 +2614,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 15.4,
-            "p95": 20.5,
-            "min": 13.2,
-            "max": 27.3
+            "p50": 15.5,
+            "p95": 17.5,
+            "min": 13.4,
+            "max": 25.1
           },
           "total": {
             "runs": 50,
             "p50": 16.6,
-            "p95": 21.1,
-            "min": 14.5,
-            "max": 28.3
+            "p95": 19.1,
+            "min": 14.6,
+            "max": 26.6
           },
           "cold": {
-            "ttfb": 444.9,
-            "total": 445.9
+            "ttfb": 390.1,
+            "total": 391
           },
           "sentBytes": 55944,
           "db": {
@@ -2636,8 +2636,8 @@
             "readsFirst": 6,
             "roundTrips": 4,
             "rowsRead": 1357,
-            "bytesDown": 7319,
-            "bytesDownDecoded": 28633,
+            "bytesDown": 7328,
+            "bytesDownDecoded": 28634,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -2672,20 +2672,20 @@
           "ttfb": {
             "runs": 50,
             "p50": 13.5,
-            "p95": 17.5,
-            "min": 11.3,
-            "max": 20.7
+            "p95": 15.5,
+            "min": 10.9,
+            "max": 17.8
           },
           "total": {
             "runs": 50,
-            "p50": 14.5,
-            "p95": 17.8,
-            "min": 12.6,
-            "max": 22.6
+            "p50": 14.7,
+            "p95": 17.1,
+            "min": 12,
+            "max": 19.4
           },
           "cold": {
-            "ttfb": 543.4,
-            "total": 545
+            "ttfb": 399.7,
+            "total": 400.7
           },
           "sentBytes": 40439,
           "db": {
@@ -2693,7 +2693,7 @@
             "readsFirst": 5,
             "roundTrips": 3,
             "rowsRead": 1356,
-            "bytesDown": 5969,
+            "bytesDown": 5977,
             "bytesDownDecoded": 23715,
             "repeated": 0,
             "stable": true,
@@ -2723,21 +2723,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 4.9,
-            "p95": 11.1,
-            "min": 3.8,
-            "max": 14.3
+            "p50": 4.5,
+            "p95": 5.6,
+            "min": 3.7,
+            "max": 6.5
           },
           "total": {
             "runs": 50,
-            "p50": 5,
-            "p95": 11.1,
-            "min": 3.9,
-            "max": 14.4
+            "p50": 4.6,
+            "p95": 5.7,
+            "min": 3.7,
+            "max": 6.5
           },
           "cold": {
-            "ttfb": 425.9,
-            "total": 426.5
+            "ttfb": 319,
+            "total": 319.5
           },
           "sentBytes": 1614,
           "db": {
@@ -2745,8 +2745,8 @@
             "readsFirst": 5,
             "roundTrips": 3,
             "rowsRead": 29,
-            "bytesDown": 2246,
-            "bytesDownDecoded": 9925,
+            "bytesDown": 2247,
+            "bytesDownDecoded": 9924,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -2775,21 +2775,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 6.2,
-            "p95": 14.3,
-            "min": 5.1,
-            "max": 18.5
+            "p50": 5.7,
+            "p95": 7,
+            "min": 4.9,
+            "max": 7.7
           },
           "total": {
             "runs": 50,
-            "p50": 6.2,
-            "p95": 14.4,
-            "min": 5.2,
-            "max": 18.6
+            "p50": 5.8,
+            "p95": 7.1,
+            "min": 4.9,
+            "max": 7.7
           },
           "cold": {
-            "ttfb": 407.8,
-            "total": 408.4
+            "ttfb": 329.2,
+            "total": 329.6
           },
           "sentBytes": 1614,
           "db": {
@@ -2797,7 +2797,7 @@
             "readsFirst": 3,
             "roundTrips": 5,
             "rowsRead": 31,
-            "bytesDown": 2615,
+            "bytesDown": 2617,
             "bytesDownDecoded": 10507,
             "repeated": 0,
             "stable": true,
@@ -2837,21 +2837,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 20.9,
-            "p95": 36,
-            "min": 18,
-            "max": 45.9
+            "p50": 20.6,
+            "p95": 23.3,
+            "min": 16.5,
+            "max": 25.4
           },
           "total": {
             "runs": 50,
-            "p50": 22,
-            "p95": 36.8,
-            "min": 18.7,
-            "max": 47.6
+            "p50": 21.8,
+            "p95": 23.7,
+            "min": 18,
+            "max": 27
           },
           "cold": {
-            "ttfb": 465.2,
-            "total": 466.1
+            "ttfb": 413.3,
+            "total": 414.2
           },
           "sentBytes": 53871,
           "db": {
@@ -2859,8 +2859,8 @@
             "readsFirst": 11,
             "roundTrips": 9,
             "rowsRead": 1414,
-            "bytesDown": 10458,
-            "bytesDownDecoded": 43564,
+            "bytesDown": 10465,
+            "bytesDownDecoded": 43563,
             "repeated": 3,
             "stable": true,
             "sqldAgrees": true,
@@ -2904,21 +2904,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 7.8,
-            "p95": 12.2,
-            "min": 6.7,
-            "max": 25.5
+            "p50": 7.5,
+            "p95": 9.1,
+            "min": 6.4,
+            "max": 9.8
           },
           "total": {
             "runs": 50,
-            "p50": 7.9,
-            "p95": 12.3,
-            "min": 6.8,
-            "max": 25.7
+            "p50": 7.6,
+            "p95": 9.1,
+            "min": 6.5,
+            "max": 9.8
           },
           "cold": {
-            "ttfb": 409.5,
-            "total": 410
+            "ttfb": 279,
+            "total": 279.5
           },
           "sentBytes": 79898,
           "db": {
@@ -2926,8 +2926,8 @@
             "readsFirst": 6,
             "roundTrips": 4,
             "rowsRead": 434,
-            "bytesDown": 11526,
-            "bytesDownDecoded": 69896,
+            "bytesDown": 11537,
+            "bytesDownDecoded": 69895,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -2957,20 +2957,20 @@
           "ttfb": {
             "runs": 50,
             "p50": 2.4,
-            "p95": 3.9,
+            "p95": 2.8,
             "min": 2,
-            "max": 4.8
+            "max": 3.2
           },
           "total": {
             "runs": 50,
-            "p50": 2.5,
-            "p95": 3.9,
+            "p50": 2.4,
+            "p95": 2.8,
             "min": 2,
-            "max": 4.9
+            "max": 3.3
           },
           "cold": {
-            "ttfb": 322.3,
-            "total": 322.7
+            "ttfb": 280.5,
+            "total": 280.7
           },
           "sentBytes": 28,
           "db": {
@@ -2978,7 +2978,7 @@
             "readsFirst": 1,
             "roundTrips": 1,
             "rowsRead": 2,
-            "bytesDown": 3871,
+            "bytesDown": 3878,
             "bytesDownDecoded": 12713,
             "repeated": 0,
             "stable": true,
@@ -2998,21 +2998,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 3.5,
-            "p95": 6.1,
-            "min": 2.8,
-            "max": 9.3
+            "p50": 3.3,
+            "p95": 4.6,
+            "min": 2.6,
+            "max": 4.9
           },
           "total": {
             "runs": 50,
-            "p50": 3.5,
-            "p95": 6.2,
-            "min": 2.8,
-            "max": 9.4
+            "p50": 3.3,
+            "p95": 4.7,
+            "min": 2.7,
+            "max": 5
           },
           "cold": {
-            "ttfb": 309.6,
-            "total": 309.9
+            "ttfb": 279.7,
+            "total": 280
           },
           "sentBytes": 1040,
           "db": {
@@ -3020,8 +3020,8 @@
             "readsFirst": 2,
             "roundTrips": 2,
             "rowsRead": 14,
-            "bytesDown": 4933,
-            "bytesDownDecoded": 17314,
+            "bytesDown": 4940,
+            "bytesDownDecoded": 17315,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -3045,21 +3045,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 3.3,
-            "p95": 5.5,
-            "min": 2.6,
-            "max": 7.2
+            "p50": 3.4,
+            "p95": 4.4,
+            "min": 2.7,
+            "max": 5.6
           },
           "total": {
             "runs": 50,
-            "p50": 3.3,
-            "p95": 5.5,
-            "min": 2.6,
-            "max": 7.2
+            "p50": 3.4,
+            "p95": 4.4,
+            "min": 2.7,
+            "max": 5.6
           },
           "cold": {
-            "ttfb": 383.4,
-            "total": 383.7
+            "ttfb": 279.2,
+            "total": 279.4
           },
           "sentBytes": 536,
           "db": {
@@ -3067,7 +3067,7 @@
             "readsFirst": 2,
             "roundTrips": 2,
             "rowsRead": 14,
-            "bytesDown": 4933,
+            "bytesDown": 4940,
             "bytesDownDecoded": 17315,
             "repeated": 0,
             "stable": true,
@@ -3092,8 +3092,8 @@
       "label": "v4, 200 posts",
       "store": "documents store, v4 list",
       "posts": 200,
-      "build": "es8ihdvIYpyRLktsdJvbC",
-      "commit": "f893710",
+      "build": "5l1hOEW_X9jdtP97Qs80k",
+      "commit": "5e5fa58",
       "fixture": {
         "name": "perf",
         "sizes": {
@@ -3110,7 +3110,7 @@
           "placements": 42,
           "media": 32,
           "mediaBytes": 4100174,
-          "liveReleaseBytes": 37353,
+          "liveReleaseBytes": 10953,
           "cmsMode": "documents",
           "liveReleaseVersion": 4,
           "documents": 233,
@@ -3119,7 +3119,7 @@
           "homeSections": 12,
           "contentDigest": "331b3929e7a67fe9"
         },
-        "seededAt": "2026-11-03T22:02:39.491Z"
+        "seededAt": "2026-11-03T22:29:21.812Z"
       },
       "routes": [
         {
@@ -3128,30 +3128,30 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 39.2,
-            "p95": 45.3,
-            "min": 36.4,
-            "max": 49.3
+            "p50": 40,
+            "p95": 44.7,
+            "min": 35.8,
+            "max": 52.8
           },
           "total": {
             "runs": 50,
-            "p50": 40.6,
-            "p95": 47,
-            "min": 37.6,
-            "max": 50.9
+            "p50": 41.5,
+            "p95": 46.2,
+            "min": 36.3,
+            "max": 54.6
           },
           "cold": {
-            "ttfb": 538.5,
-            "total": 540.1
+            "ttfb": 442.4,
+            "total": 443.9
           },
-          "sentBytes": 174867,
+          "sentBytes": 174682,
           "db": {
             "reads": 25,
             "readsFirst": 27,
             "roundTrips": 25,
             "rowsRead": 5364,
-            "bytesDown": 30167,
-            "bytesDownDecoded": 89800,
+            "bytesDown": 16428,
+            "bytesDownDecoded": 61398,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -3230,21 +3230,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 15.7,
-            "p95": 17.8,
-            "min": 13.1,
-            "max": 18.4
+            "p50": 13.9,
+            "p95": 15.8,
+            "min": 12.4,
+            "max": 18.7
           },
           "total": {
             "runs": 50,
-            "p50": 24.5,
-            "p95": 27.1,
-            "min": 21.7,
-            "max": 27.5
+            "p50": 25.1,
+            "p95": 28.5,
+            "min": 20,
+            "max": 29.5
           },
           "cold": {
-            "ttfb": 377.5,
-            "total": 400.6
+            "ttfb": 402,
+            "total": 424.3
           },
           "sentBytes": 76989,
           "db": {
@@ -3252,8 +3252,8 @@
             "readsFirst": 13,
             "roundTrips": 11,
             "rowsRead": 3757,
-            "bytesDown": 25262,
-            "bytesDownDecoded": 74835,
+            "bytesDown": 11531,
+            "bytesDownDecoded": 46434,
             "repeated": 3,
             "stable": true,
             "sqldAgrees": true,
@@ -3307,21 +3307,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 16.8,
-            "p95": 19.9,
-            "min": 14.3,
-            "max": 29.6
+            "p50": 15.5,
+            "p95": 17,
+            "min": 13.1,
+            "max": 18.7
           },
           "total": {
             "runs": 50,
             "p50": 22.2,
-            "p95": 26.4,
-            "min": 20.2,
-            "max": 36.5
+            "p95": 25.6,
+            "min": 18.1,
+            "max": 26.1
           },
           "cold": {
-            "ttfb": 373.8,
-            "total": 391.9
+            "ttfb": 398.1,
+            "total": 419.1
           },
           "sentBytes": 140401,
           "db": {
@@ -3329,8 +3329,8 @@
             "readsFirst": 11,
             "roundTrips": 9,
             "rowsRead": 1806,
-            "bytesDown": 22942,
-            "bytesDownDecoded": 72581,
+            "bytesDown": 9208,
+            "bytesDownDecoded": 44182,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -3384,21 +3384,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 16.6,
-            "p95": 18.2,
-            "min": 13.4,
-            "max": 18.8
+            "p50": 15,
+            "p95": 16.9,
+            "min": 12.6,
+            "max": 17.5
           },
           "total": {
             "runs": 50,
-            "p50": 25.6,
-            "p95": 28.4,
-            "min": 23.7,
-            "max": 28.5
+            "p50": 25.8,
+            "p95": 28.7,
+            "min": 22.9,
+            "max": 29.4
           },
           "cold": {
-            "ttfb": 388.1,
-            "total": 412.3
+            "ttfb": 375.9,
+            "total": 397.2
           },
           "sentBytes": 171320,
           "db": {
@@ -3406,8 +3406,8 @@
             "readsFirst": 9,
             "roundTrips": 9,
             "rowsRead": 5778,
-            "bytesDown": 23950,
-            "bytesDownDecoded": 74997,
+            "bytesDown": 10221,
+            "bytesDownDecoded": 46599,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -3461,21 +3461,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 18.2,
-            "p95": 20.3,
-            "min": 16.4,
-            "max": 23.7
+            "p50": 17.2,
+            "p95": 19.3,
+            "min": 14.5,
+            "max": 20
           },
           "total": {
             "runs": 50,
-            "p50": 19.5,
-            "p95": 21.4,
-            "min": 17.1,
-            "max": 25.2
+            "p50": 18.6,
+            "p95": 20.9,
+            "min": 15.6,
+            "max": 21.6
           },
           "cold": {
-            "ttfb": 389.6,
-            "total": 397.2
+            "ttfb": 384.4,
+            "total": 388.6
           },
           "sentBytes": 94913,
           "db": {
@@ -3483,8 +3483,8 @@
             "readsFirst": 7,
             "roundTrips": 5,
             "rowsRead": 2704,
-            "bytesDown": 22372,
-            "bytesDownDecoded": 63907,
+            "bytesDown": 8641,
+            "bytesDownDecoded": 35507,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -3518,21 +3518,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 18.5,
-            "p95": 21.5,
-            "min": 16.7,
-            "max": 22.7
+            "p50": 19.1,
+            "p95": 20.8,
+            "min": 17.5,
+            "max": 21.2
           },
           "total": {
             "runs": 50,
-            "p50": 20,
-            "p95": 23,
-            "min": 18.2,
-            "max": 24.2
+            "p50": 20.5,
+            "p95": 22.5,
+            "min": 17.9,
+            "max": 22.9
           },
           "cold": {
-            "ttfb": 449.2,
-            "total": 450.5
+            "ttfb": 405.1,
+            "total": 406.4
           },
           "sentBytes": 126727,
           "db": {
@@ -3540,8 +3540,8 @@
             "readsFirst": 6,
             "roundTrips": 4,
             "rowsRead": 1809,
-            "bytesDown": 20936,
-            "bytesDownDecoded": 63321,
+            "bytesDown": 7207,
+            "bytesDownDecoded": 34920,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -3575,21 +3575,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 16.5,
-            "p95": 20.2,
-            "min": 13.5,
-            "max": 21.3
+            "p50": 15.3,
+            "p95": 16.7,
+            "min": 13.2,
+            "max": 17.3
           },
           "total": {
             "runs": 50,
-            "p50": 17.9,
-            "p95": 20.6,
-            "min": 14.8,
-            "max": 21.9
+            "p50": 16.6,
+            "p95": 18.2,
+            "min": 13.7,
+            "max": 18.9
           },
           "cold": {
-            "ttfb": 541,
-            "total": 542.9
+            "ttfb": 389.4,
+            "total": 390.4
           },
           "sentBytes": 55944,
           "db": {
@@ -3597,8 +3597,8 @@
             "readsFirst": 6,
             "roundTrips": 4,
             "rowsRead": 1357,
-            "bytesDown": 21109,
-            "bytesDownDecoded": 57146,
+            "bytesDown": 7377,
+            "bytesDownDecoded": 28745,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -3632,21 +3632,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 25.3,
-            "p95": 38.2,
-            "min": 21.9,
-            "max": 50.9
+            "p50": 25.1,
+            "p95": 27.8,
+            "min": 21.4,
+            "max": 28.6
           },
           "total": {
             "runs": 50,
-            "p50": 26.9,
-            "p95": 40.4,
-            "min": 23.6,
-            "max": 52.7
+            "p50": 26.7,
+            "p95": 29.5,
+            "min": 23.2,
+            "max": 30.3
           },
           "cold": {
-            "ttfb": 432.3,
-            "total": 433.9
+            "ttfb": 394.3,
+            "total": 396.1
           },
           "sentBytes": 222138,
           "db": {
@@ -3654,8 +3654,8 @@
             "readsFirst": 6,
             "roundTrips": 4,
             "rowsRead": 1357,
-            "bytesDown": 29823,
-            "bytesDownDecoded": 125056,
+            "bytesDown": 16094,
+            "bytesDownDecoded": 96654,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -3689,21 +3689,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 4.3,
-            "p95": 6.6,
-            "min": 3.4,
-            "max": 7.9
+            "p50": 4.6,
+            "p95": 5.2,
+            "min": 4,
+            "max": 5.2
           },
           "total": {
             "runs": 50,
-            "p50": 4.4,
-            "p95": 6.7,
-            "min": 3.5,
-            "max": 8
+            "p50": 4.6,
+            "p95": 5.2,
+            "min": 4,
+            "max": 5.3
           },
           "cold": {
-            "ttfb": 361.5,
-            "total": 362
+            "ttfb": 333.3,
+            "total": 333.8
           },
           "sentBytes": 1614,
           "db": {
@@ -3711,7 +3711,7 @@
             "readsFirst": 5,
             "roundTrips": 3,
             "rowsRead": 29,
-            "bytesDown": 2254,
+            "bytesDown": 2249,
             "bytesDownDecoded": 9925,
             "repeated": 0,
             "stable": true,
@@ -3741,21 +3741,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 5.1,
-            "p95": 8.3,
-            "min": 4.5,
-            "max": 11
+            "p50": 5.6,
+            "p95": 6.6,
+            "min": 4.7,
+            "max": 7.2
           },
           "total": {
             "runs": 50,
-            "p50": 5.1,
-            "p95": 8.3,
-            "min": 4.5,
-            "max": 11.1
+            "p50": 5.6,
+            "p95": 6.6,
+            "min": 4.7,
+            "max": 7.2
           },
           "cold": {
-            "ttfb": 320.2,
-            "total": 320.7
+            "ttfb": 330.4,
+            "total": 330.9
           },
           "sentBytes": 1614,
           "db": {
@@ -3763,7 +3763,7 @@
             "readsFirst": 3,
             "roundTrips": 5,
             "rowsRead": 31,
-            "bytesDown": 2628,
+            "bytesDown": 2623,
             "bytesDownDecoded": 10507,
             "repeated": 0,
             "stable": true,
@@ -3803,21 +3803,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 20.8,
-            "p95": 28.9,
-            "min": 19,
-            "max": 31.8
+            "p50": 21.4,
+            "p95": 25,
+            "min": 18.8,
+            "max": 36.2
           },
           "total": {
             "runs": 50,
-            "p50": 22.2,
-            "p95": 30.3,
-            "min": 19.3,
-            "max": 33.3
+            "p50": 22.9,
+            "p95": 26.3,
+            "min": 19.4,
+            "max": 38.6
           },
           "cold": {
-            "ttfb": 409.2,
-            "total": 410
+            "ttfb": 393.3,
+            "total": 394.1
           },
           "sentBytes": 53871,
           "db": {
@@ -3825,8 +3825,8 @@
             "readsFirst": 11,
             "roundTrips": 9,
             "rowsRead": 1414,
-            "bytesDown": 24260,
-            "bytesDownDecoded": 72077,
+            "bytesDown": 10524,
+            "bytesDownDecoded": 43677,
             "repeated": 3,
             "stable": true,
             "sqldAgrees": true,
@@ -3870,21 +3870,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 15.1,
-            "p95": 17.7,
-            "min": 13.1,
-            "max": 22
+            "p50": 10.5,
+            "p95": 12.3,
+            "min": 9.3,
+            "max": 24.7
           },
           "total": {
             "runs": 50,
-            "p50": 15.1,
-            "p95": 17.8,
-            "min": 13.1,
-            "max": 22
+            "p50": 10.6,
+            "p95": 12.4,
+            "min": 9.4,
+            "max": 24.9
           },
           "cold": {
-            "ttfb": 319.1,
-            "total": 319.4
+            "ttfb": 308.5,
+            "total": 308.8
           },
           "sentBytes": 105797,
           "db": {
@@ -3892,8 +3892,8 @@
             "readsFirst": 7,
             "roundTrips": 5,
             "rowsRead": 435,
-            "bytesDown": 49176,
-            "bytesDownDecoded": 199749,
+            "bytesDown": 21706,
+            "bytesDownDecoded": 142947,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -3927,21 +3927,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 4.5,
-            "p95": 6.1,
-            "min": 4,
-            "max": 6.6
+            "p50": 2.5,
+            "p95": 2.9,
+            "min": 2,
+            "max": 3
           },
           "total": {
             "runs": 50,
-            "p50": 4.5,
-            "p95": 6.1,
-            "min": 4.1,
-            "max": 6.6
+            "p50": 2.5,
+            "p95": 3,
+            "min": 2,
+            "max": 3
           },
           "cold": {
-            "ttfb": 277.3,
-            "total": 277.4
+            "ttfb": 267.3,
+            "total": 267.5
           },
           "sentBytes": 28,
           "db": {
@@ -3949,8 +3949,8 @@
             "readsFirst": 1,
             "roundTrips": 1,
             "rowsRead": 2,
-            "bytesDown": 17659,
-            "bytesDownDecoded": 41223,
+            "bytesDown": 3926,
+            "bytesDownDecoded": 12825,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -3969,21 +3969,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 5.4,
-            "p95": 7.7,
-            "min": 4.8,
-            "max": 8.2
+            "p50": 3.3,
+            "p95": 4,
+            "min": 2.7,
+            "max": 4.4
           },
           "total": {
             "runs": 50,
-            "p50": 5.4,
-            "p95": 7.8,
-            "min": 4.8,
-            "max": 8.3
+            "p50": 3.3,
+            "p95": 4,
+            "min": 2.7,
+            "max": 4.4
           },
           "cold": {
-            "ttfb": 273.9,
-            "total": 274.1
+            "ttfb": 283,
+            "total": 283.2
           },
           "sentBytes": 1040,
           "db": {
@@ -3991,8 +3991,8 @@
             "readsFirst": 2,
             "roundTrips": 2,
             "rowsRead": 14,
-            "bytesDown": 18719,
-            "bytesDownDecoded": 45827,
+            "bytesDown": 4990,
+            "bytesDownDecoded": 17427,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -4016,21 +4016,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 5.2,
-            "p95": 7.6,
-            "min": 4.8,
-            "max": 9.2
+            "p50": 3.2,
+            "p95": 3.9,
+            "min": 2.6,
+            "max": 5
           },
           "total": {
             "runs": 50,
-            "p50": 5.3,
-            "p95": 7.7,
-            "min": 4.8,
-            "max": 9.2
+            "p50": 3.2,
+            "p95": 3.9,
+            "min": 2.6,
+            "max": 5.1
           },
           "cold": {
-            "ttfb": 297.4,
-            "total": 297.7
+            "ttfb": 284.5,
+            "total": 284.7
           },
           "sentBytes": 536,
           "db": {
@@ -4038,8 +4038,8 @@
             "readsFirst": 2,
             "roundTrips": 2,
             "rowsRead": 14,
-            "bytesDown": 18719,
-            "bytesDownDecoded": 45826,
+            "bytesDown": 4990,
+            "bytesDownDecoded": 17427,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -4063,8 +4063,8 @@
       "label": "v4, 1,000 posts",
       "store": "documents store, v4 list",
       "posts": 1000,
-      "build": "es8ihdvIYpyRLktsdJvbC",
-      "commit": "f893710",
+      "build": "5l1hOEW_X9jdtP97Qs80k",
+      "commit": "5e5fa58",
       "fixture": {
         "name": "perf",
         "sizes": {
@@ -4081,7 +4081,7 @@
           "placements": 42,
           "media": 32,
           "mediaBytes": 4100174,
-          "liveReleaseBytes": 142953,
+          "liveReleaseBytes": 10953,
           "cmsMode": "documents",
           "liveReleaseVersion": 4,
           "documents": 1033,
@@ -4090,7 +4090,7 @@
           "homeSections": 12,
           "contentDigest": "331b3929e7a67fe9"
         },
-        "seededAt": "2026-11-03T22:03:24.420Z"
+        "seededAt": "2026-11-03T22:30:05.405Z"
       },
       "routes": [
         {
@@ -4099,21 +4099,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 49,
-            "p95": 53.5,
-            "min": 44.8,
-            "max": 84.9
+            "p50": 38.5,
+            "p95": 44,
+            "min": 35.5,
+            "max": 44.6
           },
           "total": {
             "runs": 50,
-            "p50": 50,
-            "p95": 54.9,
-            "min": 46.4,
-            "max": 86.5
+            "p50": 40.3,
+            "p95": 45.2,
+            "min": 37.2,
+            "max": 46.4
           },
           "cold": {
-            "ttfb": 550.4,
-            "total": 552.1
+            "ttfb": 433.8,
+            "total": 435.8
           },
           "sentBytes": 174867,
           "db": {
@@ -4121,8 +4121,8 @@
             "readsFirst": 27,
             "roundTrips": 25,
             "rowsRead": 5364,
-            "bytesDown": 83985,
-            "bytesDownDecoded": 203426,
+            "bytesDown": 16457,
+            "bytesDownDecoded": 61428,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -4201,21 +4201,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 25.7,
-            "p95": 28.4,
-            "min": 23.6,
-            "max": 37.2
+            "p50": 14,
+            "p95": 15.4,
+            "min": 12.3,
+            "max": 15.5
           },
           "total": {
             "runs": 50,
-            "p50": 34.6,
-            "p95": 38.8,
-            "min": 31.8,
-            "max": 46.4
+            "p50": 23.4,
+            "p95": 26.5,
+            "min": 19.4,
+            "max": 27.2
           },
           "cold": {
-            "ttfb": 388.6,
-            "total": 409.7
+            "ttfb": 379.1,
+            "total": 400.2
           },
           "sentBytes": 76989,
           "db": {
@@ -4223,8 +4223,8 @@
             "readsFirst": 13,
             "roundTrips": 11,
             "rowsRead": 3757,
-            "bytesDown": 79073,
-            "bytesDownDecoded": 188446,
+            "bytesDown": 11538,
+            "bytesDownDecoded": 46444,
             "repeated": 3,
             "stable": true,
             "sqldAgrees": true,
@@ -4278,21 +4278,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 26.4,
-            "p95": 29.3,
-            "min": 23.9,
-            "max": 31.3
+            "p50": 15.1,
+            "p95": 17.6,
+            "min": 12.4,
+            "max": 19.1
           },
           "total": {
             "runs": 50,
-            "p50": 32.4,
-            "p95": 36.2,
-            "min": 29.2,
-            "max": 37.3
+            "p50": 22,
+            "p95": 24.4,
+            "min": 17.8,
+            "max": 25.5
           },
           "cold": {
-            "ttfb": 384.9,
-            "total": 402.3
+            "ttfb": 402.1,
+            "total": 420.4
           },
           "sentBytes": 140401,
           "db": {
@@ -4300,8 +4300,8 @@
             "readsFirst": 11,
             "roundTrips": 9,
             "rowsRead": 1806,
-            "bytesDown": 76751,
-            "bytesDownDecoded": 186191,
+            "bytesDown": 9216,
+            "bytesDownDecoded": 44189,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -4355,21 +4355,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 26.7,
-            "p95": 30.7,
-            "min": 24.3,
-            "max": 36.2
+            "p50": 14.8,
+            "p95": 16.4,
+            "min": 12.5,
+            "max": 16.8
           },
           "total": {
             "runs": 50,
-            "p50": 35.9,
-            "p95": 39.9,
-            "min": 32.9,
-            "max": 45.2
+            "p50": 25.5,
+            "p95": 28.4,
+            "min": 22.4,
+            "max": 29.5
           },
           "cold": {
-            "ttfb": 403.4,
-            "total": 421.4
+            "ttfb": 400.1,
+            "total": 422.7
           },
           "sentBytes": 171320,
           "db": {
@@ -4377,8 +4377,8 @@
             "readsFirst": 9,
             "roundTrips": 9,
             "rowsRead": 5778,
-            "bytesDown": 77759,
-            "bytesDownDecoded": 188606,
+            "bytesDown": 10223,
+            "bytesDownDecoded": 46607,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -4432,21 +4432,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 28.3,
-            "p95": 30.6,
-            "min": 25.1,
-            "max": 34
+            "p50": 17.3,
+            "p95": 20.7,
+            "min": 14.4,
+            "max": 27.2
           },
           "total": {
             "runs": 50,
-            "p50": 29.3,
-            "p95": 32,
-            "min": 26.5,
-            "max": 35.5
+            "p50": 18.4,
+            "p95": 22.3,
+            "min": 15.7,
+            "max": 28.7
           },
           "cold": {
-            "ttfb": 406.1,
-            "total": 407.1
+            "ttfb": 376.2,
+            "total": 381
           },
           "sentBytes": 94913,
           "db": {
@@ -4454,8 +4454,8 @@
             "readsFirst": 7,
             "roundTrips": 5,
             "rowsRead": 2704,
-            "bytesDown": 76183,
-            "bytesDownDecoded": 177512,
+            "bytesDown": 8649,
+            "bytesDownDecoded": 35511,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -4489,21 +4489,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 27.4,
-            "p95": 29.4,
-            "min": 24.7,
-            "max": 29.6
+            "p50": 17.9,
+            "p95": 20.2,
+            "min": 15.8,
+            "max": 20.7
           },
           "total": {
             "runs": 50,
-            "p50": 28.8,
-            "p95": 31,
-            "min": 26.3,
-            "max": 31.2
+            "p50": 19.4,
+            "p95": 21.1,
+            "min": 17.5,
+            "max": 22.2
           },
           "cold": {
-            "ttfb": 401.9,
-            "total": 403.3
+            "ttfb": 465.3,
+            "total": 466.6
           },
           "sentBytes": 126727,
           "db": {
@@ -4511,8 +4511,8 @@
             "readsFirst": 6,
             "roundTrips": 4,
             "rowsRead": 1809,
-            "bytesDown": 74745,
-            "bytesDownDecoded": 176924,
+            "bytesDown": 7211,
+            "bytesDownDecoded": 34924,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -4546,21 +4546,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 25.4,
-            "p95": 27.7,
-            "min": 22.5,
-            "max": 28.2
+            "p50": 15.4,
+            "p95": 16.6,
+            "min": 13.1,
+            "max": 17.2
           },
           "total": {
             "runs": 50,
-            "p50": 26.7,
-            "p95": 29.2,
-            "min": 23.8,
-            "max": 29.7
+            "p50": 16.4,
+            "p95": 18.2,
+            "min": 13.4,
+            "max": 18.8
           },
           "cold": {
-            "ttfb": 386.1,
-            "total": 387.1
+            "ttfb": 396.7,
+            "total": 397.7
           },
           "sentBytes": 55944,
           "db": {
@@ -4568,8 +4568,8 @@
             "readsFirst": 6,
             "roundTrips": 4,
             "rowsRead": 1357,
-            "bytesDown": 74916,
-            "bytesDownDecoded": 170749,
+            "bytesDown": 7381,
+            "bytesDownDecoded": 28747,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -4603,21 +4603,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 80.6,
-            "p95": 90.1,
-            "min": 77.7,
-            "max": 105.7
+            "p50": 69.9,
+            "p95": 77.5,
+            "min": 65.9,
+            "max": 96.8
           },
           "total": {
             "runs": 50,
-            "p50": 83.5,
-            "p95": 91.8,
-            "min": 79.3,
-            "max": 107.6
+            "p50": 72.5,
+            "p95": 80.1,
+            "min": 68.9,
+            "max": 98.9
           },
           "cold": {
-            "ttfb": 458.9,
-            "total": 462.5
+            "ttfb": 470.5,
+            "total": 474.4
           },
           "sentBytes": 952430,
           "db": {
@@ -4625,8 +4625,8 @@
             "readsFirst": 6,
             "roundTrips": 4,
             "rowsRead": 1357,
-            "bytesDown": 119318,
-            "bytesDownDecoded": 527656,
+            "bytesDown": 51778,
+            "bytesDownDecoded": 385655,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -4660,21 +4660,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 4.2,
-            "p95": 5.5,
-            "min": 3.8,
-            "max": 6
+            "p50": 4.8,
+            "p95": 9.3,
+            "min": 4.1,
+            "max": 9.8
           },
           "total": {
             "runs": 50,
-            "p50": 4.3,
-            "p95": 5.5,
-            "min": 3.9,
-            "max": 6
+            "p50": 4.8,
+            "p95": 9.4,
+            "min": 4.1,
+            "max": 9.8
           },
           "cold": {
-            "ttfb": 325.5,
-            "total": 326
+            "ttfb": 325.2,
+            "total": 325.7
           },
           "sentBytes": 1614,
           "db": {
@@ -4682,7 +4682,7 @@
             "readsFirst": 5,
             "roundTrips": 3,
             "rowsRead": 29,
-            "bytesDown": 2249,
+            "bytesDown": 2250,
             "bytesDownDecoded": 9928,
             "repeated": 0,
             "stable": true,
@@ -4712,21 +4712,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 5,
-            "p95": 5.9,
-            "min": 4.4,
-            "max": 8.2
+            "p50": 5.7,
+            "p95": 11.1,
+            "min": 4.7,
+            "max": 12.9
           },
           "total": {
             "runs": 50,
-            "p50": 5,
-            "p95": 5.9,
-            "min": 4.4,
-            "max": 8.3
+            "p50": 5.7,
+            "p95": 11.1,
+            "min": 4.7,
+            "max": 12.9
           },
           "cold": {
-            "ttfb": 303.8,
-            "total": 304.3
+            "ttfb": 327.2,
+            "total": 327.6
           },
           "sentBytes": 1614,
           "db": {
@@ -4735,7 +4735,7 @@
             "roundTrips": 5,
             "rowsRead": 31,
             "bytesDown": 2626,
-            "bytesDownDecoded": 10512,
+            "bytesDownDecoded": 10510,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -4774,21 +4774,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 30.2,
-            "p95": 33.4,
-            "min": 28.3,
-            "max": 34
+            "p50": 21,
+            "p95": 24.5,
+            "min": 16.6,
+            "max": 26.1
           },
           "total": {
             "runs": 50,
-            "p50": 31.6,
-            "p95": 33.8,
-            "min": 29.4,
-            "max": 35.4
+            "p50": 22.4,
+            "p95": 26.1,
+            "min": 16.8,
+            "max": 27.6
           },
           "cold": {
-            "ttfb": 436.9,
-            "total": 437.7
+            "ttfb": 406.6,
+            "total": 407.4
           },
           "sentBytes": 53871,
           "db": {
@@ -4796,8 +4796,8 @@
             "readsFirst": 11,
             "roundTrips": 9,
             "rowsRead": 1414,
-            "bytesDown": 78067,
-            "bytesDownDecoded": 185683,
+            "bytesDown": 10532,
+            "bytesDownDecoded": 43684,
             "repeated": 3,
             "stable": true,
             "sqldAgrees": true,
@@ -4841,21 +4841,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 42.3,
-            "p95": 48.9,
-            "min": 39.5,
-            "max": 62.1
+            "p50": 18.2,
+            "p95": 20.1,
+            "min": 16.8,
+            "max": 20.3
           },
           "total": {
             "runs": 50,
-            "p50": 42.4,
-            "p95": 49,
-            "min": 39.6,
-            "max": 62.2
+            "p50": 18.3,
+            "p95": 20.2,
+            "min": 16.8,
+            "max": 20.3
           },
           "cold": {
-            "ttfb": 320.1,
-            "total": 320.4
+            "ttfb": 294,
+            "total": 294.3
           },
           "sentBytes": 209320,
           "db": {
@@ -4863,8 +4863,8 @@
             "readsFirst": 7,
             "roundTrips": 5,
             "rowsRead": 435,
-            "bytesDown": 192470,
-            "bytesDownDecoded": 715951,
+            "bytesDown": 57390,
+            "bytesDownDecoded": 431951,
             "repeated": 1,
             "stable": true,
             "sqldAgrees": true,
@@ -4898,21 +4898,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 14.1,
-            "p95": 15.8,
-            "min": 13,
-            "max": 16.5
+            "p50": 2.6,
+            "p95": 3,
+            "min": 2.1,
+            "max": 3.5
           },
           "total": {
             "runs": 50,
-            "p50": 14.1,
-            "p95": 15.8,
-            "min": 13.1,
-            "max": 16.6
+            "p50": 2.6,
+            "p95": 3.1,
+            "min": 2.1,
+            "max": 3.6
           },
           "cold": {
-            "ttfb": 270.9,
-            "total": 271.1
+            "ttfb": 281.7,
+            "total": 281.9
           },
           "sentBytes": 28,
           "db": {
@@ -4920,8 +4920,8 @@
             "readsFirst": 1,
             "roundTrips": 1,
             "rowsRead": 2,
-            "bytesDown": 71466,
-            "bytesDownDecoded": 154826,
+            "bytesDown": 3928,
+            "bytesDownDecoded": 12826,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -4940,21 +4940,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 15.3,
-            "p95": 18,
-            "min": 13.7,
-            "max": 19
+            "p50": 3.2,
+            "p95": 4.4,
+            "min": 2.7,
+            "max": 4.5
           },
           "total": {
             "runs": 50,
-            "p50": 15.3,
-            "p95": 18,
-            "min": 13.8,
-            "max": 19
+            "p50": 3.2,
+            "p95": 4.4,
+            "min": 2.7,
+            "max": 4.6
           },
           "cold": {
-            "ttfb": 290.7,
-            "total": 290.9
+            "ttfb": 278.2,
+            "total": 278.4
           },
           "sentBytes": 1040,
           "db": {
@@ -4962,8 +4962,8 @@
             "readsFirst": 2,
             "roundTrips": 2,
             "rowsRead": 14,
-            "bytesDown": 72528,
-            "bytesDownDecoded": 159429,
+            "bytesDown": 4992,
+            "bytesDownDecoded": 17427,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
@@ -4987,21 +4987,21 @@
           "status": 200,
           "ttfb": {
             "runs": 50,
-            "p50": 14.5,
-            "p95": 16.6,
-            "min": 13.8,
-            "max": 16.7
+            "p50": 3.3,
+            "p95": 4.3,
+            "min": 2.7,
+            "max": 5
           },
           "total": {
             "runs": 50,
-            "p50": 14.5,
-            "p95": 16.6,
-            "min": 13.9,
-            "max": 16.7
+            "p50": 3.3,
+            "p95": 4.3,
+            "min": 2.8,
+            "max": 5
           },
           "cold": {
-            "ttfb": 272.1,
-            "total": 272.3
+            "ttfb": 273.7,
+            "total": 273.9
           },
           "sentBytes": 536,
           "db": {
@@ -5009,8 +5009,8 @@
             "readsFirst": 2,
             "roundTrips": 2,
             "rowsRead": 14,
-            "bytesDown": 72528,
-            "bytesDownDecoded": 159428,
+            "bytesDown": 4993,
+            "bytesDownDecoded": 17429,
             "repeated": 0,
             "stable": true,
             "sqldAgrees": true,
