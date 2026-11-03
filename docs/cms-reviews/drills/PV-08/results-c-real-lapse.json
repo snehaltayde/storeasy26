@@ -1,0 +1,121 @@
+{
+  "id": "PV-08",
+  "part": "c-real-lapse",
+  "title": "P1-DRILLS-C: PV-08 drills still needed — c-real-lapse",
+  "ranAt": "2026-11-03T16:42:30.311Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 12,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: the seeded hero test is running",
+      "detail": "running"
+    },
+    {
+      "ok": true,
+      "label": "the preview connects (\"Preview shows your last save\")"
+    },
+    {
+      "ok": true,
+      "label": "at the start: the frame shows the founder's saved title",
+      "detail": "Winter repair, started."
+    },
+    {
+      "ok": true,
+      "label": "at the start: the browser holds a preview cookie",
+      "detail": {
+        "expires": 1793724052.274915
+      }
+    },
+    {
+      "ok": true,
+      "label": "after just over an hour: the browser itself has dropped the preview cookie",
+      "detail": [
+        "_admin",
+        "_unit"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after just over an hour: still signed in to the console"
+    },
+    {
+      "ok": true,
+      "label": "after the lapse: Save answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "after the lapse: the frame never shows variant b",
+      "detail": [
+        "Winter repair, started.",
+        "Winter repair, started."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after the lapse: the frame shows the live hero (\"Winter repair, started.\")",
+      "detail": [
+        "Winter repair, started.",
+        "Winter repair, started."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after the lapse: the Designer reads \"Connecting…\" (PV-04)",
+      "detail": "Connecting…"
+    },
+    {
+      "ok": true,
+      "label": "no POST /api/exp from the browser, before or after the lapse",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "no exposure row for this unit",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "setup: unit p1c-lapse-mw0uuc1x-0 in variant b; saved title \"Winter repair, started.\"; variant b \"Visibly brighter in 14 days\"",
+    "started 2026-11-03T15:40:55.950Z; the preview cookie expires 2026-11-03T16:40:52.274Z (in 3596 s)",
+    "after the wait (2026-11-03T16:42:22.282Z): cookies [\"_admin\",\"_unit\"]",
+    "the Designer's status before touching anything: \"Preview shows your last save\"",
+    "after Save and Refresh preview: frame [{\"h1\":\"Winter repair, started.\",\"note\":false,\"draftBar\":false},{\"h1\":\"Winter repair, started.\",\"note\":false,\"draftBar\":false}]; live title \"Winter repair, started.\"; status \"Connecting…\"",
+    "/api/exp requests during the whole session: []",
+    "exposures in all: 46 before the wait, 51 after (other drills may add shopper rows meanwhile)",
+    "hero title put back: 200"
+  ],
+  "screenshots": [
+    {
+      "name": "c-lapse-0-start",
+      "file": "docs/cms-reviews/drills/PV-08/c-lapse-0-start.png",
+      "bytes": 33474,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "c-lapse-1-after-hour-untouched",
+      "file": "docs/cms-reviews/drills/PV-08/c-lapse-1-after-hour-untouched.png",
+      "bytes": 33474,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "c-lapse-2-saved-refreshed",
+      "file": "docs/cms-reviews/drills/PV-08/c-lapse-2-saved-refreshed.png",
+      "bytes": 45853,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

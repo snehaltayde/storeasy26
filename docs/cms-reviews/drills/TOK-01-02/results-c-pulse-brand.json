@@ -1,0 +1,93 @@
+{
+  "id": "TOK-01-02",
+  "part": "c-pulse-brand",
+  "title": "P1-DRILLS-C: TOK-01/02 drills still needed — c-pulse-brand",
+  "ranAt": "2026-11-03T16:03:11.865Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 2,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "Theme: the Pulse kit applied with its brand",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "the Pulse kit's own brand publishes",
+      "detail": {
+        "status": 200,
+        "brand": {
+          "accent": "#84cc16",
+          "background": "#ffffff",
+          "foreground": "#0a0a0b",
+          "radius": "md",
+          "type_scale": "regular"
+        }
+      }
+    },
+    {
+      "ok": false,
+      "label": "links measure 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#9f9fa9",
+          "bg": "#ffffff",
+          "ratio": 2.62,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#9f9fa9",
+          "bg": "#ffffff",
+          "ratio": 2.62,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the footer wordmark measures 3:1 or better",
+      "detail": "the harness logo has no second word, so no accent part is drawn"
+    },
+    {
+      "ok": true,
+      "label": "the checkout wordmark measures 3:1 or better",
+      "detail": "no accent part drawn (one-word logo)"
+    },
+    {
+      "ok": false,
+      "label": "every screenshot equals the no-brand baseline on Pulse",
+      "detail": [
+        "home-375: 22445 px in [0,0,374,699]",
+        "product-375: 26455 px in [0,0,374,862]",
+        "collection-375: 10618 px in [0,0,374,57]",
+        "search-375: 11279 px in [0,0,374,247]",
+        "cms-page-375: 10618 px in [0,0,374,57]",
+        "checkout-375: 10618 px in [0,0,374,57]",
+        "home-1440: 57668 px in [0,0,1439,670]",
+        "product-1440: 63163 px in [0,0,1439,399]",
+        "collection-1440: 40370 px in [0,0,1439,58]",
+        "search-1440: 41031 px in [0,0,1439,195]",
+        "cms-page-1440: 40370 px in [0,0,1439,58]",
+        "checkout-1440: 40370 px in [0,0,1439,58]"
+      ]
+    }
+  ],
+  "notes": [
+    "the Pulse brand: {\"accent\":\"#84cc16\",\"background\":\"#ffffff\",\"foreground\":\"#0a0a0b\",\"radius\":\"md\",\"type_scale\":\"regular\"}",
+    "links on the CMS page: [{\"text\":\"Home\",\"fg\":\"#9f9fa9\",\"bg\":\"#ffffff\",\"ratio\":2.62,\"need\":4.5},{\"text\":\"Contact us\",\"fg\":\"#9f9fa9\",\"bg\":\"#ffffff\",\"ratio\":2.62,\"need\":4.5}]; home links: [{\"text\":\"View all →\",\"fg\":\"#456c09\",\"bg\":\"#ffffff\",\"ratio\":6.17,\"need\":4.5}]; footer: [{\"text\":\"All collections\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"Bestsellers\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"Night routine\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"Serums\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"Contact\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"Shipping policy\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5},{\"text\":\"support@design.test\",\"fg\":\"#71717b\",\"bg\":\"#fafafa\",\"ratio\":4.62,\"need\":4.5}]; checkout wordmark: []",
+    "the harness logo is one word, so the footer and checkout wordmarks have no accent part to measure; their colours are the page's own text",
+    "pixel differences, Pulse brand against no brand on Pulse: {\"home-375\":{\"pixels\":22445,\"box\":[0,0,374,699],\"topColourChanges\":[\"#a3e635→#a8eb43 ×18102\",\"#a2e535→#a7ea43 ×209\",\"#a2e435→#a7e942 ×46\",\"#a1e334→#a6e842 ×37\",\"#a0e234→#a5e742 ×36\"]},\"product-375\":{\"pixels\":26455,\"box\":[0,0,374,862],\"topColourChanges\":[\"#a3e635→#a8eb43 ×22069\",\"#a2e535→#a7ea43 ×1443\",\"#a2e435→#a7e942 ×476\",\"#a1e334→#a6e842 ×441\",\"#435c1b→#455e20 ×35\"]},\"collection-375\":{\"pixels\":10618,\"box\":[0,0,374,57],\"topColourChanges\":[\"#a3e635→#a8eb43 ×9187\",\"#a2e535→#a7ea43 ×171\",\"#a2e435→#a7e942 ×46\",\"#a1e334→#a6e842 ×29\",\"#435c1b→#455e20 ×25\"]},\"search-375\":{\"pixels\":11279,\"box\":[0,0,374,247],\"topColourChanges\":[\"#a3e635→#a8eb43 ×9187\",\"#4d7c0f→#456c09 ×311\",\"#a2e535→#a7ea43 ×171\",\"#a2e435→#a7e942 ×46\",\"#a1e334→#a6e842 ×29\"]},\"cms-page-375\":{\"pixels\":10618,\"box\":[0,0,374,57],\"topColourChanges\":[\"#a3e635→#a8eb43 ×9187\",\"#a2e535→#a7ea43 ×171\",\"#a2e435→#a7e942 ×46\",\"#a1e334→#a6e842 ×29\",\"#435c1b→#455e20 ×25\"]},\"checkout-375\":{\"pixels\":10618,\"box\":[0,0,374,57],\"topColourChanges\":[\"#a3e635→#a8eb43 ×9187\",\"#a2e535→#a7ea43 ×171\",\"#a2e435→#a7e942 ×46\",\"#a1e334→#a6e842 ×29\",\"#435c1b→#455e20 ×25\"]},\"home-1440\":{\"pixels\":57668,\"box\":[0,0,1439,670],\"topColourChanges\":[\"#a3e635→#a8eb43 ×52557\",\"#a2e535→#a7ea43 ×196\",\"#344717→#35481b ×84\",\"#8dc62f→#91ca3b ×73\",\"#a0e234→#a5e742 ×64\"]},\"product-1440\":{\"pixels\":63163,\"box\":[0,0,1439,399],\"topColourChanges\":[\"#a3e635→#a8eb43 ×61024\",\"#a2e535→#a7ea43 ×171\",\"#4d7c0f→#456c09 ×52\",\"#a2e435→#a7e942 ×46\",\"#658d24→#68902c ×34\"]},\"collection-1440\":{\"pixels\":40370,\"box\":[0,0,1439,58],\"topColourChanges\":[\"#a3e635→#a8eb43 ×38947\",\"#a2e535→#a7ea43 ×163\",\"#a2e435→#a7e942 ×46\",\"#658d24→#68902c ×33\",\"#a1e334→#a6e842 ×29\"]},\"search-1440\":{\"pixels\":41031,\"box\":[0,0,1439,195],\"topColourChanges\":[\"#a3e635→#a8eb43 ×38947\",\"#4d7c0f→#456c09 ×311\",\"#a2e535→#a7ea43 ×163\",\"#a2e435→#a7e942 ×46\",\"#658d24→#68902c ×33\"]},\"cms-page-1440\":{\"pixels\":40370,\"box\":[0,0,1439,58],\"topColourChanges\":[\"#a3e635→#a8eb43 ×38947\",\"#a2e535→#a7ea43 ×163\",\"#a2e435→#a7e942 ×46\",\"#658d24→#68902c ×33\",\"#a1e334→#a6e842 ×29\"]},\"checkout-1440\":{\"pixels\":40370,\"box\":[0,0,1439,58],\"topColourChanges\":[\"#a3e635→#a8eb43 ×38947\",\"#a2e535→#a7ea43 ×163\",\"#a2e435→#a7e942 ×46\",\"#658d24→#68902c ×33\",\"#a1e334→#a6e842 ×29\"]}}",
+    "brand and theme put back, live release back to rel_0aff92cb615d214d"
+  ],
+  "screenshots": [
+    {
+      "name": "c-pulse-brand/home-1440",
+      "bytes": 5084
+    }
+  ]
+}

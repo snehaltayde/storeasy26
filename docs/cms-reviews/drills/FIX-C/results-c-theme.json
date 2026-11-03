@@ -1,0 +1,73 @@
+{
+  "id": "FIX-C",
+  "part": "c-theme",
+  "title": "P1-DRILLS-C: FIX-C drills still needed — c-theme",
+  "ranAt": "2026-11-03T15:44:05.741Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 7,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "before the kit change, Publishing has nothing to publish"
+    },
+    {
+      "ok": true,
+      "label": "Theme lists another kit to apply",
+      "detail": 2
+    },
+    {
+      "ok": true,
+      "label": "Apply Pulse: the apply answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "right after the kit change, Publish now is enabled"
+    },
+    {
+      "ok": true,
+      "label": "\"Theme\" is in the change list",
+      "detail": "What will publish\nUnpublished changes\n\nEach chip links to its editor. This is the item-level draft-vs-live difference — exactly what the next publish changes.\n\nPreview draft\nNo enabled privacy policy page — add one before launch (checkout links to it)\nNo enabled terms/refund page — add one before la"
+    },
+    {
+      "ok": true,
+      "label": "Publish now answers 200 (not 409)",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "the toast says it is live",
+      "detail": [
+        "Published — live now."
+      ]
+    }
+  ],
+  "notes": [
+    "baseline publish: {\"status\":200,\"toasts\":[\"Published — live now.\"]}",
+    "applied: Apply Pulse",
+    "the live release's kit: pulse"
+  ],
+  "screenshots": [
+    {
+      "name": "c-theme-publishing-at-once",
+      "file": "docs/cms-reviews/drills/FIX-C/c-theme-publishing-at-once.png",
+      "bytes": 41277,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "c-theme-published",
+      "file": "docs/cms-reviews/drills/FIX-C/c-theme-published.png",
+      "bytes": 41910,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    }
+  ]
+}

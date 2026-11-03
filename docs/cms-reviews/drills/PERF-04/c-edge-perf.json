@@ -1,0 +1,951 @@
+{
+  "id": "P1-HARNESS",
+  "title": "P1-HARNESS: the storefront on the edge runtime, on the design harness, with no code edit",
+  "ranAt": "2026-11-03T16:51:25.110Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 132,
+  "failed": 6,
+  "knownFailures": 0,
+  "aborted": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('dialog').getByRole('button', { name: /Radiance Glow Serum 30ml/ }).first()\n",
+  "checks": [
+    {
+      "ok": true,
+      "label": "app/(storefront)/layout.js still says export const runtime = \"edge\""
+    },
+    {
+      "ok": true,
+      "label": "git diff HEAD -- app is empty (no runtime flip or other app edit in the working tree)",
+      "detail": "git exit 0"
+    },
+    {
+      "ok": true,
+      "label": "home at 1440 (/): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\n\n400 products · 30 collections\n\nWinte"
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: shows real content (\"Festive sale\")",
+      "detail": "missing "
+    },
+    {
+      "ok": false,
+      "label": "home at 1440: shows one of \"Makeup second\" / \"Visibly brighter\""
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: no sideways scroll",
+      "detail": "page is 1440px wide in a 1440px window"
+    },
+    {
+      "ok": true,
+      "label": "product at 1440 (/products/glow-serum): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nHome / Serums / Radiance Glow Serum 3"
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: shows real content (\"Radiance Glow Serum 30ml\", \"1,299\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: no sideways scroll",
+      "detail": "page is 1440px wide in a 1440px window"
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440 (/collections/serums): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nHome / Collections / Serums\nSerums\n\n2"
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: shows real content (\"Serums\", \"Radiance Glow Serum 30ml\", \"Vitamin C Booster 15ml\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: no sideways scroll",
+      "detail": "page is 1440px wide in a 1440px window"
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440 (/collections): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nCollections\n\n30 collections\n\nAccessor"
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: shows real content (\"Bestsellers\", \"Serums\", \"Night routine\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: no sideways scroll",
+      "detail": "page is 1440px wide in a 1440px window"
+    },
+    {
+      "ok": true,
+      "label": "search at 1440 (/search?q=serum): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nResults for “serum”\n\n22 products\n\nHAI"
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: shows real content (\"Radiance Glow Serum 30ml\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: no sideways scroll",
+      "detail": "page is 1440px wide in a 1440px window"
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 1440 (/account): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 1440: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 1440: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nSign in\n\nNo passwords — we email you "
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 1440: shows real content (\"Sign in\", \"Email\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 1440: no sideways scroll",
+      "detail": "page is 1440px wide in a 1440px window"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440 (/policies/shipping): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nHome / Shipping policy\nShipping polic"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: shows real content (\"Shipping policy\", \"Orders dispatch within 24 hours\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: no sideways scroll",
+      "detail": "page is 1440px wide in a 1440px window"
+    },
+    {
+      "ok": true,
+      "label": "home at 768 (/): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "home at 768: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "home at 768: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\n\n400 products · 30 collections\n\nWinte"
+    },
+    {
+      "ok": true,
+      "label": "home at 768: shows real content (\"Festive sale\")",
+      "detail": "missing "
+    },
+    {
+      "ok": false,
+      "label": "home at 768: shows one of \"Makeup second\" / \"Visibly brighter\""
+    },
+    {
+      "ok": true,
+      "label": "home at 768: no sideways scroll",
+      "detail": "page is 768px wide in a 768px window"
+    },
+    {
+      "ok": true,
+      "label": "product at 768 (/products/glow-serum): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "product at 768: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "product at 768: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nHome / Serums / Radiance Glow Serum 3"
+    },
+    {
+      "ok": true,
+      "label": "product at 768: shows real content (\"Radiance Glow Serum 30ml\", \"1,299\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "product at 768: no sideways scroll",
+      "detail": "page is 768px wide in a 768px window"
+    },
+    {
+      "ok": true,
+      "label": "collection at 768 (/collections/serums): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collection at 768: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "collection at 768: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nHome / Collections / Serums\nSerums\n\n2"
+    },
+    {
+      "ok": true,
+      "label": "collection at 768: shows real content (\"Serums\", \"Radiance Glow Serum 30ml\", \"Vitamin C Booster 15ml\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "collection at 768: no sideways scroll",
+      "detail": "page is 768px wide in a 768px window"
+    },
+    {
+      "ok": true,
+      "label": "collections at 768 (/collections): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nCollections\n\n30 collections\n\nAccessor"
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: shows real content (\"Bestsellers\", \"Serums\", \"Night routine\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: no sideways scroll",
+      "detail": "page is 768px wide in a 768px window"
+    },
+    {
+      "ok": true,
+      "label": "search at 768 (/search?q=serum): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "search at 768: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "search at 768: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nResults for “serum”\n\n22 products\n\nHAI"
+    },
+    {
+      "ok": true,
+      "label": "search at 768: shows real content (\"Radiance Glow Serum 30ml\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "search at 768: no sideways scroll",
+      "detail": "page is 768px wide in a 768px window"
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 768 (/account): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 768: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 768: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nSign in\n\nNo passwords — we email you "
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 768: shows real content (\"Sign in\", \"Email\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 768: no sideways scroll",
+      "detail": "page is 768px wide in a 768px window"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 768 (/policies/shipping): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 768: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 768: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nHome / Shipping policy\nShipping polic"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 768: shows real content (\"Shipping policy\", \"Orders dispatch within 24 hours\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 768: no sideways scroll",
+      "detail": "page is 768px wide in a 768px window"
+    },
+    {
+      "ok": true,
+      "label": "home at 375 (/): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "home at 375: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "home at 375: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\n\n400 products · 30 collections\n\nWinter repair,"
+    },
+    {
+      "ok": true,
+      "label": "home at 375: shows real content (\"Festive sale\")",
+      "detail": "missing "
+    },
+    {
+      "ok": false,
+      "label": "home at 375: shows one of \"Makeup second\" / \"Visibly brighter\""
+    },
+    {
+      "ok": true,
+      "label": "home at 375: no sideways scroll",
+      "detail": "page is 375px wide in a 375px window"
+    },
+    {
+      "ok": true,
+      "label": "product at 375 (/products/glow-serum): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "product at 375: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "product at 375: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nHome / Serums / Radiance Glow Serum 30ml\nNo im"
+    },
+    {
+      "ok": true,
+      "label": "product at 375: shows real content (\"Radiance Glow Serum 30ml\", \"1,299\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "product at 375: no sideways scroll",
+      "detail": "page is 375px wide in a 375px window"
+    },
+    {
+      "ok": true,
+      "label": "collection at 375 (/collections/serums): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collection at 375: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "collection at 375: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nHome / Collections / Serums\nSerums\n\n2 products"
+    },
+    {
+      "ok": true,
+      "label": "collection at 375: shows real content (\"Serums\", \"Radiance Glow Serum 30ml\", \"Vitamin C Booster 15ml\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "collection at 375: no sideways scroll",
+      "detail": "page is 375px wide in a 375px window"
+    },
+    {
+      "ok": true,
+      "label": "collections at 375 (/collections): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nCollections\n\n30 collections\n\nAccessories\n\n39 p"
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: shows real content (\"Bestsellers\", \"Serums\", \"Night routine\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: no sideways scroll",
+      "detail": "page is 375px wide in a 375px window"
+    },
+    {
+      "ok": true,
+      "label": "search at 375 (/search?q=serum): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "search at 375: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "search at 375: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nResults for “serum”\n\n22 products\n\nHAIRCARE\n\nAd"
+    },
+    {
+      "ok": true,
+      "label": "search at 375: shows real content (\"Radiance Glow Serum 30ml\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "search at 375: no sideways scroll",
+      "detail": "page is 375px wide in a 375px window"
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 375 (/account): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 375: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 375: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nSign in\n\nNo passwords — we email you a 6-digit"
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 375: shows real content (\"Sign in\", \"Email\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "account-sign-in at 375: no sideways scroll",
+      "detail": "page is 375px wide in a 375px window"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 375 (/policies/shipping): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 375: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 375: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nHome / Shipping policy\nShipping policy\nDispatc"
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 375: shows real content (\"Shipping policy\", \"Orders dispatch within 24 hours\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 375: no sideways scroll",
+      "detail": "page is 375px wide in a 375px window"
+    },
+    {
+      "ok": true,
+      "label": "cart: adding the product, POST /api/cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "cart: the drawer opens with the item"
+    },
+    {
+      "ok": true,
+      "label": "cart: GET /api/cart answers 200 and holds the product",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "cart: Next compiled /api/cart as an edge function (.next/dev/server/app/api/cart/route/middleware-manifest.json)"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 1440 (/checkout): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "checkout at 1440: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 1440: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n1\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nDesign Demo Co\n1\nAddress\n→\n2\nReview"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 1440: shows real content (\"Contact & shipping address\", \"Radiance Glow Serum 30ml\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "checkout at 1440: no sideways scroll",
+      "detail": "page is 1440px wide in a 1440px window"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 768 (/checkout): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "checkout at 768: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 768: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n1\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nDesign Demo Co\n1\nAddress\n→\n2\nReview"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 768: shows real content (\"Contact & shipping address\", \"Radiance Glow Serum 30ml\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "checkout at 768: no sideways scroll",
+      "detail": "page is 768px wide in a 768px window"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 375 (/checkout): answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "checkout at 375: rendered on the edge runtime (x-edge-runtime: 1)",
+      "detail": "1"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 375: not an error page",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n1\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\nDesign Demo Co\n1\nAddress\n2\nReview\n3\nPayment\n"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 375: shows real content (\"Contact & shipping address\", \"Radiance Glow Serum 30ml\")",
+      "detail": "missing "
+    },
+    {
+      "ok": true,
+      "label": "checkout at 375: no sideways scroll",
+      "detail": "page is 375px wide in a 375px window"
+    },
+    {
+      "ok": false,
+      "label": "storefront: no console errors or page errors on any page above",
+      "detail": [
+        "Failed to load resource: the server responded with a status of 400 (Bad Request) (http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_1ae84a2745d034909a&w=384&q=75)",
+        "Failed to load resource: the server responded with a status of 400 (Bad Request) (http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_75768f3b65781d963d&w=384&q=75)",
+        "Failed to load resource: the server responded with a status of 400 (Bad Request) (http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_8b9f1aeffff0a92bee&w=384&q=75)",
+        "Failed to load resource: the server responded with a status of 400 (Bad Request) (http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_e219b3ef874156c3dc&w=384&q=75)",
+        "Failed to load resource: the server responded with a status of 400 (Bad Request) (http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_1a674bf3736b8437aa&w=640&q=75)",
+        "Failed to load resource: the server responded with a status of 400 (Bad Request) (http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_bac7d9594de8dc2c9b&w=640&q=75)",
+        "Failed to load resource: the server responded with a status of 400 (Bad Request) (http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_e987d4358218801ca4&w=640&q=75)",
+        "Failed to load resource: the server responded with a status of 400 (Bad Request) (http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_6ff6b329953b97992f&w=640&q=75)"
+      ]
+    },
+    {
+      "ok": false,
+      "label": "storefront: no failed requests and no 4xx/5xx answers on any page above",
+      "detail": [
+        "400 GET http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_1ae84a2745d034909a&w=384&q=75",
+        "400 GET http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_75768f3b65781d963d&w=384&q=75",
+        "400 GET http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_8b9f1aeffff0a92bee&w=384&q=75",
+        "400 GET http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_e219b3ef874156c3dc&w=384&q=75",
+        "400 GET http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_1a674bf3736b8437aa&w=640&q=75",
+        "400 GET http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_bac7d9594de8dc2c9b&w=640&q=75",
+        "400 GET http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_e987d4358218801ca4&w=640&q=75",
+        "400 GET http://localhost:3231/_next/image?url=%2Fapi%2Fmedia%2Fmed_6ff6b329953b97992f&w=640&q=75"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "console: signed in with the .design-env setup password, landed on the dashboard"
+    },
+    {
+      "ok": true,
+      "label": "Designer: the preview connects (\"Preview shows your last save\")"
+    },
+    {
+      "ok": true,
+      "label": "Designer: the preview shows the saved draft hero, not the live one (button \"Shop night routine\")",
+      "detail": "Draft preview — this is NOT what shoppers see. Exit preview\nFestive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nShop all\nProtein\n▾\nSkincare\n▾\nVitamins\n▾\nSnacks\n▾\nJournal\n\nA test is runnin"
+    },
+    {
+      "ok": true,
+      "label": "Designer: the preview is marked \"Draft preview\""
+    },
+    {
+      "ok": true,
+      "label": "Designer: the preview is not an error page"
+    },
+    {
+      "ok": true,
+      "label": "Designer: the preview's page came from the edge runtime (200, x-edge-runtime: 1)",
+      "detail": {
+        "url": "http://localhost:3231/",
+        "status": 200,
+        "edge": "1"
+      }
+    }
+  ],
+  "notes": [
+    "storefront: 0 requests were cut off by the drill's next navigation (net::ERR_ABORTED), not counted as failures",
+    "Designer preview hero title: \"Winter repair, started.\" (draft title is \"Winter repair, started.\"; the running hero-promise experiment's variant b is \"Visibly brighter in 14 days\")",
+    "Experiment exposures sent from inside the Designer preview (POST /api/exp): none"
+  ],
+  "screenshots": [
+    {
+      "name": "home-1440",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/home-1440.png",
+      "bytes": 28211,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "product-1440",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/product-1440.png",
+      "bytes": 22612,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "collection-1440",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/collection-1440.png",
+      "bytes": 19343,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/serums"
+    },
+    {
+      "name": "collections-1440",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/collections-1440.png",
+      "bytes": 30470,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections"
+    },
+    {
+      "name": "search-1440",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/search-1440.png",
+      "bytes": 19850,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/search"
+    },
+    {
+      "name": "account-sign-in-1440",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/account-sign-in-1440.png",
+      "bytes": 25632,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/account"
+    },
+    {
+      "name": "cms-page-1440",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/cms-page-1440.png",
+      "bytes": 26316,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/shipping"
+    },
+    {
+      "name": "home-768",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/home-768.png",
+      "bytes": 65758,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "product-768",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/product-768.png",
+      "bytes": 35131,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "collection-768",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/collection-768.png",
+      "bytes": 52303,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/collections/serums"
+    },
+    {
+      "name": "collections-768",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/collections-768.png",
+      "bytes": 62923,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/collections"
+    },
+    {
+      "name": "search-768",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/search-768.png",
+      "bytes": 53371,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/search"
+    },
+    {
+      "name": "account-sign-in-768",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/account-sign-in-768.png",
+      "bytes": 55461,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/account"
+    },
+    {
+      "name": "cms-page-768",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/cms-page-768.png",
+      "bytes": 57709,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/policies/shipping"
+    },
+    {
+      "name": "home-375",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/home-375.png",
+      "bytes": 36415,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "product-375",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/product-375.png",
+      "bytes": 24345,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "collection-375",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/collection-375.png",
+      "bytes": 24821,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/collections/serums"
+    },
+    {
+      "name": "collections-375",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/collections-375.png",
+      "bytes": 21487,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/collections"
+    },
+    {
+      "name": "search-375",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/search-375.png",
+      "bytes": 24526,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/search"
+    },
+    {
+      "name": "account-sign-in-375",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/account-sign-in-375.png",
+      "bytes": 24248,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/account"
+    },
+    {
+      "name": "cms-page-375",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/cms-page-375.png",
+      "bytes": 25523,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/policies/shipping"
+    },
+    {
+      "name": "cart-drawer-1440",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/cart-drawer-1440.png",
+      "bytes": 28510,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "checkout-1440",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/checkout-1440.png",
+      "bytes": 22756,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "checkout-768",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/checkout-768.png",
+      "bytes": 52295,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/checkout"
+    },
+    {
+      "name": "checkout-375",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/checkout-375.png",
+      "bytes": 23846,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/checkout"
+    },
+    {
+      "name": "designer-1440",
+      "file": "docs/cms-reviews/drills/P1-HARNESS/designer-1440.png",
+      "bytes": 36415,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

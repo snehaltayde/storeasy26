@@ -1,0 +1,106 @@
+{
+  "id": "GEN-03",
+  "part": "c-settings",
+  "title": "P1-DRILLS-C: GEN-03 drill 6 again (Settings and Brand, at once) — c-settings",
+  "ranAt": "2026-11-03T15:48:32.995Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 6,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "settings: starter rates, with the notice"
+    },
+    {
+      "ok": true,
+      "label": "settings: Save settings answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "settings: a reload right after Save shows the saved rates and no notice",
+      "detail": {
+        "flat": "79",
+        "free": "1999",
+        "cod": "49",
+        "notice": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "settings: four more reloads in a row all show the saved rates",
+      "detail": [
+        {
+          "flat": "79",
+          "free": "1999",
+          "cod": "49",
+          "notice": false
+        },
+        {
+          "flat": "79",
+          "free": "1999",
+          "cod": "49",
+          "notice": false
+        },
+        {
+          "flat": "79",
+          "free": "1999",
+          "cod": "49",
+          "notice": false
+        },
+        {
+          "flat": "79",
+          "free": "1999",
+          "cod": "49",
+          "notice": false
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "settings: a new tab shows the saved rates",
+      "detail": {
+        "flat": "79",
+        "free": "1999",
+        "cod": "49",
+        "notice": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "settings: rates removed in the control plane show as starter rates on the next reload",
+      "detail": {
+        "flat": "79",
+        "free": "999",
+        "cod": "49",
+        "notice": true
+      }
+    }
+  ],
+  "notes": [
+    "settings: starter values shown: {\"flat\":\"79\",\"free\":\"999\",\"cod\":\"49\",\"notice\":true}",
+    "settings: the control plane right after Save: {\"currency\":\"INR\",\"basis\":\"net\",\"freeThreshold\":1999,\"flatRate\":79,\"codFee\":49,\"codFeeWaivedAt\":null,\"zones\":[]}"
+  ],
+  "screenshots": [
+    {
+      "name": "settings-reload-at-once",
+      "file": "docs/cms-reviews/drills/GEN-03/settings-reload-at-once.png",
+      "bytes": 30059,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/settings"
+    },
+    {
+      "name": "settings-after-control-plane-change",
+      "file": "docs/cms-reviews/drills/GEN-03/settings-after-control-plane-change.png",
+      "bytes": 32897,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/settings"
+    }
+  ]
+}

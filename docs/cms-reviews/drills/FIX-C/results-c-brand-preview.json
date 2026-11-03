@@ -1,0 +1,74 @@
+{
+  "id": "FIX-C",
+  "part": "c-brand-preview",
+  "title": "P1-DRILLS-C: FIX-C drills still needed — c-brand-preview",
+  "ranAt": "2026-11-03T15:43:52.517Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "Save brand answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "the Designer's preview connects"
+    },
+    {
+      "ok": true,
+      "label": "the preview frame's --accent-500 is the new accent on its first load",
+      "detail": "#7c3aed"
+    },
+    {
+      "ok": true,
+      "label": "the frame's accent button is painted from the new accent's ladder (not the old accent)",
+      "detail": {
+        "button": {
+          "text": "Shop night routine",
+          "bg": "rgb(158, 109, 242)",
+          "cls": "rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent tra"
+        },
+        "ladder": {
+          "50": "#eee6fd",
+          "100": "#e5d7fb",
+          "200": "#d4bef9",
+          "300": "#bb99f6",
+          "400": "#9e6df2",
+          "500": "#7c3aed",
+          "600": "#5d0fe3",
+          "700": "#4b0cb6",
+          "800": "#3b0a90",
+          "900": "#2d076f",
+          "950": ""
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "a signed-out shopper still sees the published accent (not the draft)",
+      "detail": "#0d9488"
+    }
+  ],
+  "notes": [
+    "accent #0d9488 → #7c3aed",
+    "frame 1413 ms after Save: {\"ladder\":{\"50\":\"#eee6fd\",\"100\":\"#e5d7fb\",\"200\":\"#d4bef9\",\"300\":\"#bb99f6\",\"400\":\"#9e6df2\",\"500\":\"#7c3aed\",\"600\":\"#5d0fe3\",\"700\":\"#4b0cb6\",\"800\":\"#3b0a90\",\"900\":\"#2d076f\",\"950\":\"\"},\"accent500\":\"#7c3aed\",\"accent600\":\"#5d0fe3\",\"buttons\":[{\"text\":\"Shop night routine\",\"bg\":\"rgb(158, 109, 242)\",\"cls\":\"rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent tra\"}],\"draftBar\":true}",
+    "the frame's accent button \"Shop night routine\" is rgb(158, 109, 242), the new accent's 400 step",
+    "a signed-out shopper's --accent-500: #0d9488",
+    "accent put back to #0d9488: 200"
+  ],
+  "screenshots": [
+    {
+      "name": "c-brand-preview-designer",
+      "file": "docs/cms-reviews/drills/FIX-C/c-brand-preview-designer.png",
+      "bytes": 34274,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

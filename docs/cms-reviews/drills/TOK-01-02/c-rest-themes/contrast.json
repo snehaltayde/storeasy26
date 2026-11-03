@@ -1,0 +1,366 @@
+{
+  "light": {
+    "account-sign-in-375": {
+      "status": 200,
+      "checked": 28,
+      "exempt": [],
+      "failing": []
+    },
+    "account-orders-375": {
+      "status": 200,
+      "checked": 44,
+      "exempt": [],
+      "failing": []
+    },
+    "order-page-375": {
+      "status": 200,
+      "checked": 40,
+      "exempt": [],
+      "failing": []
+    },
+    "confirmation-375": {
+      "status": 200,
+      "checked": 45,
+      "exempt": [],
+      "failing": []
+    },
+    "wishlist-375": {
+      "status": null,
+      "checked": 34,
+      "exempt": [],
+      "failing": [
+        {
+          "text": "?",
+          "fg": "#777471",
+          "bg": "#f5f3ee",
+          "ratio": 4.19,
+          "need": 4.5
+        }
+      ]
+    },
+    "quiz-375": {
+      "status": 200,
+      "checked": 30,
+      "exempt": [],
+      "failing": []
+    },
+    "bundle-375": {
+      "status": 200,
+      "checked": 40,
+      "exempt": [],
+      "failing": []
+    },
+    "cms-page-375": {
+      "status": 200,
+      "checked": 32,
+      "exempt": [],
+      "failing": []
+    },
+    "checkout-review-375": {
+      "status": null,
+      "checked": 50,
+      "exempt": [],
+      "failing": []
+    },
+    "checkout-payment-375": {
+      "status": null,
+      "checked": 47,
+      "exempt": [
+        {
+          "text": "Pay online",
+          "fg": "#8e8b88",
+          "bg": "#fffdf8",
+          "ratio": 3.34,
+          "need": 4.5
+        },
+        {
+          "text": "· card / UPI / netbanking",
+          "fg": "#b8b5b1",
+          "bg": "#fffdf8",
+          "ratio": 2.01,
+          "need": 4.5
+        },
+        {
+          "text": "Online payment isn't available for this store right now.",
+          "fg": "#b3b1ad",
+          "bg": "#fffdf8",
+          "ratio": 2.12,
+          "need": 4.5
+        }
+      ],
+      "failing": []
+    },
+    "account-sign-in-1440": {
+      "status": 200,
+      "checked": 29,
+      "exempt": [],
+      "failing": []
+    },
+    "account-orders-1440": {
+      "status": 200,
+      "checked": 46,
+      "exempt": [],
+      "failing": []
+    },
+    "order-page-1440": {
+      "status": 200,
+      "checked": 42,
+      "exempt": [],
+      "failing": []
+    },
+    "confirmation-1440": {
+      "status": 200,
+      "checked": 47,
+      "exempt": [],
+      "failing": []
+    },
+    "wishlist-1440": {
+      "status": null,
+      "checked": 36,
+      "exempt": [],
+      "failing": [
+        {
+          "text": "?",
+          "fg": "#777471",
+          "bg": "#f5f3ee",
+          "ratio": 4.19,
+          "need": 4.5
+        }
+      ]
+    },
+    "quiz-1440": {
+      "status": 200,
+      "checked": 32,
+      "exempt": [],
+      "failing": []
+    },
+    "bundle-1440": {
+      "status": 200,
+      "checked": 42,
+      "exempt": [],
+      "failing": []
+    },
+    "cms-page-1440": {
+      "status": 200,
+      "checked": 34,
+      "exempt": [],
+      "failing": []
+    },
+    "checkout-review-1440": {
+      "status": null,
+      "checked": 55,
+      "exempt": [],
+      "failing": []
+    },
+    "checkout-payment-1440": {
+      "status": null,
+      "checked": 52,
+      "exempt": [
+        {
+          "text": "Pay online",
+          "fg": "#8e8b88",
+          "bg": "#fffdf8",
+          "ratio": 3.34,
+          "need": 4.5
+        },
+        {
+          "text": "· card / UPI / netbanking",
+          "fg": "#b8b5b1",
+          "bg": "#fffdf8",
+          "ratio": 2.01,
+          "need": 4.5
+        },
+        {
+          "text": "Online payment isn't available for this store right now.",
+          "fg": "#b3b1ad",
+          "bg": "#fffdf8",
+          "ratio": 2.12,
+          "need": 4.5
+        }
+      ],
+      "failing": []
+    }
+  },
+  "dark": {
+    "account-sign-in-375": {
+      "status": 200,
+      "checked": 28,
+      "exempt": [],
+      "failing": []
+    },
+    "account-orders-375": {
+      "status": 200,
+      "checked": 45,
+      "exempt": [],
+      "failing": []
+    },
+    "order-page-375": {
+      "status": 200,
+      "checked": 41,
+      "exempt": [],
+      "failing": []
+    },
+    "confirmation-375": {
+      "status": 200,
+      "checked": 46,
+      "exempt": [],
+      "failing": []
+    },
+    "wishlist-375": {
+      "status": null,
+      "checked": 35,
+      "exempt": [],
+      "failing": [
+        {
+          "text": "?",
+          "fg": "#797d83",
+          "bg": "#151921",
+          "ratio": 4.25,
+          "need": 4.5
+        }
+      ]
+    },
+    "quiz-375": {
+      "status": 200,
+      "checked": 31,
+      "exempt": [],
+      "failing": []
+    },
+    "bundle-375": {
+      "status": 200,
+      "checked": 41,
+      "exempt": [],
+      "failing": []
+    },
+    "cms-page-375": {
+      "status": 200,
+      "checked": 33,
+      "exempt": [],
+      "failing": []
+    },
+    "checkout-review-375": {
+      "status": null,
+      "checked": 53,
+      "exempt": [],
+      "failing": []
+    },
+    "checkout-payment-375": {
+      "status": null,
+      "checked": 50,
+      "exempt": [
+        {
+          "text": "Pay online",
+          "fg": "#7e8288",
+          "bg": "#0b0f17",
+          "ratio": 4.96,
+          "need": 4.5
+        },
+        {
+          "text": "· card / UPI / netbanking",
+          "fg": "#454950",
+          "bg": "#0b0f17",
+          "ratio": 2.1,
+          "need": 4.5
+        },
+        {
+          "text": "Online payment isn't available for this store right now.",
+          "fg": "#4d5158",
+          "bg": "#0b0f17",
+          "ratio": 2.4,
+          "need": 4.5
+        }
+      ],
+      "failing": []
+    },
+    "account-sign-in-1440": {
+      "status": 200,
+      "checked": 29,
+      "exempt": [],
+      "failing": []
+    },
+    "account-orders-1440": {
+      "status": 200,
+      "checked": 46,
+      "exempt": [],
+      "failing": []
+    },
+    "order-page-1440": {
+      "status": 200,
+      "checked": 42,
+      "exempt": [],
+      "failing": []
+    },
+    "confirmation-1440": {
+      "status": 200,
+      "checked": 47,
+      "exempt": [],
+      "failing": []
+    },
+    "wishlist-1440": {
+      "status": null,
+      "checked": 36,
+      "exempt": [],
+      "failing": [
+        {
+          "text": "?",
+          "fg": "#797d83",
+          "bg": "#151921",
+          "ratio": 4.25,
+          "need": 4.5
+        }
+      ]
+    },
+    "quiz-1440": {
+      "status": 200,
+      "checked": 32,
+      "exempt": [],
+      "failing": []
+    },
+    "bundle-1440": {
+      "status": 200,
+      "checked": 42,
+      "exempt": [],
+      "failing": []
+    },
+    "cms-page-1440": {
+      "status": 200,
+      "checked": 34,
+      "exempt": [],
+      "failing": []
+    },
+    "checkout-review-1440": {
+      "status": null,
+      "checked": 55,
+      "exempt": [],
+      "failing": []
+    },
+    "checkout-payment-1440": {
+      "status": null,
+      "checked": 52,
+      "exempt": [
+        {
+          "text": "Pay online",
+          "fg": "#7e8288",
+          "bg": "#0b0f17",
+          "ratio": 4.96,
+          "need": 4.5
+        },
+        {
+          "text": "· card / UPI / netbanking",
+          "fg": "#454950",
+          "bg": "#0b0f17",
+          "ratio": 2.1,
+          "need": 4.5
+        },
+        {
+          "text": "Online payment isn't available for this store right now.",
+          "fg": "#4d5158",
+          "bg": "#0b0f17",
+          "ratio": 2.4,
+          "need": 4.5
+        }
+      ],
+      "failing": []
+    }
+  }
+}

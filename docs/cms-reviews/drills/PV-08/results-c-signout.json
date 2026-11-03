@@ -1,0 +1,129 @@
+{
+  "id": "PV-08",
+  "part": "c-signout",
+  "title": "P1-DRILLS-C: PV-08 drills still needed — c-signout",
+  "ranAt": "2026-11-03T16:04:37.839Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 12,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: the seeded hero test is running",
+      "detail": "running"
+    },
+    {
+      "ok": true,
+      "label": "the Designer's preview connects"
+    },
+    {
+      "ok": true,
+      "label": "the Designer gave the browser a preview cookie"
+    },
+    {
+      "ok": true,
+      "label": "Sign out answers 200 and the console cookie is gone",
+      "detail": {
+        "status": 200,
+        "cookies": [
+          "_unit",
+          "_preview"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the preview cookie outlives sign-out (known limit)",
+      "detail": [
+        "_unit",
+        "_preview"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "before Exit preview: / shows the draft (the Draft preview bar and the saved title)",
+      "detail": {
+        "h1": "Winter repair, started.",
+        "draftBar": true,
+        "note": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "before Exit preview: no POST /api/exp",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "before Exit preview: no exposure row"
+    },
+    {
+      "ok": true,
+      "label": "Exit preview clears the preview cookie",
+      "detail": [
+        "_unit"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after Exit preview: variant b's title (\"Visibly brighter in 14 days\")",
+      "detail": {
+        "h1": "Visibly brighter in 14 days",
+        "draftBar": false,
+        "note": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "after Exit preview: one POST /api/exp in all, answered recorded:true",
+      "detail": [
+        {
+          "at": "2026-11-03T16:04:32.532Z",
+          "method": "POST",
+          "frame": "http://localhost:3231/",
+          "status": 200,
+          "body": {
+            "ok": true,
+            "recorded": true
+          }
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "one exposure row, variant b",
+      "detail": [
+        {
+          "variant": "b"
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "setup: unit p1c-signout-mw0voplh-2 in variant b; saved title \"Winter repair, started.\"; live \"Winter repair, started.\"; variant b \"Visibly brighter in 14 days\"",
+    "before Exit preview: {\"h1\":\"Winter repair, started.\",\"draftBar\":true,\"note\":true}; pings []",
+    "after Exit preview: landed on {\"path\":\"/\",\"h1\":\"Visibly brighter in 14 days\",\"draftBar\":false,\"note\":false}; then / again: {\"h1\":\"Visibly brighter in 14 days\",\"draftBar\":false,\"note\":false}; pings since Exit preview [{\"at\":\"2026-11-03T16:04:32.532Z\",\"method\":\"POST\",\"frame\":\"http://localhost:3231/\",\"status\":200,\"body\":{\"ok\":true,\"recorded\":true}}] (0 from the second visit)"
+  ],
+  "screenshots": [
+    {
+      "name": "c-signout-1-before-exit-preview",
+      "file": "docs/cms-reviews/drills/PV-08/c-signout-1-before-exit-preview.png",
+      "bytes": 30789,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "c-signout-2-after-exit-preview",
+      "file": "docs/cms-reviews/drills/PV-08/c-signout-2-after-exit-preview.png",
+      "bytes": 30756,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

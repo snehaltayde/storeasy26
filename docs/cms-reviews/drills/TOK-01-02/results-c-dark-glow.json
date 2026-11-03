@@ -1,0 +1,84 @@
+{
+  "id": "TOK-01-02",
+  "part": "c-dark-glow",
+  "title": "P1-DRILLS-C: TOK-01/02 drills still needed — c-dark-glow",
+  "ranAt": "2026-11-03T15:53:34.701Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 10,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "dark brand on Glow, home at 375: every one of 65 pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark brand on Glow, home at 375: the header passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark brand on Glow, home at 375: the hero passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark brand on Glow, product at 375: every one of 45 pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark brand on Glow, product at 375: the header passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark brand on Glow, home at 1440: every one of 66 pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark brand on Glow, home at 1440: the header passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark brand on Glow, home at 1440: the hero passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark brand on Glow, product at 1440: every one of 46 pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark brand on Glow, product at 1440: the header passes",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "live: a dark brand {\"accent\":\"#f59e0b\",\"background\":\"#0b0f17\",\"foreground\":\"#f1f5f9\",\"radius\":\"lg\",\"type_scale\":\"regular\"} on the Glow kit"
+  ],
+  "screenshots": [
+    {
+      "name": "c-dark-glow/home-375",
+      "bytes": 27065
+    },
+    {
+      "name": "c-dark-glow/product-375",
+      "bytes": 12007
+    },
+    {
+      "name": "c-dark-glow/home-1440",
+      "bytes": 4861
+    },
+    {
+      "name": "c-dark-glow/product-1440",
+      "bytes": 2420
+    }
+  ]
+}

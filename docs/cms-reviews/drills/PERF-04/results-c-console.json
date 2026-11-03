@@ -1,0 +1,156 @@
+{
+  "id": "PERF-04",
+  "part": "c-console",
+  "title": "P1-DRILLS-C: PERF-04 drills still needed (perf fixture) — c-console",
+  "ranAt": "2026-11-03T16:49:00.318Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 12,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: the harness holds the perf fixture (400 products, 30 collections, 85 pages, 32 media)",
+      "detail": {
+        "products": 400,
+        "collections": 30,
+        "pages": 85,
+        "journal": 60,
+        "media": 32,
+        "offers": 12
+      }
+    },
+    {
+      "ok": true,
+      "label": "Catalog opens with no error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "Catalog lists the fixture's products (first page: 30 of the 30 first titles)",
+      "detail": 30
+    },
+    {
+      "ok": true,
+      "label": "Catalog offers all 30 collections (suggestions and picker)",
+      "detail": {
+        "inSuggestions": 30,
+        "inPicker": 30
+      }
+    },
+    {
+      "ok": true,
+      "label": "Pages opens with no error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "Pages lists all 85 pages",
+      "detail": 85
+    },
+    {
+      "ok": true,
+      "label": "the journal's 60 posts are in the list",
+      "detail": 60
+    },
+    {
+      "ok": true,
+      "label": "Media opens with no error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "Media shows the library (32 thumbnails for 32 files)",
+      "detail": 32
+    },
+    {
+      "ok": true,
+      "label": "Offers opens with no error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "Offers lists all 12 named offers",
+      "detail": 12
+    },
+    {
+      "ok": true,
+      "label": "Publishing opens with no error page",
+      "detail": {
+        "status": 200
+      }
+    }
+  ],
+  "notes": [
+    "the fixture in the local DB: {\"products\":400,\"collections\":30,\"pages\":85,\"journal\":60,\"media\":32,\"offers\":12}",
+    "the collection picker: 25 on its first page, \"Load more\" pressed 1 time(s)",
+    "Catalog collections: 30 in the handle field's suggestions; the picker listed 30 of 30 titles 2300 ms after the click",
+    "Media: 32 thumbnails, 0 broken",
+    "load times, ms (tLoad: to the load event; tIdle: to network quiet; nav: the browser's own timing): {\"catalog (first load)\":{\"tLoad\":1100,\"tIdle\":2600,\"nav\":{\"ttfb\":755,\"domContentLoaded\":1093,\"load\":1097,\"transfer\":22917}},\"catalog (second load)\":{\"tLoad\":1059,\"tIdle\":1577,\"nav\":{\"ttfb\":704,\"domContentLoaded\":1053,\"load\":1057,\"transfer\":22921}},\"pages (first load)\":{\"tLoad\":854,\"tIdle\":1455,\"nav\":{\"ttfb\":809,\"domContentLoaded\":822,\"load\":851,\"transfer\":25105}},\"pages (second load)\":{\"tLoad\":822,\"tIdle\":1422,\"nav\":{\"ttfb\":775,\"domContentLoaded\":793,\"load\":820,\"transfer\":25102}},\"media (first load)\":{\"tLoad\":660,\"tIdle\":1327,\"nav\":{\"ttfb\":611,\"domContentLoaded\":628,\"load\":657,\"transfer\":17331}},\"media (second load)\":{\"tLoad\":637,\"tIdle\":1200,\"nav\":{\"ttfb\":608,\"domContentLoaded\":619,\"load\":636,\"transfer\":17324}},\"offers (first load)\":{\"tLoad\":664,\"tIdle\":1211,\"nav\":{\"ttfb\":625,\"domContentLoaded\":635,\"load\":662,\"transfer\":15287}},\"offers (second load)\":{\"tLoad\":651,\"tIdle\":1213,\"nav\":{\"ttfb\":625,\"domContentLoaded\":633,\"load\":649,\"transfer\":15284}},\"publishing (first load)\":{\"tLoad\":2006,\"tIdle\":2511,\"nav\":{\"ttfb\":1586,\"domContentLoaded\":2002,\"load\":2003,\"transfer\":16431}},\"publishing (second load)\":{\"tLoad\":2109,\"tIdle\":2613,\"nav\":{\"ttfb\":1547,\"domContentLoaded\":2107,\"load\":2107,\"transfer\":16433}}}"
+  ],
+  "screenshots": [
+    {
+      "name": "c-console-catalog-collection-picker",
+      "file": "docs/cms-reviews/drills/PERF-04/c-console-catalog-collection-picker.png",
+      "bytes": 36768,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/catalog"
+    },
+    {
+      "name": "c-console-catalog",
+      "file": "docs/cms-reviews/drills/PERF-04/c-console-catalog.png",
+      "bytes": 37942,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/catalog"
+    },
+    {
+      "name": "c-console-pages",
+      "file": "docs/cms-reviews/drills/PERF-04/c-console-pages.png",
+      "bytes": 44494,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/pages"
+    },
+    {
+      "name": "c-console-media",
+      "file": "docs/cms-reviews/drills/PERF-04/c-console-media.png",
+      "bytes": 38153,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/media"
+    },
+    {
+      "name": "c-console-offers",
+      "file": "docs/cms-reviews/drills/PERF-04/c-console-offers.png",
+      "bytes": 43507,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/offers"
+    },
+    {
+      "name": "c-console-publishing",
+      "file": "docs/cms-reviews/drills/PERF-04/c-console-publishing.png",
+      "bytes": 30045,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    }
+  ]
+}

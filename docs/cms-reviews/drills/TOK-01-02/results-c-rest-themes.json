@@ -1,0 +1,635 @@
+{
+  "id": "TOK-01-02",
+  "part": "c-rest-themes",
+  "title": "P1-DRILLS-C: TOK-01/02 drills still needed — c-rest-themes",
+  "ranAt": "2026-11-03T16:08:11.286Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 81,
+  "failed": 4,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: the shopper's sign-in code was recorded locally (never printed)"
+    },
+    {
+      "ok": true,
+      "label": "light, account-sign-in at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\nSign in\n\nNo passwords — we email you a 6-digit code. Your past orders w"
+    },
+    {
+      "ok": true,
+      "label": "light, account-sign-in at 375: every one of 28 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, account-orders at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\nYour account\nOrders\nDES-44434BCF\nRadiance Glow Serum 30ml\nPROCESSING\n₹1"
+    },
+    {
+      "ok": true,
+      "label": "light, account-orders at 375: every one of 44 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, order-page at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\nAccount / DES-44434BCF\nOrder DES-44434BCF\n\nPlaced 3 Nov 2026, 9:37 pm ·"
+    },
+    {
+      "ok": true,
+      "label": "light, order-page at 375: every one of 40 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, confirmation at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\n✓\nOrder confirmed\n\nOrder DES-44434BCF\n\nThanks Drill! You'll pay cash on"
+    },
+    {
+      "ok": true,
+      "label": "light, confirmation at 375: every one of 45 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, wishlist at 375: the saved product is listed"
+    },
+    {
+      "ok": true,
+      "label": "light, wishlist at 375: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\nWishlist\nSaved on this device (1)\nclear all\n\nYou’re signed in. Move the"
+    },
+    {
+      "ok": false,
+      "label": "light, wishlist at 375: every one of 34 text and icon pairs passes",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#777471",
+          "bg": "#f5f3ee",
+          "ratio": 4.19,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light, quiz at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\nFind your routine\n\nTwo questions.\n\n1 / 2\n\nWhat bothers you most?\nDull s"
+    },
+    {
+      "ok": true,
+      "label": "light, quiz at 375: every one of 30 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, bundle at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\nHome / Glow duo\n\n2-PIECE SET\n\nGlow duo\n\nSerum and sunscreen together.\n\n"
+    },
+    {
+      "ok": true,
+      "label": "light, bundle at 375: every one of 40 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, cms-page at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\nHome / Shipping policy\nShipping policy\nDispatch\n\nOrders dispatch within"
+    },
+    {
+      "ok": true,
+      "label": "light, cms-page at 375: every one of 32 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, checkout-review at 375: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n1\nBestsellers\nNight routine\nSerums\nDesign Demo Co\n1\nAddress\n2\nReview\n3\nPayment\nReview your order\n\nSHIP T"
+    },
+    {
+      "ok": true,
+      "label": "light, checkout-review at 375: every one of 50 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, checkout-payment at 375: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n1\nBestsellers\nNight routine\nSerums\nDesign Demo Co\n1\nAddress\n2\nReview\n3\nPayment\nPayment\n\nCash on Delivery"
+    },
+    {
+      "ok": true,
+      "label": "light, checkout-payment at 375: every one of 47 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, account-sign-in at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\nSign in\n\nNo passwords — we email you a 6-digit code. Your past"
+    },
+    {
+      "ok": true,
+      "label": "light, account-sign-in at 1440: every one of 29 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, account-orders at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n1\nBestsellers\nNight routine\nSerums\nYour account\nOrders\nDES-44434BCF\nRadiance Glow Serum 30ml\nPR"
+    },
+    {
+      "ok": true,
+      "label": "light, account-orders at 1440: every one of 46 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, order-page at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n1\nBestsellers\nNight routine\nSerums\nAccount / DES-44434BCF\nOrder DES-44434BCF\n\nPlaced 3 Nov 2026"
+    },
+    {
+      "ok": true,
+      "label": "light, order-page at 1440: every one of 42 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, confirmation at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n1\nBestsellers\nNight routine\nSerums\n✓\nOrder confirmed\n\nOrder DES-44434BCF\n\nThanks Drill! You'll "
+    },
+    {
+      "ok": true,
+      "label": "light, confirmation at 1440: every one of 47 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, wishlist at 1440: the saved product is listed"
+    },
+    {
+      "ok": true,
+      "label": "light, wishlist at 1440: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n1\nBestsellers\nNight routine\nSerums\nWishlist\nSaved on this device (1)\nclear all\n\nYou’re signed i"
+    },
+    {
+      "ok": false,
+      "label": "light, wishlist at 1440: every one of 36 text and icon pairs passes",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#777471",
+          "bg": "#f5f3ee",
+          "ratio": 4.19,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light, quiz at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n1\nBestsellers\nNight routine\nSerums\nFind your routine\n\nTwo questions.\n\n1 / 2\n\nWhat bothers you m"
+    },
+    {
+      "ok": true,
+      "label": "light, quiz at 1440: every one of 32 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, bundle at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n1\nBestsellers\nNight routine\nSerums\nHome / Glow duo\n\n2-PIECE SET\n\nGlow duo\n\nSerum and sunscreen "
+    },
+    {
+      "ok": true,
+      "label": "light, bundle at 1440: every one of 42 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, cms-page at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n1\nBestsellers\nNight routine\nSerums\nHome / Shipping policy\nShipping policy\nDispatch\n\nOrders disp"
+    },
+    {
+      "ok": true,
+      "label": "light, cms-page at 1440: every one of 34 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, checkout-review at 1440: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n2\nBestsellers\nNight routine\nSerums\nDesign Demo Co\n1\nAddress\n→\n2\nReview\n→\n3\nPayment\nReview your "
+    },
+    {
+      "ok": true,
+      "label": "light, checkout-review at 1440: every one of 55 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "light, checkout-payment at 1440: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n2\nBestsellers\nNight routine\nSerums\nDesign Demo Co\n1\nAddress\n→\n2\nReview\n→\n3\nPayment\nPayment\n\nCas"
+    },
+    {
+      "ok": true,
+      "label": "light, checkout-payment at 1440: every one of 52 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, account-sign-in at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\nSign in\n\nNo passwords — we email you a 6-digit code. Your past orders w"
+    },
+    {
+      "ok": true,
+      "label": "dark, account-sign-in at 375: every one of 28 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, account-orders at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n2\nBestsellers\nNight routine\nSerums\nYour account\nOrders\nDES-44434BCF\nRadiance Glow Serum 30ml\nPROCESSING\n"
+    },
+    {
+      "ok": true,
+      "label": "dark, account-orders at 375: every one of 45 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, order-page at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n2\nBestsellers\nNight routine\nSerums\nAccount / DES-44434BCF\nOrder DES-44434BCF\n\nPlaced 3 Nov 2026, 9:37 pm"
+    },
+    {
+      "ok": true,
+      "label": "dark, order-page at 375: every one of 41 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, confirmation at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n2\nBestsellers\nNight routine\nSerums\n✓\nOrder confirmed\n\nOrder DES-44434BCF\n\nThanks Drill! You'll pay cash "
+    },
+    {
+      "ok": true,
+      "label": "dark, confirmation at 375: every one of 46 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, wishlist at 375: the saved product is listed"
+    },
+    {
+      "ok": true,
+      "label": "dark, wishlist at 375: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n2\nBestsellers\nNight routine\nSerums\nWishlist\nSaved on this device (1)\nclear all\n\nYou’re signed in. Move t"
+    },
+    {
+      "ok": false,
+      "label": "dark, wishlist at 375: every one of 35 text and icon pairs passes",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#797d83",
+          "bg": "#151921",
+          "ratio": 4.25,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark, quiz at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n2\nBestsellers\nNight routine\nSerums\nFind your routine\n\nTwo questions.\n\n1 / 2\n\nWhat bothers you most?\nDull"
+    },
+    {
+      "ok": true,
+      "label": "dark, quiz at 375: every one of 31 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, bundle at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n2\nBestsellers\nNight routine\nSerums\nHome / Glow duo\n\n2-PIECE SET\n\nGlow duo\n\nSerum and sunscreen together."
+    },
+    {
+      "ok": true,
+      "label": "dark, bundle at 375: every one of 41 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, cms-page at 375: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n2\nBestsellers\nNight routine\nSerums\nHome / Shipping policy\nShipping policy\nDispatch\n\nOrders dispatch with"
+    },
+    {
+      "ok": true,
+      "label": "dark, cms-page at 375: every one of 33 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, checkout-review at 375: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n3\nBestsellers\nNight routine\nSerums\nDesign Demo Co\n1\nAddress\n2\nReview\n3\nPayment\nReview your order\n\nSHIP T"
+    },
+    {
+      "ok": true,
+      "label": "dark, checkout-review at 375: every one of 53 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, checkout-payment at 375: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\n3\nBestsellers\nNight routine\nSerums\nDesign Demo Co\n1\nAddress\n2\nReview\n3\nPayment\nPayment\n\nCash on Delivery"
+    },
+    {
+      "ok": true,
+      "label": "dark, checkout-payment at 375: every one of 50 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, account-sign-in at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\nSign in\n\nNo passwords — we email you a 6-digit code. Your past"
+    },
+    {
+      "ok": true,
+      "label": "dark, account-sign-in at 1440: every one of 29 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, account-orders at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n3\nBestsellers\nNight routine\nSerums\nYour account\nOrders\nDES-44434BCF\nRadiance Glow Serum 30ml\nPR"
+    },
+    {
+      "ok": true,
+      "label": "dark, account-orders at 1440: every one of 46 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, order-page at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n3\nBestsellers\nNight routine\nSerums\nAccount / DES-44434BCF\nOrder DES-44434BCF\n\nPlaced 3 Nov 2026"
+    },
+    {
+      "ok": true,
+      "label": "dark, order-page at 1440: every one of 42 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, confirmation at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n3\nBestsellers\nNight routine\nSerums\n✓\nOrder confirmed\n\nOrder DES-44434BCF\n\nThanks Drill! You'll "
+    },
+    {
+      "ok": true,
+      "label": "dark, confirmation at 1440: every one of 47 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, wishlist at 1440: the saved product is listed"
+    },
+    {
+      "ok": true,
+      "label": "dark, wishlist at 1440: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n3\nBestsellers\nNight routine\nSerums\nWishlist\nSaved on this device (1)\nclear all\n\nYou’re signed i"
+    },
+    {
+      "ok": false,
+      "label": "dark, wishlist at 1440: every one of 36 text and icon pairs passes",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#797d83",
+          "bg": "#151921",
+          "ratio": 4.25,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark, quiz at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n3\nBestsellers\nNight routine\nSerums\nFind your routine\n\nTwo questions.\n\n1 / 2\n\nWhat bothers you m"
+    },
+    {
+      "ok": true,
+      "label": "dark, quiz at 1440: every one of 32 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, bundle at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n3\nBestsellers\nNight routine\nSerums\nHome / Glow duo\n\n2-PIECE SET\n\nGlow duo\n\nSerum and sunscreen "
+    },
+    {
+      "ok": true,
+      "label": "dark, bundle at 1440: every one of 42 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, cms-page at 1440: the page renders (200)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n3\nBestsellers\nNight routine\nSerums\nHome / Shipping policy\nShipping policy\nDispatch\n\nOrders disp"
+    },
+    {
+      "ok": true,
+      "label": "dark, cms-page at 1440: every one of 34 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, checkout-review at 1440: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n4\nBestsellers\nNight routine\nSerums\nDesign Demo Co\n1\nAddress\n→\n2\nReview\n→\n3\nPayment\nReview your "
+    },
+    {
+      "ok": true,
+      "label": "dark, checkout-review at 1440: every one of 55 text and icon pairs passes",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "dark, checkout-payment at 1440: the page renders (same page)",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n4\nBestsellers\nNight routine\nSerums\nDesign Demo Co\n1\nAddress\n→\n2\nReview\n→\n3\nPayment\nPayment\n\nCas"
+    },
+    {
+      "ok": true,
+      "label": "dark, checkout-payment at 1440: every one of 52 text and icon pairs passes",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "setup: quiz p1c-skin and bundle p1c-duo inserted into the local DB",
+    "setup: order DES-44434BCF for the test shopper; signed in",
+    "light, checkout-payment at 375: exempt as a disabled control: [\"Pay online · card / UPI / netbanking Online payment isn't available for this sto\"]",
+    "light, checkout-payment at 1440: exempt as a disabled control: [\"Pay online · card / UPI / netbanking Online payment isn't available for this sto\"]",
+    "dark, checkout-payment at 375: exempt as a disabled control: [\"Pay online · card / UPI / netbanking Online payment isn't available for this sto\"]",
+    "dark, checkout-payment at 1440: exempt as a disabled control: [\"Pay online · card / UPI / netbanking Online payment isn't available for this sto\"]"
+  ],
+  "screenshots": [
+    {
+      "name": "c-rest-themes/light-account-sign-in-375",
+      "bytes": 17918
+    },
+    {
+      "name": "c-rest-themes/light-account-orders-375",
+      "bytes": 16199
+    },
+    {
+      "name": "c-rest-themes/light-order-page-375",
+      "bytes": 16515
+    },
+    {
+      "name": "c-rest-themes/light-confirmation-375",
+      "bytes": 23938
+    },
+    {
+      "name": "c-rest-themes/light-wishlist-375",
+      "bytes": 18820
+    },
+    {
+      "name": "c-rest-themes/light-quiz-375",
+      "bytes": 16270
+    },
+    {
+      "name": "c-rest-themes/light-bundle-375",
+      "bytes": 20192
+    },
+    {
+      "name": "c-rest-themes/light-cms-page-375",
+      "bytes": 15788
+    },
+    {
+      "name": "c-rest-themes/light-checkout-review-375",
+      "bytes": 20913
+    },
+    {
+      "name": "c-rest-themes/light-checkout-payment-375",
+      "bytes": 21017
+    },
+    {
+      "name": "c-rest-themes/light-account-sign-in-1440",
+      "bytes": 3335
+    },
+    {
+      "name": "c-rest-themes/light-account-orders-1440",
+      "bytes": 4627
+    },
+    {
+      "name": "c-rest-themes/light-order-page-1440",
+      "bytes": 3599
+    },
+    {
+      "name": "c-rest-themes/light-confirmation-1440",
+      "bytes": 3705
+    },
+    {
+      "name": "c-rest-themes/light-wishlist-1440",
+      "bytes": 3581
+    },
+    {
+      "name": "c-rest-themes/light-quiz-1440",
+      "bytes": 3114
+    },
+    {
+      "name": "c-rest-themes/light-bundle-1440",
+      "bytes": 4098
+    },
+    {
+      "name": "c-rest-themes/light-cms-page-1440",
+      "bytes": 3767
+    },
+    {
+      "name": "c-rest-themes/light-checkout-review-1440",
+      "bytes": 4873
+    },
+    {
+      "name": "c-rest-themes/light-checkout-payment-1440",
+      "bytes": 4529
+    },
+    {
+      "name": "c-rest-themes/dark-account-sign-in-375",
+      "bytes": 13634
+    },
+    {
+      "name": "c-rest-themes/dark-account-orders-375",
+      "bytes": 16000
+    },
+    {
+      "name": "c-rest-themes/dark-order-page-375",
+      "bytes": 14237
+    },
+    {
+      "name": "c-rest-themes/dark-confirmation-375",
+      "bytes": 19924
+    },
+    {
+      "name": "c-rest-themes/dark-wishlist-375",
+      "bytes": 16740
+    },
+    {
+      "name": "c-rest-themes/dark-quiz-375",
+      "bytes": 13041
+    },
+    {
+      "name": "c-rest-themes/dark-bundle-375",
+      "bytes": 17399
+    },
+    {
+      "name": "c-rest-themes/dark-cms-page-375",
+      "bytes": 14266
+    },
+    {
+      "name": "c-rest-themes/dark-checkout-review-375",
+      "bytes": 18574
+    },
+    {
+      "name": "c-rest-themes/dark-checkout-payment-375",
+      "bytes": 19160
+    },
+    {
+      "name": "c-rest-themes/dark-account-sign-in-1440",
+      "bytes": 2603
+    },
+    {
+      "name": "c-rest-themes/dark-account-orders-1440",
+      "bytes": 2585
+    },
+    {
+      "name": "c-rest-themes/dark-order-page-1440",
+      "bytes": 3020
+    },
+    {
+      "name": "c-rest-themes/dark-confirmation-1440",
+      "bytes": 2984
+    },
+    {
+      "name": "c-rest-themes/dark-wishlist-1440",
+      "bytes": 2873
+    },
+    {
+      "name": "c-rest-themes/dark-quiz-1440",
+      "bytes": 2566
+    },
+    {
+      "name": "c-rest-themes/dark-bundle-1440",
+      "bytes": 3299
+    },
+    {
+      "name": "c-rest-themes/dark-cms-page-1440",
+      "bytes": 2671
+    },
+    {
+      "name": "c-rest-themes/dark-checkout-review-1440",
+      "bytes": 3630
+    },
+    {
+      "name": "c-rest-themes/dark-checkout-payment-1440",
+      "bytes": 3557
+    }
+  ]
+}

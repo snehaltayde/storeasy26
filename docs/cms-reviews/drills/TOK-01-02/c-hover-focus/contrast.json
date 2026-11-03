@@ -1,0 +1,132 @@
+{
+  "light-dark-button-continue-to-review": [
+    {
+      "text": "Continue to review",
+      "fg": "#fffdf8",
+      "bg": "#373432",
+      "ratio": 12.15,
+      "need": 4.5
+    }
+  ],
+  "light-accent-button-add-to-cart": [
+    {
+      "text": "Add to cart",
+      "fg": "#0a0a0b",
+      "bg": "#f6966e",
+      "ratio": 8.96,
+      "need": 4.5
+    }
+  ],
+  "light-accent-button-hero": [
+    {
+      "text": "Shop bestsellers",
+      "fg": "#0a0a0b",
+      "bg": "#f6966e",
+      "ratio": 8.96,
+      "need": 4.5
+    }
+  ],
+  "light-link-footer": [
+    {
+      "text": "All collections",
+      "fg": "#1c1917",
+      "bg": "#faf8f3",
+      "ratio": 16.48,
+      "need": 4.5
+    }
+  ],
+  "light-filter-chip": [
+    {
+      "text": "In stock",
+      "fg": "#4f4c4a",
+      "bg": "#fffdf8",
+      "ratio": 8.38,
+      "need": 4.5
+    }
+  ],
+  "light-tab-field": {
+    "focused": {
+      "name": "",
+      "placeholder": "Search products…"
+    },
+    "ring": {
+      "outline": "none 1px rgb(0, 95, 204)",
+      "border": "rgb(169, 166, 162)",
+      "boxShadow": "none"
+    },
+    "measured": [
+      {
+        "text": "Pune",
+        "fg": "#1c1917",
+        "bg": "#fffdf8",
+        "ratio": 17.2,
+        "need": 4.5
+      }
+    ]
+  },
+  "dark-dark-button-continue-to-review": [
+    {
+      "text": "Continue to review",
+      "fg": "#0b0f17",
+      "bg": "#d5d9de",
+      "ratio": 13.53,
+      "need": 4.5
+    }
+  ],
+  "dark-accent-button-add-to-cart": [
+    {
+      "text": "Add to cart",
+      "fg": "#0a0a0b",
+      "bg": "#94e9de",
+      "ratio": 14.11,
+      "need": 4.5
+    }
+  ],
+  "dark-accent-button-hero": [
+    {
+      "text": "Shop bestsellers",
+      "fg": "#0a0a0b",
+      "bg": "#94e9de",
+      "ratio": 14.11,
+      "need": 4.5
+    }
+  ],
+  "dark-link-footer": [
+    {
+      "text": "All collections",
+      "fg": "#f1f5f9",
+      "bg": "#10141c",
+      "ratio": 16.83,
+      "need": 4.5
+    }
+  ],
+  "dark-filter-chip": [
+    {
+      "text": "In stock",
+      "fg": "#bdc1c6",
+      "bg": "#0b0f17",
+      "ratio": 10.6,
+      "need": 4.5
+    }
+  ],
+  "dark-tab-field": {
+    "focused": {
+      "name": "",
+      "placeholder": "Search products…"
+    },
+    "ring": {
+      "outline": "none 1px rgb(0, 95, 204)",
+      "border": "rgb(99, 103, 109)",
+      "boxShadow": "none"
+    },
+    "measured": [
+      {
+        "text": "Pune",
+        "fg": "#f1f5f9",
+        "bg": "#0b0f17",
+        "ratio": 17.51,
+        "need": 4.5
+      }
+    ]
+  }
+}

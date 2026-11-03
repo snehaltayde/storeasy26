@@ -1,0 +1,22 @@
+{
+  "home-375": {
+    "kit": "glow-1",
+    "checked": 65,
+    "failing": []
+  },
+  "product-375": {
+    "kit": "glow-1",
+    "checked": 45,
+    "failing": []
+  },
+  "home-1440": {
+    "kit": "glow-1",
+    "checked": 66,
+    "failing": []
+  },
+  "product-1440": {
+    "kit": "glow-1",
+    "checked": 46,
+    "failing": []
+  }
+}

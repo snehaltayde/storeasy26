@@ -1,0 +1,105 @@
+{
+  "id": "TOK-01-02",
+  "part": "c-glow-twoword",
+  "title": "P1-DRILLS-C: TOK-01/02 drills still needed — c-glow-twoword",
+  "ranAt": "2026-11-03T15:53:06.295Z",
+  "harness": "http://localhost:3231",
+  "chrome": "156.0.8078.80",
+  "passed": 7,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "Settings: the logo saved as two words (Design / Demo)"
+    },
+    {
+      "ok": true,
+      "label": "at 375: the header shows the two-word logo on the Glow kit",
+      "detail": {
+        "text": "Demo",
+        "color": "rgb(77, 124, 15)",
+        "kit": "glow-1",
+        "headerBg": "rgb(255, 251, 247)"
+      }
+    },
+    {
+      "ok": true,
+      "label": "at 375: the wordmark's second word measures 3:1 or better",
+      "detail": [
+        {
+          "text": "Demo",
+          "fg": "#4d7c0f",
+          "bg": "#fffbf7",
+          "ratio": 4.85,
+          "need": 3
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "at 375: it is #4d7c0f on #fffbf7 (4.85:1 expected)",
+      "detail": [
+        {
+          "text": "Demo",
+          "fg": "#4d7c0f",
+          "bg": "#fffbf7",
+          "ratio": 4.85,
+          "need": 3
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "at 1440: the header shows the two-word logo on the Glow kit",
+      "detail": {
+        "text": "Demo",
+        "color": "rgb(77, 124, 15)",
+        "kit": "glow-1",
+        "headerBg": "rgb(255, 251, 247)"
+      }
+    },
+    {
+      "ok": true,
+      "label": "at 1440: the wordmark's second word measures 3:1 or better",
+      "detail": [
+        {
+          "text": "Demo",
+          "fg": "#4d7c0f",
+          "bg": "#fffbf7",
+          "ratio": 4.85,
+          "need": 3
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "at 1440: it is #4d7c0f on #fffbf7 (4.85:1 expected)",
+      "detail": [
+        {
+          "text": "Demo",
+          "fg": "#4d7c0f",
+          "bg": "#fffbf7",
+          "ratio": 4.85,
+          "need": 3
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "live: a copy of the live release with no brand and the Glow kit",
+    "at 375: {\"text\":\"Demo\",\"color\":\"rgb(77, 124, 15)\",\"kit\":\"glow-1\",\"headerBg\":\"rgb(255, 251, 247)\"}; measured [{\"text\":\"Demo\",\"fg\":\"#4d7c0f\",\"bg\":\"#fffbf7\",\"ratio\":4.85,\"need\":3}]",
+    "at 1440: {\"text\":\"Demo\",\"color\":\"rgb(77, 124, 15)\",\"kit\":\"glow-1\",\"headerBg\":\"rgb(255, 251, 247)\"}; measured [{\"text\":\"Demo\",\"fg\":\"#4d7c0f\",\"bg\":\"#fffbf7\",\"ratio\":4.85,\"need\":3}]",
+    "logo put back to {\"t1\":\"\",\"t2\":\"\"}: 200; live release back to rel_0aff92cb615d214d"
+  ],
+  "screenshots": [
+    {
+      "name": "c-glow-twoword/header-375",
+      "bytes": 28460
+    },
+    {
+      "name": "c-glow-twoword/header-1440",
+      "bytes": 5039
+    }
+  ]
+}
