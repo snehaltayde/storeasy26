@@ -1,0 +1,115 @@
+{
+  "id": "PV-08",
+  "part": "before-preview-tab",
+  "title": "PV-08 experiments are inert in preview — before-preview-tab",
+  "ranAt": "2026-11-03T12:53:14.813Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 2,
+  "failed": 0,
+  "knownFailures": 6,
+  "checks": [
+    {
+      "ok": false,
+      "label": "preview tab at 1440: the founder's saved title",
+      "detail": "Visibly brighter in 14 days",
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "preview tab at 1440: the note in the hero",
+      "detail": null,
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": true,
+      "label": "preview tab at 1440: no sideways scroll, the note fits",
+      "detail": {
+        "h1": "Visibly brighter in 14 days",
+        "note": null,
+        "fits": null,
+        "sw": 1440,
+        "vw": 1440
+      }
+    },
+    {
+      "ok": false,
+      "label": "preview tab at 375: the founder's saved title",
+      "detail": "Visibly brighter in 14 days",
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "preview tab at 375: the note in the hero",
+      "detail": null,
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": true,
+      "label": "preview tab at 375: no sideways scroll, the note fits",
+      "detail": {
+        "h1": "Visibly brighter in 14 days",
+        "note": null,
+        "fits": null,
+        "sw": 375,
+        "vw": 375
+      }
+    },
+    {
+      "ok": false,
+      "label": "no POST /api/exp from the preview tab",
+      "detail": [
+        {
+          "method": "POST",
+          "frame": "http://localhost:3202/",
+          "status": 200,
+          "body": {
+            "ok": true,
+            "recorded": true
+          }
+        },
+        {
+          "method": "POST",
+          "frame": "http://localhost:3202/",
+          "status": 200,
+          "body": {
+            "ok": true,
+            "recorded": true
+          }
+        }
+      ],
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "no exposure row for this unit",
+      "detail": [
+        {
+          "variant": "b"
+        }
+      ],
+      "known": "PV-08 not built (8968db3)"
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "before-preview-tab-1440",
+      "file": "docs/cms-reviews/drills/PV-08/before-preview-tab-1440.png",
+      "bytes": 28015,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "before-preview-tab-375",
+      "file": "docs/cms-reviews/drills/PV-08/before-preview-tab-375.png",
+      "bytes": 30329,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    }
+  ]
+}

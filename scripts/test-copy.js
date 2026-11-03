@@ -601,6 +601,7 @@ async function renderHome({ emptyCatalogSrc = realEmptyCatalog, stats = null, he
     "next/headers": { headers: async () => ({ get: () => "shop.test" }), cookies: async () => ({ get: () => undefined }) },
     "@/components/EmptyCatalog": await loadComponent(emptyCatalogSrc),
     "@/components/ExperimentPing": nothing,
+    "@/components/preview/ExperimentNote": nothing, // PV-08: preview-only; scanned as source above
     "@/components/site/MarketingHome": nothing,
     "@/components/sections/HomeSections": nothing,
     "@/lib/experiments": experiments,
@@ -609,7 +610,12 @@ async function renderHome({ emptyCatalogSrc = realEmptyCatalog, stats = null, he
     "@/lib/cms/section-data": sectionData,
     "@/lib/cms/defaults": cmsDefaults,
     // resolve.js needs a request; a store with no release reads drafts, which is these getters
-    "@/lib/content/resolve": { resolvedHero: async () => ({ ...(await S.getHero()), ...hero }), resolvedHomeSections: S.getHomeSections, resolvedCollectionsIndex: S.getCollectionsIndex },
+    "@/lib/content/resolve": {
+      resolvedHero: async () => ({ ...(await S.getHero()), ...hero }),
+      resolvedHomeSections: S.getHomeSections,
+      resolvedCollectionsIndex: S.getCollectionsIndex,
+      contentSource: async () => ({ mode: "draft", content: null, preview: false }), // a shopper, not a preview (PV-08)
+    },
     "@/lib/tenant-request": { tfetch: inShop },
   });
   return renderToStaticMarkup(await page.default());

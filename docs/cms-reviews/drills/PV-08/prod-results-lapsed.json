@@ -1,0 +1,105 @@
+{
+  "id": "PV-08",
+  "part": "lapsed",
+  "title": "PV-08 experiments are inert in preview — lapsed",
+  "ranAt": "2026-11-03T14:02:47.402Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 11,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the preview connects (\"Preview shows your last save\")"
+    },
+    {
+      "ok": true,
+      "label": "while the preview lasts: the founder's saved title",
+      "detail": "Winter repair, started."
+    },
+    {
+      "ok": true,
+      "label": "the preview cookie expires with its token, so the browser drops it then",
+      "detail": {
+        "cookieExpires": 1793718161.797678,
+        "tokenExp": 1793718162,
+        "difference": -0.2
+      }
+    },
+    {
+      "ok": true,
+      "label": "setup: the preview cookie is gone, the console cookie stays",
+      "detail": [
+        "_admin",
+        "_unit"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after the lapse: the Designer frame never shows variant b",
+      "detail": [
+        "Skin first. Makeup second.",
+        "Skin first. Makeup second."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after the lapse: the frame shows the live hero (\"Skin first. Makeup second.\"), as a signed-in founder sees the store",
+      "detail": [
+        "Skin first. Makeup second.",
+        "Skin first. Makeup second."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after the lapse: no preview note (it needs a valid preview)",
+      "detail": [
+        null,
+        null
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after the lapse: the frame sends no POST /api/exp",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "after the lapse: a ping sent from the frame by hand is refused (recorded:false)",
+      "detail": {
+        "ok": true,
+        "recorded": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "no exposure row for the founder's unit",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "exposures in all unchanged",
+      "detail": {
+        "before": 53,
+        "after": 53
+      }
+    }
+  ],
+  "notes": [
+    "setup: founder's browser unit pv08-lapsed-mw0rc68o-0 is in variant b; saved title \"Winter repair, started.\"; live title \"Skin first. Makeup second.\"; variant b's title \"Visibly brighter in 14 days\"",
+    "after the lapse: frame {\"draftBar\":false,\"sw\":1280,\"vw\":1280}; the Designer's status reads \"Connecting…\" (renewing the session is PV-04's)",
+    "/api/exp requests the pages sent: []"
+  ],
+  "screenshots": [
+    {
+      "name": "lapsed-designer",
+      "file": "docs/cms-reviews/drills/PV-08/lapsed-designer.png",
+      "bytes": 35478,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

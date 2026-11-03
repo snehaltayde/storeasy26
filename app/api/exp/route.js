@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { recordExposure, UNIT_COOKIE } from "@/lib/experiments";
+import { recordExposure, isFounderRequest, UNIT_COOKIE } from "@/lib/experiments";
 import { rateLimit } from "@/lib/rate-limit";
 import { tenantHandler } from "@/lib/tenant-request";
 
@@ -13,6 +13,10 @@ export const dynamic = "force-dynamic";
 export const POST = tenantHandler(async (request) => {
   const limited = rateLimit(request, { name: "exp", limit: 60 });
   if (limited) return limited;
+  // PV-08: a browser in a preview session, or signed in to the console (a
+  // lapsed preview), is the founder, never a visitor. Neither pings; this
+  // refuses one that arrives anyway.
+  if (isFounderRequest(request)) return NextResponse.json({ ok: true, recorded: false });
   const unit = request.cookies.get(UNIT_COOKIE)?.value;
   if (!unit || !/^[a-z0-9-]{8,64}$/.test(unit)) return NextResponse.json({ ok: true, recorded: false });
   const body = await request.json().catch(() => ({}));

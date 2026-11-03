@@ -1,0 +1,66 @@
+{
+  "id": "DOC-04",
+  "part": "overview",
+  "title": "P1-DRILLS DOC-04: plain, located messages, and failures after a write — overview",
+  "ranAt": "2026-11-03T13:55:20.787Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 2,
+  "failed": 1,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "overview setup: a banner linking to /collections/not-a-collection saved (PUT 200)",
+      "detail": {
+        "at": 1793714115086,
+        "method": "PUT",
+        "path": "/api/admin/storefront",
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "\"Fix before publishing\" lists \"Section N (Banner / CTA): …\"",
+      "detail": "Fix before publishing\nSection 3 (Banner / CTA): \"/collections/not-a-collection\" points at a collection that doesn't exist in the catalog\nSection 4 (Banner / CTA): \"/collections/not-a-collection\" points at a collection that doesn't exist in the catalog"
+    },
+    {
+      "ok": false,
+      "label": "overview: N (3) matches the banner's position among the Designer's homepage sections (4)",
+      "detail": {
+        "tree": [
+          "Hero\nTest running",
+          "Announcement bar",
+          "Shop by collection",
+          "New arrivals",
+          "Monsoon sale",
+          "Monsoon sale"
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "overview: banners: [{\"tone\":\"info\",\"inCard\":false,\"text\":\"Platform notice: Payments provider latency\\nCard payments may take a little longer than usual today.\"},{\"tone\":\"danger\",\"inCard\":true,\"text\":\"Fix before publishing\\nSection 3 (Banner / CTA): \\\"/collections/not-a-collection\\\" points at a collection that doesn't exist in the catalog\\nSection 4 (Banner / CTA): \\\"/collections/not-a-collection\\\" points at a collection that doesn't exist in the catalog\"}]",
+    "overview: the Designer's tree reads [\"Hero\\nTest running\",\"Announcement bar\",\"Shop by collection\",\"New arrivals\",\"Monsoon sale\",\"Monsoon sale\"]"
+  ],
+  "screenshots": [
+    {
+      "name": "B-overview-fix-before-publishing",
+      "file": "docs/cms-reviews/drills/DOC-04/B-overview-fix-before-publishing.png",
+      "bytes": 46946,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront"
+    },
+    {
+      "name": "B-overview-designer-tree",
+      "file": "docs/cms-reviews/drills/DOC-04/B-overview-designer-tree.png",
+      "bytes": 34470,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

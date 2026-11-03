@@ -1,0 +1,241 @@
+{
+  "id": "PV-08",
+  "part": "designer",
+  "title": "PV-08 experiments are inert in preview — designer",
+  "ranAt": "2026-11-03T13:52:21.182Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 19,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: the seeded hero test is running",
+      "detail": {
+        "slug": "hero-promise",
+        "status": "running"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the preview connects (\"Preview shows your last save\")"
+    },
+    {
+      "ok": true,
+      "label": "the preview shows the founder's saved hero title, not variant b's",
+      "detail": "Winter repair, started."
+    },
+    {
+      "ok": true,
+      "label": "the preview's hero carries the note, naming the test",
+      "detail": "A test is running on this section: “Hero promise test”. Some visitors see a different version; the preview shows yours. See the test"
+    },
+    {
+      "ok": true,
+      "label": "the preview note links to the test's row",
+      "detail": "/admin/experiments#exp-row-hero-promise"
+    },
+    {
+      "ok": true,
+      "label": "five reloads of the preview: the saved title every time",
+      "detail": [
+        "Winter repair, started.",
+        "Winter repair, started.",
+        "Winter repair, started.",
+        "Winter repair, started.",
+        "Winter repair, started."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "beside the hero settings: the note names the test and says what the preview shows",
+      "detail": "A test is running on this section It's called “Hero promise test”. Some visitors see a different version; the preview shows yours. See the test (opens in a new tab)"
+    },
+    {
+      "ok": true,
+      "label": "the settings note links to the test's row and sits above the fields",
+      "detail": {
+        "note": "A test is running on this section It's called “Hero promise test”. Some visitors see a different version; the preview shows yours. See the test (opens in a new tab)",
+        "href": "/admin/experiments#exp-row-hero-promise",
+        "before": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "the tree's Hero row says a test is running (as its description)",
+      "detail": {
+        "text": "Hero Test running",
+        "describedBy": "Test running"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the tree's Hero button is still named \"Hero\" (the other drills select it by that name)",
+      "detail": 1
+    },
+    {
+      "ok": true,
+      "label": "typed title and subtitle show in the preview before saving",
+      "detail": "1011 ms"
+    },
+    {
+      "ok": true,
+      "label": "Save answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "after Save the preview shows the saved title and subtitle",
+      "detail": {
+        "h1": "PV-08 hero 13.52.14",
+        "text": "A test is running on this section: “Hero promise test”. Some visitors see a different version; the preview shows yours. See the test 8 products · 3 collections PV-08 hero 13.52.14 Typed in the Designer while the test runs, 13.52.14. Shop night routine See what’s new",
+        "note": "A test is running on this section: “Hero promise test”. Some visitors see a different version; the preview shows yours. See the test",
+        "noteLink": "/admin/experiments#exp-row-hero-promise"
+      }
+    },
+    {
+      "ok": true,
+      "label": "no POST /api/exp from the Designer, the preview or its reloads",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "no exposure row for the founder's unit",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "exposures in all unchanged by the Designer session",
+      "detail": {
+        "before": 48,
+        "after": 48
+      }
+    },
+    {
+      "ok": true,
+      "label": "every preview document answered 200 on the edge runtime",
+      "detail": [
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the note's link opens Experiments at the test's row",
+      "detail": {
+        "url": "http://localhost:3202/admin/experiments#exp-row-hero-promise",
+        "row": {
+          "text": "Running Hero promise test hero-promise · hero · control 50% / b 50% Pause Complete Results Hypothesis: a benefit-led hea",
+          "top": 250,
+          "inView": true
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the link opens a new tab, and the Designer keeps the unsaved title",
+      "detail": {
+        "newTab": true,
+        "designerUrl": "/admin/storefront/designer",
+        "title": "PV-08 unsaved 13.52.14",
+        "unsavedShownBefore": true,
+        "unsavedShownAfter": true
+      }
+    }
+  ],
+  "notes": [
+    "setup: founder's browser unit pv08-founder-mw0qykew-1 is in variant b; saved hero title \"Winter repair, started.\"",
+    "/api/exp requests from the founder's browser: []",
+    "hero put back to the seeded draft: 200"
+  ],
+  "screenshots": [
+    {
+      "name": "designer-preview-note",
+      "file": "docs/cms-reviews/drills/PV-08/designer-preview-note.png",
+      "bytes": 34180,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "designer-hero-settings",
+      "file": "docs/cms-reviews/drills/PV-08/designer-hero-settings.png",
+      "bytes": 41782,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "designer-typed",
+      "file": "docs/cms-reviews/drills/PV-08/designer-typed.png",
+      "bytes": 42590,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "designer-saved",
+      "file": "docs/cms-reviews/drills/PV-08/designer-saved.png",
+      "bytes": 42855,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "experiments-row",
+      "file": "docs/cms-reviews/drills/PV-08/experiments-row.png",
+      "bytes": 21701,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/experiments"
+    }
+  ]
+}

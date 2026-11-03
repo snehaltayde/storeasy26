@@ -1,0 +1,246 @@
+{
+  "id": "PV-08",
+  "part": "before-designer",
+  "title": "PV-08 experiments are inert in preview — before-designer",
+  "ranAt": "2026-11-03T12:53:09.440Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 0,
+  "knownFailures": 13,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: the seeded hero test is running",
+      "detail": {
+        "slug": "hero-promise",
+        "status": "running"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the preview connects (\"Preview shows your last save\")"
+    },
+    {
+      "ok": false,
+      "label": "the preview shows the founder's saved hero title, not variant b's",
+      "detail": "Visibly brighter in 14 days",
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "the preview's hero carries the note, naming the test",
+      "detail": null,
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "the preview note links to the test's row",
+      "detail": null,
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "five reloads of the preview: the saved title every time",
+      "detail": [
+        "Visibly brighter in 14 days",
+        "Visibly brighter in 14 days",
+        "Visibly brighter in 14 days",
+        "Visibly brighter in 14 days",
+        "Visibly brighter in 14 days"
+      ],
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "beside the hero settings: the note names the test and says what the preview shows",
+      "detail": null,
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "the settings note links to the test's row and sits above the fields",
+      "detail": {
+        "note": null,
+        "href": null,
+        "before": null
+      },
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "the tree's Hero row says a test is running",
+      "detail": "Hero",
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "typed title and subtitle show in the preview before saving",
+      "detail": {
+        "h1": "Visibly brighter in 14 days",
+        "text": "8 products · 3 collections Visibly brighter in 14 days Or your money back. Shop night routine See what’s new",
+        "note": null,
+        "noteLink": null
+      },
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": true,
+      "label": "Save answers 200",
+      "detail": 200
+    },
+    {
+      "ok": false,
+      "label": "after Save the preview shows the saved title and subtitle",
+      "detail": {
+        "h1": "Visibly brighter in 14 days",
+        "text": "8 products · 3 collections Visibly brighter in 14 days Or your money back. Shop night routine See what’s new",
+        "note": null,
+        "noteLink": null
+      },
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "no POST /api/exp from the Designer, the preview or its reloads",
+      "detail": [
+        {
+          "method": "POST",
+          "frame": "http://localhost:3202/",
+          "status": 200,
+          "body": {
+            "ok": true,
+            "recorded": true
+          }
+        }
+      ],
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "no exposure row for the founder's unit",
+      "detail": [
+        {
+          "variant": "b"
+        }
+      ],
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": false,
+      "label": "exposures in all unchanged by the Designer session",
+      "detail": {
+        "before": 52,
+        "after": 53
+      },
+      "known": "PV-08 not built (8968db3)"
+    },
+    {
+      "ok": true,
+      "label": "every preview document answered 200 on the edge runtime",
+      "detail": [
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        },
+        {
+          "status": 200,
+          "edge": "1"
+        }
+      ]
+    },
+    {
+      "ok": false,
+      "label": "the note's link opens Experiments at the test's row",
+      "detail": {
+        "url": "http://localhost:3202/admin/storefront/designer",
+        "row": null
+      },
+      "known": "PV-08 not built (8968db3)"
+    }
+  ],
+  "notes": [
+    "setup: founder's browser unit pv08-founder-mw0osh7l-1 is in variant b; saved hero title \"Winter repair, started.\"",
+    "/api/exp requests from the founder's browser: [{\"method\":\"POST\",\"frame\":\"http://localhost:3202/\",\"status\":200,\"body\":{\"ok\":true,\"recorded\":true}}]",
+    "hero put back to the seeded draft: 200"
+  ],
+  "screenshots": [
+    {
+      "name": "before-designer-preview-note",
+      "file": "docs/cms-reviews/drills/PV-08/before-designer-preview-note.png",
+      "bytes": 34655,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "before-designer-hero-settings",
+      "file": "docs/cms-reviews/drills/PV-08/before-designer-hero-settings.png",
+      "bytes": 41038,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "before-designer-typed",
+      "file": "docs/cms-reviews/drills/PV-08/before-designer-typed.png",
+      "bytes": 40579,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "before-designer-saved",
+      "file": "docs/cms-reviews/drills/PV-08/before-designer-saved.png",
+      "bytes": 40660,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "before-experiments-row",
+      "file": "docs/cms-reviews/drills/PV-08/before-experiments-row.png",
+      "bytes": 40660,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

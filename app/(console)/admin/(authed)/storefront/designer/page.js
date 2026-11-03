@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { storefrontView } from "@/lib/cms/view";
+import { runningTestsBySection } from "@/lib/experiments";
 import { tfetch } from "@/lib/console-request";
 import Designer from "@/components/admin/cms/Designer";
 
@@ -17,7 +18,9 @@ export default async function StorefrontDesignerPage() {
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
-  const initial = await tfetch(() => storefrontView());
+  // PV-08: running tests by section, for the "a test is running" notes. A
+  // failed read only costs the note, never the editor.
+  const [initial, tests] = await tfetch(() => Promise.all([storefrontView(), runningTestsBySection().catch(() => ({}))]));
 
-  return <Designer initial={initial} />;
+  return <Designer initial={initial} tests={tests} />;
 }

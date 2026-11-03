@@ -1,0 +1,77 @@
+{
+  "id": "PV-08",
+  "part": "before-conversion",
+  "title": "PV-08 experiments are inert in preview — before-conversion",
+  "ranAt": "2026-11-03T12:53:36.735Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 0,
+  "knownFailures": 1,
+  "checks": [
+    {
+      "ok": true,
+      "label": "shopper: exposed once as a shopper first",
+      "detail": [
+        {
+          "variant": "b"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "shopper: the COD order counts as a conversion for the test",
+      "detail": {
+        "unit": "pv08-conv-shopper-mw0ov047-0",
+        "order": "DES-38063636",
+        "conversions": [
+          {
+            "order_id": "DES-38063636"
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "previewing: exposed once as a shopper first",
+      "detail": [
+        {
+          "variant": "b"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "previewing: the browser holds the preview cookie",
+      "detail": true
+    },
+    {
+      "ok": false,
+      "label": "previewing: the COD order placed in a preview session counts as no conversion",
+      "detail": {
+        "unit": "pv08-conv-previewing-mw0ov4uy-0",
+        "order": "DES-5D3B40E1",
+        "conversions": [
+          {
+            "order_id": "DES-5D3B40E1"
+          }
+        ]
+      },
+      "known": "PV-08 not built (8968db3)"
+    }
+  ],
+  "notes": [
+    "conversions: {\"shopper\":{\"unit\":\"pv08-conv-shopper-mw0ov047-0\",\"order\":\"DES-38063636\",\"conversions\":[{\"order_id\":\"DES-38063636\"}]},\"previewing\":{\"unit\":\"pv08-conv-previewing-mw0ov4uy-0\",\"order\":\"DES-5D3B40E1\",\"conversions\":[{\"order_id\":\"DES-5D3B40E1\"}]}} (harness orders; re-seed afterwards)"
+  ],
+  "screenshots": [
+    {
+      "name": "before-conversion-preview-order",
+      "file": "docs/cms-reviews/drills/PV-08/before-conversion-preview-order.png",
+      "bytes": 21451,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/DES-5D3B40E1"
+    }
+  ]
+}

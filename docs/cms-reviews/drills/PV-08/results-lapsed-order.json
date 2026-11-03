@@ -1,0 +1,54 @@
+{
+  "id": "PV-08",
+  "part": "lapsed-order",
+  "title": "PV-08 experiments are inert in preview — lapsed-order",
+  "ranAt": "2026-11-03T13:53:11.059Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "exposed once as a shopper first",
+      "detail": [
+        {
+          "variant": "b"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "setup: signed in, the preview cookie gone",
+      "detail": [
+        "_unit",
+        "_consent",
+        "_admin"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the COD order from the signed-in browser, preview lapsed, counts as no conversion",
+      "detail": {
+        "unit": "pv08-lapsed-order-mw0qzn6f-0",
+        "order": "DES-A7BFE177",
+        "conversions": []
+      }
+    }
+  ],
+  "notes": [
+    "lapsed order: {\"unit\":\"pv08-lapsed-order-mw0qzn6f-0\",\"order\":\"DES-A7BFE177\",\"conversions\":[]} (a harness order; re-seed afterwards)"
+  ],
+  "screenshots": [
+    {
+      "name": "lapsed-order",
+      "file": "docs/cms-reviews/drills/PV-08/lapsed-order.png",
+      "bytes": 20133,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/DES-A7BFE177"
+    }
+  ]
+}

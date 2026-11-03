@@ -4,7 +4,10 @@ import EmptyCatalog from "@/components/EmptyCatalog";
 import ExperimentPing from "@/components/ExperimentPing";
 import MarketingHome from "@/components/site/MarketingHome";
 import HomeSections from "@/components/sections/HomeSections";
-import { runningExperimentFor, heroVariantFor, UNIT_COOKIE } from "@/lib/experiments";
+import { runningExperimentFor, heroVariantFor, signedInToConsole, UNIT_COOKIE } from "@/lib/experiments";
+// PV-08 (its own lines, away from the resolve/tfetch imports another branch edits)
+import ExperimentNote from "@/components/preview/ExperimentNote";
+import { contentSource } from "@/lib/content/resolve";
 import { isPlatformSiteHost } from "@/lib/platform-site";
 import { getCatalogStats } from "@/lib/repo";
 import { resolveHomeSectionData } from "@/lib/cms/section-data";
@@ -38,16 +41,23 @@ export default async function Home() {
   // The unit cookie is functional (like the cart cookie); a first-time
   // visitor gets an id the ping component persists — the pure-hash
   // assignment makes this render and every later one agree on the variant.
-  const unitId = (await cookies()).get(UNIT_COOKIE)?.value || crypto.randomUUID();
+  const jar = await cookies();
+  const unitId = jar.get(UNIT_COOKIE)?.value || crypto.randomUUID();
+  // PV-08: a browser signed in to the console is the founder's, preview or not
+  // (the preview cookie lapses with its token while the Designer stays open).
+  const founder = signedInToConsole(jar);
 
-  const { hero, sections, stats, dataById, assignment } = await tfetch(async () => {
-    const [liveHero, sections, stats, index] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats(), resolvedCollectionsIndex()]);
+  const { hero, sections, stats, dataById, assignment, testNotice } = await tfetch(async () => {
+    const [liveHero, sections, stats, index, src] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats(), resolvedCollectionsIndex(), contentSource()]);
     const heroExp = await runningExperimentFor("hero");
-    const { hero, assignment } = heroVariantFor(heroExp, liveHero, unitId);
+    // PV-08: a preview shows the founder's own hero. No variant, no exposure
+    // ping (no assignment), and a note that a test runs on this section.
+    // Signed in but out of preview: the live hero, no variant, no ping, no note.
+    const { hero, assignment, notice: testNotice = null } = heroVariantFor(heroExp, liveHero, unitId, { preview: src.preview, founder });
     // S54: data resolves PER SECTION INSTANCE (registry bindings, batched) —
     // duplicate sections no longer overwrite each other's data or limits.
     const dataById = await resolveHomeSectionData(sections, { index });
-    return { hero, sections, stats, dataById, assignment };
+    return { hero, sections, stats, dataById, assignment, testNotice };
   });
   const empty = stats.products === 0;
   // GEN-03: on an empty store the default words promise a catalog, and #new only
@@ -62,6 +72,7 @@ export default async function Home() {
       <section data-sec="hero" className="relative overflow-hidden bg-hero text-hero-fg">
         <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-accent-500/20 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
+          <ExperimentNote notice={testNotice} />
           <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-accent-400">
             <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />
             {empty ? "Coming soon" : hero.badge || `${stats.products} products · ${stats.collections} collections`}

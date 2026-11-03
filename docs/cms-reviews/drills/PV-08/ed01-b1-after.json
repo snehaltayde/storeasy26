@@ -1,0 +1,135 @@
+{
+  "id": "ED-01",
+  "part": "b1",
+  "title": "P1-DRILLS ED-01: the full-width editor on the edge runtime — b1",
+  "ranAt": "2026-11-03T13:54:08.507Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B1 at 1440: clicking the hero in the frame selects it and outlines it",
+      "detail": {
+        "sel": {
+          "tree": "Hero\nTest running",
+          "inspector": "Hero\nCustomized",
+          "heroField": true
+        },
+        "o": {
+          "found": true,
+          "selected": true,
+          "outline": "solid",
+          "top": 159,
+          "bottom": 685,
+          "vh": 964,
+          "inView": true
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B1 at 1440: then clicking a section (\"Shop by collection\") selects it and outlines it",
+      "detail": {
+        "sel": {
+          "tree": "Shop by collection",
+          "inspector": "Collections grid",
+          "heroField": false
+        },
+        "o": {
+          "found": true,
+          "selected": true,
+          "outline": "solid",
+          "top": 248,
+          "bottom": 716,
+          "vh": 964,
+          "inView": true
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B1 at 1024: clicking the hero in the frame selects it and outlines it",
+      "detail": {
+        "sel": {
+          "tree": "HeroTest running",
+          "inspector": "Hero\nCustomized",
+          "heroField": true
+        },
+        "o": {
+          "found": true,
+          "selected": true,
+          "outline": "solid",
+          "top": 159,
+          "bottom": 685,
+          "vh": 987,
+          "inView": true
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B1 at 1024: then clicking a section (\"Shop by collection\") selects it and outlines it",
+      "detail": {
+        "sel": {
+          "tree": "Shop by collection",
+          "inspector": "Collections grid",
+          "heroField": false
+        },
+        "o": {
+          "found": true,
+          "selected": true,
+          "outline": "solid",
+          "top": 259,
+          "bottom": 727,
+          "vh": 987,
+          "inView": true
+        }
+      }
+    }
+  ],
+  "notes": [
+    "B1 at 1440: caption \"Desktop, 1280 px wide, shown at 71% to fit\", frame {\"shownWidth\":912,\"cssWidth\":1280,\"transform\":\"matrix(0.7125, 0, 0, 0.7125, 0, 0)\"}, store inside {\"innerWidth\":1280,\"desktop\":true}",
+    "B1 at 1024: caption \"Desktop, 1280 px wide, shown at 56% to fit\", frame {\"shownWidth\":720,\"cssWidth\":1280,\"transform\":\"matrix(0.5625, 0, 0, 0.5625, 0, 0)\"}, store inside {\"innerWidth\":1280,\"desktop\":true}"
+  ],
+  "screenshots": [
+    {
+      "name": "B1-1440-hero",
+      "file": "docs/cms-reviews/drills/ED-01/B1-1440-hero.png",
+      "bytes": 41803,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "B1-1440-section",
+      "file": "docs/cms-reviews/drills/ED-01/B1-1440-section.png",
+      "bytes": 35054,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "B1-1024-hero",
+      "file": "docs/cms-reviews/drills/ED-01/B1-1024-hero.png",
+      "bytes": 51628,
+      "width": 720,
+      "height": 540,
+      "viewport": 1024,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "B1-1024-section",
+      "file": "docs/cms-reviews/drills/ED-01/B1-1024-section.png",
+      "bytes": 43623,
+      "width": 720,
+      "height": 540,
+      "viewport": 1024,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

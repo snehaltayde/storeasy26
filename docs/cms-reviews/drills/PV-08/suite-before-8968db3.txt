@@ -1,0 +1,71 @@
+{"ts":"2026-11-03T13:58:44.987Z","evt":"release_published","tenant":"pv","release":"rel_4ef3c983dafcfabb","hash":"f44cbb211e95"}
+{"ts":"2026-11-03T13:58:44.991Z","evt":"release_published","tenant":"pw","release":"rel_4f27bc0b454fb653","hash":"f44cbb211e95"}
+{"ts":"2026-11-03T13:58:44.993Z","evt":"experiment_started","tenant":"pv","experiment":"hero-promise"}
+{"ts":"2026-11-03T13:58:44.994Z","evt":"experiment_started","tenant":"px","experiment":"hero-promise"}
+— the storefront home page, rendered, with the hero test running
+✓ fixture: the store really runs the hero test, and its live and draft heroes differ
+✗ THE BUG: in a preview, a visitor bucketed into variant b still sees the founder's own saved hero
+    unit unit-pv08-0 title: expected "Winter repair, started.", got "Visibly brighter in 14 days"
+✗ THE BUG, typing: an unsaved title in the preview shows while the hero test runs
+    unit unit-pv08-0: expected "Typed while the test runs", got "Visibly brighter in 14 days"
+✗ THE BUG, exposure: a preview render never mounts the exposure ping, for any bucket or no unit at all
+    unit unit-pv08-0: the preview would ping /api/exp
+✗ a preview of every bucket: 80 units, each shows the founder's hero, none pings
+    distinct (title|pinged) across 80 units: expected ["Winter repair, started.|false"], got ["Visibly brighter in 14 days|true","Winter repair, started.|true"]
+✗ the note: in a preview the hero says a test is running, names it, and links to it
+    no note inside the hero section: 1 products · 0 collections Visibly brighter in 14 days Or your money back. Shop night routine See what’s new
+✓ NEGATIVE: shoppers never see the note, in either bucket, and a preview with no test running has none
+✓ REGRESSION: signed-out shoppers are bucketed and served exactly as at 8968db3 (80 units, frozen oracle)
+✗ REGRESSION: on a store that has never published, shoppers get drafts and are still bucketed (drafts are not a preview)
+    the founder's preview there pings or has no note
+✓ REGRESSION: a first-time shopper (no unit cookie) is still bucketed and still pings
+✓ a forged preview cookie, or another store's, is not a preview: the live page serves as for any shopper
+✗ THE BUG, lapsed preview: the preview cookie goes mid-session and the founder, still signed in, sees no variant, sends no ping and gets no note
+    unit unit-pv08-0, while the preview lasts: expected "Winter repair, started.", got "Visibly brighter in 14 days"
+✗ NEGATIVE: a signed-out shopper in variant b still gets variant b and its ping, beside a signed-in founder in the same bucket
+    the founder: expected "Live hero, published.", got "Visibly brighter in 14 days"
+✗ unit: heroVariantFor in a preview applies nothing and returns the note; outside it matches 8968db3 for 2,000 units
+    preview: the hero is not the founder's own object
+— POST /api/exp, the real route
+✗ THE BUG: an exposure ping from a preview session is refused by the server, and no row is written
+    body: expected {"ok":true,"recorded":false}, got {"ok":true,"recorded":true}
+✗ NEGATIVE: any preview cookie is refused, even a forged one or another store's
+    cookie 0: expected {"ok":true,"recorded":false}, got {"ok":true,"recorded":true}
+✗ THE BUG, lapsed preview: a ping from a browser signed in to the console, its preview cookie gone, is refused and writes no row
+    _admin: expected {"ok":true,"recorded":false}, got {"ok":true,"recorded":true}
+✓ REGRESSION: a shopper's ping is counted, with the variant re-derived on the server, once
+✓ REGRESSION: no unit, a bad unit or a bad slug still answer recorded:false, and another store's ping counts there only
+— conversions
+✗ a preview session's order converts nothing; a shopper's still converts
+    lib/experiments.js has no conversionUnit gate
+✗ THE BUG, lapsed preview: an order from a browser signed in to the console converts nothing, preview cookie or not
+    X.conversionUnit is not a function
+✗ guard: the checkout route takes every conversion unit through conversionUnit, never the raw cookie
+    a conversion unit read past the preview gate: expUnit = request.cookies.get("_unit")?.value || null;
+— the console: Designer, Designer page, Experiments
+✗ runningTestsBySection names the running hero test, and nothing on a store with none
+    lib/experiments.js has no runningTestsBySection
+{"ts":"2026-11-03T13:58:45.156Z","evt":"experiment_status","tenant":"pv","experiment":"hero-promise","status":"paused"}
+{"ts":"2026-11-03T13:58:45.156Z","evt":"experiment_started","tenant":"pv","experiment":"hero-promise"}
+✗ a paused test serves nobody and is named nowhere: no Designer note or mark, no preview note, shoppers get the live hero
+    X.runningTestsBySection is not a function
+✗ Designer: the hero's settings say a test is running, name it, and link to its row
+    no note beside the hero settings: Hero Customized The big home-page opener. Title * Highlight matching substring of the title gets the accent color Subtitle Badge blank shows live catalog stats Primary button label blank = no primary button Primary button link Secondary button label blank = no secondary button Secondary button link 
+✗ Designer: the tree marks the hero while a test runs on it
+    hero row: Hero
+✓ NEGATIVE: with no test running the Designer shows no note, and the announcement's settings never do
+✗ the Designer page loads the running tests and hands them to the Designer
+    pv.test tests: expected {"hero":{"slug":"hero-promise","name":"Hero promise test"}}, got undefined
+✗ Experiments: each test's row carries the anchor the notes link to
+    no row anchor: <header class="mb-6"><div class="flex flex-wrap items-start justify-between gap-3"><div class="min-w-0"><h1 class="text-2xl font-semibold tracking-tight text-fg">Experiments</h1><p class="mt-1 max-w-2xl text-sm text-fg-muted">A/B tests on the home hero. The plan (hypothesis, allocation, minimum samp
+— guard
+✗ guard: only the known, gated places pick, apply or count a variant (a new one must be gated, then listed here)
+    raw reads of the _unit cookie: expected ["app/(storefront)/page.js","app/api/exp/route.js"], got ["app/(storefront)/page.js","app/api/checkout/route.js","app/api/exp/route.js"]
+✗ guard: the home page passes the preview state and the console sign-in to the hero test, and pings only with an assignment
+    heroVariantFor is called without { preview: src.preview, founder }
+✗ guard: the console cookies the gate knows are the ones sign-in really sets
+    console cookies: expected ["_admin","_platform"], got undefined
+✗ edge: the storefront files this item touches import nothing from node:
+    components/preview/ExperimentNote.js is missing
+
+8 passed, 25 failed

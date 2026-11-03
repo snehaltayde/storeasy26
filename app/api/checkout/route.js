@@ -19,6 +19,7 @@ import { razorpayConfigured, razorpayKeyId, createRazorpayOrder, verifyRazorpayS
 import { toMinor, sameAmount } from "@/lib/money";
 import { checkoutCapability } from "@/lib/commerce/adapter";
 import { tenantHandler } from "@/lib/tenant-request";
+import { conversionUnit } from "@/lib/experiments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -175,8 +176,9 @@ export const POST = tenantHandler(async (request) => {
         // Async after the response: Shopify push (payment-pending) + the
         // server-side purchase event (durable, browser-independent).
         // S47 (BE22): experiment conversion join — best-effort, AFTER the
-        // money committed, idempotent per (experiment, order).
-        const expUnit = request.cookies.get("_unit")?.value || null;
+        // money committed, idempotent per (experiment, order). PV-08: none
+        // from the founder's browser (a preview, or signed in to the console).
+        const expUnit = conversionUnit(request);
         after(async () => {
           await enqueueShopifyPush(order.id);
           await enqueuePurchaseAndForward(order.id);
@@ -272,7 +274,7 @@ export const POST = tenantHandler(async (request) => {
       });
       if (cartId) await clearCart(cartId);
       if (!paid.already) {
-        const expUnit = request.cookies.get("_unit")?.value || null;
+        const expUnit = conversionUnit(request); // PV-08: none from the founder's browser
         after(async () => {
           await enqueueShopifyPush(orderId);
           await enqueuePurchaseAndForward(orderId);
