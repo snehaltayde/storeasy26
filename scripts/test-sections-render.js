@@ -68,6 +68,8 @@ const Reg = await import("../lib/registry/index.js");
 const Svc = await import("../lib/documents/service.js");
 const Pub = await import("../lib/documents/publish.js");
 const { resolveHomeSectionData } = await import("../lib/cms/section-data.js");
+const { createPreviewSession } = await import("../lib/preview-sessions.js");
+const { PREVIEW_COOKIE } = await import("../lib/cms/candidates.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 
 let pass = 0;
@@ -501,6 +503,71 @@ await t("an experiment variant merged with heroVariantSettings changes only the 
   }
 });
 
+await t("a hero image off the Shopify CDN (any https photo, or a '/' path) publishes and renders as its own url, never through /_next/image", async () => {
+  const OTHER = "https://images.example.com/jar.jpg";
+  // the registry accepts it, so the publish succeeds: the page must then show it
+  const issues = Reg.validateDocument(homeBody([sec("hero", "sec_hero", { ...HERO_SETTINGS, image: { media: OTHER, alt: "A jar" } })]), { mode: "publish" });
+  ok(issues.ok === true && issues.issues.length === 0, `the validator refused it: ${JSON.stringify(issues.issues)}`);
+  await publishHome([sec("hero", "sec_hero", { ...HERO_SETTINGS, image: { media: OTHER, alt: "A jar" } }), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+  const env = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production"; // the optimizer's url, as a shopper's browser gets it
+  try {
+    for (const [media, h] of [
+      [OTHER, heroOf(await renderHome("srv.test"))],
+      ["/uploads/x.jpg", view(sec("hero", "sec_h3", { ...HERO_SETTINGS, image: { media: "/uploads/x.jpg", alt: "" } }), {}, { surface: "home" })],
+    ]) {
+      const [img] = imgs(h);
+      ok(img, `${media}: no image in the hero: ${h.slice(0, 300)}`);
+      eq(attr(img, "src"), media, `${media}: src:`);
+      ok(!/_next\/image/.test(img), `${media}: sent to the optimizer, which refuses it: ${img}`);
+    }
+    // the Shopify CDN still goes through the optimizer
+    const shop = view(sec("hero", "sec_h2", { ...HERO_SETTINGS, image: { media: "https://cdn.shopify.com/s/files/1/0001/hero.jpg", alt: "" } }), {}, { surface: "home" });
+    ok(attr(imgs(shop)[0], "src").startsWith("/_next/image?url=https%3A%2F%2Fcdn.shopify.com"), `shopify src: ${imgs(shop)[0]}`);
+  } finally {
+    if (env === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = env;
+  }
+});
+
+await t("DOC-05 through page.js: in the founder's preview an unfinished banner and rail show the 'not finished yet' note with their placeholder; shoppers never see it", async () => {
+  await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+  const { token } = await inV4(async () => {
+    const cur = await Svc.getDocument("doc_home");
+    const r = await Svc.saveDraft({
+      id: cur.id,
+      revision: cur.revision,
+      body: homeBody([
+        sec("hero", "sec_hero", HERO_SETTINGS),
+        sec("banner", "sec_bn", { title: "", text: "" }),
+        sec("product_rail", "sec_rail", { title: "Picks", collection: null }),
+        sec("new", "sec_new1", { title: "Draft new", limit: 3 }),
+      ]),
+    });
+    for (const id of ["sec_bn", "sec_rail"]) ok(r.issues.some((i) => i.sectionId === id && i.severity !== "warning"), `${id} is not incomplete: ${JSON.stringify(r.issues)}`);
+    return createPreviewSession({ actor: { kind: "merchant", id: 1 } });
+  });
+  const h = await renderHome("srv.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: token });
+  ok(h.includes("Draft new"), `not the preview: ${h.slice(0, 400)}`);
+  for (const [id, kind, label, placeholder] of [
+    ["sec_bn", "banner", "Banner", "Write a short message, with an optional button"],
+    ["sec_rail", "product_rail", "Product rail", "Pick a collection to show its products"],
+  ]) {
+    const root = h.match(new RegExp(`<section[^>]*data-section-id="${id}"[^>]*>[\\s\\S]*?</section>`))?.[0] || "";
+    ok(root, `${id}: nothing rendered: ${h.slice(0, 600)}`);
+    eq(attr(root, "data-section-kind"), kind, `${id} kind:`);
+    eq(attr(root, "data-sec"), id, `${id} data-sec (the preview's click target):`);
+    ok(root.includes(`${label}: not finished yet`), `${id}: no title: ${root}`);
+    ok(root.includes(`${placeholder}. Only you can see this in your preview. Finish this section to publish this page.`), `${id}: no note: ${root}`);
+    ok(/data-unfinished=""/.test(root), `${id}: no data-unfinished`);
+  }
+  const live = await renderHome("srv.test");
+  ok(!/not finished yet|Only you can see this|data-unfinished/.test(live) && !live.includes("Draft new"), "a shopper saw the draft or the note");
+  // the renderer itself: an unfinished banner is the note, not an empty box
+  const one = view(sec("banner", "sec_bn", { title: "", text: "" }, { unfinished: { label: "Banner", placeholder: "Write a short message, with an optional button" } }));
+  ok(one.includes("Banner: not finished yet") && !/bg-sf-accent-soft/.test(one), `banner: ${one}`);
+});
+
 // =====================================================================================
 console.log("— 4. the DOC-03 shopper state table");
 // =====================================================================================
@@ -592,6 +659,9 @@ await t("no node: import in the files this item touches (the storefront is edge 
     "app/(storefront)/page.js",
     "lib/cms/section-data.js",
     "lib/content/resolve.js",
+    "lib/content/unfinished.js",
+    "lib/content/documents-reader.js",
+    "lib/image-src.js",
   ];
   const nodeImport = /(?:from\s+|import\s*\(\s*|require\s*\(\s*)["'](node:[^"']+|fs|path|crypto|child_process|os|module|url)["']/;
   for (const f of files) ok(!nodeImport.test(await readFile(join(ROOT, f), "utf8")), `${f} imports a Node module`);

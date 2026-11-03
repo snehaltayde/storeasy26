@@ -4,12 +4,21 @@ Branch `cms/p2-sections`, cut from `f893710`. Plan: `docs/cms-reviews/P2-PLAN.md
 
 This is the author's own report. Reviewers should re-read the code.
 
+### Fix round 1
+
+Two blockers from review, each with a test that failed before the fix (run with the fix's code files stashed: 30 passed, 2 failed; with them: 32 passed).
+
+1. **Unfinished sections in a documents-mode preview lost the founder's note (a regression of P2-PREVIEW's DOC-05 item).** The home page now renders from `resolvedHomePage()`, which keeps each section's `unfinished` mark, but only the hero read it. An unfinished banner rendered as an empty coloured box and an unfinished rail rendered nothing. Fix: `SectionView` (and `sectionShows`) in `components/sections/index.js` render any non-hero section carrying the mark as the P2-PREVIEW note: a rich text section titled "<Label>: not finished yet" with "<placeholder>. Only you can see this in your preview. Finish this section to publish this page." Its root keeps the section's own `data-sec`, `data-section-id` and `data-section-kind` (so a click in the Designer still selects it), plus `data-unfinished`. The words moved to a new pure module, `lib/content/unfinished.js`, which `documents-reader.js` now imports too, so there is one wording. `resolveHomeSectionData` skips unfinished sections (they need no data, and their settings may be invalid). The hero keeps its own handling (the placeholder where the title goes). Live versions never carry the mark. Test: `test:sections-render` §3 "DOC-05 through page.js": a real preview session token (`createPreviewSession`) and saved drafts with an incomplete banner and an incomplete product rail, rendered through the real `page.js`; both show the note with their placeholder, the live page shows neither the draft nor the note. Before the fix it failed with the empty banner box.
+2. **A hero image off the Shopify CDN was broken for shoppers.** The registry accepts any https photo, or any "/" path, as hero media, and the publish succeeds, but `HeroSection` sent it through Next's optimizer, which allows only `cdn.shopify.com` (400 for other hosts; a host-less fetch of a relative path gives 404). Fix: `lib/image-src.js` gains `isOptimizable(src)` (true only for `https://cdn.shopify.com/…`), and the hero passes `unoptimized` for every other image, so the browser loads it from its own url (library photos were already unoptimized through `StoreImage`). Test: §3 "a hero image off the Shopify CDN": the validator accepts `https://images.example.com/jar.jpg` in publish mode with no issues, the home publishes, and with `NODE_ENV=production` the rendered hero's `<img>` has that url as its `src` and no `/_next/image`; the same for `/uploads/x.jpg`; a Shopify CDN photo still goes through `/_next/image`. Before the fix it failed with `src="/_next/image?url=https%3A%2F%2Fimages.example.com…"`.
+
+`scripts/test-copy.js` gains the `@/lib/image-src` stub the hero now imports. The edge-safety test also scans `lib/content/unfinished.js`, `lib/content/documents-reader.js` and `lib/image-src.js`.
+
 ## Where this stands
 
 | Stage | Status |
 |---|---|
 | Implemented | Yes, on this branch |
-| Locally tested | Yes. `pnpm test:sections-render` 30 passed, 0 failed (about 1 s in the gate). `pnpm test`: 66 of 66 suites passed in 116.8 s. 13 deliberate breaks, all caught (see "Do the tests bite?"). `pnpm build` passed; the only warnings are the `next.config.mjs` trace warnings through `lib/platform/migrate.js` that were already there |
+| Locally tested | Yes. `pnpm test:sections-render` 32 passed, 0 failed (about 1 s in the gate). `pnpm test`: 66 of 66 suites passed in 117.5 s (after fix round 1). 13 deliberate breaks, all caught (see "Do the tests bite?"). `pnpm build` passed; the only warnings are the `next.config.mjs` trace warnings through `lib/platform/migrate.js` that were already there |
 | Browser verified | Yes, on the design harness on this Mac (ports 3600 and 4600 to 4602), storefront on the edge runtime (`x-edge-runtime: 1`). Legacy: `drill:edge` in headless desktop Chrome, 150 passed. v4: the Claude desktop app's built-in browser (Chromium) at 1440 x 900. Not Safari, not a phone. See "Browser evidence" |
 | Staging verified | **NOT DONE. Staging is unverified.** |
 | Production enabled | **NOT DONE.** Nothing pushed, merged or deployed. No real store changed mode |
@@ -79,7 +88,7 @@ Page sections arrive in the page shape (from the legacy tables, or from a v4 bod
 | Hero button linked to a sold-out product | The hero stays exactly as it is, and the button opens the product page (which says sold out). Nothing reads stock | `HeroSection` |
 | A page that renders no sections | "There’s nothing on this page yet." and a "Browse our collections" link to `/collections`. Content pages: when no section renders and nothing of the page's own follows (the contact page's form does). Home: when there is no hero and no section shows | `parts.js` `EmptyPageNote`, `ContentPage`, `HomeSections` |
 
-Founder notes in preview (the third column of the spec table) are PV-02 and PV-09, not this item.
+Founder notes in preview (the third column of the spec table) are PV-02 and PV-09, not this item. The one preview note this item does render is P2-PREVIEW's "not finished yet" note for an unfinished section (fix round 1).
 
 ### Deliberate changes from a6d028e (shopper-visible, legacy stores included)
 
@@ -97,7 +106,7 @@ The equivalence fixtures are all in stock, with every rail above its minimum, so
 |---|---|---|---|
 | 1 | Every registered kind has exactly one component in the map; a fake kind registered in the test renders through the map with data-section-id and data-section-kind | **Done** | `test:sections-render` §1, four tests: the contract check is `[]` and the map's kinds equal the registry's; NEGATIVE: a registered kind with no component and a component with no kind are each reported; a `fake_quote` kind defined in the registry plus one map entry renders on the home page and on a content page with both attributes; every kind's root carries both attributes on both surfaces. Fails without the change: no map exists at f893710; break B10 (no attrs) fails 13 tests |
 | 2 | The home page HTML for v1, v2 and v3 fixtures, legacy drafts, an S59 candidate preview and a running hero experiment equals a6d028e's output (data-section-* normalized) | **Done** | `scripts/support/home-render-outputs.js` renders the real `page.js` and `ContentPage` (Next's SWC, react-dom/server, real next/image) for 10 states: drafts, the experiment (variant b, control, a console sign-in, the founder's preview with the PV-08 note), an S59 candidate, v1, v2, v3 and an empty store, plus 4 content pages each (text, rich with an effective date, FAQ, images). Recorded inside an a6d028e checkout to `scripts/fixtures/home-render-outputs.a6d028e.json`. `test:sections-render` §2 re-runs it here and compares each page after removing ` data-section-id="…"` and ` data-section-kind="…"` (11 tests). Breaks B11 (one class changed) and B12 (no legacyKey) fail them |
-| 3 | A v4 doc_home with a hero image renders the image with its alt through StoreImage; without an image the markup equals the legacy hero | **Done** | §3: a doc_home published through the real service renders `<img src="/api/media/…" alt="A jar on linen">` with no srcset; a Shopify image goes through `/_next/image`. Without an image (null, `media: ""`, no key) the hero equals the a6d028e drafts hero byte for byte. Break B9 fails it. Browser: screenshot below |
+| 3 | A v4 doc_home with a hero image renders the image with its alt through StoreImage; without an image the markup equals the legacy hero | **Done** | §3: a doc_home published through the real service renders `<img src="/api/media/…" alt="A jar on linen">` with no srcset; a Shopify image goes through `/_next/image`; any other https photo or "/" path is sent unoptimized, as its own url (fix round 1, tested with `NODE_ENV=production`). Without an image (null, `media: ""`, no key) the hero equals the a6d028e drafts hero byte for byte. Break B9 fails it. Browser: screenshot below |
 | 4 | Sold-out rail products are labelled and sorted last, but keep their order when hand-picked | **Done** | §4, two tests (some sold out, all sold out, hand-picked); §3 shows a legacy rail following its pin. Breaks B4 and B5 |
 | 5 | A rail below minItems and a rail bound to an empty collection render nothing (no empty slots) | **Done** | §4, two tests: 2 of 8 renders `""` and leaves no trace in a full `HomeSections`; limit 2 with 2 products still shows; an empty collection and no collection, through the real data path on a legacy store, render `""`. Break B6. Browser: the harness's 2-product `serums` rail is left out |
 | 6 | A section with a missing image renders the token-coloured fallback | **Done** | §4: image with text (home, with and without alt), a page image, a collection with no photo, a product with no photo. Break B7 |
@@ -108,7 +117,7 @@ The equivalence fixtures are all in stock, with every rail above its minimum, so
 
 ## Tests
 
-New: `scripts/test-sections-render.js` (replaces the P2-ATOM placeholder): 30 tests, about 1 s. It uses two real tenants (one v4 published through `lib/documents/service.js` and `publish.js`, one legacy), the real page and components, and spawns the recorder for §2.
+New: `scripts/test-sections-render.js` (replaces the P2-ATOM placeholder): 32 tests (30, plus 2 from fix round 1), about 1 s. It uses two real tenants (one v4 published through `lib/documents/service.js` and `publish.js`, one legacy), the real page and components, and spawns the recorder for §2.
 
 New: `scripts/support/home-render-outputs.js` (the recorder; runs in any checkout) and `scripts/fixtures/home-render-outputs.a6d028e.json` (recorded in a detached a6d028e worktree; the recorder took 1.9 s there).
 
@@ -157,6 +166,8 @@ The design harness at `DESIGN_PORT=3600 DESIGN_SQLD_PORT=4600`, started and stop
 - **Content pages still receive the page shape**, so on a v4 page only text, rich text, image and FAQ reach the map; `pageFromBody` (P2-READ) still drops `banner`, `collections`, `new` and `product_rail` there. The map renders them, but page routes need data binding (section-data for pages) first. DOC-06's "a campaign can hold a rail" is not done here.
 - **`product_main` places only what the route hands in** (`ctx.productMain`). The product page doesn't render its layout through the map yet (SURF items).
 - **No field attribute per editable text** (DOC-03's "a field attribute for each editable text") yet. That is ED-04's click-to-select. Only the section attributes are here.
+- **A hero image off the Shopify CDN is not resized** (fix round 1): the browser gets the full file. The validator still accepts any https photo; restricting hero media (or proxying other hosts) is a later choice. Library photos and Shopify photos are unchanged.
+- **An unfinished section's note on the home page is a rich text block**, not the section's own look; the founder sees where it is and what it needs, not a preview of the finished section.
 - The hero image has no aspect or focal setting (DOC-11 and MED items); it fills a 4:3 frame with `object-cover`.
 - Rendered tests are react-dom/server, not the RSC renderer. Real Next rendering was checked only on the harness (above), in Chromium.
 - Hero experiments that target the section id, and translating running payloads at cutover, are MIG's (plan section 4).
@@ -164,6 +175,7 @@ The design harness at `DESIGN_PORT=3600 DESIGN_SQLD_PORT=4600`, started and stop
 ## Owner checks
 
 - **Rails below 3 products disappear on legacy stores after deploy.** Before deploying, check whether any live store has a product rail bound to a collection with 1 or 2 in-stock products (and a limit of 3 or more). Decide whether hiding it is what you want for legacy stores, or whether it should wait for cutover.
+- In the Designer preview of a documents-mode store (the harness only), leave a banner or rail unfinished and check the "not finished yet" note shows and clicking it selects the section: covered by the rendered test, not checked in a browser.
 - Look at a real store's home and a policy page after deploy, in desktop and phone browsers: they must look exactly as before (the equivalence covers the HTML, not the CSS a browser applies).
 - A hero with an image on a phone (it stacks under the words) and on Safari: not checked.
 - **CI sqld** (unchanged from P2-ATOM): `.github/` was not touched. `test:publish` needs sqld, so CI stays red until the owner approves the pinned, checksum-verified sqld download.
@@ -172,6 +184,7 @@ The design harness at `DESIGN_PORT=3600 DESIGN_SQLD_PORT=4600`, started and stop
 ## Files
 
 - New: `components/sections/index.js`, `HeroSection.js`, `CollectionsSection.js`, `NewProductsSection.js`, `BannerSection.js`, `RichTextSection.js`, `ImageWithTextSection.js`, `ProductRailSection.js`, `TextSection.js`, `FaqListSection.js`, `ProductMainSection.js`, `parts.js`
+- New in fix round 1: `lib/content/unfinished.js`. Changed in fix round 1: `components/sections/index.js`, `components/sections/HeroSection.js`, `lib/image-src.js`, `lib/content/documents-reader.js`, `lib/cms/section-data.js`
 - Changed: `components/sections/HomeSections.js`, `components/ContentPage.js`, `components/FaqSection.js` (root props), `app/(storefront)/page.js`, `lib/cms/section-data.js`, `lib/content/resolve.js` (one line, `legacyKey`)
 - Tests: `scripts/test-sections-render.js`, `scripts/support/home-render-outputs.js`, `scripts/fixtures/home-render-outputs.a6d028e.json`, `scripts/test-copy.js`, `scripts/test-page-editor.js`, `scripts/test-release-readers.js`
 - `docs/cms-reviews/P2-SECTIONS.md`, `docs/cms-reviews/drills/P2-SECTIONS/*`

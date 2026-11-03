@@ -3,6 +3,7 @@ import StoreImage from "@/components/StoreImage";
 import ExperimentNote from "@/components/preview/ExperimentNote";
 import { DEFAULT_HERO_SUBTITLE, EMPTY_STORE_HERO_SUBTITLE } from "@/lib/cms/defaults";
 import { settingsToLegacyHero } from "@/lib/registry/legacy";
+import { isOptimizable } from "@/lib/image-src";
 
 // The hero section (P2-SECTIONS, DOC-07). Moved out of app/(storefront)/page.js
 // with the same markup, so a store's hero looks exactly as before. It reads a
@@ -12,7 +13,10 @@ import { settingsToLegacyHero } from "@/lib/registry/legacy";
 //
 // New: an optional image (settings.image = { media, alt }). It goes through
 // StoreImage, so a library photo (/api/media/<id>) is served as its own url
-// (P1-IMAGES). With no image the markup is the old hero's, byte for byte.
+// (P1-IMAGES). The registry accepts any https photo or "/" path here, and
+// Next's optimizer can fetch only the Shopify CDN (next.config.mjs), so every
+// other image goes out unoptimized, as its own url: never a broken image
+// (DOC-03). With no image the markup is the old hero's, byte for byte.
 //
 // ctx (from the home page): { empty, stats, notice }
 //   empty   the store has no products yet (GEN-03 words)
@@ -100,7 +104,7 @@ function HeroSection({ section, ctx = {}, attrs = {} }) {
           <div className="grid items-center gap-10 md:grid-cols-2">
             <div>{words}</div>
             <div data-hero-image="" className="relative aspect-[4/3] overflow-hidden rounded-sf-card bg-gradient-to-br from-sf-media-from to-sf-media-to">
-              <StoreImage src={image.media} alt={image.alt} fill priority sizes="(min-width:768px) 50vw, 100vw" className="object-cover" />
+              <StoreImage src={image.media} alt={image.alt} unoptimized={!isOptimizable(image.media)} fill priority sizes="(min-width:768px) 50vw, 100vw" className="object-cover" />
             </div>
           </div>
         ) : (

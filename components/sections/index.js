@@ -8,6 +8,7 @@ import ProductRailSection from "./ProductRailSection";
 import TextSection from "./TextSection";
 import FaqListSection from "./FaqListSection";
 import ProductMainSection from "./ProductMainSection";
+import { unfinishedMark, unfinishedTitle, unfinishedHtml } from "@/lib/content/unfinished";
 
 // The renderer map (P2-SECTIONS, DOC-03; spec 8.5). One component per
 // registered section kind (lib/registry/sections.js), found by kind. The home
@@ -26,6 +27,16 @@ import ProductMainSection from "./ProductMainSection";
 // A component may carry a static shows(section, data, ctx): false means it
 // renders nothing for this data (a rail with too few products). Pages use it
 // to tell "nothing rendered" apart (the DOC-03 empty-page message).
+//
+// P2-PREVIEW (DOC-05): in the founder's preview, a section the overlay marked
+// `unfinished` ({ label, placeholder }) renders as the founder's note, a rich
+// text section titled "<Label>: not finished yet" with the placeholder and
+// "Only you can see this in your preview" (lib/content/unfinished.js), in
+// place of its own component, so an unfinished banner is never an empty box
+// and an unfinished rail never vanishes. Its root keeps the section's own id
+// and kind, plus data-unfinished. The hero is the one exception: HeroSection
+// shows the placeholder where its title goes, as before. Live versions never
+// carry the mark.
 const COMPONENTS = {
   hero: HeroSection,
   collections: CollectionsSection,
@@ -65,10 +76,17 @@ export function checkSectionComponents(kinds) {
 
 export const sectionAttrs = (section) => ({ "data-section-id": section?.id ?? "", "data-section-kind": section?.kind ?? "" });
 
+// An unfinished section's note (see above), or null.
+function unfinishedNote(section) {
+  const u = section?.kind === "hero" ? null : unfinishedMark(section);
+  return u ? { id: section.id, kind: "rich_text", settings: { title: unfinishedTitle(u), html: unfinishedHtml(u) } } : null;
+}
+
 // Whether a section renders anything for this data.
 export function sectionShows(section, data = {}, ctx = {}) {
   const C = sectionComponent(section?.kind);
   if (!C) return false;
+  if (unfinishedNote(section)) return true;
   return typeof C.shows === "function" ? Boolean(C.shows(section, data, ctx)) : true;
 }
 
@@ -76,5 +94,7 @@ export function sectionShows(section, data = {}, ctx = {}) {
 export function SectionView({ section, data = {}, ctx = {} }) {
   const C = sectionComponent(section?.kind);
   if (!C) return null;
+  const note = unfinishedNote(section);
+  if (note) return <RichTextSection section={note} ctx={ctx} attrs={{ ...sectionAttrs(section), "data-unfinished": "" }} />;
   return <C section={section} data={data} ctx={ctx} attrs={sectionAttrs(section)} />;
 }

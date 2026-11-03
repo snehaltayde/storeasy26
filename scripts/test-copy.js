@@ -605,6 +605,7 @@ const { default: HeroSection } = await loadComponent(await readFile(join(ROOT, "
   "@/components/preview/ExperimentNote": nothing,
   "@/lib/cms/defaults": cmsDefaults,
   "@/lib/registry/legacy": registryLegacy,
+  "@/lib/image-src": await import("../lib/image-src.js"),
 });
 const sectionMap = { SectionView: ({ section, ctx }) => (section.kind === "hero" ? React.createElement(HeroSection, { section, ctx, attrs: {} }) : null) };
 async function renderHome({ emptyCatalogSrc = realEmptyCatalog, stats = null, hero = null } = {}) {
