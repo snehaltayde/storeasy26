@@ -81,9 +81,12 @@
     "test:w6": "node scripts/test-w6.js",
     "test:copy": "node scripts/test-copy.js",
     "test:media-upload": "node scripts/test-media-upload.js",
+    "test:design-harness": "node scripts/test-design-harness.js",
     "test:perf": "node scripts/perf-report.js",
     "seed:design": "node scripts/dev-design.js seed",
-    "dev:design": "node scripts/dev-design.js"
+    "dev:design": "node scripts/dev-design.js",
+    "drill:smoke": "node scripts/drill.js smoke",
+    "drill:edge": "node scripts/drill.js harness-edge"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
@@ -98,6 +101,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "playwright-core": "1.64.1",
     "tailwindcss": "^4"
   }
 }
