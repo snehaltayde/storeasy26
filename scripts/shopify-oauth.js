@@ -7,21 +7,13 @@ import http from "node:http";
 import crypto from "node:crypto";
 import { exchangeCodeForToken, mintStorefrontToken } from "../lib/shopify-admin.js";
 import { upsertEnv } from "../lib/env-file.js";
+import { OAUTH_SCOPES } from "../lib/platform/oauth.js";
 
 const domain = process.env.SHOPIFY_STORE_DOMAIN;
 const clientId = process.env.SHOPIFY_CLIENT_ID;
 const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
 const PORT = Number(process.env.SHOPIFY_OAUTH_PORT || 3456);
 const REDIRECT = `http://localhost:${PORT}/callback`;
-const SCOPES = [
-  "read_products",
-  "read_orders",
-  "write_orders", // orderCancel (order:cancel CLI) needs it
-  "write_draft_orders",
-  "unauthenticated_read_product_listings",
-  "unauthenticated_read_product_inventory",
-  "unauthenticated_read_product_tags",
-].join(",");
 
 if (!domain || !clientId || !clientSecret) {
   console.error("Need SHOPIFY_STORE_DOMAIN, SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET in .env.local");
@@ -32,7 +24,7 @@ const state = crypto.randomBytes(16).toString("hex");
 const authorizeUrl =
   `https://${domain}/admin/oauth/authorize` +
   `?client_id=${encodeURIComponent(clientId)}` +
-  `&scope=${encodeURIComponent(SCOPES)}` +
+  `&scope=${encodeURIComponent(OAUTH_SCOPES)}` +
   `&redirect_uri=${encodeURIComponent(REDIRECT)}` +
   `&state=${state}`;
 

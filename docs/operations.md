@@ -63,6 +63,36 @@ lazy (4 priority above the fold) · PDP 124ms · `/api/search` at full index
 ~1.2s PDP, CLS 0) still applies — the render path is unchanged; the consent
 banner is `position:fixed` (no CLS). Re-run Lighthouse after major UI changes.
 
+## Tests (SHOP-06)
+
+`pnpm test` runs every `test:*` suite in `package.json` except `test:perf` (a
+measurement), one at a time, prints one line per suite, shows the output of any
+that failed and exits non-zero. It takes about 25 seconds. It needs no secrets
+and no network. A suite stuck for 2 minutes is stopped and counted as failed
+(`TEST_SUITE_TIMEOUT_MS` changes that), even if it started a background process
+that keeps its output open. A `scripts/test-*.js` file that no `test:*` script
+runs fails the run, because it would otherwise never run. So does a `test:*`
+script that is anything other than exactly `node scripts/<file>.js`, because
+something like `|| true` would hide a failure.
+
+- **On push:** `.github/workflows/test.yml` runs `pnpm test`. It does nothing
+  until this repo is pushed to GitHub.
+- **Before each commit and merge commit:** `.githooks/pre-commit` runs the same
+  `pnpm test`, and `.githooks/pre-merge-commit` runs that same check for `git merge`.
+  They are off until you run `pnpm hooks:enable` once. That sets `core.hooksPath` in
+  the repo's shared git config, so it applies to every worktree of this clone at
+  once. To turn them off: `git config --unset core.hooksPath`. The tests read the
+  files on disk, not what is staged. So the hook first stops the commit if a tracked
+  file on disk differs from what is staged, and names the files. Stage them or put
+  them aside, then commit again. Untracked files are not compared: the tests see
+  them, and the commit does not carry them. A fast-forward merge makes no commit, so
+  no hook runs.
+
+`pnpm test:shopify-boundary` is the suite that enforces Decision 2 (content is
+never written back to Shopify). If it fails on a change you meant to make, read
+its message before touching its lists: a new mutation, write scope or field sent
+to Shopify is a product decision, not a test fix.
+
 ## Related runbooks
 
 [docs/refunds.md](./refunds.md) — manual refund/cancel flows (Razorpay + Shopify + ledger).

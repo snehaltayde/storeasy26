@@ -1433,8 +1433,8 @@ multi-tenant payments go live. Severity-ordered:
     `order:trace`/`order:cancel --tenant`.
 20. **Unused surface**: `GET /api/cart`, the GET variants of admin
     settings/storefront/offers[id]/orders[id] (UIs use page-loads + PUT/POST),
-    `components/Price.js`, `CartContext.clear`/`checkoutUrl()` (legacy Shopify
-    permalink), `public/icons/apple-touch-icon.png`, `VERCEL_OIDC_TOKEN` in env.
+    `components/Price.js`, `CartContext.clear`,
+    `public/icons/apple-touch-icon.png`, `VERCEL_OIDC_TOKEN` in env.
 21. **Doc staleness elsewhere**: `docs/tracking.md` says 13 event tests / 7 funnel
     names (now 16 / 8 with `select_item`); `docs/operations.md`'s rate-limit table
     omits the S22/S24 limiters; the root `README.md` predates orders, events and
@@ -1954,7 +1954,7 @@ the default context. **Bold** = `NEXT_PUBLIC_` (build-time, client-visible).
 |---|---|
 | Default-tenant DB | `TURSO_DB_URL` + `TURSO_DB_AUTH_TOKEN` (first choice) · `DATABASE_URL` + `DATABASE_AUTH_TOKEN` (fallback; else `file:local.db`) |
 | Control plane | `PLATFORM_DB_URL` (presence = platformConfigured; else `file:platform.db`) · `PLATFORM_DB_TOKEN` · `PLATFORM_SECRET` (AES key + OAuth-state HMAC) · `PLATFORM_SECRET_NEXT` (open rotation: dual-read, writes under NEXT — see §3 rotation runbook) · `PLATFORM_CACHE_MS` (30000) · `PLATFORM_ADMIN_PASSWORD` · `PLATFORM_URL` (webhook/callback base; must be https to register webhooks) · `TURSO_API_TOKEN` + `TURSO_ORG` (+`TURSO_GROUP`) switch provisioning to the HTTP API |
-| Shopify | `SHOPIFY_STORE_DOMAIN` (tenantOwn) · `SHOPIFY_API_VERSION` (2025-10) · `SHOPIFY_CLIENT_ID`/`SHOPIFY_CLIENT_SECRET` (tenantOwn) · `SHOPIFY_ADMIN_TOKEN` (tenantOwn) · `SHOPIFY_STOREFRONT_TOKEN`/`…_PRIVATE_TOKEN` (legacy storefront source) · **`NEXT_PUBLIC_SHOPIFY_DOMAIN`** (legacy permalink, unused) · `SHOPIFY_OAUTH_PORT` (3456) · `SHOPIFY_SYNC_MAX_ATTEMPTS` (5) / `…_BACKOFF_MS` (60000) / `…_STALE_MS` (600000) |
+| Shopify | `SHOPIFY_STORE_DOMAIN` (tenantOwn) · `SHOPIFY_API_VERSION` (2025-10) · `SHOPIFY_CLIENT_ID`/`SHOPIFY_CLIENT_SECRET` (tenantOwn) · `SHOPIFY_ADMIN_TOKEN` (tenantOwn) · `SHOPIFY_STOREFRONT_TOKEN`/`…_PRIVATE_TOKEN` (legacy storefront source) · **`NEXT_PUBLIC_SHOPIFY_DOMAIN`** (nothing reads it since SHOP-03 removed the legacy permalink) · `SHOPIFY_OAUTH_PORT` (3456) · `SHOPIFY_SYNC_MAX_ATTEMPTS` (5) / `…_BACKOFF_MS` (60000) / `…_STALE_MS` (600000) |
 | Razorpay | **`NEXT_PUBLIC_RAZORPAY_KEY_ID`** (tenantOwn server-side; see quirk #1) · `RAZORPAY_KEY_SECRET` (tenantOwn) · `RAZORPAY_WEBHOOK_SECRET` (tenantOwn) |
 | GA4/Meta/tracking | **`NEXT_PUBLIC_GA4_MEASUREMENT_ID`** / `GA4_API_SECRET` (tenantOwn) · `GA4_MP_EVENTS` ("purchase"; "all" for QA) · `GA4_DEBUG_MODE` · **`NEXT_PUBLIC_META_PIXEL_ID`** / `META_CAPI_TOKEN` (tenantOwn) · `META_TEST_EVENT_CODE` · `META_API_VERSION` (v21.0) · `COOKIE_DOMAIN` · `EVENTS_MAX_ATTEMPTS` (8) / `EVENTS_BACKOFF_MS` (60000) |
 | Typesense (env-global) | `TYPESENSE_HOST` / `TYPESENSE_PORT` (443) / `TYPESENSE_PROTOCOL` (https) / `TYPESENSE_ADMIN_API_KEY` · `TYPESENSE_COLLECTION` (per-tenant via config `typesense_collection`) |

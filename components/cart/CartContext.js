@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback } from "react";
-import { numericId } from "@/lib/ids";
 import { track } from "@/lib/track/client";
 
 const CartContext = createContext(null);
@@ -99,12 +98,4 @@ export function useCart() {
   const ctx = useContext(CartContext);
   if (!ctx) throw new Error("useCart must be used within CartProvider");
   return ctx;
-}
-
-// Shopify checkout permalink from cart items — numeric ids at the API boundary.
-export function checkoutUrl(items) {
-  const domain = process.env.NEXT_PUBLIC_SHOPIFY_DOMAIN;
-  if (!domain || !items?.length) return null;
-  const parts = items.map((i) => `${i.variantNumericId || numericId(i.variantId)}:${i.quantity}`).join(",");
-  return `https://${domain}/cart/${parts}`;
 }

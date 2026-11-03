@@ -1,0 +1,4 @@
+#!/bin/sh
+# git runs this one instead of pre-commit when `git merge` makes a merge commit by
+# itself. Same check. A fast-forward makes no commit and runs no hook.
+exec "$(dirname "$0")/pre-commit"

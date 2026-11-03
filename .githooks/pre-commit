@@ -1,0 +1,24 @@
+#!/bin/sh
+# Required local check (SHOP-06): the same `pnpm test` the workflow runs. It takes
+# about 25 seconds. Not on by default: run `pnpm hooks:enable` once to turn it on.
+#
+# `pnpm test` reads the files on disk, not what git is about to commit. So this
+# first stops if a tracked file on disk differs from what is staged, which is the
+# only way the two can tell different stories about a tracked file. Untracked files
+# are not compared: the suites see them, and the commit does not carry them.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+# Before the unset below: git points GIT_INDEX_FILE at what this commit will hold.
+if ! git diff --quiet; then
+  echo "Commit stopped: these files on disk differ from what is staged, so the tests would not be checking what you are committing:" >&2
+  git diff --name-only >&2
+  echo "Stage them or put them aside, then commit again." >&2
+  exit 1
+fi
+# git sets these for hooks. They would point any git call in a suite at this commit.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE
+pnpm test
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo "Commit stopped: pnpm test failed. See the failed suites above." >&2
+fi
+exit "$status"

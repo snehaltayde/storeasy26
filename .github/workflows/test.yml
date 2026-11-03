@@ -1,0 +1,23 @@
+# The test gate (SHOP-06): every test:* suite except test:perf, on every push.
+# INERT until this repo is pushed to GitHub. Needs no repository secrets: the
+# suites use throwaway local databases and fake transports.
+name: test
+on:
+  push:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
