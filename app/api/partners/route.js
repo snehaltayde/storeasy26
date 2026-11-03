@@ -18,8 +18,7 @@ import {
 import { platformDb } from "@/lib/platform/control";
 import { sameOrigin } from "@/lib/origin-check";
 import { rateLimit } from "@/lib/rate-limit";
-import { runAsTenant } from "@/lib/platform/ops";
-import { legacyWritesRefusal } from "@/lib/cms-mode";
+import { contentWriteAnswer } from "@/lib/content-writes";
 
 // Agency workspace API (S48 / AG01–06). EVERY tenant-touching action
 // re-checks the accepted grant on this request — revocation is immediate,
@@ -86,12 +85,10 @@ export async function POST(request) {
     }
     if (body.kit_apply) {
       const tenant = String(body.kit_apply.tenant || "");
-      // P2-GUARD: the grant first (no probing other stores), then the store's
-      // own mode: a store on the new editor refuses the kit's legacy drafts.
-      // P2-WRITERS replaces this with a mode-aware facade.
+      // the grant first (no probing other stores). P2-WRITERS: the drafts go
+      // through lib/content-writes.js, which reads the store's own mode inside
+      // the store (legacy blocks, or doc_home / doc_announcement drafts)
       if (!(await activeGrant(agencyId, tenant))) return fail(422, "no accepted grant for that store");
-      const refused = await runAsTenant(tenant, () => legacyWritesRefusal({ route: "partners" }));
-      if (refused) return NextResponse.json(refused.body, { status: refused.status });
       const r = await applyAgencyKit({ agencyId, kitId: String(body.kit_apply.kit || ""), tenantId: tenant });
       return NextResponse.json({ ok: true, ...r });
     }
@@ -103,6 +100,8 @@ export async function POST(request) {
     }
     return fail(400, "Nothing to do");
   } catch (e) {
+    const write = contentWriteAnswer(e, { route: "partners" }); // the draft door's own answers: 409 conflict or mode, 422 issues
+    if (write) return NextResponse.json(write.body, { status: write.status });
     return fail(422, String(e?.message || e).slice(0, 300));
   }
 }
