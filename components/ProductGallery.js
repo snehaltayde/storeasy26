@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import Image from "@/components/StoreImage";
 import FadeImage from "./FadeImage";
 
 export default function ProductGallery({ images = [], title }) {

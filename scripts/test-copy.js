@@ -763,7 +763,7 @@ const checkoutFixture = {
   couponStatus: null,
 };
 const flowStubs = {
-  "next/image": nothing,
+  "@/components/StoreImage": nothing,
   "next/link": passthrough,
   "@/lib/format": format,
   "@/lib/shipping": shippingLib,
@@ -851,7 +851,7 @@ async function renderRealDrawer(initialCart) {
     "@/lib/track/client": { track() {} },
   });
   const { default: CartDrawer } = await loadComponent(sources.get("components/cart/CartDrawer.js"), {
-    "next/image": nothing,
+    "@/components/StoreImage": nothing,
     "next/link": passthrough,
     "@/lib/format": format,
     "./CartContext": { useCart: () => ({ ...ctx.useCart(), open: true }) },

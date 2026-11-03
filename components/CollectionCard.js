@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/StoreImage";
 
 export default function CollectionCard({ collection }) {
   const { handle, title, image, image_alt, product_count } = collection;

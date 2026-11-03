@@ -1,0 +1,22 @@
+✗ a library photo (/api/media/<id>) is library media, in every shape next/image takes
+   lib/image-src.js is missing
+✗ NEGATIVE: nothing else is library media (Shopify, public files, look-alikes, empty values)
+   lib/image-src.js is missing
+✗ every next/image in app/, components/ and lib/ goes through components/StoreImage.js
+   components/StoreImage.js doesn't exist or doesn't use next/image
+✗ the components that show photos use StoreImage (directly or through FadeImage)
+   components/FadeImage.js should import @/components/StoreImage
+✓ NEGATIVE: the media route still answers only for the store whose host asked
+✗ StoreImage: a library photo is its own url, with no srcset to the optimizer
+   components/StoreImage.js didn't load: ENOENT: no such file or directory, open '/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/batch-d/images/base/components/StoreImage.js'
+✗ StoreImage: a Shopify photo still goes through the optimizer
+   components/StoreImage.js didn't load: ENOENT: no such file or directory, open '/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/batch-d/images/base/components/StoreImage.js'
+✗ StoreImage: an explicit unoptimized still wins
+   components/StoreImage.js didn't load: ENOENT: no such file or directory, open '/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/batch-d/images/base/components/StoreImage.js'
+✗ product page gallery: library photos (main and thumbnails) render as /api/media urls
+   a library photo went to the optimizer: /_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=3840&q=75 | /_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=3840&q=75 | /_next/image?url=%2Fapi%2Fmedia%2Fmed_194a107989db40261d&w=3840&q=75
+✓ product page gallery: Shopify photos still go through the optimizer
+✗ product card and collection card: library photos render as /api/media urls
+   product card: /_next/image?url=%2Fapi%2Fmedia%2Fmed_ae5f4af4b10aec0b01&w=3840&q=75
+
+2 passed, 9 failed

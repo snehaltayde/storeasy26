@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/StoreImage";
 import { formatMoney } from "@/lib/format";
 
 // Header search (S38 / SF05): debounced suggestions with stale-response
