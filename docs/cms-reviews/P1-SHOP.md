@@ -170,8 +170,9 @@ round 2 suite, run first in this worktree.
 
 ## SHOP-06 findings
 
-**Time.** `pnpm test` takes about 25 seconds here (25.1s and 27.0s on the final code).
-About 7 seconds of that is the boundary suite, which now runs the real hook and runner.
+**Time.** `pnpm test` takes about 25 to 32 seconds here (27.4s through the real hook on the
+round 3 code; 12 runs in a row took 383s, about 32s each). About 10 seconds of that is the
+boundary suite (3 runs in 29s), which runs the hooks in throwaway repos and the real runner.
 That is far under the 2 minute limit, so the hook runs the same `pnpm test`, as the spec
 asks. No fast subset was needed.
 
@@ -182,7 +183,9 @@ reporting as an exception. Those runs below are from before the second review. A
 `pnpm test` was run again with network denied (exit 0, `41 of 41 suites passed in 27.0s`),
 and the boundary suite with `CI=true TZ=UTC` (35 passed). The stripped-environment run and
 the Node 24 run were not repeated, because the tool running this session refuses `env -i`.
-The new checks need only `pnpm`, `git` and `sleep` on `PATH`.
+The new checks need only `pnpm`, `git` and `sleep` on `PATH`. Round 3 did not repeat the
+network-denied or stripped-environment runs. Its new hook checks run `git` only on throwaway
+local repos, with the user's and system git config turned off for those calls.
 
 - Node 26.0.0: exit 0, `41 of 41 suites passed in 22.5s`.
 - Node 24.15.0: exit 0, `41 of 41 suites passed in 17.5s`.
@@ -287,16 +290,17 @@ text, so they can be beaten on purpose. These are not chased:
 - A file that contains a NUL byte is skipped as binary, so a full `productUpdate` document
   after `// <NUL>` passes (tried).
 - A `{` or `}` inside a string argument is counted as a brace. In a new file that still
-  fails, as any new document does (tried, exit 1). Edited into a listed document, inside a nested field (`job { id(f: "}") }`), it ends the reading early and
-  hides the fields after it, such as `collectionAddProducts` (tried in `lib/order-cancel.js`).
-  No document here has a string argument today.
+  fails, as any new document does (tried, exit 1). Edited into a listed document, inside a
+  nested field (`job { id(f: "}") }`), it ends the reading early and hides the fields after
+  it, such as `collectionAddProducts` (tried in `lib/order-cancel.js`). No mutation document
+  here has a string argument today.
 - A Shopify call through another name for the transport, such as `const send = gql` and then
   `send(CREATE_SUB, ...)` in `lib/platform/shopify-webhooks.js`, adds no counted call. Sent on
   every run, the admin payload check still fails it (tried, exit 1). Behind a tenant setting,
   it passes (tried).
 - A client library named in pieces, such as `require("shopify-" + "api-node")` (tried). Only
   `@shopify/...` and `shopify-api-node` are checked, so another Shopify client package under
-  a different name is not refused either. Its REST URL would still be caught if written out.
+  a different name is not refused either.
 - REST, in a new file: `/admin` kept in a constant (`https://${d}${ADMIN}/products/1`),
   `new URL("/admin/products/1", base)`, and a console page with more joined on after it
   (`${base}/admin` + p) (tried in round 2). The token header check does not help with these if
@@ -311,7 +315,8 @@ text, so they can be beaten on purpose. These are not chased:
   in round 2).
 
 **Shapes the third review found that are left as they are.** No code has them today. Each
-was reported by the reviewer with exit 0 and tried again here on the final suite, exit 0:
+was reported by the reviewer with exit 0, and tried again here on the final suite with
+exit 0, unless the line says otherwise:
 
 - SHOP-03: `${d}/cart/c/${t}` and `${d}/checkouts/${id}` with no scheme. The reviewer also
   reported `"https://" + d + "/checkouts/" + id` and `"https://" + d + "/cart"` (not re-tried).
@@ -382,9 +387,11 @@ was reported by the reviewer with exit 0 and tried again here on the final suite
 - The hook compares tracked files only. An untracked file on disk is seen by the tests and is
   not part of the commit, so a commit whose tests pass only because of an untracked file still
   goes through.
-- A commit of part of the work (`git add -p`, or `git commit <file>` with other changes on
-  disk) is stopped, because what is on disk is not what is being committed. That is on
-  purpose: commit the rest, or put it aside first.
+- A commit of part of the work is stopped, because what is on disk is not what is being
+  committed. That is on purpose: commit the rest, or put it aside first. The suite tries a
+  file staged and then changed on disk, which is what `git add -p` leaves. `git commit <file>`
+  with other changes on disk should stop the same way, because git hands the hook an index
+  without those changes (not tried).
 - A fast-forward merge makes no commit, so no hook runs. A merge stopped by a conflict is
   finished with `git commit`, which runs `pre-commit` (from git's documentation, not tried).
   Git does not run `pre-commit` for `git rebase` or `git cherry-pick` (from git's
@@ -471,8 +478,10 @@ added only by migrations, the cancel follow-up query, and the runner guard that 
 
 ## Test results on the final tree
 
+Round 3, on commit c1775a4 (the code of this round), in a fresh worktree:
+
 ```
-pnpm test:shopify-boundary    35 passed, 0 failed
+pnpm test:shopify-boundary    41 passed, 0 failed
 pnpm test:shopify-push        13 passed, 0 failed
 pnpm test:platform-sync       15 passed, 0 failed
 pnpm test:sync-generations     8 passed, 0 failed
@@ -487,6 +496,30 @@ pnpm test                     41 of 41 suites passed, exit 0
 
 `pnpm test` runs every `test:*` suite except `test:perf`, which is a measurement.
 
+Repeat runs, one after another, on the round 3 code:
+
+```
+pnpm test:cms-api        40 runs, 0 failed (20s)
+pnpm test:shopify-push   40 runs, 0 failed (27s)
+pnpm test                12 runs, 0 failed (383s)
+pnpm test:shopify-boundary 3 runs, 0 failed (29s)
+```
+
+One earlier `pnpm test` loop was stopped and its results thrown away, because temporary
+breaks were being run in the same tree at the same time, which would have failed the
+boundary suite for reasons that had nothing to do with flakes. No suite other than the two
+fixed in deviation 2 has been seen to fail at random in this branch's runs, but 12 runs of
+the whole gate can miss a rare flake.
+
+By hand, the real hooks into the real `pnpm test` (the link the suite cannot run itself):
+
+- `sh .githooks/pre-commit` on the clean tree: `41 of 41 suites passed in 27.4s`, no stop.
+- `lib/zz-staged-probe.js` holding `productUpdate`, staged and then removed from disk:
+  `Commit stopped: these files on disk differ from what is staged`, the file named, exit 1,
+  before any suite ran. Unstaged afterwards. The round 2 hook let this through
+  (`41 of 41 suites passed`).
+- `git config core.hooksPath` printed nothing (exit 1): the hooks are still off.
+
 ## Still needs doing
 
 **Browser drills (none done):**
@@ -498,7 +531,8 @@ pnpm test                     41 of 41 suites passed, exit 0
 - Run `pnpm build`. It was not run in this batch.
 - Push a branch and watch `.github/workflows/test.yml` pass, then push one with
   `productUpdate` and watch it fail. This is the real test of the SHOP-06 negative.
-- Run `pnpm hooks:enable` once the parallel sessions finish, then make one commit.
+- Run `pnpm hooks:enable` once the parallel sessions finish, then make one commit and one
+  merge commit.
 - Run `pnpm shopify:oauth` against a dev store to confirm the shared scope list in a real
   grant. Only the import was tested.
 - When OVL-03 lands, finish the SHOP-02 overlay test at the `OVL-03 HOOK`.
