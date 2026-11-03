@@ -128,28 +128,31 @@ await t("offerScheduleStatus lifecycle matrix", () => {
 // --- BE07: simulator ----------------------------------------------------------------
 const COUPON = { id: "sim-c10", type: "COUPON", scope: "order", priority: 50, title: "SIM10", code: "SIM10", discount: { kind: "percent", value: 10 }, combinable: true };
 
+// COM-03: the example carts come from this store's own catalog (Tee, Cap, Gift
+// Sticker above), not fixed sample baskets; scripts/test-offer-form.js covers
+// the examples in depth.
 await t("simulator: deterministic, explains not-applying, coupon applies with its code", async () => {
-  const a = await inT(() => SIM.simulateOffer({ offer: COUPON, cartKey: "medium" }));
-  const b = await inT(() => SIM.simulateOffer({ offer: COUPON, cartKey: "medium" }));
+  const a = await inT(() => SIM.simulateOffer({ offer: COUPON }));
+  const b = await inT(() => SIM.simulateOffer({ offer: COUPON }));
   eq(JSON.stringify(a), JSON.stringify(b), "deterministic");
   eq(a.ok, true, "ok");
   eq(a.applied.alone, true, "coupon auto-simulated with its code");
-  eq(a.alone.discountTotal, 190, "10% of the ₹1,897 basket (engine's own rounding, as test-offers proves)");
+  eq(a.cart.items.map((i) => i.title).join(), "Gift Sticker — OS", "the store's cheapest product, by its variant");
+  eq(a.alone.discountTotal, 10, "10% of the ₹99 cart (engine's own rounding, as test-offers proves)");
   const gift = { id: "sim-gift", type: "FREE_GIFT", scope: "gift", priority: 40, title: "Gift over 5k", threshold: 5000, gift: { variantId: "gid://shopify/ProductVariant/900001", productId: "gid://shopify/Product/900001", handle: "gift", title: "Gift Sticker", value: 99 } };
-  const g = await inT(() => SIM.simulateOffer({ offer: gift, cartKey: "small" }));
-  eq(g.applied.alone, false, "threshold not met on small basket");
-  ok(g.notes.some((n) => /threshold|targeting/i.test(n)), "explains why not");
-  const g2 = await inT(() => SIM.simulateOffer({ offer: { ...gift, threshold: 1000 }, cartKey: "medium" }));
-  eq(g2.applied.alone, true, "gift applies above threshold");
-  eq(g2.alone.gifts.length, 1, "gift present");
+  const g = await inT(() => SIM.simulateOffer({ offer: gift }));
+  eq(g.applied.alone, true, "the example cart crosses the threshold");
+  eq(g.alone.gifts.length, 1, "gift present");
+  eq(g.nearMiss.appliedAlone, false, "the closest cart under it gets no gift");
+  ok(/must be over/.test(g.nearMiss.text), "explains why not");
 });
 
 await t("simulator: combination preview vs ACTIVE offers + one-coupon note; invalid offer → errors", async () => {
   await inT(() => upsertOffer({ offer: { ...COUPON, id: "live-c20", code: "LIVE20", title: "LIVE20", discount: { kind: "percent", value: 20 } }, enabled: true }));
-  const r = await inT(() => SIM.simulateOffer({ offer: COUPON, cartKey: "medium" }));
+  const r = await inT(() => SIM.simulateOffer({ offer: COUPON }));
   eq(r.activeOfferCount, 1, "sees the live offer");
-  ok(r.notes.some((n) => /one coupon/.test(n)), "one-coupon-per-cart note");
-  const bad = await inT(() => SIM.simulateOffer({ offer: { id: "x", type: "COUPON" }, cartKey: "small" }));
+  ok(r.notes.some((n) => /one code per order/.test(n)), "one-coupon-per-cart note");
+  const bad = await inT(() => SIM.simulateOffer({ offer: { id: "x", type: "COUPON" } }));
   eq(bad.ok, false, "invalid offer refused");
   ok(bad.errors.length > 0, "named errors");
   await inT(() => deleteOffer("live-c20"));

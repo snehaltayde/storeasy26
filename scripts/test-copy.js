@@ -113,7 +113,6 @@ const ALLOWED = [
   { file: "lib/content/pages.js", re: /./, why: "BeastLife's own pages; brandDefaultsApply() gates them (tested below)" },
   { file: "lib/offers/config.js", re: /./, why: "BeastLife's own offers; seeded only by its bootstrap (test-platform-sync)" },
   { file: "lib/themes/kits.js", re: /Proteins, pre-workouts/, why: "Pulse kit preset: applied only when a founder picks that nutrition kit and accepts its copy" },
-  { file: "lib/offers/simulate.js", re: /./, why: "console offer simulator fixtures, never rendered to shoppers" },
   { file: "lib/content/templates.js", re: /\d–\d working days/, why: "console prefill a founder edits and saves; GEN-06 binds it to real settings" },
   { file: "lib/brand-tenants.js", re: /\["_default", "beastlife", "beastlife-staging"\]/, why: "tenant ids in the check that keeps BeastLife's pages on BeastLife" },
   { file: "app/(storefront)/layout.js", re: /Storeasy — fast, branded|on your existing Shopify catalog|%s · Storeasy|>Storeasy<|^Storeasy$/, why: "the platform-host branch only; a store's own address never reaches it" },

@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import OfferForm from "./OfferForm";
+import { doneMessage } from "./offerFormModel";
 import { offerScheduleStatus } from "@/lib/admin/schedule";
+import { OFFER_TYPE_NAMES, offerSentence } from "@/lib/offers/plain";
 import { PageHeader } from "@/components/console/PageHeader";
 import { Card } from "@/components/console/Card";
 import { Badge, StatusBadge } from "@/components/console/Badge";
@@ -14,17 +16,24 @@ import { ConfirmDialog } from "@/components/console/Dialog";
 import { EmptyState, Skeleton } from "@/components/console/bits";
 import { useToast } from "@/components/console/Toast";
 
-// Single-store offer console (Session 19, redesigned S50). List +
-// enable/disable + schedule + edit/create for the 4 engine offer types.
-// Every save is live on the next cart read — deliberately NOT a SaaS console
-// (no tenants/theming/billing).
+// Single-store offer console (Session 19, redesigned S50, plain words in
+// COM-03). List + on/off + schedule + edit/create for the 4 engine offer
+// types. Every save is live on the next cart read — deliberately NOT a SaaS
+// console (no tenants/theming/billing).
 // S32 (MC14): lifecycle — draft / paused / scheduled / active / expired
 // (derived in lib/admin/schedule.js, same logic the engine's window uses);
 // S50 renders it through the one StatusBadge map instead of a local chip.
+// COM-03: each row reads as the offer's sentence (lib/offers/plain.js) in the
+// store's currency. PUB-04 ("Recently published", phase 3) will list offer
+// changes from listRecentOfferChanges() in lib/offers/store.js, with Undo
+// calling the same /api/admin/offers/:id/revert as the form's
+// "Go back to previous offer settings".
 
-export default function OffersAdmin({ initialOffers }) {
+export default function OffersAdmin({ initialOffers, initialNames = {}, currency: initialCurrency = "INR" }) {
   const toast = useToast();
   const [offers, setOffers] = useState(initialOffers);
+  const [names, setNames] = useState(initialNames);
+  const [currency, setCurrency] = useState(initialCurrency);
   const [editing, setEditing] = useState(null); // offer row | "new"
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,8 +47,10 @@ export default function OffersAdmin({ initialOffers }) {
     try {
       const res = await fetch("/api/admin/offers");
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.offers) throw new Error(data.error || `Couldn't load offers (${res.status})`);
+      if (!res.ok || !data.offers) throw new Error(data.error || "Your offers couldn't load. Try again.");
       setOffers(data.offers);
+      if (data.names) setNames(data.names);
+      if (data.currency) setCurrency(data.currency);
     } catch (e) {
       setError(String(e.message || e));
     } finally {
@@ -58,7 +69,7 @@ export default function OffersAdmin({ initialOffers }) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Toggle failed (${res.status})`);
+        throw new Error(data.error || "That didn't work. Try again.");
       }
       await refresh({ silent: true });
     } catch (e) {
@@ -72,30 +83,16 @@ export default function OffersAdmin({ initialOffers }) {
     const res = await fetch(`/api/admin/offers/${offer.id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `Delete failed (${res.status})`);
+      throw new Error(data.error || "That didn't work. Try again.");
     }
     toast.success(`Deleted “${offer.label}”`);
     await refresh();
   }
 
-  const summarize = (o) => {
-    const c = o.config || {};
-    switch (o.type) {
-      case "BXGY":
-        return `buy ${c.buy} get ${c.free} free · ${c.target?.kind}=${c.target?.value}`;
-      case "TIERED_QTY":
-        return `${(c.tiers || []).map((t) => `${t.minQty}+→${t.percent}%`).join(", ")} · ${c.target?.kind}=${c.target?.value}`;
-      case "FREE_GIFT":
-        return `over ₹${c.threshold} → ${c.gift?.title?.slice(0, 30)}`;
-      case "COUPON":
-        return `${c.code} · ${c.discount?.kind === "percent" ? `${c.discount.value}%` : `₹${c.discount?.value}`}${c.minSubtotal ? ` (min ₹${c.minSubtotal})` : ""}${c.combinable === false ? " · exclusive" : ""}`;
-      default:
-        return "";
-    }
-  };
+  const summarize = (o) => offerSentence(o.config, { names, currency }) || o.label;
 
   const schedule = (o) => {
-    if (!o.starts_at && !o.ends_at) return "always";
+    if (!o.starts_at && !o.ends_at) return "Runs whenever it's on";
     const f = (s) => (s ? new Date(s).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "…");
     return `${f(o.starts_at)} → ${f(o.ends_at)}`;
   };
@@ -104,8 +101,14 @@ export default function OffersAdmin({ initialOffers }) {
     return (
       <OfferForm
         existing={editing === "new" ? null : editing}
-        onDone={async () => {
+        currency={currency}
+        names={names}
+        offers={offers}
+        onChanged={() => refresh({ silent: true })}
+        onDone={async (result = {}) => {
           setEditing(null);
+          // true to when shoppers get it: a future start, dates that ended, or off
+          toast.success(doneMessage(result));
           await refresh();
         }}
         onCancel={() => setEditing(null)}
@@ -123,7 +126,7 @@ export default function OffersAdmin({ initialOffers }) {
     <div>
       <PageHeader
         title="Offers"
-        description="Changes are live on the next cart read — no deploy needed."
+        description="An offer reaches shoppers as soon as you start it, with no publish step. Turn one off at any time."
         actions={newOfferButton}
       />
 
@@ -149,35 +152,51 @@ export default function OffersAdmin({ initialOffers }) {
         ) : offers.length === 0 ? (
           <EmptyState
             title="No offers yet"
-            body="Coupons, bundles, tiered discounts and free gifts all start here."
+            body="Buy-some-get-some-free deals, bigger discounts for buying more, free gifts and discount codes all start here."
             action={newOfferButton}
           />
         ) : (
           <ul className="divide-y divide-edge">
             {offers.map((o) => (
-              <li key={o.id} className="flex items-center gap-4 px-4 py-4">
-                <Switch
-                  checked={!!o.enabled}
-                  pending={togglingId === o.id}
-                  label={`${o.enabled ? "Disable" : "Enable"} ${o.label}`}
-                  onChange={() => toggle(o)}
-                />
+              <li key={o.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4">
+                {o.type === "BUNDLE" ? (
+                  // shows the bundle's state; turning it on or off here would
+                  // leave the offer and its bundle record disagreeing
+                  <Switch checked={!!o.enabled} disabled label={`${o.label}: turn it on or off in Catalog`} />
+                ) : (
+                  <Switch
+                    checked={!!o.enabled}
+                    pending={togglingId === o.id}
+                    label={`${o.enabled ? "Turn off" : "Turn on"} ${o.label}`}
+                    onChange={() => toggle(o)}
+                  />
+                )}
                 <div className="min-w-0 flex-1">
-                  <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-fg">
+                  <p className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold text-fg">
                     <span className="truncate">{o.label}</span>
-                    <Badge>{o.type}</Badge>
+                    <Badge>{OFFER_TYPE_NAMES[o.type] || o.type}</Badge>
                     <StatusBadge status={offerScheduleStatus(o)} />
                   </p>
-                  <p className="truncate text-xs text-fg-muted">
+                  <p className="text-xs text-fg-muted">
                     {summarize(o)} · <span className={o.starts_at || o.ends_at ? "text-warning" : ""}>{schedule(o)}</span>
                   </p>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => setEditing(o)}>
-                  Edit
-                </Button>
-                <Button size="sm" variant="dangerOutline" onClick={() => setDeleting(o)}>
-                  Delete
-                </Button>
+                {o.type === "BUNDLE" ? (
+                  // a bundle's offer follows its bundle record; editing or
+                  // deleting it here would leave the two disagreeing
+                  <a href="/admin/catalog" className="rounded-ctl px-2.5 py-1.5 text-xs font-medium text-fg-muted focus-ring hover:bg-surface-sunken hover:text-fg">
+                    Change it in Catalog
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setEditing(o)}>
+                      Edit
+                    </Button>
+                    <Button size="sm" variant="dangerOutline" onClick={() => setDeleting(o)}>
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -190,7 +209,7 @@ export default function OffersAdmin({ initialOffers }) {
         title="Delete offer"
         tone="danger"
         confirmLabel="Delete offer"
-        body={deleting ? `Delete “${deleting.label}”? Shoppers lose it on the next cart read — this cannot be undone.` : null}
+        body={deleting ? `Delete “${deleting.label}”? Shoppers lose it on their next cart, and it can't be brought back.` : null}
         onConfirm={() => remove(deleting)}
       />
     </div>
