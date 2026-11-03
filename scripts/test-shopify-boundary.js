@@ -137,6 +137,18 @@ function rootFields(text, open) {
   return fields;
 }
 
+// True when only whitespace (real, or written as \n) sits between an opening quote
+// and this position, which is how an indented document starts.
+function startsString(text, index) {
+  let i = index - 1;
+  while (i >= 0) {
+    if (/\s/.test(text[i])) i--;
+    else if (text[i - 1] === "\\" && /[nrt]/.test(text[i])) i -= 2;
+    else break;
+  }
+  return i >= 0 && /["'`]/.test(text[i]);
+}
+
 // Every GraphQL mutation written in a piece of source text. Prose that uses the
 // word ("a duplicate-mutation guard") has no selection set and is ignored. A
 // string that starts with "mutation" but has no readable document is a mutation
@@ -149,14 +161,24 @@ function findMutations(text) {
     let i = skipBlank(text, m.index + "mutation".length);
     const name = /^[A-Za-z_]\w*/.exec(text.slice(i));
     if (name) i = skipBlank(text, i + name[0].length);
-    if (text[i] === "(") i = skipBlank(text, skipBalanced(text, i, "(", ")"));
+    else if (text.startsWith("${", i)) i = skipBlank(text, skipBalanced(text, i + 1, "{", "}"));
+    let graphqlHead = false;
+    if (text[i] === "(") {
+      graphqlHead = true;
+      i = skipBlank(text, skipBalanced(text, i, "(", ")"));
+    }
+    for (let directive; (directive = /^@[A-Za-z_]\w*/.exec(text.slice(i))); ) {
+      graphqlHead = true;
+      i = skipBlank(text, i + directive[0].length);
+      if (text[i] === "(") i = skipBlank(text, skipBalanced(text, i, "(", ")"));
+    }
     if (text[i] === "{") {
       found.push(...rootFields(text, i));
       continue;
     }
-    const opensString = /["'`]\s*$/.test(text.slice(Math.max(0, m.index - 3), m.index));
     const closesString = /^["'`]/.test(text.slice(m.index + "mutation".length));
-    if (opensString && !closesString) found.push("<unreadable>");
+    const bodyIsInterpolated = graphqlHead && text.startsWith("${", i);
+    if (bodyIsInterpolated || (startsString(text, m.index) && !closesString)) found.push("<unreadable>");
   }
   return found;
 }
@@ -175,9 +197,9 @@ const findMutationNames = (text) => [...text.matchAll(MUTATION_NAME)].map((m) =>
 // URL other than graphql.json counts as a REST write until someone reviews it.
 function findAdminRest(text) {
   const hits = [];
-  for (const m of text.matchAll(/\/admin\/api\//g)) {
+  for (const m of text.matchAll(/\/admin\/api(?![\w-])/g)) {
     const rest = text.slice(m.index + m[0].length, m.index + m[0].length + 80);
-    if (!/^(?:\$\{[^}]*\}|[\w.-]+)\/graphql\.json/.test(rest)) hits.push(`${m[0]}${rest.split(/[\s"'`]/)[0]}`);
+    if (!/^\/(?:\$\{[^}]*\}|[\w.-]+)\/graphql\.json/.test(rest)) hits.push(`${m[0]}${rest.split(/[\s"'`]/)[0]}`);
   }
   for (const m of text.matchAll(/\/admin\/(?!api\/|oauth\/)[^\s"'`]*\.json\b/g)) hits.push(m[0]);
   for (const m of text.matchAll(/\/admin\/oauth\/([\w.-]*)/g)) {
@@ -192,6 +214,7 @@ function findShopifyCartLinks(text) {
     /\bcheckoutUrl\b/g,
     /\bNEXT_PUBLIC_SHOPIFY_DOMAIN\b/g,
     /\/cart\/(?:\$\{|\d|add\b|clear\b|change\b|update\b)/g,
+    /\/cart\/["'`]/g,
     /https?:\/\/[^\s"'`]*\/cart\b/g,
     /https?:\/\/(?!checkout\.razorpay\.com)[^\s"'`]*\/checkouts?\b/g,
   ];
@@ -243,6 +266,12 @@ await t("SHOP-01: scanners catch what they must and ignore prose", async () => {
   eq(findMutations("`mutation { ${FIELD}(input: $i) { id } }`"), ["<unreadable>"], "interpolated:");
   eq(findMutations("`mutation { ...Save }`"), ["<unreadable>"], "fragment:");
   eq(findMutations('"mutation " + op'), ["<unreadable>"], "built at run time:");
+  eq(findMutations("`\n  mutation Foo($i: ID!) @inContext(country: IN) {\n    collectionAddProducts(id: $i) { userErrors { message } }\n  }\n`"), ["collectionAddProducts(id:$i)"], "indented, with a directive:");
+  eq(findMutations("`\n  mutation ${n}($i: ID!) {\n    collectionAddProducts(id: $i) { userErrors { message } }\n  }`"), ["collectionAddProducts(id:$i)"], "interpolated operation name:");
+  eq(findMutations("mutation Foo($i: ID!) @inContext(country: IN) @x {\n  collectionReorderProducts(id: $i) { userErrors { message } }\n}\n"), ["collectionReorderProducts(id:$i)"], ".graphql file, two directives:");
+  eq(findMutations("`\n  mutation ${rest}\n`"), ["<unreadable>"], "indented, built at run time:");
+  eq(findMutations('"\\n  mutation " + op'), ["<unreadable>"], "escaped newline, built at run time:");
+  eq(findMutations("`\n  mutation Foo($i: ID!) ${body}\n`"), ["<unreadable>"], "interpolated body:");
   eq(findMutations("// every mutation hits the edge\nconst mutation = sub ? A : B; gql(mutation, vars); a duplicate-mutation guard"), [], "prose:");
   eq(findMutationNames("// see productUpdate later"), ["productUpdate"], "name in a comment:");
   eq(findMutationNames("const x = 'productVariantsBulkUpdate' + metafieldsSet"), ["productVariantsBulkUpdate", "metafieldsSet"], "bare names:");
@@ -251,14 +280,17 @@ await t("SHOP-01: scanners catch what they must and ignore prose", async () => {
   ok(findAdminRest("fetch(`https://${shop}/admin/api/2025-10/products/1.json`, { method: 'PUT' })").length, "versioned REST write");
   ok(findAdminRest("fetch(`https://${shop}/admin/api/${v}/products.json`, { method: 'POST' })").length, "interpolated version REST write");
   ok(findAdminRest("const base = `https://${shop}/admin/api/${v}`;").length, "bare Admin base URL");
+  ok(findAdminRest("const ADMIN_API = () => `https://${shop}/admin/api`;").length, "base URL with no trailing slash");
   ok(findAdminRest("fetch(`https://${shop}/admin/products/1.json`)").length, "unversioned REST");
   ok(findAdminRest("fetch(`https://${shop}/admin/oauth/access_scopes.json`)").length, "other oauth endpoint");
   eq(findAdminRest("`https://${storeDomain()}/admin/api/${API_VERSION()}/graphql.json`"), [], "graphql.json:");
-  eq(findAdminRest("`https://${d}/admin/oauth/access_token` `https://${d}/admin/oauth/authorize?x=1` href='/admin/orders'"), [], "oauth + console path:");
+  eq(findAdminRest("`https://${d}/admin/oauth/access_token` `https://${d}/admin/oauth/authorize?x=1` href='/admin/orders' href='/admin/api-keys'"), [], "oauth + console paths:");
 
   ok(findShopifyCartLinks("return `https://${domain}/cart/${parts}`;").length, "cart permalink");
   ok(findShopifyCartLinks("`https://x.myshopify.com/cart/123:1`").length, "literal permalink");
   ok(findShopifyCartLinks("`https://${d}/checkouts/abc`").length, "checkout link");
+  ok(findShopifyCartLinks("`${base}/cart/` + parts").length, "permalink joined to a template");
+  ok(findShopifyCartLinks("base + '/cart/' + parts").length, "permalink joined to a string");
   eq(findShopifyCartLinks('import x from "@/components/cart/CartContext"; fetch("/api/cart"); // navigation/cart/wishlist'), [], "own cart paths:");
   eq(findShopifyCartLinks('"https://checkout.razorpay.com/v1/checkout.js"'), [], "payment script:");
 });
@@ -300,11 +332,30 @@ await t("SHOP-01: the spike stays a labelled one-off that nothing imports", asyn
   ok(files.find((f) => f.path === SPIKE)?.text.startsWith("// Session 8 SPIKE"), "spike keeps its label");
 });
 
+// The two files that may send the Admin token. The token check cannot see a new
+// call inside them, so their Admin URLs and fetch calls are locked exactly. A new
+// one, however its URL is put together, is a reviewed change to this list.
+const ADMIN_TOKEN_FILES = {
+  "lib/shopify-admin.js": {
+    urls: ["/admin/api/${API_VERSION()}/graphql.json", "/admin/oauth/access_token", "/admin/oauth/access_token"],
+    fetches: 3,
+  },
+  [SPIKE]: { urls: ["/admin/api/${APIVER}/graphql.json"], fetches: 1 },
+};
+
 await t("SHOP-01: no REST call to the Admin API, and the Admin token header stays in known files", async () => {
   const rest = files.flatMap((f) => findAdminRest(f.text).map((h) => `${f.path}: ${h}`));
   eq(rest.length, 0, `Admin API must go through graphql.json so the mutation list can see it:${listIn(rest)}\n   `);
   const tokenUsers = files.filter((f) => /x-shopify-access-token/i.test(f.text)).map((f) => f.path);
-  eq(sorted(tokenUsers), sorted(["lib/shopify-admin.js", SPIKE]), "files sending the Admin token:");
+  eq(sorted(tokenUsers), sorted(Object.keys(ADMIN_TOKEN_FILES)), "files sending the Admin token:");
+});
+
+await t("SHOP-01: the files that send the Admin token call only their known URLs", async () => {
+  for (const [path, { urls, fetches }] of Object.entries(ADMIN_TOKEN_FILES)) {
+    const { text } = files.find((f) => f.path === path);
+    eq([...text.matchAll(/\/admin\b[^\s"'`]*/g)].map((m) => m[0]).sort(), urls, `${path} Admin URLs:`);
+    eq([...text.matchAll(/\bfetch\b/g)].length, fetches, `${path} fetch calls:`);
+  }
 });
 
 await t("SHOP-01: the allowed write scopes are exactly write_orders and write_draft_orders", async () => {
@@ -475,6 +526,38 @@ const fullOrder = (overrides = {}) => ({
   ...overrides,
 });
 
+// fullOrder() can only fire branches for fields it has. A key added behind a field
+// it lacks, such as `...(it.displayTitle ? { title: it.displayTitle } : {})`, would
+// never show up. So this wraps the whole order: a field the fixture does not have
+// reads as a marker string and is written down. That fires the branch, and the
+// exact key and path checks then see what comes out.
+const UNKNOWN_FIELD = "UNKNOWN-FIELD-MARKER";
+function probeUnknownFields(order) {
+  const unknownReads = [];
+  const wrap = (value, path) =>
+    new Proxy(value, {
+      get(target, key, receiver) {
+        if (typeof key === "symbol") return Reflect.get(target, key, receiver);
+        if (!(key in target)) {
+          unknownReads.push(`${path}.${key}`);
+          return UNKNOWN_FIELD;
+        }
+        const v = Reflect.get(target, key, receiver);
+        return v && typeof v === "object" ? wrap(v, Array.isArray(target) ? `${path}[]` : `${path}.${key}`) : v;
+      },
+    });
+  return { order: wrap(order, "order"), unknownReads };
+}
+const READS_UNKNOWN = "The draft order reads a field this test does not have. Add it to fullOrder() so its branch runs:";
+
+await t("SHOP-02: the unknown-field probe fires a branch the fixture would not", async () => {
+  const items = (o) => o.snapshot.items.map((it) => ({ variantId: it.variantId, ...(it.displayTitle ? { title: it.displayTitle } : {}) }));
+  eq(Object.keys(items(fullOrder())[0]), ["variantId"], "plain fixture:");
+  const { order, unknownReads } = probeUnknownFields(fullOrder());
+  eq(items(order)[0], { variantId: VARIANT_ID, title: UNKNOWN_FIELD }, "probed:");
+  eq(sorted(unknownReads), ["order.snapshot.items[].displayTitle"], "reads written down:");
+});
+
 await t("SHOP-02: a paid line item carries only variantId and quantity", async () => {
   const input = P.buildDraftOrderInput(fullOrder());
   eq(Object.keys(input.lineItems[0]).sort(), LINE_KEYS, "line item keys:");
@@ -485,6 +568,13 @@ await t("SHOP-02: a gift line carries only variantId, quantity and the fixed dis
   const input = P.buildDraftOrderInput(fullOrder());
   eq(Object.keys(input.lineItems[1]).sort(), GIFT_LINE_KEYS, "gift keys:");
   eq(input.lineItems[1], { variantId: GIFT_VARIANT_ID, quantity: 1, appliedDiscount: GIFT_DISCOUNT }, "gift line:");
+});
+
+await t("SHOP-02: a line key behind a field the order does not have yet fails here too", async () => {
+  const { order, unknownReads } = probeUnknownFields(fullOrder());
+  const { lineItems } = P.buildDraftOrderInput(order);
+  eq(lineItems.map((l) => Object.keys(l).sort()), [LINE_KEYS, GIFT_LINE_KEYS], "line item keys:");
+  eq(sorted(unknownReads), [], READS_UNKNOWN);
 });
 
 await t("SHOP-02: content on the snapshot (title, handle, image, sku, catalog_title) stays out of the draft", async () => {
@@ -546,14 +636,24 @@ const FIXED_PATHS = [
 ];
 const KNOWN_PATHS = [...Object.values(MERCHANT_TEXT_ROUTES).map((r) => r.path), ...SHOPPER_PATHS, ...FIXED_PATHS];
 
-// Paths of every value, in the form that goes over the wire.
+// Paths of every value, in the form that goes over the wire. An empty array or
+// object gets a path too, so a new field cannot go out unnamed and fill up later.
 function leaves(value, path = "", out = []) {
-  if (Array.isArray(value)) for (const v of value) leaves(v, `${path}[]`, out);
-  else if (value && typeof value === "object") for (const [k, v] of Object.entries(value)) leaves(v, path ? `${path}.${k}` : k, out);
-  else out.push({ path, value });
+  if (Array.isArray(value)) {
+    if (!value.length) out.push({ path: `${path}[]`, value });
+    for (const v of value) leaves(v, `${path}[]`, out);
+  } else if (value && typeof value === "object") {
+    const entries = Object.entries(value);
+    if (!entries.length) out.push({ path, value });
+    for (const [k, v] of entries) leaves(v, path ? `${path}.${k}` : k, out);
+  } else out.push({ path, value });
   return out;
 }
 const wireLeaves = (value) => leaves(JSON.parse(JSON.stringify(value)));
+
+await t("SHOP-04: an empty array or object still gets a path", async () => {
+  eq(wireLeaves({ a: [], b: {}, c: [{ d: [] }] }).map((l) => l.path), ["a[]", "b", "c[].d[]"], "paths:");
+});
 
 await t("SHOP-04: the route list names all six: discount description and title, shipping title, note, tags, cancel staff note", async () => {
   eq(Object.keys(MERCHANT_TEXT_ROUTES).sort(), ["discount description", "discount title", "note", "shipping title", "tags"], "draft order routes:");
@@ -565,6 +665,14 @@ await t("SHOP-04: a draft order holds only known fields, so a new free-text fiel
   const unknown = found.filter((p) => !KNOWN_PATHS.includes(p));
   eq(unknown, [], "New field sent to Shopify. Decide whether it is order data, then name it in this test:");
   eq(found, sorted(KNOWN_PATHS), "every known field still sent:");
+});
+
+await t("SHOP-04: a field behind a value the order does not have yet fails here too", async () => {
+  const { order, unknownReads } = probeUnknownFields(fullOrder());
+  const found = sorted(wireLeaves(P.buildDraftOrderInput(order)).map((l) => l.path));
+  eq(found.filter((p) => !KNOWN_PATHS.includes(p)), [], "New field sent to Shopify. Decide whether it is order data, then name it in this test:");
+  eq(found, sorted(KNOWN_PATHS), "every known field still sent:");
+  eq(sorted(unknownReads), [], READS_UNKNOWN);
 });
 
 await t("SHOP-04: a real order's draft (COD, nothing optional) holds no unknown field either", async () => {
@@ -667,17 +775,23 @@ await t("SHOP-03: no Shopify cart or checkout link in lib, app, components", asy
 // ===========================================================================
 // SHOP-06: the check is wired up
 // ===========================================================================
-await t("SHOP-06: pnpm test, the workflow and the hook all reach this suite", async () => {
+await t("SHOP-06: pnpm test, the workflow and the hook all reach this suite, and nothing turns them off", async () => {
   const pkg = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
   eq(pkg.scripts.test, "node scripts/run-tests.js", "test script:");
   eq(pkg.scripts["test:shopify-boundary"], "node scripts/test-shopify-boundary.js", "suite script:");
 
-  const workflow = await readFile(join(ROOT, ".github/workflows/test.yml"), "utf8");
-  ok(/^on:\s*\n\s+push:/m.test(workflow), "the workflow runs on push");
-  ok(/run: pnpm test\s*$/m.test(workflow), "the workflow runs pnpm test");
+  // Comment lines first: a line that has been commented out runs nothing.
+  const code = (text) => text.split("\n").filter((line) => !/^\s*#/.test(line)).join("\n");
 
-  const hook = await readFile(join(ROOT, ".githooks/pre-commit"), "utf8");
-  ok(/^pnpm test$/m.test(hook), "the hook runs pnpm test");
+  const workflow = code(await readFile(join(ROOT, ".github/workflows/test.yml"), "utf8"));
+  ok(/^on:\n  push:\n  workflow_dispatch: \{\}$/m.test(workflow), "the workflow runs on every push");
+  ok(/^\s*- run: pnpm test\s*$/m.test(workflow), "the workflow runs pnpm test");
+  eq([...workflow.matchAll(/^[\s-]*(if|continue-on-error):/gm)].map((m) => m[1]), [], "switches that skip the gate or ignore its failure:");
+
+  const hook = code(await readFile(join(ROOT, ".githooks/pre-commit"), "utf8"));
+  ok(/^pnpm test\nstatus=\$\?$/m.test(hook), "the hook runs pnpm test and keeps its result");
+  ok(hook.trimEnd().endsWith('exit "$status"'), 'the hook ends with exit "$status"');
+  eq([...hook.matchAll(/\bexit\b.*/g)].map((m) => m[0]), ["exit 1", 'exit "$status"'], "the hook's exits:");
   ok(((await stat(join(ROOT, ".githooks/pre-commit"))).mode & 0o111) !== 0, "the hook is executable");
 });
 

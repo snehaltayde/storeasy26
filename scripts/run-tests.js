@@ -18,6 +18,7 @@ const SUITE_TIMEOUT_MS = Number(process.env.TEST_SUITE_TIMEOUT_MS || 2 * 60_000)
 
 // test:perf is a measurement. It reports numbers and has nothing to fail on.
 const NOT_A_GATE = new Set(["test:perf"]);
+const BOUNDARY_COMMAND = "node scripts/test-shopify-boundary.js";
 
 const args = process.argv.slice(2);
 const unknown = args.filter((a) => a !== "--verbose");
@@ -33,6 +34,8 @@ const suites = Object.keys(scripts).filter((name) => name.startsWith("test:") &&
 // A guard that cannot find its suites must fail, never pass by running nothing.
 const problems = [];
 if (!suites.includes("test:shopify-boundary")) problems.push("test:shopify-boundary is missing from package.json");
+// The suite cannot report its own command being weakened (`... || true`), so this does.
+else if (scripts["test:shopify-boundary"] !== BOUNDARY_COMMAND) problems.push(`test:shopify-boundary must be exactly: ${BOUNDARY_COMMAND}`);
 // A suite file with no test:* script would silently never run.
 const commands = Object.values(scripts).join("\n");
 for (const file of await readdir(join(ROOT, "scripts"))) {
