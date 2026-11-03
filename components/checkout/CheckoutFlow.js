@@ -5,12 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { formatMoney } from "@/lib/format";
 import { computeShipping } from "@/lib/shipping";
+import { friendlyCheckoutError } from "@/lib/shopper-errors";
 import { track } from "@/lib/track/client";
 
 const STEPS = ["Address", "Review", "Payment"];
-
-// The /api/checkout messages that are safe to show as written (GEN-03).
-const SHOPPER_CHECKOUT_ERRORS = /^(please fill all required fields|this checkout attempt no longer matches|online payment isn.t available|too many requests)/i;
 
 const AUTOCOMPLETE = {
   email: "email",
@@ -108,21 +106,6 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // S32 (SF07): honest handoff states — the cart is never lost on a failure,
-  // say so, and explain the recoverable cases instead of parroting codes.
-  function friendlyCheckoutError(data = {}) {
-    if (data.code === "CHECKOUT_DISABLED") {
-      return "Checkout is temporarily unavailable for this store — your cart is saved, nothing was charged. Please try again later.";
-    }
-    if (/cart is empty|no cart session/i.test(data.error || "")) {
-      return "Your cart session expired — your items may still be in the cart. Go back to the cart and try again.";
-    }
-    // GEN-03: only messages written for shoppers pass through. The route's
-    // catch-all forwards raw internals (provider responses, database errors).
-    if (SHOPPER_CHECKOUT_ERRORS.test(data.error || "")) return data.error;
-    return "Could not continue — your cart is untouched, please retry.";
-  }
 
   function goConfirmation(data) {
     // Full nav so the layout re-reads the (now-cleared) cart. The server hands

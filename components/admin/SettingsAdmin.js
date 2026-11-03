@@ -7,6 +7,7 @@ import { Banner } from "@/components/console/Banner";
 import { Button, IconButton } from "@/components/console/Button";
 import { Field, Input, Select } from "@/components/console/fields";
 import { useToast } from "@/components/console/Toast";
+import { shippingFormChanged } from "@/lib/admin/settings";
 
 // Merchant settings console (Session 22, redesigned S50). One form,
 // sectioned into anchor-target Cards; secret fields are WRITE-ONLY — a
@@ -105,7 +106,7 @@ export default function SettingsAdmin({ initial }) {
         commerce,
         tracking,
         // GEN-03: saving something else here must not turn starter rates into "the store's own"
-        ...(s.shipping_is_default && JSON.stringify(shipping) === JSON.stringify(buildState(s).shipping) ? {} : { shipping }),
+        ...(s.shipping_is_default && !shippingFormChanged(shipping, buildState(s).shipping) ? {} : { shipping }),
         ...(adminPassword ? { admin_password: adminPassword } : {}),
       }),
     });

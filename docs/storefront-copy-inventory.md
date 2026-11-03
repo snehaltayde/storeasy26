@@ -10,7 +10,15 @@ Every piece of fixed text a shopper can receive, swept at baseline `939d630`, an
 - **Editable:** a founder can already change it through an existing setting. No new CMS field was added.
 - **Kept:** left as it is, with the reason.
 
-`pnpm test:copy` guards this list. Changing a decision here should go with a change to `BANNED` or `ALLOWED` in `scripts/test-copy.js`.
+**What `pnpm test:copy` guards:** section 1. Putting back any row's old wording fails the suite, through the source scan, a render, or a test that calls the route or clicks the button. Wording changed from what section 1 says is not pinned unless a test names it.
+
+**What it does not guard:**
+
+- The ban on naming Razorpay, Shopify or Storeasy in visible text covers storefront pages and components only. In `lib` and `app/api`, only the listed phrases fail.
+- Sections 2 and 3 are decisions, not assertions, apart from the guards named in section 3.
+- Text put together at runtime from fragments, and text a founder has stored (see "Old default words already saved" in section 5).
+
+Changing a decision here should go with a change to `BANNED` or `ALLOWED` in `scripts/test-copy.js`.
 
 BeastLife's stored content (its hero, tagline, footer tagline, logo and legal name, set by `scripts/seed-cms-beastlife.js` and `scripts/seed-tenant-beastlife.js`) is untouched. Only code defaults changed.
 
@@ -26,8 +34,9 @@ Line numbers are from `939d630`.
 |---|---|---|
 | "Something dropped the weights" | `app/(storefront)/error.js:22` | "Something went wrong" |
 | "Add some gains and they'll show up here." | `components/cart/CartDrawer.js:158` | "Add something you like and it'll show up here." |
-| "Browse the full catalog at ludicrous speed — fresh drops, live offers and fast checkout." (default hero; it also promised offers a store may not have) | `lib/cms/defaults.js:13` | "Browse the full catalog and check out in a few easy steps." Also editable (section 2). |
-| "Fresh drops" (default title of the newest-products section) | `lib/cms/defaults.js:23`, `lib/cms/registry.js:58`, `components/admin/cms/HomeEditor.js:38` | "New arrivals". Also editable (section 2). |
+| "Browse the full catalog at ludicrous speed — fresh drops, live offers and fast checkout." (default hero; it also promised offers a store may not have) | `lib/cms/defaults.js:13` | "Browse the full catalog and check out in a few easy steps." On an empty store, "Our shop is opening soon." Also editable (section 2). A store that already saved the old text keeps it (section 5). |
+| "Fresh drops" (default title of the newest-products section) | `lib/cms/defaults.js:23`, `lib/cms/registry.js:58`, `components/admin/cms/HomeEditor.js:38` | "New arrivals". Also editable (section 2). A store that already saved the old text keeps it (section 5). |
+| `Storeasy <onboarding@resend.dev>`, or one `MAIL_FROM` name, as the sender of every store's emails (sign-in codes, automations, quiz picks) | `lib/mail.js:8`, `lib/notifications.js:81` | `{store name} <the MAIL_FROM address>`. Invitations and password resets stay the platform's. |
 
 ### Developer or platform text
 
@@ -35,6 +44,7 @@ Line numbers are from `939d630`.
 |---|---|---|
 | "Catalog not synced yet" / "Connect the store's Shopify account, then pull the catalog:" / `pnpm migrate` `pnpm sync` / "Home, collections, product pages and search all light up automatically once products land." | `app/(storefront)/page.js:97-114` | `components/EmptyCatalog.js`: "New products are on the way" / "We're getting things ready. Please check back soon." |
 | "Storefront ready" (badge on an empty home) | `app/(storefront)/page.js:61` | "Coming soon" |
+| "See what's new" on an empty home, pointing at `#new`, which only exists once there are products | `app/(storefront)/page.js:77` | Hidden while the store is empty, on any hero that points at `#new` |
 | "No collections yet — run `pnpm sync`." | `app/(storefront)/collections/page.js:35` | "No collections to show yet — please check back soon." |
 | "© {name} · Catalog synced from the live Shopify store" (both footer variants) | `components/Footer.js:64`, `:147` | "© {name}" |
 | "Browse the {name} catalog — a fast storefront over the live Shopify store." (default tagline: meta description, manifest, footer) | `lib/site.js:36` | "Shop {name} online." Also editable (section 2). |
@@ -53,13 +63,14 @@ Line numbers are from `939d630`.
 
 | Was | Location | Now |
 |---|---|---|
-| Any `/api/checkout` error shown as written, including the route's catch-all: raw provider text ("Razorpay order create failed (…)") and database errors | `components/checkout/CheckoutFlow.js:117` | Only four known messages pass, by allow-list. Anything else shows the plain "Could not continue…" line. |
+| Any `/api/checkout` error shown as written, including the route's catch-all: raw provider text ("Razorpay order create failed (…)") and database errors | `components/checkout/CheckoutFlow.js:117` | Only four known messages pass, by allow-list (`lib/shopper-errors.js`). Anything else shows the plain "Could not continue…" line. |
 | Server verify errors ("Payment signature verification failed", "Order mismatch") | `components/checkout/CheckoutFlow.js:217` | "We couldn't confirm your payment for order {id}. If money left your account, please don't pay again — contact the store with this order number." |
 | Browser wording from a failed fetch or a non-JSON reply ("Failed to fetch", "Unexpected token…") | `components/checkout/CheckoutFlow.js:229` | "Could not reach the store — your cart is untouched. Check your connection and try again." |
 | "Razorpay is not configured" | `app/api/checkout/route.js:197` | "Online payment isn't available for this store right now." |
 | "Checkout is briefly paused by the platform — …" | `app/api/checkout/route.js:116` | "Checkout is briefly paused — …" |
 | Any thrown message on `/api/account`, including database errors, shown by the sign-in, returns, profile and wishlist forms | `app/api/account/route.js:107` | `lib/shopper-errors.js`: messages written for shoppers still show. Database and network errors become "Something went wrong — please try again." |
 | Raw database error text in the public search JSON (no screen showed it) | `app/api/search/route.js:32` | Field removed |
+| Any thrown message in the public cart JSON, such as "variant not in catalog: {id}" (no screen showed it) | `app/api/cart/route.js:71` | Field removed. The 400 status stays. |
 | `— automated rule "{rule name}"` at the foot of automation emails sent to shoppers | `lib/automations.js:235` | Shopper emails end with "Order {id}". The note stays on emails to the store. |
 
 ### Promises the store never made
@@ -81,7 +92,7 @@ Line numbers are from `939d630`.
 | Tagline, footer tagline | Settings → store identity | "Shop {name} online." |
 | Legal name in the footer | Settings → store identity | Store name |
 | Support email and phone | Settings → store identity | Hidden when empty |
-| Hero title, subtitle, badge, buttons | Home editor | "Shop {name}." and the neutral subtitle; "Shop all collections", "See what's new" |
+| Hero title, subtitle, badge, buttons | Home editor | "Shop {name}." and the neutral subtitle; "Shop all collections", "See what's new". The empty-store changes in section 1 apply only to the default subtitle and a `#new` button. A founder's own subtitle stays as written. |
 | Section titles and limits | Home editor | "Shop by collection", "New arrivals", "Featured products" |
 | Announcement bar | CMS announcement | Off |
 | Header and footer links | CMS navigation | Derived from the catalog; "All collections", "About us", "Contact" |
@@ -101,7 +112,7 @@ Line numbers are from `939d630`.
 | `"BeastLife"` fallback store name | `lib/site.js:23` | Reached only with no tenant context. That legacy env store is BeastLife, and every tenant has a registry name first (S51). | `test:copy`, `ALLOWED` |
 | BeastLife's about, contact and policy copy, with its ₹999 / ₹79 / ₹49 figures | `lib/content/pages.js` | BeastLife's own content. `brandDefaultsApply()` serves it only to BeastLife. | `test:copy`, `test:storefront` |
 | BeastLife offers and coupons (BEAST10 and others) | `lib/offers/config.js` | Seeded only by BeastLife's bootstrap. Both real `evaluateOffers` callers pass offers from the database. | `test:platform-sync` |
-| `"beastlife"` tenant ids | `lib/cms/store.js:231` | The check that keeps BeastLife's pages on BeastLife | `ALLOWED` |
+| `"beastlife"` tenant ids | `lib/brand-tenants.js` | The check that keeps BeastLife's pages on BeastLife | `ALLOWED` |
 | Pulse kit preset: "Fuel the work." / "Proteins, pre-workouts and daily essentials…" | `lib/themes/kits.js:42` | Written as a draft only if a founder applies that nutrition kit and accepts its copy. **For ED:** show the preset text before applying. | `ALLOWED` |
 | Sim Whey and other simulator products | `lib/offers/simulate.js` | Console offer simulator, never shown to shoppers | `ALLOWED` |
 
@@ -111,6 +122,7 @@ Line numbers are from `939d630`.
 |---|---|---|
 | "Ref: {digest}" | `app/(storefront)/error.js` | A code the shopper can quote to support. It reveals nothing else. |
 | "Paid · {payment id}" | Checkout confirmation | The shopper's payment reference for a bank dispute |
+| Razorpay's own failure description, shown as written after a failed payment | `components/checkout/CheckoutFlow.js`, `payment.failed` | It comes from the payment window and is written for the person paying. The fallback is "Payment failed". Not checked against the provider's full list of messages. |
 | "Free shipping (₹999+)", "Standard shipping + COD fee ₹49" | `lib/shipping.js` labels, shown on the confirmation | True of that order. The label is also what is pushed to Shopify, and `test:shipping` pins it. |
 | "Analytics (Google Analytics)", "Marketing (Meta ads)" | `components/analytics/ConsentBanner.js` | Consent needs the real vendor named |
 | "{store} is temporarily unavailable", "Store not found" | `app/(storefront)/not-found.js`, `lib/tenant-gate.js` | Neutral by design (S25), no tenant data |
@@ -157,7 +169,7 @@ Line numbers are from `939d630`.
 | Text | Location | Why |
 |---|---|---|
 | Storeasy, Shopify, Razorpay, Vercel, Turso and nutrition copy on marketing pages | `app/(storefront)/{customers,integrations,legal,pricing,templates,trust,verticals}`, `components/site` | Each route returns 404 on a store's address. `test:copy` asserts every host gate. |
-| "Storeasy — fast, branded storefronts…" | `app/(storefront)/layout.js:44`, `:170` | The platform-host branch only |
+| "Storeasy — fast, branded storefronts…" | `app/(storefront)/layout.js:44`, `:170` | The platform-host branch only. `ALLOWED` names these exact strings. |
 | "Shopify-hosted checkout is not implemented yet…", and the billing-pause reason | `lib/commerce/adapter.js` | API and console detail. Shoppers get the checkout page's fixed text, or `friendlyCheckoutError`'s, for this code. `test:commerce` asserts the wording. |
 | "storeasy26 order {id} — paid via Razorpay …" | `lib/shopify-push.js:105` | A note staff read in Shopify admin |
 | `pnpm` hints, `.env.local` errors | `lib/integrations.js`, `lib/env-file.js`, `lib/shopify.js`, `lib/platform/*` | Operator console and CLI paths |
@@ -174,11 +186,11 @@ Line numbers are from `939d630`.
 | Path | What happened | Decision |
 |---|---|---|
 | Checkout preview. `CheckoutFlow` called `computeShipping` with no config. | **Bug: every store saw the code default, even a store with its own rates.** The summary, "Pay ₹…" button and COD fee could differ from the amount the server charged. | Fixed. The page now passes the store's own config, the same value the server uses. |
-| Cart drawer, "Add ₹X more for free shipping" (`lib/cart.js`) | A promise in the store's name about a threshold the founder never chose | Shown only when the store chose its rates. BeastLife keeps it, since its shipping policy publishes those figures. |
+| Cart drawer, "Add ₹X more for free shipping" (`lib/cart.js`) | A promise in the store's name about a threshold the founder never chose | Shown only when the store chose its rates (`shippingRatesChosen`, `lib/brand-tenants.js`, the one definition the console uses too). BeastLife keeps it, since its shipping policy publishes those figures. |
 | Cart drawer and checkout, the shipping amount | The real charge, so hiding it would be dishonest | Kept. "Shipping" makes no claim about who set it. |
 | Order confirmation label ("Standard shipping") | True of that order | Kept |
 | `emptyCart()`: `computeShipping` with no config | Never displayed: the drawer's totals need items | Kept, no shopper path |
-| Console. The Settings form showed defaults as if saved, and **every save wrote them to `shipping_config`**, so saving a support email silently adopted them. | The founder couldn't tell | The form says "You haven't set your own shipping rates yet", sends starter rates only if they changed, and offers "Keep these rates". |
+| Console. The Settings form showed defaults as if saved, and **every save wrote them to `shipping_config`**, so saving a support email silently adopted them. | The founder couldn't tell | The form says "You haven't set your own shipping rates yet", sends starter rates only if their values changed (retyping 79 is no change), and offers "Keep these rates". BeastLife sees no notice, because its cart already treats the rates as chosen. |
 
 **What did not change:** what any shopper is charged. `lib/shipping.js` is untouched and `test:shipping` is unmodified. The server was already using the store's rates, and it remains the only source of the charged amount.
 
@@ -192,14 +204,16 @@ No new CMS field was added. These should become editable or get a better answer 
 
 | Item | Why | Suggested owner |
 |---|---|---|
+| **Old default words already saved** | **Known limit.** "Ludicrous speed" and "Fresh drops" were code defaults, and section 1 changed only the code. The Home editor prefills from the defaults, so a non-BeastLife store that saved the Home editor before this change stored the old text, and any release it published froze it (`lib/cms/view.js:30`, `components/admin/cms/HomeEditor.js:153`, `lib/releases.js:52`). Those shoppers still see both phrases, and the suite can't see them, because stored content isn't scanned. A probe on a local test store confirmed this. Production wasn't read, so the number of stores affected is unknown. **Owner decision:** a one-off replacement of those two exact strings on non-BeastLife stores would clear it, but it changes stored content, including published releases, so it isn't done here. | Owner, then GEN-01 or a one-off script |
 | Empty-store message and "Coming soon" badge | A founder may want their own words. Today they are fixed. | ED, or GEN-01 |
+| "Shop all collections" on an empty home | It works, but leads to "No collections to show yet". Left in place so an empty home keeps one way forward. | GEN-01 |
 | Telling the founder why the store looks empty | The shopper page no longer explains it, so the console has to. US-04 needs this. | GEN-01, GEN-02 |
 | Error, 404 and offline wording; "Your cart is empty" | Could carry a store's voice. BeastLife loses its gym line on the error page and in the cart. | ED |
 | Refund timing and return review time | Removed because no setting holds them. Should come from real settings. | GEN-06 |
 | Whether prices include GST | Removed because code can't know. Should come from Shopify or a setting. | GEN-06 or a tax item |
 | Pulse kit preset | Show the copy before it is applied | ED |
 | "A confirmation was sent to {email}" | Shopify sends this email (S18), so it can be early or wrong if the Shopify push is delayed. Kept for now. Not a brand or developer leak. | COM or PUB-12 |
-| Sender of shopper emails | Defaults to `Storeasy <onboarding@resend.dev>` unless `MAIL_FROM` is set, on every store. Needs a per-store sender. | Operations |
+| Sender address of store emails | Every store now shows its own name, but all share one `MAIL_FROM` address, and replies go there rather than to the store. If `MAIL_FROM` is unset in production, Resend's `onboarding@resend.dev` is used. The live value wasn't read. A per-store address and a reply-to using the support email are still needed. | Operations |
 | Quiz email links | Relative paths (`/products/x`) in an email don't open. Not copy, so not changed here. | Follow-up bug |
 | Shared bolt icon | `app/icon.svg` and `public/icons/*` are the lime bolt on every store | GEN-04 |
 | Raw errors still in the `/api/checkout` JSON | No screen shows them now, but the network response still carries them. The catch-all is shared with the verify path, which another branch is changing. | Follow-up after that branch lands |

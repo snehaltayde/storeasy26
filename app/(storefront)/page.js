@@ -8,6 +8,7 @@ import { runningExperimentFor, heroVariantFor, UNIT_COOKIE } from "@/lib/experim
 import { isPlatformSiteHost } from "@/lib/platform-site";
 import { getCatalogStats } from "@/lib/repo";
 import { resolveHomeSectionData } from "@/lib/cms/section-data";
+import { DEFAULT_HERO_SUBTITLE, EMPTY_STORE_HERO_SUBTITLE } from "@/lib/cms/defaults";
 import { resolvedHero, resolvedHomeSections, resolvedCollectionsIndex } from "@/lib/content/resolve";
 import { tfetch } from "@/lib/tenant-request";
 
@@ -49,6 +50,10 @@ export default async function Home() {
     return { hero, sections, stats, dataById, assignment };
   });
   const empty = stats.products === 0;
+  // GEN-03: on an empty store the default words promise a catalog, and #new only
+  // exists inside HomeSections. A founder's own subtitle stays as written.
+  const subtitle = empty && hero.subtitle === DEFAULT_HERO_SUBTITLE ? EMPTY_STORE_HERO_SUBTITLE : hero.subtitle;
+  const showSecondary = hero.secondary?.label && !(empty && (hero.secondary.href || "#new") === "#new");
 
   return (
     <div>
@@ -64,7 +69,7 @@ export default async function Home() {
           <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
             <HeroTitle title={hero.title} highlight={hero.highlight} />
           </h1>
-          {hero.subtitle ? <p className="mt-5 max-w-xl text-lg text-hero-muted">{hero.subtitle}</p> : null}
+          {subtitle ? <p className="mt-5 max-w-xl text-lg text-hero-muted">{subtitle}</p> : null}
           <div className="mt-8 flex flex-wrap gap-3">
             {hero.primary?.label ? (
               <Link
@@ -74,7 +79,7 @@ export default async function Home() {
                 {hero.primary.label}
               </Link>
             ) : null}
-            {hero.secondary?.label ? (
+            {showSecondary ? (
               <Link
                 href={hero.secondary.href || "#new"}
                 className="rounded-[var(--btn-radius,9999px)] border border-hero-fg/20 px-6 py-3 text-sm font-semibold text-hero-fg transition hover:bg-hero-fg/10"
