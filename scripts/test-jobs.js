@@ -247,6 +247,65 @@ await t("ACCEPTANCE: razorpay webhook_apply replay marks the order paid exactly 
   eq((await J.getInbox(inboxId)).status, "done", "receipt done");
 });
 
+// --- GEN-02: long jobs, budgets, requeue ------------------------------------------------
+const same = (got, want, label) => eq(JSON.stringify(got), JSON.stringify(want), label);
+await t("long jobs (catalog_sync) only run for a caller with a budget, and after the others", async () => {
+  await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE status IN ('pending','leased')");
+  await J.enqueueJob({ type: "catalog_sync", tenantId: "jt", payload: { runId: "r1" }, idempotencyKey: "k-long" });
+  await J.enqueueJob({ type: "probe", tenantId: "jt", idempotencyKey: "k-short" });
+  const order = [];
+  const handlers = { probe: async () => order.push("probe"), catalog_sync: async (_p, ctx) => order.push(`sync:${ctx.deadline != null}`) };
+  const without = await W.runDueJobs({ limit: 10, handlers });
+  eq(without.map((r) => r.type).join(","), "probe", "no budget: only the short job:");
+  const pending = (await J.listJobs({})).find((j) => j.idempotency_key === "k-long");
+  same([pending.status, Number(pending.attempts)], ["pending", 0], "the long job untouched:");
+  await J.enqueueJob({ type: "probe", tenantId: "jt", idempotencyKey: "k-short-2" });
+  await W.runDueJobs({ limit: 10, handlers, budgetMs: 50_000 });
+  eq(order.slice(1).join(","), "probe,sync:true", "with a budget: short first, the long one last and given the deadline:");
+});
+
+await t("a job leased but not reached before the deadline is handed back with its attempt", async () => {
+  await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE status IN ('pending','leased')");
+  await J.enqueueJob({ type: "probe", idempotencyKey: "k-slow" });
+  await J.enqueueJob({ type: "probe", idempotencyKey: "k-late" });
+  let t0 = 0;
+  const now = () => t0;
+  const handlers = { probe: async () => (t0 += 60_000) }; // the first job eats the whole budget
+  const results = await W.runDueJobs({ limit: 10, handlers, budgetMs: 50_000, now });
+  eq(results.length, 1, "ran:");
+  const rows = (await J.listJobs({})).filter((j) => ["k-slow", "k-late"].includes(j.idempotency_key));
+  const late = rows.find((j) => j.id !== results[0].id);
+  same([late.status, Number(late.attempts), late.lease_until], ["pending", 0, null], "handed back:");
+});
+
+await t("a handler that has more to do requeues its job: pending, due, fresh attempts, back of the line", async () => {
+  await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE status IN ('pending','leased')");
+  const { id } = await J.enqueueJob({ type: "catalog_sync", idempotencyKey: "k-requeue" });
+  const before = (await J.listJobs({})).find((j) => j.id === id).created_at;
+  const res = await W.runJobById(id, { handlers: { catalog_sync: async () => ({ requeue: true }) }, budgetMs: 40_000 });
+  eq(res.requeued, true, "requeued:");
+  const row = (await J.listJobs({})).find((j) => j.id === id);
+  same([row.status, Number(row.attempts), row.run_after], ["pending", 0, null], "row:");
+  ok(row.created_at >= before, "moved to the back of the line");
+  const later = new Date(Date.now() + 60_000).toISOString();
+  await W.runJobById(id, { handlers: { catalog_sync: async () => ({ requeue: true, runAfter: later }) }, budgetMs: 40_000 });
+  eq((await J.listJobs({})).find((j) => j.id === id).run_after, later, "a requeue can wait for another runner:");
+});
+
+await t("makeJobDue takes over a job whose runner was killed (lease ran out), never one a live runner holds", async () => {
+  await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE status IN ('pending','leased')");
+  const { id } = await J.enqueueJob({ type: "catalog_sync", idempotencyKey: "k-killed" });
+  const set = (until) => C.platformDb().execute({ sql: "UPDATE jobs SET status = 'leased', attempts = 3, lease_until = ? WHERE id = ?", args: [until, id] });
+  const row = async () => (await J.listJobs({})).find((j) => j.id === id);
+  await set(new Date(Date.now() + 60_000).toISOString());
+  await J.makeJobDue(id);
+  eq((await row()).status, "leased", "a live lease is left alone:");
+  await set(new Date(Date.now() - 1_000).toISOString());
+  await J.makeJobDue(id);
+  const r = await row();
+  same([r.status, Number(r.attempts), r.lease_until, r.run_after], ["pending", 0, null, null], "a lapsed lease becomes due, with a fresh budget:");
+});
+
 // --- stats + retention ---------------------------------------------------------------
 await t("queueStats + prune: counts are sane; OLD done rows age out, recent done + dead stay", async () => {
   const stats = await J.queueStats();

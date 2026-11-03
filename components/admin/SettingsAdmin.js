@@ -8,6 +8,7 @@ import { Button, IconButton } from "@/components/console/Button";
 import { Field, Input, Select } from "@/components/console/fields";
 import { useToast } from "@/components/console/Toast";
 import { shippingFormChanged } from "@/lib/admin/settings";
+import SyncProgress from "@/components/admin/SyncProgress";
 
 // Merchant settings console (Session 22, redesigned S50). One form,
 // sectioned into anchor-target Cards; secret fields are WRITE-ONLY — a
@@ -41,7 +42,7 @@ const buildState = (s) => ({
   adminPassword: "",
 });
 
-export default function SettingsAdmin({ initial }) {
+export default function SettingsAdmin({ initial, syncProgress = null, canRunSync = false }) {
   const toast = useToast();
   const [s, setS] = useState(initial);
   const ro = s.readOnly;
@@ -54,7 +55,6 @@ export default function SettingsAdmin({ initial }) {
   const [adminPassword, setAdminPassword] = useState("");
   const [errors, setErrors] = useState(null); // string[] — persistent until the next attempt
   const [busy, setBusy] = useState(false);
-  const [syncBusy, setSyncBusy] = useState(false);
 
   const current = { identity, payments, commerce, tracking, shipping, adminPassword };
   const dirty = JSON.stringify(current) !== JSON.stringify(buildState(s));
@@ -119,18 +119,6 @@ export default function SettingsAdmin({ initial }) {
       setErrors(data.errors || [data.error || `Save failed (${res.status})`]);
     }
     setBusy(false);
-  }
-
-  async function syncNow() {
-    setSyncBusy(true);
-    const res = await fetch("/api/admin/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-    const data = await res.json().catch(() => ({}));
-    if (data.ok) {
-      toast.success(`Synced ${data.products} products, ${data.collections} collections${data.searchError ? " (search index degraded)" : ""}`);
-    } else {
-      toast.error(`Sync failed: ${data.error || res.status}`);
-    }
-    setSyncBusy(false);
   }
 
   const zone = (i, patch) =>
@@ -313,19 +301,18 @@ export default function SettingsAdmin({ initial }) {
         </div>
       </Card>
 
-      <Card id="catalog-sync">
-        <CardHeader
-          title="Catalog sync"
-          description={
-            s.sync
-              ? `${s.sync.products} products · ${s.sync.collections} collections · last synced ${s.sync.lastSyncedAt ? new Date(s.sync.lastSyncedAt).toLocaleString("en-IN") : "never"}`
-              : "Status unavailable"
-          }
-        />
-        <Button onClick={syncNow} busy={syncBusy}>
-          {syncBusy ? "Syncing — this can take a minute…" : "Sync now"}
-        </Button>
-      </Card>
+      {/* GEN-02: progress, plain failures and a retry, read from the sync's own record */}
+      <SyncProgress
+        id="catalog-sync"
+        initial={syncProgress}
+        canRun={canRunSync}
+        showStart
+        description={
+          s.sync
+            ? `${s.sync.products} products and ${s.sync.collections} collections in your store now. Shopify changes also come in by themselves.`
+            : undefined
+        }
+      />
 
       <Card id="password">
         <CardHeader title="Console password" description="Rotating signs out every other session immediately." />

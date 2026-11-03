@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 import { sameOrigin } from "@/lib/origin-check";
 import { listJobs, listInbox, queueStats, replayJob, replayInbox } from "@/lib/platform/jobs";
-import { runDueJobs } from "@/lib/platform/worker";
+import { runDueJobs, TICK_BUDGET_MS } from "@/lib/platform/worker";
 
 // Queue & webhook inspector API (S29 / OP05). Metadata ONLY — raw webhook
 // payloads can carry PII and are never serialized here; replay is scoped,
@@ -42,7 +42,8 @@ export async function POST(request) {
       return NextResponse.json({ ok }, { status: ok ? 200 : 404 });
     }
     if (body.action === "tick") {
-      const results = await runDueJobs({ limit: 25 });
+      // same budget as the tick route, so catalog sync slices run too (GEN-02)
+      const results = await runDueJobs({ limit: 25, budgetMs: TICK_BUDGET_MS });
       return NextResponse.json({ ok: true, ran: results.length, failed: results.filter((r) => r.ok === false).length });
     }
     return NextResponse.json({ error: "action must be replay|tick" }, { status: 400 });

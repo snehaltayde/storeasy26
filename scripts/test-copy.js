@@ -1073,6 +1073,8 @@ const settingsStubs = {
   "@/components/console/fields": { Field: ({ children }) => React.createElement("label", null, children), Input: () => null, Select: () => null },
   "@/components/console/Toast": { useToast: () => ({ success() {}, error() {} }) },
   "@/lib/admin/settings": settingsLib,
+  // GEN-02's sync card; scripts/test-first-sync.js renders it
+  "@/components/admin/SyncProgress": nothing,
 };
 const settingsSrc = await readFile(join(ROOT, "components/admin/SettingsAdmin.js"), "utf8");
 const NOTICE = "You haven't set your own shipping rates yet";

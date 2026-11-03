@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runDueJobs } from "@/lib/platform/worker";
+import { runDueJobs, TICK_BUDGET_MS } from "@/lib/platform/worker";
 import { queueStats, pruneQueues } from "@/lib/platform/jobs";
 import { platformConfigured } from "@/lib/platform/control";
 
@@ -27,7 +27,9 @@ async function tick(request) {
     return NextResponse.json({ ok: true, skipped: "no control plane (legacy mode — sweeps own retries)" });
   }
   const limit = Number(request.nextUrl.searchParams.get("limit") || 25);
-  const results = await runDueJobs({ limit });
+  // GEN-02: a budget inside maxDuration, so long jobs (catalog sync slices)
+  // run too — last, and only as long as the tick has time left.
+  const results = await runDueJobs({ limit, budgetMs: TICK_BUDGET_MS });
   if (Math.random() < 0.05) await pruneQueues().catch(() => {}); // occasional retention pass
   const stats = await queueStats();
   return NextResponse.json({

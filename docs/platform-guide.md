@@ -573,7 +573,8 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 - **What**: store identity (name, site URL, support contacts; domains read-only),
   Shopify connection status, Razorpay keys, GA4/Meta credentials, the **shipping
   rules editor** (flat rate, thresholds, COD fee/waiver, basis, pincode zones),
-  catalog sync status + **Sync now**, and console-password rotation.
+  "Products from Shopify" (GEN-02: the sync card with progress, plain failures,
+  **Try again** and **Refresh from Shopify**), and console-password rotation.
 - **Use**: `/admin/settings` → edit → Save settings. Secret fields are write-only:
   a "Set ✓" hint shows presence, blank keeps the current value. Password rotation
   signs out every other session (your browser gets a fresh cookie).
@@ -584,8 +585,11 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   for the Host-resolved tenant only (the tenant id is never taken from the request
   body). Secret values never serialize back to the client. The env-fallback default
   tenant is read-only here (no control-plane row to patch). Changes go live within
-  the 30s control-plane cache TTL. "Sync now" runs a full catalog sync inline
-  (rate-limited 2/min; big catalogs → `pnpm tenant:sync`).
+  the 30s control-plane cache TTL. "Refresh from Shopify" (`POST /api/admin/sync`,
+  6/min) queues a resumable sync and answers 202 at once; `{retry: true}` resumes
+  a failed or stopped one; `GET /api/admin/sync` reads progress and, for a role
+  allowed `sync.run`, gives a running sync its next slice. See "Full sync &
+  reconcile".
 - **Files**: `app/admin/settings/page.js`, `components/admin/SettingsAdmin.js`,
   `app/api/admin/settings|sync/route.js`.
 
@@ -1047,7 +1051,8 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   PLATFORM_SECRET; the callback verifies state + Shopify's param HMAC (tenant's
   client secret) + shop-domain match, exchanges the code WITH THE TENANT'S app creds,
   `patchTenant`s the token into encrypted secrets, registers the 7 catalog webhooks
-  (idempotent create-or-repoint), and starts the first sync in `after()`.
+  (idempotent create-or-repoint), and queues the first sync (GEN-02) before it
+  answers, kicking its first slice in `after()`.
 - **Files**: `app/api/connect/shopify/start|callback/route.js`,
   [lib/platform/oauth.js](../lib/platform/oauth.js),
   [lib/platform/shopify-webhooks.js](../lib/platform/shopify-webhooks.js) (`registerWebhooks`).
@@ -1062,12 +1067,30 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 
 #### Full sync & reconcile
 - **What**: complete catalog pulls per tenant; the backstop behind webhooks.
-- **Use**: `pnpm sync` (default/env tenant) · `pnpm tenant:sync <slug>` ·
-  `POST /api/jobs/sync-catalog {tenant}` / `GET ?limit=N` (CRON_SECRET; no cron slot
-  — Hobby's two are taken; 60s budget fits small/mid stores) · Settings "Sync now" ·
-  `/platform` Sync button. `pnpm sync:search` reindexes Typesense only.
-- **Files**: [lib/sync.js](../lib/sync.js) (`runCatalogSync`, `syncTenantCatalog`),
-  `scripts/sync.js`, `scripts/tenant-sync.js`, `app/api/jobs/sync-catalog/route.js`.
+  GEN-02: a full sync is a recorded, resumable run (`sync_runs`) that moves one
+  Shopify page per step, each page committed with the run's position in one
+  batch. Products pages → collections pages (⇄ member pages for collections
+  over 250) → prune → search index → complete. Nothing is pruned before
+  completion, and a collection's old members go only with its last member page.
+- **Use**: `pnpm sync` (default/env tenant) · `pnpm tenant:sync <slug>` (both run
+  to the end in-process and join a queued run) · `POST /api/jobs/sync-catalog
+  {tenant}` / `GET ?limit=N` (CRON_SECRET — open when unset; no cron slot; queues
+  a run for every active tenant, or the first N, spends its 45s on first slices,
+  answers 202) · Settings "Refresh from Shopify" / Try again · `/platform` Sync
+  button (queues, 202). `pnpm sync:search` reindexes Typesense only.
+- **How it gets time**: one `catalog_sync` job per run; each run of the job is a
+  ≤40s slice that requeues itself. Slices come from the starter's `after()` kick,
+  the tick (`/api/jobs/tick`, the durable path, OQ-19), and the merchant card's
+  poll while it shows progress. A slice the platform kills is picked up again by
+  any of them once its leases lapse (~2 minutes). Each Admin API read gives up
+  after 15s (a retryable error). The queue's dead-letter fails the run so the
+  card shows a plain message and Try again.
+- **Files**: [lib/sync.js](../lib/sync.js) (`runSyncSlice`, `requestCatalogSync`,
+  `runCatalogSync`, `catalogSyncStatus`, `confirmedCatalogSync`),
+  [lib/platform/sync-jobs.js](../lib/platform/sync-jobs.js),
+  [lib/admin/sync-view.js](../lib/admin/sync-view.js),
+  `components/admin/SyncProgress.js`, `scripts/sync.js`, `scripts/tenant-sync.js`,
+  `app/api/jobs/sync-catalog/route.js`, `app/api/admin/sync/route.js`.
 
 #### Domain mapping
 - **What**: host → tenant routing via the `domains` array on the tenant row (full

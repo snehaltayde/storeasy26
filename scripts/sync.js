@@ -4,6 +4,8 @@
 //   pnpm sync               # full pull + DB write + search index
 //   pnpm sync:search        # reindex Typesense from the local DB
 // Per-tenant syncs: pnpm tenant:sync <slug>
+// GEN-02: page by page with the position recorded in sync_runs (the same run
+// the console shows); an interrupted run is continued by the next one.
 import { runCatalogSync } from "../lib/sync.js";
 import { libsql } from "../lib/db.js";
 import { loadMigrations, runMigrations } from "../lib/platform/migrate.js";
