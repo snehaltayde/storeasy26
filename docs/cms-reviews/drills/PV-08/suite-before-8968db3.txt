@@ -1,11 +1,11 @@
 — the storefront home page, rendered, with the hero test running
 ✓ fixture: the store really runs the hero test, and its live and draft heroes differ
 ✗ THE BUG: in a preview, a visitor bucketed into variant b still sees the founder's own saved hero
-    unit unit-pv08-0 title: expected "Winter repair, started.", got "Visibly brighter in 14 days"
+    unit unit-pv08-1 title: expected "Winter repair, started.", got "Visibly brighter in 14 days"
 ✗ THE BUG, typing: an unsaved title in the preview shows while the hero test runs
-    unit unit-pv08-0: expected "Typed while the test runs", got "Visibly brighter in 14 days"
+    unit unit-pv08-1: expected "Typed while the test runs", got "Visibly brighter in 14 days"
 ✗ THE BUG, exposure: a preview render never mounts the exposure ping, for any bucket or no unit at all
-    unit unit-pv08-0: the preview would ping /api/exp
+    unit unit-pv08-1: the preview would ping /api/exp
 ✗ a preview of every bucket: 80 units, each shows the founder's hero, none pings
     distinct (title|pinged) across 80 units: expected ["Winter repair, started.|false"], got ["Visibly brighter in 14 days|true","Winter repair, started.|true"]
 ✗ the note: in a preview the hero says a test is running, names it, and links to it

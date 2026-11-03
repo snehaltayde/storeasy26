@@ -352,7 +352,7 @@ await t("the note: in a preview the hero says a test is running, names it, and l
   ok(NOTE_RE.test(text(hero)), `no note inside the hero section: ${text(hero).slice(0, 240)}`);
   ok(text(hero).includes(`“${TEST_NAME}”`), `the note doesn't name the test: ${text(hero).slice(0, 240)}`);
   ok(text(hero).includes("Some visitors see a different version; the preview shows yours."), "the note doesn't say what the founder sees");
-  ok(hero.includes('href="/admin/experiments#exp-hero-promise"'), `no link to the test's row: ${hero.slice(0, 600)}`);
+  ok(hero.includes('href="/admin/experiments#exp-row-hero-promise"'), `no link to the test's row: ${hero.slice(0, 600)}`);
   ok(!/\b(variant|exposure|bucket)\b/i.test(text(hero.match(/<[a-z]+[^>]*data-preview-note[\s\S]*?<\/(p|div)>/)?.[0] || "")), "the note uses jargon");
 });
 
@@ -624,7 +624,7 @@ await t("Designer: the hero's settings say a test is running, name it, and link 
   ok(NOTE_RE.test(text(inspector)), `no note beside the hero settings: ${text(inspector).slice(0, 300)}`);
   ok(text(inspector).includes(`“${TEST_NAME}”`), "the note doesn't name the test");
   ok(text(inspector).includes("Some visitors see a different version; the preview shows yours."), "the note doesn't say what the preview shows");
-  ok(inspector.includes('href="/admin/experiments#exp-hero-promise"'), "no link to the test's row");
+  ok(inspector.includes('href="/admin/experiments#exp-row-hero-promise"'), "no link to the test's row");
   ok(inspector.indexOf("A test is running") < inspector.indexOf('id="ins-hero-title"'), "the note should come before the fields");
 });
 
@@ -672,7 +672,11 @@ await t("Experiments: each test's row carries the anchor the notes link to", asy
   const { default: ExperimentsAdmin } = await loadJsx(join(ROOT, "components/admin/ExperimentsAdmin.js"), { ...consoleStubs, react: React });
   const list = await inPv(() => X.listExperiments());
   const html = renderToStaticMarkup(React.createElement(ExperimentsAdmin, { initial: list }));
-  ok(html.includes('id="exp-hero-promise"'), `no row anchor: ${html.slice(0, 300)}`);
+  ok(html.includes('id="exp-row-hero-promise"'), `no row anchor: ${html.slice(0, 300)}`);
+  // the anchor can't land on a form field: no other id on that screen starts "exp-row-"
+  const src = await readFile(join(ROOT, "components/admin/ExperimentsAdmin.js"), "utf8");
+  const ids = [...src.matchAll(/\bid=(?:"([^"]+)"|\{`([^`]+)`\})/g)].map((m) => m[1] || m[2]);
+  eq(ids.filter((id) => id.startsWith("exp-row-")), ["exp-row-${e.slug}"], "ids starting exp-row-:");
 });
 
 // ---- 5. guard: every place a variant is picked or applied is gated ------------------

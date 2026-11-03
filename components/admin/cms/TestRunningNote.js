@@ -11,7 +11,7 @@ export function TestRunningNote({ test }) {
     <Banner tone="info" title="A test is running on this section">
       <p>
         It's called “{test.name}”. Some visitors see a different version; the preview shows yours.{" "}
-        <Link href={`/admin/experiments#exp-${test.slug}`} className="font-semibold underline">
+        <Link href={`/admin/experiments#exp-row-${test.slug}`} className="font-semibold underline">
           See the test
         </Link>
       </p>

@@ -145,9 +145,11 @@ export default function ExperimentsAdmin({ initial }) {
         </Card>
       )}
 
+      {/* PV-08: each row's id is what the "a test is running" notes link to.
+          "exp-row-" keeps it apart from the form's own ids (exp-slug, exp-name, …). */}
       <ul className="space-y-3">
         {experiments.map((e) => (
-          <Card as="li" key={e.id} id={`exp-${e.slug}`}>
+          <Card as="li" key={e.id} id={`exp-row-${e.slug}`}>
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <StatusBadge status={e.status} />
               <span className="font-semibold text-fg">{e.name}</span>

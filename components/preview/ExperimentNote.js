@@ -14,7 +14,7 @@ export default function ExperimentNote({ notice }) {
       className="relative mb-5 max-w-xl rounded-lg bg-purple-700 px-3 py-2 text-xs font-medium leading-snug text-white"
     >
       A test is running on this section: “{notice.name}”. Some visitors see a different version; the preview shows yours.{" "}
-      <a href={`/admin/experiments#exp-${notice.slug}`} target="_top" className="whitespace-nowrap underline">
+      <a href={`/admin/experiments#exp-row-${notice.slug}`} target="_top" className="whitespace-nowrap underline">
         See the test
       </a>
     </p>

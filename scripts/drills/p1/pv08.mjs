@@ -135,7 +135,7 @@ async function designer(drill) {
   const first = await waitHero(page, (h) => h.h1 === draft.title, 8_000);
   drill.check(first.hero?.h1 === draft.title, "the preview shows the founder's saved hero title, not variant b's", first.hero?.h1, K);
   drill.check(first.hero?.note?.includes(NOTE) && first.hero.note.includes(`“${exp.name}”`) && first.hero.note.includes(SEES), "the preview's hero carries the note, naming the test", first.hero?.note, K);
-  drill.check(first.hero?.noteLink === "/admin/experiments#exp-hero-promise", "the preview note links to the test's row", first.hero?.noteLink, K);
+  drill.check(first.hero?.noteLink === "/admin/experiments#exp-row-hero-promise", "the preview note links to the test's row", first.hero?.noteLink, K);
   await drill.shoot(page, shot("designer-preview-note"));
 
   // Reload the frame five times: the same visitor, the same answer.
@@ -160,7 +160,7 @@ async function designer(drill) {
     return { note: banner ? banner.innerText.replace(/\s+/g, " ").trim() : null, href: a?.getAttribute("href") ?? null, before: banner ? !!(banner.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING) : null };
   }, NOTE);
   drill.check(inspector.note?.includes(`“${exp.name}”`) && inspector.note.includes(SEES), "beside the hero settings: the note names the test and says what the preview shows", inspector.note, K);
-  drill.check(inspector.href === "/admin/experiments#exp-hero-promise" && inspector.before, "the settings note links to the test's row and sits above the fields", inspector, K);
+  drill.check(inspector.href === "/admin/experiments#exp-row-hero-promise" && inspector.before, "the settings note links to the test's row and sits above the fields", inspector, K);
   const treeMark = await page.evaluate(() => {
     const b = [...document.querySelectorAll("[data-tree-pick]")].find((x) => x.innerText.includes("Hero"));
     const d = b?.getAttribute("aria-describedby");
@@ -198,11 +198,11 @@ async function designer(drill) {
   drill.check(docs.length > 0 && docs.every((d) => d.status === 200 && d.edge === "1"), "every preview document answered 200 on the edge runtime", docs);
 
   // The link opens the test's row in the console.
-  await page.locator("a[href='/admin/experiments#exp-hero-promise']").first().click().catch(() => {});
+  await page.locator("a[href='/admin/experiments#exp-row-hero-promise']").first().click().catch(() => {});
   await page.waitForURL(/\/admin\/experiments/, { timeout: 15_000 }).catch(() => {});
   await sleep(800);
   const row = await page.evaluate(() => {
-    const el = document.getElementById("exp-hero-promise");
+    const el = document.getElementById("exp-row-hero-promise");
     if (!el) return null;
     const r = el.getBoundingClientRect();
     return { text: el.innerText.replace(/\s+/g, " ").slice(0, 120), top: Math.round(r.top), inView: r.top >= 0 && r.top < window.innerHeight };
