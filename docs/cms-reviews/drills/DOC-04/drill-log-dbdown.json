@@ -1,0 +1,31 @@
+{
+  "when": "2026-11-03T09:01:54.151Z",
+  "base": "http://localhost:3164",
+  "log": [
+    [
+      "login status",
+      200
+    ],
+    [
+      "D7 lock held by pid",
+      40194
+    ],
+    [
+      "D7 banner",
+      [
+        "Couldn't save",
+        "We couldn't reach your store's data just now, so nothing was saved. Your changes are still here. Try again in a minute."
+      ]
+    ],
+    [
+      "D7 still unsaved",
+      true
+    ]
+  ],
+  "shots": [
+    [
+      "D7-page-editor-database-locked",
+      83984
+    ]
+  ]
+}

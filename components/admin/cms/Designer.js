@@ -38,7 +38,8 @@ import { EmptyState, Skeleton, SkeletonText } from "@/components/console/bits";
 import { Field, Input, Select, Textarea } from "@/components/console/fields";
 import { Switch } from "@/components/console/Switch";
 import { useToast } from "@/components/console/Toast";
-import { COMPONENTS, HOME_SECTION_KINDS } from "@/lib/cms/registry";
+import { COMPONENTS, HOME_SECTION_KINDS, SECTION_ID_RE, mintSectionId } from "@/lib/cms/registry";
+import { issueText, HERO_SECTION_ID } from "@/lib/cms/issues";
 import { getStorefrontView, saveBlock, resetBlock, startPreview, getHistory, saveCandidate } from "./api";
 import { ConflictBanner } from "./ConflictBanner";
 import DesignerTabs from "./DesignerTabs";
@@ -385,6 +386,7 @@ export default function Designer({ initial }) {
       return true;
     }
     if (res.conflict) fail(block, { kind: "conflict" });
+    else if (res.issues) fail(block, { kind: "errors", issues: res.issues.filter((i) => i.severity === "error"), errors: res.errors });
     else if (res.errors) fail(block, { kind: "errors", errors: res.errors });
     else fail(block, { kind: "errors", errors: [res.error || "Save failed"] });
     return false;
@@ -494,15 +496,16 @@ export default function Designer({ initial }) {
   const duplicateSection = (key) => {
     const i = sections.findIndex((s) => s._key === key);
     if (i < 0) return;
-    const copy = { ...JSON.parse(JSON.stringify(stripKeys([sections[i]])[0])), _key: mintKey() };
-    delete copy.id; // a duplicate is a NEW instance — the server mints its durable id
+    // a duplicate is a NEW instance. DOC-04: it gets its own durable id now,
+    // so a refusal can point at it before the first save.
+    const copy = { ...JSON.parse(JSON.stringify(stripKeys([sections[i]])[0])), id: mintSectionId(), _key: mintKey() };
     mutate([...sections.slice(0, i + 1), copy, ...sections.slice(i + 1)]);
     setSelected(copy._key);
   };
   const addSection = (kind) => {
     const def = COMPONENTS[kind];
     // defaults come from the registry — no hard-coded kind list or values
-    const next = { kind, ...JSON.parse(JSON.stringify(def?.defaults || {})), enabled: true, _key: mintKey() };
+    const next = { id: mintSectionId(), kind, ...JSON.parse(JSON.stringify(def?.defaults || {})), enabled: true, _key: mintKey() };
     mutate([...sections, next]);
     setSelected(next._key);
     setAddOpen(false);
@@ -519,7 +522,8 @@ export default function Designer({ initial }) {
     else if (histFor === "announcement") setAnn(seedAnn(value));
     else if (histFor === "home_sections") {
       const list = JSON.parse(JSON.stringify(Array.isArray(value) ? value : []));
-      mutate(list.map((s) => ({ ...s, _key: mintKey() }))); // undo brings the current draft back
+      // undo brings the current draft back; an old entry with no id gets one
+      mutate(list.map((s) => ({ ...s, id: typeof s?.id === "string" && SECTION_ID_RE.test(s.id) ? s.id : mintSectionId(), _key: mintKey() })));
       setSelected(null); // the old client keys are gone
     }
     setHistFor(null);
@@ -557,12 +561,38 @@ export default function Designer({ initial }) {
 
   // -- pieces ---------------------------------------------------------------------
 
+  // DOC-04: a refusal lists every issue. Each one names its section by the
+  // id, so its number here comes from the sections as they are NOW, and
+  // clicking it selects that section in the tree and the preview.
+  const issueLabel = (s, i) => {
+    const title = String(s.title ?? "").trim();
+    return `Section ${i + 1} (${COMPONENTS[s.kind]?.label || s.kind}${title ? ` “${title}”` : ""})`;
+  };
+  const issueTarget = (it) => {
+    if (it.sectionId === HERO_SECTION_ID) return "hero";
+    if (it.documentId === "doc_announcement") return "announcement";
+    return sections.find((s) => s.id === it.sectionId)?._key ?? null;
+  };
   const errorBanner = (block) =>
     errs[block]?.kind === "errors" && (
       <Banner key={`${block}-err`} tone="danger" title={`Couldn't save ${BLOCK_LABELS[block]}`}>
-        {errs[block].errors.map((t, i) => (
-          <p key={i}>{t}</p>
-        ))}
+        {errs[block].issues
+          ? errs[block].issues.map((it, i) => {
+              const text = issueText(it, { sections, sectionLabel: issueLabel, documentLabels: false });
+              const target = issueTarget(it);
+              return (
+                <p key={i}>
+                  {target ? (
+                    <button type="button" className="text-left underline-offset-2 hover:underline focus-ring" onClick={() => selectNode(target)}>
+                      {text}
+                    </button>
+                  ) : (
+                    text
+                  )}
+                </p>
+              );
+            })
+          : errs[block].errors.map((t, i) => <p key={i}>{t}</p>)}
       </Banner>
     );
 

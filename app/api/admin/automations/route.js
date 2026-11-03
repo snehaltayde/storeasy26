@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { db } from "@/lib/db";
@@ -67,6 +68,9 @@ export const POST = tenantHandler(async (request) => {
     if (body.retry) return NextResponse.json({ ok: true, ...(await retryRun(String(body.retry.run || ""))) });
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300), ...(e.errors ? { errors: e.errors } : {}) }, { status: 422 });
+    if (e?.errors) return NextResponse.json({ error: String(e.message).slice(0, 300), errors: e.errors }, { status: 422 }); // the automation's own problems
+    const infra = infraResponse(e, { route: "admin/automations" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
+    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }
 });

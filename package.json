@@ -82,6 +82,7 @@
     "test:copy": "node scripts/test-copy.js",
     "test:media-upload": "node scripts/test-media-upload.js",
     "test:design-harness": "node scripts/test-design-harness.js",
+    "test:failure-matrix": "node scripts/test-failure-matrix.js",
     "test:perf": "node scripts/perf-report.js",
     "seed:design": "node scripts/dev-design.js seed",
     "dev:design": "node scripts/dev-design.js",

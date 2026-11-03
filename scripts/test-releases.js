@@ -138,7 +138,12 @@ await t("missing hero title blocks; dead catalog link blocks; unknown path warns
 await t("brand contrast failure blocks a publish even if it slipped into drafts", async () => {
   const r = await inTenant(() => R.validateRelease({ v: 1, blocks: {}, pages: [], brand: { foreground: "#cccccc", background: "#ffffff" } }));
   eq(r.ok, false);
-  if (!/Brand:/.test(r.errors[0])) throw new Error(`wrong error: ${r.errors}`);
+  // DOC-04: the issue names its document; "Brand:" is the reader's wording, not the server's
+  const brand = r.issues.find((i) => i.severity === "error");
+  if (brand?.documentId !== "doc_design" || brand.code !== "BRAND_INVALID") throw new Error(`wrong issue: ${JSON.stringify(r.issues)}`);
+  if (!/contrast/i.test(r.errors[0])) throw new Error(`wrong error: ${r.errors}`);
+  const { issueText } = await import("../lib/cms/issues.js");
+  if (!/^Brand: /.test(issueText(brand))) throw new Error(`worded: ${issueText(brand)}`);
 });
 
 await t("createRelease refuses an invalid draft set with RELEASE_INVALID", async () => {
@@ -236,8 +241,14 @@ await t("links to /journal, /quiz, /bundles, /wishlist, /account no longer warn"
   );
   const snap = await inTenant(() => R.snapshotContent());
   const v = await inTenant(() => R.validateRelease(snap.content));
-  const navWarnings = v.warnings.filter((w) => /nav/.test(w) && /isn't a storefront route/.test(w));
+  // DOC-04: the messages no longer say "Header nav …", so filter on where each
+  // issue is filed, not its words (filtering on /nav/ found nothing, ever)
+  const navUnknown = (i) => i.documentId === "doc_header" && i.code === "LINK_UNKNOWN_ROUTE";
+  const navWarnings = v.issues.filter(navUnknown).map((i) => i.message);
   eq(navWarnings.length, 0, `spurious warnings: ${navWarnings.join(" | ")}`);
+  // and the same filter does catch one when there is one
+  const bad = await inTenant(() => R.validateRelease({ ...snap.content, blocks: { ...snap.content.blocks, nav_header: [{ label: "Blog", href: "/blog" }] } }));
+  eq(bad.issues.filter(navUnknown).length, 1, "a real unknown route is caught:");
   await inTenant(() => S.deleteBlock("nav_header"));
 });
 

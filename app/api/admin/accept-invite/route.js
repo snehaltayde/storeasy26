@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { acceptInvite } from "@/lib/platform/identity";
 import { createSession, MERCHANT_SESSION_TTL_MS } from "@/lib/platform/sessions";
 import { ADMIN_COOKIE } from "@/lib/admin-auth";
@@ -34,6 +35,8 @@ export const POST = tenantHandler(async (request) => {
   try {
     user = await acceptInvite({ token, name: name || null, password, tenantId: tenantId() });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/accept-invite" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 400 });
   }
   if (!user) {

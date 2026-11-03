@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { listInsights, generateInsights, setInsightStatus, applyInsightDraft, aiBudget, aiConfigured, AI_MODEL } from "@/lib/ai/insights";
@@ -40,7 +41,10 @@ export const POST = tenantHandler(async (request) => {
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
   } catch (e) {
-    const status = e.code === "AI_UNCONFIGURED" ? 503 : 422;
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300), code: e.code || null }, { status });
+    // the AI provider's own failures first: they are not the store's database
+    if (e?.code === "AI_UNCONFIGURED" || e?.code === "AI_UNAVAILABLE") return NextResponse.json({ error: String(e.message).slice(0, 300), code: e.code }, { status: 503 });
+    const infra = infraResponse(e, { route: "admin/insights" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
+    return NextResponse.json({ error: String(e?.message || e).slice(0, 300), code: e.code || null }, { status: 422 });
   }
 });

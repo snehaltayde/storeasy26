@@ -1,25 +1,55 @@
 "use client";
 
 // Client helpers for the CMS editors (S52): one normalized result shape for
-// every save — { ok, view } | { conflict } | { errors } | { error } — so each
-// screen renders the same states instead of re-parsing responses its own way.
+// every save — { ok, view } | { conflict } | { issues, errors } | { error } —
+// so each screen renders the same states instead of re-parsing responses its
+// own way.
+//
+// DOC-04: a 422 carries `issues` (lib/cms/issues.js). `errors` here is those
+// issues in words with no section context ("Header menu, item 2: …"); an
+// editor that shows sections formats `issues` itself, so the section number
+// comes from the id against what is on screen. Anything else that failed (a
+// 5xx with a code, no connection, a page that isn't JSON) is `error`, in
+// plain words, and never looks like a validation problem.
+import { issueText } from "../../../lib/cms/issues.js"; // relative, so plain node (test:page-editor) loads it too
+
+export const NETWORK_ERROR = "We couldn't reach Storeasy, so nothing was saved. Check your internet connection, then try again. Your changes are still here.";
+const unreadable = (status) =>
+  `Something went wrong on our side (error ${status}), so nothing was saved. Your changes are still here. Try again in a minute.`;
 
 async function call(url, options) {
   let res;
   try {
     res = await fetch(url, options);
-  } catch (e) {
-    return { ok: false, error: `Network error: ${String(e?.message || e)}` };
+  } catch {
+    return { ok: false, error: NETWORK_ERROR, code: "NETWORK" };
   }
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch(() => null);
+  if (data == null) return { ok: false, error: unreadable(res.status), code: "UNREADABLE_RESPONSE", status: res.status };
   if (res.status === 409 && data.code === "CMS_CONFLICT") return { ok: false, conflict: { current: data.current ?? null } };
+  if (res.status === 422 && Array.isArray(data.issues)) {
+    return { ok: false, issues: data.issues, errors: data.issues.filter((i) => i.severity === "error").map((i) => issueText(i)), warnings: data.warnings || [] };
+  }
   if (res.status === 422 && Array.isArray(data.errors)) return { ok: false, errors: data.errors, warnings: data.warnings || [] };
-  if (!res.ok || data.ok === false) return { ok: false, error: data.error || `Request failed (${res.status})` };
+  if (!res.ok || data.ok === false) return { ok: false, error: data.error || unreadable(res.status), code: data.code || null, status: res.status };
   return { ok: true, ...data };
 }
 
-const put = (body) =>
-  call("/api/admin/storefront", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+// DOC-04 fix round 1: SAVED_RELOAD_FAILED means the save went through but the
+// server couldn't read the editor's view back. Ask for the view once more; if
+// that works, the editor carries on as after any save, with the new revision
+// (without it, the next Save would conflict with the founder's own save). If
+// it fails too, the answer stands: it says the changes were saved, and to
+// reload. Only for the operations whose success IS the view.
+const VIEW_OPS = ["block", "page", "deletePage"];
+const put = async (body) => {
+  const r = await call("/api/admin/storefront", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (r.code === "SAVED_RELOAD_FAILED" && VIEW_OPS.some((k) => body[k] !== undefined)) {
+    const view = await call("/api/admin/storefront");
+    if (view.ok) return view;
+  }
+  return r;
+};
 
 export const getStorefrontView = () => call("/api/admin/storefront");
 

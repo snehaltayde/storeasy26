@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { integrationStatus, testIntegration, revokeIntegration } from "@/lib/integrations";
 import { tenantHandler } from "@/lib/tenant-request";
@@ -31,6 +32,8 @@ export const POST = tenantHandler(async (request) => {
     const result = await testIntegration(String(body.provider || ""));
     return NextResponse.json(result);
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/integrations" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 400 });
   }
 });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { platformDb, platformConfigured } from "@/lib/platform/control";
 import { createInvite, addMembership, removeMembership } from "@/lib/platform/identity";
@@ -90,6 +91,8 @@ export const POST = tenantHandler(async (request) => {
     }
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/team" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }
 });

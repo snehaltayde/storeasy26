@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { listOffers, upsertOffer } from "@/lib/offers/store";
@@ -31,7 +32,9 @@ export const POST = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "offers.write", resource: `offer:${saved.id}`, diff: { type: saved.type, enabled: saved.enabled } });
     return NextResponse.json({ ok: true, offer: saved });
   } catch (e) {
-    const status = e?.code === "OFFER_INVALID" ? 422 : 400;
-    return NextResponse.json({ error: String(e?.message || e), errors: e?.errors }, { status });
+    if (e?.code === "OFFER_INVALID") return NextResponse.json({ error: String(e.message), errors: e.errors }, { status: 422 });
+    const infra = infraResponse(e, { route: "admin/offers" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
+    return NextResponse.json({ error: String(e?.message || e), errors: e?.errors }, { status: 400 });
   }
 });

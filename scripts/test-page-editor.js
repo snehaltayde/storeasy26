@@ -6,7 +6,7 @@
 // two components run too, compiled with Next's own SWC (plain node has no JSX):
 // ContentPage renders to markup, PageEditor runs on small stand-in hooks.
 //   pnpm test:page-editor
-import { readFile, rm } from "node:fs/promises";
+import { readFile, rm, chmod } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -21,8 +21,11 @@ process.env.PLATFORM_DB_TOKEN = "";
 process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
-const dbs = [".test-pageeditor-default.db", ".test-pageeditor-platform.db", ".test-pageeditor-tenant.db"];
-for (const f of dbs) await rm(join(here, "..", f), { force: true });
+const dbs = [".test-pageeditor-default.db", ".test-pageeditor-platform.db", ".test-pageeditor-tenant.db", ".test-pageeditor-readonly.db"];
+for (const f of dbs) {
+  await chmod(join(here, "..", f), 0o644).catch(() => {});
+  await rm(join(here, "..", f), { force: true });
+}
 
 const { createClient } = await import("@libsql/client");
 const C = await import("../lib/platform/control.js");
@@ -31,13 +34,15 @@ const I = await import("../lib/platform/identity.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { db } = await import("../lib/db.js");
 const { handleStorefrontPut } = await import("../lib/admin/cms-api.js");
-const { getContentPage, validatePageSections } = await import("../lib/cms/store.js");
+const pageStore = await import("../lib/cms/store.js");
+const { getContentPage, validatePageSections } = pageStore;
 const { sanitizeHtml } = await import("../lib/sanitize.js");
 const { normalizePageSections } = await import("../lib/cms/schemas.js");
 const { componentFor } = await import("../lib/cms/registry.js");
 const R = await import("../lib/releases.js");
 const pageSections = await import("../components/admin/cms/pageSections.js");
-const { toEdit, formSections, sectionsPayload, editEmpty, blankSection } = pageSections;
+const { toEdit, formSections, sectionsPayload, editEmpty, blankSection, newSectionId, pageIssueText } = pageSections;
+const { ISSUE_KEYS } = await import("../lib/cms/issues.js");
 const { PAGE_TEMPLATES } = await import("../lib/content/templates.js");
 const { PAGES } = await import("../lib/content/pages.js");
 
@@ -71,21 +76,38 @@ await tdb.executeMultiple(await readFile(join(here, "../lib/schema.sql"), "utf8"
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 await runMigrations(tdb, await loadMigrations("tenant"));
 
+// DOC-04: a second store whose database has gone read-only, to see what the
+// editor shows when the failure is ours and not the founder's.
+const rodb = createClient({ url: "file:.test-pageeditor-readonly.db" });
+await rodb.executeMultiple(await readFile(join(here, "../lib/schema.sql"), "utf8"));
+await runMigrations(rodb, await loadMigrations("tenant"));
+rodb.close();
+await chmod(join(here, "..", ".test-pageeditor-readonly.db"), 0o444);
+await C.upsertTenant({ id: "zpro", name: "Read-only store", domains: ["zpro.test"], dbUrl: "file:.test-pageeditor-readonly.db", config: {}, secrets: {} });
+const ZPRO = await C.getTenant("zpro");
+
 const staffU = await I.createUser({ email: "staff@zp.test", password: "staff-pass-au05" });
 await I.addMembership(staffU.id, "zp", "staff");
+await I.addMembership(staffU.id, "zpro", "staff");
 const tok = (await Sess.createSession({ userId: staffU.id, kind: "merchant", ttlMs: 60_000 })).token;
 
+let ACTIVE = ZP; // which store the requests go to
 const req = (body) => ({
   cookies: { get: (name) => (name === "_admin" ? { value: tok } : undefined) },
-  headers: { get: (k) => ({ host: "zp.test" })[k.toLowerCase()] ?? null },
+  headers: { get: (k) => ({ host: `${ACTIVE.id}.test` })[k.toLowerCase()] ?? null },
   json: async () => body,
 });
-const inT = (fn) => withTenant(ZP, fn);
+const inT = (fn) => withTenant(ACTIVE, fn);
 const put = (body) => inT(() => handleStorefrontPut(req(body)));
 
-// The form the editor holds → exactly what its Save sends.
-const form = (...sections) => sections.map((s, i) => ({ id: `s${i}`, ...s }));
-const save = (slug, sections, revision = null) => put({ page: { slug, title: `Page ${slug}`, sections: sectionsPayload(sections) }, revision });
+// The form the editor holds → exactly what its Save sends. DOC-04: like the
+// editor, every row carries its durable id (`pid`) from the moment it exists.
+const form = (...sections) => sections.map((s, i) => ({ id: `s${i}`, pid: newSectionId(), ...s }));
+const save = async (slug, sections, revision = null) => {
+  const res = await put({ page: { slug, title: `Page ${slug}`, sections: sectionsPayload(sections) }, revision });
+  res.sent = sections; // the form, so the test can word the refusal as the editor does
+  return res;
+};
 const row = (slug) => inT(() => db.selectFrom("cms_pages").selectAll().where("slug", "=", slug).executeTakeFirst());
 // Reload = what app/(console)/admin/(authed)/storefront/pages/[slug]/page.js
 // hands the editor: the row, normalized, back through the form conversion.
@@ -96,6 +118,24 @@ const content = (sections) => sections.map(({ id, pid, ...rest }) => rest);
 const assertPlain = (message, label = "") => {
   ok(typeof message === "string" && message.length > 0, `${label} has a message:`);
   ok(!/undefined|null|\[object|\bkind\b|\bsrc\b|\bbody\b|\bhtml\b|array|https?:/i.test(message), `${label} plain words only, got "${message}":`);
+};
+
+// DOC-04: a refusal is { error, code, issues }. Each issue is the one shape,
+// names its section by id, and carries NO position: "section 3" is the
+// editor's to say. `shown` is what the editor's banner says for this response,
+// worded by the editor's own pageIssueText against the form that was sent.
+const issuesOf = (res) => res.body.issues.filter((i) => i.severity === "error");
+const shown = (res, sections = res.sent || []) => issuesOf(res).map((i) => pageIssueText(i, sections));
+const POSITION = /\b(section|question|accordion|item)\s+\d/i;
+const assertStructured = (res, label = "") => {
+  eq(res.body.code, "VALIDATION_FAILED", `${label} code:`);
+  ok(Array.isArray(res.body.issues) && issuesOf(res).length > 0, `${label} has issues:`);
+  for (const i of res.body.issues) {
+    eq(Object.keys(i), ISSUE_KEYS, `${label} issue keys:`);
+    ok(typeof i.code === "string" && /^[A-Z_]+$/.test(i.code), `${label} issue code "${i.code}":`);
+    ok(!POSITION.test(i.message), `${label} the server sends no position, got "${i.message}":`);
+    eq(i.blockId, null, `${label} blockId (nested blocks arrive with TREE-02):`);
+  }
 };
 
 // --- the reported bug --------------------------------------------------------
@@ -159,13 +199,17 @@ const seed = async (slug) => {
 const refused = async (slug, res, label) => {
   eq(res.status, 422, `${label} status:`);
   assertPlain(res.body.error, label);
+  assertStructured(res, label);
+  for (const i of issuesOf(res)) assertPlain(i.message, `${label} issue`);
 };
 
 await t("text section with neither heading nor paragraphs: refused with a plain message, row untouched", async () => {
   const before = await seed("blank-text");
-  const res = await save("blank-text", form(blankSection("text", "n1")), before.revision);
+  const sent = form(blankSection("text", "n1"));
+  const res = await save("blank-text", sent, before.revision);
   await refused("blank-text", res, "blank text");
-  eq(res.body.error, "section 1: add a heading or some text, or remove this section.", "message:");
+  eq(shown(res), ["section 1: add a heading or some text, or remove this section."], "message:");
+  eq(issuesOf(res).map(({ sectionId, field, code }) => ({ sectionId, field, code })), [{ sectionId: sent[0].pid, field: "body", code: "SECTION_EMPTY" }], "issue:");
   eq(await row("blank-text"), before, "row unchanged:");
 });
 
@@ -200,8 +244,95 @@ await t("one empty section refuses the WHOLE save and names its position on the 
     before.revision,
   );
   await refused("mixed-blank", res, "third blank");
-  ok(res.body.error.startsWith("section 3:"), `position in the message, got "${res.body.error}":`);
+  ok(shown(res)[0].startsWith("section 3:"), `position in the banner, got "${shown(res)}":`);
+  eq(issuesOf(res)[0].sectionId, res.sent[2].pid, "the issue names the third section's id:");
   eq(await row("mixed-blank"), before, "row unchanged:");
+});
+
+// --- DOC-04: one structured result ---------------------------------------------
+console.log("— DOC-04: structured issues, all of them, located by id");
+
+await t("every problem in the page is reported at once, each naming its own section id and field", async () => {
+  const before = await seed("all-issues");
+  const sent = form(
+    { kind: "text", heading: "Fine", text: "Fine words." },
+    blankSection("text", "n1"),
+    { kind: "image", src: "http://cdn.example/a.jpg", alt: "", caption: "" },
+    { kind: "faq", heading: "", items: [{ q: "Q1", a: "<p>A1</p>" }, { q: "", a: "<p>Orphan</p>" }, { q: "Q3", a: "<p></p>" }] },
+    { kind: "rich", heading: "h".repeat(121), html: "Free on orders <500 and >100 rupees." },
+  );
+  const res = await put({ page: { slug: "all-issues", title: "  ", sections: sectionsPayload(sent) }, revision: before.revision });
+  res.sent = sent;
+  await refused("all-issues", res, "all issues");
+  eq(
+    issuesOf(res).map(({ sectionId, field, code }) => [sectionId, field, code]),
+    [
+      [null, "title", "REQUIRED"],
+      [sent[1].pid, "body", "SECTION_EMPTY"],
+      [sent[2].pid, "src", "IMAGE_INVALID"],
+      [sent[3].pid, "items.1.q", "REQUIRED"],
+      [sent[3].pid, "items.2.a", "REQUIRED"],
+      [sent[4].pid, "heading", "TOO_LONG"],
+      [sent[4].pid, "html", "WORDS_LOST"],
+    ],
+    "issues in order:",
+  );
+  eq(
+    shown(res),
+    [
+      "title required",
+      "section 2: add a heading or some text, or remove this section.",
+      "section 3: this image link isn't secure. Use a link that starts with https, or choose an image from your library.",
+      "section 4, question 2: question text required",
+      "section 4, question 3: answer required",
+      "section 5: the heading is too long (121 characters, the limit is 120)",
+      'section 5: saving would lose these words: "<500 and >". This usually comes from < or > signs. Reword them or remove them, then save again.',
+    ],
+    "what the banner says:",
+  );
+  eq(res.body.error, "There are 7 things to fix", "summary:");
+  eq(await row("all-issues"), before, "row unchanged:");
+});
+
+await t("every issue names the id the section is stored under, also for a section the form never saved", async () => {
+  const sent = form(blankSection("rich", "n1"));
+  const res = await save("ids-new", sent);
+  eq(issuesOf(res)[0].sectionId, sent[0].pid, "a brand-new section's id:");
+  ok(/^sec_[a-z0-9]+$/.test(sent[0].pid), `minted in the form: ${sent[0].pid}`);
+  const fixed = await save("ids-new", [{ ...sent[0], html: "<p>Now words</p>" }]);
+  eq(fixed.status, 200, "save once fixed:");
+  eq(JSON.parse((await row("ids-new")).sections)[0].id, sent[0].pid, "the server keeps the id the form minted:");
+});
+
+await t("the number comes from the id against the form as it is now, never from the server", async () => {
+  const sent = form({ kind: "text", heading: "One", text: "x" }, { kind: "text", heading: "Two", text: "y" }, blankSection("image", "n2"));
+  const res = await save("renumber", sent);
+  eq(shown(res), ["section 3: choose an image, or remove this section."], "as sent:");
+  eq(shown(res, [sent[2], sent[0], sent[1]]), ["section 1: choose an image, or remove this section."], "after moving it to the top:");
+  eq(shown(res, [sent[0], sent[1]]), ["A section: choose an image, or remove this section."], "after removing it:");
+});
+
+await t("a question number counts the rows on screen, including the blank ones the save leaves out", async () => {
+  const sent = form({ kind: "faq", heading: "", items: [{ q: "Q1", a: "<p>A1</p>" }, { q: "", a: "" }, { q: "Q3", a: "" }] });
+  const res = await save("faq-rows", sent);
+  eq(issuesOf(res).map((i) => i.field), ["items.1.a"], "the server's index is into what was sent:");
+  eq(shown(res), ["section 1, question 3: answer required"], "the banner's number is the row on screen:");
+});
+
+await t("two sections sent with the same id: each issue names the id its own section would be saved under", () => {
+  const { checkPageSections } = pageStore;
+  const { issues, value } = checkPageSections([
+    { id: "sec_same1", kind: "image", src: "", alt: "" },
+    { id: "sec_same1", kind: "image", src: "", alt: "" },
+  ]);
+  eq(issues.map((i) => i.sectionId), value.map((s) => s.id), "issue ids are the saved ids:");
+  eq(issues[0].sectionId, "sec_same1", "the first keeps its id:");
+  ok(issues[1].sectionId !== "sec_same1", `the second gets its own: ${issues[1].sectionId}`);
+});
+
+await t("no refusal anywhere in this suite's server messages carries a position", () => {
+  // assertStructured runs inside refused(); this pins the old forms by name
+  for (const old of ["section 1: x", "Section 2 (banner): x", "section 1, question 2: x"]) ok(POSITION.test(old), `the check sees ${old}:`);
 });
 
 // --- every kind, every filled/blank combination ------------------------------
@@ -260,7 +391,7 @@ await t("alt text typed on an image with no picture is refused, not lost", async
   const before = await seed("img-alt");
   const res = await save("img-alt", form({ kind: "image", src: "", alt: "Alt words", caption: "" }), before.revision);
   await refused("img-alt", res, "image alt only");
-  ok(/choose an image/.test(res.body.error), `says what to do, got "${res.body.error}":`);
+  eq(shown(res), ["section 1: choose an image, or remove this section."], "says what to do, and only that:");
   eq(await row("img-alt"), before, "row unchanged:");
 });
 
@@ -355,8 +486,10 @@ await t(`stray brackets (${LOSES_WORDS.length} cases, both fields): refused, quo
       const res = await save(slug, form(section), before.revision);
       const label = `${field} ${JSON.stringify(typed)}`;
       await refused(slug, res, label);
-      ok(res.body.error.includes(`"${words}"`), `${label} quotes ${words}, got "${res.body.error}":`);
-      ok(res.body.error.startsWith(field === "rich" ? "section 1:" : "section 1, question 1:"), `${label} position, got "${res.body.error}":`);
+      const [said] = shown(res);
+      ok(said.includes(`"${words}"`), `${label} quotes ${words}, got "${said}":`);
+      ok(said.startsWith(field === "rich" ? "section 1:" : "section 1, question 1:"), `${label} position, got "${said}":`);
+      eq(issuesOf(res)[0].field, field === "rich" ? "html" : "items.0.a", `${label} field:`);
       eq(await row(slug), before, `${label} row unchanged:`);
     }
   }
@@ -365,7 +498,7 @@ await t(`stray brackets (${LOSES_WORDS.length} cases, both fields): refused, quo
 await t("a very long stretch of lost words is quoted short, and the message stays usable", async () => {
   const res = await save("stray-long", form({ kind: "rich", heading: "", html: `<${"w".repeat(500)}> and more` }));
   eq(res.status, 422, "status:");
-  ok(res.body.error.length < 300, `length ${res.body.error.length}:`);
+  ok(shown(res)[0].length < 300, `length ${shown(res)[0].length}:`);
 });
 
 // HTML that needs no change, and words that aren't at risk: stored as typed.
@@ -478,7 +611,7 @@ await t("a row the old code cut mid-tag saves again, unless encoding its < takes
   const before = await row("old-cut");
   const res = await save("old-cut", await reload("old-cut"), 1);
   await refused("old-cut", res, "cut at the limit");
-  eq(res.body.error, "section 1: the content is too long (20003 characters, the limit is 20000)", "message:");
+  eq(shown(res), ["section 1: the content is too long (20003 characters, the limit is 20000)"], "message:");
   eq(await row("old-cut"), before, "row unchanged:");
 });
 
@@ -534,8 +667,10 @@ await t(`addresses (${LOSES_ADDRESS.length} cases, both fields): refused, quotin
       const res = await save(slug, form(section), before.revision);
       const label = `${field} ${typed}`;
       await refused(slug, res, label);
-      ok(res.body.error.includes(`"${address}"`), `${label} quotes the address, got "${res.body.error}":`);
-      ok(res.body.error.startsWith(field === "rich" ? "section 1:" : "section 1, question 1:"), `${label} position, got "${res.body.error}":`);
+      const [said] = shown(res);
+      ok(said.includes(`"${address}"`), `${label} quotes the address, got "${said}":`);
+      ok(said.startsWith(field === "rich" ? "section 1:" : "section 1, question 1:"), `${label} position, got "${said}":`);
+      eq(issuesOf(res)[0].code, "ADDRESS_LOST", `${label} code:`);
       eq(await row(slug), before, `${label} row unchanged:`);
     }
   }
@@ -580,8 +715,9 @@ const refusedQuoting = async (cases, message, prefix) => {
       const res = await save(slug, form(section), before.revision);
       const label = `${field} ${typed}`;
       eq(res.status, 422, `${label} status:`);
-      eq(res.body.error, `${field === "rich" ? "section 1" : "section 1, question 1"}: ${message(address)}`, `${label} message:`);
-      assertPlain(res.body.error.replace(address, ""), label);
+      eq(shown(res), [`${field === "rich" ? "section 1" : "section 1, question 1"}: ${message(address)}`], `${label} message:`);
+      eq(issuesOf(res)[0].message, message(address), `${label} the server's message has no position:`);
+      assertPlain(issuesOf(res)[0].message.replace(address, ""), label);
       eq(await row(slug), before, `${label} row unchanged:`);
     }
   }
@@ -592,9 +728,12 @@ await t(`embedded videos and sound (${LOSES_MEDIA.length} cases, both fields): r
 await t(`pictures held only in srcset or data-src (${LOSES_PICTURE.length} cases, both fields): refused, quoting the address, row untouched`, () => refusedQuoting(LOSES_PICTURE, PICTURE_MESSAGE, "picture"));
 
 await t("the same refusal reaches Save as template, with the right section number", async () => {
-  const res = await put({ saveTemplate: { name: "Video", family: "page", sections: sectionsPayload(form(noHeading, { kind: "rich", heading: "", html: '<iframe src="/v"></iframe>' })) } });
+  const sent = form(noHeading, { kind: "rich", heading: "", html: '<iframe src="/v"></iframe>' });
+  const res = await put({ saveTemplate: { name: "Video", family: "page", sections: sectionsPayload(sent) } });
   eq(res.status, 422, "status:");
-  eq(res.body.error, `section 2: ${MEDIA_MESSAGE("/v")}`, "message:");
+  assertStructured(res, "template");
+  eq(shown(res, sent), [`section 2: ${MEDIA_MESSAGE("/v")}`], "message:");
+  eq(issuesOf(res)[0].sectionId, sent[1].pid, "names the second section:");
 });
 
 await t("addresses that work are stored as typed", async () => {
@@ -651,7 +790,7 @@ await t(`only empty markup (${EMPTY_MARKUP.length} kinds, both fields) counts as
     for (const [field, section] of htmlField(typed)) {
       const res = await save("empty-markup", form(section), before.revision);
       await refused("empty-markup", res, `${field} ${typed}`);
-      ok(res.body.error.includes(field === "rich" ? "this section is empty" : "answer required"), `${field} ${typed} message, got "${res.body.error}":`);
+      eq(shown(res), [field === "rich" ? "section 1: this section is empty. Add some content, or remove this section." : "section 1, question 1: answer required"], `${field} ${typed} message:`);
     }
   }
   eq(await row("empty-markup"), before, "row unchanged:");
@@ -679,7 +818,7 @@ await t("an image link that isn't https or from the library is refused in plain 
   for (const src of ["http://cdn.example/a.jpg", "//cdn.example/a.jpg", "javascript:alert(1)", "a.jpg"]) {
     const res = await save("img-link", form({ kind: "image", src, alt: "Alt", caption: "" }), before.revision);
     await refused("img-link", res, src);
-    eq(res.body.error, "section 1: this image link isn't secure. Use a link that starts with https, or choose an image from your library.", `${src} message:`);
+    eq(shown(res), ["section 1: this image link isn't secure. Use a link that starts with https, or choose an image from your library."], `${src} message:`);
   }
   eq(await row("img-link"), before, "row unchanged:");
 });
@@ -705,8 +844,13 @@ await t(`each of the ${LONG.length} limited fields refuses over-limit text, row 
   for (const [label, section] of LONG) {
     const res = await put({ page: { slug: "too-long", title: "x", sections: [section] }, revision: before.revision });
     eq(res.status, 422, `${label} status:`);
-    ok(/too long/.test(res.body.error), `${label} message, got "${res.body.error}":`);
-    assertPlain(res.body.error, label);
+    assertStructured(res, label);
+    const [only] = issuesOf(res);
+    eq(issuesOf(res).length, 1, `${label} one issue:`);
+    ok(/too long \(\d+ characters, the limit is \d+\)/.test(only.message), `${label} says the length and the limit, got "${only.message}":`);
+    eq(only.code, "TOO_LONG", `${label} code:`);
+    ok(only.sectionId && /^sec_/.test(only.sectionId) && only.field, `${label} names a section and field: ${JSON.stringify(only)}`);
+    assertPlain(only.message, label);
   }
   eq(await row("too-long"), before, "row unchanged:");
 });
@@ -730,9 +874,10 @@ await t("a headingless text section survives save as template", async () => {
 });
 
 await t("a blank section is refused in a template too, plainly", async () => {
-  const res = await put({ saveTemplate: { name: "Blank", family: "page", sections: sectionsPayload(form(noHeading, blankSection("text", "n1"))) } });
+  const sent = form(noHeading, blankSection("text", "n1"));
+  const res = await put({ saveTemplate: { name: "Blank", family: "page", sections: sectionsPayload(sent) } });
   await refused("template", res, "template");
-  ok(res.body.error.startsWith("section 2:"), `position, got "${res.body.error}":`);
+  eq(shown(res, sent), ["section 2: add a heading or some text, or remove this section."], "position:");
 });
 
 const oldTemplate = (id, sections) => inT(() => db.insertInto("cms_templates").values({ id, name: "Old", family: "page", sections: JSON.stringify(sections), version: 1, revision: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }).execute());
@@ -753,7 +898,8 @@ await t("a template saved under older rules still opens, keeping what today's ru
   const edit = formSections(sections);
   const refusedSave = await save("from-old-template", edit);
   await refused("from-old-template", refusedSave, "stale section on Save");
-  eq(refusedSave.body.error, "section 1: this section is empty. Add some content, or remove this section.", "message on Save:");
+  // DOC-04: both stale sections are named at once, not only the first
+  eq(shown(refusedSave), ["section 1: this section is empty. Add some content, or remove this section.", "section 3, question 1: answer required"], "message on Save:");
   eq(await row("from-old-template"), undefined, "nothing written:");
   const fixed = await save("from-old-template", [{ ...edit[0], html: "<p>Now it has words</p>" }, edit[1], { ...edit[2], items: [{ q: "Keep this question", a: "<p>Now answered</p>" }] }, edit[3]]);
   eq(fixed.status, 200, `saved once fixed: "${fixed.body.error}"`);
@@ -763,7 +909,8 @@ await t("a template name over the limit is refused, not cut", async () => {
   const sections = sectionsPayload(form(noHeading));
   const long = await put({ saveTemplate: { name: "n".repeat(81), family: "page", sections } });
   eq(long.status, 422, "status:");
-  eq(long.body.error, "the template name is too long (81 characters, the limit is 80)", "message:");
+  eq(shown(long, []), ["the template name is too long (81 characters, the limit is 80)"], "message:");
+  eq(issuesOf(long)[0].field, "name", "field:");
   const atLimit = await put({ saveTemplate: { name: "n".repeat(80), family: "page", sections } });
   eq(atLimit.status, 200, "at the limit:");
   eq(atLimit.body.template.name.length, 80, "stored whole:");
@@ -922,6 +1069,19 @@ const mountEditor = (page, revision) => {
     save: () => all("Button", (n) => n.props.variant === "primary" && textOf(n) === "Save")[0].props.onClick(),
     unsaved: () => all("Badge", (n) => textOf(n) === "Unsaved").length > 0,
     problems: () => all("Banner", (n) => n.props.title === "Couldn't save").map(textOf),
+    // DOC-04: each line of the banner, and what clicking it does
+    lines: () => {
+      const found = [];
+      walk(all("Banner", (n) => n.props.title === "Couldn't save"), (n) => n.type === "li" && found.push(n));
+      return found;
+    },
+    clickLine: (i) => {
+      let button = null;
+      walk(view.lines()[i], (n) => n.type === "button" && (button = n));
+      return button;
+    },
+    sectionCards: () => all("Card", (n) => typeof n.props.id === "string" && n.props.id.startsWith("pe-sec-")).map((n) => n.props.id),
+    press: (label, i) => all("IconButton", (n) => n.props.label === label)[i].props.onClick(),
   };
 };
 let view = null;
@@ -968,6 +1128,53 @@ await t("words the sanitizer would remove are refused in the editor too, and sta
   eq(await row("ed-stray"), before, "row unchanged:");
 });
 
+// DOC-04, in the editor: the banner is worded from each issue's section id
+// against the form as it is NOW, and each line takes the founder to its card.
+await t("DOC-04: the banner lists every issue, numbers it from the id, renumbers when the section moves, and each line scrolls to its card", async () => {
+  view = mountEditor(
+    {
+      slug: "ed-renumber",
+      title: "Page ed-renumber",
+      sections: [
+        { id: "sec_keep1", kind: "text", heading: "Fine", body: ["Words."] },
+        { id: "sec_blank2", kind: "text", heading: "", body: [] },
+        { id: "sec_img3", kind: "image", src: "", alt: "", caption: "" },
+      ],
+    },
+    null,
+  );
+  await view.save();
+  eq(view.lines().map(textOf), ["section 2: add a heading or some text, or remove this section.", "section 3: choose an image, or remove this section."], "both, numbered from their ids:");
+  const scrolled = [];
+  const realDocument = globalThis.document;
+  globalThis.document = { getElementById: (id) => ({ scrollIntoView: () => scrolled.push(id) }) };
+  try {
+    view.clickLine(1).props.onClick();
+  } finally {
+    globalThis.document = realDocument;
+  }
+  eq(scrolled, ["pe-sec-sec_img3"], "clicking the image line scrolls to the image's card:");
+  ok(view.sectionCards().includes("pe-sec-sec_img3"), `that card carries the anchor: ${view.sectionCards()}`);
+  view.press("Move section up", 2); // the image moves above the blank text section
+  eq(view.lines().map(textOf), ["section 3: add a heading or some text, or remove this section.", "section 2: choose an image, or remove this section."], "renumbered by the editor, with no new request:");
+});
+
+await t("DOC-04: a database failure shows one plain line, not a list of section problems, and the form stays Unsaved", async () => {
+  ACTIVE = ZPRO;
+  try {
+    view = mountEditor({ slug: "ed-dbdown", title: "Page ed-dbdown", sections: [{ id: "sec_dbdown", kind: "text", heading: "H", body: ["x"] }] }, null);
+    view.type("Section paragraphs", "Typed while the database is read-only.");
+    toasts.length = 0;
+    await view.save();
+    eq(view.lines().map(textOf), ["We couldn't reach your store's data just now, so nothing was saved. Your changes are still here. Try again in a minute."], "banner:");
+    ok(view.unsaved(), "still unsaved:");
+    eq(toasts, [], "no success toast:");
+    eq(view.field("Section paragraphs").props.value, "Typed while the database is read-only.", "the typing stays:");
+  } finally {
+    ACTIVE = ZP;
+  }
+});
+
 // --- guard on what the stand-ins can't see ------------------------------------
 console.log("— source guard");
 
@@ -988,5 +1195,8 @@ await t("PageEditor copy matches the rule, and each badge shows the number refus
 
 // ----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);
-for (const f of dbs) await rm(join(here, "..", f), { force: true });
+for (const f of dbs) {
+  await chmod(join(here, "..", f), 0o644).catch(() => {});
+  await rm(join(here, "..", f), { force: true });
+}
 process.exit(fail ? 1 : 0);

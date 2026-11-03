@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { db } from "@/lib/db";
@@ -70,6 +71,9 @@ export const POST = tenantHandler(async (request) => {
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300), ...(e.problems ? { problems: e.problems } : {}) }, { status: 422 });
+    if (e?.problems) return NextResponse.json({ error: String(e.message).slice(0, 300), problems: e.problems }, { status: 422 }); // enabling refused, with why
+    const infra = infraResponse(e, { route: "admin/bundles" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
+    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }
 });

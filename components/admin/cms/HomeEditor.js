@@ -11,7 +11,8 @@ import { ConfirmDialog } from "@/components/console/Dialog";
 import { Field, Input, Textarea } from "@/components/console/fields";
 import { Switch } from "@/components/console/Switch";
 import { useToast } from "@/components/console/Toast";
-import { COMPONENTS } from "@/lib/cms/registry"; // pure data, no server imports — safe in a client file
+import { COMPONENTS, mintSectionId } from "@/lib/cms/registry"; // pure data, no server imports — safe in a client file
+import { issueText } from "@/lib/cms/issues";
 import { getStorefrontView, saveBlock, resetBlock } from "./api";
 import { CollectionPicker } from "./RefPicker";
 import { ConflictBanner } from "./ConflictBanner";
@@ -99,11 +100,16 @@ const ciValue = (mode, lists) => {
 const ciSnapOf = (v) => JSON.stringify(v == null ? null : ciValue("curated", ciLists(v)));
 
 // Persistent in-card failure surface (house rule: toasts carry success only).
-function CardErrors({ error, className = "" }) {
+// DOC-04: server issues name their section by id; the number shown is worked
+// out here from the sections as they are now, matching each row's "N. Kind".
+function CardErrors({ error, sections = [], className = "" }) {
   if (!error || error.kind !== "errors") return null;
+  const lines = error.issues
+    ? error.issues.map((it) => issueText(it, { sections, sectionLabel: (s, i) => `Section ${i + 1} (${kindLabel(s.kind)})`, documentLabels: false }))
+    : error.errors;
   return (
     <Banner tone="danger" title="Save failed" className={className}>
-      {error.errors.map((t, i) => (
+      {lines.map((t, i) => (
         <p key={i}>{t}</p>
       ))}
     </Banner>
@@ -223,6 +229,8 @@ export default function HomeEditor({ initial }) {
       toast.success("Saved as a draft — publish from Publishing");
     } else if (res.conflict) {
       fail(block, { kind: "conflict" });
+    } else if (res.issues) {
+      fail(block, { kind: "errors", issues: res.issues.filter((i) => i.severity === "error"), errors: res.errors });
     } else if (res.errors) {
       fail(block, { kind: "errors", errors: res.errors });
     } else {
@@ -334,11 +342,12 @@ export default function HomeEditor({ initial }) {
   const duplicateSection = (id) => {
     const i = sections.findIndex((s) => s._id === id);
     if (i < 0) return;
-    const copy = { ...JSON.parse(JSON.stringify(stripIds([sections[i]])[0])), _id: mintId() };
-    delete copy.id; // S54: a duplicate is a NEW instance — the server mints its durable id
+    // S54: a duplicate is a NEW instance. DOC-04: it gets its own durable id
+    // now, so a refusal can point at it before the first save.
+    const copy = { ...JSON.parse(JSON.stringify(stripIds([sections[i]])[0])), id: mintSectionId(), _id: mintId() };
     mutate([...sections.slice(0, i + 1), copy, ...sections.slice(i + 1)]);
   };
-  const addSection = (kind) => mutate([...sections, { ...NEW_SECTION[kind], _id: mintId() }]);
+  const addSection = (kind) => mutate([...sections, { id: mintSectionId(), ...NEW_SECTION[kind], _id: mintId() }]);
 
   const sectionsStatus = saving.home_sections
     ? "Saving…"
@@ -462,7 +471,7 @@ export default function HomeEditor({ initial }) {
         />
         <div className="space-y-3">
           {conflictBanner("home_sections", stripIds(sections), { onSaved: () => setSectionsSaved(true) })}
-          <CardErrors error={errs.home_sections} />
+          <CardErrors error={errs.home_sections} sections={sections} />
 
           <div className="flex flex-wrap items-center gap-1.5">
             <IconButton label="Undo" variant="secondary" icon={<Undo2 size={14} aria-hidden />} onClick={undo} disabled={!history.length} />

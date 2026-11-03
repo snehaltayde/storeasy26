@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { KITS, applyKit, kitUpgradeAvailable } from "@/lib/themes/kits";
 import { tenantOwnCfg } from "@/lib/tenant-context";
@@ -36,6 +37,8 @@ export const POST = tenantHandler(async (request) => {
     // this request's tenant context predates the patch — answer with the pin we just wrote
     return NextResponse.json({ ok: true, applied: r, ...view(), theme: r.theme, upgradeAvailable: false });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/theme" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }
 });

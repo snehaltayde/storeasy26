@@ -5,7 +5,12 @@ import Link from "next/link";
 import { CircleCheck, ExternalLink } from "lucide-react";
 import { localInputToIso } from "@/lib/admin/schedule";
 import { diffItemInfo } from "@/components/admin/cms/labels";
-import { startPreview } from "@/components/admin/cms/api";
+import { startPreview, NETWORK_ERROR } from "@/components/admin/cms/api";
+// DOC-04: publish issues are the same structured shape as save issues. The
+// server sends no positions; "Section 2 (Banner / CTA)" is worked out here
+// from each issue's section id against the sections being published, both
+// before publishing and in the warnings that come back after it.
+import { issueLines, resultWarningLines } from "@/lib/cms/issues";
 import { Card, CardHeader } from "@/components/console/Card";
 import { Badge, StatusBadge } from "@/components/console/Badge";
 import { Banner } from "@/components/console/Banner";
@@ -59,6 +64,9 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.ok) {
         if (json.releases) setData(json); // every mutating POST returns the full view
+        // DOC-04: the change went through but the view couldn't be read, so
+        // what this page shows is out of date. Say so; don't claim a failure.
+        if (json.notice) setResultWarnings([json.notice]);
         return json;
       }
       // S53 (0B-1): the publish was bound to the hash we DISPLAYED; drafts
@@ -68,11 +76,15 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
         setApiErrors([json.error || "Drafts changed since you reviewed them — review the updated list, then publish again."]);
         return { ok: false, error: json.error };
       }
-      const msgs = json.errors ? [json.error, ...json.errors].filter(Boolean) : [json.error || `Request failed (${res.status})`];
+      const msgs = Array.isArray(json.issues)
+        ? [json.error, ...issueLines(json.issues, json.sections, "error")].filter(Boolean)
+        : json.errors
+          ? [json.error, ...json.errors].filter(Boolean)
+          : [json.error || `Something went wrong on our side (error ${res.status}), so nothing was published. Your live store hasn't changed. Try again in a minute.`];
       setApiErrors(msgs);
       return { ok: false, error: msgs.join(" — ") };
-    } catch (e) {
-      const msg = `Network error: ${String(e?.message || e)}`;
+    } catch {
+      const msg = NETWORK_ERROR.replace("nothing was saved", "nothing was published");
       setApiErrors([msg]);
       return { ok: false, error: msg };
     } finally {
@@ -96,7 +108,10 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
     }
   }
 
-  const v = data.validation || { ok: true, errors: [], warnings: [] };
+  const rawV = data.validation || { ok: true, errors: [], warnings: [] };
+  const v = Array.isArray(rawV.issues)
+    ? { ...rawV, errors: issueLines(rawV.issues, rawV.sections, "error"), warnings: issueLines(rawV.issues, rawV.sections, "warning") }
+    : rawV;
   const diff = data.diff || { firstPublish: !data.live, dirty: !!data.dirty, items: [] };
   const diffItems = diff.items || [];
   const readyToPublish = v.ok && !!data.dirty; // content gate; canPublish is the ROLE gate
@@ -250,7 +265,7 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
                 const json = await call({ action: "schedule", note, at: iso, expectedDraftHash: data.draftHash });
                 if (json.ok) {
                   toast.success(`Scheduled for ${when(json.scheduled?.scheduledFor)} — the pending release is in the history below.`);
-                  setResultWarnings(json.scheduled?.warnings || []);
+                  setResultWarnings([...(json.notice ? [json.notice] : []), ...resultWarningLines(json.scheduled)]);
                   setNote("");
                   setAt("");
                 }
@@ -344,7 +359,7 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
           const json = await call({ action: "publish", note, expectedDraftHash: data.draftHash });
           if (!json.ok) throw new Error(json.error); // keeps the dialog open, shows the reason
           toast.success("Published — live now.");
-          setResultWarnings(json.published?.warnings || []);
+          setResultWarnings([...(json.notice ? [json.notice] : []), ...resultWarningLines(json.published)]);
           setNote("");
         }}
       />

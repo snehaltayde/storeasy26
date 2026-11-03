@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { listDomains, verifyDomain } from "@/lib/platform/domains";
 import { currentTenant } from "@/lib/tenant-context";
@@ -57,6 +58,8 @@ export const POST = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "settings.write", resource: `domain:${host}`, diff: { verified: !!r.ok } });
     return NextResponse.json({ ok: true, result: { verified: !!r.ok, error: r.error || null }, domains: await view(tenant.id) });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/domains" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }
 });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { buildChecklist, markManualStep } from "@/lib/admin/onboarding";
 import { audit } from "@/lib/platform/audit";
@@ -27,6 +28,8 @@ export const POST = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "settings.write", resource: `onboarding:${r.step}`, diff: { done: r.done } });
     return NextResponse.json({ ok: true, ...(await buildChecklist()) });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/setup" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }
 });
