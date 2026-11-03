@@ -192,6 +192,24 @@ No owner checks for this item.
 - [ ] Hosted Turso on a staging tenant: repeat the P2-ATOM concurrency and lost-answer checks, and once publish a build that reuses another document's version id to confirm it ends failed with nothing written.
 - [ ] Approve the new {failed} codes (BAD_BUILD, VERSION_ID_CLASH, RELEASE_ID_CLASH, MISSING_DOCUMENT, DB_REFUSED) and the reply mapping suggested in P2-HARDEN.md, then have P2-PLAN.md decision 2 updated before P2-PUBLISH starts (it still names three outcomes).
 
+## Phase 2, batch 3
+
+### Drafts, checkpoints and versions for the new editor (P2-DOCS)
+- [ ] CI sqld install (carried from P2-ATOM): approve the libsql-server 0.24.32 release source and its SHA-256, then add the step from docs/cms-reviews/P2-ATOM.md owner check 1 to .github/workflows/test.yml. .github/ was not touched.
+- [ ] Decide whether an image used only in an older document version (not live, not the draft) may be force-deleted, accepting that restoring that version then shows a missing image. Today it is always refused.
+- [ ] Confirm the plain names in Earlier versions: 'Someone on your team' for people who left and for the shared store password, 'Storeasy' for support and automatic changes, and a teammate's email shown when they set no name.
+- [ ] Hosted Turso, on a staging tenant in documents mode: one save; two saves racing from one revision (one 409); two creates racing at one slug (one 409 SLUG_TAKEN); a save while another connection holds BEGIN IMMEDIATE.
+- [ ] Confirm the checkpoint interval of 5 minutes, or give the number to use.
+
+### The storefront reads published documents, legacy stores unchanged (P2-READ)
+- [ ] Hosted Turso replica consistency: publish on a staging tenant and load the home page right away. A missing version must render after the one re-read or show the error page, never defaults.
+- [ ] Hosted perf numbers for the v4 home page, policy page, sitemap and /journal (OQ-19), after P2-PERF has the local numbers.
+- [ ] DR-1 and DR-2 still apply: never roll back past P2-VGATE while any v4 pointer exists, and scan the fleet's live v values before deploy.
+- [ ] CI sqld step: approve the pinned, checksum-verified libsql-server download from P2-ATOM owner check 1 before anyone adds it under .github/. Until then CI stays red on test:publish. This suite does not need sqld.
+- [ ] After deploy, a legacy store's /journal and /sitemap.xml must list exactly what they listed before.
+- [ ] P2-SECTIONS or OVL: home product rails read collection_overrides directly (lib/cms/section-data.js); pass v4 pins instead.
+- [ ] P2-SECTIONS: move the home page to resolvedHomePage before a v4 store can hide its hero, because resolvedHero returns null on v4 when the hero is hidden.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
