@@ -9,6 +9,8 @@
 //      schema. Cart and search go through their real API routes.
 //   4. P2-GUARD: a tenant at BEFORE_DOCUMENTS (no cms_state table) still saves
 //      legacy content and publishes through the real console handlers.
+//   5. P2-READ: a tenant at READ_BEFORE_DOCUMENTS renders legacy content exactly
+//      as a current tenant with the same content does, before and after a publish.
 //   pnpm test:schema-compat
 import { readFile, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -27,6 +29,11 @@ const OLDER_SCHEMA = "0017_cms_approvals";
 // drops this check: the last migration before 0021 (documents, cms_state).
 // A store here has no cms_state table and must read as legacy.
 const BEFORE_DOCUMENTS = "0020_sync_runs_resumable";
+
+// P2-READ's own pin, kept apart from the two above: a store with no cms_state
+// table must read as legacy on the shopper path (drafts before the first
+// publish, the frozen legacy reader after it).
+const READ_BEFORE_DOCUMENTS = "0020_sync_runs_resumable";
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -53,6 +60,8 @@ const dbs = [
   ".test-compat-cur.db",
   ".test-compat-spare.db",
   ".test-compat-pre21.db",
+  ".test-compat-read20.db",
+  ".test-compat-readcur.db",
 ];
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
@@ -735,6 +744,88 @@ console.log(`— a tenant at ${BEFORE_DOCUMENTS} (no cms_state): legacy saves an
     const g = await inT("pre21", () => handleReleasesGet(req(null)));
     eq(g.status, 200, "GET:");
     ok(!g.body.documents && g.body.dirty === false, `legacy view after publish: ${JSON.stringify({ documents: g.body.documents, dirty: g.body.dirty })}`);
+  });
+}
+
+// =============================================================================
+// 5. P2-READ: a tenant at READ_BEFORE_DOCUMENTS renders legacy content unchanged
+// =============================================================================
+console.log(`— a tenant at ${READ_BEFORE_DOCUMENTS} renders legacy content as a current tenant does`);
+{
+  const Res = await import("../lib/content/resolve.js");
+  const S = await import("../lib/cms/store.js");
+  const R = await import("../lib/releases.js");
+  for (const [id, file] of [
+    ["read20", ".test-compat-read20.db"],
+    ["readcur", ".test-compat-readcur.db"],
+  ]) {
+    await C.upsertTenant({ id, name: "Read Compat", domains: [`${id}.test`], dbUrl: `file:${file}`, config: { site: { name: "Read Compat" } }, secrets: { order_link_secret: `${id}-secret` } });
+  }
+  await inT("read20", () => runMigrations(libsql, upTo(READ_BEFORE_DOCUMENTS)));
+  await inT("readcur", () => runMigrations(libsql, MIGRATIONS));
+  const seed = async () => {
+    await S.setBlock("hero", { title: "Same hero", primary: { label: "Shop", href: "/collections" } });
+    await S.setBlock("announcement", { enabled: true, text: "Same bar", href: "" });
+    await S.setBlock("nav_header", [{ label: "All", href: "/collections" }]);
+    await S.setBlock("home_sections", [{ id: "sec_aa11", kind: "new", title: "New", limit: 4 }]);
+    await S.setBlock("pdp_extras", [{ title: "Care", html: "<p>Gently</p>" }]);
+    await S.upsertContentPage({ slug: "shipping", title: "Shipping", sections: [{ id: "sec_ship01", kind: "text", heading: "Times", body: ["Two days"] }] });
+    await S.upsertContentPage({ slug: "hello", title: "Hello", family: "journal", sections: [], window_start: "2025-01-01T00:00:00.000Z" });
+    await S.upsertContentPage({ slug: "later", title: "Later", family: "journal", sections: [], window_start: "2099-01-01T00:00:00.000Z" });
+  };
+  await inT("read20", seed);
+  await inT("readcur", seed);
+  const calls = [
+    ["resolvedAnnouncement", []],
+    ["resolvedHero", []],
+    ["resolvedHomeSections", []],
+    ["resolvedHomePage", []],
+    ["resolvedNav", ["header"]],
+    ["resolvedNav", ["footer"]],
+    ["resolvedCollectionsIndex", []],
+    ["resolvedPdpExtras", []],
+    ["resolvedContentPage", ["shipping"]],
+    ["resolvedContentPage", ["hello"]],
+    ["resolvedContentPageList", []],
+    ["resolvedJournalEntries", []],
+    ["resolvedBrand", []],
+    ["resolvedTheme", []],
+    ["resolvedSurfaceTemplates", []],
+    ["resolvedSlugRedirect", ["old"]],
+  ];
+  const sameEach = (a, b, what) => {
+    for (const k of Object.keys(b)) same(a[k], b[k], `${what} ${k}:`);
+    eq(Object.keys(a).length, Object.keys(b).length, `${what} outputs:`);
+  };
+  const outputs = async (id) => {
+    const out = {};
+    for (const [fn, args] of calls) {
+      const v = await inT(id, () => Res[fn](...args));
+      // listContentPages carries each row's updated_at, which differs by clock
+      out[`${fn}(${args.join(",")})`] = JSON.parse(JSON.stringify(v, (k, x) => (k === "updated_at" ? undefined : x)));
+    }
+    return out;
+  };
+
+  await t(`a tenant at ${READ_BEFORE_DOCUMENTS} (no cms_state) renders its drafts exactly as a current tenant does`, async () => {
+    ok(MIGRATIONS.some((m) => m.id > READ_BEFORE_DOCUMENTS), `nothing after ${READ_BEFORE_DOCUMENTS}: move the pin`);
+    eq((await inT("read20", async () => (await libsql.execute("SELECT name FROM sqlite_master WHERE name = 'cms_state'")).rows.length)), 0, "cms_state tables:");
+    eq((await inT("read20", () => Res.contentSource())).mode, "draft", "mode at 0020:");
+    const a = await outputs("read20");
+    sameEach(a, await outputs("readcur"), "drafts");
+    eq(a["resolvedHero()"].title, "Same hero", "hero:");
+    same(a["resolvedJournalEntries()"].map((p) => p.slug), ["hello"], "journal:");
+  });
+
+  await t(`a tenant at ${READ_BEFORE_DOCUMENTS}: after a legacy publish the frozen legacy reader serves the same content`, async () => {
+    await inT("read20", () => R.createRelease({ note: "read compat" }));
+    await inT("readcur", () => R.createRelease({ note: "read compat" }));
+    const src = await inT("read20", () => Res.contentSource());
+    eq(src.mode, "live", "mode:");
+    eq(src.content.v, 3, "a v3 release:");
+    const a = await outputs("read20");
+    sameEach(a, await outputs("readcur"), "live");
+    eq(a["resolvedAnnouncement()"].text, "Same bar", "announcement:");
   });
 }
 
