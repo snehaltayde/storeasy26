@@ -1,0 +1,1765 @@
+{
+  "recordedFrom": "scripts/support/legacy-release-outputs.js",
+  "fixtures": {
+    "v1": {
+      "getLiveReleaseState": {
+        "ok": {
+          "state": "live",
+          "release": {
+            "id": "rel_fixture_v1",
+            "content": {
+              "blocks": {
+                "announcement": {
+                  "enabled": true,
+                  "href": "/collections/serums",
+                  "text": "Free shipping this week"
+                },
+                "collections_index": {
+                  "featured": [
+                    "serums"
+                  ],
+                  "order": [
+                    "whey",
+                    "serums"
+                  ]
+                },
+                "hero": {
+                  "primary": {
+                    "href": "/collections/whey",
+                    "label": "Shop"
+                  },
+                  "subtitle": "Frozen words",
+                  "title": "Live hero v1"
+                },
+                "home_sections": [
+                  {
+                    "kind": "new",
+                    "limit": 4,
+                    "title": "New in"
+                  },
+                  {
+                    "collection": "serums",
+                    "collection_id": "gid://shopify/Collection/2",
+                    "kind": "product_rail",
+                    "limit": 4,
+                    "title": "Serums"
+                  },
+                  {
+                    "kind": "not-a-kind",
+                    "title": "Dropped"
+                  },
+                  {
+                    "enabled": false,
+                    "kind": "new",
+                    "title": "Disabled"
+                  }
+                ],
+                "nav_footer": [
+                  {
+                    "href": "/collections/whey",
+                    "label": "Whey"
+                  }
+                ],
+                "nav_header": [
+                  {
+                    "href": "/collections/serums",
+                    "label": "Serums"
+                  },
+                  {
+                    "href": "/no-label",
+                    "label": ""
+                  },
+                  {
+                    "children": [
+                      {
+                        "href": "/contact",
+                        "label": "Contact"
+                      }
+                    ],
+                    "href": "/about",
+                    "label": "About"
+                  }
+                ],
+                "pdp_extras": [
+                  {
+                    "html": "<p>Twice daily</p>",
+                    "title": "How to use"
+                  },
+                  {
+                    "enabled": false,
+                    "html": "<p>x</p>",
+                    "title": "Hidden"
+                  },
+                  {
+                    "html": "<p>no title</p>",
+                    "title": ""
+                  }
+                ]
+              },
+              "brand": {
+                "accent": "#0d9488"
+              },
+              "pages": [
+                {
+                  "description": "Who we are",
+                  "enabled": true,
+                  "sections": [
+                    {
+                      "body": [
+                        "We began."
+                      ],
+                      "heading": "Story"
+                    }
+                  ],
+                  "slug": "about",
+                  "title": "About us"
+                },
+                {
+                  "description": "",
+                  "effective_at": "2026-01-01",
+                  "enabled": true,
+                  "sections": [
+                    {
+                      "body": [
+                        "Two days"
+                      ],
+                      "heading": "Times",
+                      "kind": "text"
+                    }
+                  ],
+                  "slug": "shipping",
+                  "title": "Shipping"
+                },
+                {
+                  "description": "",
+                  "enabled": false,
+                  "sections": [],
+                  "slug": "hidden-page",
+                  "title": "Hidden"
+                },
+                {
+                  "description": "",
+                  "enabled": true,
+                  "family": "campaign",
+                  "sections": [],
+                  "slug": "spring",
+                  "title": "Spring sale",
+                  "window_end": "2026-03-31",
+                  "window_start": "2026-03-01"
+                }
+              ],
+              "theme": null,
+              "v": 1
+            },
+            "content_hash": "hash_rel_fixture_v1",
+            "published_at": "2026-01-01T00:00:00.000Z",
+            "note": "note rel_fixture_v1"
+          }
+        }
+      },
+      "contentSource": {
+        "ok": {
+          "mode": "live",
+          "content": {
+            "blocks": {
+              "announcement": {
+                "enabled": true,
+                "href": "/collections/serums",
+                "text": "Free shipping this week"
+              },
+              "collections_index": {
+                "featured": [
+                  "serums"
+                ],
+                "order": [
+                  "whey",
+                  "serums"
+                ]
+              },
+              "hero": {
+                "primary": {
+                  "href": "/collections/whey",
+                  "label": "Shop"
+                },
+                "subtitle": "Frozen words",
+                "title": "Live hero v1"
+              },
+              "home_sections": [
+                {
+                  "kind": "new",
+                  "limit": 4,
+                  "title": "New in"
+                },
+                {
+                  "collection": "serums",
+                  "collection_id": "gid://shopify/Collection/2",
+                  "kind": "product_rail",
+                  "limit": 4,
+                  "title": "Serums"
+                },
+                {
+                  "kind": "not-a-kind",
+                  "title": "Dropped"
+                },
+                {
+                  "enabled": false,
+                  "kind": "new",
+                  "title": "Disabled"
+                }
+              ],
+              "nav_footer": [
+                {
+                  "href": "/collections/whey",
+                  "label": "Whey"
+                }
+              ],
+              "nav_header": [
+                {
+                  "href": "/collections/serums",
+                  "label": "Serums"
+                },
+                {
+                  "href": "/no-label",
+                  "label": ""
+                },
+                {
+                  "children": [
+                    {
+                      "href": "/contact",
+                      "label": "Contact"
+                    }
+                  ],
+                  "href": "/about",
+                  "label": "About"
+                }
+              ],
+              "pdp_extras": [
+                {
+                  "html": "<p>Twice daily</p>",
+                  "title": "How to use"
+                },
+                {
+                  "enabled": false,
+                  "html": "<p>x</p>",
+                  "title": "Hidden"
+                },
+                {
+                  "html": "<p>no title</p>",
+                  "title": ""
+                }
+              ]
+            },
+            "brand": {
+              "accent": "#0d9488"
+            },
+            "pages": [
+              {
+                "description": "Who we are",
+                "enabled": true,
+                "sections": [
+                  {
+                    "body": [
+                      "We began."
+                    ],
+                    "heading": "Story"
+                  }
+                ],
+                "slug": "about",
+                "title": "About us"
+              },
+              {
+                "description": "",
+                "effective_at": "2026-01-01",
+                "enabled": true,
+                "sections": [
+                  {
+                    "body": [
+                      "Two days"
+                    ],
+                    "heading": "Times",
+                    "kind": "text"
+                  }
+                ],
+                "slug": "shipping",
+                "title": "Shipping"
+              },
+              {
+                "description": "",
+                "enabled": false,
+                "sections": [],
+                "slug": "hidden-page",
+                "title": "Hidden"
+              },
+              {
+                "description": "",
+                "enabled": true,
+                "family": "campaign",
+                "sections": [],
+                "slug": "spring",
+                "title": "Spring sale",
+                "window_end": "2026-03-31",
+                "window_start": "2026-03-01"
+              }
+            ],
+            "theme": null,
+            "v": 1
+          },
+          "preview": false
+        }
+      },
+      "resolvedAnnouncement()": {
+        "ok": {
+          "enabled": true,
+          "text": "Free shipping this week",
+          "href": "/collections/serums"
+        }
+      },
+      "resolvedHero()": {
+        "ok": {
+          "title": "Live hero v1",
+          "highlight": "Legacy Outputs",
+          "subtitle": "Frozen words",
+          "primary": {
+            "href": "/collections/whey",
+            "label": "Shop"
+          },
+          "secondary": {
+            "label": "See what’s new",
+            "href": "#new"
+          }
+        }
+      },
+      "resolvedHomeSections()": {
+        "ok": [
+          {
+            "kind": "new",
+            "limit": 4,
+            "title": "New in"
+          },
+          {
+            "collection": "serums",
+            "collection_id": "gid://shopify/Collection/2",
+            "kind": "product_rail",
+            "limit": 4,
+            "title": "Serums"
+          }
+        ]
+      },
+      "resolvedNav(\"header\")": {
+        "ok": [
+          {
+            "href": "/collections/serums",
+            "label": "Serums"
+          },
+          {
+            "children": [
+              {
+                "href": "/contact",
+                "label": "Contact"
+              }
+            ],
+            "href": "/about",
+            "label": "About"
+          }
+        ]
+      },
+      "resolvedNav(\"footer\")": {
+        "ok": [
+          {
+            "href": "/collections/whey",
+            "label": "Whey"
+          }
+        ]
+      },
+      "resolvedCollectionsIndex()": {
+        "ok": {
+          "featured": [
+            "serums"
+          ],
+          "order": [
+            "whey",
+            "serums"
+          ]
+        }
+      },
+      "resolvedPdpExtras()": {
+        "ok": [
+          {
+            "html": "<p>Twice daily</p>",
+            "title": "How to use"
+          }
+        ]
+      },
+      "resolvedContentPage(\"about\")": {
+        "ok": {
+          "slug": "about",
+          "title": "About us",
+          "description": "Who we are",
+          "sections": [
+            {
+              "kind": "text",
+              "body": [
+                "We began."
+              ],
+              "heading": "Story",
+              "id": "sec_l0"
+            }
+          ],
+          "effective_at": null,
+          "family": "page",
+          "window_start": null,
+          "window_end": null
+        }
+      },
+      "resolvedContentPage(\"hidden-page\")": {
+        "ok": null
+      },
+      "resolvedContentPage(\"spring\")": {
+        "ok": {
+          "slug": "spring",
+          "title": "Spring sale",
+          "description": "",
+          "sections": [],
+          "effective_at": null,
+          "family": "campaign",
+          "window_start": "2026-03-01",
+          "window_end": "2026-03-31"
+        }
+      },
+      "resolvedContentPage(\"no-such-page\")": {
+        "ok": null
+      },
+      "resolvedContentPageList()": {
+        "ok": [
+          {
+            "slug": "about",
+            "title": "About us",
+            "enabled": true,
+            "source": "custom",
+            "family": "page"
+          },
+          {
+            "slug": "hidden-page",
+            "title": "Hidden",
+            "enabled": false,
+            "source": "custom",
+            "family": "page"
+          },
+          {
+            "slug": "shipping",
+            "title": "Shipping",
+            "enabled": true,
+            "source": "custom",
+            "family": "page"
+          },
+          {
+            "slug": "spring",
+            "title": "Spring sale",
+            "enabled": true,
+            "source": "custom",
+            "family": "campaign"
+          }
+        ]
+      },
+      "resolvedBrand()": {
+        "ok": {
+          "accent": "#0d9488"
+        }
+      },
+      "resolvedTheme()": {
+        "ok": null
+      },
+      "resolvedSurfaceTemplates()": {
+        "ok": {
+          "pdp": "classic",
+          "collection": "standard",
+          "header": "standard",
+          "footer": "columns"
+        }
+      },
+      "resolvedSurfaceTemplateFor(\"product\",\"gid://shopify/Product/1\")": {
+        "ok": {
+          "source": "platform"
+        }
+      },
+      "resolvedProductOverride(\"gid://shopify/Product/1\")": {
+        "ok": {
+          "product_id": "gid://shopify/Product/1",
+          "modules": [
+            {
+              "title": "From the table",
+              "html": "<p>table</p>"
+            }
+          ],
+          "badge": "TABLE",
+          "updated_at": null
+        }
+      },
+      "resolvedProductOverride(\"gid://shopify/Product/2\")": {
+        "ok": null
+      },
+      "resolvedCollectionPins(\"serums\")": {
+        "ok": [
+          "gid://shopify/Product/2"
+        ]
+      },
+      "resolvedCollectionPins(\"no-such-collection\")": {
+        "ok": []
+      },
+      "resolvedPdpPairs(\"gid://shopify/Product/1\")": {
+        "ok": {
+          "title": "Table pairs",
+          "products": [
+            {
+              "id": "gid://shopify/Product/3",
+              "handle": "whey-gold",
+              "title": "Whey Gold",
+              "price_min": 2499,
+              "compare_at_min": null,
+              "currency": "INR",
+              "available": true,
+              "featured_image": null,
+              "featured_image_alt": null
+            }
+          ],
+          "source": "manual"
+        }
+      },
+      "resolvedCartUpsell([])": {
+        "ok": {
+          "title": "Table upsell",
+          "products": [
+            {
+              "id": "gid://shopify/Product/2",
+              "handle": "night-cream",
+              "title": "Night Cream",
+              "price_min": 899,
+              "compare_at_min": null,
+              "currency": "INR",
+              "available": true,
+              "featured_image": null,
+              "featured_image_alt": null,
+              "variant_id": "gid://shopify/ProductVariant/2",
+              "variant_price": 899
+            }
+          ]
+        }
+      },
+      "resolvedSlugRedirect(\"old-post\")": {
+        "ok": "table-post"
+      }
+    },
+    "v2": {
+      "getLiveReleaseState": {
+        "ok": {
+          "state": "live",
+          "release": {
+            "id": "rel_fixture_v2",
+            "content": {
+              "blocks": {
+                "announcement": {
+                  "enabled": true,
+                  "href": "/collections/serums",
+                  "text": "Free shipping this week"
+                },
+                "collections_index": {
+                  "featured": [
+                    "serums"
+                  ],
+                  "order": [
+                    "whey",
+                    "serums"
+                  ]
+                },
+                "hero": {
+                  "primary": {
+                    "href": "/collections/whey",
+                    "label": "Shop"
+                  },
+                  "subtitle": "Frozen words",
+                  "title": "Live hero v2"
+                },
+                "home_sections": [
+                  {
+                    "kind": "new",
+                    "limit": 4,
+                    "title": "New in"
+                  },
+                  {
+                    "collection": "serums",
+                    "collection_id": "gid://shopify/Collection/2",
+                    "kind": "product_rail",
+                    "limit": 4,
+                    "title": "Serums"
+                  },
+                  {
+                    "kind": "not-a-kind",
+                    "title": "Dropped"
+                  },
+                  {
+                    "enabled": false,
+                    "kind": "new",
+                    "title": "Disabled"
+                  }
+                ],
+                "nav_footer": [
+                  {
+                    "href": "/collections/whey",
+                    "label": "Whey"
+                  }
+                ],
+                "nav_header": [
+                  {
+                    "href": "/collections/serums",
+                    "label": "Serums"
+                  },
+                  {
+                    "href": "/no-label",
+                    "label": ""
+                  },
+                  {
+                    "children": [
+                      {
+                        "href": "/contact",
+                        "label": "Contact"
+                      }
+                    ],
+                    "href": "/about",
+                    "label": "About"
+                  }
+                ],
+                "pdp_extras": [
+                  {
+                    "html": "<p>Twice daily</p>",
+                    "title": "How to use"
+                  },
+                  {
+                    "enabled": false,
+                    "html": "<p>x</p>",
+                    "title": "Hidden"
+                  },
+                  {
+                    "html": "<p>no title</p>",
+                    "title": ""
+                  }
+                ],
+                "surface_templates": {
+                  "product": "editorial"
+                }
+              },
+              "brand": {
+                "accent": "#0d9488"
+              },
+              "collection_pins": [
+                {
+                  "collection_id": "gid://shopify/Collection/2",
+                  "pinned": [
+                    "gid://shopify/Product/1"
+                  ]
+                }
+              ],
+              "pages": [
+                {
+                  "description": "Who we are",
+                  "enabled": true,
+                  "sections": [
+                    {
+                      "body": [
+                        "We began."
+                      ],
+                      "heading": "Story"
+                    }
+                  ],
+                  "slug": "about",
+                  "title": "About us"
+                },
+                {
+                  "description": "",
+                  "effective_at": "2026-01-01",
+                  "enabled": true,
+                  "sections": [
+                    {
+                      "body": [
+                        "Two days"
+                      ],
+                      "heading": "Times",
+                      "kind": "text"
+                    }
+                  ],
+                  "slug": "shipping",
+                  "title": "Shipping"
+                },
+                {
+                  "description": "",
+                  "enabled": false,
+                  "sections": [],
+                  "slug": "hidden-page",
+                  "title": "Hidden"
+                },
+                {
+                  "description": "",
+                  "enabled": true,
+                  "family": "campaign",
+                  "sections": [],
+                  "slug": "spring",
+                  "title": "Spring sale",
+                  "window_end": "2026-03-31",
+                  "window_start": "2026-03-01"
+                }
+              ],
+              "placements": [
+                {
+                  "enabled": true,
+                  "id": "pl_frz_pairs",
+                  "kind": "pdp_pairs",
+                  "position": 0,
+                  "source_product_id": "gid://shopify/Product/1",
+                  "target_product_ids": [
+                    "gid://shopify/Product/2"
+                  ],
+                  "title": "Frozen pairs"
+                },
+                {
+                  "enabled": true,
+                  "id": "pl_frz_cart",
+                  "kind": "cart_upsell",
+                  "position": 0,
+                  "source_product_id": null,
+                  "target_product_ids": [
+                    "gid://shopify/Product/3"
+                  ],
+                  "title": "Frozen upsell"
+                }
+              ],
+              "product_overrides": [
+                {
+                  "badge": "FROZEN",
+                  "modules": [
+                    {
+                      "html": "<p>frozen</p>",
+                      "title": "Frozen module"
+                    }
+                  ],
+                  "product_id": "gid://shopify/Product/1"
+                }
+              ],
+              "redirects": [
+                {
+                  "from_slug": "old-post",
+                  "to_slug": "frozen-post"
+                }
+              ],
+              "theme": {
+                "kit": "glow",
+                "version": 1
+              },
+              "v": 2
+            },
+            "content_hash": "hash_rel_fixture_v2",
+            "published_at": "2026-01-01T00:00:00.000Z",
+            "note": "note rel_fixture_v2"
+          }
+        }
+      },
+      "contentSource": {
+        "ok": {
+          "mode": "live",
+          "content": {
+            "blocks": {
+              "announcement": {
+                "enabled": true,
+                "href": "/collections/serums",
+                "text": "Free shipping this week"
+              },
+              "collections_index": {
+                "featured": [
+                  "serums"
+                ],
+                "order": [
+                  "whey",
+                  "serums"
+                ]
+              },
+              "hero": {
+                "primary": {
+                  "href": "/collections/whey",
+                  "label": "Shop"
+                },
+                "subtitle": "Frozen words",
+                "title": "Live hero v2"
+              },
+              "home_sections": [
+                {
+                  "kind": "new",
+                  "limit": 4,
+                  "title": "New in"
+                },
+                {
+                  "collection": "serums",
+                  "collection_id": "gid://shopify/Collection/2",
+                  "kind": "product_rail",
+                  "limit": 4,
+                  "title": "Serums"
+                },
+                {
+                  "kind": "not-a-kind",
+                  "title": "Dropped"
+                },
+                {
+                  "enabled": false,
+                  "kind": "new",
+                  "title": "Disabled"
+                }
+              ],
+              "nav_footer": [
+                {
+                  "href": "/collections/whey",
+                  "label": "Whey"
+                }
+              ],
+              "nav_header": [
+                {
+                  "href": "/collections/serums",
+                  "label": "Serums"
+                },
+                {
+                  "href": "/no-label",
+                  "label": ""
+                },
+                {
+                  "children": [
+                    {
+                      "href": "/contact",
+                      "label": "Contact"
+                    }
+                  ],
+                  "href": "/about",
+                  "label": "About"
+                }
+              ],
+              "pdp_extras": [
+                {
+                  "html": "<p>Twice daily</p>",
+                  "title": "How to use"
+                },
+                {
+                  "enabled": false,
+                  "html": "<p>x</p>",
+                  "title": "Hidden"
+                },
+                {
+                  "html": "<p>no title</p>",
+                  "title": ""
+                }
+              ],
+              "surface_templates": {
+                "product": "editorial"
+              }
+            },
+            "brand": {
+              "accent": "#0d9488"
+            },
+            "collection_pins": [
+              {
+                "collection_id": "gid://shopify/Collection/2",
+                "pinned": [
+                  "gid://shopify/Product/1"
+                ]
+              }
+            ],
+            "pages": [
+              {
+                "description": "Who we are",
+                "enabled": true,
+                "sections": [
+                  {
+                    "body": [
+                      "We began."
+                    ],
+                    "heading": "Story"
+                  }
+                ],
+                "slug": "about",
+                "title": "About us"
+              },
+              {
+                "description": "",
+                "effective_at": "2026-01-01",
+                "enabled": true,
+                "sections": [
+                  {
+                    "body": [
+                      "Two days"
+                    ],
+                    "heading": "Times",
+                    "kind": "text"
+                  }
+                ],
+                "slug": "shipping",
+                "title": "Shipping"
+              },
+              {
+                "description": "",
+                "enabled": false,
+                "sections": [],
+                "slug": "hidden-page",
+                "title": "Hidden"
+              },
+              {
+                "description": "",
+                "enabled": true,
+                "family": "campaign",
+                "sections": [],
+                "slug": "spring",
+                "title": "Spring sale",
+                "window_end": "2026-03-31",
+                "window_start": "2026-03-01"
+              }
+            ],
+            "placements": [
+              {
+                "enabled": true,
+                "id": "pl_frz_pairs",
+                "kind": "pdp_pairs",
+                "position": 0,
+                "source_product_id": "gid://shopify/Product/1",
+                "target_product_ids": [
+                  "gid://shopify/Product/2"
+                ],
+                "title": "Frozen pairs"
+              },
+              {
+                "enabled": true,
+                "id": "pl_frz_cart",
+                "kind": "cart_upsell",
+                "position": 0,
+                "source_product_id": null,
+                "target_product_ids": [
+                  "gid://shopify/Product/3"
+                ],
+                "title": "Frozen upsell"
+              }
+            ],
+            "product_overrides": [
+              {
+                "badge": "FROZEN",
+                "modules": [
+                  {
+                    "html": "<p>frozen</p>",
+                    "title": "Frozen module"
+                  }
+                ],
+                "product_id": "gid://shopify/Product/1"
+              }
+            ],
+            "redirects": [
+              {
+                "from_slug": "old-post",
+                "to_slug": "frozen-post"
+              }
+            ],
+            "theme": {
+              "kit": "glow",
+              "version": 1
+            },
+            "v": 2
+          },
+          "preview": false
+        }
+      },
+      "resolvedAnnouncement()": {
+        "ok": {
+          "enabled": true,
+          "text": "Free shipping this week",
+          "href": "/collections/serums"
+        }
+      },
+      "resolvedHero()": {
+        "ok": {
+          "title": "Live hero v2",
+          "highlight": "Legacy Outputs",
+          "subtitle": "Frozen words",
+          "primary": {
+            "href": "/collections/whey",
+            "label": "Shop"
+          },
+          "secondary": {
+            "label": "See what’s new",
+            "href": "#new"
+          }
+        }
+      },
+      "resolvedHomeSections()": {
+        "ok": [
+          {
+            "kind": "new",
+            "limit": 4,
+            "title": "New in"
+          },
+          {
+            "collection": "serums",
+            "collection_id": "gid://shopify/Collection/2",
+            "kind": "product_rail",
+            "limit": 4,
+            "title": "Serums"
+          }
+        ]
+      },
+      "resolvedNav(\"header\")": {
+        "ok": [
+          {
+            "href": "/collections/serums",
+            "label": "Serums"
+          },
+          {
+            "children": [
+              {
+                "href": "/contact",
+                "label": "Contact"
+              }
+            ],
+            "href": "/about",
+            "label": "About"
+          }
+        ]
+      },
+      "resolvedNav(\"footer\")": {
+        "ok": [
+          {
+            "href": "/collections/whey",
+            "label": "Whey"
+          }
+        ]
+      },
+      "resolvedCollectionsIndex()": {
+        "ok": {
+          "featured": [
+            "serums"
+          ],
+          "order": [
+            "whey",
+            "serums"
+          ]
+        }
+      },
+      "resolvedPdpExtras()": {
+        "ok": [
+          {
+            "html": "<p>Twice daily</p>",
+            "title": "How to use"
+          }
+        ]
+      },
+      "resolvedContentPage(\"about\")": {
+        "ok": {
+          "slug": "about",
+          "title": "About us",
+          "description": "Who we are",
+          "sections": [
+            {
+              "kind": "text",
+              "body": [
+                "We began."
+              ],
+              "heading": "Story",
+              "id": "sec_l0"
+            }
+          ],
+          "effective_at": null,
+          "family": "page",
+          "window_start": null,
+          "window_end": null
+        }
+      },
+      "resolvedContentPage(\"hidden-page\")": {
+        "ok": null
+      },
+      "resolvedContentPage(\"spring\")": {
+        "ok": {
+          "slug": "spring",
+          "title": "Spring sale",
+          "description": "",
+          "sections": [],
+          "effective_at": null,
+          "family": "campaign",
+          "window_start": "2026-03-01",
+          "window_end": "2026-03-31"
+        }
+      },
+      "resolvedContentPage(\"no-such-page\")": {
+        "ok": null
+      },
+      "resolvedContentPageList()": {
+        "ok": [
+          {
+            "slug": "about",
+            "title": "About us",
+            "enabled": true,
+            "source": "custom",
+            "family": "page"
+          },
+          {
+            "slug": "hidden-page",
+            "title": "Hidden",
+            "enabled": false,
+            "source": "custom",
+            "family": "page"
+          },
+          {
+            "slug": "shipping",
+            "title": "Shipping",
+            "enabled": true,
+            "source": "custom",
+            "family": "page"
+          },
+          {
+            "slug": "spring",
+            "title": "Spring sale",
+            "enabled": true,
+            "source": "custom",
+            "family": "campaign"
+          }
+        ]
+      },
+      "resolvedBrand()": {
+        "ok": {
+          "accent": "#0d9488"
+        }
+      },
+      "resolvedTheme()": {
+        "ok": {
+          "kit": "glow",
+          "version": 1
+        }
+      },
+      "resolvedSurfaceTemplates()": {
+        "ok": {
+          "pdp": "classic",
+          "collection": "standard",
+          "header": "standard",
+          "footer": "columns",
+          "product": "editorial"
+        }
+      },
+      "resolvedSurfaceTemplateFor(\"product\",\"gid://shopify/Product/1\")": {
+        "ok": {
+          "source": "platform"
+        }
+      },
+      "resolvedProductOverride(\"gid://shopify/Product/1\")": {
+        "ok": {
+          "modules": [
+            {
+              "html": "<p>frozen</p>",
+              "title": "Frozen module"
+            }
+          ],
+          "badge": "FROZEN"
+        }
+      },
+      "resolvedProductOverride(\"gid://shopify/Product/2\")": {
+        "ok": {
+          "modules": [],
+          "badge": ""
+        }
+      },
+      "resolvedCollectionPins(\"serums\")": {
+        "ok": [
+          "gid://shopify/Product/1"
+        ]
+      },
+      "resolvedCollectionPins(\"no-such-collection\")": {
+        "ok": []
+      },
+      "resolvedPdpPairs(\"gid://shopify/Product/1\")": {
+        "ok": {
+          "title": "Frozen pairs",
+          "products": [
+            {
+              "id": "gid://shopify/Product/2",
+              "handle": "night-cream",
+              "title": "Night Cream",
+              "price_min": 899,
+              "compare_at_min": null,
+              "currency": "INR",
+              "available": true,
+              "featured_image": null,
+              "featured_image_alt": null
+            }
+          ],
+          "source": "manual"
+        }
+      },
+      "resolvedCartUpsell([])": {
+        "ok": {
+          "title": "Frozen upsell",
+          "products": [
+            {
+              "id": "gid://shopify/Product/3",
+              "handle": "whey-gold",
+              "title": "Whey Gold",
+              "price_min": 2499,
+              "compare_at_min": null,
+              "currency": "INR",
+              "available": true,
+              "featured_image": null,
+              "featured_image_alt": null,
+              "variant_id": "gid://shopify/ProductVariant/3",
+              "variant_price": 2499
+            }
+          ]
+        }
+      },
+      "resolvedSlugRedirect(\"old-post\")": {
+        "ok": "frozen-post"
+      }
+    },
+    "v3": {
+      "getLiveReleaseState": {
+        "ok": {
+          "state": "live",
+          "release": {
+            "id": "rel_fixture_v3",
+            "content": {
+              "blocks": {
+                "announcement": {
+                  "enabled": true,
+                  "href": "/collections/serums",
+                  "text": "Free shipping this week"
+                },
+                "collections_index": {
+                  "featured": [
+                    "old-whey"
+                  ],
+                  "ids": {
+                    "old-whey": "gid://shopify/Collection/1"
+                  },
+                  "order": [
+                    "serums"
+                  ]
+                },
+                "hero": {
+                  "primary": {
+                    "href": "/collections/whey",
+                    "label": "Shop"
+                  },
+                  "subtitle": "Frozen words",
+                  "title": "Live hero v3"
+                },
+                "home_sections": [
+                  {
+                    "id": "sec_aa11",
+                    "kind": "new",
+                    "limit": 4,
+                    "title": "New in"
+                  },
+                  {
+                    "collection": "old-handle",
+                    "collection_id": "gid://shopify/Collection/2",
+                    "id": "sec_bb22",
+                    "kind": "product_rail",
+                    "limit": 4,
+                    "title": "Serums"
+                  }
+                ],
+                "nav_footer": [
+                  {
+                    "href": "/collections/whey",
+                    "label": "Whey"
+                  }
+                ],
+                "nav_header": [
+                  {
+                    "href": "/collections/serums",
+                    "label": "Serums"
+                  },
+                  {
+                    "href": "/no-label",
+                    "label": ""
+                  },
+                  {
+                    "children": [
+                      {
+                        "href": "/contact",
+                        "label": "Contact"
+                      }
+                    ],
+                    "href": "/about",
+                    "label": "About"
+                  }
+                ],
+                "pdp_extras": [
+                  {
+                    "html": "<p>Twice daily</p>",
+                    "title": "How to use"
+                  },
+                  {
+                    "enabled": false,
+                    "html": "<p>x</p>",
+                    "title": "Hidden"
+                  },
+                  {
+                    "html": "<p>no title</p>",
+                    "title": ""
+                  }
+                ],
+                "surface_templates": {
+                  "footer": "minimal",
+                  "header": "centered",
+                  "product": "editorial"
+                }
+              },
+              "brand": null,
+              "collection_pins": [],
+              "pages": [
+                {
+                  "description": "",
+                  "effective_at": "2026-01-01",
+                  "enabled": true,
+                  "sections": [
+                    {
+                      "body": [
+                        "Two days"
+                      ],
+                      "heading": "Times",
+                      "kind": "text"
+                    }
+                  ],
+                  "slug": "shipping",
+                  "title": "Shipping"
+                },
+                {
+                  "description": "",
+                  "enabled": false,
+                  "sections": [],
+                  "slug": "hidden-page",
+                  "title": "Hidden"
+                },
+                {
+                  "description": "",
+                  "enabled": true,
+                  "family": "campaign",
+                  "sections": [],
+                  "slug": "spring",
+                  "title": "Spring sale",
+                  "window_end": "2026-03-31",
+                  "window_start": "2026-03-01"
+                },
+                {
+                  "description": "",
+                  "enabled": true,
+                  "sections": [
+                    {
+                      "body": [
+                        "v3"
+                      ],
+                      "heading": "Story",
+                      "id": "sec_cc33",
+                      "kind": "text"
+                    }
+                  ],
+                  "slug": "about",
+                  "title": "About"
+                }
+              ],
+              "placements": [],
+              "product_overrides": [],
+              "redirects": [],
+              "theme": {
+                "kit": "glow",
+                "version": 1
+              },
+              "v": 3
+            },
+            "content_hash": "hash_rel_fixture_v3",
+            "published_at": "2026-01-01T00:00:00.000Z",
+            "note": "note rel_fixture_v3"
+          }
+        }
+      },
+      "contentSource": {
+        "ok": {
+          "mode": "live",
+          "content": {
+            "blocks": {
+              "announcement": {
+                "enabled": true,
+                "href": "/collections/serums",
+                "text": "Free shipping this week"
+              },
+              "collections_index": {
+                "featured": [
+                  "old-whey"
+                ],
+                "ids": {
+                  "old-whey": "gid://shopify/Collection/1"
+                },
+                "order": [
+                  "serums"
+                ]
+              },
+              "hero": {
+                "primary": {
+                  "href": "/collections/whey",
+                  "label": "Shop"
+                },
+                "subtitle": "Frozen words",
+                "title": "Live hero v3"
+              },
+              "home_sections": [
+                {
+                  "id": "sec_aa11",
+                  "kind": "new",
+                  "limit": 4,
+                  "title": "New in"
+                },
+                {
+                  "collection": "old-handle",
+                  "collection_id": "gid://shopify/Collection/2",
+                  "id": "sec_bb22",
+                  "kind": "product_rail",
+                  "limit": 4,
+                  "title": "Serums"
+                }
+              ],
+              "nav_footer": [
+                {
+                  "href": "/collections/whey",
+                  "label": "Whey"
+                }
+              ],
+              "nav_header": [
+                {
+                  "href": "/collections/serums",
+                  "label": "Serums"
+                },
+                {
+                  "href": "/no-label",
+                  "label": ""
+                },
+                {
+                  "children": [
+                    {
+                      "href": "/contact",
+                      "label": "Contact"
+                    }
+                  ],
+                  "href": "/about",
+                  "label": "About"
+                }
+              ],
+              "pdp_extras": [
+                {
+                  "html": "<p>Twice daily</p>",
+                  "title": "How to use"
+                },
+                {
+                  "enabled": false,
+                  "html": "<p>x</p>",
+                  "title": "Hidden"
+                },
+                {
+                  "html": "<p>no title</p>",
+                  "title": ""
+                }
+              ],
+              "surface_templates": {
+                "footer": "minimal",
+                "header": "centered",
+                "product": "editorial"
+              }
+            },
+            "brand": null,
+            "collection_pins": [],
+            "pages": [
+              {
+                "description": "",
+                "effective_at": "2026-01-01",
+                "enabled": true,
+                "sections": [
+                  {
+                    "body": [
+                      "Two days"
+                    ],
+                    "heading": "Times",
+                    "kind": "text"
+                  }
+                ],
+                "slug": "shipping",
+                "title": "Shipping"
+              },
+              {
+                "description": "",
+                "enabled": false,
+                "sections": [],
+                "slug": "hidden-page",
+                "title": "Hidden"
+              },
+              {
+                "description": "",
+                "enabled": true,
+                "family": "campaign",
+                "sections": [],
+                "slug": "spring",
+                "title": "Spring sale",
+                "window_end": "2026-03-31",
+                "window_start": "2026-03-01"
+              },
+              {
+                "description": "",
+                "enabled": true,
+                "sections": [
+                  {
+                    "body": [
+                      "v3"
+                    ],
+                    "heading": "Story",
+                    "id": "sec_cc33",
+                    "kind": "text"
+                  }
+                ],
+                "slug": "about",
+                "title": "About"
+              }
+            ],
+            "placements": [],
+            "product_overrides": [],
+            "redirects": [],
+            "theme": {
+              "kit": "glow",
+              "version": 1
+            },
+            "v": 3
+          },
+          "preview": false
+        }
+      },
+      "resolvedAnnouncement()": {
+        "ok": {
+          "enabled": true,
+          "text": "Free shipping this week",
+          "href": "/collections/serums"
+        }
+      },
+      "resolvedHero()": {
+        "ok": {
+          "title": "Live hero v3",
+          "highlight": "Legacy Outputs",
+          "subtitle": "Frozen words",
+          "primary": {
+            "href": "/collections/whey",
+            "label": "Shop"
+          },
+          "secondary": {
+            "label": "See what’s new",
+            "href": "#new"
+          }
+        }
+      },
+      "resolvedHomeSections()": {
+        "ok": [
+          {
+            "id": "sec_aa11",
+            "kind": "new",
+            "limit": 4,
+            "title": "New in"
+          },
+          {
+            "collection": "serums",
+            "collection_id": "gid://shopify/Collection/2",
+            "id": "sec_bb22",
+            "kind": "product_rail",
+            "limit": 4,
+            "title": "Serums"
+          }
+        ]
+      },
+      "resolvedNav(\"header\")": {
+        "ok": [
+          {
+            "href": "/collections/serums",
+            "label": "Serums"
+          },
+          {
+            "children": [
+              {
+                "href": "/contact",
+                "label": "Contact"
+              }
+            ],
+            "href": "/about",
+            "label": "About"
+          }
+        ]
+      },
+      "resolvedNav(\"footer\")": {
+        "ok": [
+          {
+            "href": "/collections/whey",
+            "label": "Whey"
+          }
+        ]
+      },
+      "resolvedCollectionsIndex()": {
+        "ok": {
+          "featured": [
+            "whey"
+          ],
+          "order": [
+            "serums"
+          ],
+          "hide": []
+        }
+      },
+      "resolvedPdpExtras()": {
+        "ok": [
+          {
+            "html": "<p>Twice daily</p>",
+            "title": "How to use"
+          }
+        ]
+      },
+      "resolvedContentPage(\"about\")": {
+        "ok": {
+          "slug": "about",
+          "title": "About",
+          "description": "",
+          "sections": [
+            {
+              "body": [
+                "v3"
+              ],
+              "heading": "Story",
+              "id": "sec_cc33",
+              "kind": "text"
+            }
+          ],
+          "effective_at": null,
+          "family": "page",
+          "window_start": null,
+          "window_end": null
+        }
+      },
+      "resolvedContentPage(\"hidden-page\")": {
+        "ok": null
+      },
+      "resolvedContentPage(\"spring\")": {
+        "ok": {
+          "slug": "spring",
+          "title": "Spring sale",
+          "description": "",
+          "sections": [],
+          "effective_at": null,
+          "family": "campaign",
+          "window_start": "2026-03-01",
+          "window_end": "2026-03-31"
+        }
+      },
+      "resolvedContentPage(\"no-such-page\")": {
+        "ok": null
+      },
+      "resolvedContentPageList()": {
+        "ok": [
+          {
+            "slug": "about",
+            "title": "About",
+            "enabled": true,
+            "source": "custom",
+            "family": "page"
+          },
+          {
+            "slug": "hidden-page",
+            "title": "Hidden",
+            "enabled": false,
+            "source": "custom",
+            "family": "page"
+          },
+          {
+            "slug": "shipping",
+            "title": "Shipping",
+            "enabled": true,
+            "source": "custom",
+            "family": "page"
+          },
+          {
+            "slug": "spring",
+            "title": "Spring sale",
+            "enabled": true,
+            "source": "custom",
+            "family": "campaign"
+          }
+        ]
+      },
+      "resolvedBrand()": {
+        "ok": null
+      },
+      "resolvedTheme()": {
+        "ok": {
+          "kit": "glow",
+          "version": 1
+        }
+      },
+      "resolvedSurfaceTemplates()": {
+        "ok": {
+          "pdp": "classic",
+          "collection": "standard",
+          "header": "centered",
+          "footer": "minimal",
+          "product": "editorial"
+        }
+      },
+      "resolvedSurfaceTemplateFor(\"product\",\"gid://shopify/Product/1\")": {
+        "ok": {
+          "source": "platform"
+        }
+      },
+      "resolvedProductOverride(\"gid://shopify/Product/1\")": {
+        "ok": {
+          "modules": [],
+          "badge": ""
+        }
+      },
+      "resolvedProductOverride(\"gid://shopify/Product/2\")": {
+        "ok": {
+          "modules": [],
+          "badge": ""
+        }
+      },
+      "resolvedCollectionPins(\"serums\")": {
+        "ok": []
+      },
+      "resolvedCollectionPins(\"no-such-collection\")": {
+        "ok": []
+      },
+      "resolvedPdpPairs(\"gid://shopify/Product/1\")": {
+        "ok": {
+          "title": "Pairs well with",
+          "products": [
+            {
+              "id": "gid://shopify/Product/2",
+              "handle": "night-cream",
+              "title": "Night Cream",
+              "price_min": 899,
+              "compare_at_min": null,
+              "currency": "INR",
+              "available": true,
+              "featured_image": null,
+              "featured_image_alt": null,
+              "shared": 1
+            }
+          ],
+          "source": "auto"
+        }
+      },
+      "resolvedCartUpsell([])": {
+        "ok": {
+          "title": null,
+          "products": []
+        }
+      },
+      "resolvedSlugRedirect(\"old-post\")": {
+        "ok": null
+      }
+    }
+  }
+}
