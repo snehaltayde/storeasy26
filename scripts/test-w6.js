@@ -189,6 +189,8 @@ await t("CONSENT: shopper emails send only with marketing consent on THAT order"
     const row = await db.selectFrom("notifications").selectAll().where("type", "=", "automation_email_customer").executeTakeFirst();
     eq(row.consent_class, "marketing", "classed as marketing:");
     ok(String(row.consent_ref || "").includes("W-CONSENT"), "consent ref names the order");
+    ok(row.body.includes("Thanks for ordering!") && row.body.includes("W-CONSENT"), "the shopper email keeps the message and order id");
+    ok(!row.body.includes("Thanks note") && !row.body.includes("automated rule"), "GEN-03: the internal rule name stays out of a shopper email");
   });
 });
 

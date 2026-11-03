@@ -72,6 +72,26 @@ export default function SettingsAdmin({ initial }) {
     setErrors(null);
   };
 
+  // GEN-03: the founder accepts the starter rates as they are.
+  async function keepStarterRates() {
+    setBusy(true);
+    setErrors(null);
+    const res = await fetch("/api/admin/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shipping }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      setS(data.settings);
+      setShipping(buildState(data.settings).shipping);
+      toast.success("Saved — these are now your shipping rates.");
+    } else {
+      setErrors(data.errors || [data.error || `Save failed (${res.status})`]);
+    }
+    setBusy(false);
+  }
+
   async function save(e) {
     e.preventDefault();
     setBusy(true);
@@ -84,7 +104,8 @@ export default function SettingsAdmin({ initial }) {
         payments,
         commerce,
         tracking,
-        shipping,
+        // GEN-03: saving something else here must not turn starter rates into "the store's own"
+        ...(s.shipping_is_default && JSON.stringify(shipping) === JSON.stringify(buildState(s).shipping) ? {} : { shipping }),
         ...(adminPassword ? { admin_password: adminPassword } : {}),
       }),
     });
@@ -226,7 +247,23 @@ export default function SettingsAdmin({ initial }) {
       </Card>
 
       <Card id="shipping">
-        <CardHeader title="Shipping rules" description="The same engine prices the drawer, checkout and the Shopify push." />
+        <CardHeader title="Shipping rules" description="What shoppers pay for delivery, in the cart and at checkout." />
+        {s.shipping_is_default ? (
+          <Banner
+            tone="info"
+            title="You haven't set your own shipping rates yet"
+            className="mb-4"
+            actions={
+              !ro ? (
+                <Button size="sm" disabled={busy} onClick={keepStarterRates}>
+                  Keep these rates
+                </Button>
+              ) : null
+            }
+          >
+            Shoppers are charged the starter rates below. Change them and save, or keep them as they are.
+          </Banner>
+        ) : null}
         <div className={grid}>
           <Field label="Flat rate (₹)" htmlFor="sa-flat-rate">
             <Input id="sa-flat-rate" disabled={ro} value={shipping.flatRate ?? ""} onChange={(e) => setShipping({ ...shipping, flatRate: e.target.value })} />

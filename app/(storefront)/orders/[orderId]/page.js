@@ -147,7 +147,7 @@ export default async function OrderStatusPage({ params, searchParams }) {
               {formatMoney(order.refunded_total, order.currency)}
             </p>
             <p className="mt-0.5 text-xs text-amber-700">
-              Refunds reach the original payment method in 5–7 business days.
+              Refunds go back to the original payment method. Your bank may take a few days to show it.
             </p>
           </div>
         )}

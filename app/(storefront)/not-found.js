@@ -33,7 +33,7 @@ export default async function NotFound() {
     );
   }
   if (r.outcome === "unknown" || r.outcome === "unavailable") {
-    return <GatedSurface code="404" title="Store not found" body="No store is configured for this address." />;
+    return <GatedSurface code="404" title="Store not found" body="There is no store at this address." />;
   }
   // S36 (SF23): tenant-branded 404 — the store's own name, and the accent
   // utilities already follow the tenant's brand variables.

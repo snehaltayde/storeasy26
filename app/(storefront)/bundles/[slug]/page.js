@@ -67,8 +67,7 @@ export default async function BundlePage({ params }) {
             )}
           </p>
           <p className="mt-2 text-xs text-zinc-400">
-            Everything is added as normal items — the set price applies automatically in your cart, and each
-            piece stays returnable on its own.
+            Everything is added as normal items — the set price applies automatically in your cart.
           </p>
           <div className="mt-5">
             <BundleAddButton components={b.components} disabled={!b.available} />

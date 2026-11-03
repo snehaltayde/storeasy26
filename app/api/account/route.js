@@ -4,6 +4,7 @@ import { requestReturn } from "@/lib/returns";
 import { mergeWishlist, accountWishlist, removeWishlistItem } from "@/lib/wishlist";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
+import { shopperErrorMessage } from "@/lib/shopper-errors";
 import { tenantHandler } from "@/lib/tenant-request";
 
 // Shopper account API (S45 / BE30 + SF10–12). Passwordless email OTP;
@@ -104,6 +105,6 @@ export const POST = tenantHandler(async (request) => {
     }
     return NextResponse.json({ error: "unknown action" }, { status: 400 });
   } catch (e) {
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 200) }, { status: 422 });
+    return NextResponse.json({ error: shopperErrorMessage(e, "Something went wrong — please try again.").slice(0, 200) }, { status: 422 });
   }
 });

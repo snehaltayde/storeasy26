@@ -22,7 +22,7 @@ export default function ReorderPanel({ orderId }) {
       setData(json);
       setState("ready");
     } else {
-      setErr(json.error || `Couldn't check this order (${res.status}).`);
+      setErr(json.error || "Couldn't check this order — please try again.");
       setState("error");
     }
   }

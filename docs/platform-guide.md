@@ -1393,8 +1393,9 @@ multi-tenant payments go live. Severity-ordered:
    `/platform` and `/campaigns/` disallowed).
 10. **Static BeastLife branding remnants** — mostly FIXED (S36): manifest, SW cache
     names, offline page and 404 copy are per-tenant now. Still platform-generic or
-    BeastLife-flavored: the shared icon set (per-tenant icons still pending), 500
-    copy, the `BL-` order-id prefix, "(test mode)" on the Razorpay radio.
+    BeastLife-flavored: the shared icon set (per-tenant icons still pending, GEN-04).
+    The 500 copy and "(test mode)" went in GEN-03 (`docs/storefront-copy-inventory.md`);
+    the `BL-` prefix is per store since S51.
 11. **Rate-limit override env names** for hyphenated limiters uppercase to
     `RATE_LIMIT_ADMIN-SYNC` / `RATE_LIMIT_PLATFORM-LOGIN` (awkward but functional).
 12. **Settings has no fields** for `site.logo`, `title`, `tagline`,

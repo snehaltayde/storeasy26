@@ -32,7 +32,7 @@ export default async function CollectionsPage() {
 
       {collections.length === 0 ? (
         <p className="mt-10 text-zinc-500">
-          No collections yet — run <code className="font-mono">pnpm sync</code>.
+          No collections to show yet — please check back soon.
         </p>
       ) : (
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

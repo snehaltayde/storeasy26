@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
-import { tenantOwnCfg } from "@/lib/tenant-context";
+import { tenantOwnCfg, tenantShippingConfig } from "@/lib/tenant-context";
 import { checkoutCapability } from "@/lib/commerce/adapter";
 import { siteName, siteLogo } from "@/lib/site";
 import { resolvedContentPageList } from "@/lib/content/resolve";
@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage() {
   const id = (await cookies()).get(CART_COOKIE)?.value;
-  const { cart, storeName, logo, razorpayEnabled, capability, policies } = await tfetch(async () => ({
+  const { cart, storeName, logo, razorpayEnabled, capability, policies, shippingConfig } = await tfetch(async () => ({
     cart: id ? await getCart(id) : emptyCart(),
     storeName: siteName(),
     logo: siteLogo(), // S55 fix: the checkout wordmark hardcoded BEASTLIFE on every tenant
@@ -39,6 +39,7 @@ export default async function CheckoutPage() {
     razorpayEnabled: Boolean(tenantOwnCfg("razorpay_key_id", "NEXT_PUBLIC_RAZORPAY_KEY_ID")),
     capability: checkoutCapability(), // S32 (BE06): the per-tenant mode gate
     policies: await policyLinks(), // S38 (SF14): links near the pay button
+    shippingConfig: tenantShippingConfig(), // GEN-03: the live preview must use THIS store's rates
   }));
 
   if (!capability.available) {
@@ -73,5 +74,5 @@ export default async function CheckoutPage() {
     );
   }
 
-  return <CheckoutFlow cart={cart} razorpayEnabled={razorpayEnabled} storeName={storeName} logo={logo} policies={policies} />;
+  return <CheckoutFlow cart={cart} razorpayEnabled={razorpayEnabled} storeName={storeName} logo={logo} policies={policies} shippingConfig={shippingConfig} />;
 }

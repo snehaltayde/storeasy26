@@ -71,6 +71,7 @@ export default function CartDrawer() {
     discountTotal,
     total,
     shipping,
+    shippingRatesSet,
     grandTotal,
     open,
     setOpen,
@@ -155,7 +156,7 @@ export default function CartDrawer() {
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-zinc-500">
               <p className="font-medium text-zinc-700">Your cart is empty</p>
-              <p className="text-sm">Add some gains and they’ll show up here.</p>
+              <p className="text-sm">Add something you like and it’ll show up here.</p>
             </div>
           )
         ) : (
@@ -336,7 +337,9 @@ export default function CartDrawer() {
                   )}
                 </div>
               )}
-              {shipping?.remainingForFree > 0 && (
+              {/* GEN-03: this nudge is a promise in the store's name, so it needs
+                  rates the store actually chose. The charge above always shows. */}
+              {shippingRatesSet && shipping?.remainingForFree > 0 && (
                 <p className="text-right text-xs text-zinc-500">
                   Add {formatMoney(shipping.remainingForFree, currency)} more for{" "}
                   <span className="font-semibold text-accent-700">free shipping</span>
@@ -363,7 +366,7 @@ export default function CartDrawer() {
               Checkout →
             </Link>
             <p className="mt-2 text-center text-[11px] text-zinc-400">
-              COD fee (if any) added at checkout · prices incl. GST
+              Any cash on delivery fee is added at checkout
             </p>
           </footer>
         )}

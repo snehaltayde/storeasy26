@@ -80,6 +80,7 @@ export function CartProvider({ children, initialCart }) {
     discountTotal: cart.discountTotal || 0,
     total: cart.total ?? cart.subtotal,
     shipping: cart.shipping || null,
+    shippingRatesSet: Boolean(cart.shippingRatesSet), // GEN-03: false = starter rates
     grandTotal: cart.grandTotal ?? cart.total ?? cart.subtotal,
     couponStatus: cart.couponStatus || null,
     changes: cart.changes || [], // S32 (SF06): price/availability change notices

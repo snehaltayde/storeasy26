@@ -35,7 +35,7 @@ const KIND_META = {
 };
 const NEW_SECTION = {
   collections: { kind: "collections", title: "Shop by collection", limit: 6, enabled: true },
-  new: { kind: "new", title: "Fresh drops", limit: 8, enabled: true },
+  new: { kind: "new", title: "New arrivals", limit: 8, enabled: true },
   banner: { kind: "banner", title: "Festive offer", text: "", label: "Shop now", href: "/collections", enabled: true },
   rich_text: { kind: "rich_text", title: "", html: "<p>Tell your story…</p>", enabled: true },
 };
