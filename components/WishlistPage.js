@@ -22,21 +22,21 @@ function Row({ item, onRemove }) {
     <li className="flex items-center gap-3 py-3">
       {item.image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={item.image} alt="" className={`h-14 w-14 rounded-lg object-cover ${dim ? "opacity-40 grayscale" : ""}`} />
+        <img src={item.image} alt="" className={`h-14 w-14 rounded-sf-small object-cover ${dim ? "opacity-40 grayscale" : ""}`} />
       ) : (
-        <span className="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-100 text-zinc-300">?</span>
+        <span className="flex h-14 w-14 items-center justify-center rounded-sf-small bg-sf-surface-sunken text-sf-mark">?</span>
       )}
       <span className="min-w-0 flex-1">
         {item.state === "gone" ? (
-          <span className="block truncate font-semibold text-zinc-400">{item.handle}</span>
+          <span className="block truncate font-semibold text-sf-text-faint">{item.handle}</span>
         ) : (
-          <Link href={`/products/${item.handle}`} className={`block truncate font-semibold hover:underline ${dim ? "text-zinc-400" : ""}`}>
+          <Link href={`/products/${item.handle}`} className={`block truncate font-semibold hover:underline ${dim ? "text-sf-text-faint" : ""}`}>
             {item.title}
           </Link>
         )}
-        {dim ? <span className="text-xs text-amber-600">{STATE_LABEL[item.state]}</span> : <span className="text-xs text-zinc-500">{inr(item.price, item.currency)}</span>}
+        {dim ? <span className="text-xs text-sf-warning">{STATE_LABEL[item.state]}</span> : <span className="text-xs text-sf-text-subtle">{inr(item.price, item.currency)}</span>}
       </span>
-      <button type="button" onClick={onRemove} className="text-xs text-zinc-400 hover:text-red-600">
+      <button type="button" onClick={onRemove} className="text-xs text-sf-text-faint hover:text-sf-danger">
         remove
       </button>
     </li>
@@ -96,14 +96,14 @@ export default function WishlistPage() {
     refresh();
   };
 
-  if (local === null) return <p className="text-sm text-zinc-400">Loading…</p>;
+  if (local === null) return <p className="text-sm text-sf-text-faint">Loading…</p>;
   const empty = local.length === 0 && (!account || account.length === 0);
 
   return (
     <div>
-      {note && <p className="mb-4 rounded-lg bg-lime-50 px-3 py-2 text-sm text-lime-800">{note}</p>}
+      {note && <p className="mb-4 rounded-sf-small bg-sf-success-surface px-3 py-2 text-sm text-sf-success-strong">{note}</p>}
       {empty && (
-        <p className="rounded-2xl border border-zinc-200 p-6 text-sm text-zinc-500">
+        <p className="rounded-sf-card border border-sf-border p-6 text-sm text-sf-text-subtle">
           Nothing saved yet — tap <strong>Save for later</strong> on any product. Your list stays in this browser
           unless you sign in and choose to merge it into your account.
         </p>
@@ -113,20 +113,20 @@ export default function WishlistPage() {
         <section>
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold">Saved on this device ({local.length})</h2>
-            <button type="button" className="text-xs text-zinc-400 hover:text-red-600" onClick={() => { writeLocalWishlist([]); refresh(); }}>
+            <button type="button" className="text-xs text-sf-text-faint hover:text-sf-danger" onClick={() => { writeLocalWishlist([]); refresh(); }}>
               clear all
             </button>
           </div>
           {authed && (
-            <div className="mt-2 rounded-xl bg-zinc-50 px-4 py-3 text-sm">
-              <p className="text-zinc-600">You&rsquo;re signed in. Move these into your account so they follow you across devices?</p>
-              <button type="button" disabled={busy} onClick={merge} className="mt-2 rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-50">
+            <div className="mt-2 rounded-sf-control bg-sf-surface-muted px-4 py-3 text-sm">
+              <p className="text-sf-text-muted">You&rsquo;re signed in. Move these into your account so they follow you across devices?</p>
+              <button type="button" disabled={busy} onClick={merge} className="mt-2 rounded-sf-control bg-sf-inverse px-4 py-2 text-xs font-bold text-sf-on-inverse hover:bg-sf-inverse-hover disabled:opacity-50">
                 {busy ? "Merging…" : "Merge into my account"}
               </button>
-              <p className="mt-1 text-[11px] text-zinc-400">This is the only way device and account lists ever join — nothing merges on its own.</p>
+              <p className="mt-1 text-sf-2xs text-sf-text-faint">This is the only way device and account lists ever join — nothing merges on its own.</p>
             </div>
           )}
-          <ul className="mt-2 divide-y divide-zinc-100">
+          <ul className="mt-2 divide-y divide-sf-border-soft">
             {local.map((i) => (
               <Row key={i.handle} item={i} onRemove={() => localRemove(i.handle)} />
             ))}
@@ -137,7 +137,7 @@ export default function WishlistPage() {
       {authed && account?.length > 0 && (
         <section className="mt-8">
           <h2 className="text-sm font-bold">In your account ({account.length})</h2>
-          <ul className="mt-2 divide-y divide-zinc-100">
+          <ul className="mt-2 divide-y divide-sf-border-soft">
             {account.map((i) => (
               <Row key={i.handle} item={i} onRemove={() => accountRemove(i.handle)} />
             ))}
@@ -145,8 +145,8 @@ export default function WishlistPage() {
         </section>
       )}
       {!authed && account === null && local.length > 0 && (
-        <p className="mt-6 text-xs text-zinc-400">
-          <Link href="/account?return=%2Fwishlist" className="underline hover:text-zinc-600">
+        <p className="mt-6 text-xs text-sf-text-faint">
+          <Link href="/account?return=%2Fwishlist" className="underline hover:text-sf-text-muted">
             Sign in
           </Link>{" "}
           to optionally keep this list on your account (your choice — nothing merges automatically).

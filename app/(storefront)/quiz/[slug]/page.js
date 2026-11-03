@@ -20,7 +20,7 @@ export default async function QuizPage({ params }) {
   return (
     <div className="mx-auto max-w-xl px-4 py-12 sm:px-6">
       <h1 className="text-3xl font-extrabold tracking-tight">{quiz.title}</h1>
-      {quiz.intro && <p className="mt-2 text-zinc-500">{quiz.intro}</p>}
+      {quiz.intro && <p className="mt-2 text-sf-text-subtle">{quiz.intro}</p>}
       <div className="mt-8">
         <QuizRunner quiz={quiz} />
       </div>

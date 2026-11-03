@@ -84,22 +84,22 @@ export default async function CollectionPage({ params, searchParams }) {
           })),
         }}
       />
-      <nav className="mb-4 text-sm text-zinc-400">
-        <Link href="/" className="hover:text-zinc-600">
+      <nav className="mb-4 text-sm text-sf-text-faint">
+        <Link href="/" className="hover:text-sf-text-muted">
           Home
         </Link>{" "}
         /{" "}
-        <Link href="/collections" className="hover:text-zinc-600">
+        <Link href="/collections" className="hover:text-sf-text-muted">
           Collections
         </Link>{" "}
-        / <span className="text-zinc-600">{collection.title}</span>
+        / <span className="text-sf-text-muted">{collection.title}</span>
       </nav>
 
       <h1 className="text-3xl font-extrabold tracking-tight">{collection.title}</h1>
       {collection.description ? (
-        <p className="mt-3 max-w-2xl text-zinc-500">{collection.description}</p>
+        <p className="mt-3 max-w-2xl text-sf-text-subtle">{collection.description}</p>
       ) : null}
-      <p className="mt-2 text-sm text-zinc-400">
+      <p className="mt-2 text-sm text-sf-text-faint">
         {total} {total === 1 ? "product" : "products"}
         {totalPages > 1 ? ` · page ${page} of ${totalPages}` : ""}
       </p>
@@ -117,10 +117,10 @@ export default async function CollectionPage({ params, searchParams }) {
               href={qs(handle, { ...filters, type: active ? "" : f.type })}
               aria-pressed={active}
               className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
-                active ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
+                active ? "border-sf-inverse bg-sf-inverse text-sf-on-inverse" : "border-sf-border bg-sf-surface text-sf-text-body hover:border-sf-border-hover"
               }`}
             >
-              {f.type} <span className={active ? "text-zinc-300" : "text-zinc-400"}>{f.count}</span>
+              {f.type} <span className={active ? "text-sf-on-inverse-muted" : "text-sf-text-faint"}>{f.count}</span>
             </Link>
           );
         };
@@ -129,14 +129,14 @@ export default async function CollectionPage({ params, searchParams }) {
             href={qs(handle, { ...filters, inStock: !filters.inStock })}
             aria-pressed={filters.inStock}
             className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
-              filters.inStock ? "border-accent-700 bg-accent-100 text-accent-800" : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
+              filters.inStock ? "border-sf-accent-text bg-sf-accent-soft text-sf-on-accent-soft" : "border-sf-border bg-sf-surface text-sf-text-body hover:border-sf-border-hover"
             }`}
           >
             In stock
           </Link>
         );
         const clearLink = filtered && (
-          <Link href={`/collections/${handle}`} className="text-sm font-medium text-accent-700 hover:underline">
+          <Link href={`/collections/${handle}`} className="text-sm font-medium text-sf-accent-text hover:underline">
             Clear all
           </Link>
         );
@@ -145,12 +145,12 @@ export default async function CollectionPage({ params, searchParams }) {
         );
         const grid =
           products.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-10 text-center">
-              <p className="font-medium text-zinc-700">
+            <div className="rounded-sf-card border border-sf-border bg-sf-surface-muted p-10 text-center">
+              <p className="font-medium text-sf-text-body">
                 {filtered ? "Nothing matches these filters." : "No products in this collection yet."}
               </p>
               {filtered && (
-                <Link href={`/collections/${handle}`} className="mt-3 inline-block rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800">
+                <Link href={`/collections/${handle}`} className="mt-3 inline-block rounded-full bg-sf-inverse px-5 py-2.5 text-sm font-semibold text-sf-on-inverse hover:bg-sf-inverse-hover">
                   Clear all filters
                 </Link>
               )}
@@ -163,7 +163,7 @@ export default async function CollectionPage({ params, searchParams }) {
           return (
             <div data-collection-template="sidebar" className="mt-6 gap-8 lg:grid lg:grid-cols-[13rem_1fr]">
               <aside className="mb-6 lg:mb-0 lg:sticky lg:top-24 lg:self-start" aria-label="Filters">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Filter</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sf-text-faint">Filter</p>
                 <div className="flex flex-wrap gap-2 lg:flex-col lg:items-start">
                   {facets.length > 1 && facets.map(facetChip)}
                   {inStockChip}
@@ -198,18 +198,18 @@ export default async function CollectionPage({ params, searchParams }) {
           {page > 1 && (
             <Link
               href={qs(handle, { ...filters, page: page - 1 })}
-              className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
+              className="rounded-sf-control border border-sf-border-strong px-4 py-2 text-sm font-semibold hover:bg-sf-surface-muted"
             >
               ← Previous
             </Link>
           )}
-          <span className="px-2 text-sm text-zinc-500">
+          <span className="px-2 text-sm text-sf-text-subtle">
             {page} / {totalPages}
           </span>
           {page < totalPages && (
             <Link
               href={qs(handle, { ...filters, page: page + 1 })}
-              className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
+              className="rounded-sf-control border border-sf-border-strong px-4 py-2 text-sm font-semibold hover:bg-sf-surface-muted"
             >
               Next →
             </Link>

@@ -115,12 +115,12 @@ export default async function ProductPage({ params }) {
           ],
         }}
       />
-      <nav className="mb-5 text-sm text-zinc-400">
-        <Link href="/" className="hover:text-zinc-600">
+      <nav className="mb-5 text-sm text-sf-text-faint">
+        <Link href="/" className="hover:text-sf-text-muted">
           Home
         </Link>{" "}
-        / <span className="text-zinc-500">{product.product_type || "Product"}</span> /{" "}
-        <span className="text-zinc-600">{product.title}</span>
+        / <span className="text-sf-text-subtle">{product.product_type || "Product"}</span> /{" "}
+        <span className="text-sf-text-muted">{product.title}</span>
       </nav>
 
       {/* S56: template variants over the SAME purchase/gallery components —

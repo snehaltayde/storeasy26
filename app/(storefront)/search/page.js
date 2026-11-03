@@ -48,27 +48,27 @@ export default async function SearchPage({ searchParams }) {
       <h1 className="text-2xl font-bold tracking-tight">
         {q ? (
           <>
-            Results for “<span className="text-accent-700">{q}</span>”
+            Results for “<span className="text-sf-accent-text">{q}</span>”
           </>
         ) : (
           "Search"
         )}
       </h1>
       {q ? (
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-sf-text-faint">
           {products.length} {products.length === 1 ? "product" : "products"}
         </p>
       ) : null}
 
       <div className="mt-8">
         {!q ? (
-          <p className="text-zinc-500">Type at least 2 characters to search.</p>
+          <p className="text-sf-text-subtle">Type at least 2 characters to search.</p>
         ) : products.length === 0 ? (
-          <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-8 text-center">
-            <p className="font-medium text-zinc-700">No products match “{q}”.</p>
+          <div className="rounded-sf-card border border-sf-border bg-sf-surface-muted p-8 text-center">
+            <p className="font-medium text-sf-text-body">No products match “{q}”.</p>
             <Link
               href="/collections"
-              className="mt-3 inline-block text-sm text-accent-700 hover:underline"
+              className="mt-3 inline-block text-sm text-sf-accent-text hover:underline"
             >
               Browse all collections →
             </Link>

@@ -972,7 +972,7 @@ async function checkoutAtPayment(props = {}) {
   return app;
 }
 const payOnline = (app) => app.find((e) => e.type === "input" && e.props.type === "radio" && e.props.disabled !== undefined, "online payment option").props.onChange();
-const shownError = (app) => app.textOf(app.find((e) => e.type === "p" && /bg-red-50/.test(e.props.className || ""), "the error message"));
+const shownError = (app) => app.textOf(app.find((e) => e.type === "p" && /bg-sf-danger-surface/.test(e.props.className || ""), "the error message"));
 
 const PLAIN_CHECKOUT = "Could not continue — your cart is untouched, please retry.";
 const RAW_CHECKOUT_ERRORS = [
@@ -1269,7 +1269,7 @@ async function accountBadges(src = accountSrc) {
     "@/lib/tenant-request": { tfetch: inOwn },
   });
   const html = renderToStaticMarkup(await page.default({ searchParams: Promise.resolve({}) }));
-  return Object.fromEntries([...html.matchAll(/font-mono[^>]*>(B-\d+)<.*?rounded bg-zinc-100[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]]));
+  return Object.fromEntries([...html.matchAll(/font-mono[^>]*>(B-\d+)<.*?rounded-sf-2xs bg-sf-surface-sunken[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]]));
 }
 const badgeProblems = (badges) =>
   ACCOUNT_BADGES.flatMap(([raw, status, want], i) => {

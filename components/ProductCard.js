@@ -22,7 +22,7 @@ export default function ProductCard({ product, priority = false }) {
 
   return (
     <Link href={`/products/${handle}`} className="group block">
-      <div className="relative aspect-square overflow-hidden rounded-2xl bg-zinc-100">
+      <div className="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
         {featured_image ? (
           <FadeImage
             src={featured_image}
@@ -33,18 +33,18 @@ export default function ProductCard({ product, priority = false }) {
             className="object-cover group-hover:scale-105"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-zinc-400">
+          <div className="flex h-full items-center justify-center text-sm text-sf-text-faint">
             No image
           </div>
         )}
 
         {!available && (
-          <span className="absolute left-3 top-3 rounded-full bg-zinc-900/85 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+          <span className="absolute left-3 top-3 rounded-full bg-sf-inverse/85 px-2.5 py-1 text-sf-2xs font-semibold uppercase tracking-wide text-sf-on-inverse">
             Sold out
           </span>
         )}
         {available && pct > 0 && (
-          <span className="absolute left-3 top-3 rounded-full bg-accent-400 px-2.5 py-1 text-[11px] font-bold text-accent-label">
+          <span className="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
             -{pct}%
           </span>
         )}
@@ -52,18 +52,18 @@ export default function ProductCard({ product, priority = false }) {
 
       <div className="mt-3 space-y-1">
         {product_type ? (
-          <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+          <p className="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
             {product_type}
           </p>
         ) : null}
-        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-zinc-900 transition-colors group-hover:text-accent-700">
+        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
           {title}
         </h3>
         <p className="text-sm">
-          {ranged && <span className="text-zinc-500">from </span>}
-          <span className="font-semibold text-zinc-900">{formatMoney(price_min, currency)}</span>
+          {ranged && <span className="text-sf-text-subtle">from </span>}
+          <span className="font-semibold text-sf-text">{formatMoney(price_min, currency)}</span>
           {onSale && (
-            <span className="ml-2 text-xs text-zinc-400 line-through">
+            <span className="ml-2 text-xs text-sf-text-faint line-through">
               {formatMoney(compare_at_min, currency)}
             </span>
           )}

@@ -57,32 +57,32 @@ export default function QuizRunner({ quiz }) {
     return (
       <div>
         <h2 className="text-2xl font-extrabold tracking-tight">Your picks</h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-sf-text-subtle">
           Matched on: {result.topTags.join(", ") || "your answers"} — same answers, same picks, every time.
         </p>
         {result.products.length === 0 ? (
-          <p className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-6 text-sm text-zinc-500">
+          <p className="mt-6 rounded-sf-card border border-sf-border bg-sf-surface-muted p-6 text-sm text-sf-text-subtle">
             Nothing in the catalog matches those answers right now —{" "}
-            <Link href="/collections" className="font-medium text-accent-700 underline">browse everything</Link> instead.
+            <Link href="/collections" className="font-medium text-sf-accent-text underline">browse everything</Link> instead.
           </p>
         ) : (
           <div className="mt-6 grid grid-cols-2 gap-4">
             {result.products.map((p) => (
-              <Link key={p.handle} href={`/products/${p.handle}`} className="group overflow-hidden rounded-2xl border border-zinc-200 transition hover:border-zinc-400">
-                <div className="relative aspect-square bg-zinc-100">
+              <Link key={p.handle} href={`/products/${p.handle}`} className="group overflow-hidden rounded-sf-card border border-sf-border transition hover:border-sf-border-hover">
+                <div className="relative aspect-square bg-sf-surface-sunken">
                   {p.image && <Image src={p.image} alt={p.title} fill sizes="(max-width: 640px) 50vw, 300px" className="object-cover" />}
                 </div>
                 <div className="p-3">
                   <p className="truncate text-sm font-semibold group-hover:underline">{p.title}</p>
-                  <p className="text-sm text-zinc-500">{formatMoney(p.price, p.currency)}</p>
+                  <p className="text-sm text-sf-text-subtle">{formatMoney(p.price, p.currency)}</p>
                 </div>
               </Link>
             ))}
           </div>
         )}
-        <div className="mt-8 rounded-2xl border border-zinc-200 p-5">
+        <div className="mt-8 rounded-sf-card border border-sf-border p-5">
           {lead.sent ? (
-            <p className="text-sm text-lime-700">Sent ✓ — check your inbox.</p>
+            <p className="text-sm text-sf-success">Sent ✓ — check your inbox.</p>
           ) : (
             <form onSubmit={sendLead}>
               <p className="text-sm font-semibold">Want these picks in your inbox? (optional)</p>
@@ -93,13 +93,13 @@ export default function QuizRunner({ quiz }) {
                   value={lead.email}
                   onChange={(e) => setLead((l) => ({ ...l, email: e.target.value }))}
                   placeholder="you@example.com"
-                  className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+                  className="min-w-0 flex-1 rounded-sf-control border border-sf-border px-3 py-2 text-sm outline-none focus:border-sf-border-hover"
                 />
-                <button type="submit" disabled={lead.busy} className="shrink-0 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50">
+                <button type="submit" disabled={lead.busy} className="shrink-0 rounded-sf-control bg-sf-inverse px-4 py-2 text-sm font-semibold text-sf-on-inverse hover:bg-sf-inverse-hover disabled:opacity-50">
                   {lead.busy ? "…" : "Send"}
                 </button>
               </div>
-              <p className="mt-2 text-[11px] text-zinc-400">
+              <p className="mt-2 text-sf-2xs text-sf-text-faint">
                 One email with these picks — that&rsquo;s the whole deal. No list, no follow-ups.
               </p>
             </form>
@@ -111,25 +111,25 @@ export default function QuizRunner({ quiz }) {
 
   return (
     <div>
-      {err && <p className="mb-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{err}</p>}
-      <p className="text-xs font-semibold text-zinc-400">
+      {err && <p className="mb-3 rounded-sf-control bg-sf-danger-surface px-4 py-3 text-sm text-sf-danger">{err}</p>}
+      <p className="text-xs font-semibold text-sf-text-faint">
         {idx + 1} / {quiz.questions.length}
       </p>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100">
-        <div className="h-full bg-accent-400 transition-all" style={{ width: `${Math.round((idx / quiz.questions.length) * 100)}%` }} />
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-sf-surface-sunken">
+        <div className="h-full bg-sf-accent transition-all" style={{ width: `${Math.round((idx / quiz.questions.length) * 100)}%` }} />
       </div>
       <h2 className="mt-5 text-xl font-bold">{state === "loading" ? "Matching…" : q.prompt}</h2>
       {state !== "loading" && (
         <div className="mt-4 space-y-2">
           {q.options.map((o) => (
-            <button key={o.id} type="button" onClick={() => choose(o.id)} className="block w-full rounded-xl border border-zinc-200 px-4 py-3 text-left text-sm font-medium transition hover:border-zinc-900">
+            <button key={o.id} type="button" onClick={() => choose(o.id)} className="block w-full rounded-sf-control border border-sf-border px-4 py-3 text-left text-sm font-medium transition hover:border-sf-inverse">
               {o.label}
             </button>
           ))}
         </div>
       )}
       {idx > 0 && state !== "loading" && (
-        <button type="button" onClick={() => setIdx(idx - 1)} className="mt-4 text-xs text-zinc-400 hover:text-zinc-600">
+        <button type="button" onClick={() => setIdx(idx - 1)} className="mt-4 text-xs text-sf-text-faint hover:text-sf-text-muted">
           ← Back
         </button>
       )}

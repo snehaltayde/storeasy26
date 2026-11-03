@@ -55,9 +55,9 @@ export default async function AccountPage({ searchParams }) {
       <section className="mt-6">
         <h2 className="text-sm font-bold">Orders</h2>
         {orders.length === 0 ? (
-          <p className="mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-6 text-sm text-zinc-500">
+          <p className="mt-3 rounded-sf-card border border-sf-border bg-sf-surface-muted p-6 text-sm text-sf-text-subtle">
             No orders on this account yet — anything you buy with {customer.email} lands here after sign-in.{" "}
-            <Link href="/collections" className="font-medium text-accent-700 underline">
+            <Link href="/collections" className="font-medium text-sf-accent-text underline">
               Start shopping
             </Link>
           </p>
@@ -65,16 +65,16 @@ export default async function AccountPage({ searchParams }) {
           <ul className="mt-3 space-y-2">
             {orders.map((o) => (
               <li key={o.id}>
-                <Link href={`/account/orders/${o.id}`} className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-200 p-4 text-sm transition hover:border-zinc-400">
-                  <span className="font-mono text-xs text-zinc-400">{o.id}</span>
-                  <span className="min-w-0 flex-1 truncate text-zinc-600">
+                <Link href={`/account/orders/${o.id}`} className="flex flex-wrap items-center gap-3 rounded-sf-card border border-sf-border p-4 text-sm transition hover:border-sf-border-hover">
+                  <span className="font-mono text-xs text-sf-text-faint">{o.id}</span>
+                  <span className="min-w-0 flex-1 truncate text-sf-text-muted">
                     {o.items.map((i) => i.title).join(", ") || "—"}
                   </span>
-                  <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-500">
+                  <span className="rounded-sf-2xs bg-sf-surface-sunken px-1.5 py-0.5 text-sf-3xs font-bold uppercase text-sf-text-subtle">
                     {orderBadge(o)}
                   </span>
                   <span className="font-semibold">{formatMoney(o.total, o.currency)}</span>
-                  <span className="text-xs text-zinc-400">{new Date(o.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+                  <span className="text-xs text-sf-text-faint">{new Date(o.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
                 </Link>
               </li>
             ))}

@@ -88,6 +88,7 @@
     "test:schema-compat": "node scripts/test-schema-compat.js",
     "test:order-catalog": "node scripts/test-order-catalog.js",
     "test:editor-layout": "node scripts/test-editor-layout.js",
+    "test:tokens": "node scripts/test-tokens.js",
     "test:perf": "node scripts/perf-report.js",
     "seed:design": "node scripts/dev-design.js seed",
     "dev:design": "node scripts/dev-design.js",

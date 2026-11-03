@@ -19,10 +19,10 @@ export default function HomeSections({ sections, dataById }) {
         const data = dataById.get(key) || {};
         if (s.kind === "collections" && data.collections?.length > 0) {
           return (
-            <section key={key} data-sec={key} className="py-[var(--section-pad-y,3.5rem)]">
+            <section key={key} data-sec={key} className="py-sf-section">
               <div className="mb-6 flex items-end justify-between">
                 <h2 className="text-2xl font-bold tracking-tight">{s.title}</h2>
-                <Link href="/collections" className="text-sm font-medium text-accent-700 hover:underline">
+                <Link href="/collections" className="text-sm font-medium text-sf-accent-text hover:underline">
                   View all →
                 </Link>
               </div>
@@ -38,7 +38,7 @@ export default function HomeSections({ sections, dataById }) {
           const anchor = !newAnchorUsed;
           newAnchorUsed = true;
           return (
-            <section key={key} data-sec={key} id={anchor ? "new" : undefined} className="scroll-mt-24 py-[var(--section-pad-y,3.5rem)]">
+            <section key={key} data-sec={key} id={anchor ? "new" : undefined} className="scroll-mt-24 py-sf-section">
               <div className="mb-6 flex items-end justify-between">
                 <h2 className="text-2xl font-bold tracking-tight">{s.title}</h2>
               </div>
@@ -48,12 +48,12 @@ export default function HomeSections({ sections, dataById }) {
         }
         if (s.kind === "banner") {
           return (
-            <section key={key} data-sec={key} className="py-[var(--section-pad-y,3.5rem)]">
-              <div className="rounded-brand bg-accent-100 px-6 py-10 text-center sm:px-10">
-                {s.title ? <h2 className="font-display text-2xl font-bold tracking-tight text-accent-900">{s.title}</h2> : null}
-                {s.text ? <p className="mx-auto mt-2 max-w-xl text-accent-800">{s.text}</p> : null}
+            <section key={key} data-sec={key} className="py-sf-section">
+              <div className="rounded-brand bg-sf-accent-soft px-6 py-10 text-center sm:px-10">
+                {s.title ? <h2 className="font-display text-2xl font-bold tracking-tight text-sf-on-accent-soft-strong">{s.title}</h2> : null}
+                {s.text ? <p className="mx-auto mt-2 max-w-xl text-sf-on-accent-soft">{s.text}</p> : null}
                 {s.href && s.label ? (
-                  <Link href={s.href} className="mt-5 inline-block rounded-[var(--btn-radius,9999px)] bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition hover:bg-accent-300">
+                  <Link href={s.href} className="mt-5 inline-block rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover">
                     {s.label}
                   </Link>
                 ) : null}
@@ -64,7 +64,7 @@ export default function HomeSections({ sections, dataById }) {
         if (s.kind === "rich_text") {
           // html is allowlist-SANITIZED at save (lib/cms/validate.js, S37)
           return (
-            <section key={key} data-sec={key} className="py-[var(--section-pad-y,3.5rem)]">
+            <section key={key} data-sec={key} className="py-sf-section">
               {s.title ? <h2 className="mb-4 text-2xl font-bold tracking-tight">{s.title}</h2> : null}
               <div className="rte max-w-3xl" dangerouslySetInnerHTML={{ __html: s.html || "" }} />
             </section>
@@ -73,7 +73,7 @@ export default function HomeSections({ sections, dataById }) {
         // S55 (audit slice 4): the broader library — distinct layouts
         if (s.kind === "image_with_text" && s.image) {
           return (
-            <section key={key} data-sec={key} className="py-[var(--section-pad-y,3.5rem)]">
+            <section key={key} data-sec={key} className="py-sf-section">
               <div className="grid items-center gap-8 md:grid-cols-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -88,7 +88,7 @@ export default function HomeSections({ sections, dataById }) {
                   {s.href && s.label ? (
                     <Link
                       href={s.href}
-                      className="mt-6 inline-block rounded-[var(--btn-radius,9999px)] bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition hover:bg-accent-300"
+                      className="mt-6 inline-block rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover"
                     >
                       {s.label}
                     </Link>
@@ -100,11 +100,11 @@ export default function HomeSections({ sections, dataById }) {
         }
         if (s.kind === "product_rail" && data.products?.length > 0) {
           return (
-            <section key={key} data-sec={key} className="py-[var(--section-pad-y,3.5rem)]">
+            <section key={key} data-sec={key} className="py-sf-section">
               <div className="mb-6 flex items-end justify-between">
                 <h2 className="text-2xl font-bold tracking-tight">{s.title}</h2>
                 {s.collection ? (
-                  <Link href={`/collections/${s.collection}`} className="text-sm font-medium text-accent-700 hover:underline">
+                  <Link href={`/collections/${s.collection}`} className="text-sm font-medium text-sf-accent-text hover:underline">
                     View all →
                   </Link>
                 ) : null}

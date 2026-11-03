@@ -30,24 +30,24 @@ function UpsellSlot({ open, items, addItem, pending, currency }) {
 
   if (!slot || items.length === 0) return null;
   return (
-    <div className="border-t border-zinc-100 px-5 py-3">
-      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-500">{slot.title}</p>
+    <div className="border-t border-sf-border-soft px-5 py-3">
+      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-sf-text-subtle">{slot.title}</p>
       <ul className="space-y-2">
         {slot.products.map((p) => (
           <li key={p.handle} className="flex items-center gap-3">
-            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-sf-small bg-sf-surface-sunken">
               {p.featured_image ? (
                 <Image src={p.featured_image} alt={p.title} fill sizes="48px" className="object-cover" />
               ) : null}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="line-clamp-1 text-sm font-medium text-zinc-900">{p.title}</p>
-              <p className="text-xs text-zinc-500">{formatMoney(p.variant_price ?? p.price_min, p.currency || currency)}</p>
+              <p className="line-clamp-1 text-sm font-medium text-sf-text">{p.title}</p>
+              <p className="text-xs text-sf-text-subtle">{formatMoney(p.variant_price ?? p.price_min, p.currency || currency)}</p>
             </div>
             <button
               onClick={() => addItem(p.variant_id)}
               disabled={pending}
-              className="shrink-0 rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+              className="shrink-0 rounded-sf-small border border-sf-border-strong px-2.5 py-1 text-xs font-semibold text-sf-text-body hover:bg-sf-surface-muted disabled:opacity-50"
             >
               Add
             </button>
@@ -110,26 +110,26 @@ export default function CartDrawer() {
     <>
       <div
         onClick={() => setOpen(false)}
-        className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ${
+        className={`fixed inset-0 z-40 bg-sf-overlay/40 transition-opacity duration-300 ${
           open ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         aria-hidden="true"
       />
       <aside
-        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-white shadow-xl transition-transform duration-300 ${
+        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-sf-surface shadow-xl transition-transform duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
         aria-label="Shopping cart"
       >
-        <header className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
+        <header className="flex items-center justify-between border-b border-sf-border-soft px-5 py-4">
           <h2 className="text-lg font-bold">
-            Your cart {count > 0 && <span className="text-zinc-400">({count})</span>}
+            Your cart {count > 0 && <span className="text-sf-text-faint">({count})</span>}
           </h2>
           <button
             onClick={() => setOpen(false)}
             aria-label="Close cart"
-            className="rounded-full p-1.5 text-zinc-500 hover:bg-zinc-100"
+            className="rounded-full p-1.5 text-sf-text-subtle hover:bg-sf-surface-sunken"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -144,41 +144,41 @@ export default function CartDrawer() {
             <ul className="flex-1 space-y-4 px-5 py-4">
               {[0, 1].map((i) => (
                 <li key={i} className="flex gap-3">
-                  <div className="h-20 w-20 shrink-0 animate-pulse rounded-lg bg-zinc-100" />
+                  <div className="h-20 w-20 shrink-0 animate-pulse rounded-sf-small bg-sf-surface-sunken" />
                   <div className="flex-1 space-y-2 py-1">
-                    <div className="h-4 w-3/4 animate-pulse rounded bg-zinc-100" />
-                    <div className="h-3 w-1/3 animate-pulse rounded bg-zinc-100" />
-                    <div className="h-7 w-24 animate-pulse rounded bg-zinc-100" />
+                    <div className="h-4 w-3/4 animate-pulse rounded-sf-2xs bg-sf-surface-sunken" />
+                    <div className="h-3 w-1/3 animate-pulse rounded-sf-2xs bg-sf-surface-sunken" />
+                    <div className="h-7 w-24 animate-pulse rounded-sf-2xs bg-sf-surface-sunken" />
                   </div>
                 </li>
               ))}
             </ul>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-zinc-500">
-              <p className="font-medium text-zinc-700">Your cart is empty</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sf-text-subtle">
+              <p className="font-medium text-sf-text-body">Your cart is empty</p>
               <p className="text-sm">Add something you like and it’ll show up here.</p>
             </div>
           )
         ) : (
-          <ul className="flex-1 divide-y divide-zinc-100 overflow-y-auto px-5">
+          <ul className="flex-1 divide-y divide-sf-border-soft overflow-y-auto px-5">
             {items.map((it) => (
               <li key={it.variantId} className="flex gap-3 py-4">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-sf-small bg-sf-surface-sunken">
                   {it.image ? (
                     <Image src={it.image} alt={it.title} fill sizes="80px" className="object-cover" />
                   ) : null}
                 </div>
                 <div className="flex flex-1 flex-col">
-                  <p className="line-clamp-2 text-sm font-medium text-zinc-900">{it.title}</p>
+                  <p className="line-clamp-2 text-sm font-medium text-sf-text">{it.title}</p>
                   {it.variantTitle && it.variantTitle !== "Default Title" && (
-                    <p className="text-xs text-zinc-500">{it.variantTitle}</p>
+                    <p className="text-xs text-sf-text-subtle">{it.variantTitle}</p>
                   )}
                   <div className="mt-auto flex items-center justify-between pt-2">
-                    <div className="inline-flex items-center rounded-lg border border-zinc-200">
+                    <div className="inline-flex items-center rounded-sf-small border border-sf-border">
                       <button
                         onClick={() => setQty(it.variantId, it.quantity - 1)}
                         disabled={pending}
-                        className="px-2.5 py-1 text-zinc-600 hover:text-zinc-900 disabled:opacity-50"
+                        className="px-2.5 py-1 text-sf-text-muted hover:text-sf-text disabled:opacity-50"
                         aria-label="Decrease quantity"
                       >
                         −
@@ -187,7 +187,7 @@ export default function CartDrawer() {
                       <button
                         onClick={() => setQty(it.variantId, it.quantity + 1)}
                         disabled={pending}
-                        className="px-2.5 py-1 text-zinc-600 hover:text-zinc-900 disabled:opacity-50"
+                        className="px-2.5 py-1 text-sf-text-muted hover:text-sf-text disabled:opacity-50"
                         aria-label="Increase quantity"
                       >
                         +
@@ -200,7 +200,7 @@ export default function CartDrawer() {
                   onClick={() => removeItem(it.variantId)}
                   disabled={pending}
                   aria-label="Remove item"
-                  className="self-start text-zinc-300 hover:text-zinc-600 disabled:opacity-50"
+                  className="self-start text-sf-mark hover:text-sf-text-muted disabled:opacity-50"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <path d="M18 6 6 18M6 6l12 12" />
@@ -211,21 +211,21 @@ export default function CartDrawer() {
 
             {gifts.map((g) => (
               <li key={`gift-${g.variantId}`} className="animate-offer-in flex gap-3 py-4">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-sf-small bg-sf-surface-sunken">
                   {g.image ? (
                     <Image src={g.image} alt={g.title} fill sizes="80px" className="object-cover" />
                   ) : null}
-                  <span className="absolute left-1 top-1 rounded bg-accent-400 px-1.5 py-0.5 text-[10px] font-bold text-accent-label">
+                  <span className="absolute left-1 top-1 rounded-sf-2xs bg-sf-accent px-1.5 py-0.5 text-sf-3xs font-bold text-sf-on-accent">
                     FREE
                   </span>
                 </div>
                 <div className="flex flex-1 flex-col justify-center">
-                  <p className="line-clamp-2 text-sm font-medium text-zinc-900">{g.title}</p>
-                  <p className="text-xs text-zinc-500">Free gift 🎁</p>
+                  <p className="line-clamp-2 text-sm font-medium text-sf-text">{g.title}</p>
+                  <p className="text-xs text-sf-text-subtle">Free gift 🎁</p>
                   <div className="mt-1 flex items-center gap-2 text-sm">
-                    <span className="font-semibold text-accent-700">FREE</span>
+                    <span className="font-semibold text-sf-accent-text">FREE</span>
                     {g.value ? (
-                      <span className="text-xs text-zinc-400 line-through">
+                      <span className="text-xs text-sf-text-faint line-through">
                         {formatMoney(g.value, currency)}
                       </span>
                     ) : null}
@@ -239,7 +239,7 @@ export default function CartDrawer() {
         {/* S32 (SF06): acknowledge catalog changes under the shopper's cart —
             totals already use current prices; this says what moved. */}
         {changes?.length > 0 && (
-          <div className="mx-5 mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+          <div className="mx-5 mb-2 rounded-sf-control border border-sf-warning-border bg-sf-warning-surface px-3 py-2.5 text-xs text-sf-warning-strong">
             {changes.map((c, i) => (
               <p key={`${c.variantId}-${c.kind}-${i}`}>
                 {c.kind === "unavailable"
@@ -253,21 +253,21 @@ export default function CartDrawer() {
         <UpsellSlot open={open} items={items} addItem={addItem} pending={pending} currency={currency} />
 
         {items.length > 0 && (
-          <footer className="border-t border-zinc-100 px-5 py-4">
+          <footer className="border-t border-sf-border-soft px-5 py-4">
             {/* Coupon — validated by the engine (try BEAST10, FLAT200, SOLO25) */}
             <div className="mb-4">
               {couponStatus?.valid ? (
-                <div className="flex items-center justify-between rounded-xl border border-accent-200 bg-accent-50 px-3 py-2.5">
+                <div className="flex items-center justify-between rounded-sf-control border border-sf-accent-border bg-sf-accent-subtle px-3 py-2.5">
                   <span className="text-sm">
-                    <span className="text-zinc-500">Coupon</span>{" "}
-                    <span className="font-semibold text-accent-800">{couponStatus.code}</span>
+                    <span className="text-sf-text-subtle">Coupon</span>{" "}
+                    <span className="font-semibold text-sf-on-accent-soft">{couponStatus.code}</span>
                     {couponStatus.applied ? (
-                      <span className="text-accent-700"> · −{formatMoney(couponStatus.applied, currency)}</span>
+                      <span className="text-sf-accent-text"> · −{formatMoney(couponStatus.applied, currency)}</span>
                     ) : null}
                   </span>
                   <button
                     onClick={() => setCoupon(null)}
-                    className="text-xs font-medium text-zinc-500 hover:text-zinc-800"
+                    className="text-xs font-medium text-sf-text-subtle hover:text-sf-text-soft"
                   >
                     Remove
                   </button>
@@ -280,24 +280,24 @@ export default function CartDrawer() {
                       onChange={(e) => setCode(e.target.value)}
                       placeholder="Coupon code"
                       aria-label="Coupon code"
-                      className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-sm uppercase outline-none placeholder:normal-case focus:border-zinc-400"
+                      className="min-w-0 flex-1 rounded-sf-control border border-sf-border px-3 py-2.5 text-sm uppercase outline-none placeholder:normal-case focus:border-sf-border-hover"
                     />
                     <button
                       type="submit"
                       disabled={!code.trim() || pending}
-                      className="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 disabled:opacity-40"
+                      className="rounded-sf-control border border-sf-border-strong px-4 py-2.5 text-sm font-semibold text-sf-text-soft transition hover:bg-sf-surface-muted disabled:opacity-40"
                     >
                       Apply
                     </button>
                   </form>
                   {couponStatus && !couponStatus.valid && (
-                    <p className="mt-1.5 flex items-center justify-between gap-2 text-xs text-red-600">
+                    <p className="mt-1.5 flex items-center justify-between gap-2 text-xs text-sf-danger">
                       <span>
                         “{couponStatus.code}” — {couponStatus.reason}
                       </span>
                       <button
                         onClick={() => setCoupon(null)}
-                        className="shrink-0 font-medium text-zinc-400 hover:text-zinc-700"
+                        className="shrink-0 font-medium text-sf-text-faint hover:text-sf-text-body"
                       >
                         clear
                       </button>
@@ -309,13 +309,13 @@ export default function CartDrawer() {
 
             <div className="mb-3 space-y-1.5">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-zinc-500">Subtotal</span>
-                <span className="text-zinc-700">{formatMoney(subtotal, currency)}</span>
+                <span className="text-sf-text-subtle">Subtotal</span>
+                <span className="text-sf-text-body">{formatMoney(subtotal, currency)}</span>
               </div>
               {appliedOffers.filter((o) => o.amount > 0).map((o) => (
                 <div
                   key={o.id}
-                  className="animate-offer-in flex items-start justify-between gap-3 text-sm text-accent-700"
+                  className="animate-offer-in flex items-start justify-between gap-3 text-sm text-sf-accent-text"
                 >
                   <span className="flex items-start gap-1.5">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
@@ -329,30 +329,30 @@ export default function CartDrawer() {
               ))}
               {shipping && (
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-500">Shipping</span>
+                  <span className="text-sf-text-subtle">Shipping</span>
                   {shipping.total === 0 ? (
-                    <span className="font-semibold text-accent-700">FREE</span>
+                    <span className="font-semibold text-sf-accent-text">FREE</span>
                   ) : (
-                    <span className="text-zinc-700">{formatMoney(shipping.total, currency)}</span>
+                    <span className="text-sf-text-body">{formatMoney(shipping.total, currency)}</span>
                   )}
                 </div>
               )}
               {/* GEN-03: this nudge is a promise in the store's name, so it needs
                   rates the store actually chose. The charge above always shows. */}
               {shippingRatesSet && shipping?.remainingForFree > 0 && (
-                <p className="text-right text-xs text-zinc-500">
+                <p className="text-right text-xs text-sf-text-subtle">
                   Add {formatMoney(shipping.remainingForFree, currency)} more for{" "}
-                  <span className="font-semibold text-accent-700">free shipping</span>
+                  <span className="font-semibold text-sf-accent-text">free shipping</span>
                 </p>
               )}
-              <div className="flex items-center justify-between border-t border-zinc-100 pt-2">
+              <div className="flex items-center justify-between border-t border-sf-border-soft pt-2">
                 <span className="font-semibold">Total</span>
                 <span className="text-base font-bold">{formatMoney(grandTotal ?? total, currency)}</span>
               </div>
               {discountTotal > 0 && (
                 <p
                   key={savePop}
-                  className="animate-save-pop origin-right text-right text-xs font-semibold text-accent-700"
+                  className="animate-save-pop origin-right text-right text-xs font-semibold text-sf-accent-text"
                 >
                   You save {formatMoney(discountTotal, currency)}
                 </p>
@@ -361,11 +361,11 @@ export default function CartDrawer() {
             <Link
               href="/checkout"
               onClick={() => setOpen(false)}
-              className="block rounded-xl bg-zinc-900 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-zinc-800"
+              className="block rounded-sf-control bg-sf-inverse px-5 py-3 text-center text-sm font-semibold text-sf-on-inverse transition hover:bg-sf-inverse-hover"
             >
               Checkout →
             </Link>
-            <p className="mt-2 text-center text-[11px] text-zinc-400">
+            <p className="mt-2 text-center text-sf-2xs text-sf-text-faint">
               Any cash on delivery fee is added at checkout
             </p>
           </footer>

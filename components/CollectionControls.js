@@ -18,13 +18,13 @@ export default function CollectionControls({ basePath, params, sort }) {
   }
 
   return (
-    <label className="flex items-center gap-2 text-sm text-zinc-500">
+    <label className="flex items-center gap-2 text-sm text-sf-text-subtle">
       Sort
       <select
         value={sort}
         onChange={onSort}
         aria-label="Sort products"
-        className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-sm font-medium text-zinc-800 outline-none focus:border-zinc-400"
+        className="rounded-sf-small border border-sf-border bg-sf-surface px-2.5 py-1.5 text-sm font-medium text-sf-text-soft outline-none focus:border-sf-border-hover"
       >
         <option value="featured">Featured</option>
         <option value="new">Newest</option>

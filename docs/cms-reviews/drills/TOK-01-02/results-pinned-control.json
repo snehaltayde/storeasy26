@@ -1,0 +1,198 @@
+{
+  "id": "TOK-01-02",
+  "part": "pinned-control",
+  "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — pinned-control",
+  "ranAt": "2026-11-03T13:39:34.978Z",
+  "harness": "http://localhost:3204",
+  "chrome": "156.0.8078.80",
+  "passed": 36,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "pinned/default: home at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: product at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: collection at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: collections at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: search at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: cart-drawer at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: cart at 375: Add to cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: checkout at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: account at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: cms-page at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: not-found at 375 answers 404",
+      "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: no page errors at 375",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: home at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: product at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: collection at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: collections at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: search at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: cart-drawer at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: cart at 768: Add to cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: checkout at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: account at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: cms-page at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: not-found at 768 answers 404",
+      "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: no page errors at 768",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: home at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: product at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: collection at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: collections at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: search at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: cart-drawer at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: cart at 1440: Add to cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: checkout at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: account at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: cms-page at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: not-found at 1440 answers 404",
+      "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "pinned/default: no page errors at 1440",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "live release before: rel_603b89e777d1554f",
+    "live release put back: rel_603b89e777d1554f"
+  ],
+  "screenshots": []
+}

@@ -26,12 +26,12 @@ export default async function CollectionsPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
       <h1 className="text-3xl font-extrabold tracking-tight">Collections</h1>
-      <p className="mt-2 text-sm text-zinc-500">
+      <p className="mt-2 text-sm text-sf-text-subtle">
         {collections.length} {collections.length === 1 ? "collection" : "collections"}
       </p>
 
       {collections.length === 0 ? (
-        <p className="mt-10 text-zinc-500">
+        <p className="mt-10 text-sf-text-subtle">
           No collections to show yet — please check back soon.
         </p>
       ) : (
@@ -39,7 +39,7 @@ export default async function CollectionsPage() {
           {collections.map((c) => (
             <div key={c.handle} className="relative">
               {featured.includes(c.handle) && (
-                <span className="absolute right-3 top-3 z-10 rounded-full bg-accent-400 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-accent-label">
+                <span className="absolute right-3 top-3 z-10 rounded-full bg-sf-accent px-2.5 py-1 text-sf-3xs font-bold uppercase tracking-wide text-sf-on-accent">
                   Featured
                 </span>
               )}
@@ -50,7 +50,7 @@ export default async function CollectionsPage() {
       )}
 
       <p className="mt-10">
-        <Link href="/" className="text-sm text-accent-700 hover:underline">
+        <Link href="/" className="text-sm text-sf-accent-text hover:underline">
           ← Back home
         </Link>
       </p>

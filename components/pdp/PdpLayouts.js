@@ -16,10 +16,10 @@ import { sanitizeHtml } from "@/lib/sanitize";
 function VendorBadge({ product, override, center = false }) {
   if (!product.vendor && !override?.badge) return null;
   return (
-    <p className={`flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-accent-700 ${center ? "justify-center" : ""}`}>
+    <p className={`flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-sf-accent-text ${center ? "justify-center" : ""}`}>
       {product.vendor}
       {override?.badge ? (
-        <span className="rounded-full bg-accent-100 px-2.5 py-0.5 text-[11px] font-bold normal-case tracking-normal text-accent-800">
+        <span className="rounded-full bg-sf-accent-soft px-2.5 py-0.5 text-sf-2xs font-bold normal-case tracking-normal text-sf-on-accent-soft">
           {override.badge}
         </span>
       ) : null}
@@ -30,7 +30,7 @@ function VendorBadge({ product, override, center = false }) {
 function DetailsBlock({ product }) {
   if (product.description_html) {
     return (
-      <div className="mt-8 border-t border-zinc-100 pt-8">
+      <div className="mt-8 border-t border-sf-border-soft pt-8">
         <h2 className="mb-3 text-lg font-bold">Details</h2>
         {/* Merchant-authored HTML from the store's own Shopify catalog —
             allowlist-sanitized (S35): a compromised catalog must not XSS shoppers. */}
@@ -40,9 +40,9 @@ function DetailsBlock({ product }) {
   }
   if (product.description) {
     return (
-      <div className="mt-8 border-t border-zinc-100 pt-8">
+      <div className="mt-8 border-t border-sf-border-soft pt-8">
         <h2 className="mb-3 text-lg font-bold">Details</h2>
-        <p className="whitespace-pre-line text-zinc-700">{product.description}</p>
+        <p className="whitespace-pre-line text-sf-text-body">{product.description}</p>
       </div>
     );
   }
@@ -53,14 +53,14 @@ function Accordions({ override, extras }) {
   if (!(override?.modules?.length > 0 || extras?.length > 0)) return null;
   return (
     // data-sec: S59 surface designer click-target (PreviewBridge select)
-    <div data-sec="pdp-modules" className="mt-6 divide-y divide-zinc-100 border-t border-zinc-100">
+    <div data-sec="pdp-modules" className="mt-6 divide-y divide-sf-border-soft border-t border-sf-border-soft">
       {[...(override?.modules || []), ...(extras || [])].map((x) => (
         <details key={x.title} className="group py-3">
-          <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-zinc-800 [&::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-sf-text-soft [&::-webkit-details-marker]:hidden">
             {x.title}
-            <span className="text-zinc-400 transition group-open:rotate-45">+</span>
+            <span className="text-sf-text-faint transition group-open:rotate-45">+</span>
           </summary>
-          <div className="rte mt-2 text-sm text-zinc-600" dangerouslySetInnerHTML={{ __html: x.html }} />
+          <div className="rte mt-2 text-sm text-sf-text-muted" dangerouslySetInnerHTML={{ __html: x.html }} />
         </details>
       ))}
     </div>
@@ -70,7 +70,7 @@ function Accordions({ override, extras }) {
 export function PairsSection({ pairs }) {
   if (!(pairs?.products?.length > 0)) return null;
   return (
-    <section data-sec="pdp-pairs" className="mt-16 border-t border-zinc-100 pt-10">
+    <section data-sec="pdp-pairs" className="mt-16 border-t border-sf-border-soft pt-10">
       <h2 className="mb-6 text-2xl font-bold tracking-tight">{pairs.title}</h2>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {pairs.products.map((p) => (
@@ -140,7 +140,7 @@ export function PdpEditorial({ product, override, extras, pairs }) {
           ) : null}
         </div>
         <aside className="lg:sticky lg:top-24 lg:self-start">
-          <div className="rounded-brand border border-zinc-200 p-5 shadow-sm">
+          <div className="rounded-brand border border-sf-border p-5 shadow-sm">
             <ProductPurchase product={product} />
             <div className="mt-3">
               <WishlistButton handle={product.handle} />

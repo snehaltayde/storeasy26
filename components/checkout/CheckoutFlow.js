@@ -230,20 +230,20 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
         <Link href="/" className="text-xl font-extrabold tracking-tight">
           {/* S55 fix: the tenant's own wordmark — this hardcoded BEASTLIFE on every store */}
           {logo?.text1 || storeName}
-          {logo?.text2 ? <span className="text-accent-500">{logo.text2}</span> : null}
+          {logo?.text2 ? <span className="text-sf-accent-mark">{logo.text2}</span> : null}
         </Link>
         <ol className="flex items-center gap-2 text-sm">
           {STEPS.map((label, i) => (
             <li key={label} className="flex items-center gap-2">
               <span
                 className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                  i <= step ? "bg-zinc-900 text-white" : "bg-zinc-200 text-zinc-500"
+                  i <= step ? "bg-sf-inverse text-sf-on-inverse" : "bg-sf-surface-strong text-sf-text-subtle"
                 }`}
               >
                 {i + 1}
               </span>
-              <span className={i === step ? "font-semibold" : "text-zinc-400"}>{label}</span>
-              {i < STEPS.length - 1 && <span className="text-zinc-300">→</span>}
+              <span className={i === step ? "font-semibold" : "text-sf-text-faint"}>{label}</span>
+              {i < STEPS.length - 1 && <span className="text-sf-mark">→</span>}
             </li>
           ))}
         </ol>
@@ -258,14 +258,14 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
               <div className="grid grid-cols-2 gap-3">
                 {FIELDS.map((f) => (
                   <div key={f.key} className={f.half ? "col-span-1" : "col-span-2"}>
-                    <label className="mb-1 block text-xs font-medium text-zinc-500">{f.label}</label>
+                    <label className="mb-1 block text-xs font-medium text-sf-text-subtle">{f.label}</label>
                     <input
                       type={f.type || "text"}
                       name={f.key}
                       autoComplete={AUTOCOMPLETE[f.key]}
                       value={form[f.key]}
                       onChange={(e) => set(f.key, e.target.value)}
-                      className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400"
+                      className="w-full rounded-sf-control border border-sf-border px-3 py-2.5 text-sm outline-none focus:border-sf-border-hover"
                     />
                   </div>
                 ))}
@@ -273,7 +273,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
               <button
                 onClick={() => setStep(1)}
                 disabled={!addressValid}
-                className="mt-6 w-full rounded-xl bg-zinc-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                className="mt-6 w-full rounded-sf-control bg-sf-inverse px-6 py-3 text-sm font-semibold text-sf-on-inverse transition hover:bg-sf-inverse-hover disabled:cursor-not-allowed disabled:bg-sf-surface-disabled"
               >
                 Continue to review
               </button>
@@ -283,51 +283,51 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
           {step === 1 && (
             <section>
               <h2 className="mb-4 text-lg font-bold">Review your order</h2>
-              <div className="rounded-2xl border border-zinc-200 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">Ship to</p>
+              <div className="rounded-sf-card border border-sf-border p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-sf-text-faint">Ship to</p>
                 <p className="mt-1 text-sm font-medium">{form.name}</p>
-                <p className="text-sm text-zinc-600">
+                <p className="text-sm text-sf-text-muted">
                   {form.line1}
                   {form.line2 ? `, ${form.line2}` : ""}, {form.city}, {form.state} {form.pincode}
                 </p>
-                <p className="text-sm text-zinc-600">
+                <p className="text-sm text-sf-text-muted">
                   {form.email} · {form.phone}
                 </p>
-                <button onClick={() => setStep(0)} className="mt-2 text-xs font-medium text-accent-700 hover:underline">
+                <button onClick={() => setStep(0)} className="mt-2 text-xs font-medium text-sf-accent-text hover:underline">
                   Edit
                 </button>
               </div>
-              <ul className="mt-4 divide-y divide-zinc-100">
+              <ul className="mt-4 divide-y divide-sf-border-soft">
                 {cart.items.map((it) => (
                   <li key={it.variantId} className="flex items-center gap-3 py-3">
-                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-sf-small bg-sf-surface-sunken">
                       {it.image ? <Image src={it.image} alt={it.title} fill sizes="48px" className="object-cover" /> : null}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{it.title}</p>
-                      <p className="text-xs text-zinc-500">Qty {it.quantity}</p>
+                      <p className="text-xs text-sf-text-subtle">Qty {it.quantity}</p>
                     </div>
                     <span className="text-sm font-semibold">{formatMoney(it.lineTotal, cart.currency)}</span>
                   </li>
                 ))}
                 {cart.gifts.map((g) => (
                   <li key={`gift-${g.variantId}`} className="flex items-center gap-3 py-3">
-                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-sf-small bg-sf-surface-sunken">
                       {g.image ? <Image src={g.image} alt={g.title} fill sizes="48px" className="object-cover" /> : null}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{g.title}</p>
-                      <p className="text-xs text-zinc-500">Free gift 🎁</p>
+                      <p className="text-xs text-sf-text-subtle">Free gift 🎁</p>
                     </div>
-                    <span className="text-sm font-semibold text-accent-700">FREE</span>
+                    <span className="text-sm font-semibold text-sf-accent-text">FREE</span>
                   </li>
                 ))}
               </ul>
               <div className="mt-6 flex gap-3">
-                <button onClick={() => setStep(0)} className="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-semibold hover:bg-zinc-50">
+                <button onClick={() => setStep(0)} className="rounded-sf-control border border-sf-border-strong px-5 py-3 text-sm font-semibold hover:bg-sf-surface-muted">
                   Back
                 </button>
-                <button onClick={() => setStep(2)} className="flex-1 rounded-xl bg-zinc-900 px-6 py-3 text-sm font-semibold text-white hover:bg-zinc-800">
+                <button onClick={() => setStep(2)} className="flex-1 rounded-sf-control bg-sf-inverse px-6 py-3 text-sm font-semibold text-sf-on-inverse hover:bg-sf-inverse-hover">
                   Continue to payment
                 </button>
               </div>
@@ -338,21 +338,21 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
             <section>
               <h2 className="mb-4 text-lg font-bold">Payment</h2>
               <div className="space-y-3">
-                <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 ${method === "cod" ? "border-zinc-900 ring-1 ring-zinc-900" : "border-zinc-200"}`}>
+                <label className={`flex cursor-pointer items-start gap-3 rounded-sf-card border p-4 ${method === "cod" ? "border-sf-inverse ring-1 ring-sf-inverse" : "border-sf-border"}`}>
                   <input type="radio" name="method" checked={method === "cod"} onChange={() => setMethod("cod")} className="mt-1" />
                   <div>
                     <p className="text-sm font-semibold">
                       Cash on Delivery
                       {codPreview.codFee > 0 && (
-                        <span className="font-normal text-zinc-400"> · +{formatMoney(codPreview.codFee, cart.currency)} COD fee</span>
+                        <span className="font-normal text-sf-text-faint"> · +{formatMoney(codPreview.codFee, cart.currency)} COD fee</span>
                       )}
                     </p>
-                    <p className="text-xs text-zinc-500">Pay in cash when your order arrives.</p>
+                    <p className="text-xs text-sf-text-subtle">Pay in cash when your order arrives.</p>
                   </div>
                 </label>
                 <label
-                  className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 ${
-                    method === "razorpay" ? "border-zinc-900 ring-1 ring-zinc-900" : "border-zinc-200"
+                  className={`flex cursor-pointer items-start gap-3 rounded-sf-card border p-4 ${
+                    method === "razorpay" ? "border-sf-inverse ring-1 ring-sf-inverse" : "border-sf-border"
                   } ${razorpayEnabled ? "" : "opacity-50"}`}
                 >
                   <input
@@ -365,25 +365,25 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
                   />
                   <div>
                     <p className="text-sm font-semibold">
-                      Pay online <span className="font-normal text-zinc-400">· card / UPI / netbanking</span>
+                      Pay online <span className="font-normal text-sf-text-faint">· card / UPI / netbanking</span>
                     </p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-sf-text-subtle">
                       {razorpayEnabled ? "You'll finish paying in a secure payment window." : "Online payment isn't available for this store right now."}
                     </p>
                   </div>
                 </label>
               </div>
 
-              {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+              {error && <p className="mt-4 rounded-sf-control bg-sf-danger-surface px-4 py-3 text-sm text-sf-danger">{error}</p>}
 
               <div className="mt-6 flex gap-3">
-                <button onClick={() => setStep(1)} disabled={placing} className="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-semibold hover:bg-zinc-50 disabled:opacity-50">
+                <button onClick={() => setStep(1)} disabled={placing} className="rounded-sf-control border border-sf-border-strong px-5 py-3 text-sm font-semibold hover:bg-sf-surface-muted disabled:opacity-50">
                   Back
                 </button>
                 <button
                   onClick={() => placeOrder()}
                   disabled={placing}
-                  className="flex-1 rounded-xl bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition hover:bg-accent-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 rounded-sf-control bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {placing
                     ? "Processing…"
@@ -395,12 +395,12 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
 
               {/* S38 (SF14): the store's own policies, right where the money moves */}
               {policies.length > 0 && (
-                <p className="mt-3 text-center text-xs text-zinc-400">
+                <p className="mt-3 text-center text-xs text-sf-text-faint">
                   By placing this order you agree to our{" "}
                   {policies.map((p, i) => (
                     <span key={p.href}>
                       {i > 0 && (i === policies.length - 1 ? " and " : ", ")}
-                      <a href={p.href} target="_blank" rel="noopener" className="underline hover:text-zinc-600">
+                      <a href={p.href} target="_blank" rel="noopener" className="underline hover:text-sf-text-muted">
                         {p.label}
                       </a>
                     </span>
@@ -413,34 +413,34 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
         </div>
 
         {/* sticky order summary — mirrors the cart drawer exactly */}
-        <aside className="h-fit rounded-2xl border border-zinc-200 p-5 lg:sticky lg:top-6">
+        <aside className="h-fit rounded-sf-card border border-sf-border p-5 lg:sticky lg:top-6">
           <h3 className="mb-3 text-sm font-bold">Order summary</h3>
-          <div className="space-y-1.5 border-b border-zinc-100 pb-3 text-sm">
+          <div className="space-y-1.5 border-b border-sf-border-soft pb-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-zinc-500">Subtotal</span>
+              <span className="text-sf-text-subtle">Subtotal</span>
               <span>{formatMoney(cart.subtotal, cart.currency)}</span>
             </div>
             {cart.appliedOffers
               .filter((o) => o.amount > 0)
               .map((o) => (
-                <div key={o.id} className="flex justify-between gap-3 text-accent-700">
+                <div key={o.id} className="flex justify-between gap-3 text-sf-accent-text">
                   <span className="leading-snug">{o.label}</span>
                   <span className="whitespace-nowrap font-medium">−{formatMoney(o.amount, cart.currency)}</span>
                 </div>
               ))}
             {cart.gifts.map((g) => (
-              <div key={`g-${g.variantId}`} className="flex justify-between text-accent-700">
+              <div key={`g-${g.variantId}`} className="flex justify-between text-sf-accent-text">
                 <span>Free gift · {g.title}</span>
                 <span className="font-medium">FREE</span>
               </div>
             ))}
             <div className="flex justify-between">
-              <span className="text-zinc-500">
+              <span className="text-sf-text-subtle">
                 Shipping
                 {shipping.codFee > 0 && <span className="text-xs"> (incl. COD fee)</span>}
               </span>
               {shipping.total === 0 ? (
-                <span className="font-semibold text-accent-700">FREE</span>
+                <span className="font-semibold text-sf-accent-text">FREE</span>
               ) : (
                 <span>{formatMoney(shipping.total, cart.currency)}</span>
               )}
@@ -451,7 +451,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
             <span className="text-lg font-bold">{formatMoney(grandTotal, cart.currency)}</span>
           </div>
           {cart.discountTotal > 0 && (
-            <p className="mt-1 text-right text-xs font-semibold text-accent-700">
+            <p className="mt-1 text-right text-xs font-semibold text-sf-accent-text">
               You save {formatMoney(cart.discountTotal, cart.currency)}
             </p>
           )}

@@ -9,15 +9,15 @@ import FaqSection from "./FaqSection";
 export default function ContentPage({ page, legalName = "", children = null }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      <nav className="mb-6 text-sm text-zinc-400">
-        <Link href="/" className="hover:text-zinc-600">
+      <nav className="mb-6 text-sm text-sf-text-faint">
+        <Link href="/" className="hover:text-sf-text-muted">
           Home
         </Link>{" "}
-        / <span className="text-zinc-600">{page.title}</span>
+        / <span className="text-sf-text-muted">{page.title}</span>
       </nav>
       <h1 className="text-3xl font-extrabold tracking-tight">{page.title}</h1>
       {page.effective_at ? (
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-sf-text-faint">
           Effective from{" "}
           {new Date(`${page.effective_at}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}
         </p>
@@ -28,8 +28,8 @@ export default function ContentPage({ page, legalName = "", children = null }) {
           if (kind === "rich") {
             return (
               <section key={idx}>
-                {s.heading ? <h2 className="text-lg font-bold text-zinc-900">{s.heading}</h2> : null}
-                <div className="rte mt-2 text-zinc-600" dangerouslySetInnerHTML={{ __html: s.html || "" }} />
+                {s.heading ? <h2 className="text-lg font-bold text-sf-text">{s.heading}</h2> : null}
+                <div className="rte mt-2 text-sf-text-muted" dangerouslySetInnerHTML={{ __html: s.html || "" }} />
               </section>
             );
           }
@@ -41,16 +41,16 @@ export default function ContentPage({ page, legalName = "", children = null }) {
               <figure key={idx}>
                 {/* library images are same-origin, arbitrary https allowed too — plain <img>, not next/image */}
                 <img src={s.src} alt={s.alt || ""} className="w-full rounded-brand" loading="lazy" />
-                {s.caption ? <figcaption className="mt-2 text-center text-sm text-zinc-400">{s.caption}</figcaption> : null}
+                {s.caption ? <figcaption className="mt-2 text-center text-sm text-sf-text-faint">{s.caption}</figcaption> : null}
               </figure>
             );
           }
           return (
             <section key={idx}>
-              {s.heading ? <h2 className="text-lg font-bold text-zinc-900">{s.heading}</h2> : null}
+              {s.heading ? <h2 className="text-lg font-bold text-sf-text">{s.heading}</h2> : null}
               <div className="mt-2 space-y-3">
                 {(s.body || []).map((p, i) => (
-                  <p key={i} className="leading-relaxed text-zinc-600">
+                  <p key={i} className="leading-relaxed text-sf-text-muted">
                     {p}
                   </p>
                 ))}
@@ -60,9 +60,9 @@ export default function ContentPage({ page, legalName = "", children = null }) {
         })}
       </div>
       {children}
-      <p className="mt-12 border-t border-zinc-100 pt-6 text-xs text-zinc-400">
+      <p className="mt-12 border-t border-sf-border-soft pt-6 text-xs text-sf-text-faint">
         {legalName ? `Operated by ${legalName} · ` : ""}Questions?{" "}
-        <Link href="/contact" className="underline hover:text-zinc-600">
+        <Link href="/contact" className="underline hover:text-sf-text-muted">
           Contact us
         </Link>
       </p>

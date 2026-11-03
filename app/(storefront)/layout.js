@@ -117,7 +117,8 @@ async function chromeData() {
         // resolver — published brand serves live, a brand edit stays draft
         // (and previewable) until the next publish. Default brand emits
         // nothing (globals.css already carries those values).
-        brandCss: brand ? brandCssVars(resolveBrand(brand)) : "",
+        // TOK-01: the kit decides the header/hero surfaces the accent is checked on
+        brandCss: brand ? brandCssVars(resolveBrand(brand), { kit: kitAttr(theme) }) : "",
         kitAttr: kitAttr(theme),
         preview: src.preview,
         footerPages,

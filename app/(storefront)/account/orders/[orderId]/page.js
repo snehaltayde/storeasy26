@@ -48,49 +48,49 @@ export default async function AccountOrderPage({ params }) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <nav className="mb-5 text-sm text-zinc-400">
-        <Link href="/account" className="hover:text-zinc-600">
+      <nav className="mb-5 text-sm text-sf-text-faint">
+        <Link href="/account" className="hover:text-sf-text-muted">
           Account
         </Link>{" "}
-        / <span className="text-zinc-600">{o.id}</span>
+        / <span className="text-sf-text-muted">{o.id}</span>
       </nav>
       <h1 className="text-2xl font-extrabold tracking-tight">Order {o.id}</h1>
-      <p className="mt-1 text-sm text-zinc-500">
+      <p className="mt-1 text-sm text-sf-text-subtle">
         Placed {new Date(o.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} ·{" "}
         {o.payment_method === "cod" ? "Cash on delivery" : "Paid online"}
       </p>
 
-      <section className="mt-6 rounded-2xl border border-zinc-200 p-5">
-        <ul className="divide-y divide-zinc-100 text-sm">
+      <section className="mt-6 rounded-sf-card border border-sf-border p-5">
+        <ul className="divide-y divide-sf-border-soft text-sm">
           {(snap.items || []).map((it, i) => (
             <li key={i} className="flex items-center gap-3 py-2">
               <span className="min-w-0 flex-1 truncate">{it.title}</span>
-              <span className="text-xs text-zinc-400">×{it.quantity}</span>
+              <span className="text-xs text-sf-text-faint">×{it.quantity}</span>
               <span className="font-semibold">{formatMoney(it.lineTotal ?? it.price * it.quantity, cur)}</span>
             </li>
           ))}
         </ul>
-        <div className="mt-3 space-y-1 border-t border-zinc-100 pt-3 text-sm">
-          <p className="flex justify-between text-zinc-500">
+        <div className="mt-3 space-y-1 border-t border-sf-border-soft pt-3 text-sm">
+          <p className="flex justify-between text-sf-text-subtle">
             <span>Subtotal</span>
             <span>{formatMoney(o.subtotal, cur)}</span>
           </p>
           {Number(o.discount_total) > 0 && (
-            <p className="flex justify-between text-zinc-500">
+            <p className="flex justify-between text-sf-text-subtle">
               <span>Discounts</span>
               <span>−{formatMoney(o.discount_total, cur)}</span>
             </p>
           )}
-          <p className="flex justify-between text-zinc-500">
+          <p className="flex justify-between text-sf-text-subtle">
             <span>Shipping</span>
             <span>{Number(o.shipping_total) > 0 ? formatMoney(o.shipping_total, cur) : "Free"}</span>
           </p>
-          <p className="flex justify-between font-bold text-zinc-900">
+          <p className="flex justify-between font-bold text-sf-text">
             <span>Total</span>
             <span>{formatMoney(o.total, cur)}</span>
           </p>
           {Number(o.refunded_total) > 0 && (
-            <p className="flex justify-between text-red-600">
+            <p className="flex justify-between text-sf-danger">
               <span>Refunded</span>
               <span>−{formatMoney(o.refunded_total, cur)}</span>
             </p>
@@ -99,17 +99,17 @@ export default async function AccountOrderPage({ params }) {
       </section>
 
       {data.fulfillments.length > 0 && (
-        <section className="mt-4 rounded-2xl border border-zinc-200 p-5">
+        <section className="mt-4 rounded-sf-card border border-sf-border p-5">
           <h2 className="text-sm font-bold">Shipment</h2>
           {data.fulfillments.map((f) => (
-            <p key={f.id} className="mt-2 text-sm text-zinc-600">
+            <p key={f.id} className="mt-2 text-sm text-sf-text-muted">
               {f.tracking_company || "Courier"} · {f.tracking_number || "tracking pending"}
               {f.tracking_url && (
-                <a href={f.tracking_url} target="_blank" rel="noopener noreferrer" className="ml-2 font-medium text-accent-700 underline">
+                <a href={f.tracking_url} target="_blank" rel="noopener noreferrer" className="ml-2 font-medium text-sf-accent-text underline">
                   Track →
                 </a>
               )}
-              {f.updated_at && <span className="ml-2 text-xs text-zinc-400">updated {new Date(f.updated_at).toLocaleDateString("en-IN")}</span>}
+              {f.updated_at && <span className="ml-2 text-xs text-sf-text-faint">updated {new Date(f.updated_at).toLocaleDateString("en-IN")}</span>}
             </p>
           ))}
         </section>
