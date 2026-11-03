@@ -95,7 +95,7 @@ export default async function AdminAnalyticsPage() {
           <Table
             columns={PRODUCT_COLUMNS}
             rows={prods.products}
-            rowKey={(p) => p.title}
+            rowKey={(p) => p.product_id || p.title}
             dense
             empty={<EmptyState title="No sales in this window" className="py-6" />}
             renderCell={(p, col) => {

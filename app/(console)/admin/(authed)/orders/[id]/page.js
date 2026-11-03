@@ -4,7 +4,7 @@ import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { getOrder, canTransition, ORDER_STATUS } from "@/lib/orders";
 import { roleAllows } from "@/lib/platform/authz";
 import { getOrderProjection } from "@/lib/order-projection";
-import { redactOrderForRole } from "@/lib/admin/order-view";
+import { redactOrderForRole, shopifyMatchLine } from "@/lib/admin/order-view";
 import { StatusBadge, Badge } from "@/components/console/Badge";
 import { PageHeader } from "@/components/console/PageHeader";
 import { Card, CardHeader } from "@/components/console/Card";
@@ -34,6 +34,10 @@ export default async function AdminOrderDetail({ params }) {
   const [rawOrder, projection] = await tfetch(async () => [await getOrder(id), await getOrderProjection(id)]);
   if (!rawOrder) notFound();
   const order = redactOrderForRole(rawOrder, role);
+  // OVL-06: "Shopify title: X, SKU: Y" under a line the shopper saw under another
+  // title. The snapshot's items hold titles and SKUs only, no customer details,
+  // so the support role gets this line too.
+  const shopifyLines = order.items.map((it) => shopifyMatchLine(it, rawOrder.snapshot?.items));
 
   return (
     <>
@@ -109,6 +113,7 @@ export default async function AdminOrderDetail({ params }) {
                 <p className="text-xs text-fg-muted">
                   {it.variant_title ? `${it.variant_title} · ` : ""}× {it.quantity}
                 </p>
+                {shopifyLines[i] && <p className="text-xs text-fg-subtle">{shopifyLines[i]}</p>}
               </div>
               <span className="font-medium tabular-nums">{inr(it.line_total)}</span>
             </li>

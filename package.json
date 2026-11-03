@@ -83,6 +83,8 @@
     "test:media-upload": "node scripts/test-media-upload.js",
     "test:design-harness": "node scripts/test-design-harness.js",
     "test:failure-matrix": "node scripts/test-failure-matrix.js",
+    "test:schema-compat": "node scripts/test-schema-compat.js",
+    "test:order-catalog": "node scripts/test-order-catalog.js",
     "test:perf": "node scripts/perf-report.js",
     "seed:design": "node scripts/dev-design.js seed",
     "dev:design": "node scripts/dev-design.js",
