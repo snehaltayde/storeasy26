@@ -9,7 +9,7 @@ This is the author's own report. Reviewers should re-read the code.
 | Stage | Status |
 |---|---|
 | Implemented | Yes, on this branch. New files only, plus the placeholder suite replaced. No migration, no `package.json` change, nothing under `.github/` |
-| Locally tested | Yes. `test:registry-contract` 20 passed, 0 failed, in about 0.7 s. `pnpm test` 66 of 66 suites passed in 115.7 s (`test:registry-contract` 0.5 s in the gate). 19 deliberate breaks: 18 caught on their own, and the 19th is a second line behind a check that does catch it (see "Do the tests bite?"). `pnpm build` passed, with only the 2 warnings that were already there (`next.config.mjs` traced through `lib/platform/migrate.js`) |
+| Locally tested | Yes. After fix round 1: `test:registry-contract` 21 passed, 0 failed, and `pnpm test` 66 of 66 suites passed in 117.3 s. Before that round: `test:registry-contract` 20 passed, 0 failed, in about 0.7 s. `pnpm test` 66 of 66 suites passed in 115.7 s (`test:registry-contract` 0.5 s in the gate). 19 deliberate breaks: 18 caught on their own, and the 19th is a second line behind a check that does catch it (see "Do the tests bite?"). `pnpm build` passed, with only the 2 warnings that were already there (`next.config.mjs` traced through `lib/platform/migrate.js`) |
 | Edge runtime | Proven locally: a temporary edge route importing `lib/registry/index.js` was built and called on port 3500 (see "Edge evidence"). The route was removed before the commit and the build re-run |
 | Browser verified | **NOT DONE.** Nothing in this item renders. Every section kind at 375, 768 and 1440 wide against `worstCase(kind)` is P2-DRILLS, after P2-SECTIONS adds the renderers |
 | Staging verified | **NOT DONE. Staging is unverified.** |
@@ -141,6 +141,21 @@ A temporary route, `app/api/p2reg-probe/route.js` with `runtime = "edge"`, impor
 
 - `scripts/test-registry-contract.js` replaces the P2-ATOM placeholder (same `test:registry-contract` script, `package.json` unchanged). 20 tests, about 0.7 s. It needs no database: only `lib/themes/kits.js` (for the kit presets) loads the database layer, pointed at a throwaway folder that is removed at the end.
 - `pnpm test`: the first run on this branch failed only `test:copy`, because two fixture strings used nutrition words (the copy scan reads `lib/`). They were reworded; `test:copy` then passed 53 of 53, and the full run passed 66 of 66 suites in 115.7 s.
+
+## Fix round 1
+
+The review found that several lookups read a plain object with a name taken from the body, so names that every object inherits (`constructor`, `toString`, `__proto__` and the like) were treated as known:
+
+- A page link with `family: "constructor"` passed publish-mode validation with no issues, and `linkHref` (and so `refsOf`) returned `function Object() { [native code] }x`, which a renderer would have put in a shopper's link.
+- A link of type `constructor` or `__proto__`, or a `bindings` key such as `toString`, threw a `TypeError` instead of returning issues (a 5xx where DOC-04 wants a 422).
+- In the legacy adapters, a section of kind `toString` had its settings replaced by a string, one of kind `constructor` lost its kind, and a legacy field named `constructor` on a page section threw while renaming fields.
+
+Fix: each file in `lib/registry/` that looks names up in a table now uses a small `own(table, name)` helper (`Object.hasOwn`, strings only). It is used for `PAGE_FAMILIES` and `LINK_KEYS` (in `checkLink` and `linkHref`), the declared `bindings` in `validate.js`, `HOME_MAPPERS`, `LEGACY_KIND_NAMES` and the field renames in `legacy.js`, and the setting-kind check in `defineSetting`. Section kinds and document types were already looked up in `Map`s; a probe confirmed `constructor`, `toString` and `__proto__` as a section kind, a document type or a settings key each come back as one plain issue (`UNKNOWN_KIND`, `UNKNOWN_TYPE`, `UNKNOWN_FIELD`).
+
+Tests, both failing before the fix (`linkHref family constructor expected null, got "function Object() { [native code] }x"`, and `Cannot read properties of undefined (reading 'includes')`):
+
+- in the link test: four inherited names as a page family give `linkHref` null, one `LINK_INVALID` on `primary.link.family`, `ok: false` in publish mode, and nothing function-like from `refsOf`; three as a link type give one `LINK_INVALID`;
+- a new test: inherited names (including a real `__proto__` own key) as a `bindings` key give one `UNKNOWN_FIELD`; legacy home and page sections of four inherited kinds keep their kind and their fields; legacy page fields named `constructor` and `toString` are carried as they are.
 
 ## Known limits
 

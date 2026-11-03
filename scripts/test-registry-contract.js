@@ -248,8 +248,21 @@ await t("a hero link to https://evil.example or /admin gives LINK_NOT_STOREFRONT
   eq(R.linkHref({ type: "page", slug: "about-us", family: "page" }), "/policies/about-us");
   eq(R.linkHref({ type: "page", slug: "sale", family: "campaign" }), "/campaigns/sale");
   one(validate(home([sec("hero", "sec_hero1", { primary: { label: "Go", link: { type: "ftp", href: "/" } } })]), { mode: "draft" }), "LINK_INVALID");
+  // names inherited from Object.prototype are not link types or page families
+  for (const family of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+    const link = { type: "page", slug: "x", family };
+    eq(R.linkHref(link), null, `linkHref family ${family}`);
+    const r = validate(home([sec("hero", "sec_hero1", { primary: { label: "Go", link } })]), { mode: "publish" });
+    ok(!r.ok, `family ${family} must not publish`);
+    one(r, "LINK_INVALID", { field: "primary.link.family" });
+    ok(!R.refsOf(sec("hero", "sec_hero1", { primary: { label: "Go", link } })).some((x) => /native code|function/.test(JSON.stringify(x))), `refsOf family ${family}`);
+  }
+  for (const type of ["constructor", "__proto__", "toString"]) {
+    const r = validate(home([sec("hero", "sec_hero1", { primary: { label: "Go", link: { type, href: "/" } } })]), { mode: "draft" });
+    one(r, "LINK_INVALID");
+  }
   // the same check reaches menus, announcement bars and banners
-  const header = validate({ schema: 1, type: "header", meta: {}, settings: { mode: "custom", items: [{ label: "Admin", link: { type: "url", href: "/admin" } }], template: "standard" } }, { mode: "draft" });
+  const header =validate({ schema: 1, type: "header", meta: {}, settings: { mode: "custom", items: [{ label: "Admin", link: { type: "url", href: "/admin" } }], template: "standard" } }, { mode: "draft" });
   one(header, "LINK_NOT_STOREFRONT", { field: "items.0.link.href", documentId: "doc_header" });
   const bar = validate({ schema: 1, type: "announcement", meta: {}, settings: { enabled: true, text: "Hi", link: { type: "url", href: "https://evil.example" } } }, { mode: "draft" });
   one(bar, "LINK_NOT_STOREFRONT", { field: "link.href", documentId: "doc_announcement" });
@@ -406,6 +419,32 @@ await t("the announcement and home section adapters carry every legacy field", a
   one(r, "UNKNOWN_FIELD", { sectionId: "sec_l3", field: "colour" });
   one(r, "UNKNOWN_KIND", { sectionId: "sec_l4" });
   eq(r.body.sections[4].settings.slides, 3, "an unknown kind keeps its fields");
+});
+
+await t("names inherited from Object.prototype are refused as issues, never thrown or mapped", async () => {
+  // a bindings key such as toString is an unknown field, not a crash
+  for (const k of ["toString", "constructor", "hasOwnProperty"]) {
+    const s = sec("collections", "sec_c1");
+    s.bindings = { [k]: { source: "featured_collections" } };
+    one(validate(home([s]), { mode: "draft" }), "UNKNOWN_FIELD", { field: `bindings.${k}` });
+  }
+  const proto = sec("collections", "sec_c1");
+  proto.bindings = JSON.parse('{"__proto__":{"source":"featured_collections"}}');
+  one(validate(home([proto]), { mode: "draft" }), "UNKNOWN_FIELD", { field: "bindings.__proto__" });
+  // legacy sections of such kinds keep their kind and their fields
+  for (const kind of ["toString", "constructor", "valueOf", "hasOwnProperty"]) {
+    const [h] = R.legacyHomeSectionsToSections([{ kind, title: "T", limit: 3 }]);
+    eq(h.kind, kind, `home kind ${kind}`);
+    deq(h.settings, { title: "T", limit: 3 }, `home settings ${kind}`);
+    const [p] = R.legacyPageSectionsToSections([{ kind, heading: "H" }]);
+    eq(p.kind, kind, `page kind ${kind}`);
+    deq(p.settings, { heading: "H" }, `page settings ${kind}`);
+  }
+  // a legacy field named like a prototype member is carried, not renamed
+  const [t1] = R.legacyPageSectionsToSections([{ kind: "text", heading: "H", constructor: "c", toString: "s" }]);
+  eq(t1.kind, "text");
+  eq(t1.settings.constructor, "c");
+  eq(t1.settings.toString, "s");
 });
 
 // ---- DOC-01: ids and hashing ---------------------------------------------------------
