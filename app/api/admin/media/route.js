@@ -113,5 +113,14 @@ export const PUT = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.read");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
-  return NextResponse.json({ ok: true, usage: await mediaUsage(String(body.id || "")) });
+  try {
+    return NextResponse.json({ ok: true, usage: await mediaUsage(String(body.id || "")) });
+  } catch (e) {
+    // P2-DOCFIX: the document scan fails closed (it throws when it can't read
+    // the documents tables), so a read failure here is ours: a 5xx with a code
+    const infra = infraResponse(e, { route: "admin/media", doing: "load" });
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
+    slog("api_internal_failure", { route: "admin/media", error: String(e?.message || e).slice(0, 300) });
+    return NextResponse.json({ error: "Something went wrong on our side, so this couldn't load. Try again, and contact support if it keeps happening.", code: "INTERNAL_ERROR" }, { status: 500 });
+  }
 });
