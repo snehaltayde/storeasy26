@@ -6,4 +6,4 @@
 # To turn it off again: git config --unset core.hooksPath
 cd "$(git rev-parse --show-toplevel)" || exit 1
 git config core.hooksPath .githooks
-echo "Hooks on: each commit now runs .githooks/pre-commit."
+echo "Hooks on: each commit and merge commit now runs .githooks/pre-commit."

@@ -257,6 +257,19 @@ await t("history: console saves trail into cms_history, newest first, readable b
   const capped = await inT(() => listHistory("block", "cap-probe"));
   eq(capped.length, HISTORY_KEEP, "pruned to the cap");
   eq(capped[0].value.i, HISTORY_KEEP + 6, "newest kept");
+  // Saves in the same millisecond, every time: with the clock held still, only the
+  // order they were saved in can tell them apart. Their ids are random.
+  const realToISOString = Date.prototype.toISOString;
+  Date.prototype.toISOString = () => "2030-01-01T00:00:00.000Z";
+  try {
+    await inT(async () => {
+      for (let i = 0; i < HISTORY_KEEP + 7; i++) await appendHistory({ kind: "block", key: "same-ms-probe", value: { i } });
+    });
+  } finally {
+    Date.prototype.toISOString = realToISOString;
+  }
+  const sameMs = await inT(() => listHistory("block", "same-ms-probe"));
+  eq(JSON.stringify(sameMs.map((h) => h.value.i)), JSON.stringify(Array.from({ length: HISTORY_KEEP }, (_, n) => HISTORY_KEEP + 6 - n)), "same millisecond, newest first and newest kept");
 });
 
 await t("validation errors still 422 with the errors list", async () => {

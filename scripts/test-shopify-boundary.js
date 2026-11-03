@@ -88,10 +88,19 @@ async function sourceFiles(dirs = SCAN_DIRS) {
   return files;
 }
 
-function skipBalanced(text, start, open, close) {
+// A GraphQL # comment runs to the end of its line, written as a real newline or,
+// in a one-line JS string, as \n.
+function skipComment(text, start) {
+  let i = start;
+  while (i < text.length && text[i] !== "\n" && !(text[i] === "\\" && text[i + 1] === "n")) i++;
+  return i;
+}
+
+function skipBalanced(text, start, open, close, { graphql = true } = {}) {
   let depth = 0;
   for (let i = start; i < text.length; i++) {
-    if (text[i] === open) depth++;
+    if (graphql && text[i] === "#") i = skipComment(text, i);
+    else if (text[i] === open) depth++;
     else if (text[i] === close && --depth === 0) return i + 1;
   }
   return text.length;
@@ -101,7 +110,7 @@ const skipBlank = (text, start) => {
   let i = start;
   while (i < text.length) {
     if (/[\s,]/.test(text[i])) i++;
-    else if (text[i] === "#") while (i < text.length && text[i] !== "\n") i++;
+    else if (text[i] === "#") i = skipComment(text, i);
     else break;
   }
   return i;
@@ -109,7 +118,8 @@ const skipBlank = (text, start) => {
 
 // Root fields of one selection set, as "name(args)" with spaces removed. Anything
 // that cannot be named from the source (an interpolated field, a fragment, a
-// document that never closes) comes back as <unreadable>, which no list allows.
+// document that never closes, a selection with no field in it) comes back as
+// <unreadable>, which no list allows.
 function rootFields(text, open) {
   const fields = [];
   const end = skipBalanced(text, open, "{", "}");
@@ -136,7 +146,7 @@ function rootFields(text, open) {
     if (text[i] === "{") i = skipBlank(text, skipBalanced(text, i, "{", "}"));
     fields.push(field + args);
   }
-  return fields;
+  return fields.length ? fields : ["<unreadable>"];
 }
 
 // True when only whitespace (real, or written as \n) sits between an opening quote
@@ -163,7 +173,7 @@ function findMutations(text) {
     let i = skipBlank(text, m.index + "mutation".length);
     const name = /^[A-Za-z_]\w*/.exec(text.slice(i));
     if (name) i = skipBlank(text, i + name[0].length);
-    else if (text.startsWith("${", i)) i = skipBlank(text, skipBalanced(text, i + 1, "{", "}"));
+    else if (text.startsWith("${", i)) i = skipBlank(text, skipBalanced(text, i + 1, "{", "}", { graphql: false }));
     let graphqlHead = false;
     if (text[i] === "(") {
       graphqlHead = true;
@@ -241,6 +251,13 @@ function findShopifyCartLinks(text) {
   return patterns.flatMap((re) => [...text.matchAll(re)].map((m) => m[0]));
 }
 
+// A Shopify client library makes REST calls with no /admin URL, no mutation text and
+// no token header in this source, so none of the scans above could see them. Any
+// string naming one counts, which covers import, require and import().
+const SHOPIFY_CLIENT = /^(?:@shopify\/.*|shopify-api-node(?:\/.*)?)$/;
+const findShopifyClientImports = (text) =>
+  [...text.matchAll(/["'`](@shopify\/[^"'`]*|shopify-api-node(?:\/[^"'`]*)?)["'`]/g)].map((m) => m[1]);
+
 const WRITE_SCOPE_TOKEN = /\b(?:unauthenticated_|customer_)?write_[a-z_]+\b/g;
 const READ_SCOPE_TOKEN = /\b(?:unauthenticated_|customer_)?read_[a-z_]+\b/g;
 
@@ -264,9 +281,9 @@ const ALLOWED_MUTATIONS = [
 const SPIKE = "scripts/spike-order-push.js";
 const SPIKE_ONLY = ["orderCreate"];
 
-// Every mutation document in the codebase, with its exact arguments. Moving or
-// adding one, or adding an argument (a new free-text one, say), is a reviewed
-// change to this list.
+// Every mutation document in the codebase, with its exact arguments, one entry per
+// document. Moving or adding one, adding a second identical one, or adding an
+// argument (a new free-text one, say) is a reviewed change to this list.
 const MUTATION_DOCUMENTS = [
   "lib/order-cancel.js::orderCancel(orderId:$id,reason:$reason,refund:false,restock:true,notifyCustomer:false,staffNote:$staffNote)",
   "lib/platform/shopify-webhooks.js::webhookSubscriptionCreate(topic:$topic,webhookSubscription:$sub)",
@@ -292,6 +309,11 @@ await t("SHOP-01: scanners catch what they must and ignore prose", async () => {
   eq(findMutations("`\n  mutation ${rest}\n`"), ["<unreadable>"], "indented, built at run time:");
   eq(findMutations('"\\n  mutation " + op'), ["<unreadable>"], "escaped newline, built at run time:");
   eq(findMutations("`\n  mutation Foo($i: ID!) ${body}\n`"), ["<unreadable>"], "interpolated body:");
+  eq(findMutations("`mutation { # }\n  collectionAddProducts(id: 1) { id }\n}`"), ["collectionAddProducts(id:1)"], "a # comment holding a brace:");
+  eq(findMutations("`mutation {\n  orderCancel(orderId: $i) { job { id } } # }\n  collectionAddProducts(id: 1) { id }\n}`").map(fieldName), ["orderCancel", "collectionAddProducts"], "a # comment after a field:");
+  eq(findMutations("`mutation Foo($i: ID # )\n) { collectionAddProducts(id: $i # )\n) { id } }`").map(fieldName), ["collectionAddProducts"], "a # comment in the brackets:");
+  eq(findMutations('"mutation { # }\\n  collectionAddProducts(id: 1) { id }\\n}"'), ["<unreadable>"], "the same in a one-line string:");
+  eq(findMutations("`mutation { # nothing\n}`"), ["<unreadable>"], "no field at all:");
   eq(findMutations("// every mutation hits the edge\nconst mutation = sub ? A : B; gql(mutation, vars); a duplicate-mutation guard"), [], "prose:");
   eq(findMutationNames("// see productUpdate later"), ["productUpdate"], "name in a comment:");
   eq(findMutationNames("const x = 'productVariantsBulkUpdate' + metafieldsSet"), ["productVariantsBulkUpdate", "metafieldsSet"], "bare names:");
@@ -319,6 +341,10 @@ await t("SHOP-01: scanners catch what they must and ignore prose", async () => {
 
   eq(["'x,read_themes'", '"read_products read_themes"', "`\n  read_themes,\n`", "'unauthenticated_read_checkouts'"].map((s) => s.match(READ_SCOPE_TOKEN).at(-1)), ["read_themes", "read_themes", "read_themes", "unauthenticated_read_checkouts"], "read scopes in a string:");
   eq("thread_id spread_x already_read".match(READ_SCOPE_TOKEN), null, "ordinary identifiers:");
+
+  eq(findShopifyClientImports('import { x } from "@shopify/admin-api-client"; import y from \'shopify-api-node\'; const z = require("@shopify/shopify-api"); await import(`@shopify/${n}`);').length, 4, "client imports:");
+  eq(findShopifyClientImports('await import("shopify-api-node/lib"); const p = "@shopify/";'), ["shopify-api-node/lib", "@shopify/"], "subpath, bare scope:");
+  eq(findShopifyClientImports('import x from "@/lib/shopify-admin.js"; import y from "./shopify-api-node-notes.js"; // a shopify-api-node style client, @shopify/x'), [], "own files, prose:");
 
   ok(findShopifyCartLinks("return `https://${domain}/cart/${parts}`;").length, "cart permalink");
   ok(findShopifyCartLinks("`https://x.myshopify.com/cart/123:1`").length, "literal permalink");
@@ -351,11 +377,59 @@ await t("SHOP-01: no Shopify write mutation name appears outside the allowlist, 
   eq(bad.length, 0, `Decision 2: write mutation names found:${listIn(bad)}\n   `);
 });
 
-await t("SHOP-01: the mutation documents are exactly the known list, with their exact arguments", async () => {
+// What xs has beyond ys, counting repeats: a second copy of something ys holds once
+// is left over.
+function beyond(xs, ys) {
+  const rest = [...ys];
+  return xs
+    .filter((x) => {
+      const at = rest.indexOf(x);
+      if (at < 0) return true;
+      rest.splice(at, 1);
+      return false;
+    })
+    .sort();
+}
+
+await t("SHOP-01: the mutation documents are exactly the known list, with their exact arguments and how many of each", async () => {
   const found = files.flatMap((f) => findMutations(f.text).map((field) => `${f.path}::${field}`));
-  eq(sorted(found).filter((d) => !MUTATION_DOCUMENTS.includes(d)), [], "mutation documents not on the list:");
-  eq(sorted(MUTATION_DOCUMENTS).filter((d) => !found.includes(d)), [], "listed mutation documents no longer found:");
+  eq(beyond(found, MUTATION_DOCUMENTS), [], "mutation documents not on the list (a second identical one counts as new):");
+  eq(beyond(MUTATION_DOCUMENTS, found), [], "listed mutation documents no longer found:");
   eq(sorted(found.map((d) => fieldName(d.split("::")[1])).filter((n) => !SPIKE_ONLY.includes(n))), sorted(ALLOWED_MUTATIONS), "every allowed mutation still in use:");
+});
+
+// A new send can reuse an allowed document and add no document at all, so the send
+// sites are locked as well. A draft helper is reached only from pushOrderToShopify,
+// whose sent draft the SHOP-04 checks read. The count includes each definition. Any
+// other mention of these names in the file, even a comment, is a failure to look at.
+const SEND_CALL = /\b(?:gql|adminGraphql|adminGraphqlWithToken)\s*\(/g;
+const SEND_CALLS = {
+  "lib/order-cancel.js": 2, // the cancel, and the check after an error
+  "lib/platform/shopify-webhooks.js": 2, // list, and create or update
+  "lib/shopify-admin.js": 6, // definitions, retries, the token mint
+  "lib/shopify-push.js": 3, // find, create, complete
+  [SPIKE]: 7,
+};
+const DRAFT_HELPERS = {
+  createDraft: 2, // definition, and one call
+  completeDraft: 3, // definition, and two calls: after a create, and for a leftover draft
+};
+
+await t("SHOP-01: each file holding a mutation document has a fixed number of Shopify calls", async () => {
+  const withDocuments = files.filter((f) => findMutations(f.text).length).map((f) => f.path);
+  eq(sorted(Object.keys(SEND_CALLS)), sorted(withDocuments), "files holding a mutation document:");
+  for (const [path, count] of Object.entries(SEND_CALLS)) {
+    const { text } = files.find((f) => f.path === path);
+    eq([...text.matchAll(SEND_CALL)].length, count, `${path} Shopify calls. A new send can carry anything, so it is a reviewed change to SEND_CALLS:`);
+  }
+});
+
+await t("SHOP-01: createDraft and completeDraft stay private, with known call sites", async () => {
+  eq(Object.keys(DRAFT_HELPERS).filter((name) => name in P), [], "exported from lib/shopify-push.js:");
+  const { text } = files.find((f) => f.path === "lib/shopify-push.js");
+  for (const [name, count] of Object.entries(DRAFT_HELPERS)) {
+    eq([...text.matchAll(new RegExp(`\\b${name}\\b`, "g"))].length, count, `${name} mentions in lib/shopify-push.js:`);
+  }
 });
 
 await t("SHOP-01: the spike stays a labelled one-off that nothing imports", async () => {
@@ -382,6 +456,19 @@ await t("SHOP-01: no REST call to the Admin API, and the Admin token header stay
   eq(rest.length, 0, `Admin API must go through graphql.json so the mutation list can see it:${listIn(rest)}\n   `);
   const tokenUsers = files.filter((f) => /x-shopify-access-token/i.test(f.text)).map((f) => f.path);
   eq(sorted(tokenUsers), sorted(Object.keys(ADMIN_TOKEN_FILES)), "files sending the Admin token:");
+});
+
+await t("SHOP-01: no Shopify client library, in source or in package.json", async () => {
+  const imports = files.flatMap((f) => findShopifyClientImports(f.text).map((name) => `${f.path}: ${name}`));
+  eq(imports.length, 0, `A Shopify client library can write to the Admin API where no scan here can see it:${listIn(imports)}\n   `);
+  const pkg = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
+  // By name, or under another name ("client": "npm:@shopify/admin-api-client@1").
+  const declared = ["dependencies", "devDependencies"].flatMap((field) =>
+    Object.entries(pkg[field] || {})
+      .filter(([name, spec]) => SHOPIFY_CLIENT.test(name) || /^npm:(?:@shopify\/|shopify-api-node@)/.test(String(spec)))
+      .map(([name]) => `${field}: ${name}`),
+  );
+  eq(declared, [], "package.json:");
 });
 
 await t("SHOP-01: the files that send the Admin token call only their known URLs", async () => {
@@ -881,36 +968,154 @@ await t("SHOP-06: pnpm test, the workflow and the hook name this suite, and thei
   const hook = code(await readFile(join(ROOT, ".githooks/pre-commit"), "utf8"));
   ok(/^pnpm test\nstatus=\$\?$/m.test(hook), "the hook runs pnpm test and keeps its result");
   ok(hook.trimEnd().endsWith('exit "$status"'), 'the hook ends with exit "$status"');
-  eq([...hook.matchAll(/\bexit\b.*/g)].map((m) => m[0]), ["exit 1", 'exit "$status"'], "the hook's exits:");
+  eq([...hook.matchAll(/\bexit\b.*/g)].map((m) => m[0]), ["exit 1", "exit 1", 'exit "$status"'], "the hook's exits:");
 });
 
-// Runs the real hook with a stand-in pnpm first on PATH, so nothing recurses.
-async function runHook(pnpmExit) {
+// Runs copies of the real hooks in a throwaway git repo, with a stand-in pnpm first on
+// PATH so nothing recurses. Throwaway, because the hook looks at the repo's state and
+// this suite has to pass on a tree with work in progress. core.hooksPath is given per
+// call, in that repo only, and nothing here touches this repo's config.
+async function withHookRepo(pnpmExit, fn) {
   const dir = await mkdtemp(join(tmpdir(), "boundary-hook-"));
   try {
+    const repo = join(dir, "repo");
+    const stubs = join(dir, "stubs");
     const log = join(dir, "calls");
+    await mkdir(join(repo, ".githooks"), { recursive: true });
+    await mkdir(stubs);
     await writeFile(log, "");
-    await writeFile(join(dir, "pnpm"), `#!/bin/sh\necho "$*" >> "$STUB_PNPM_LOG"\nexit ${pnpmExit}\n`, { mode: 0o755 });
-    const { GIT_DIR, GIT_INDEX_FILE, GIT_WORK_TREE, ...env } = process.env;
-    const r = spawnSync(join(ROOT, ".githooks/pre-commit"), [], {
-      cwd: ROOT,
-      env: { ...env, PATH: `${dir}${delimiter}${env.PATH}`, STUB_PNPM_LOG: log },
-      encoding: "utf8",
-    });
-    return { status: r.status, stderr: r.stderr, calls: await readFile(log, "utf8") };
+    await writeFile(join(stubs, "pnpm"), `#!/bin/sh\necho "$*" >> "$STUB_PNPM_LOG"\nexit ${pnpmExit}\n`, { mode: 0o755 });
+    for (const hook of ["pre-commit", "pre-merge-commit"]) await copyFile(join(ROOT, ".githooks", hook), join(repo, ".githooks", hook));
+    // Anything git set for an outer hook would point these calls back at this repo.
+    const inherited = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")));
+    const env = { ...inherited, PATH: `${stubs}${delimiter}${inherited.PATH}`, STUB_PNPM_LOG: log, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
+    const git = (...args) => {
+      const identity = ["-c", "user.name=Boundary Test", "-c", "user.email=boundary@example.test", "-c", "core.hooksPath=.githooks"];
+      const r = spawnSync("git", [...identity, ...args], { cwd: repo, env, encoding: "utf8" });
+      return { status: r.status, output: r.stdout + r.stderr };
+    };
+    const must = (...args) => {
+      const r = git(...args);
+      eq(r.status, 0, `git ${args.join(" ")}: ${r.output}\n`);
+      return r.output.trim();
+    };
+    const write = (file, text) => writeFile(join(repo, file), text);
+    const calls = () => readFile(log, "utf8");
+    const runHook = (hook = "pre-commit") => {
+      const r = spawnSync(join(repo, ".githooks", hook), [], { cwd: repo, env, encoding: "utf8" });
+      return { status: r.status, stderr: r.stderr };
+    };
+    must("init", "-q", "-b", "main");
+    await write("a.js", "one\n");
+    must("add", ".");
+    must("commit", "-q", "--no-verify", "-m", "base");
+    return await fn({ git, must, write, calls, runHook, repo });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
 }
 
 await t("SHOP-06: the hook runs pnpm test and stops the commit when it fails", async () => {
-  const failed = await runHook(3);
-  eq(failed.calls, "test\n", "what the hook ran:");
-  eq(failed.status, 3, "hook exit when pnpm test fails:");
-  ok(failed.stderr.includes("Commit stopped"), `expected the stop message, got: ${failed.stderr.slice(0, 200)}`);
-  const passed = await runHook(0);
-  eq(passed.calls, "test\n", "what the hook ran:");
-  eq(passed.status, 0, "hook exit when pnpm test passes:");
+  await withHookRepo(3, async ({ runHook, calls }) => {
+    const failed = runHook();
+    eq(await calls(), "test\n", "what the hook ran:");
+    eq(failed.status, 3, "hook exit when pnpm test fails:");
+    ok(failed.stderr.includes("Commit stopped"), `expected the stop message, got: ${failed.stderr.slice(0, 200)}`);
+  });
+  await withHookRepo(0, async ({ runHook, calls }) => {
+    eq(runHook().status, 0, "hook exit when pnpm test passes:");
+    eq(await calls(), "test\n", "what the hook ran:");
+  });
+});
+
+await t("SHOP-06: a real commit stops on a failing pnpm test, and goes through on a passing one", async () => {
+  await withHookRepo(3, async ({ git, must, write, calls }) => {
+    const head = must("rev-parse", "HEAD");
+    await write("b.js", "two\n");
+    must("add", "b.js");
+    const r = git("commit", "-m", "next");
+    ok(r.status !== 0, `commit went through: ${r.output}`);
+    eq(must("rev-parse", "HEAD"), head, "HEAD:");
+    eq(await calls(), "test\n", "what the hook ran:");
+  });
+  await withHookRepo(0, async ({ must, write, calls }) => {
+    await write("b.js", "two\n");
+    must("add", "b.js");
+    must("commit", "-q", "-m", "next");
+    eq(must("log", "--format=%s", "-1"), "next", "the commit:");
+    eq(await calls(), "test\n", "what the hook ran:");
+  });
+});
+
+await t("SHOP-06: the hook refuses a commit whose staged content is not what is on disk", async () => {
+  // Staged, then gone from disk: pnpm test would pass with the staged text unread.
+  await withHookRepo(0, async ({ git, must, write, calls, repo }) => {
+    const head = must("rev-parse", "HEAD");
+    await write("staged.js", "productUpdate\n");
+    must("add", "staged.js");
+    await rm(join(repo, "staged.js"));
+    const r = git("commit", "-m", "next");
+    ok(r.status !== 0, `commit went through: ${r.output}`);
+    ok(r.output.includes("Commit stopped") && r.output.includes("staged.js"), r.output);
+    eq(must("rev-parse", "HEAD"), head, "HEAD:");
+    eq(await calls(), "", "stopped before running anything:");
+  });
+  // Staged, then changed on disk.
+  await withHookRepo(0, async ({ git, must, write, calls }) => {
+    await write("a.js", "productUpdate\n");
+    must("add", "a.js");
+    await write("a.js", "clean\n");
+    ok(git("commit", "-m", "next").status !== 0, "a changed file must stop the commit");
+    eq(await calls(), "", "stopped before running anything:");
+  });
+  // A file only touched is not different.
+  await withHookRepo(0, async ({ must, write, calls }) => {
+    await write("a.js", "one\n");
+    must("commit", "-q", "--allow-empty", "-m", "next");
+    eq(await calls(), "test\n", "what the hook ran:");
+  });
+  // commit -a commits what is on disk, so nothing differs. The hook has to read the
+  // index git hands it, not the old one.
+  await withHookRepo(0, async ({ must, write, calls }) => {
+    await write("a.js", "two\n");
+    must("commit", "-q", "-a", "-m", "next");
+    eq(must("show", "HEAD:a.js"), "two", "the commit:");
+    eq(await calls(), "test\n", "what the hook ran:");
+  });
+});
+
+await t("SHOP-06: a real merge commit runs the same check", async () => {
+  const diverged = async ({ must, write }) => {
+    must("checkout", "-q", "-b", "other");
+    await write("other.js", "other\n");
+    must("add", "other.js");
+    must("commit", "-q", "--no-verify", "-m", "other");
+    must("checkout", "-q", "main");
+    await write("main.js", "main\n");
+    must("add", "main.js");
+    must("commit", "-q", "--no-verify", "-m", "main");
+  };
+  await withHookRepo(3, async (repo) => {
+    await diverged(repo);
+    const head = repo.must("rev-parse", "HEAD");
+    const r = repo.git("merge", "--no-edit", "other");
+    ok(r.status !== 0, `merge went through: ${r.output}`);
+    eq(repo.must("rev-parse", "HEAD"), head, "HEAD:");
+    eq(await repo.calls(), "test\n", "what the hook ran:");
+  });
+  await withHookRepo(0, async (repo) => {
+    await diverged(repo);
+    repo.must("merge", "-q", "--no-edit", "other");
+    eq(repo.must("log", "--format=%p", "-1").split(" ").length, 2, "parents of the merge commit:");
+    eq(await repo.calls(), "test\n", "what the hook ran:");
+  });
+  // Work in progress on disk that the merge would not carry.
+  await withHookRepo(0, async (repo) => {
+    await diverged(repo);
+    await repo.write("a.js", "unstaged\n");
+    ok(repo.git("merge", "--no-edit", "other").status !== 0, "unstaged work must stop the merge commit");
+    eq(await repo.calls(), "", "stopped before running anything:");
+  });
 });
 
 // Runs a copy of the real runner over a small package of its own, through the real

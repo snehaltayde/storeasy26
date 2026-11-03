@@ -12,19 +12,21 @@ This is the author's own report. Reviewers should re-read the code.
 | Locally tested | Yes. Exact commands and results below |
 | Browser verified | NOT DONE. No browser or dev server in this batch |
 | Staging verified | NOT DONE |
-| Production enabled | NO. The workflow has never run on GitHub, and the hook is deliberately off |
+| Production enabled | NO. The workflow has never run on GitHub, and the hooks are deliberately off |
 
 ## What changed
 
-- `scripts/test-shopify-boundary.js` (new, `test:shopify-boundary`): 35 checks.
+- `scripts/test-shopify-boundary.js` (new, `test:shopify-boundary`): 41 checks.
 - `lib/platform/oauth.js`: `OAUTH_SCOPES` is now the one list. `scripts/shopify-oauth.js`
   imports it and its own copy is gone.
 - `components/cart/CartContext.js`: `checkoutUrl` and its `numericId` import removed.
 - `lib/shopify-push.js`, `lib/order-cancel.js`: comments naming the free-text routes. No logic change.
 - `scripts/run-tests.js` (new, `pnpm test`), `.github/workflows/test.yml` (new),
-  `.githooks/pre-commit` (new), `scripts/enable-git-hooks.sh` (new, `pnpm hooks:enable`).
+  `.githooks/pre-commit` (new), `.githooks/pre-merge-commit` (new),
+  `scripts/enable-git-hooks.sh` (new, `pnpm hooks:enable`).
 - `package.json`: `test`, `hooks:enable`, `test:shopify-boundary`, `test:offers`.
 - `lib/cms/history.js` and `scripts/test-shopify-push.js`: flake fixes the gate needed (deviation 2).
+  `scripts/test-cms-api.js`: one assertion that saves in a single millisecond (deviation 2).
 - Docs: `docs/operations.md` (new section), `README.md`, `docs/platform-guide.md`, the `lib/ids.js` comment.
 
 ## Acceptance
@@ -33,38 +35,38 @@ This is the author's own report. Reviewers should re-read the code.
 
 | Item | Tag | Status | Evidence |
 |---|---|---|---|
-| Adding `productUpdate` anywhere in `lib`, `app`, `components` or `scripts` fails the test | unit | Pass | Temporary break in each of the four directories, plus a comment-only mention in the spike: exit 1 each time (log below) |
+| Adding `productUpdate` anywhere in `lib`, `app`, `components` or `scripts` fails the test | unit | Pass, with one exception | Temporary break in each of the four directories, plus a comment-only mention in the spike: exit 1 each time (log below). Exception: a file that contains a NUL byte is skipped as binary, so `productUpdate` in it passes (tried, exit 0; see "Known limits") |
 | Adding any other `write_*` scope fails the test | unit | Pass | `write_products` added to the list, and separately named in another file: exit 1 both times |
-| There is one scope list in the codebase | unit | Pass | `SHOP-01: there is one scope list in the codebase` passes. A second `const SCOPES` in `scripts/shopify-oauth.js`: exit 1. A second list in another file: exit 1 when comma-separated, space-separated, multi-line, or mid-string, because any `read_*` word outside `lib/platform/oauth.js` is flagged unless it is one of two known mentions. The script was also run with no credentials to prove the import resolves (exit 1 with its normal missing-credentials message) |
-| Negative: a REST write to the Admin API is also caught | unit | Pass, with the limit below | `fetch(.../admin/api/2025-10/products/1.json, { method: 'PUT' })` in a temporary `lib` file: exit 1. A base URL with no trailing slash: exit 1, in a new file and in `lib/shopify-admin.js`. Any URL whose path starts at `/admin` fails too, unless it is one of three Shopify endpoints (`graphql.json`, `oauth/access_token`, `oauth/authorize`), or, with its origin in a variable, one of the app's own console pages. So `https://${d}/admin/${p}` with the path passed in, `https://${d}/admin/products/1` and `${base}/admin/${p}`: exit 1 each. In the two files allowed to send the Admin token, any new Admin URL or `fetch` is also a failure. See "Limits of these tests" for the split-text cases |
+| There is one scope list in the codebase | unit | Pass | `SHOP-01: there is one scope list in the codebase` passes. A second `const SCOPES` in `scripts/shopify-oauth.js`: exit 1. A second list in another file: exit 1 when comma-separated, space-separated, multi-line, or mid-string, because any `read_*` word outside `lib/platform/oauth.js` is flagged unless it is one of two known mentions. The script was also run with no credentials to prove the import resolves (exit 1 with its normal missing-credentials message). Not covered: a third file that builds the authorize URL with `URLSearchParams` and scopes from an env var (see "Known limits") |
+| Negative: a REST write to the Admin API is also caught | unit | Pass, with the limit below | `fetch(.../admin/api/2025-10/products/1.json, { method: 'PUT' })` in a temporary `lib` file: exit 1. A base URL with no trailing slash: exit 1, in a new file and in `lib/shopify-admin.js`. Any URL whose path starts at `/admin` fails too, unless it is one of three Shopify endpoints (`graphql.json`, `oauth/access_token`, `oauth/authorize`), or, with its origin in a variable, one of the app's own console pages. So `https://${d}/admin/${p}` with the path passed in, `https://${d}/admin/products/1` and `${base}/admin/${p}`: exit 1 each. In the two files allowed to send the Admin token, any new Admin URL or `fetch` is also a failure. A Shopify client library is refused too, because its REST calls carry no `/admin` URL in our source: any string naming `@shopify/...` or `shopify-api-node` in the scanned folders (so `import`, `require` and `import()`), and those names in `dependencies` or `devDependencies` of `package.json`. `@shopify/admin-api-client` with `c.put(...)`, `shopify-api-node` with `s.product.update(...)`, `@shopify/shopify-api` with `clients.Rest`, a `require`, a dynamic `import()`, and each name added to `package.json`: exit 1 each. See "Known limits" for the split-text cases |
 
 ### SHOP-02
 
 | Item | Tag | Status | Evidence |
 |---|---|---|---|
-| A test with an overlaid title proves that no overlay string appears anywhere in the push payload | unit | **Partial. Stays open until OVL-03** | No overlay exists yet. The test seeds a `products`, a `variants` and a `product_images` row with a marker string in every text column except the ids (another check holds that list to the schema, so a new text column fails until it is seeded), runs the real `pushOrderToShopify` against a fake Shopify, and checks every query and variable for those strings and the order's. A temporary break that reads the catalog title from the `products` table into the draft failed with `CATALOG-TITLE-SENTINEL reached Shopify`. The hook is the `OVL-03 HOOK` comment and `seedOverlay()`. `OVERLAY-TITLE-SENTINEL` is already on the checked list, but nothing writes it yet, so today that one string proves nothing |
-| Negative: a new key on a line item fails the test | unit | Pass, with the limit below | Exact key sets are asserted: paid lines `quantity, variantId`; gift lines `appliedDiscount, quantity, variantId`. Temporary `title` on a paid line and `customAttributes` on a gift line: exit 1 both times. A key behind a field the order does not have yet (`...(it.displayTitle ? { title: it.displayTitle } : {})`, and the same on a gift): exit 1, because the order is also run through `probeUnknownFields`. Not covered: a key behind a value test on a field the order already has, or behind something outside the order. See "Limits of these tests" |
+| A test with an overlaid title proves that no overlay string appears anywhere in the push payload | unit | **Partial. Stays open until OVL-03** | No overlay exists yet. The test seeds a `products`, a `variants` and a `product_images` row with a marker string in every text column except the ids (another check holds that list to `lib/schema.sql`, so a new text column there fails until it is seeded; a column added only by a tenant migration is not seen, see "Known limits"), runs the real `pushOrderToShopify` against a fake Shopify, and checks every query and variable for those strings and the order's. A temporary break that reads the catalog title from the `products` table into the draft failed with `CATALOG-TITLE-SENTINEL reached Shopify`. The hook is the `OVL-03 HOOK` comment and `seedOverlay()`. `OVERLAY-TITLE-SENTINEL` is already on the checked list, but nothing writes it yet, so today that one string proves nothing |
+| Negative: a new key on a line item fails the test | unit | Pass, with the limit below | Exact key sets are asserted: paid lines `quantity, variantId`; gift lines `appliedDiscount, quantity, variantId`. Temporary `title` on a paid line and `customAttributes` on a gift line: exit 1 both times. A key behind a field the order does not have yet (`...(it.displayTitle ? { title: it.displayTitle } : {})`, and the same on a gift): exit 1, because the order is also run through `probeUnknownFields`. Not covered: a key behind a value test on a field the order already has, behind something outside the order, or only on a second line or a larger order (the fixtures have one paid line and one gift). See "Known limits" |
 
 ### SHOP-03
 
 | Item | Tag | Status | Evidence |
 |---|---|---|---|
 | `checkoutUrl` is gone and all tests pass | unit | Pass | `pnpm test`: 41 of 41. Nothing called it before removal (`grep -rn checkoutUrl lib app components scripts` found only the definition). `pnpm build` NOT run (no secrets or servers in this batch), so see the drills below |
-| Negative: a grep for Shopify `cart/` checkout URLs in `lib`, `app` and `components` finds nothing | unit | Pass | `SHOP-03: no Shopify cart or checkout link` passes. `checkoutUrl` put back temporarily: exit 1. A link joined by concatenation (`${base}/cart/` + p, base + '/cart/' + p): exit 1 |
+| Negative: a grep for Shopify `cart/` checkout URLs in `lib`, `app` and `components` finds nothing | unit | Pass, with the limit below | `SHOP-03: no Shopify cart or checkout link` passes. `checkoutUrl` put back temporarily: exit 1. A link joined by concatenation (`${base}/cart/` + p, base + '/cart/' + p): exit 1. The automated check misses some link shapes (`${d}/cart/c/${t}`, `${d}/checkouts/${id}` with no scheme; see "Known limits"). A plain `grep` finds neither shape in `lib`, `app` or `components` today, only this app's own `/checkout` paths |
 
 ### SHOP-04
 
 | Item | Tag | Status | Evidence |
 |---|---|---|---|
 | The test lists every merchant text reaching Shopify: discount description, discount title, shipping title, note, tags, cancel staff note | unit | Pass | `MERCHANT_TEXT_ROUTES` and `CANCEL_STAFF_NOTE`. Each is proved by following a marker string: offer label, bundle title (through the real offer engine), store name, shipping label, order id, cancel reason. Each one reaches Shopify only by its named field |
-| Negative: a new free-text field fails the test | unit | Pass, with the limit below | Every field of a full draft order is checked against a closed list, including empty arrays and objects, in two places: what `buildDraftOrderInput` returns, and what the fake Shopify received from the real push for a paid order and for a COD order. The sent draft must also equal the builder's, and the variables of the find, create and complete calls are compared exactly. Temporary `poNumber` on the draft: exit 1. `poNumber`, `sourceName: siteName()`, an extra `customAttributes` entry or changed note text added where the draft is sent: exit 1 each. An extra variable on the find, create or complete call: exit 1 each. Temporary `note` argument on `orderCancel`: exit 1. `poNumber` behind a field the order does not have yet: exit 1. Not covered: the same limit as SHOP-02, a field added only behind a condition these orders do not reach, and an extra variable on the cancel call behind an order field the test does not set. See "Limits of these tests" |
+| Negative: a new free-text field fails the test | unit | Pass, with the limit below | Every field of a full draft order is checked against a closed list, including empty arrays and objects, in two places: what `buildDraftOrderInput` returns, and what the fake Shopify received from the real push for a paid order and for a COD order. The sent draft must also equal the builder's, and the variables of the find, create and complete calls are compared exactly. Temporary `poNumber` on the draft: exit 1. `poNumber`, `sourceName: siteName()`, an extra `customAttributes` entry or changed note text added where the draft is sent: exit 1 each. An extra variable on the find, create or complete call: exit 1 each. Temporary `note` argument on `orderCancel`: exit 1. `poNumber` behind a field the order does not have yet: exit 1. A new send that reuses an allowed mutation also fails: a second identical `draftOrderCreate` or `orderCancel` document, a new export calling `createDraft`, a function that reads a `products` row and sends it through `createDraft`, and a new Shopify call in any file that holds a mutation document: exit 1 each. Not covered: the same limit as SHOP-02, a field added only behind a condition these orders do not reach, an extra variable on the cancel call behind an order field the test does not set, and anything sent by the follow-up query that runs only when Shopify refuses the cancel. See "Known limits" |
 
 ### SHOP-06
 
 | Item | Tag | Status | Evidence |
 |---|---|---|---|
-| A failing `test-shopify-boundary` fails the check | unit | Pass locally | `pnpm test` with the suite failing: exit 1, `40 of 41 suites passed`, `Failed: test:shopify-boundary`. This is now also run by the suite: a copy of the real runner over a small package whose boundary suite fails must exit 1, and the real hook with a stand-in `pnpm` that exits 3 must exit 3 |
-| Negative: adding `productUpdate` on a branch produces a failing check | manual drill | Pass locally, **not on GitHub** | `productUpdate` in a temporary staged file, then `git -c core.hooksPath=.githooks ... commit`: hook ran, `Commit stopped`, `COMMIT EXIT 1`, HEAD unchanged. The workflow itself has never run, because nothing here pushes |
+| A failing `test-shopify-boundary` fails the check | unit | Pass locally | `pnpm test` with the suite failing: exit 1, `40 of 41 suites passed`, `Failed: test:shopify-boundary`. This is now also run by the suite: a copy of the real runner over a small package whose boundary suite fails must exit 1, and copies of the real hooks, in a throwaway git repo with a stand-in `pnpm` that exits 3, must stop a real `git commit` and a real `git merge` |
+| Negative: adding `productUpdate` on a branch produces a failing check | manual drill | Pass locally, **not on GitHub** | Round 2: `productUpdate` in a temporary staged file, then `git -c core.hooksPath=.githooks ... commit`: hook ran, `Commit stopped`, `COMMIT EXIT 1`, HEAD unchanged. Round 3: the hook now also stops when a staged file differs from the file on disk, which round 2's hook missed (reproduced, below). The workflow itself has never run, because nothing here pushes |
 
 ## Proof that the tests can fail
 
@@ -141,6 +143,31 @@ with a script that restored each file it changed.
 | Runner: no finish after the suite's process exits | same | 1 | Detached child check, after waiting the full 30s |
 | The round 1 runner, with the new tests | same | 1 | Weakened command, detached child and stuck suite checks. Took 64s, because each detached child held it for the full 30s |
 
+Round 3 rows. Each was run by a script that wrote the change, ran the suite and put the
+exact bytes back; `git status` was clean afterwards. "Was" is the same break on the
+round 2 suite, run first in this worktree.
+
+| Temporary break | Command | Exit | Check that failed |
+|---|---|---|---|
+| A second identical `draftOrderCreate` document in `lib/shopify-push.js`, sending `product.description` and `product.title` | `node scripts/test-shopify-boundary.js` | 1 (was 0) | Document list, Shopify calls |
+| A second identical `orderCancel` document in `lib/order-cancel.js`, sending `order.title` as the staff note | same | 1 (was 0) | same |
+| `export const pushContent = (p, gql) => createDraft({ note: p.description, ... }, gql)` | same | 1 (was 0) | Draft helpers |
+| `syncTitle`: reads a `products` row and sends `row.title` and `row.vendor` through `createDraft` | same | 1 (was 0) | Draft helpers |
+| `export { createDraft }`; `export async function completeDraft`; a third `completeDraft` call; `const cd = createDraft` | same | 1 each (was 0) | Draft helpers |
+| A second token mint, `adminGraphqlWithToken(t, MINT_MUTATION, { input: { title } })`, in `lib/shopify-admin.js` | same | 1 (was 0) | Shopify calls |
+| A second `gql(CREATE_SUB, ...)`, and `adminGraphql(CREATE_SUB, ...)`, in `lib/platform/shopify-webhooks.js` | same | 1 each (was 1, by the admin payload check only) | Shopify calls, admin payload |
+| `@shopify/admin-api-client` with `c.put(...)`, `shopify-api-node` with `s.product.update(...)`, `@shopify/shopify-api` with `clients.Rest`, `require("shopify-api-node")`, and ``import(`@shopify/admin-api-client`)`` in `components` | same | 1 each (was 0) | Client library |
+| `@shopify/admin-api-client` in `dependencies`; `shopify-api-node` in `devDependencies` | same | 1 each (was 0) | Client library |
+| `mutation { # }` with `collectionAddProducts(...)` on the next line; the same as a one-line string with `\n` written in it | same | 1 each (was 0) | Allowlist, document list, Shopify calls |
+| `orderCancel(...) { job { id } } # }` with `collectionAddProducts(...)` on the next line; a `}` inside a string argument | same | 1 each (was 1) | same |
+| Hook: the staged check turned off (`if false`) | same | 1 | Staged content, merge commit |
+| Hook: the staged check moved after the `unset` line | same | 1 | Staged content (the `commit -a` case) |
+| Hook: the staged check stops with `exit 0` | same | 1 | Hook text, staged content, merge commit |
+| Merge hook: only `exit 0`; or runs `pre-commit` and then `exit 0` | same | 1 each | Merge commit |
+| Changed `createDraft(buildDraftOrderInput(order), gql)` to add `poNumber` (control) | same | 1 | Both SHOP-04 real push checks |
+| Staged `lib/zz-staged-probe.js` holding `productUpdate`, then removed from disk | `sh .githooks/pre-commit` | round 2 hook: `41 of 41 suites passed`, no stop. Round 3 hook: 1 | `Commit stopped: these files on disk differ from what is staged`, before any suite ran |
+| `lib/cms/history.js` put back to its 939d630 version (ties broken by the random `id`) | `node scripts/test-cms-api.js` | 1 in 10 of 10 runs | The new same-millisecond assertion, or the older `newest kept` one |
+
 ## SHOP-06 findings
 
 **Time.** `pnpm test` takes about 25 seconds here (25.1s and 27.0s on the final code).
@@ -180,20 +207,37 @@ to match the machine the baseline ran on. The repo does not state a production N
    these were fixed rather than left.
    - `test:cms-api` failed 12 of 40 runs: `newest kept expected 26, got 25`. Two history
      rows written in one millisecond were ordered by their random id, so the wrong one
-     could be pruned or listed first. This is a real, if small, ordering bug.
-     `lib/cms/history.js` now breaks ties by `rowid`. After the fix: 0 failures in 60 runs.
+     could be pruned or listed first. This is a real, if small, ordering bug in the code,
+     not the test: a founder saving twice in one millisecond could lose the newer entry.
+     `lib/cms/history.js` now breaks ties by `rowid`, which follows insert order (the table
+     is not `WITHOUT ROWID`, and pruning removes the oldest rows, so a new row always gets
+     the highest `rowid`). After the fix: 0 failures in 60 runs.
+     Round 3: other branches cut from 939d630 still fail this way (1 of 15 there, 4 of 15 on
+     another branch, as reported), because they do not have this fix. Re-checked here: the
+     939d630 version of `lib/cms/history.js` failed 1 of 30 runs; this branch's 0 of 40.
+     The suite now also saves 27 entries with the clock held still, so all of them share one
+     millisecond. That makes the bug fail every run instead of at random: the 939d630 code
+     failed 10 of 10, the fixed code passes.
    - `test:shopify-push` failed 2 of 20 full runs: a sweep in the same millisecond as
      the failure still sees the 1ms backoff. This was a test bug. The test now waits
-     10ms, as another test in that file already did. After the fix: 0 failures in 100 runs.
-   - Then the whole gate: 15 of 15 runs passed. A rarer flake could still exist.
-3. **The hook is present but OFF, as instructed for this batch.** So "runs as a required
+     10ms, as another test in that file already did. After the fix: 0 failures in 100 runs,
+     and 0 of 40 again in round 3.
+   - Then the whole gate: 15 of 15 runs passed in round 1. Round 3 counts are under
+     "Test results". A rarer flake could still exist.
+3. **The hooks are present but OFF, as instructed for this batch.** So "runs as a required
    local check before each commit" is **not yet true**. It becomes true when the owner
    runs `pnpm hooks:enable` after the parallel sessions finish. `scripts/enable-git-hooks.sh`
    has only been syntax-checked (`sh -n`), never run. `core.hooksPath` was confirmed unset
-   afterwards. The hook itself was exercised with `git -c core.hooksPath=.githooks`, which
-   applies to one call and writes no config.
+   afterwards, in round 2 and again in round 3. In round 2 the hook was exercised in this
+   repo with `git -c core.hooksPath=.githooks`, which applies to one call and writes no
+   config. In round 3 the commit and merge cases run inside the suite, in a throwaway repo,
+   so nothing here touches this repo's hook setting.
+   `.githooks/pre-merge-commit` is new in round 3: git runs it instead of `pre-commit` when
+   `git merge` makes a merge commit by itself, and it runs the same check.
 4. **More checks than the spec asks for.** The test also locks every mutation document's
-   file and exact arguments, and the two files allowed to send the Admin token header.
+   file, exact arguments and count, as far as the parser can read them (see "Known
+   limits"), the number of Shopify calls in each file that holds a document, the two draft
+   helpers' call sites, and the two files allowed to send the Admin token header.
    Any Admin REST URL counts as a write, even a read, because the method cannot be read
    reliably from source. A future REST read therefore needs a deliberate change here.
    The two token files also have their Admin URLs and `fetch` count locked. The draft
@@ -217,78 +261,145 @@ to match the machine the baseline ran on. The repo does not state a production N
    also goes further than asked: it covers a URL whose origin is in a variable or joined with
    `+`, because this app builds its own console links that way and `${base}/admin/${p}` looks
    the same as they do. Those get a short list of console pages instead of a free pass.
+9. **One difference from what the third review proposed.** It asked for `createDraft` and
+   `completeDraft` to have exactly one call site each. `completeDraft` has two today, both in
+   `pushOrderToShopify`: after a new draft is created, and for a leftover draft from a crashed
+   attempt. So the lock is one call for `createDraft` and two for `completeDraft`, plus their
+   definitions. `completeDraft` sends only a draft id and a true or false. The other parts of
+   that finding were right and are fixed.
 
 Spec citations for these five requirements were opened and matched the code at 939d630.
 `main` is still 92 commits ahead of `origin` (`git rev-list --count origin/main..main`), so
 a push-triggered workflow would not run today, as the spec says. One old comment was wrong: `lib/ids.js` said `draftOrderCreate` uses numeric ids, but the
 push sends full ids. That comment is corrected.
 
-## Limits of these tests
+## Known limits
 
-- The scans read source text, so they can be beaten on purpose. These are all missed
-  (each was tried, exit 0): `"muta" + "tion { ... }"`, the word `mutation` kept in its own
-  constant and joined in with `${OP} { ... }`, and `${FRAGMENT}` followed by
-  `mutation ${rest}` when nothing else in the string can be read.
-- A readable document is caught whatever its name, directives or indentation. A mutation
-  name outside a document is caught only for the resources in `MUTATION_NAME`, and only
-  when the name ends in a verb. `collectionAddProducts` in a comment is not flagged.
-- REST, in a new file: any URL whose path visibly starts at `/admin` is caught, whichever
-  file holds the token header, unless it is one of the three Shopify endpoints or, with its
-  origin in a variable, a console page (`/admin`, `/admin/login`, `/admin/accept-invite`,
-  `/admin/reset`). Missed, each tried, exit 0: `/admin` kept in a constant
-  (`https://${d}${ADMIN}/products/1`), `new URL("/admin/products/1", base)`, and a console
-  page with more joined on after it (`${base}/admin` + p). The token header check does not
-  help with these if the header comes from a helper, such as one exported from
-  `lib/shopify-admin.js`, because it looks only at which files contain the header's name.
-  A relative `/admin/...` string on its own is not flagged, because the console's own links
-  look like that.
-- REST, in `lib/shopify-admin.js` and the spike: the token header check does not help
-  here, so their exact Admin URLs and `fetch` count are locked instead. A new `fetch`
-  fails even with a split URL. Changing the URL of an existing `fetch` to a variable
-  also fails, because the known URL is then gone. A split URL picked at run time beside
-  a known one, going through an existing `fetch`, would still pass.
-- The one-list check flags any `read_*` word in a production file other than
-  `lib/platform/oauth.js`, in a string or a comment, except the two known mentions in
-  `READ_SCOPE_MENTIONS`. A name split across strings (`"read_" + "themes"`) is missed (tried,
-  exit 0). Files named `scripts/test-*` are not checked, because tests name scopes on
-  purpose. Write scopes are caught anywhere, tests included. An ordinary name such as
-  `read_more` would be flagged: rename it or add it to the list.
+What is deliberately left. "Tried" means the break was run against the final suite and
+gave exit 0 (it passed when it should not have), unless the line says otherwise.
+
+**Ways around the checks that need deliberately evasive code.** The scans read source
+text, so they can be beaten on purpose. These are not chased:
+
+- A mutation split across strings: `"muta" + "tion { ... }"`, the word `mutation` kept in
+  its own constant and joined in with `${OP} { ... }`, and `${FRAGMENT}` followed by
+  `mutation ${rest}` when nothing else in the string can be read (tried in round 2).
+- A file that contains a NUL byte is skipped as binary, so a full `productUpdate` document
+  after `// <NUL>` passes (tried).
+- A `{` or `}` inside a string argument is counted as a brace. In a new file that still
+  fails, as any new document does (tried, exit 1). Edited into a listed document, inside a nested field (`job { id(f: "}") }`), it ends the reading early and
+  hides the fields after it, such as `collectionAddProducts` (tried in `lib/order-cancel.js`).
+  No document here has a string argument today.
+- A Shopify call through another name for the transport, such as `const send = gql` and then
+  `send(CREATE_SUB, ...)` in `lib/platform/shopify-webhooks.js`, adds no counted call. Sent on
+  every run, the admin payload check still fails it (tried, exit 1). Behind a tenant setting,
+  it passes (tried).
+- A client library named in pieces, such as `require("shopify-" + "api-node")` (tried). Only
+  `@shopify/...` and `shopify-api-node` are checked, so another Shopify client package under
+  a different name is not refused either. Its REST URL would still be caught if written out.
+- REST, in a new file: `/admin` kept in a constant (`https://${d}${ADMIN}/products/1`),
+  `new URL("/admin/products/1", base)`, and a console page with more joined on after it
+  (`${base}/admin` + p) (tried in round 2). The token header check does not help with these if
+  the header comes from a helper exported from `lib/shopify-admin.js`, because it looks only at
+  which files contain the header's name. A relative `/admin/...` string on its own is not
+  flagged, because the console's own links look like that.
+- REST, in `lib/shopify-admin.js` and the spike: their exact Admin URLs and `fetch` count are
+  locked. A new `fetch` fails even with a split URL, and changing an existing `fetch` to a
+  variable also fails. A split URL picked at run time beside a known one, going through an
+  existing `fetch`, would still pass.
+- A read scope named in pieces (`"read_" + "themes"`) outside `lib/platform/oauth.js` (tried
+  in round 2).
+
+**Shapes the third review found that are left as they are.** No code has them today. Each
+was reported by the reviewer with exit 0 and tried again here on the final suite, exit 0:
+
+- SHOP-03: `${d}/cart/c/${t}` and `${d}/checkouts/${id}` with no scheme. The reviewer also
+  reported `"https://" + d + "/checkouts/" + id` and `"https://" + d + "/cart"` (not re-tried).
+  The SHOP-03 check is narrower than its name.
+- SHOP-02 and SHOP-04: the fixtures have one paid line and one gift, and a small discount. A
+  key added only on the second paid line, or a field added only when the discount is over
+  1000, passes. The builder-level key checks look at `lineItems[0]` and `[1]`.
+- One scope list: a third file that builds the authorize URL with `URLSearchParams` and takes
+  its scopes from an env var names no scope word, so it passes. The granted scopes could then
+  differ from `OAUTH_SCOPES`. Today only `lib/platform/oauth.js`, `scripts/shopify-oauth.js`
+  and `scripts/test-platform-sync.js` name `/admin/oauth/authorize`.
+- SHOP-02: "every text column" is held to `lib/schema.sql` only. A text column added by a
+  tenant migration alone passes (`ALTER TABLE products ADD COLUMN seo_title TEXT` in a new
+  migration). One exists already and is not seeded: `products.sync_generation`, a sync marker
+  added by `migrations/tenant/0002_sync_runs.sql`.
+- SHOP-04: the follow-up query in `lib/order-cancel.js` runs only when Shopify refuses the
+  cancel, and the fake Shopify never refuses. Sending the typed reason there passes.
+- Runner: the suite file guard sees only `.js`, so a `scripts/test-*.mjs` file would never
+  run, with no warning (reported by the reviewer, not re-tried).
+- The `fetch` count in the two token files counts the word, so a comment such as
+  `// we fetch nothing new here` in `lib/shopify-admin.js` fails with a message about fetch
+  calls (tried, exit 1). That is a false alarm, not a gap.
+
+**Branches the test orders do not reach.**
+
 - The real push checks read what was sent for the two orders they push. A field added where
-  the draft is sent, behind a condition those orders do not reach, is missed (tried, exit 0).
-  The path that adopts a leftover draft is not run here, only in `test:shopify-push`. The text
-  of the read query is not compared, only its variables. The mutation documents are locked
-  by the SHOP-01 list.
-- `probeUnknownFields` fires a branch only when it depends on a field the fixture lacks.
-  So a key behind a value test on a field the fixture already has, such as
-  `...(it.quantity > 50 ? { title: it.title } : {})`, is missed (tried, exit 0). So is a key
-  behind something outside the order, such as an env var or a tenant setting (tried, exit 0).
-  A real push only runs the branches its data reaches.
+  the draft is sent, behind a condition those orders do not reach, is missed (tried in round 3:
+  `poNumber` only when the total is over 100000). The path that adopts a leftover draft is not
+  run here, only in `test:shopify-push`. The text of the read query is not compared, only its
+  variables.
+- `probeUnknownFields` fires a branch only when it depends on a field the fixture lacks. A key
+  behind a value test on a field the fixture has, such as
+  `...(it.quantity > 50 ? { title: it.title } : {})`, is missed (tried in round 2). So is a key
+  behind something outside the order, such as an env var or a tenant setting (tried in round 2).
 - That probe covers `buildDraftOrderInput` only. The cancel call reads its order from the
-  database, so an extra variable behind an unset order field is missed (tried, exit 0). A
+  database, so an extra variable behind an unset order field is missed (tried in round 2). A
   field that is always sent is caught, because the cancel variables are compared exactly.
-- SHOP-06 runs the real hook with a stand-in `pnpm`, and a copy of the real runner through
-  the real `pnpm` over small throwaway packages. So a hook or runner edit that stops a failure
-  reaching the exit code fails, whatever the edit looks like. It does not run the hook into
-  the real `pnpm test`, because the suite would call itself. That link is only run by hand:
-  `sh .githooks/pre-commit` on the final code gave `41 of 41 suites passed in 25.7s`, exit 0.
-  A runner edit that changes behaviour only for the real `package.json`, such as skipping a
+
+**What the document and name scans read.**
+
+- A readable document is caught whatever its name, directives, indentation or `#` comments,
+  including a `#` comment that holds a brace. A selection with no field in it, and a one-line
+  string with `\n` written in it, read as `<unreadable>`, which fails. Not caught: the
+  evasive cases above (a NUL byte, a brace inside a string argument, a document split across
+  strings).
+- A mutation name outside a document is caught only for the resources in `MUTATION_NAME`, and
+  only when the name ends in a verb. `collectionAddProducts` in a comment is not flagged.
+- `MUTATION_NAME` and `NOT_SCOPES` can flag an ordinary identifier, such as a local function
+  that happens to be called `pageCreate`. None exists today on `cms/phase-1`, `cms/p1-gen03`,
+  `cms/p1-med01` or `cms/p1-au05` (checked with `git grep` in round 2). If one appears, rename
+  it, or for a `write_*` name add it to `NOT_SCOPES`. The same goes for `SEND_CALLS` and
+  `DRAFT_HELPERS`: a comment that names `gql(` or `createDraft` in a locked file fails, and
+  the message names the count to look at.
+- The one-list check flags any `read_*` word in a production file other than
+  `lib/platform/oauth.js`, except the two known mentions in `READ_SCOPE_MENTIONS`. Files named
+  `scripts/test-*` are not checked, because tests name scopes on purpose. Write scopes are
+  caught anywhere, tests included. An ordinary name such as `read_more` would be flagged.
+- The boundary test skips its own file, and it scans only `lib`, `app`, `components` and
+  `scripts`, as the requirement says. Root files such as `instrumentation.js` are not scanned.
+
+**The gate and the hooks.**
+
+- The suite runs copies of the real hooks, with a stand-in `pnpm`, in a throwaway git repo:
+  a real `git commit` and a real `git merge`. It runs a copy of the real runner through the
+  real `pnpm` over small throwaway packages. It does not run the hook into the real
+  `pnpm test`, because the suite would call itself. That link is only run by hand (see "Test
+  results").
+- The hook compares tracked files only. An untracked file on disk is seen by the tests and is
+  not part of the commit, so a commit whose tests pass only because of an untracked file still
+  goes through.
+- A commit of part of the work (`git add -p`, or `git commit <file>` with other changes on
+  disk) is stopped, because what is on disk is not what is being committed. That is on
+  purpose: commit the rest, or put it aside first.
+- A fast-forward merge makes no commit, so no hook runs. A merge stopped by a conflict is
+  finished with `git commit`, which runs `pre-commit` (from git's documentation, not tried).
+  Git does not run `pre-commit` for `git rebase` or `git cherry-pick` (from git's
+  documentation, not tried). `pre-merge-commit` needs git 2.24 or later. This Mac has 2.50.1.
+- A runner edit that changes behaviour only for the real `package.json`, such as skipping a
   suite by name, is seen only by review, apart from the check that `NOT_A_GATE` is exactly
   `test:perf`.
 - The workflow is only read as text, so it is the weakest of the three. The text check cannot
   see the workflow being turned off on GitHub, or a switch written in a form it does not know.
-  Nothing here can see `git commit --no-verify` or the hook not being enabled.
+  Nothing here can see `git commit --no-verify` or the hooks not being enabled.
+- `core.hooksPath` is shared by all worktrees. A worktree on a commit older than this one has
+  no `.githooks` folder, and git then runs no hook there, with no warning.
 - A suite that exits 0 and leaves a detached process behind passes, and that process keeps
   running. The runner waits 1 second for output after a suite's process has gone, so anything
-  written later is lost. The time limit now holds in that case, which it did not before.
-- The boundary test skips its own file, and it scans only `lib`, `app`, `components`
-  and `scripts`, as the requirement says. Root files such as `instrumentation.js` are not scanned.
-- `MUTATION_NAME` and `NOT_SCOPES` can flag an ordinary identifier, such as a local
-  function that happens to be called `pageCreate`. None exists today on `cms/phase-1`,
-  `cms/p1-gen03`, `cms/p1-med01` or `cms/p1-au05` (checked with `git grep`). If one
-  appears, rename it, or for a `write_*` name add it to `NOT_SCOPES`.
-- The hook tests the files on disk, not only what is staged.
-- `core.hooksPath` is shared by all worktrees. A worktree on a commit older than this one
-  has no `.githooks` folder, and git then runs no hook there, with no warning.
+  written later is lost.
 
 ## First review round
 
@@ -297,7 +408,7 @@ reproduced on the unfixed tree before changing anything, and none was wrong. All
 fixed: keys hidden behind fields the fixture lacked (blocker), documents the mutation scan
 could not read, REST calls with no trailing slash and calls inside the token files, the
 wiring check, concatenated cart links, and empty containers. Each now has a row in the
-table above. What these fixes do not cover is under "Limits of these tests".
+table above. What these fixes do not cover is under "Known limits".
 
 ## Second review round
 
@@ -322,6 +433,41 @@ The comment one was checked by reading. All eight are fixed:
 - **Catalog text:** every text column of the three catalog tables is seeded and checked.
 - **Comments:** `lib/shopify-push.js` and `MERCHANT_TEXT_ROUTES` now name
   `customAttributes[].value` as a route.
+
+## Third review round
+
+An independent reviewer reported two major and eight minor items. Four of them, and one
+flake reported separately, were in scope for this round. Each was checked against the code
+first and reproduced before the fix (exit 0 on the round 2 suite, or the round 2 hook
+passing). All five were right, with one correction (deviation 9):
+
+- **Major, SHOP-02 and SHOP-04:** documents were compared as a set, so a second identical
+  `draftOrderCreate` or `orderCancel` passed, and a new caller of `createDraft` added no
+  document at all. Now each document is counted, each file that holds a document has a fixed
+  number of Shopify calls, and `createDraft` and `completeDraft` must stay unexported with
+  known call sites. The comment above `MUTATION_DOCUMENTS` and deviation 4 now say what is
+  really locked.
+- **Major, SHOP-01:** a Shopify client library makes REST writes that no scan could see. Any
+  `@shopify/...` or `shopify-api-node` string in the scanned folders now fails, and so do those
+  names in `dependencies` and `devDependencies`, also under another name (`npm:@shopify/...`).
+- **Minor, SHOP-06:** the hook never read what was staged, and `git merge` ran no tracked hook.
+  The hook now stops, before running anything, when a tracked file on disk differs from what
+  is staged, and `.githooks/pre-merge-commit` runs the same check. The docs said "including
+  changes that are not staged", which read as more than the hook did. They now say what
+  happens. The round 2 line "The hook tests the files on disk, not only what is staged" is gone.
+- **Minor, SHOP-01:** "A readable document is caught whatever its name, directives or
+  indentation" was false for a `}` inside a `#` comment. The parser now skips `#` comments and
+  reads a selection with no field as `<unreadable>`. The corrected sentence is in "Known
+  limits", which also lists the NUL byte case, left as it is.
+- **Flake:** `test:cms-api`, `newest kept expected 26, got 25`. The cause is a real ordering
+  bug in `lib/cms/history.js`, fixed in the code on this branch in round 1 (deviation 2). The
+  failures measured at 939d630 and on another branch are on code without that fix. A
+  same-millisecond assertion now makes the bug fail every run if it comes back.
+
+The other six minor items are left as they are and listed in "Known limits": the SHOP-03 link
+shapes, the one-line fixtures, the authorize URL built with `URLSearchParams`, text columns
+added only by migrations, the cancel follow-up query, and the runner guard that sees only
+`.js` (with the `fetch` word count, which is a false alarm rather than a gap).
 
 ## Test results on the final tree
 

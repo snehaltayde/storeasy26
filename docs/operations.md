@@ -77,11 +77,16 @@ something like `|| true` would hide a failure.
 
 - **On push:** `.github/workflows/test.yml` runs `pnpm test`. It does nothing
   until this repo is pushed to GitHub.
-- **Before each commit:** `.githooks/pre-commit` runs the same `pnpm test`. It is
-  off until you run `pnpm hooks:enable` once. That sets `core.hooksPath` in the
-  repo's shared git config, so it applies to every worktree of this clone at once.
-  To turn it off: `git config --unset core.hooksPath`. The hook checks the files
-  on disk, including changes that are not staged.
+- **Before each commit and merge commit:** `.githooks/pre-commit` runs the same
+  `pnpm test`, and `.githooks/pre-merge-commit` runs that same check for `git merge`.
+  They are off until you run `pnpm hooks:enable` once. That sets `core.hooksPath` in
+  the repo's shared git config, so it applies to every worktree of this clone at
+  once. To turn them off: `git config --unset core.hooksPath`. The tests read the
+  files on disk, not what is staged. So the hook first stops the commit if a tracked
+  file on disk differs from what is staged, and names the files. Stage them or put
+  them aside, then commit again. Untracked files are not compared: the tests see
+  them, and the commit does not carry them. A fast-forward merge makes no commit, so
+  no hook runs.
 
 `pnpm test:shopify-boundary` is the suite that enforces Decision 2 (content is
 never written back to Shopify). If it fails on a change you meant to make, read
