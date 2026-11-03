@@ -1,0 +1,125 @@
+{
+  "id": "PV-08",
+  "part": "before-fix1-lapsed",
+  "title": "PV-08 experiments are inert in preview — before-fix1-lapsed",
+  "ranAt": "2026-11-03T13:51:37.585Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 6,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the preview connects (\"Preview shows your last save\")"
+    },
+    {
+      "ok": true,
+      "label": "while the preview lasts: the founder's saved title",
+      "detail": "Winter repair, started."
+    },
+    {
+      "ok": true,
+      "label": "the preview cookie expires with its token, so the browser drops it then",
+      "detail": {
+        "cookieExpires": 1793717491.923996,
+        "tokenExp": 1793717492,
+        "difference": -0.1
+      }
+    },
+    {
+      "ok": true,
+      "label": "setup: the preview cookie is gone, the console cookie stays",
+      "detail": [
+        "_admin",
+        "_unit"
+      ]
+    },
+    {
+      "ok": false,
+      "label": "after the lapse: the Designer frame never shows variant b",
+      "detail": [
+        "Visibly brighter in 14 days",
+        "Visibly brighter in 14 days"
+      ],
+      "known": "fix round 1 not built (da7617f)"
+    },
+    {
+      "ok": false,
+      "label": "after the lapse: the frame shows the live hero (\"Skin first. Makeup second.\"), as a signed-in founder sees the store",
+      "detail": [
+        "Visibly brighter in 14 days",
+        "Visibly brighter in 14 days"
+      ],
+      "known": "fix round 1 not built (da7617f)"
+    },
+    {
+      "ok": true,
+      "label": "after the lapse: no preview note (it needs a valid preview)",
+      "detail": [
+        null,
+        null
+      ]
+    },
+    {
+      "ok": false,
+      "label": "after the lapse: the frame sends no POST /api/exp",
+      "detail": [
+        {
+          "method": "POST",
+          "frame": "http://localhost:3202/",
+          "status": 200,
+          "body": {
+            "ok": true,
+            "recorded": true
+          }
+        }
+      ],
+      "known": "fix round 1 not built (da7617f)"
+    },
+    {
+      "ok": false,
+      "label": "after the lapse: a ping sent from the frame by hand is refused (recorded:false)",
+      "detail": {
+        "ok": true,
+        "recorded": true
+      },
+      "known": "fix round 1 not built (da7617f)"
+    },
+    {
+      "ok": false,
+      "label": "no exposure row for the founder's unit",
+      "detail": [
+        {
+          "variant": "b"
+        }
+      ],
+      "known": "fix round 1 not built (da7617f)"
+    },
+    {
+      "ok": false,
+      "label": "exposures in all unchanged",
+      "detail": {
+        "before": 46,
+        "after": 47
+      },
+      "known": "fix round 1 not built (da7617f)"
+    }
+  ],
+  "notes": [
+    "setup: founder's browser unit pv08-lapsed-mw0qxsj3-0 is in variant b; saved title \"Winter repair, started.\"; live title \"Skin first. Makeup second.\"; variant b's title \"Visibly brighter in 14 days\"",
+    "after the lapse: frame {\"draftBar\":false,\"sw\":1280,\"vw\":1280}; the Designer's status reads \"Connecting…\" (renewing the session is PV-04's)",
+    "/api/exp requests the pages sent: [{\"method\":\"POST\",\"frame\":\"http://localhost:3202/\",\"status\":200,\"body\":{\"ok\":true,\"recorded\":true}}]"
+  ],
+  "screenshots": [
+    {
+      "name": "before-fix1-lapsed-designer",
+      "file": "docs/cms-reviews/drills/PV-08/before-fix1-lapsed-designer.png",
+      "bytes": 35638,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

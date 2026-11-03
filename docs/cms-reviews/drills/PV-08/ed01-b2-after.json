@@ -1,0 +1,53 @@
+{
+  "id": "ED-01",
+  "part": "b2",
+  "title": "P1-DRILLS ED-01: the full-width editor on the edge runtime — b2",
+  "ranAt": "2026-11-03T13:54:13.636Z",
+  "harness": "http://localhost:3202",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B2 at 1024: picking the last section closes the drawer",
+      "detail": 0
+    },
+    {
+      "ok": true,
+      "label": "B2: focus returns to the Sections button",
+      "detail": {
+        "dataTree": true,
+        "text": "Sections"
+      }
+    },
+    {
+      "ok": true,
+      "label": "B2: the preview outlines \"New arrivals\" and scrolls it into view",
+      "detail": {
+        "found": true,
+        "selected": true,
+        "outline": "solid",
+        "top": 70,
+        "bottom": 1014,
+        "vh": 987,
+        "inView": true
+      }
+    }
+  ],
+  "notes": [
+    "B2: the drawer lists [\"Hero\\nTest running\",\"Announcement bar\",\"Shop by collection\",\"New arrivals\"]"
+  ],
+  "screenshots": [
+    {
+      "name": "B2-1024-last-section-picked",
+      "file": "docs/cms-reviews/drills/ED-01/B2-1024-last-section-picked.png",
+      "bytes": 33509,
+      "width": 720,
+      "height": 540,
+      "viewport": 1024,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

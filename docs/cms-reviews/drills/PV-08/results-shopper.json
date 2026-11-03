@@ -2,7 +2,7 @@
   "id": "PV-08",
   "part": "shopper",
   "title": "PV-08 experiments are inert in preview — shopper",
-  "ranAt": "2026-11-03T13:15:41.208Z",
+  "ranAt": "2026-11-03T13:52:33.516Z",
   "harness": "http://localhost:3202",
   "chrome": "156.0.8078.80",
   "passed": 12,
@@ -125,7 +125,7 @@
     }
   ],
   "notes": [
-    "shoppers: [{\"key\":\"b\",\"unit\":\"pv08-shopper-b-mw0pnjt8-0\",\"h1\":\"Visibly brighter in 14 days\",\"pings\":[{\"ok\":true,\"recorded\":true}],\"exposure\":[\"b\"]},{\"key\":\"control\",\"unit\":\"pv08-shopper-control-mw0pnlpe-0\",\"h1\":\"Skin first. Makeup second.\",\"pings\":[{\"ok\":true,\"recorded\":true}],\"exposure\":[\"control\"]},{\"key\":\"first visit\",\"unit\":\"7b5a04e6-4a5f-499e-a7f9-bf2b96868c6a\",\"h1\":\"Visibly brighter in 14 days\",\"pings\":[{\"ok\":true,\"recorded\":true}],\"exposure\":[\"b\"]}]; the live release's hero title: \"Skin first. Makeup second.\""
+    "shoppers: [{\"key\":\"b\",\"unit\":\"pv08-shopper-b-mw0qyysk-1\",\"h1\":\"Visibly brighter in 14 days\",\"pings\":[{\"ok\":true,\"recorded\":true}],\"exposure\":[\"b\"]},{\"key\":\"control\",\"unit\":\"pv08-shopper-control-mw0qz0pf-1\",\"h1\":\"Skin first. Makeup second.\",\"pings\":[{\"ok\":true,\"recorded\":true}],\"exposure\":[\"control\"]},{\"key\":\"first visit\",\"unit\":\"57a8ad9d-9534-4963-b1a4-869791362134\",\"h1\":\"Visibly brighter in 14 days\",\"pings\":[{\"ok\":true,\"recorded\":true}],\"exposure\":[\"b\"]}]; the live release's hero title: \"Skin first. Makeup second.\""
   ],
   "screenshots": [
     {

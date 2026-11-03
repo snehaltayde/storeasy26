@@ -2,7 +2,7 @@
   "id": "harness",
   "part": "designer",
   "title": "P1-DRILLS P1-HARNESS follow-ups — designer",
-  "ranAt": "2026-11-03T13:06:16.473Z",
+  "ranAt": "2026-11-03T13:53:52.233Z",
   "harness": "http://localhost:3202",
   "chrome": "156.0.8078.80",
   "passed": 10,
@@ -22,14 +22,13 @@
       "ok": true,
       "label": "S57: the typed title and subtitle show in the preview before saving",
       "detail": {
-        "title": 4,
-        "subtitle": 8,
+        "title": 6,
+        "subtitle": 3,
         "hero": [
-          "Drill hero 13.06.01",
-          "Edited in the Designer on the edge runtime at 13.06.01."
+          "Drill hero 13.53.38",
+          "Edited in the Designer on the edge runtime at 13.53.38."
         ]
-      },
-      "known": "finding 1"
+      }
     },
     {
       "ok": true,
@@ -45,10 +44,9 @@
       "ok": true,
       "label": "S57: after Save the preview shows the saved title and subtitle",
       "detail": [
-        "Drill hero 13.06.01",
-        "Edited in the Designer on the edge runtime at 13.06.01."
-      ],
-      "known": "finding 1"
+        "Drill hero 13.53.38",
+        "Edited in the Designer on the edge runtime at 13.53.38."
+      ]
     },
     {
       "ok": true,
@@ -75,12 +73,12 @@
       "label": "S57: every signed-out visitor sees the new title and subtitle",
       "detail": [
         {
-          "h1": "Drill hero 13.06.01",
-          "sub": true
+          "h1": "Visibly brighter in 14 days",
+          "sub": false
         },
         {
-          "h1": "Drill hero 13.06.01",
-          "sub": true
+          "h1": "Visibly brighter in 14 days",
+          "sub": false
         },
         {
           "h1": "Visibly brighter in 14 days",
@@ -91,7 +89,7 @@
           "sub": false
         }
       ],
-      "known": "finding 1"
+      "known": "the running hero test shows variant b to some visitors, as it should"
     },
     {
       "ok": true,
@@ -100,16 +98,14 @@
     }
   ],
   "notes": [
-    "\"S57: the typed title and subtitle show in the preview before saving\" passes now, so finding 1 looks fixed: remove its known marker in the drill",
-    "\"S57: after Save the preview shows the saved title and subtitle\" passes now, so finding 1 looks fixed: remove its known marker in the drill",
-    "S57: signed-out visitors' hero titles (each a new visitor): [{\"h1\":\"Drill hero 13.06.01\",\"sub\":true},{\"h1\":\"Drill hero 13.06.01\",\"sub\":true},{\"h1\":\"Visibly brighter in 14 days\",\"sub\":false},{\"h1\":\"Visibly brighter in 14 days\",\"sub\":false}]",
+    "S57: signed-out visitors' hero titles (each a new visitor): [{\"h1\":\"Visibly brighter in 14 days\",\"sub\":false},{\"h1\":\"Visibly brighter in 14 days\",\"sub\":false},{\"h1\":\"Visibly brighter in 14 days\",\"sub\":false},{\"h1\":\"Visibly brighter in 14 days\",\"sub\":false}]",
     "S57: preview documents seen: [{\"url\":\"/\",\"status\":200,\"edge\":\"1\"},{\"url\":\"/\",\"status\":200,\"edge\":\"1\"},{\"url\":\"/\",\"status\":200,\"edge\":\"1\"},{\"url\":\"/\",\"status\":200,\"edge\":\"1\"}]"
   ],
   "screenshots": [
     {
       "name": "S57-designer-typed",
       "file": "docs/cms-reviews/drills/harness/S57-designer-typed.png",
-      "bytes": 42233,
+      "bytes": 42395,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -118,7 +114,7 @@
     {
       "name": "S57-designer-saved",
       "file": "docs/cms-reviews/drills/harness/S57-designer-saved.png",
-      "bytes": 42855,
+      "bytes": 43199,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -127,7 +123,7 @@
     {
       "name": "S57-published",
       "file": "docs/cms-reviews/drills/harness/S57-published.png",
-      "bytes": 34050,
+      "bytes": 34153,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -136,7 +132,7 @@
     {
       "name": "S57-live-signed-out",
       "file": "docs/cms-reviews/drills/harness/S57-live-signed-out.png",
-      "bytes": 26883,
+      "bytes": 27582,
       "width": 720,
       "height": 450,
       "viewport": 1440,
