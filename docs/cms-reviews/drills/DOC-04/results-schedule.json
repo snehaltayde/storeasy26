@@ -1,0 +1,72 @@
+{
+  "id": "DOC-04",
+  "part": "schedule",
+  "title": "P1-DRILLS DOC-04: plain, located messages, and failures after a write — schedule",
+  "ranAt": "2026-11-03T11:12:01.485Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "schedule setup: the banner's link changed to /odd-route (a warning, not an error)"
+    },
+    {
+      "ok": true,
+      "label": "schedule setup: banner, hero and announcement saved (every PUT 200; hero and announcement hold the odd links)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "schedule: the card lists located lines (Hero:, Announcement bar:, Section N (Banner / CTA):)",
+      "detail": [
+        "Hero: the primary button links to \"/x-odd\", which isn't a storefront route this platform serves — double-check it",
+        "Announcement bar: \"/another-odd\" isn't a storefront route this platform serves — double-check it",
+        "Section 3 (Banner / CTA): \"/odd-route\" isn't a storefront route this platform serves — double-check it"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "schedule: the toast \"Scheduled for …\"",
+      "detail": [
+        "Scheduled for 5 Nov, 10:00 am — the pending release is in the history below."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "schedule: the top banner lists the same located lines as the card",
+      "detail": {
+        "topLines": [
+          "Hero: the primary button links to \"/x-odd\", which isn't a storefront route this platform serves — double-check it",
+          "Announcement bar: \"/another-odd\" isn't a storefront route this platform serves — double-check it",
+          "Section 3 (Banner / CTA): \"/odd-route\" isn't a storefront route this platform serves — double-check it",
+          "No enabled privacy policy page — add one before launch (checkout links to it)",
+          "No enabled terms/refund page — add one before launch"
+        ],
+        "cardWarnings": [
+          "Hero: the primary button links to \"/x-odd\", which isn't a storefront route this platform serves — double-check it",
+          "Announcement bar: \"/another-odd\" isn't a storefront route this platform serves — double-check it",
+          "Section 3 (Banner / CTA): \"/odd-route\" isn't a storefront route this platform serves — double-check it"
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "schedule: the card's warnings before scheduling: [\"Hero: the primary button links to \\\"/x-odd\\\", which isn't a storefront route this platform serves — double-check it\",\"Announcement bar: \\\"/another-odd\\\" isn't a storefront route this platform serves — double-check it\",\"Section 3 (Banner / CTA): \\\"/odd-route\\\" isn't a storefront route this platform serves — double-check it\"]",
+    "schedule: POST [{\"at\":1793704320327,\"method\":\"POST\",\"path\":\"/api/admin/releases\",\"status\":200}]; toasts [\"Scheduled for 5 Nov, 10:00 am — the pending release is in the history below.\"]; top banner {\"tone\":\"warning\",\"inCard\":false,\"text\":\"Hero: the primary button links to \\\"/x-odd\\\", which isn't a storefront route this platform serves — double-check it\\nAnnouncement bar: \\\"/another-odd\\\" isn't a storefront route this platform serves — double-check it\\nSection 3 (Banner / CTA): \\\"/odd-route\\\" isn't a storefront route this platform serves — double-check it\\nNo enabled privacy policy page — add one before launch (checkout links to it)\\nNo enabled terms/refund page — add one before launch\"}",
+    "schedule: pending schedule cancelled afterwards: true"
+  ],
+  "screenshots": [
+    {
+      "name": "B-schedule-toast-and-banner",
+      "file": "docs/cms-reviews/drills/DOC-04/B-schedule-toast-and-banner.png",
+      "bytes": 60529,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "id": "DOC-04",
+  "part": "publishfail",
+  "title": "P1-DRILLS DOC-04: plain, located messages, and failures after a write — publishfail",
+  "ranAt": "2026-11-03T11:13:39.356Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "publishfail: the toast \"Published — live now.\"",
+      "detail": [
+        "Published — live now."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "publishfail: a warning banner starting \"Published. Your live store has the new version, but this page couldn't refresh…\"",
+      "detail": [
+        {
+          "tone": "info",
+          "inCard": false,
+          "text": "Platform notice: Payments provider latency\nCard payments may take a little longer than usual today."
+        },
+        {
+          "tone": "warning",
+          "inCard": false,
+          "text": "Published. Your live store has the new version, but this page couldn't refresh, so it may show old details. Reload it.\nHero: the primary button links to \"/x-odd\", which isn't a storefront route this platform serves — double-check it\nAnnouncement bar: \"/another-odd\" isn't a storefront route this platform serves — double-check it\nSection 3 (Banner / CTA): \"/odd-route\" isn't a storefront route this platform serves — double-check it\nNo enabled privacy policy page — add one before launch (checkout links to it)\nNo enabled terms/refund page — add one before launch"
+        },
+        {
+          "tone": "warning",
+          "inCard": true,
+          "text": "Hero: the primary button links to \"/x-odd\", which isn't a storefront route this platform serves — double-check it\nAnnouncement bar: \"/another-odd\" isn't a storefront route this platform serves — double-check it\nSection 3 (Banner / CTA): \"/odd-route\" isn't a storefront route this platform serves — double-check it\nNo enabled privacy policy page — add one before launch (checkout links to it)\nNo enabled terms/refund page — add one before launch"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "publishfail: no red error banner",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "publishfail: after restoring cms_approvals and reloading, History shows the new release as Live",
+      "detail": "3 Nov, 04:43 pm no note e0fbd8a466da Live"
+    }
+  ],
+  "notes": [
+    "publishfail: a read of cms_approvals now fails: SQLITE_UNKNOWN: SQLite error: malformed JSON",
+    "publishfail: POST [{\"at\":1793704415546,\"method\":\"POST\",\"path\":\"/api/admin/releases\",\"status\":200}]; toasts [\"Published — live now.\"]; banners [{\"tone\":\"info\",\"inCard\":false,\"text\":\"Platform notice: Payments provider latency\\nCard payments may take a little longer than usual today.\"},{\"tone\":\"warning\",\"inCard\":false,\"text\":\"Published. Your live store has the new version, but this page couldn't refresh, so it may show old details. Reload it.\\nHero: the primary button links to \\\"/x-odd\\\", which isn't a storefront route this platform serves — double-check it\\nAnnouncement bar: \\\"/another-odd\\\" isn't a storefront route this platform serves — double-check it\\nSection 3 (Banner / CTA): \\\"/odd-route\\\" isn't a storefront route this platform serves — double-check it\\nNo enabled privacy policy page — add one before launch (checkout links to it)\\nNo enabled terms/refund page — add one before launch\"},{\"tone\":\"warning\",\"inCard\":true,\"text\":\"Hero: the primary button links to \\\"/x-odd\\\", which isn't a storefront route this platform serves — double-check it\\nAnnouncement bar: \\\"/another-odd\\\" isn't a storefront route this platform serves — double-check it\\nSection 3 (Banner / CTA): \\\"/odd-route\\\" isn't a storefront route this platform serves — double-check it\\nNo enabled privacy policy page — add one before launch (checkout links to it)\\nNo enabled terms/refund page — add one before launch\"}]",
+    "publishfail: loading Publishing while cms_approvals reads fail shows: \"Platform notice: Payments provider latency\\n\\nCard payments may take a little longer than usual today.\\n\\nDesign Demo Co\\n\\nlocalhost\\n\\nOVERVIEW\\n\\nDashboard\\nAnalytics\\nSetup\\n2/9\\n\\nORDERS\\n\\nOrders\\n1\\n\\nCATALOG\\n\\nCat\"",
+    "publishfail: release_state before [{\"id\":1,\"live_release_id\":\"rel_858b70d8770a96f1\",\"updated_at\":\"2026-11-03T11:13:11.735Z\"}], after [{\"id\":1,\"live_release_id\":\"rel_19a9a4fb3534e887\",\"updated_at\":\"2026-11-03T11:13:35.582Z\"}]; newest release before rel_858b70d8770a96f1, after rel_19a9a4fb3534e887"
+  ],
+  "screenshots": [
+    {
+      "name": "B-publish-then-refresh-failed",
+      "file": "docs/cms-reviews/drills/DOC-04/B-publish-then-refresh-failed.png",
+      "bytes": 60356,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "B-publish-history-live",
+      "file": "docs/cms-reviews/drills/DOC-04/B-publish-history-live.png",
+      "bytes": 45631,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    }
+  ]
+}

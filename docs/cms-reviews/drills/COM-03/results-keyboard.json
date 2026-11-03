@@ -1,0 +1,211 @@
+{
+  "id": "COM-03",
+  "part": "keyboard",
+  "title": "P1-DRILLS COM-03: offers in plain words, a check before going live, a way back — keyboard",
+  "ranAt": "2026-11-03T11:48:24.698Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 10,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B2: Tab reaches New offer",
+      "detail": {
+        "tag": "BUTTON",
+        "stop": "26",
+        "type": "button",
+        "text": "New offer",
+        "ringOrOutline": true,
+        "focused": {
+          "outline": "solid 2px",
+          "shadow": "none",
+          "border": "rgb(255, 255, 255)"
+        },
+        "inDialog": false,
+        "visible": true,
+        "how": "outline or ring"
+      }
+    },
+    {
+      "ok": true,
+      "label": "B2: Tab reaches the kind 'Buy some, get some free'",
+      "detail": {
+        "tag": "BUTTON",
+        "stop": "28",
+        "type": "button",
+        "text": "Buy some, get some free\nFor example: buy 2, get 1 ",
+        "ringOrOutline": true,
+        "focused": {
+          "outline": "solid 2px",
+          "shadow": "none",
+          "border": "rgb(212, 212, 216)"
+        },
+        "inDialog": false,
+        "visible": true,
+        "how": "outline or ring"
+      }
+    },
+    {
+      "ok": true,
+      "label": "B2: Tab reaches Choose a product",
+      "detail": {
+        "tag": "BUTTON",
+        "stop": "36",
+        "type": "button",
+        "text": "Choose a product",
+        "ringOrOutline": true,
+        "focused": {
+          "outline": "solid 2px",
+          "shadow": "none",
+          "border": "rgb(212, 212, 216)"
+        },
+        "inDialog": false,
+        "visible": true,
+        "how": "outline or ring"
+      }
+    },
+    {
+      "ok": true,
+      "label": "B2: the product picker opens with focus inside",
+      "detail": {
+        "tag": "BUTTON",
+        "stop": "37",
+        "type": "button",
+        "text": "Close",
+        "ringOrOutline": true,
+        "focused": {
+          "outline": "solid 2px",
+          "shadow": "none",
+          "border": "rgb(82, 82, 91)"
+        },
+        "inDialog": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "B2: Escape closes the picker and focus returns to Choose a product",
+      "detail": {
+        "open1": 0,
+        "f": {
+          "tag": "BUTTON",
+          "stop": "36",
+          "type": "button",
+          "text": "Choose a product",
+          "ringOrOutline": true,
+          "focused": {
+            "outline": "solid 2px",
+            "shadow": "none",
+            "border": "rgb(212, 212, 216)"
+          },
+          "inDialog": false
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B2: Tab reaches the product in the picker",
+      "detail": {
+        "tag": "BUTTON",
+        "stop": "44",
+        "type": "button",
+        "text": "Night Repair Cream 50g\nnight-repair-cream\n₹1,799",
+        "ringOrOutline": true,
+        "focused": {
+          "outline": "solid 2px",
+          "shadow": "none",
+          "border": "rgb(82, 82, 91)"
+        },
+        "inDialog": true,
+        "visible": true,
+        "how": "outline or ring"
+      }
+    },
+    {
+      "ok": true,
+      "label": "B2: Enter on the product picks it, closes the picker, and focus returns to the button that opened it",
+      "detail": {
+        "open2": 0,
+        "f": {
+          "tag": "BUTTON",
+          "stop": "36",
+          "type": "button",
+          "text": "Change",
+          "ringOrOutline": true,
+          "focused": {
+            "outline": "solid 2px",
+            "shadow": "none",
+            "border": "rgb(212, 212, 216)"
+          },
+          "inDialog": false
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B2: Tab reaches Start offer",
+      "detail": {
+        "tag": "BUTTON",
+        "stop": "65",
+        "type": "submit",
+        "text": "Start offer",
+        "ringOrOutline": true,
+        "focused": {
+          "outline": "solid 2px",
+          "shadow": "none",
+          "border": "rgb(255, 255, 255)"
+        },
+        "inDialog": false,
+        "visible": true,
+        "how": "outline or ring"
+      }
+    },
+    {
+      "ok": true,
+      "label": "B2: focus is visible at every stop outside the date fields (62 stops)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "B2: Enter on Start offer starts it (back on the list with a toast)",
+      "detail": [
+        "“Buy 2 of Night Repair Cream 50g, get 1 free” has started."
+      ]
+    }
+  ],
+  "notes": [
+    "B2: focus indicators seen: [\"A → outline or ring\",\"BUTTON:button → outline or ring\",\"INPUT:search → outline or ring\",\"INPUT:number → outline or ring\",\"INPUT:text → outline or ring\",\"INPUT:datetime-local → outline or ring\",\"INPUT:datetime-local → none\",\"BUTTON:submit → outline or ring\"]",
+    "B2: 2 stop(s) inside the Starts/Ends date fields have no ring on the field (Chrome's own part highlight only); see B2-date-part-focus.png",
+    "B2: start toast [\"“Buy 2 of Night Repair Cream 50g, get 1 free” has started.\"]"
+  ],
+  "screenshots": [
+    {
+      "name": "B2-picked-by-keyboard",
+      "file": "docs/cms-reviews/drills/COM-03/B2-picked-by-keyboard.png",
+      "bytes": 36697,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    },
+    {
+      "name": "B2-date-part-focus",
+      "file": "docs/cms-reviews/drills/COM-03/B2-date-part-focus.png",
+      "bytes": 36293,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    },
+    {
+      "name": "B2-started",
+      "file": "docs/cms-reviews/drills/COM-03/B2-started.png",
+      "bytes": 55535,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    }
+  ]
+}

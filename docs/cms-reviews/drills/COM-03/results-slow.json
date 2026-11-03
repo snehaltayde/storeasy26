@@ -1,0 +1,77 @@
+{
+  "id": "COM-03",
+  "part": "slow",
+  "title": "P1-DRILLS COM-03: offers in plain words, a check before going live, a way back — slow",
+  "ranAt": "2026-11-03T11:47:01.142Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B3 (Slow 3G): \"Checking on your store's products…\" shows right after the change",
+      "detail": {
+        "t": 2,
+        "checking": true,
+        "get2": true,
+        "failed": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "B3: it stays until the new example arrives",
+      "detail": {
+        "lastChecking": {
+          "t": 2385,
+          "checking": true,
+          "get2": true,
+          "failed": false
+        },
+        "arrived": {
+          "t": 2488,
+          "checking": false,
+          "get2": true,
+          "failed": false
+        },
+        "samples": 25
+      }
+    },
+    {
+      "ok": true,
+      "label": "B3 (offline): the example area says \"The example couldn't load. Check your connection and try again.\""
+    },
+    {
+      "ok": true,
+      "label": "B3: back online, Start offer works",
+      "detail": [
+        "“Buy 3 of Rose Hydration Mist 100ml, get 2 free” has started."
+      ]
+    }
+  ],
+  "notes": [
+    "B3: example requests under Slow 3G: [{\"at\":355,\"m\":\"POST\",\"u\":\"/api/admin/offers/simulate\"}]",
+    "B3: back online, Start offer enabled: true"
+  ],
+  "screenshots": [
+    {
+      "name": "B3-slow-example-arrived",
+      "file": "docs/cms-reviews/drills/COM-03/B3-slow-example-arrived.png",
+      "bytes": 37364,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    },
+    {
+      "name": "B3-offline-example",
+      "file": "docs/cms-reviews/drills/COM-03/B3-offline-example.png",
+      "bytes": 37370,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    }
+  ]
+}

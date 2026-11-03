@@ -1,0 +1,217 @@
+▲ Next.js 16.2.9 (Turbopack)
+
+  Creating an optimized production build ...
+Turbopack build encountered 2 warnings:
+./next.config.mjs
+Encountered unexpected file in NFT list
+A file was traced that indicates that the whole project was traced unintentionally. Somewhere in the import trace below, there are:
+- filesystem operations (like path.join, path.resolve or fs.readFile), or
+- very dynamic requires (like require('./' + foo)).
+To resolve this, you can
+- remove them if possible, or
+- only use them in development, or
+- make sure they are statically scoped to some subfolder: path.join(process.cwd(), 'data', bar), or
+- add ignore comments: path.join(/*turbopackIgnore: true*/ process.cwd(), bar)
+
+Import trace:
+  App Route:
+    ./next.config.mjs
+    ./lib/platform/migrate.js
+    ./app/api/platform/overview/route.js
+
+
+./next.config.mjs
+Encountered unexpected file in NFT list
+A file was traced that indicates that the whole project was traced unintentionally. Somewhere in the import trace below, there are:
+- filesystem operations (like path.join, path.resolve or fs.readFile), or
+- very dynamic requires (like require('./' + foo)).
+To resolve this, you can
+- remove them if possible, or
+- only use them in development, or
+- make sure they are statically scoped to some subfolder: path.join(process.cwd(), 'data', bar), or
+- add ignore comments: path.join(/*turbopackIgnore: true*/ process.cwd(), bar)
+
+Output asset trace:
+  [output]/.next/server/app/api/platform/tenants/route.js
+  [output]/.next/server/chunks/[root-of-the-server]__0cua000._.js
+
+Import trace:
+  App Route:
+    ./next.config.mjs
+    ./lib/platform/migrate.js
+    ./app/api/platform/overview/route.js
+
+
+✓ Compiled successfully in 4.8s
+  Running TypeScript ...
+  Finished TypeScript in 114ms ...
+  Collecting page data using 14 workers ...
+⚠ Using edge runtime on a page currently disables static generation for that page
+  Generating static pages using 14 workers (0/6) ...
+  Generating static pages using 14 workers (1/6) 
+  Generating static pages using 14 workers (2/6) 
+  Generating static pages using 14 workers (4/6) 
+✓ Generating static pages using 14 workers (6/6) in 196ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /[...unmatched]
+├ ƒ /about
+├ ƒ /account
+├ ƒ /account/orders/[orderId]
+├ ƒ /admin
+├ ƒ /admin/accept-invite
+├ ƒ /admin/analytics
+├ ƒ /admin/automations
+├ ƒ /admin/billing
+├ ƒ /admin/brand
+├ ƒ /admin/catalog
+├ ƒ /admin/dashboard
+├ ƒ /admin/experiments
+├ ƒ /admin/insights
+├ ƒ /admin/integrations
+├ ƒ /admin/login
+├ ƒ /admin/media
+├ ƒ /admin/offers
+├ ƒ /admin/orders
+├ ƒ /admin/orders/[id]
+├ ƒ /admin/releases
+├ ƒ /admin/reset
+├ ƒ /admin/settings
+├ ƒ /admin/setup
+├ ƒ /admin/storefront
+├ ƒ /admin/storefront/designer
+├ ƒ /admin/storefront/designer/collection
+├ ƒ /admin/storefront/designer/product
+├ ƒ /admin/storefront/home
+├ ƒ /admin/storefront/navigation
+├ ƒ /admin/storefront/pages
+├ ƒ /admin/storefront/pages/[slug]
+├ ƒ /admin/storefront/product-pages
+├ ƒ /admin/theme
+├ ƒ /admin/upsells
+├ ƒ /api/account
+├ ƒ /api/admin/accept-invite
+├ ƒ /api/admin/agency-grants
+├ ƒ /api/admin/audit
+├ ƒ /api/admin/automations
+├ ƒ /api/admin/billing
+├ ƒ /api/admin/brand
+├ ƒ /api/admin/bundles
+├ ƒ /api/admin/catalog
+├ ƒ /api/admin/domains
+├ ƒ /api/admin/experiments
+├ ƒ /api/admin/help
+├ ƒ /api/admin/insights
+├ ƒ /api/admin/integrations
+├ ƒ /api/admin/login
+├ ƒ /api/admin/logout
+├ ƒ /api/admin/maintenance-pass
+├ ƒ /api/admin/media
+├ ƒ /api/admin/offers
+├ ƒ /api/admin/offers/[id]
+├ ƒ /api/admin/offers/[id]/revert
+├ ƒ /api/admin/offers/simulate
+├ ƒ /api/admin/offers/targets
+├ ƒ /api/admin/orders
+├ ƒ /api/admin/orders/[id]
+├ ƒ /api/admin/privacy
+├ ƒ /api/admin/quiz
+├ ƒ /api/admin/recover
+├ ƒ /api/admin/refs
+├ ƒ /api/admin/releases
+├ ƒ /api/admin/reset
+├ ƒ /api/admin/returns
+├ ƒ /api/admin/settings
+├ ƒ /api/admin/setup
+├ ƒ /api/admin/storefront
+├ ƒ /api/admin/stores
+├ ƒ /api/admin/sync
+├ ƒ /api/admin/team
+├ ƒ /api/admin/theme
+├ ƒ /api/admin/upsells
+├ ƒ /api/admin/upsells/[id]
+├ ƒ /api/approve
+├ ƒ /api/cart
+├ ƒ /api/checkout
+├ ƒ /api/connect/shopify/callback
+├ ƒ /api/connect/shopify/start
+├ ƒ /api/contact
+├ ƒ /api/errors
+├ ƒ /api/exp
+├ ƒ /api/health
+├ ƒ /api/jobs/forward-events
+├ ƒ /api/jobs/sync-catalog
+├ ƒ /api/jobs/sync-shopify
+├ ƒ /api/jobs/tick
+├ ƒ /api/leads
+├ ƒ /api/media/[id]
+├ ƒ /api/partners
+├ ƒ /api/partners/auth
+├ ƒ /api/platform/billing
+├ ƒ /api/platform/billing/webhook
+├ ƒ /api/platform/costs
+├ ƒ /api/platform/domains
+├ ƒ /api/platform/flags
+├ ƒ /api/platform/incidents
+├ ƒ /api/platform/login
+├ ƒ /api/platform/logout
+├ ƒ /api/platform/overview
+├ ƒ /api/platform/partners
+├ ƒ /api/platform/privacy
+├ ƒ /api/platform/provisions
+├ ƒ /api/platform/queues
+├ ƒ /api/platform/support
+├ ƒ /api/platform/tenants
+├ ƒ /api/platform/tenants/[id]
+├ ƒ /api/platform/tenants/[id]/export
+├ ƒ /api/platform/tenants/[id]/handoff
+├ ƒ /api/platform/tenants/[id]/offboard
+├ ƒ /api/platform/themes
+├ ƒ /api/preview
+├ ƒ /api/quiz/[slug]
+├ ƒ /api/razorpay/webhook
+├ ƒ /api/search
+├ ƒ /api/shopify/webhooks
+├ ƒ /api/track
+├ ƒ /api/upsell
+├ ƒ /api/wishlist
+├ ƒ /approve/[token]
+├ ƒ /bundles/[slug]
+├ ƒ /campaigns/[slug]
+├ ƒ /checkout
+├ ƒ /checkout/confirmation/[orderId]
+├ ƒ /collections
+├ ƒ /collections/[handle]
+├ ƒ /contact
+├ ƒ /customers
+├ ƒ /customers/[slug]
+├ ○ /icon.svg
+├ ƒ /integrations
+├ ƒ /journal
+├ ƒ /journal/[slug]
+├ ƒ /legal/[doc]
+├ ƒ /manifest.webmanifest
+├ ƒ /offline
+├ ƒ /orders/[orderId]
+├ ƒ /partners
+├ ƒ /platform
+├ ƒ /policies/[slug]
+├ ƒ /pricing
+├ ƒ /products/[handle]
+├ ƒ /quiz/[slug]
+├ ƒ /robots.txt
+├ ƒ /search
+├ ƒ /sitemap.xml
+├ ƒ /templates
+├ ƒ /trust
+├ ƒ /verticals/[vertical]
+└ ƒ /wishlist
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+exit 0

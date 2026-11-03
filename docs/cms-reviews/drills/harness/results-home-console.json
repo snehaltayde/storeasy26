@@ -1,0 +1,18 @@
+{
+  "id": "harness",
+  "part": "home-console",
+  "title": "Storefront console errors — home-console",
+  "ranAt": "2026-11-03T12:17:40.913Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 0,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [],
+  "notes": [
+    "/: []",
+    "/products/glow-serum: []",
+    "/account: []"
+  ],
+  "screenshots": []
+}

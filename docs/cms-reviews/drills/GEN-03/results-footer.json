@@ -1,0 +1,48 @@
+{
+  "id": "GEN-03",
+  "part": "footer",
+  "title": "P1-DRILLS GEN-03: a good store before the founder edits anything — footer",
+  "ranAt": "2026-11-03T12:05:39.797Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 2,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "8: the columns footer carries the store's name and no catalog or vendor note",
+      "detail": "Design Demo Co\n\nRealistic data for the console redesign\n\nShop\n\nAll collections\nBestsellers\nNight routine\nSerums\n\nCompany\n\nContact\nAU-05 D1 (saved again)\nAU-05 D3\nAU-05 D4\nAU-05 D5\nAU-05 D7\nAU-05 D8\n\nSupport\n\nsupport@design.test\n\n© Design Demo Co"
+    },
+    {
+      "ok": true,
+      "label": "8: the minimal footer carries the store's name and no catalog or vendor note",
+      "detail": "Design Demo Co\n\nRealistic data for the console redesign\n\nAll collections\nContact\nAU-05 D1 (saved again)\nAU-05 D11\nAU-05 D3\nAU-05 D4\nAU-05 D5\nAU-05 D7\n\nsupport@design.test\n\n© Design Demo Co"
+    }
+  ],
+  "notes": [
+    "8: the footer layout before: columns",
+    "8: switched to minimal: {\"st\":200,\"pub\":200}",
+    "8: switched back to columns: {\"st\":200,\"pub\":200}"
+  ],
+  "screenshots": [
+    {
+      "name": "8-footer-columns",
+      "file": "docs/cms-reviews/drills/GEN-03/8-footer-columns.png",
+      "bytes": 18179,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "8-footer-minimal",
+      "file": "docs/cms-reviews/drills/GEN-03/8-footer-minimal.png",
+      "bytes": 27407,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

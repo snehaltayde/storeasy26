@@ -1,0 +1,302 @@
+{
+  "id": "AU-05",
+  "part": "editor",
+  "title": "P1-DRILLS AU-05: the page editor keeps the founder's words — editor",
+  "ranAt": "2026-11-03T11:53:06.774Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 27,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "D1: a text section with two paragraphs and no heading saves (PUT 200)",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "D1: after reload both paragraphs are there and the heading is empty",
+      "detail": {
+        "heads": [
+          "About us",
+          ""
+        ],
+        "paras": [
+          "We make things by hand.",
+          "First paragraph.\n\nSecond paragraph."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "D1: the preview shows both paragraphs, with no empty h2 in the DOM",
+      "detail": {
+        "url": "/policies/drill-au05-d1",
+        "emptyH2": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "D2: a blank text section is refused with a plain message naming section 3 (its badge reads \"3. Text\")",
+      "detail": {
+        "st": 422,
+        "msg": "Couldn't save\n\nsection 3: add a heading or some text, or remove this section."
+      }
+    },
+    {
+      "ok": true,
+      "label": "D2: the Unsaved badge stays"
+    },
+    {
+      "ok": true,
+      "label": "D2: with the blank section removed, Save succeeds (the banner and the Unsaved badge go)",
+      "detail": {
+        "st": 200,
+        "msgAfter": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "D2: after reload the earlier content is unchanged",
+      "detail": [
+        "We make things by hand.",
+        "First paragraph.\n\nSecond paragraph."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D3: the rich (heading only), image (alt only) and FAQ (answer, no question) sections are each refused",
+      "detail": "Couldn't save\n\nsection 2: this section is empty. Add some content, or remove this section.\nsection 3: choose an image, or remove this section.\nsection 4, question 1: question text required"
+    },
+    {
+      "ok": true,
+      "label": "D3: nothing is lost from the form",
+      "detail": {
+        "heading": "Only a heading",
+        "alt": "Only alt text",
+        "answer": "<p>An answer with no question.</p>"
+      }
+    },
+    {
+      "ok": true,
+      "label": "D4: with only a headingless text section, Save as template is enabled"
+    },
+    {
+      "ok": true,
+      "label": "D4: Save as template works (PUT 200)"
+    },
+    {
+      "ok": true,
+      "label": "D4: a new page from that template holds the paragraphs",
+      "detail": [
+        "Template paragraph one.\n\nTemplate paragraph two."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D4: a blank section shows its error inside the dialog",
+      "detail": "Save as template\n\nSaves the current sections as a reusable starting point for new pages. New pages get an independent copy — editing the template later never changes existing pages.\n\nTemplate name\n\nsection 2: add a heading or some text, or remove this section.\n\nCancel\nSave template"
+    },
+    {
+      "ok": true,
+      "label": "D5: add, save, edit, save, reload: no duplicated or swapped section",
+      "detail": {
+        "st": 200,
+        "st2": 200,
+        "h5": [
+          "One",
+          "Two"
+        ],
+        "p5": [
+          "First.",
+          "Second, edited."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "D6: a paragraph over 4,000 characters is refused with its length and the limit",
+      "detail": {
+        "len": 4354,
+        "msg": "Couldn't save\n\nsection 2: the paragraph is too long (4354 characters, the limit is 4000)"
+      }
+    },
+    {
+      "ok": true,
+      "label": "D6: the text stays in the form"
+    },
+    {
+      "ok": true,
+      "label": "D7: the banner quotes \"<500 and >\"",
+      "detail": "Couldn't save\n\nsection 1, question 1: saving would lose these words: \"<500 and >\". This usually comes from < or > signs. Reword them or remove them, then save again."
+    },
+    {
+      "ok": true,
+      "label": "D7: the number matches the section badge",
+      "detail": {
+        "msg": "Couldn't save\n\nsection 1, question 1: saving would lose these words: \"<500 and >\". This usually comes from < or > signs. Reword them or remove them, then save again.",
+        "b7": [
+          "1. FAQ"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "D7: the text stays"
+    },
+    {
+      "ok": true,
+      "label": "D7: reworded, Save succeeds",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "D8: a tel: link is refused and the banner quotes the address",
+      "detail": "Couldn't save\n\nsection 2: saving would lose this link or image address: \"tel:+919876543210\". It needs to start with https or a slash (/). Change it or remove it, then save again."
+    },
+    {
+      "ok": true,
+      "label": "D8: the form stays Unsaved"
+    },
+    {
+      "ok": true,
+      "label": "D8: with https addresses (one rel=nofollow target=_blank) Save succeeds",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "D9: the banner quotes the address",
+      "detail": "Couldn't save\n\nsection 2: this page can't show embedded videos or sound yet, so saving would lose \"https://www.youtube.com/embed/dQw4w9WgXcQ\". Remove it or link to it instead."
+    },
+    {
+      "ok": true,
+      "label": "D9: it says the page can't show embedded videos, and doesn't say the section is empty",
+      "detail": "Couldn't save\n\nsection 2: this page can't show embedded videos or sound yet, so saving would lose \"https://www.youtube.com/embed/dQw4w9WgXcQ\". Remove it or link to it instead."
+    },
+    {
+      "ok": true,
+      "label": "D9: the form stays Unsaved"
+    },
+    {
+      "ok": true,
+      "label": "D9: replaced with a plain link, Save succeeds",
+      "detail": 200
+    }
+  ],
+  "notes": [
+    "D2: right after removing the blank section the form matches the saved page, so Save is disabled; the earlier banner still reads \"Couldn't save\\n\\nA section: add a heading or some text, or remove this section.\"",
+    "D3: banner \"Couldn't save\\n\\nsection 2: this section is empty. Add some content, or remove this section.\\nsection 3: choose an image, or remove this section.\\nsection 4, question 1: question text required\"",
+    "D5: stored sections [{\"id\":\"sec_535a4643\",\"kind\":\"text\",\"heading\":\"One\",\"body\":[\"First.\"]},{\"id\":\"sec_752bb1ac\",\"kind\":\"text\",\"heading\":\"Two\",\"body\":[\"Second, edited.\"]}]"
+  ],
+  "screenshots": [
+    {
+      "name": "D1-editor-after-reload",
+      "file": "docs/cms-reviews/drills/AU-05/D1-editor-after-reload.png",
+      "bytes": 38885,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-au05-d1"
+    },
+    {
+      "name": "D1-preview",
+      "file": "docs/cms-reviews/drills/AU-05/D1-preview.png",
+      "bytes": 21183,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/policies/drill-au05-d1"
+    },
+    {
+      "name": "D2-blank-refused",
+      "file": "docs/cms-reviews/drills/AU-05/D2-blank-refused.png",
+      "bytes": 39304,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-au05-d1"
+    },
+    {
+      "name": "D2-after-remove",
+      "file": "docs/cms-reviews/drills/AU-05/D2-after-remove.png",
+      "bytes": 38364,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-au05-d1"
+    },
+    {
+      "name": "D3-three-refused",
+      "file": "docs/cms-reviews/drills/AU-05/D3-three-refused.png",
+      "bytes": 40044,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-au05-d3"
+    },
+    {
+      "name": "D4-new-page-from-template",
+      "file": "docs/cms-reviews/drills/AU-05/D4-new-page-from-template.png",
+      "bytes": 38308,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/new"
+    },
+    {
+      "name": "D4-template-dialog-error",
+      "file": "docs/cms-reviews/drills/AU-05/D4-template-dialog-error.png",
+      "bytes": 51522,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/new"
+    },
+    {
+      "name": "D5-identity",
+      "file": "docs/cms-reviews/drills/AU-05/D5-identity.png",
+      "bytes": 37267,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-au05-d5"
+    },
+    {
+      "name": "D6-too-long",
+      "file": "docs/cms-reviews/drills/AU-05/D6-too-long.png",
+      "bytes": 47511,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-au05-d5"
+    },
+    {
+      "name": "D7-quoted",
+      "file": "docs/cms-reviews/drills/AU-05/D7-quoted.png",
+      "bytes": 41571,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-au05-d7"
+    },
+    {
+      "name": "D8-tel-refused",
+      "file": "docs/cms-reviews/drills/AU-05/D8-tel-refused.png",
+      "bytes": 39916,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-au05-d8"
+    },
+    {
+      "name": "D9-embed-refused",
+      "file": "docs/cms-reviews/drills/AU-05/D9-embed-refused.png",
+      "bytes": 42875,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-au05-d9"
+    }
+  ]
+}

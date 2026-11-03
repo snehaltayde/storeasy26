@@ -1,0 +1,51 @@
+{
+  "id": "GEN-03",
+  "part": "boundary",
+  "title": "P1-DRILLS GEN-03: a good store before the founder edits anything — boundary",
+  "ranAt": "2026-11-03T12:05:46.362Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "7 setup: a temporary throw is in app/(storefront)/search/page.js"
+    },
+    {
+      "ok": true,
+      "label": "7: the page ran on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: the storefront's error boundary shows its plain words",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\nSomething went wrong\n\nA temporary error stopped this page from loading. It's usually gone on retry.\n\nRef: 2534939360\n\nTry again\nBack to home\n\nDesign Demo Co\n\nRealistic data for the console redesign\n\nSho"
+    },
+    {
+      "ok": true,
+      "label": "7: with Try again and Back to home"
+    },
+    {
+      "ok": true,
+      "label": "7: no error text or stack shown to the shopper",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\nSomething went wrong\n\nA temporary error stopped this page from loading. It's usually gone on retry.\n\nRef: 2534939360\n\nTry again\nBack to home\n\nDesign Demo Co\n\nRealistic data for the console redesign\n\nSho"
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "7-error-boundary-edge",
+      "file": "docs/cms-reviews/drills/GEN-03/7-error-boundary-edge.png",
+      "bytes": 18448,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/search"
+    }
+  ]
+}

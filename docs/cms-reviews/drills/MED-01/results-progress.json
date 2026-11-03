@@ -1,0 +1,166 @@
+{
+  "id": "MED-01",
+  "part": "progress",
+  "title": "P1-DRILLS MED-01: one upload path that makes photos fit (desktop Chrome) — progress",
+  "ranAt": "2026-11-03T12:17:15.591Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 6,
+  "failed": 1,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "2 (library, throttled): the banner goes Getting … ready…, Uploading … N% (moving), Saving…",
+      "detail": [
+        "Getting photo-4000x3000-again.jpg ready…",
+        "Uploading photo-4000x3000-again.jpg… 0%",
+        "Uploading photo-4000x3000-again.jpg… 6%",
+        "Uploading photo-4000x3000-again.jpg… 12%",
+        "Uploading photo-4000x3000-again.jpg… 18%",
+        "Uploading photo-4000x3000-again.jpg… 24%",
+        "Uploading photo-4000x3000-again.jpg… 30%",
+        "Uploading photo-4000x3000-again.jpg… 36%",
+        "Uploading photo-4000x3000-again.jpg… 42%",
+        "Uploading photo-4000x3000-again.jpg… 48%",
+        "Uploading photo-4000x3000-again.jpg… 60%",
+        "Uploading photo-4000x3000-again.jpg… 66%",
+        "Uploading photo-4000x3000-again.jpg… 72%",
+        "Uploading photo-4000x3000-again.jpg… 84%",
+        "Uploading photo-4000x3000-again.jpg… 90%",
+        "Uploading photo-4000x3000-again.jpg… 96%",
+        "Saving photo-4000x3000-again.jpg…"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "2 (picker, throttled): the banner stages show, and the picked image lands in the field",
+      "detail": {
+        "stages": [
+          "Getting photo-4000x3000.jpg ready…",
+          "Uploading photo-4000x3000.jpg… 6%",
+          "Uploading photo-4000x3000.jpg… 12%",
+          "Uploading photo-4000x3000.jpg… 18%",
+          "Uploading photo-4000x3000.jpg… 24%",
+          "Uploading photo-4000x3000.jpg… 30%",
+          "Uploading photo-4000x3000.jpg… 36%",
+          "Uploading photo-4000x3000.jpg… 42%",
+          "Uploading photo-4000x3000.jpg… 48%",
+          "Uploading photo-4000x3000.jpg… 60%",
+          "Uploading photo-4000x3000.jpg… 66%",
+          "Uploading photo-4000x3000.jpg… 72%",
+          "Uploading photo-4000x3000.jpg… 78%",
+          "Uploading photo-4000x3000.jpg… 90%",
+          "Uploading photo-4000x3000.jpg… 96%",
+          "Saving photo-4000x3000.jpg…"
+        ],
+        "urls": [
+          "/api/media/med_7dd7768e69db050f0e",
+          ""
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "2: Escape mid-upload: the spot stays empty and a toast says the image is in the library and wasn't added",
+      "detail": {
+        "urls": [
+          "/api/media/med_7dd7768e69db050f0e",
+          ""
+        ],
+        "toasts": [
+          "\"sideways-exif6.jpg\" is now in your library. It wasn't added here because you closed the window before it finished. You can choose it from the library when you're ready."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "2: reopening the picker for a different spot mid-upload: neither spot changes and the reopened picker stays open",
+      "detail": {
+        "stillOpen": 1,
+        "before": [
+          "/api/media/med_7dd7768e69db050f0e",
+          ""
+        ],
+        "after": [
+          "/api/media/med_7dd7768e69db050f0e",
+          ""
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "2: network lost after closing: a toast gives the \"didn't go through\" message",
+      "detail": [
+        "The upload didn't go through. Check your connection and try again."
+      ]
+    },
+    {
+      "ok": false,
+      "label": "7: network off during upload (library): \"didn't go through\", and re-picking the same file starts again and says the same",
+      "detail": {
+        "off1": false,
+        "off2": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: back online, re-picking uploads",
+      "detail": {
+        "before": 24,
+        "after": 24
+      }
+    }
+  ],
+  "notes": [
+    "2: library result {\"mime\":\"image/png\",\"w\":300,\"h\":300,\"size\":261691}",
+    "2: preview requests from the picker grid: [\"/api/media/med_406f6f1608b5540b15\",\"/api/media/med_40764966ddb77182a7\",\"/api/media/med_05bbaea1269a777ac1\",\"/api/media/med_966916688801246d8a\",\"/api/media/med_00949871ca25a27e2d\",\"/api/media/med_3ffa9ae430c1c1ec81\"]"
+  ],
+  "screenshots": [
+    {
+      "name": "2-picker-landed",
+      "file": "docs/cms-reviews/drills/MED-01/2-picker-landed.png",
+      "bytes": 41130,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-med01"
+    },
+    {
+      "name": "2-escape-mid-upload",
+      "file": "docs/cms-reviews/drills/MED-01/2-escape-mid-upload.png",
+      "bytes": 45079,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-med01"
+    },
+    {
+      "name": "2-reopened-other-spot",
+      "file": "docs/cms-reviews/drills/MED-01/2-reopened-other-spot.png",
+      "bytes": 58982,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-med01"
+    },
+    {
+      "name": "2-network-lost-after-closing",
+      "file": "docs/cms-reviews/drills/MED-01/2-network-lost-after-closing.png",
+      "bytes": 43714,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/drill-med01"
+    },
+    {
+      "name": "7-back-online",
+      "file": "docs/cms-reviews/drills/MED-01/7-back-online.png",
+      "bytes": 49369,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/media"
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "id": "GEN-03",
+  "part": "rates",
+  "title": "P1-DRILLS GEN-03: a good store before the founder edits anything — rates",
+  "ranAt": "2026-11-03T12:03:30.528Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 11,
+  "failed": 1,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "5: on starter rates the drawer shows no free-shipping nudge",
+      "detail": [
+        "Shipping"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "6: the shipping card shows \"You haven't set your own shipping rates yet\" with Keep these rates"
+    },
+    {
+      "ok": true,
+      "label": "6: Save settings answers 200",
+      "detail": 200
+    },
+    {
+      "ok": false,
+      "label": "6: a reload right after Save shows the saved rates and no notice",
+      "detail": {
+        "flat": "79",
+        "free": "999",
+        "cod": "49",
+        "notice": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "6: a reload 31 s later shows the saved rates and no notice",
+      "detail": {
+        "flat": "79",
+        "free": "1999",
+        "cod": "49",
+        "notice": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "5: after saving rates the drawer shows the nudge (Add ₹700 more for free shipping, at ₹1,299 of ₹1,999)",
+      "detail": "Add ₹700 more for free shipping"
+    },
+    {
+      "ok": true,
+      "label": "9: on a real page, adding to the cart opens the drawer with the right nudge (₹1,499 → Add ₹500 more)",
+      "detail": "Add ₹500 more for free shipping"
+    },
+    {
+      "ok": true,
+      "label": "9: after a reload the header's cart button comes from the real cart (layout seeds CartProvider)",
+      "detail": "Open cart, 1 item"
+    },
+    {
+      "ok": true,
+      "label": "3: with no Razorpay keys, Pay online is disabled with \"Online payment isn't available for this store right now.\"",
+      "detail": {
+        "disabled": true,
+        "label": "Pay online · card / UPI / netbanking\n\nOnline payment isn't available for this store right now."
+      }
+    },
+    {
+      "ok": true,
+      "label": "4: a failed network call shows \"Could not reach the store — your cart is untouched. Check your connection and try again.\"",
+      "detail": "Could not reach the store — your cart is untouched. Check your connection and try again."
+    },
+    {
+      "ok": true,
+      "label": "2 (COD): the Place order button (₹1,427) matches the amount charged (order total ₹1427)",
+      "detail": {
+        "total": 1427,
+        "subtotal": 1299,
+        "shipping_total": 128,
+        "payment_method": "cod"
+      }
+    },
+    {
+      "ok": true,
+      "label": "2 (COD): the summary's total matches the button",
+      "detail": [
+        "Subtotal",
+        "₹1,299",
+        "Shipping (incl. COD fee)",
+        "₹128",
+        "Total",
+        "₹1,427"
+      ]
+    }
+  ],
+  "notes": [
+    "setup: the store's shipping config before: null",
+    "6: starter values shown: {\"flat\":\"79\",\"free\":\"999\",\"cod\":\"49\"}",
+    "6: what the control plane holds right after Save: {\"currency\":\"INR\",\"basis\":\"net\",\"freeThreshold\":1999,\"flatRate\":79,\"codFee\":49,\"codFeeWaivedAt\":null,\"zones\":[]}",
+    "2: payment step: button \"Place order · ₹1,427\"; summary [\"Subtotal\",\"₹1,299\",\"Shipping (incl. COD fee)\",\"₹128\",\"Total\",\"₹1,427\"]"
+  ],
+  "screenshots": [
+    {
+      "name": "5-drawer-starter-no-nudge",
+      "file": "docs/cms-reviews/drills/GEN-03/5-drawer-starter-no-nudge.png",
+      "bytes": 18628,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "6-settings-notice",
+      "file": "docs/cms-reviews/drills/GEN-03/6-settings-notice.png",
+      "bytes": 33124,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/settings"
+    },
+    {
+      "name": "6-settings-after-save-reload",
+      "file": "docs/cms-reviews/drills/GEN-03/6-settings-after-save-reload.png",
+      "bytes": 33124,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/settings"
+    },
+    {
+      "name": "6-settings-reload-31s-later",
+      "file": "docs/cms-reviews/drills/GEN-03/6-settings-reload-31s-later.png",
+      "bytes": 30116,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/settings"
+    },
+    {
+      "name": "5-drawer-own-rates-nudge",
+      "file": "docs/cms-reviews/drills/GEN-03/5-drawer-own-rates-nudge.png",
+      "bytes": 19001,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "9-drawer-real-page",
+      "file": "docs/cms-reviews/drills/GEN-03/9-drawer-real-page.png",
+      "bytes": 16398,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/vitamin-c-booster"
+    },
+    {
+      "name": "3-payment-no-keys",
+      "file": "docs/cms-reviews/drills/GEN-03/3-payment-no-keys.png",
+      "bytes": 23798,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "4-network-failed",
+      "file": "docs/cms-reviews/drills/GEN-03/4-network-failed.png",
+      "bytes": 25104,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "2-cod-confirmation",
+      "file": "docs/cms-reviews/drills/GEN-03/2-cod-confirmation.png",
+      "bytes": 20206,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/DES-51007930"
+    }
+  ]
+}

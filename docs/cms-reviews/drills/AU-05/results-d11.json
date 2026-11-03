@@ -1,0 +1,61 @@
+{
+  "id": "AU-05",
+  "part": "d11",
+  "title": "P1-DRILLS AU-05: the page editor keeps the founder's words — d11",
+  "ranAt": "2026-11-03T11:54:55.191Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "D11: the template opens with every section and the heading kept",
+      "detail": {
+        "b": [
+          "1. Text",
+          "2. Rich HTML"
+        ],
+        "heads": [
+          "Our promise",
+          "Old details"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "D11: Save names the empty section (section 2)",
+      "detail": {
+        "st": 422,
+        "msg": "Couldn't save\n\nsection 2: this section is empty. Add some content, or remove this section."
+      }
+    },
+    {
+      "ok": true,
+      "label": "D11: fixing it, Save succeeds",
+      "detail": 200
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "D11-opened",
+      "file": "docs/cms-reviews/drills/AU-05/D11-opened.png",
+      "bytes": 39443,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/new"
+    },
+    {
+      "name": "D11-save-names-section",
+      "file": "docs/cms-reviews/drills/AU-05/D11-save-names-section.png",
+      "bytes": 39055,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/new"
+    }
+  ]
+}

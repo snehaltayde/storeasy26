@@ -1,0 +1,224 @@
+{
+  "id": "MIG-OVL",
+  "part": "orders",
+  "title": "P1-DRILLS MIG-05/OVL-06: both titles on the order page — orders",
+  "ranAt": "2026-11-03T11:05:34.234Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 17,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: two products added to the storefront cart (POST /api/cart 200)",
+      "detail": [
+        {
+          "status": 200,
+          "drawer": true
+        },
+        {
+          "status": 200,
+          "drawer": true
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D6 setup: the drawer shows the cart",
+      "detail": "Your cart (3)\n\nRadiance Glow Serum 30ml\n\nDefault\n\n−\n1\n+\n₹1,299\n\nDaily Defence SPF 50\n\nDefault\n\n−\n2\n+\n₹1,798\nApply\nSubtot"
+    },
+    {
+      "ok": true,
+      "label": "D6: no SKU or 'Shopify title' text in the cart drawer"
+    },
+    {
+      "ok": true,
+      "label": "setup: COD order placed on the harness storefront",
+      "detail": "DES-985D0AE0"
+    },
+    {
+      "ok": true,
+      "label": "D6: no SKU or 'Shopify title' text on checkout (address)"
+    },
+    {
+      "ok": true,
+      "label": "D6: no SKU or 'Shopify title' text on checkout (review)"
+    },
+    {
+      "ok": true,
+      "label": "D6: no SKU or 'Shopify title' text on checkout (payment)"
+    },
+    {
+      "ok": true,
+      "label": "D6: no SKU or 'Shopify title' text on checkout (confirmation)"
+    },
+    {
+      "ok": true,
+      "label": "D1 setup: the order's lines carry catalog_title (= title) and sku (migration 0018)",
+      "detail": [
+        {
+          "position": 0,
+          "variant_id": "gid://v/1",
+          "title": "Radiance Glow Serum 30ml",
+          "catalog_title": "Radiance Glow Serum 30ml",
+          "sku": "DD-GLOW-30",
+          "quantity": 1
+        },
+        {
+          "position": 1,
+          "variant_id": "gid://v/3",
+          "title": "Daily Defence SPF 50",
+          "catalog_title": "Daily Defence SPF 50",
+          "sku": "DD-SPF-50",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D1: under the renamed line, \"Shopify title: Radiance Glow Serum 30ml, SKU: DD-GLOW-30\"",
+      "detail": [
+        {
+          "text": "Shopify title: Radiance Glow Serum 30ml, SKU: DD-GLOW-30",
+          "row": "Glow Serum, festive edition\n\nDefault · × 1\n\nShopify title: Radiance Glow Serum 30ml, SKU: DD-GLOW-30\n\n₹1,299",
+          "color": "rgb(161, 161, 170)",
+          "size": "12px"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D1: it sits under the line the shopper saw as the new name",
+      "detail": "Glow Serum, festive edition\n\nDefault · × 1\n\nShopify title: Radiance Glow Serum 30ml, SKU: DD-GLOW-30\n\n₹1,299"
+    },
+    {
+      "ok": true,
+      "label": "D1: the other line shows nothing new",
+      "detail": [
+        {
+          "text": "Shopify title: Radiance Glow Serum 30ml, SKU: DD-GLOW-30",
+          "row": "Glow Serum, festive edition\n\nDefault · × 1\n\nShopify title: Radiance Glow Serum 30ml, SKU: DD-GLOW-30\n\n₹1,299",
+          "color": "rgb(161, 161, 170)",
+          "size": "12px"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D1 at 1280: nothing overflows sideways",
+      "detail": {
+        "vw": 1280,
+        "sw": 1280
+      }
+    },
+    {
+      "ok": true,
+      "label": "D1 at 375: nothing overflows (page and the Shopify line fit)",
+      "detail": {
+        "sw": {
+          "vw": 375,
+          "sw": 375
+        },
+        "clipped": {
+          "right": 279.078125,
+          "vw": 375,
+          "scrollW": 242,
+          "clientW": 242
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "D5 setup: support grant created in the operator console",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "D5: as support, the Shopify title and SKU line shows",
+      "detail": [
+        {
+          "text": "Shopify title: Radiance Glow Serum 30ml, SKU: DD-GLOW-30",
+          "row": "Glow Serum, festive edition\n\nDefault · × 1\n\nShopify title: Radiance Glow Serum 30ml, SKU: DD-GLOW-30\n\n₹1,299",
+          "color": "rgb(161, 161, 170)",
+          "size": "12px"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D5: name, email, phone and address are hidden from support",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "D6: the cart JSON a shopper's browser receives carries catalog_title and sku (known limit, not visible): [{\"title\":\"Radiance Glow Serum 30ml\",\"catalog_title\":\"Radiance Glow Serum 30ml\",\"sku\":\"DD-GLOW-30\"},{\"title\":\"Daily Defence SPF 50\",\"catalog_title\":\"Daily Defence SPF 50\",\"sku\":\"DD-SPF-50\"}]",
+    "D1: order DES-985D0AE0 lines as written: [{\"position\":0,\"variant_id\":\"gid://v/1\",\"title\":\"Radiance Glow Serum 30ml\",\"catalog_title\":\"Radiance Glow Serum 30ml\",\"sku\":\"DD-GLOW-30\",\"quantity\":1},{\"position\":1,\"variant_id\":\"gid://v/3\",\"title\":\"Daily Defence SPF 50\",\"catalog_title\":\"Daily Defence SPF 50\",\"sku\":\"DD-SPF-50\",\"quantity\":2}]",
+    "D1: the line is 12px in rgb(161, 161, 170), contrast 2.56:1 on white (review finding: text-fg-subtle, about 2.6:1)"
+  ],
+  "screenshots": [
+    {
+      "name": "D6-cart-drawer",
+      "file": "docs/cms-reviews/drills/MIG-OVL/D6-cart-drawer.png",
+      "bytes": 19381,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/spf-50-sunscreen"
+    },
+    {
+      "name": "D6-checkout-review",
+      "file": "docs/cms-reviews/drills/MIG-OVL/D6-checkout-review.png",
+      "bytes": 23358,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "D6-checkout-payment",
+      "file": "docs/cms-reviews/drills/MIG-OVL/D6-checkout-payment.png",
+      "bytes": 23617,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "D6-confirmation",
+      "file": "docs/cms-reviews/drills/MIG-OVL/D6-confirmation.png",
+      "bytes": 21280,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/DES-985D0AE0"
+    },
+    {
+      "name": "D1-order-1280",
+      "file": "docs/cms-reviews/drills/MIG-OVL/D1-order-1280.png",
+      "bytes": 36831,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/orders/DES-985D0AE0"
+    },
+    {
+      "name": "D1-order-375",
+      "file": "docs/cms-reviews/drills/MIG-OVL/D1-order-375.png",
+      "bytes": 21735,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/admin/orders/DES-985D0AE0"
+    },
+    {
+      "name": "D5-support-order",
+      "file": "docs/cms-reviews/drills/MIG-OVL/D5-support-order.png",
+      "bytes": 37777,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/orders/DES-985D0AE0"
+    }
+  ]
+}

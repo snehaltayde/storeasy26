@@ -1,0 +1,87 @@
+{
+  "id": "GEN-02",
+  "part": "support",
+  "title": "P1-DRILLS GEN-02: first sync progress, failures and retry — support",
+  "ranAt": "2026-11-03T11:00:58.293Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 6,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "D9: the operator console created a support grant for the design store",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "D9: as support, the card shows progress",
+      "detail": "Your products from Shopify\n\nBringing in your products from Shopify\n\n240 of 600 products so far. Big stores can take a while. You can keep using the console."
+    },
+    {
+      "ok": true,
+      "label": "D9: no buttons on the card for support",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "D9: the support login's card polls (GET /api/admin/sync)",
+      "detail": [
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D9: sync_runs.products_fetched (and updated_at) unchanged while support's card polls",
+      "detail": {
+        "before": {
+          "products_fetched": 240,
+          "updated_at": "2026-11-03T11:00:36.271Z",
+          "lease_owner": "drill"
+        },
+        "after": {
+          "products_fetched": 240,
+          "updated_at": "2026-11-03T11:00:36.271Z",
+          "lease_owner": "drill"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "D9 (extra): with no lease held, support's polls still don't touch the run",
+      "detail": {
+        "before": {
+          "products_fetched": 240,
+          "updated_at": "2026-11-03T11:00:36.271Z",
+          "lease_owner": null,
+          "status": "running",
+          "error": null
+        },
+        "after": {
+          "products_fetched": 240,
+          "updated_at": "2026-11-03T11:00:36.271Z",
+          "lease_owner": null,
+          "status": "running",
+          "error": null
+        }
+      }
+    }
+  ],
+  "notes": [
+    "D9: support view banner: \"Platform support access is active\""
+  ],
+  "screenshots": [
+    {
+      "name": "D9-support",
+      "file": "docs/cms-reviews/drills/GEN-02/D9-support.png",
+      "bytes": 39253,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    }
+  ]
+}

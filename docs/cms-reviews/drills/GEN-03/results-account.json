@@ -1,0 +1,139 @@
+{
+  "id": "GEN-03",
+  "part": "account",
+  "title": "P1-DRILLS GEN-03: a good store before the founder edits anything — account",
+  "ranAt": "2026-11-03T12:03:57.789Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 6,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "13: a wrong sign-in code shows \"That code isn't right — check the email and try again.\", not \"Something went wrong\"",
+      "detail": [
+        "No passwords — we email you a 6-digit code. Your past orders with this email join your account automatically once it’s verified.",
+        "That code isn't right — check the email and try again.",
+        "Code sent to drill-account@design.test.",
+        "6-digit code"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "14 setup: the sign-in code was recorded locally (notifications table; email is blanked on the harness)"
+    },
+    {
+      "ok": true,
+      "label": "14 at 1440: the order list shows plain words on the badges (shipped, partly shipped)",
+      "detail": [
+        {
+          "t": "PARTLY SHIPPED",
+          "w": 94,
+          "cw": 94,
+          "right": 1037,
+          "vw": 1440
+        },
+        {
+          "t": "SHIPPED",
+          "w": 55,
+          "cw": 55,
+          "right": 1038,
+          "vw": 1440
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "14 at 1440: \"PARTLY SHIPPED\" fits",
+      "detail": [
+        {
+          "t": "PARTLY SHIPPED",
+          "w": 94,
+          "cw": 94,
+          "right": 1037,
+          "vw": 1440
+        },
+        {
+          "t": "SHIPPED",
+          "w": 55,
+          "cw": 55,
+          "right": 1038,
+          "vw": 1440
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "14 at 375: the order list shows plain words on the badges (shipped, partly shipped)",
+      "detail": [
+        {
+          "t": "PARTLY SHIPPED",
+          "w": 94,
+          "cw": 94,
+          "right": 252,
+          "vw": 375
+        },
+        {
+          "t": "SHIPPED",
+          "w": 55,
+          "cw": 55,
+          "right": 253,
+          "vw": 375
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "14 at 375: \"PARTLY SHIPPED\" fits",
+      "detail": [
+        {
+          "t": "PARTLY SHIPPED",
+          "w": 94,
+          "cw": 94,
+          "right": 252,
+          "vw": 375
+        },
+        {
+          "t": "SHIPPED",
+          "w": 55,
+          "cw": 55,
+          "right": 253,
+          "vw": 375
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "14 setup: orders DES-94EA3D58, DES-EB54C457 for drill-account@design.test, set shipped and partly shipped in the local DB"
+  ],
+  "screenshots": [
+    {
+      "name": "13-wrong-code",
+      "file": "docs/cms-reviews/drills/GEN-03/13-wrong-code.png",
+      "bytes": 20123,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/account"
+    },
+    {
+      "name": "14-orders-1440",
+      "file": "docs/cms-reviews/drills/GEN-03/14-orders-1440.png",
+      "bytes": 15675,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/account"
+    },
+    {
+      "name": "14-orders-375",
+      "file": "docs/cms-reviews/drills/GEN-03/14-orders-375.png",
+      "bytes": 16554,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/account"
+    }
+  ]
+}

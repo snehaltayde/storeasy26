@@ -1,0 +1,350 @@
+{
+  "id": "GEN-02",
+  "part": "main",
+  "title": "P1-DRILLS GEN-02: first sync progress, failures and retry — main",
+  "ranAt": "2026-11-03T11:00:36.261Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 35,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "D1 dashboard: the sync card shows"
+    },
+    {
+      "ok": true,
+      "label": "D1 dashboard: the card is first on the page (no stats or other card above it)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "D1: headline \"Bringing in your products from Shopify\"",
+      "detail": "Your products from Shopify\n\nBringing in your products from Shopify\n\n240 of 600 products so far. Big stores can take a while. You can keep using the console."
+    },
+    {
+      "ok": true,
+      "label": "D1: \"240 of 600 products so far. Big stores can take a while. You can keep using the console.\" (full stop after \"so far\")",
+      "detail": "Your products from Shopify\n\nBringing in your products from Shopify\n\n240 of 600 products so far. Big stores can take a while. You can keep using the console."
+    },
+    {
+      "ok": true,
+      "label": "D1: the bar is at 40% (aria-valuenow 40)",
+      "detail": {
+        "label": "Products brought in",
+        "now": "40",
+        "min": "0",
+        "max": "100",
+        "fill": "40%"
+      }
+    },
+    {
+      "ok": true,
+      "label": "D1: no button on the card",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "D8: the progress bar has a label (\"Products brought in\") and aria-valuenow",
+      "detail": {
+        "label": "Products brought in",
+        "now": "40",
+        "min": "0",
+        "max": "100",
+        "fill": "40%"
+      }
+    },
+    {
+      "ok": true,
+      "label": "D8: the headline area is aria-live=\"polite\"",
+      "detail": "Bringing in your products from Shopify\n\n240 of 600 products so far. Big stores can take a while. You can keep using the console."
+    },
+    {
+      "ok": true,
+      "label": "D1 at 375: no sideways scroll",
+      "detail": {
+        "vw": 375,
+        "sw": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "D2: headline \"Your products didn't finish coming in\"",
+      "detail": "Your products from Shopify\n\nYour products didn't finish coming in\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\n240 of 600 products so far. Your store keeps everything already brought in.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D2: the message is in a red (danger) banner",
+      "detail": {
+        "tone": "danger",
+        "color": "rgb(254, 242, 242)",
+        "border": "rgb(254, 202, 202)"
+      }
+    },
+    {
+      "ok": true,
+      "label": "D2: the plain message",
+      "detail": "Your products from Shopify\n\nYour products didn't finish coming in\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\n240 of 600 products so far. Your store keeps everything already brought in.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D2: \"240 of 600 products so far. Your store keeps everything already brought in.\"",
+      "detail": "Your products from Shopify\n\nYour products didn't finish coming in\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\n240 of 600 products so far. Your store keeps everything already brought in.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D2: a Try again button",
+      "detail": [
+        "Try again"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D2: nothing raw on the sync card (no 502, GraphQL, Bad Gateway)",
+      "detail": "Your products from Shopify\n\nYour products didn't finish coming in\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\n240 of 600 products so far. Your store keeps everything already brought in.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D8: Tab reaches Try again",
+      "detail": "after 29 Tab presses"
+    },
+    {
+      "ok": true,
+      "label": "D8: Enter pressed Try again (a POST /api/admin/sync went out)",
+      "detail": [
+        {
+          "at": 1793703595542,
+          "method": "POST",
+          "path": "/api/admin/sync",
+          "status": 409
+        },
+        {
+          "at": 1793703616016,
+          "method": "GET",
+          "path": "/api/admin/sync",
+          "status": 200
+        },
+        {
+          "at": 1793703619053,
+          "method": "GET",
+          "path": "/api/admin/sync",
+          "status": 200
+        },
+        {
+          "at": 1793703622071,
+          "method": "GET",
+          "path": "/api/admin/sync",
+          "status": 200
+        },
+        {
+          "at": 1793703625092,
+          "method": "GET",
+          "path": "/api/admin/sync",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D2: Try again gives a \"Couldn't start\" banner: \"Storeasy isn't linked to your Shopify store. Contact support to link it, then try again.\"",
+      "detail": "Your products from Shopify\n\nYour products didn't finish coming in\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\n240 of 600 products so far. Your store keeps everything already brought in.\n\nCouldn't start\n\nStoreasy isn't linked to your Shopify store. Contact support to link it, then try again.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D2: no raw text in the Couldn't start banner",
+      "detail": "Your products from Shopify\n\nYour products didn't finish coming in\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\n240 of 600 products so far. Your store keeps everything already brought in.\n\nCouldn't start\n\nStoreasy isn't linked to your Shopify store. Contact support to link it, then try again.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D3: an amber (warning) banner",
+      "detail": {
+        "tone": {
+          "tone": "warning",
+          "color": "rgb(255, 251, 235)",
+          "border": "rgb(253, 230, 138)"
+        },
+        "text": "Your products from Shopify\n\nWe hit a snag and will try again\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\n240 of 600 products so far. Your store keeps everything already brought in. We'll try again by itself, or you can try now.\n\nTry again now"
+      }
+    },
+    {
+      "ok": true,
+      "label": "D3: a Try again now button",
+      "detail": [
+        "Try again now"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D3: the message is plain (no 'fetch failed')",
+      "detail": "Your products from Shopify\n\nWe hit a snag and will try again\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\n240 of 600 products so far. Your store keeps everything already brought in. We'll try again by itself, or you can try now.\n\nTry again now"
+    },
+    {
+      "ok": true,
+      "label": "D4: \"Bringing in your products stopped partway\"",
+      "detail": "Your products from Shopify\n\nBringing in your products stopped partway\n\nIt stopped before finishing. Try again to pick up where it left off.\n\n240 of 600 products so far. Your store keeps everything already brought in.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D4: \"It stopped before finishing. Try again to pick up where it left off.\"",
+      "detail": "Your products from Shopify\n\nBringing in your products stopped partway\n\nIt stopped before finishing. Try again to pick up where it left off.\n\n240 of 600 products so far. Your store keeps everything already brought in.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D4: Try again",
+      "detail": [
+        "Try again"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D4: no repeating GET /api/admin/sync over 10 s (a stalled card doesn't poll)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "D5: the settings section nav says \"Products from Shopify\""
+    },
+    {
+      "ok": true,
+      "label": "D5: the nav jumps to the card (#catalog-sync, card at the top of the window)",
+      "detail": {
+        "hash": "#catalog-sync",
+        "top": 79.75,
+        "bottom": 235.75,
+        "vh": 900
+      }
+    },
+    {
+      "ok": true,
+      "label": "D5: with the D1 row the settings card shows progress",
+      "detail": "Your products from Shopify\n\n8 products and 3 collections in your store now. Shopify changes also come in by themselves.\n\nBringing in your products from Shopify\n\n240 of 600 products so far. Big stores can take a while. You can keep using the console."
+    },
+    {
+      "ok": true,
+      "label": "D5: \"Your products are in\"",
+      "detail": "Your products from Shopify\n\n8 products and 3 collections in your store now. Shopify changes also come in by themselves.\n\nYour products are in\n\n600 products and 120 collections, brought in just now."
+    },
+    {
+      "ok": true,
+      "label": "D5: \"600 products and 120 collections, brought in just now.\"",
+      "detail": "Your products from Shopify\n\n8 products and 3 collections in your store now. Shopify changes also come in by themselves.\n\nYour products are in\n\n600 products and 120 collections, brought in just now."
+    },
+    {
+      "ok": true,
+      "label": "D5: no \"Refresh from Shopify\" button (the harness has no Shopify link)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "D6: GET /api/admin/sync fires about every 3 s while it runs",
+      "detail": {
+        "count": 3,
+        "gapsMs": [
+          3037,
+          3018
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "D6: without a reload the card turns into \"Your products are in\" within a few seconds",
+      "detail": "1.3 s"
+    },
+    {
+      "ok": true,
+      "label": "D6: the requests stop once it is done (none in the next 10 s)",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "D2: elsewhere on the dashboard (not the sync card) the seeded order-push failures show raw text: [\"DD-FAIL1: push dead-lettered after 5 attempts: Shopify 502: upstream timeout after 3 retries\",\"DD-FAIL2: push dead-lettered after 5 attempts: Shopify 502: upstream timeout after 3 retries\"]",
+    "D8: focus style on Try again: outline solid 2px, box-shadow none",
+    "D2: POST /api/admin/sync answered 409",
+    "D3 card text: \"Your products from Shopify\\n\\nWe hit a snag and will try again\\n\\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\\n\\n240 of 600 products so far. Your store keeps everything already brought in. We'll try again by itself, or you can try now.\\n\\nTry again now\"",
+    "D4 row before reload: {\"status\":\"running\",\"error\":null,\"lease_owner\":null,\"updated_at\":\"2026-11-03T08:59:57.169Z\",\"products_fetched\":240}"
+  ],
+  "screenshots": [
+    {
+      "name": "D1-dashboard-1440",
+      "file": "docs/cms-reviews/drills/GEN-02/D1-dashboard-1440.png",
+      "bytes": 35412,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "D1-dashboard-375",
+      "file": "docs/cms-reviews/drills/GEN-02/D1-dashboard-375.png",
+      "bytes": 26887,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "D2-failed",
+      "file": "docs/cms-reviews/drills/GEN-02/D2-failed.png",
+      "bytes": 38158,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "D2-try-again-couldnt-start",
+      "file": "docs/cms-reviews/drills/GEN-02/D2-try-again-couldnt-start.png",
+      "bytes": 33884,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "D3-retrying",
+      "file": "docs/cms-reviews/drills/GEN-02/D3-retrying.png",
+      "bytes": 37633,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "D4-stalled",
+      "file": "docs/cms-reviews/drills/GEN-02/D4-stalled.png",
+      "bytes": 37652,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "D5-settings-progress",
+      "file": "docs/cms-reviews/drills/GEN-02/D5-settings-progress.png",
+      "bytes": 31147,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/settings"
+    },
+    {
+      "name": "D5-settings-complete",
+      "file": "docs/cms-reviews/drills/GEN-02/D5-settings-complete.png",
+      "bytes": 28464,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/settings"
+    },
+    {
+      "name": "D6-done-without-reload",
+      "file": "docs/cms-reviews/drills/GEN-02/D6-done-without-reload.png",
+      "bytes": 35263,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    }
+  ]
+}

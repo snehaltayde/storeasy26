@@ -1,0 +1,58 @@
+{
+  "id": "AU-05",
+  "part": "d10",
+  "title": "P1-DRILLS AU-05: the page editor keeps the founder's words — d10",
+  "ranAt": "2026-11-03T11:53:22.316Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "D10: the product page shows the stray markup as text",
+      "detail": "Brightens in two weeks.\n\n< <img src=x onerror=alert(1)"
+    },
+    {
+      "ok": true,
+      "label": "D10: no dialog appears and the DOM has no img from it",
+      "detail": {
+        "dialogs": 0,
+        "facts": {
+          "text": "Brightens in two weeks.\n\n< <img src=x onerror=alert(1)",
+          "imgs": 0,
+          "xImgs": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "D10: 'a <!-- private > note --> b' shows only a and b",
+      "detail": "a b"
+    }
+  ],
+  "notes": [
+    "D10: the harness product's description before: \"null\""
+  ],
+  "screenshots": [
+    {
+      "name": "D10-stray-markup-as-text",
+      "file": "docs/cms-reviews/drills/AU-05/D10-stray-markup-as-text.png",
+      "bytes": 16583,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "D10-comment-hidden",
+      "file": "docs/cms-reviews/drills/AU-05/D10-comment-hidden.png",
+      "bytes": 14922,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "id": "ED-01",
+  "part": "b4",
+  "title": "P1-DRILLS ED-01: the full-width editor on the edge runtime — b4",
+  "ranAt": "2026-11-03T11:37:17.190Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B4 at 1024: the store inside reports innerWidth 1280 (desktop media query true)",
+      "detail": {
+        "caption": "Desktop, 1280 px wide, shown at 56% to fit",
+        "box": {
+          "shownWidth": 720,
+          "cssWidth": 1280,
+          "transform": "matrix(0.5625, 0, 0, 0.5625, 0, 0)"
+        },
+        "inner": {
+          "innerWidth": 1280,
+          "desktop": true
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B4 at 1024: the store shows its desktop navigation (no menu button)",
+      "detail": {
+        "visibleLinks": [
+          "Festive sale — free shipping over ₹1,499",
+          "Design Demo Co",
+          "Shop all",
+          "Bestsellers",
+          "Night routine",
+          "Serums"
+        ],
+        "burger": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "B4 at 1440: the store inside reports innerWidth 1280 (desktop media query true)",
+      "detail": {
+        "caption": "Desktop, 1280 px wide, shown at 71% to fit",
+        "box": {
+          "shownWidth": 912,
+          "cssWidth": 1280,
+          "transform": "matrix(0.7125, 0, 0, 0.7125, 0, 0)"
+        },
+        "inner": {
+          "innerWidth": 1280,
+          "desktop": true
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B4 at 1440: the store shows its desktop navigation (no menu button)",
+      "detail": {
+        "visibleLinks": [
+          "Festive sale — free shipping over ₹1,499",
+          "Design Demo Co",
+          "Shop all",
+          "Bestsellers",
+          "Night routine",
+          "Serums"
+        ],
+        "burger": false
+      }
+    }
+  ],
+  "notes": [
+    "B4 at 1024: caption \"Desktop, 1280 px wide, shown at 56% to fit\", shown 720px",
+    "B4 at 1440: caption \"Desktop, 1280 px wide, shown at 71% to fit\", shown 912px"
+  ],
+  "screenshots": [
+    {
+      "name": "B4-1024",
+      "file": "docs/cms-reviews/drills/ED-01/B4-1024.png",
+      "bytes": 42792,
+      "width": 720,
+      "height": 540,
+      "viewport": 1024,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "B4-1440",
+      "file": "docs/cms-reviews/drills/ED-01/B4-1440.png",
+      "bytes": 34039,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

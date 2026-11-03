@@ -1,0 +1,146 @@
+{
+  "id": "ED-01",
+  "part": "b7",
+  "title": "P1-DRILLS ED-01: the full-width editor on the edge runtime — b7",
+  "ranAt": "2026-11-03T11:41:29.636Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B7 setup: the temporary 4 s delay is in the designer pages"
+    },
+    {
+      "ok": true,
+      "label": "B7 home: an editor-shaped skeleton with the Open menu button shows",
+      "detail": {
+        "menu": true,
+        "tree": true,
+        "header": {
+          "top": 78,
+          "height": 55
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B7 home: with tree in the skeleton",
+      "detail": {
+        "menu": true,
+        "tree": true,
+        "header": {
+          "top": 78,
+          "height": 55
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B7: the skeleton's menu opens the navigation",
+      "detail": {
+        "links": [
+          "Dashboard",
+          "Analytics",
+          "Setup\n2/9",
+          "Orders\n1",
+          "Catalog",
+          "Overview"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "B7 home: the real editor replaces the skeleton without the top bar jumping",
+      "detail": {
+        "skeleton": {
+          "top": 78,
+          "height": 55
+        },
+        "real": {
+          "top": 78,
+          "height": 55
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B7 product: an editor-shaped skeleton with the Open menu button shows",
+      "detail": {
+        "menu": true,
+        "tree": false,
+        "header": {
+          "top": 78,
+          "height": 55
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B7 product: no tree in the skeleton",
+      "detail": {
+        "menu": true,
+        "tree": false,
+        "header": {
+          "top": 78,
+          "height": 55
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B7 product: the real editor replaces the skeleton without the top bar jumping",
+      "detail": {
+        "skeleton": {
+          "top": 78,
+          "height": 55
+        },
+        "real": {
+          "top": 78,
+          "height": 55
+        }
+      }
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "B7-home-skeleton",
+      "file": "docs/cms-reviews/drills/ED-01/B7-home-skeleton.png",
+      "bytes": 8395,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "B7-home-skeleton-menu-open",
+      "file": "docs/cms-reviews/drills/ED-01/B7-home-skeleton-menu-open.png",
+      "bytes": 12530,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "B7-product-skeleton",
+      "file": "docs/cms-reviews/drills/ED-01/B7-product-skeleton.png",
+      "bytes": 8094,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer/product"
+    },
+    {
+      "name": "B7-product-real",
+      "file": "docs/cms-reviews/drills/ED-01/B7-product-real.png",
+      "bytes": 11526,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer/product"
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "id": "GEN-03",
+  "part": "empty",
+  "title": "P1-DRILLS GEN-03: a good store before the founder edits anything — empty",
+  "ranAt": "2026-11-03T12:06:38.706Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 7,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "1/10 setup: the store has 0 products",
+      "detail": 0
+    },
+    {
+      "ok": true,
+      "label": "1 at 1440: the empty store's home renders with no error and no sideways scroll",
+      "detail": {
+        "sw": 1440,
+        "vw": 1440,
+        "heroButtons": [
+          "Shop drill 22.24"
+        ],
+        "heroH": 150,
+        "err": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "10 at 1440: the shorter hero has one button",
+      "detail": [
+        "Shop drill 22.24"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "1 at 1440: /collections on the empty store renders with no error and no sideways scroll",
+      "detail": {
+        "sw": 1440,
+        "vw": 1440,
+        "err": false,
+        "text": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nCollections\n\n0 collections\n\nNo collections to show yet — please check back soon.\n\n← Back home\n\nDesign Demo Co\n\nRealistic data for the console redesign\n\nShop\n\nAll collections\n\nCompany\n\nContact\nAU-05 D1 (saved again)\nAU-05 D11\nAU-05 D3\nAU-05 D4\nAU-05 D5\nAU-05 D7\n\nSupport\n\nsupport@design.test\n\n© Design Demo Co\n\nYour cart\n\nYour cart is e"
+      }
+    },
+    {
+      "ok": true,
+      "label": "1 at 375: the empty store's home renders with no error and no sideways scroll",
+      "detail": {
+        "sw": 375,
+        "vw": 375,
+        "heroButtons": [
+          "Shop drill 22.24"
+        ],
+        "heroH": 394,
+        "err": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "10 at 375: the shorter hero has one button",
+      "detail": [
+        "Shop drill 22.24"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "1 at 375: /collections on the empty store renders with no error and no sideways scroll",
+      "detail": {
+        "sw": 375,
+        "vw": 375,
+        "err": false,
+        "text": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nCollections\n\n0 collections\n\nNo collections to show yet — please check back soon.\n\n← Back home\n\nDesign Demo Co\n\nRealistic data for the console redesign\n\nShop\n\nAll collections\n\nCompany\n\nContact\nAU-05 D1 (saved again)\nAU-05 D11\nAU-05 D3\nAU-05 D4\nAU-05 D5\nAU-05 D7\n\nSupport\n\nsupport@design.test\n\n© Design Demo Co\n\nYour cart\n\nYour cart is empty\n\nAdd"
+      }
+    }
+  ],
+  "notes": [
+    "10 at 1440: hero 150px tall; text \"Festive sale — free shipping over ₹1,499\\nDesign Demo Co\\nShop all\\n\\nComing soon\\n\\nDrill hero 11.22.24\\n\\nEdited in the Designer on the edge runtime at 11.22.24.\\n\\nShop drill 22.24\\nNew products are on the way\\n\\nWe’re getting things ready. Please ch\"",
+    "1 at 1440: /collections reads \"Festive sale — free shipping over ₹1,499\\nDesign Demo Co\\nShop all\\nCollections\\n\\n0 collections\\n\\nNo collections to show yet — please check back soon.\\n\\n← Back home\\n\\nDesign Demo Co\\n\\nRealistic data for the console redesign\\n\\nShop\\n\\nAll collections\\n\\n\"",
+    "10 at 375: hero 394px tall; text \"Festive sale — free shipping over ₹1,499\\nDesign Demo Co\\n\\nComing soon\\n\\nDrill hero 11.22.24\\n\\nEdited in the Designer on the edge runtime at 11.22.24.\\n\\nShop drill 22.24\\nNew products are on the way\\n\\nWe’re getting things ready. Please check back \"",
+    "1 at 375: /collections reads \"Festive sale — free shipping over ₹1,499\\nDesign Demo Co\\nCollections\\n\\n0 collections\\n\\nNo collections to show yet — please check back soon.\\n\\n← Back home\\n\\nDesign Demo Co\\n\\nRealistic data for the console redesign\\n\\nShop\\n\\nAll collections\\n\\nCompany\\n\\n\""
+  ],
+  "screenshots": [
+    {
+      "name": "1-empty-home-1440",
+      "file": "docs/cms-reviews/drills/GEN-03/1-empty-home-1440.png",
+      "bytes": 20781,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "1-empty-collections-1440",
+      "file": "docs/cms-reviews/drills/GEN-03/1-empty-collections-1440.png",
+      "bytes": 14947,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections"
+    },
+    {
+      "name": "1-empty-home-375",
+      "file": "docs/cms-reviews/drills/GEN-03/1-empty-home-375.png",
+      "bytes": 28639,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "1-empty-collections-375",
+      "file": "docs/cms-reviews/drills/GEN-03/1-empty-collections-375.png",
+      "bytes": 16204,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/collections"
+    }
+  ]
+}

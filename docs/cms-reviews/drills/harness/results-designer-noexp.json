@@ -1,0 +1,155 @@
+{
+  "id": "harness",
+  "part": "designer-noexp",
+  "title": "P1-DRILLS P1-HARNESS follow-ups — designer-noexp",
+  "ranAt": "2026-11-03T11:22:37.381Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 12,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: no hero experiment running (completed in the console)",
+      "detail": [
+        {
+          "id": "exp-d641b2606986e8b781",
+          "status": "completed"
+        },
+        {
+          "id": "exp-da2ab84391721575f2",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: the preview connects (\"Preview shows your last save\")"
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: the typed button label shows in the preview before saving",
+      "detail": "819 ms"
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: the typed title and subtitle show in the preview before saving",
+      "detail": {
+        "title": 7,
+        "subtitle": 7,
+        "hero": [
+          "Drill hero 11.22.24",
+          "Edited in the Designer on the edge runtime at 11.22.24."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: Save answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: after Save the preview shows the saved button label",
+      "detail": "Draft preview — this is NOT what shoppers see. Exit preview\nFestive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\n\n8"
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: after Save the preview shows the saved title and subtitle",
+      "detail": [
+        "Drill hero 11.22.24",
+        "Edited in the Designer on the edge runtime at 11.22.24."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: Publish now answers 200 ok",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: a signed-out visitor sees the new button label on /",
+      "detail": "after 5 s"
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: the live page is 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: every signed-out visitor sees the new title and subtitle",
+      "detail": [
+        {
+          "h1": "Drill hero 11.22.24",
+          "sub": true
+        },
+        {
+          "h1": "Drill hero 11.22.24",
+          "sub": true
+        },
+        {
+          "h1": "Drill hero 11.22.24",
+          "sub": true
+        },
+        {
+          "h1": "Drill hero 11.22.24",
+          "sub": true
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "S57-noexp: every preview document answered 200 with x-edge-runtime: 1",
+      "detail": "4 documents"
+    }
+  ],
+  "notes": [
+    "S57-noexp: signed-out visitors' hero titles (each a new visitor): [{\"h1\":\"Drill hero 11.22.24\",\"sub\":true},{\"h1\":\"Drill hero 11.22.24\",\"sub\":true},{\"h1\":\"Drill hero 11.22.24\",\"sub\":true},{\"h1\":\"Drill hero 11.22.24\",\"sub\":true}]",
+    "S57-noexp: preview documents seen: [{\"url\":\"/\",\"status\":200,\"edge\":\"1\"},{\"url\":\"/\",\"status\":200,\"edge\":\"1\"},{\"url\":\"/\",\"status\":200,\"edge\":\"1\"},{\"url\":\"/\",\"status\":200,\"edge\":\"1\"}]"
+  ],
+  "screenshots": [
+    {
+      "name": "S57-noexp-designer-typed",
+      "file": "docs/cms-reviews/drills/harness/S57-noexp-designer-typed.png",
+      "bytes": 40651,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "S57-noexp-designer-saved",
+      "file": "docs/cms-reviews/drills/harness/S57-noexp-designer-saved.png",
+      "bytes": 40801,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "S57-noexp-published",
+      "file": "docs/cms-reviews/drills/harness/S57-noexp-published.png",
+      "bytes": 34021,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "S57-noexp-live-signed-out",
+      "file": "docs/cms-reviews/drills/harness/S57-noexp-live-signed-out.png",
+      "bytes": 26944,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

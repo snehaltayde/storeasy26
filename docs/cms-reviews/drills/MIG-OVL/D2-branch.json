@@ -1,0 +1,22 @@
+{
+  "label": "branch",
+  "base": "http://localhost:3081",
+  "orderId": "DD-SYNC1",
+  "ranAt": "2026-11-03T12:09:14.232Z",
+  "widths": {
+    "375": {
+      "text": "Orders\nDD-SYNC1\nDD-SYNC1\nSynced\n\nPaid online · placed 3 Nov 2026, 05:38 pm\n\nReconcile from Shopify\nCancel order\nCustomer\nName\nAarav Shah\nEmail\nshopper0@example.test\nPhone\n9876500000\nAddress\nNo address\nPayment & sync\nCreated\n3 Nov 2026, 05:38 pm\nPaid\n3 Nov 2026, 06:38 pm\nRazorpay\n—\nShopify order\n900\nSync attempts\n0\nSubtotal\n₹3,448\nShipping\n₹49\nTotal\n₹3,497\nRefunded\n−₹899\nShipments (0)\nNo shipments yet.\nRefunds\n\nShopify is authoritative — Reconcile refreshes this.\n\n1 Nov 2026, 05:38 pmdamaged in transit — SPF refunded\n−₹899\nTimeline\nNo events recorded.",
+      "shopifyLine": false,
+      "sw": 375,
+      "vw": 375,
+      "itemsShotBytes": 56266
+    },
+    "1280": {
+      "text": "Orders\nDD-SYNC1\nDD-SYNC1\nSynced\n\nPaid online · placed 3 Nov 2026, 05:38 pm\n\nReconcile from Shopify\nCancel order\nCustomer\nName\nAarav Shah\nEmail\nshopper0@example.test\nPhone\n9876500000\nAddress\nNo address\nPayment & sync\nCreated\n3 Nov 2026, 05:38 pm\nPaid\n3 Nov 2026, 06:38 pm\nRazorpay\n—\nShopify order\n900\nSync attempts\n0\nSubtotal\n₹3,448\nShipping\n₹49\nTotal\n₹3,497\nRefunded\n−₹899\nShipments (0)\nNo shipments yet.\nRefunds\n\nShopify is authoritative — Reconcile refreshes this.\n\n1 Nov 2026, 05:38 pmdamaged in transit — SPF refunded\n−₹899\nTimeline\nNo events recorded.",
+      "shopifyLine": false,
+      "sw": 1280,
+      "vw": 1280,
+      "itemsShotBytes": 117111
+    }
+  }
+}

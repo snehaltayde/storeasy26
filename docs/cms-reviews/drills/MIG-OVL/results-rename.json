@@ -1,0 +1,86 @@
+{
+  "id": "MIG-OVL",
+  "part": "rename",
+  "title": "P1-DRILLS MIG-05/OVL-06: both titles on the order page — rename",
+  "ranAt": "2026-11-03T11:05:48.791Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "D3 setup: two COD orders for one product, renamed in the local DB between them",
+      "detail": [
+        "DES-95DEBF8A",
+        "DES-26027D4D"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D3: Analytics shows Top products"
+    },
+    {
+      "ok": true,
+      "label": "D3: one Top products row for the product, under its current title \"Rose Hydration Mist 100ml Renamed\"",
+      "detail": [
+        "Rose Hydration Mist 100ml Renamed"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D3: the CSV export still has the columns title, qty, revenue",
+      "detail": "title,qty,revenue"
+    },
+    {
+      "ok": true,
+      "label": "D3: the CSV has one row for it with both orders' quantity (3) and revenue (2247)",
+      "detail": [
+        "Rose Hydration Mist 100ml Renamed,3,2247"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D4 setup: signed in to the Partners console as the harness agency"
+    },
+    {
+      "ok": true,
+      "label": "D4: the design tenant has a report button"
+    },
+    {
+      "ok": true,
+      "label": "D4: one row for that product under its current title",
+      "detail": [
+        "Rose Hydration Mist 100ml Renamed — 3 units · ₹2,247"
+      ]
+    }
+  ],
+  "notes": [
+    "D3: lines for Rose Hydration Mist 100ml before the drill: 0 (seeded orders don't carry this product)",
+    "D3: the two orders' lines: [{\"order_id\":\"DES-26027D4D\",\"title\":\"Rose Hydration Mist 100ml Renamed\",\"catalog_title\":\"Rose Hydration Mist 100ml Renamed\",\"quantity\":2,\"line_total\":1498},{\"order_id\":\"DES-95DEBF8A\",\"title\":\"Rose Hydration Mist 100ml\",\"catalog_title\":\"Rose Hydration Mist 100ml\",\"quantity\":1,\"line_total\":749}]",
+    "D3: Top products card: \"Top products\\n23 orders\\nExport CSV\\nProduct\\tQty\\tRevenue\\n\\nRadiance Glow Serum 30ml\\n\\t×38\\t₹49,362\\n\\nDaily Defence SPF 50\\n\\t×19\\t₹17,081\\n\\nDaily Defence SPF 50\\n\\t×4\\t₹3,596\\n\\nRadiance Glow Serum 30ml\\n\\t×2\\t₹2,598\\n\\nRose Hydration Mist 100ml Renamed\\n\\t×3\\t₹2,247\\n\\nQuantity and revenue from order snapshots (sale-status orders), ranked by revenue. This is the orders ledger, not events — consent doesn’t limit it.\"",
+    "D3: CSV rows: [\"Radiance Glow Serum 30ml,38,49362\",\"Daily Defence SPF 50,19,17081\",\"Daily Defence SPF 50,4,3596\",\"Radiance Glow Serum 30ml,2,2598\",\"Rose Hydration Mist 100ml Renamed,3,2247\"]",
+    "D4: the report dialog: \"Design Demo Co — 30 days\\n\\nINR, Asia/Kolkata · Prepared by Northwind Studio · generated 3/11/2026, 4:35:48 pm· this report contains only this client’s data.\\n\\nOrders (30d)\\n\\n23\\n\\nNet sales\\n\\n₹85,760\\n\\nRefunds\\n\\n₹899\\n\\nTop products\\n\\nRadiance Glow Serum 30ml — 38 units · ₹49,362\\nDaily Defence SPF 50 — 19 units · ₹17,081\\nDaily Defence SPF 50 — 4 units · ₹3,596\\nRadiance Glow Serum 30ml — 2 units · ₹2,598\\nRose Hydration Mist 100ml Renamed — 3 units · ₹2,247\""
+  ],
+  "screenshots": [
+    {
+      "name": "D3-analytics-top-products",
+      "file": "docs/cms-reviews/drills/MIG-OVL/D3-analytics-top-products.png",
+      "bytes": 29301,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/analytics"
+    },
+    {
+      "name": "D4-agency-report",
+      "file": "docs/cms-reviews/drills/MIG-OVL/D4-agency-report.png",
+      "bytes": 29576,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/partners"
+    }
+  ]
+}

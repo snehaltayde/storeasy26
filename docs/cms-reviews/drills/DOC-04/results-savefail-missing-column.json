@@ -1,0 +1,77 @@
+{
+  "id": "DOC-04",
+  "part": "savefail",
+  "title": "P1-DRILLS DOC-04: plain, located messages, and failures after a write — savefail",
+  "ranAt": "2026-11-03T11:13:59.854Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 4,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": false,
+      "label": "savefail: the banner reads \"Your changes were saved, but this page couldn't refresh. Reload it before you make more changes.\"",
+      "detail": "Platform notice: Payments provider latency\nCard payments may take a little longer than usual today."
+    },
+    {
+      "ok": true,
+      "label": "savefail: no conflict banner",
+      "detail": "Platform notice: Payments provider latency\nCard payments may take a little longer than usual today."
+    },
+    {
+      "ok": true,
+      "label": "savefail: no validation list",
+      "detail": "Platform notice: Payments provider latency\nCard payments may take a little longer than usual today."
+    },
+    {
+      "ok": true,
+      "label": "savefail: the hero really was saved (cms_blocks holds the new title)",
+      "detail": "{\"title\":\"Winter repair, saved while reads fail\",\"highlight\":\"Winter repair\",\"subtitle\":\"The night-cream routine your sk"
+    },
+    {
+      "ok": false,
+      "label": "page editor load: the console's \"This page hit an error\" screen",
+      "detail": "404 — not found\n\nThis console page doesn’t exist, or this store isn’t available here."
+    },
+    {
+      "ok": false,
+      "label": "page editor load: with Retry"
+    },
+    {
+      "ok": false,
+      "label": "page editor load: not a 404",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "page editor load: not a built-in default page",
+      "detail": "404 — not found\n\nThis console page doesn’t exist, or this store isn’t available here."
+    }
+  ],
+  "notes": [
+    "savefail: requests [{\"at\":1793704433526,\"method\":\"PUT\",\"path\":\"/api/admin/storefront\",\"status\":200}]; banners [{\"tone\":\"info\",\"inCard\":false,\"text\":\"Platform notice: Payments provider latency\\nCard payments may take a little longer than usual today.\"}]",
+    "savefail: the banner's title line is \"undefined\" (known limit: under the Designer's \"Couldn't save…\" title)",
+    "savefail: /admin/storefront/pages/shipping answered 200; text \"404 — not found\\n\\nThis console page doesn’t exist, or this store isn’t available here.\""
+  ],
+  "screenshots": [
+    {
+      "name": "B-designer-saved-refresh-failed",
+      "file": "docs/cms-reviews/drills/DOC-04/B-designer-saved-refresh-failed.png",
+      "bytes": 42187,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "B-page-editor-reads-failing",
+      "file": "docs/cms-reviews/drills/DOC-04/B-page-editor-reads-failing.png",
+      "bytes": 4764,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/shipping"
+    }
+  ]
+}

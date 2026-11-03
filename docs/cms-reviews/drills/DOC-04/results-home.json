@@ -1,0 +1,77 @@
+{
+  "id": "DOC-04",
+  "part": "home",
+  "title": "P1-DRILLS DOC-04: plain, located messages, and failures after a write — home",
+  "ranAt": "2026-11-03T11:10:12.301Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "home setup: a blank Banner / CTA added as row 3",
+      "detail": [
+        "Hide section 1 (Collections grid)",
+        "Hide section 2 (Newest products)",
+        "Hide section 3 (Banner / CTA)"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "home: Save shows \"Section 3 (Banner / CTA): needs a title or text\"",
+      "detail": [
+        "Platform notice: Payments provider latency",
+        "Card payments may take a little longer than usual today.",
+        "Save failed",
+        "Section 3 (Banner / CTA): needs a title or text"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "home: after Move up it reads \"Section 2 (Banner / CTA): …\"",
+      "detail": [
+        "Platform notice: Payments provider latency",
+        "Card payments may take a little longer than usual today.",
+        "Save failed",
+        "Section 2 (Banner / CTA): needs a title or text"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "home: and row 2 is the banner on screen",
+      "detail": [
+        "Hide section 1 (Collections grid)",
+        "Hide section 2 (Banner / CTA)",
+        "Hide section 3 (Newest products)"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "home: with no new request",
+      "detail": []
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "B-home-section-3",
+      "file": "docs/cms-reviews/drills/DOC-04/B-home-section-3.png",
+      "bytes": 32918,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/home"
+    },
+    {
+      "name": "B-home-after-move-up",
+      "file": "docs/cms-reviews/drills/DOC-04/B-home-after-move-up.png",
+      "bytes": 32884,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/home"
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "id": "ED-01",
+  "part": "b3",
+  "title": "P1-DRILLS ED-01: the full-width editor on the edge runtime — b3",
+  "ranAt": "2026-11-03T11:35:17.874Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B3 setup: no hero experiment running (hero-promise completed in the console earlier)",
+      "detail": [
+        {
+          "slug": "hero-promise",
+          "status": "completed"
+        },
+        {
+          "slug": "cta-copy",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "B3: typed announcement text shows in the preview within about 1 s",
+      "detail": "845 ms"
+    },
+    {
+      "ok": true,
+      "label": "B3: caption, frame size and inner width unchanged",
+      "detail": {
+        "before": {
+          "caption": "Desktop, 1280 px wide, shown at 59% to fit",
+          "box": {
+            "shownWidth": 752,
+            "cssWidth": 1280,
+            "transform": "matrix(0.5875, 0, 0, 0.5875, 0, 0)"
+          },
+          "inner": {
+            "innerWidth": 1280,
+            "desktop": true
+          }
+        },
+        "after": {
+          "caption": "Desktop, 1280 px wide, shown at 59% to fit",
+          "box": {
+            "shownWidth": 752,
+            "cssWidth": 1280,
+            "transform": "matrix(0.5875, 0, 0, 0.5875, 0, 0)"
+          },
+          "inner": {
+            "innerWidth": 1280,
+            "desktop": true
+          }
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B3: typed hero title shows in the preview within about 1 s",
+      "detail": "795 ms"
+    },
+    {
+      "ok": true,
+      "label": "B3: device, shrink and caption unchanged",
+      "detail": {
+        "before": {
+          "caption": "Desktop, 1280 px wide, shown at 59% to fit",
+          "box": {
+            "shownWidth": 752,
+            "cssWidth": 1280,
+            "transform": "matrix(0.5875, 0, 0, 0.5875, 0, 0)"
+          },
+          "inner": {
+            "innerWidth": 1280,
+            "desktop": true
+          }
+        },
+        "end": {
+          "caption": "Desktop, 1280 px wide, shown at 59% to fit",
+          "box": {
+            "shownWidth": 752,
+            "cssWidth": 1280,
+            "transform": "matrix(0.5875, 0, 0, 0.5875, 0, 0)"
+          },
+          "inner": {
+            "innerWidth": 1280,
+            "desktop": true
+          }
+        },
+        "device": [
+          "Mobile:false",
+          "Tablet:false",
+          "Desktop:true"
+        ]
+      }
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "B3-1280-announcement",
+      "file": "docs/cms-reviews/drills/ED-01/B3-1280-announcement.png",
+      "bytes": 44440,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "B3-1280-hero-title",
+      "file": "docs/cms-reviews/drills/ED-01/B3-1280-hero-title.png",
+      "bytes": 47690,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}
