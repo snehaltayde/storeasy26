@@ -681,13 +681,19 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   privacy|help/route.js` (audit API existed since S27).
 
 #### Maintenance & incidents (S43 / OP12) + offboarding (BE29)
-- **Maintenance mode** (per tenant, operator-toggled): shoppers get a
-  BRANDED kit-styled closed page with the operator's message; any
-  console/platform cookie (or the 15-min `_mx` sign-in pass the page links
-  to) lifts the visual curtain so the team keeps working — presence-only, a
-  UX curtain, not auth — while **checkout answers 503 for everyone**,
-  cookie or not. Toggle: /platform tenant row or
+- **Maintenance mode** (per tenant, operator-toggled): shoppers get a closed
+  page in the store's own brand colours (every text tone at least 4.5:1)
+  with the operator's message, and every page is titled "<Store> will be
+  right back". Only a VERIFIED staff credential lifts the curtain: a
+  merchant session on this tenant, an operator session, or the signed,
+  tenant-bound 15-min `_mx` pass that only a verified session can obtain
+  (`lib/maintenance.js`). A cookie's presence proves nothing. The gate sits
+  in the data path (`lib/storefront-request.js`), so for anyone else the
+  storefront pages and sitemap fetch no store data and the catalog shopper
+  APIs answer 503 `STORE_MAINTENANCE`. **Checkout answers 503 for
+  everyone**, staff included. Toggle: /platform tenant row or
   `PATCH /api/platform/tenants/<id> {maintenance:{enabled,message}}`.
+  Proof on the edge runtime: `pnpm drill:maintenance-edge`.
 - **Incidents**: operator-declared, with the INTERNAL note strictly separated
   from the PUBLIC message; open incidents (platform-wide or tenant-scoped)
   banner in the affected merchant consoles (login page included) and vanish
@@ -703,7 +709,8 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 - **Files**: [lib/platform/export.js](../lib/platform/export.js),
   [lib/platform/incidents.js](../lib/platform/incidents.js),
   `app/api/platform/incidents|privacy/`, `app/api/platform/tenants/[id]/
-  export|offboard/`, maintenance branch in [app/layout.js](../app/layout.js),
+  export|offboard/`, maintenance branch in `app/(storefront)/layout.js`,
+  `lib/maintenance.js`, `lib/storefront-request.js`,
   `app/api/admin/maintenance-pass/`, platform migration 0007.
 
 #### Dashboard & Analytics tabs (S42 / BE21 + MC04 + MC17)

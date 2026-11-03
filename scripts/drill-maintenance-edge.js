@@ -111,6 +111,33 @@ async function waitFor(fn, label, tries = 60) {
   throw new Error(`timed out waiting for ${label}`);
 }
 
+const STORE = "Edge Drill";
+const CLOSED_TITLE = `${STORE} will be right back`;
+// A dark brand: the closed page must follow it and stay readable on it.
+const BRAND = { background: "#111827", foreground: "#f9fafb", accent: "#84cc16" };
+const BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
+const GOOGLEBOT_UA = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+
+const unescapeHtml = (s) => s.replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+const titlesOf = (html) => [...html.matchAll(/<title>([^<]*)<\/title>/g)].map((m) => unescapeHtml(m[1]));
+
+// Inline colours of the element marked data-curtain="<part>", as declared in
+// the served HTML (the curtain sets every colour inline).
+function curtainColours(html, part) {
+  const tag = new RegExp(`<[a-z0-9]+[^>]*data-curtain="${part}"[^>]*>`).exec(html)?.[0] || "";
+  const style = /style="([^"]*)"/.exec(tag)?.[1] || "";
+  const prop = (name) => new RegExp(`(?:^|;)\\s*${name}:\\s*(#[0-9a-fA-F]{6})`).exec(style)?.[1]?.toLowerCase() || null;
+  return { color: prop("color"), background: prop("background-color") };
+}
+const luminance = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+
 // Router state a client would send if it already held the storefront layout.
 const treeOf = (segment) => {
   const leaf = ["__PAGE__", {}];
@@ -127,6 +154,8 @@ const PAGES = [
   { name: "policy", path: "/policies/drill-policy", claim: null, mark: MARK.policy },
   { name: "search", path: "/search?q=drillmark", claim: null, mark: MARK.product },
 ];
+// Every page whose title the closed store must replace (contact has no marker).
+const TITLE_PAGES = [...PAGES.map(({ name, path }) => ({ name, path })), { name: "contact", path: "/contact" }];
 
 let problems = 0;
 let checks = 0;
@@ -156,7 +185,7 @@ try {
   await runMigrations(C.platformDb(), await loadMigrations("platform"), {});
   const dbUrl = env.DATABASE_URL;
   const closed = { enabled: true, message: "DRILL-CURTAIN" };
-  await C.upsertTenant({ id: "edge", name: "Edge Drill", domains: ["edge.test", "localhost"], dbUrl, config: {}, secrets: { order_link_secret: "drill-edge", admin_password: "drill-edge-admin" } });
+  await C.upsertTenant({ id: "edge", name: STORE, domains: ["edge.test", "localhost"], dbUrl, config: { brand: BRAND }, secrets: { order_link_secret: "drill-edge", admin_password: "drill-edge-admin" } });
   await C.upsertTenant({ id: "other", name: "Other", domains: ["other.test"], dbUrl, config: {}, secrets: { order_link_secret: "drill-other", admin_password: "drill-other-admin" } });
   const setMaintenance = (on) => C.patchTenant("edge", { config: { maintenance: on ? closed : null } });
 
@@ -234,6 +263,13 @@ try {
   }
   const offSearch = await req("/api/search?q=drillmark");
   record(offSearch.status === 200 && offSearch.body.includes(MARK.product), `/api/search ${offSearch.status}, returns the product`);
+  // The real titles, to hold staff to during maintenance.
+  const OPEN_TITLES = {};
+  for (const p of TITLE_PAGES) {
+    const titles = titlesOf((await req(p.path, { headers: { "user-agent": BROWSER_UA } })).body);
+    OPEN_TITLES[p.path] = titles[0];
+    record(titles.length === 1 && !/will be right back|Page not found/.test(titles[0]), `${p.name}: title "${titles.join(" | ")}"`);
+  }
 
   // ---------- maintenance ON ----------
   await setMaintenance(true);
@@ -277,10 +313,39 @@ try {
 
   console.log("\n— maintenance ON: what a crawler receives (metadata blocks the response for bots)");
   for (const p of PAGES) {
-    const r = await req(p.path, { headers: { "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" } });
+    const r = await req(p.path, { headers: { "user-agent": GOOGLEBOT_UA } });
     const found = leaks(r.body, p.path);
     record(!found.length && r.body.includes("DRILL-CURTAIN"), `${p.name}: Googlebot, full page: ${r.status}${found.length ? ` LEAKS ${found.join(", ")}` : ""}`);
   }
+
+  console.log("\n— maintenance ON: every page is titled as closed, not as missing");
+  for (const p of TITLE_PAGES) {
+    for (const [ua, agent] of [["browser", BROWSER_UA], ["Googlebot", GOOGLEBOT_UA]]) {
+      const titles = titlesOf((await req(p.path, { headers: { "user-agent": agent } })).body);
+      record(titles.length === 1 && titles[0] === CLOSED_TITLE, `${p.name}: ${ua}, title "${titles.join(" | ")}"`);
+    }
+  }
+  for (const p of PAGES) {
+    const r = await req(p.path, { headers: rscHeaders(p.claim, { "user-agent": BROWSER_UA }) });
+    record(r.body.includes(CLOSED_TITLE) && !r.body.includes("Page not found"), `${p.name}: client navigation (RSC), title is "${CLOSED_TITLE}"`);
+  }
+
+  // A tab opened before the store closed: its click gets only a 404 digest
+  // (checked above, no leak) and renders the 404 it got at load, which then
+  // reloads once (components/ReloadOnSoftNotFound.js). That part runs in a
+  // browser, so this drill can't see it.
+
+  console.log("\n— maintenance ON: the closed page follows the brand and stays readable");
+  const curtainPage = (await req(`/products/${MARK.handle}`)).body;
+  const page = curtainColours(curtainPage, "page");
+  record(page.background === BRAND.background && page.color === BRAND.foreground, `page colours ${page.background} / ${page.color} (brand ${BRAND.background} / ${BRAND.foreground})`);
+  for (const part of ["eyebrow", "title", "message", "signin"]) {
+    const { color } = curtainColours(curtainPage, part);
+    const ratio = color && page.background ? contrast(color, page.background) : 0;
+    record(ratio >= 4.5, `${part}: ${color ?? "no inline colour"} on ${page.background}, ${ratio.toFixed(2)}:1`);
+  }
+  const visible = (/<body[\s\S]*<\/body>/.exec(curtainPage)?.[0] || "").replace(/<script[\s\S]*?<\/script>/g, "");
+  record(visible.includes("DRILL-CURTAIN") && !/opacity-\d|text-zinc-\d|text-hero-muted/.test(visible), "the closed page uses no fixed grey or opacity class");
 
   console.log("\n— maintenance ON: verified staff still get the real site");
   const passRes = await req("/api/admin/maintenance-pass", { cookie: STAFF });
@@ -292,6 +357,12 @@ try {
       record(full.body.includes(p.mark), `${p.name}: ${who}, full page ${full.status}`);
       const rsc = await req(p.path, { cookie, headers: rscHeaders(p.claim) });
       record(rsc.body.includes(p.mark), `${p.name}: ${who}, RSC ${rsc.status}`);
+    }
+  }
+  for (const [who, cookie] of [["_admin session", STAFF], ["_mx pass", PASS]]) {
+    for (const p of TITLE_PAGES) {
+      const titles = titlesOf((await req(p.path, { cookie, headers: { "user-agent": BROWSER_UA } })).body);
+      record(titles.length === 1 && titles[0] === OPEN_TITLES[p.path], `${p.name}: ${who}, title unchanged "${titles.join(" | ")}"`);
     }
   }
 
@@ -351,6 +422,10 @@ try {
   for (const p of PAGES) {
     const r = await req(p.path, { cookie: FORGED, headers: rscHeaders(p.claim) });
     record(r.body.includes(p.mark), `${p.name}: forged cookies, RSC ${r.status}, real content again`);
+  }
+  for (const p of TITLE_PAGES) {
+    const titles = titlesOf((await req(p.path, { headers: { "user-agent": BROWSER_UA } })).body);
+    record(titles[0] === OPEN_TITLES[p.path], `${p.name}: anonymous, real title again "${titles.join(" | ")}"`);
   }
   const backOn = await req("/api/search?q=drillmark");
   record(backOn.status === 200, `/api/search ${backOn.status}`);

@@ -5,12 +5,27 @@
 // use the gate, NOT the edge runtime or real responses. For those, run
 // `pnpm drill:maintenance-edge`.
 //   pnpm test:maintenance
+import { createHmac } from "node:crypto";
 import { readFile, readdir, rm } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { registerHooks } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
+
+// Next's bundler resolves these; plain Node needs the extension and the @/
+// alias, so the suite can load lib/storefront-request.js and the routes.
+registerHooks({
+  resolve(specifier, context, next) {
+    if (/^next\/(headers|navigation|server)$/.test(specifier)) return next(`${specifier}.js`, context);
+    if (specifier.startsWith("@/")) {
+      const file = join(root, specifier.slice(2));
+      return next(pathToFileURL(file.endsWith(".js") ? file : `${file}.js`).href, context);
+    }
+    return next(specifier, context);
+  },
+});
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -33,7 +48,9 @@ const { createSession, revokeSessionByToken, OPERATOR_SESSION_TTL_MS, MERCHANT_S
 const { platformSessionToken } = await import("../lib/platform/admin-auth.js");
 const { adminSessionToken } = await import("../lib/admin-auth.js");
 const { checkoutCapability } = await import("../lib/commerce/adapter.js");
-const { maintenanceCurtain, maintenanceBypass, issueMaintenancePass, verifyMaintenancePass, MAINTENANCE_PASS_TTL_S } = await import("../lib/maintenance.js");
+const { maintenanceCurtain, maintenanceBypass, issueMaintenancePass, verifyMaintenancePass, curtainPalette, MAINTENANCE_PASS_TTL_S } = await import("../lib/maintenance.js");
+const { storeCurtain, storefrontHandler } = await import("../lib/storefront-request.js");
+const { validateBrand, resolveBrand, contrastRatio } = await import("../lib/brand.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 
 await C.migratePlatform(await readFile(join(here, "../lib/platform/schema.sql"), "utf8"));
@@ -53,6 +70,8 @@ const inTenant = async (id, fn) => withTenant(await C.getTenant(id), fn);
 
 // A cookie jar shaped like next/headers cookies() and request.cookies.
 const jar = (cookies = {}) => ({ get: (name) => (cookies[name] === undefined ? undefined : { name, value: cookies[name] }) });
+// The parts of a NextRequest the handlers read.
+const request = (host, cookies = {}) => ({ headers: new Headers({ host }), cookies: jar(cookies), url: `http://${host}/` });
 
 let pass = 0;
 let fail = 0;
@@ -143,6 +162,19 @@ await t("a tampered _mx expiry → rejected", async () => {
   await curtained("ma", { _mx: `${m}.${Number(exp) + 86400}.${sig}` });
 });
 
+console.log("— passes signed with the wrong key");
+
+const forgePass = (tenant, key, exp = Math.floor(Date.now() / 1000) + 600) =>
+  `m.${exp}.${createHmac("sha256", key).update(`${tenant}|${exp}`).digest("hex")}`;
+await t("a pass made with the real key verifies (so the forgeries below are well formed)", () =>
+  open("ma", { _mx: forgePass("ma", "ma-secret|maintenance-pass") }));
+await t("a pass keyed on the bare order_link_secret → curtain (the pass key has its own purpose)", () =>
+  curtained("ma", { _mx: forgePass("ma", "ma-secret") }));
+for (const key of ["null", "undefined", "null|maintenance-pass", "undefined|maintenance-pass", "|maintenance-pass"]) {
+  await t(`a tenant with no order_link_secret: a pass keyed "${key}" → curtain`, () =>
+    curtained("nosecret", { _mx: forgePass("nosecret", key) }));
+}
+
 console.log("— who can get a pass");
 
 await t("anonymous → no pass (the public sign-in link hands out nothing)", async () => {
@@ -212,6 +244,109 @@ await t("checkout is closed however valid the credential", async () => {
   eq(cap.maintenance, true);
 });
 
+console.log("— the gated data path (lib/storefront-request.js)");
+
+await t("storeCurtain fails closed when the cookie jar can't be read", async () => {
+  // Outside a request, cookies() throws: that must count as "no credential".
+  eq((await inTenant("ma", () => storeCurtain()))?.message, MESSAGE);
+});
+await t("storeCurtain on an open store → null, without reading cookies", async () => {
+  await C.patchTenant("mb", { config: { maintenance: { enabled: false, message: "stale" } } });
+  try {
+    eq(await inTenant("mb", () => storeCurtain()), null);
+  } finally {
+    await C.patchTenant("mb", { config: { maintenance: closed } });
+  }
+});
+const gatedApi = storefrontHandler(async () => Response.json({ ran: true }));
+await t("storefrontHandler: anonymous, forged, other tenant → 503 STORE_MAINTENANCE, Retry-After, handler not run", async () => {
+  for (const cookies of [{}, { _admin: "x", _platform: "x", _mx: "1" }, { _admin: otherAdminToken }]) {
+    const res = await gatedApi(request("ma.test", cookies), {});
+    eq(res.status, 503, `${JSON.stringify(cookies)}:`);
+    const body = await res.json();
+    eq(body.code, "STORE_MAINTENANCE");
+    eq(body.ran, undefined);
+    eq(res.headers.get("retry-after"), "300");
+  }
+});
+await t("storefrontHandler: a staff session or pass → the handler runs", async () => {
+  const value = await inTenant("ma", () => issueMaintenancePass(jar({ _admin: adminToken })));
+  for (const cookies of [{ _admin: adminToken }, { _platform: operatorToken }, { _mx: value }]) {
+    const res = await gatedApi(request("ma.test", cookies), {});
+    eq((await res.json()).ran, true, `${Object.keys(cookies)}:`);
+  }
+});
+await t("storefrontHandler: an open store → the handler runs for anyone", async () => {
+  await C.patchTenant("mb", { config: { maintenance: null } });
+  try {
+    eq((await (await gatedApi(request("mb.test"), {})).json()).ran, true);
+  } finally {
+    await C.patchTenant("mb", { config: { maintenance: closed } });
+  }
+});
+
+console.log("— the sign-in pass route and sign-out");
+
+const passRoute = await import("../app/api/admin/maintenance-pass/route.js");
+const passCookie = (res) => res.headers.getSetCookie().find((c) => c.startsWith("_mx=")) || "";
+await t("pass route: everyone goes to /admin/login; anonymous, forged and other-tenant get no pass", async () => {
+  for (const cookies of [{}, { _admin: "x", _platform: "x", _mx: "1" }, { _admin: otherAdminToken }]) {
+    const res = await passRoute.GET(request("ma.test", cookies), {});
+    eq(res.status, 302);
+    eq(res.headers.get("location"), "http://ma.test/admin/login");
+    eq(passCookie(res), "", `${JSON.stringify(cookies)} got a pass:`);
+  }
+});
+await t("pass route: staff get a pass that verifies, HttpOnly, SameSite=Lax, Path=/, 15 minutes", async () => {
+  const cookie = passCookie(await passRoute.GET(request("ma.test", { _admin: adminToken }), {}));
+  for (const attr of ["httponly", "samesite=lax", "path=/", `max-age=${MAINTENANCE_PASS_TTL_S}`]) {
+    eq(cookie.toLowerCase().includes(attr), true, `${attr} in ${cookie}:`);
+  }
+  eq(await inTenant("ma", () => verifyMaintenancePass(decodeURIComponent(cookie.split(";")[0].slice(4)))), true);
+});
+for (const kind of ["admin", "platform"]) {
+  await t(`${kind} sign-out clears the pass`, async () => {
+    const { POST } = await import(`../app/api/${kind}/logout/route.js`);
+    const cookie = passCookie(await POST(request("ma.test", { _mx: "m.1.x" }), {}));
+    eq(/max-age=0/i.test(cookie), true, `cleared: ${JSON.stringify(cookie)}`);
+  });
+}
+
+console.log("— the closed page is readable on any brand");
+
+await t("text tones reach 4.5:1 on the brand's own background", async () => {
+  const brands = [
+    { background: "#111827", foreground: "#f9fafb" },
+    { background: "#fff1ee", foreground: "#1c1917" },
+    { background: "#595959", foreground: "#ffffff" },
+    { background: "#ffffff", foreground: "#767676" },
+  ];
+  let seed = 7;
+  const hex = () => `#${Math.floor(((seed = (seed * 16807) % 2147483647) / 2147483647) * 0xffffff).toString(16).padStart(6, "0")}`;
+  while (brands.length < 300) {
+    const b = { background: hex(), foreground: hex(), accent: hex() };
+    if (validateBrand(b).ok) brands.push(b);
+  }
+  for (const b of brands) {
+    const p = curtainPalette(b);
+    eq(p.background, resolveBrand(b).background, "follows the brand:");
+    for (const tone of ["foreground", "muted"]) {
+      eq(contrastRatio(p[tone], p.background) >= 4.5, true, `${tone} ${p[tone]} on ${p.background}:`);
+    }
+  }
+});
+await t("a missing or invalid brand → the default palette, still readable", async () => {
+  for (const b of [null, {}, { background: "red" }, { background: "#777777", foreground: "#888888" }]) {
+    const p = curtainPalette(b);
+    eq(p.background, "#ffffff", `${JSON.stringify(b)}:`);
+    eq(contrastRatio(p.muted, p.background) >= 4.5, true);
+  }
+});
+await t("the muted tone is softer than the text where there is room", () => {
+  const p = curtainPalette(null);
+  eq(p.muted !== p.foreground && contrastRatio(p.muted, p.background) < contrastRatio(p.foreground, p.background), true);
+});
+
 console.log("— legacy single-tenant mode (no PLATFORM_DB_URL)");
 
 await t("forged cookies → no bypass; the derived tokens and a pass still work", async () => {
@@ -273,6 +408,14 @@ await t("webhooks, jobs and console APIs are NOT gated", async () => {
   const routes = (await walk("app/api")).filter((f) => /app\/api\/(razorpay|shopify|jobs|admin|platform|partners|connect)\//.test(f) && f.endsWith("route.js"));
   eq(routes.length > 20, true, "found the routes:");
   for (const f of routes) eq((await source(f)).includes("storefrontHandler"), false, `${f} gated:`);
+});
+await t("no storefront file sets an absolute title (it would skip the closed-store title)", async () => {
+  for (const f of (await walk("app/(storefront)")).filter((x) => x.endsWith(".js"))) {
+    eq(/\babsolute\s*:/.test(await source(f)), false, `${f}:`);
+  }
+});
+await t("the store 404 reloads once after a client-side click (an open tab's 404 is stale)", async () => {
+  eq((await source("app/(storefront)/not-found.js")).includes("<ReloadOnSoftNotFound />"), true);
 });
 await t("console pages keep the ungated tfetch (sign-in works during maintenance)", async () => {
   for (const f of (await walk("app/(console)")).filter((x) => x.endsWith(".js"))) {

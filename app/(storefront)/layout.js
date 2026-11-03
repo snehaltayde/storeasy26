@@ -19,7 +19,8 @@ import { kitAttr } from "@/lib/themes/kits";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
 import { isPlatformSiteHost } from "@/lib/platform-site";
-import { maintenanceCurtain } from "@/lib/maintenance";
+import { curtainPalette, curtainTitle } from "@/lib/maintenance";
+import { storeCurtain } from "@/lib/storefront-request";
 import { headers } from "next/headers";
 import SiteNav from "@/components/site/SiteNav";
 import Link from "next/link";
@@ -49,10 +50,12 @@ export async function generateMetadata() {
   if (isGated(await requestResolution())) {
     return { title: "Store", robots: { index: false } };
   }
-  const [name, title, tagline, url] = await tfetch(async () => [siteName(), siteTitle(), siteTagline(), siteUrl()]);
+  const [name, title, tagline, url, closed] = await tfetch(async () => [siteName(), siteTitle(), siteTagline(), siteUrl(), Boolean(await storeCurtain())]);
+  // A template with no %s replaces whatever title the page sets.
+  const closedTitle = closed ? curtainTitle(name) : null;
   return {
     metadataBase: new URL(url),
-    title: { default: title, template: `%s · ${name}` },
+    title: closedTitle ? { default: closedTitle, template: closedTitle } : { default: title, template: `%s · ${name}` },
     description: tagline,
     manifest: "/manifest.webmanifest",
     applicationName: name,
@@ -203,23 +206,35 @@ export default async function RootLayout({ children }) {
   // holders of a VERIFIED console/platform session or _mx pass see the real
   // site so the team can work while the store is closed (lib/maintenance.js).
   // Checkout is closed for EVERYONE via checkoutCapability.
-  const jar = await cookies();
-  const maintenance = await tfetch(() => maintenanceCurtain(jar)).catch(() => null);
+  const maintenance = await tfetch(() => storeCurtain()).catch(() => null);
   if (maintenance) {
-    const [name, brand, theme] = await tfetch(async () => [siteName(), resolvedBrand(), resolvedTheme()]).catch(() => ["Store", null, null]);
+    const [name, brand, theme] = await tfetch(async () => [siteName(), await resolvedBrand(), await resolvedTheme()]).catch(() => ["Store", null, null]);
     const brandCss = brand ? brandCssVars(resolveBrand(brand)) : "";
+    const palette = curtainPalette(brand);
     return (
       <html lang="en" data-kit={kitAttr(theme)} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
         {brandCss ? <style id="brand-vars" precedence="default" href="brand-vars">{brandCss}</style> : null}
-        <body className="flex min-h-full flex-col items-center justify-center bg-hero px-6 text-center text-hero-fg antialiased">
-          <p className="inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-accent-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent-400" /> Scheduled maintenance
+        {/* Colours inline from curtainPalette: every text tone reaches 4.5:1 on
+            the brand's background. data-curtain marks what the edge drill measures. */}
+        <body
+          data-curtain="page"
+          className="flex min-h-full flex-col items-center justify-center px-6 text-center antialiased"
+          style={{ backgroundColor: palette.background, color: palette.foreground }}
+        >
+          <p
+            data-curtain="eyebrow"
+            className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium"
+            style={{ color: palette.muted, borderColor: palette.border }}
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: palette.accent }} /> Scheduled maintenance
           </p>
-          <h1 className="mt-5 max-w-xl font-display text-4xl font-extrabold tracking-tight">{name} will be right back.</h1>
-          <p className="mt-4 max-w-md text-hero-muted">
+          <h1 data-curtain="title" className="mt-5 max-w-xl font-display text-4xl font-extrabold tracking-tight" style={{ color: palette.foreground }}>
+            {name} will be right back.
+          </h1>
+          <p data-curtain="message" className="mt-4 max-w-md" style={{ color: palette.muted }}>
             {maintenance.message || "We're doing some quick work behind the scenes. Nothing is lost — your cart will be waiting."}
           </p>
-          <a href="/api/admin/maintenance-pass" className="mt-10 text-xs text-hero-muted underline opacity-60 hover:opacity-100">
+          <a data-curtain="signin" href="/api/admin/maintenance-pass" className="mt-10 text-xs underline" style={{ color: palette.muted }}>
             Store team sign-in
           </a>
         </body>

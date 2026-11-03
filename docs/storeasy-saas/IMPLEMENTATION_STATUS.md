@@ -1208,6 +1208,14 @@ disables the legacy `PLATFORM_ADMIN_PASSWORD`. Sign-ins slog'd
   the closed page serves HTTP 200 (a real 503 status needs middleware —
   recorded), and the unused page payload still rides the response (content
   isn't secret; the store is just closed).
+  **Superseded by the maintenance-bypass fix (2026-11):** the curtain now
+  lifts only for a VERIFIED session or a signed, tenant-bound `_mx` pass
+  (presence proved nothing; any `_admin=x` used to work), and the gate is
+  in the data path (`lib/storefront-request.js`), so the page payload,
+  RSC navigations, sitemap and catalog shopper APIs carry no store data for
+  anyone else. Every page is titled "<Store> will be right back" (was
+  "Page not found"), and the closed page follows the brand at 4.5:1 or
+  better. Still HTTP 200, not 503. Proof: `pnpm drill:maintenance-edge`.
 - Incidents: internal note / public message strictly split; open incidents
   banner in affected merchant consoles (live-verified on the login page,
   internal note absent from the HTML); resolve removes it.
