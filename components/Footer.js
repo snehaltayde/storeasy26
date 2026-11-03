@@ -61,7 +61,7 @@ export default function Footer({
               ) : null}
             </p>
           )}
-          <p className="mt-8 border-t border-zinc-200 pt-5 text-xs text-zinc-400">© {legalName} · Catalog synced from the live Shopify store</p>
+          <p className="mt-8 border-t border-zinc-200 pt-5 text-xs text-zinc-400">© {legalName}</p>
         </div>
       </footer>
     );
@@ -144,7 +144,7 @@ export default function Footer({
         </div>
 
         <p className="mt-10 border-t border-zinc-200 pt-6 text-xs text-zinc-400">
-          © {legalName} · Catalog synced from the live Shopify store
+          © {legalName}
         </p>
       </div>
     </footer>

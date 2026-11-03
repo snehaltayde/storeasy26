@@ -67,8 +67,9 @@ export const POST = tenantHandler(async (request) => {
       default:
         return respond({ ...(await getCart(id)), error: "unknown action" }, 400);
     }
-  } catch (e) {
-    return respond({ ...(await getCart(id)), error: String(e?.message || e) }, 400);
+  } catch {
+    // GEN-03: no raw error text in a public response; the 400 is the signal.
+    return respond(await getCart(id), 400);
   }
 
   return respond(await getCart(id));

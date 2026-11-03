@@ -33,11 +33,13 @@ const KIND_META = {
   banner: { label: "Banner / CTA", desc: "Accent panel with a headline and button" },
   rich_text: { label: "Rich text", desc: "Freeform content (sanitized HTML)" },
 };
+// GEN-03: a new banner or rich text section starts empty. A prefill would reach
+// shoppers if published unedited, and the save refuses these until the founder types.
 const NEW_SECTION = {
   collections: { kind: "collections", title: "Shop by collection", limit: 6, enabled: true },
-  new: { kind: "new", title: "Fresh drops", limit: 8, enabled: true },
-  banner: { kind: "banner", title: "Festive offer", text: "", label: "Shop now", href: "/collections", enabled: true },
-  rich_text: { kind: "rich_text", title: "", html: "<p>Tell your story…</p>", enabled: true },
+  new: { kind: "new", title: "New arrivals", limit: 8, enabled: true },
+  banner: { kind: "banner", title: "", text: "", label: "", href: "/collections", enabled: true },
+  rich_text: { kind: "rich_text", title: "", html: "", enabled: true },
 };
 // S55: the registry has kinds this screen has NO form for (image_with_text,
 // product_rail, whatever comes next) — they're edited in the Designer. Here
@@ -535,13 +537,13 @@ export default function HomeEditor({ initial }) {
                   {s.kind === "banner" && (
                     <div className="mt-2 grid gap-3 sm:grid-cols-2">
                       <Field label="Title" htmlFor={`${s._id}-title`}>
-                        <Input id={`${s._id}-title`} value={s.title || ""} onChange={(e) => patchSection(s._id, { title: e.target.value })} />
+                        <Input id={`${s._id}-title`} value={s.title || ""} placeholder="A short headline" onChange={(e) => patchSection(s._id, { title: e.target.value })} />
                       </Field>
                       <Field label="Text" htmlFor={`${s._id}-text`}>
                         <Input id={`${s._id}-text`} value={s.text || ""} onChange={(e) => patchSection(s._id, { text: e.target.value })} />
                       </Field>
                       <Field label="Button label" htmlFor={`${s._id}-label`}>
-                        <Input id={`${s._id}-label`} value={s.label || ""} onChange={(e) => patchSection(s._id, { label: e.target.value })} />
+                        <Input id={`${s._id}-label`} value={s.label || ""} placeholder="Shop now" onChange={(e) => patchSection(s._id, { label: e.target.value })} />
                       </Field>
                       <Field label="Button link" htmlFor={`${s._id}-href`}>
                         <Input id={`${s._id}-href`} value={s.href || ""} placeholder="/collections/…" onChange={(e) => patchSection(s._id, { href: e.target.value })} />
@@ -564,7 +566,7 @@ export default function HomeEditor({ initial }) {
                         <Input id={`${s._id}-title`} value={s.title || ""} onChange={(e) => patchSection(s._id, { title: e.target.value })} />
                       </Field>
                       <Field label="Content" htmlFor={`${s._id}-html`} hint="HTML — scripts and unsafe markup are stripped on save">
-                        <Textarea id={`${s._id}-html`} mono rows={5} value={s.html || ""} onChange={(e) => patchSection(s._id, { html: e.target.value })} />
+                        <Textarea id={`${s._id}-html`} mono rows={5} value={s.html || ""} placeholder="<p>Tell your story…</p>" onChange={(e) => patchSection(s._id, { html: e.target.value })} />
                       </Field>
                     </div>
                   )}

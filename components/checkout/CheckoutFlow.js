@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { formatMoney } from "@/lib/format";
 import { computeShipping } from "@/lib/shipping";
+import { friendlyCheckoutError } from "@/lib/shopper-errors";
 import { track } from "@/lib/track/client";
 
 const STEPS = ["Address", "Review", "Payment"];
@@ -42,7 +43,7 @@ const FIELDS = [
   { key: "pincode", label: "PIN code", required: true, half: true },
 ];
 
-export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store", logo = null, policies = [] }) {
+export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store", logo = null, policies = [], shippingConfig }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     email: "",
@@ -77,8 +78,9 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
 
   // Live shipping — same pure engine the drawer and the checkout API use, so
   // what's shown here is what the server charges. Recomputes as the payment
-  // method / pincode change.
-  const shipInputs = { subtotal: cart.subtotal, discountTotal: cart.discountTotal, pincode: form.pincode || null };
+  // method / pincode change. GEN-03: `config` is the store's own rates from the
+  // server; without it this preview showed the code default on every store.
+  const shipInputs = { subtotal: cart.subtotal, discountTotal: cart.discountTotal, pincode: form.pincode || null, config: shippingConfig };
   const shipping = computeShipping({ ...shipInputs, paymentMethod: method === "cod" ? "cod" : "prepaid" });
   const codPreview = computeShipping({ ...shipInputs, paymentMethod: "cod" });
   const grandTotal = cart.total + shipping.total;
@@ -104,18 +106,6 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // S32 (SF07): honest handoff states — the cart is never lost on a failure,
-  // say so, and explain the recoverable cases instead of parroting codes.
-  function friendlyCheckoutError(status, data = {}) {
-    if (data.code === "CHECKOUT_DISABLED") {
-      return "Checkout is temporarily unavailable for this store — your cart is saved, nothing was charged. Please try again later.";
-    }
-    if (/cart is empty|no cart session/i.test(data.error || "")) {
-      return "Your cart session expired — your items may still be in the cart. Go back to the cart and try again.";
-    }
-    return data.error || `Could not continue (HTTP ${status}) — your cart is untouched, please retry.`;
-  }
 
   function goConfirmation(data) {
     // Full nav so the layout re-reads the (now-cleared) cart. The server hands
@@ -165,7 +155,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
           return placeOrder(true);
         }
         const data = await res.json();
-        if (!data.ok) throw new Error(friendlyCheckoutError(res.status, data));
+        if (!data.ok) throw new Error(friendlyCheckoutError(data));
         goConfirmation(data);
         return;
       }
@@ -181,7 +171,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
         return placeOrder(true);
       }
       const data = await res.json();
-      if (!data.ok) throw new Error(friendlyCheckoutError(res.status, data));
+      if (!data.ok) throw new Error(friendlyCheckoutError(data));
       if (data.alreadyPaid) {
         // This intent's payment already landed (duplicate submit after verify).
         goConfirmation(data);
@@ -189,7 +179,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
       }
 
       const ready = await loadRazorpay();
-      if (!ready) throw new Error("Could not load Razorpay");
+      if (!ready) throw new Error("Could not open the payment window — check your connection and try again.");
 
       const rzp = new window.Razorpay({
         key: data.keyId,
@@ -214,7 +204,8 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
           }).then((r) => r.json());
           if (v.ok) goConfirmation(v);
           else {
-            setError(v.error || "Payment verification failed");
+            // GEN-03: the verify error is technical; say what to do instead.
+            setError(`We couldn't confirm your payment for order ${data.orderId}. If money left your account, please don't pay again — contact the store with this order number.`);
             setPlacing(false);
           }
         },
@@ -226,7 +217,9 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
       });
       rzp.open();
     } catch (e) {
-      setError(String(e.message || e));
+      // GEN-03: fetch/JSON failures carry browser wording, not ours.
+      const raw = e instanceof TypeError || e instanceof SyntaxError;
+      setError(raw ? "Could not reach the store — your cart is untouched. Check your connection and try again." : String(e.message || e));
       setPlacing(false);
     }
   }
@@ -372,10 +365,10 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
                   />
                   <div>
                     <p className="text-sm font-semibold">
-                      Razorpay <span className="font-normal text-zinc-400">· card / UPI / netbanking (test mode)</span>
+                      Pay online <span className="font-normal text-zinc-400">· card / UPI / netbanking</span>
                     </p>
                     <p className="text-xs text-zinc-500">
-                      {razorpayEnabled ? "Secure payment via Razorpay." : "Set NEXT_PUBLIC_RAZORPAY_KEY_ID to enable."}
+                      {razorpayEnabled ? "You'll finish paying in a secure payment window." : "Online payment isn't available for this store right now."}
                     </p>
                   </div>
                 </label>

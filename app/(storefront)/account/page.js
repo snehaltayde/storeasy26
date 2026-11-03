@@ -21,6 +21,15 @@ const STATUS_LABEL = {
   cancelled: "cancelled",
 };
 
+// Shopify's fulfillment values, lowercased. Only these two say more than the
+// order's own status. Any other value falls back to it, and never shows as written.
+const FULFILLMENT_LABEL = {
+  fulfilled: "shipped",
+  partially_fulfilled: "partly shipped",
+};
+
+const orderBadge = (o) => FULFILLMENT_LABEL[o.fulfillment] || STATUS_LABEL[o.status] || "processing";
+
 export default async function AccountPage({ searchParams }) {
   const sp = await searchParams;
   const jar = await cookies();
@@ -62,7 +71,7 @@ export default async function AccountPage({ searchParams }) {
                     {o.items.map((i) => i.title).join(", ") || "—"}
                   </span>
                   <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-zinc-500">
-                    {o.fulfillment || STATUS_LABEL[o.status] || o.status}
+                    {orderBadge(o)}
                   </span>
                   <span className="font-semibold">{formatMoney(o.total, o.currency)}</span>
                   <span className="text-xs text-zinc-400">{new Date(o.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>

@@ -122,7 +122,7 @@ export default async function ConfirmationPage({ params, searchParams }) {
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">Payment</p>
-            <p className="mt-1 font-medium">{cod ? "Cash on Delivery" : "Razorpay"}</p>
+            <p className="mt-1 font-medium">{cod ? "Cash on Delivery" : "Online payment"}</p>
             <p className="text-zinc-600">
               {paid
                 ? `Paid · ${order.razorpay_payment_id || ""}`

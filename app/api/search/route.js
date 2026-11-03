@@ -28,7 +28,7 @@ export const GET = tenantHandler(async (request) => {
   try {
     const result = await searchProductsInDb(q, 8);
     return Response.json({ q, ...result });
-  } catch (e) {
-    return Response.json({ q, hits: [], source: "error", error: String(e?.message || e) });
+  } catch {
+    return Response.json({ q, hits: [], source: "error" });
   }
 });

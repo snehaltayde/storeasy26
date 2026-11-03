@@ -18,8 +18,7 @@ export default function Error({ error, reset }) {
   }, [error]);
   return (
     <div className="mx-auto max-w-2xl px-4 py-24 text-center sm:px-6">
-      <p className="text-6xl font-extrabold tracking-tight text-zinc-200">500</p>
-      <h1 className="mt-4 text-2xl font-bold">Something dropped the weights</h1>
+      <h1 className="text-2xl font-bold">Something went wrong</h1>
       <p className="mt-2 text-zinc-500">
         A temporary error stopped this page from loading. It's usually gone on retry.
       </p>

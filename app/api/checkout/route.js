@@ -113,7 +113,7 @@ export const POST = tenantHandler(async (request) => {
     const { currentTenant } = await import("@/lib/tenant-context");
     if (!(await flagEnabled("ff_checkout", currentTenant()?.id || null, { fallback: true }))) {
       return NextResponse.json(
-        { error: "Checkout is briefly paused by the platform — nothing was charged. Please try again shortly.", code: "CHECKOUT_DISABLED" },
+        { error: "Checkout is briefly paused — nothing was charged. Please try again shortly.", code: "CHECKOUT_DISABLED" },
         { status: 503 },
       );
     }
@@ -194,7 +194,7 @@ export const POST = tenantHandler(async (request) => {
 
     if (action === "razorpay_create") {
       if (!razorpayConfigured())
-        return NextResponse.json({ error: "Razorpay is not configured" }, { status: 400 });
+        return NextResponse.json({ error: "Online payment isn't available for this store right now." }, { status: 400 });
       if (!idempotencyKey)
         return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
       const cart = cartId ? await getCart(cartId) : { items: [] };

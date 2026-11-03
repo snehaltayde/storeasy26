@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { headers, cookies } from "next/headers";
+import EmptyCatalog from "@/components/EmptyCatalog";
 import ExperimentPing from "@/components/ExperimentPing";
 import MarketingHome from "@/components/site/MarketingHome";
 import HomeSections from "@/components/sections/HomeSections";
@@ -7,6 +8,7 @@ import { runningExperimentFor, heroVariantFor, UNIT_COOKIE } from "@/lib/experim
 import { isPlatformSiteHost } from "@/lib/platform-site";
 import { getCatalogStats } from "@/lib/repo";
 import { resolveHomeSectionData } from "@/lib/cms/section-data";
+import { DEFAULT_HERO_SUBTITLE, EMPTY_STORE_HERO_SUBTITLE } from "@/lib/cms/defaults";
 import { resolvedHero, resolvedHomeSections, resolvedCollectionsIndex } from "@/lib/content/resolve";
 import { tfetch } from "@/lib/tenant-request";
 
@@ -48,6 +50,10 @@ export default async function Home() {
     return { hero, sections, stats, dataById, assignment };
   });
   const empty = stats.products === 0;
+  // GEN-03: on an empty store the default words promise a catalog, and #new only
+  // exists inside HomeSections. A founder's own subtitle stays as written.
+  const subtitle = empty && hero.subtitle === DEFAULT_HERO_SUBTITLE ? EMPTY_STORE_HERO_SUBTITLE : hero.subtitle;
+  const showSecondary = hero.secondary?.label && !(empty && (hero.secondary.href || "#new") === "#new");
 
   return (
     <div>
@@ -58,12 +64,12 @@ export default async function Home() {
         <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
           <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-accent-400">
             <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />
-            {empty ? "Storefront ready" : hero.badge || `${stats.products} products · ${stats.collections} collections`}
+            {empty ? "Coming soon" : hero.badge || `${stats.products} products · ${stats.collections} collections`}
           </p>
           <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
             <HeroTitle title={hero.title} highlight={hero.highlight} />
           </h1>
-          {hero.subtitle ? <p className="mt-5 max-w-xl text-lg text-hero-muted">{hero.subtitle}</p> : null}
+          {subtitle ? <p className="mt-5 max-w-xl text-lg text-hero-muted">{subtitle}</p> : null}
           <div className="mt-8 flex flex-wrap gap-3">
             {hero.primary?.label ? (
               <Link
@@ -73,7 +79,7 @@ export default async function Home() {
                 {hero.primary.label}
               </Link>
             ) : null}
-            {hero.secondary?.label ? (
+            {showSecondary ? (
               <Link
                 href={hero.secondary.href || "#new"}
                 className="rounded-[var(--btn-radius,9999px)] border border-hero-fg/20 px-6 py-3 text-sm font-semibold text-hero-fg transition hover:bg-hero-fg/10"
@@ -88,27 +94,8 @@ export default async function Home() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* S54: one shared renderer for shoppers AND preview, keyed by durable
             section ids with per-instance data. */}
-        {empty ? <EmptyState /> : <HomeSections sections={sections} dataById={dataById} />}
+        {empty ? <EmptyCatalog /> : <HomeSections sections={sections} dataById={dataById} />}
       </div>
     </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <section className="py-20">
-      <div className="mx-auto max-w-xl rounded-2xl border border-zinc-200 bg-zinc-50 p-8 text-center">
-        <h2 className="text-xl font-bold">Catalog not synced yet</h2>
-        <p className="mt-2 text-sm text-zinc-600">
-          Connect the store&rsquo;s Shopify account, then pull the catalog:
-        </p>
-        <pre className="mt-4 overflow-x-auto rounded-lg bg-zinc-900 px-4 py-3 text-left text-sm text-accent-300">
-          <code>pnpm migrate{"\n"}pnpm sync</code>
-        </pre>
-        <p className="mt-4 text-xs text-zinc-500">
-          Home, collections, product pages and search all light up automatically once products land.
-        </p>
-      </div>
-    </section>
   );
 }
