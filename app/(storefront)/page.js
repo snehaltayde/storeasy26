@@ -1,36 +1,38 @@
-import Link from "next/link";
 import { headers, cookies } from "next/headers";
 import EmptyCatalog from "@/components/EmptyCatalog";
 import ExperimentPing from "@/components/ExperimentPing";
 import MarketingHome from "@/components/site/MarketingHome";
 import HomeSections from "@/components/sections/HomeSections";
-import { runningExperimentFor, heroVariantFor, signedInToConsole, UNIT_COOKIE } from "@/lib/experiments";
-// PV-08 (its own lines, away from the resolve/tfetch imports another branch edits)
-import ExperimentNote from "@/components/preview/ExperimentNote";
+import { SectionView } from "@/components/sections/index";
+import { runningExperimentFor, heroVariantFor, heroVariantSettings, signedInToConsole, UNIT_COOKIE } from "@/lib/experiments";
 import { contentSource } from "@/lib/content/resolve";
 import { isPlatformSiteHost } from "@/lib/platform-site";
 import { getCatalogStats } from "@/lib/repo";
 import { resolveHomeSectionData } from "@/lib/cms/section-data";
-import { DEFAULT_HERO_SUBTITLE, EMPTY_STORE_HERO_SUBTITLE } from "@/lib/cms/defaults";
-import { resolvedHero, resolvedHomeSections, resolvedCollectionsIndex } from "@/lib/content/resolve";
+import { defaultHero } from "@/lib/cms/defaults";
+import { resolvedHomePage, resolvedCollectionsIndex } from "@/lib/content/resolve";
+import { DOCUMENTS_RELEASE_VERSION } from "@/lib/releases";
+import { legacyHeroToSettings } from "@/lib/registry/legacy";
+import { siteName } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
 
 // Catalog reflects the latest sync — render per request (sub-ms SQLite reads).
 // Session 23: hero + section layout come from the tenant's CMS (defaults when
 // nothing is configured), so merchandising edits go live without a deploy.
+//
+// P2-SECTIONS (DOC-03, DOC-07): the page renders from resolvedHomePage(), the
+// home page as registry sections with the hero as section 0, through the
+// renderer map (components/sections/index.js). Every store goes this way:
+// legacy stores get their hero and sections adapted, a documents store its
+// published home document. A documents store may hide its hero: the page then
+// starts with the sections, and never fails for want of a hero.
 export const dynamic = "force-dynamic";
 
-// Wrap the hero title's highlight substring in the accent color.
-function HeroTitle({ title, highlight }) {
-  const i = highlight ? title.toLowerCase().indexOf(highlight.toLowerCase()) : -1;
-  if (i < 0) return <>{title}</>;
-  return (
-    <>
-      {title.slice(0, i)}
-      <span className="text-sf-hero-accent">{title.slice(i, i + highlight.length)}</span>
-      {title.slice(i + highlight.length)}
-    </>
-  );
+// The hero's settings with today's fallbacks under any key a stored hero
+// lacks (as resolvedHero() always gave): "Shop <store>." and the default
+// buttons. A legacy hero already holds every key, so nothing changes there.
+function heroWithDefaults(section) {
+  return { ...section, settings: { ...legacyHeroToSettings(defaultHero(siteName())), ...section.settings } };
 }
 
 export default async function Home() {
@@ -48,64 +50,44 @@ export default async function Home() {
   const founder = signedInToConsole(jar);
 
   const { hero, sections, stats, dataById, assignment, testNotice } = await tfetch(async () => {
-    const [liveHero, sections, stats, index, src] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats(), resolvedCollectionsIndex(), contentSource()]);
-    const heroExp = await runningExperimentFor("hero");
-    // PV-08: a preview shows the founder's own hero. No variant, no exposure
-    // ping (no assignment), and a note that a test runs on this section.
-    // Signed in but out of preview: the live hero, no variant, no ping, no note.
-    const { hero, assignment, notice: testNotice = null } = heroVariantFor(heroExp, liveHero, unitId, { preview: src.preview, founder });
+    const [page, stats, index, src] = await Promise.all([resolvedHomePage(), getCatalogStats(), resolvedCollectionsIndex(), contentSource()]);
+    const at = page.findIndex((s) => s.kind === "hero");
+    const liveHero = at < 0 ? null : heroWithDefaults(page[at]);
+    const sections = page.filter((_, i) => i !== at);
+    let hero = liveHero;
+    let assignment = null;
+    let testNotice = null;
+    // A hidden hero is not shown, so no visitor is assigned to its test.
+    if (liveHero) {
+      const heroExp = await runningExperimentFor("hero");
+      // PV-08: a preview shows the founder's own hero. No variant, no exposure
+      // ping (no assignment), and a note that a test runs on this section.
+      // Signed in but out of preview: the live hero, no variant, no ping, no note.
+      const picked = heroVariantFor(heroExp, liveHero.settings, unitId, { preview: src.preview, founder });
+      assignment = picked.assignment;
+      testNotice = picked.notice || null;
+      // DOC-07: the variant's flat payload is merged at the settings level, so
+      // what it doesn't name (the other button, the badge, the image) stays.
+      const variant = picked.hero !== liveHero.settings && assignment ? heroExp.variants.find((v) => v.key === assignment.variant) : null;
+      if (variant?.payload) hero = { ...liveHero, settings: heroVariantSettings(liveHero.settings, variant.payload) };
+    }
     // S54: data resolves PER SECTION INSTANCE (registry bindings, batched) —
     // duplicate sections no longer overwrite each other's data or limits.
-    const dataById = await resolveHomeSectionData(sections, { index });
+    // A documents store's rails never read the legacy pins (plan decision 9).
+    const dataById = await resolveHomeSectionData(sections, { index, documents: src.v === DOCUMENTS_RELEASE_VERSION });
     return { hero, sections, stats, dataById, assignment, testNotice };
   });
   const empty = stats.products === 0;
-  // GEN-03: on an empty store the default words promise a catalog, and #new only
-  // exists inside HomeSections. A founder's own subtitle stays as written.
-  const subtitle = empty && hero.subtitle === DEFAULT_HERO_SUBTITLE ? EMPTY_STORE_HERO_SUBTITLE : hero.subtitle;
-  const showSecondary = hero.secondary?.label && !(empty && (hero.secondary.href || "#new") === "#new");
 
   return (
     <div>
       {assignment && <ExperimentPing slug={assignment.slug} unit={unitId} />}
-      {/* Hero */}
-      <section data-sec="hero" className="relative overflow-hidden bg-hero text-hero-fg">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-sf-hero-glow/20 blur-3xl" />
-        <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
-          <ExperimentNote notice={testNotice} />
-          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-sf-hero-accent">
-            <span className="h-1.5 w-1.5 rounded-full bg-sf-hero-accent" />
-            {empty ? "Coming soon" : hero.badge || `${stats.products} products · ${stats.collections} collections`}
-          </p>
-          <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
-            <HeroTitle title={hero.title} highlight={hero.highlight} />
-          </h1>
-          {subtitle ? <p className="mt-5 max-w-xl text-lg text-hero-muted">{subtitle}</p> : null}
-          <div className="mt-8 flex flex-wrap gap-3">
-            {hero.primary?.label ? (
-              <Link
-                href={hero.primary.href || "/collections"}
-                className="rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover"
-              >
-                {hero.primary.label}
-              </Link>
-            ) : null}
-            {showSecondary ? (
-              <Link
-                href={hero.secondary.href || "#new"}
-                className="rounded-sf-button border border-hero-fg/20 px-6 py-3 text-sm font-semibold text-hero-fg transition hover:bg-hero-fg/10"
-              >
-                {hero.secondary.label}
-              </Link>
-            ) : null}
-          </div>
-        </div>
-      </section>
+      {hero ? <SectionView section={hero} ctx={{ surface: "home", empty, stats, notice: testNotice }} /> : null}
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         {/* S54: one shared renderer for shoppers AND preview, keyed by durable
             section ids with per-instance data. */}
-        {empty ? <EmptyCatalog /> : <HomeSections sections={sections} dataById={dataById} />}
+        {empty ? <EmptyCatalog /> : <HomeSections sections={sections} dataById={dataById} emptyNote={!hero} />}
       </div>
     </div>
   );

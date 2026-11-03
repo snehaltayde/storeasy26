@@ -596,8 +596,23 @@ const shopperText = (html) =>
     .trim();
 
 const realEmptyCatalog = await readFile(join(ROOT, "components/EmptyCatalog.js"), "utf8");
+// P2-SECTIONS: the hero renders through the renderer map. The real hero
+// component, with the same stubs; the other sections are HomeSections' (stubbed).
+const registryLegacy = await import("../lib/registry/legacy.js");
+const { default: HeroSection } = await loadComponent(await readFile(join(ROOT, "components/sections/HeroSection.js"), "utf8"), {
+  "next/link": passthrough,
+  "@/components/StoreImage": nothing,
+  "@/components/preview/ExperimentNote": nothing,
+  "@/lib/cms/defaults": cmsDefaults,
+  "@/lib/registry/legacy": registryLegacy,
+});
+const sectionMap = { SectionView: ({ section, ctx }) => (section.kind === "hero" ? React.createElement(HeroSection, { section, ctx, attrs: {} }) : null) };
 async function renderHome({ emptyCatalogSrc = realEmptyCatalog, stats = null, hero = null } = {}) {
   const page = await loadComponent(await readFile(join(ROOT, "app/(storefront)/page.js"), "utf8"), {
+    "@/components/sections/index": sectionMap,
+    "@/lib/releases": { DOCUMENTS_RELEASE_VERSION: 4 },
+    "@/lib/registry/legacy": registryLegacy,
+    "@/lib/site": site,
     "next/link": passthrough,
     "next/headers": { headers: async () => ({ get: () => "shop.test" }), cookies: async () => ({ get: () => undefined }) },
     "@/components/EmptyCatalog": await loadComponent(emptyCatalogSrc),
@@ -614,6 +629,7 @@ async function renderHome({ emptyCatalogSrc = realEmptyCatalog, stats = null, he
     "@/lib/content/resolve": {
       resolvedHero: async () => ({ ...(await S.getHero()), ...hero }),
       resolvedHomeSections: S.getHomeSections,
+      resolvedHomePage: async () => [registryLegacy.legacyHeroToSection({ ...(await S.getHero()), ...hero }), ...registryLegacy.legacyHomeSectionsToSections(await S.getHomeSections())],
       resolvedCollectionsIndex: S.getCollectionsIndex,
       contentSource: async () => ({ mode: "draft", content: null, preview: false }), // a shopper, not a preview (PV-08)
     },

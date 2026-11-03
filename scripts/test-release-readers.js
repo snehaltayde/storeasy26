@@ -370,8 +370,8 @@ async function watch(fn, { filter } = {}) {
 // Content statements: the release, documents and CMS tables. Catalog reads
 // (products, collections, variants) are not content and are not counted.
 // collection_overrides is left out here on purpose and checked on its own:
-// the home page's product rails read it straight from lib/cms/section-data.js
-// on every store, outside the release (a known limit, P2-READ.md).
+// the home page's product rails read it from lib/cms/section-data.js on a
+// legacy store only; on v4 it must not be read at all (P2-SECTIONS).
 const CONTENT_SQL = /\b(release_state|releases|document_versions|documents|cms_state|cms_blocks|cms_pages|page_redirects|placements|product_overrides|cms_preview_candidates)\b/i;
 const contentOnly = (st) => st.filter((s) => CONTENT_SQL.test(s.sql));
 const versionReads = (st) => st.filter((s) => /document_versions/i.test(s.sql));
@@ -972,9 +972,10 @@ await t("the REAL layout plus the home page issue at most 3 content statements p
   ok(ca.length <= 3, `content statements at 0 posts: ${ca.length}\n      ${ca.map((s) => s.sql.slice(0, 120)).join(" | ")}`);
   eq(cb.length, ca.length, "content statements at 1,000 posts:");
   const bytes = (st) => st.reduce((n, s) => n + s.bytes, 0);
-  // the known limit: the rails' pins, read by lib/cms/section-data.js, not by a getter
+  // P2-SECTIONS closed the known limit: a v4 store's rails never read the
+  // legacy pins (plan decision 9), so collection_overrides is not read at all
   const pinReads = a.statements.filter((s) => /collection_overrides/i.test(s.sql));
-  eq(pinReads.length, 1, "home rail pin reads (section-data.js, one rail):");
+  eq(pinReads.length, 0, "home rail pin reads on v4 (section-data.js, one rail):");
   eq(bytes(cb), bytes(ca), "bytes read at 1,000 posts vs 0:");
   // what they are: the pointer and list, the chrome set, the home set
   const listA = await versionsOf(P0);

@@ -1,12 +1,32 @@
 import Link from "next/link";
-import FaqSection from "./FaqSection";
+import { SectionView, sectionShows } from "@/components/sections/index";
+import { EmptyPageNote } from "@/components/sections/parts";
+import { LEGACY_KIND_NAMES } from "@/lib/registry/sections";
+import { legacyPageSectionsToSections } from "@/lib/registry/legacy";
 
 // Shared renderer for store content/policy pages. S38 (SF13): sections are
 // typed — text (heading + paragraphs), rich (html, allowlist-sanitized at
 // save) and image (library/https src). Legacy sections without a kind render
 // as text. SF14: an effective date renders under the title. S39: faq sections
 // (keyboard accordions + deep links) and `children` (e.g. the contact form).
+//
+// P2-SECTIONS (DOC-03, DOC-06): every section renders through the renderer map
+// (components/sections/index.js), as registry sections. Page sections arrive
+// in the page shape (text, rich, image, faq with a "heading"; a v4 page is
+// turned into that shape by lib/content/documents-reader.js) and are adapted
+// with lib/registry/legacy.js, so the merged names apply: rich is rich_text,
+// image is image_with_text, heading is title. A section whose kind isn't one
+// of the page kinds renders as text, as it always has. Each section's root
+// carries data-section-id and data-section-kind; the markup is otherwise the
+// old one. A page that renders no sections, and has nothing of its own below
+// (the contact form), shows a neutral message and a link to collections.
+export function pageSections(list) {
+  const asText = (s) => (s && typeof s === "object" && !Object.hasOwn(LEGACY_KIND_NAMES, s.kind || "text") ? { ...s, kind: "text" } : s);
+  return legacyPageSectionsToSections(Array.isArray(list) ? list.map(asText) : []).filter((s) => sectionShows(s, {}, { surface: "page" }));
+}
+
 export default function ContentPage({ page, legalName = "", children = null }) {
+  const sections = pageSections(page.sections);
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       {/* P1-CONTRAST: the two links here (Home, Contact us) are subtle text,
@@ -26,42 +46,11 @@ export default function ContentPage({ page, legalName = "", children = null }) {
         </p>
       ) : null}
       <div className="mt-8 space-y-8">
-        {page.sections.map((s, idx) => {
-          const kind = s.kind || "text";
-          if (kind === "rich") {
-            return (
-              <section key={idx}>
-                {s.heading ? <h2 className="text-lg font-bold text-sf-text">{s.heading}</h2> : null}
-                <div className="rte mt-2 text-sf-text-muted" dangerouslySetInnerHTML={{ __html: s.html || "" }} />
-              </section>
-            );
-          }
-          if (kind === "faq") {
-            return <FaqSection key={idx} heading={s.heading} items={s.items || []} />;
-          }
-          if (kind === "image") {
-            return (
-              <figure key={idx}>
-                {/* library images are same-origin, arbitrary https allowed too — plain <img>, not next/image */}
-                <img src={s.src} alt={s.alt || ""} className="w-full rounded-brand" loading="lazy" />
-                {s.caption ? <figcaption className="mt-2 text-center text-sm text-sf-text-faint">{s.caption}</figcaption> : null}
-              </figure>
-            );
-          }
-          return (
-            <section key={idx}>
-              {s.heading ? <h2 className="text-lg font-bold text-sf-text">{s.heading}</h2> : null}
-              <div className="mt-2 space-y-3">
-                {(s.body || []).map((p, i) => (
-                  <p key={i} className="leading-relaxed text-sf-text-muted">
-                    {p}
-                  </p>
-                ))}
-              </div>
-            </section>
-          );
-        })}
+        {sections.map((s, idx) => (
+          <SectionView key={`${s.id}-${idx}`} section={s} ctx={{ surface: "page" }} />
+        ))}
       </div>
+      {sections.length === 0 && !children ? <EmptyPageNote /> : null}
       {children}
       <p className="mt-12 border-t border-sf-border-soft pt-6 text-xs text-sf-text-faint">
         {legalName ? `Operated by ${legalName} · ` : ""}Questions?{" "}
