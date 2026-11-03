@@ -8,6 +8,10 @@ import { Input } from "@/components/console/fields";
 import { Banner } from "@/components/console/Banner";
 import { SkeletonText, EmptyState } from "@/components/console/bits";
 import { cx } from "@/components/console/cx";
+import { useToast } from "@/components/console/Toast";
+import { MediaUploadStatus } from "@/components/admin/MediaUploadStatus";
+import { uploadImage } from "@/lib/media-upload";
+import { UPLOAD_ACCEPT, uploadMessage } from "@/lib/media-upload-plan";
 
 // THE media picker (S52): every place content takes an image opens this
 // dialog instead of asking for a pasted URL. Lists the library with search,
@@ -16,9 +20,11 @@ export function MediaPicker({ open, onClose, onSelect }) {
   const [items, setItems] = useState(null);
   const [err, setErr] = useState(null);
   const [q, setQ] = useState("");
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState(null); // progress of the file in flight
   const [uploadErr, setUploadErr] = useState(null);
   const fileRef = useRef(null);
+  const session = useRef(0); // moves on every open and close, so an upload can tell its dialog went away
+  const toast = useToast();
 
   async function load() {
     setErr(null);
@@ -32,6 +38,7 @@ export function MediaPicker({ open, onClose, onSelect }) {
     }
   }
   useEffect(() => {
+    session.current++;
     if (open) {
       setQ("");
       setItems(null);
@@ -41,20 +48,23 @@ export function MediaPicker({ open, onClose, onSelect }) {
 
   async function upload(file) {
     if (!file) return;
-    setUploading(true);
+    const started = session.current;
     setUploadErr(null);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/admin/media", { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+    const r = await uploadImage(file, { onProgress: setUploading });
+    if (fileRef.current) fileRef.current.value = "";
+    if (r.ok) {
       await load();
-      if (data.media?.url) onSelect?.({ url: data.media.url, alt: data.media.alt || "", id: data.media.id });
-    } catch (e) {
-      setUploadErr(String(e?.message || e));
+      if (r.notice) toast.info(r.notice); // a toast, because picking closes this dialog
+      // Closed since it started: the founder changed their mind, and onSelect belongs
+      // to the spot they opened it for, so the image stays in the library, unplaced.
+      if (session.current !== started) toast.info(uploadMessage.notPlaced(file.name));
+      else if (r.media?.url) onSelect?.({ url: r.media.url, alt: r.media.alt || "", id: r.media.id });
+    } else if (session.current !== started) {
+      toast.error(r.message); // a banner would sit in a closed dialog
+    } else {
+      setUploadErr(r.message);
     }
-    setUploading(false);
+    setUploading(null);
   }
 
   const filtered = useMemo(() => {
@@ -65,7 +75,7 @@ export function MediaPicker({ open, onClose, onSelect }) {
 
   const thumbOf = (m) => {
     const t = (m.variants || []).find((v) => v.variant === "thumb");
-    return t?.url || m.url;
+    return t ? `/api/media/${t.id}` : m.url; // listed variants carry an id, not a url
   };
 
   return (
@@ -82,14 +92,15 @@ export function MediaPicker({ open, onClose, onSelect }) {
           <input
             ref={fileRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+            accept={UPLOAD_ACCEPT}
             className="sr-only"
             onChange={(e) => upload(e.target.files?.[0])}
           />
-          <Button size="sm" icon={<Upload size={13} aria-hidden />} busy={uploading} onClick={() => fileRef.current?.click()}>
+          <Button size="sm" icon={<Upload size={13} aria-hidden />} busy={!!uploading} onClick={() => fileRef.current?.click()}>
             Upload
           </Button>
         </div>
+        <MediaUploadStatus progress={uploading} />
         {uploadErr && <Banner tone="danger">{uploadErr}</Banner>}
         {err && (
           <Banner tone="danger" actions={<Button size="sm" onClick={load}>Retry</Button>}>
