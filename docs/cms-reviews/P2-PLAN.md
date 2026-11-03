@@ -315,3 +315,9 @@ It replaces P2-GUARD's route-level refusals on those four routes with the facade
 - Old tokens: no overlay in documents mode.
 - Bypass writers in batches 2 and 3: guarded at route level by P2-GUARD.
 - The gallant-keller policy: mirrored by the raw-client variant. The branch itself is not inspected.
+## 6. Updates after batch 2 (binding on later items)
+
+- `commitPublishBatch` now has four outcomes: `{ok}`, `{lost}`, `{unknown}` and `{failed, code}`. The `failed` codes are listed in docs/cms-reviews/P2-HARDEN.md. P2-PUBLISH maps `failed` to a 5xx (or a plain refusal for `MISSING_DOCUMENT`: "This page was deleted while you were publishing. Reload to see the current pages."). It never maps it to 409 "someone else published". It also wraps the call in a try and treats any throw as `failed`, never as `lost`.
+- Release ids and published version ids are always minted fresh for each build. A publish never reuses a checkpoint or any existing version id, and never pre-inserts a release row before its flip (this keeps reconcile's `oursPresent` rule true). Restore followed by publish writes a new published version row.
+- At cutover (MIG-03), cancel any pending legacy `publish_release` jobs for the tenant; otherwise they dead-letter with a critical alert.
+- The legacy preview path in `/api/admin/releases` falls back to legacy when the mode can't be read; P2-PREVIEW must ignore legacy preview tokens on documents-mode stores.
