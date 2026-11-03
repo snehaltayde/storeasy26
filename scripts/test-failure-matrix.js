@@ -18,10 +18,22 @@ const root = join(here, "..");
 
 // Route files use the "@/" alias; resolve it the way test:media-upload does,
 // so one /api/admin route runs for real below.
+// next/headers: outside a request it throws, as Next's does; inside one the
+// suite opens (globalThis.__fmRequest, for a console page's server load) it
+// answers with that request's host and cookies.
+const FM_HEADERS =
+  "data:text/javascript," +
+  encodeURIComponent(`
+    const req = () => { const q = globalThis.__fmRequest; if (!q) throw new Error("\`headers\` was called outside a request scope"); return q; };
+    export async function headers() { return new Headers({ host: req().host }); }
+    export async function cookies() { const q = req(); return { get: (n) => (q.cookies?.[n] != null ? { name: n, value: q.cookies[n] } : undefined) }; }
+    export function draftMode() { return { isEnabled: false }; }
+  `);
 registerHooks({
   resolve(spec, ctx, next) {
-    if (spec.startsWith("@/")) return next(pathToFileURL(join(root, `${spec.slice(2)}.js`)).href, ctx);
-    if (/^next\/(server|headers|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
+    if (spec.startsWith("@/")) return next(pathToFileURL(join(root, spec.endsWith(".js") ? spec.slice(2) : `${spec.slice(2)}.js`)).href, ctx);
+    if (spec === "next/headers") return { url: FM_HEADERS, shortCircuit: true };
+    if (/^next\/(server|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
     return next(spec, ctx);
   },
 });
@@ -51,6 +63,17 @@ const FILES = {
   badrevs: ".test-failmatrix-badrevs.db",
   oldpages: ".test-failmatrix-oldpages.db",
   noredir: ".test-failmatrix-noredir.db",
+  // P1-FIX-C: schema errors that are NOT a store from before a migration, and
+  // the stores from before a migration that must keep working
+  nocol: ".test-failmatrix-nocol.db",
+  nofamily: ".test-failmatrix-nofamily.db",
+  nopagestable: ".test-failmatrix-nopagestable.db",
+  relview: ".test-failmatrix-relview.db",
+  redirview: ".test-failmatrix-redirview.db",
+  apprview: ".test-failmatrix-apprview.db",
+  // P1-FIX-C: the offer go-back route (c513d27)
+  offers: ".test-failmatrix-offers.db",
+  nooffers: ".test-failmatrix-nooffers.db",
 };
 const dbs = [".test-failmatrix-default.db", ".test-failmatrix-platform.db", ...Object.values(FILES)];
 const cleanup = async () => {
@@ -185,6 +208,53 @@ const breakColumn = async (c, table, column, { drop = null } = {}) => {
     sql: "INSERT INTO cms_pages (slug, title, description, sections, enabled, revision, updated_at, family, schema_version) VALUES ('partner-network', 'Partner network', '', ?, 1, 1, 'x', 'page', 3)",
     args: [JSON.stringify([{ id: "sec_img1", kind: "image", src: "/api/media/med_net1", alt: "Our partners" }])],
   });
+
+  // P1-FIX-C. nocol: every cms_pages read fails "no such column" because the
+  // table is now a view naming a column that doesn't exist (P1-DRILLS finding
+  // 5). That is a broken schema, not a store from before a migration.
+  const KEPT_PAGE = { sql: "INSERT INTO cms_pages (slug, title, description, sections, enabled, revision, updated_at, family, schema_version) VALUES ('kept', 'Kept', '', ?, 1, 1, 'x', 'page', 3)", args: [JSON.stringify([{ id: "sec_kept1", kind: "text", heading: "Kept", body: ["Still here."] }])] };
+  const nc = await build(FILES.nocol);
+  await nc.execute(KEPT_PAGE);
+  const ncCols = (await nc.execute("PRAGMA table_info(cms_pages)")).rows.map((r) => r.name);
+  await nc.executeMultiple(`ALTER TABLE cms_pages RENAME TO cms_pages_data; CREATE VIEW cms_pages AS SELECT ${ncCols.map((n) => (n === "title" ? "nosuch_col AS title" : n)).join(", ")} FROM cms_pages_data;`);
+  // nofamily: a real store from before page families (migration 0009): no
+  // family or window columns, otherwise healthy. It must keep working.
+  const nf = await build(FILES.nofamily);
+  await nf.execute(KEPT_PAGE);
+  const nfCols = (await nf.execute("PRAGMA table_info(cms_pages)")).rows.map((r) => r.name).filter((n) => !["family", "window_start", "window_end"].includes(n));
+  await nf.executeMultiple(`ALTER TABLE cms_pages RENAME TO cms_pages_data; CREATE VIEW cms_pages AS SELECT ${nfCols.join(", ")} FROM cms_pages_data;`);
+  // nopagestable: a store from before content pages: no cms_pages at all
+  const npt = await build(FILES.nopagestable);
+  await npt.execute("DROP TABLE cms_pages");
+  // relview: the live pointer table is a view over a table that's gone. Its
+  // read fails "no such table: main.<other>", which is not release_state
+  // missing: "no release yet" would serve drafts to shoppers.
+  const rv = await build(FILES.relview);
+  await rv.executeMultiple("ALTER TABLE release_state RENAME TO release_state_data; CREATE VIEW release_state AS SELECT * FROM release_state_gone;");
+  // redirview: the same for the slug redirects a publish freezes
+  const rdv = await build(FILES.redirview);
+  await rdv.execute({ sql: "INSERT INTO cms_blocks (key, value, updated_at, revision, schema_version) VALUES ('hero', ?, '2026-01-01', 1, 1)", args: [JSON.stringify({ title: "Ready" })] });
+  await rdv.execute("INSERT INTO page_redirects (from_slug, to_slug, created_at) VALUES ('old-post', 'new-post', 'x')");
+  await rdv.executeMultiple("ALTER TABLE page_redirects RENAME TO page_redirects_data; CREATE VIEW page_redirects AS SELECT * FROM page_redirects_gone;");
+  // apprview: the approvals table is a view over a table that's gone
+  const av = await build(FILES.apprview);
+  await av.executeMultiple("ALTER TABLE cms_approvals RENAME TO cms_approvals_data; CREATE VIEW cms_approvals AS SELECT * FROM cms_approvals_gone;");
+  // offers: the go-back route's every answer. Each offer is stored the way
+  // lib/offers/store.js stores it, with the settings before its last change.
+  const coupon = (code, title = "Ten off") => ({ code, title, scope: "order", priority: 30, discount: { kind: "percent", value: 10 } });
+  const snap = (cfg, at = "2026-10-01T00:00:00.000Z", type = "COUPON", label = "Coupon") => JSON.stringify({ type, label, starts_at: null, ends_at: null, config: JSON.stringify(cfg), replaced_at: at });
+  const of = await build(FILES.offers);
+  for (const [id, type, cfg, prev] of [
+    ["o-prev", "COUPON", coupon("NEW15"), snap(coupon("OLD10"))],
+    ["o-fresh", "COUPON", coupon("FRESH"), null],
+    ["o-bundle", "BUNDLE", { title: "Duo", scope: "line", priority: 30 }, snap({ title: "Duo old" }, undefined, "BUNDLE")],
+    ["o-badprev", "COUPON", coupon("GOOD"), snap({ ...coupon("BAD"), title: "" })],
+  ]) {
+    await of.execute({ sql: "INSERT INTO offers (id, type, label, enabled, config, previous_config, created_at, updated_at) VALUES (?, ?, 'Coupon', 1, ?, ?, 'x', 'x')", args: [id, type, JSON.stringify(cfg), prev] });
+  }
+  const no = await build(FILES.nooffers);
+  await no.execute({ sql: "INSERT INTO offers (id, type, label, enabled, config, previous_config, created_at, updated_at) VALUES ('o-prev', 'COUPON', 'Coupon', 1, ?, ?, 'x', 'x')", args: [JSON.stringify(coupon("NEW15")), snap(coupon("OLD10"))] });
+  await breakReads(no, "offers");
 }
 
 const TENANTS = {
@@ -204,6 +274,14 @@ const TENANTS = {
   badrevs: `file:${FILES.badrevs}`,
   oldpages: `file:${FILES.oldpages}`,
   noredir: `file:${FILES.noredir}`,
+  nocol: `file:${FILES.nocol}`,
+  nofamily: `file:${FILES.nofamily}`,
+  nopagestable: `file:${FILES.nopagestable}`,
+  relview: `file:${FILES.relview}`,
+  redirview: `file:${FILES.redirview}`,
+  apprview: `file:${FILES.apprview}`,
+  offers: `file:${FILES.offers}`,
+  nooffers: `file:${FILES.nooffers}`,
   // nothing answers here (undici refuses port 9 at once, then lib/db.js retries)
   down: "http://127.0.0.1:9",
 };
@@ -363,6 +441,48 @@ row("load", "editor load when only the page reads fail", () => storefrontGet("no
 row("load", "editor load when only the page list can't be read", () => storefrontGet("badtitles"), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" });
 row("load", "editor load when only the page versions can't be read (the editor would save against none)", () => storefrontGet("badrevs"), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" });
 row("load", "editor load on a store from before page families, when the page list can't be read", () => storefrontGet("oldpages"), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" });
+// P1-FIX-C (P1-DRILLS finding 5): "no such column" read as a store from before
+// a migration, so this load answered 200 with no pages while a page existed,
+// and a Designer save answered 200 with no notice
+row("save", "saved, then the editor's refresh fails on a column nobody expected to be missing (not an old store)", () => storefront("nocol", { block: "hero", value: { title: "Stored while pages break" }, revision: null }), { status: 503, code: "SAVED_RELOAD_FAILED", cls: "infrastructure", doing: "saved" }, async (r) => {
+  eq(r.body.saved, true, "says it was saved:");
+  const row = await withTenant(T.nocol, async () => (await import("../lib/db.js")).db.selectFrom("cms_blocks").select(["value"]).where("key", "=", "hero").executeTakeFirst());
+  eq(JSON.parse(row?.value || "{}").title, "Stored while pages break", "the hero really is stored:");
+});
+row("load", "editor load when the page reads name a column that isn't there (a broken schema, not an old store)", () => storefrontGet("nocol"), { status: 503, code: "DATABASE_NOT_READY", cls: "infrastructure" });
+// ...and the stores from before a migration still read as they always did
+row("load", "a store from before page families still loads, with its page", () => storefrontGet("nofamily"), { status: 200 }, (r) => {
+  eq(r.body.pages.map((p) => [p.slug, p.family]), [["kept", "page"]], "pages:");
+  eq(r.body.pageRevisions, { kept: 1 }, "page versions:");
+});
+row("load", "a store from before content pages still loads, with none", () => storefrontGet("nopagestable"), { status: 200 }, (r) => {
+  eq([r.body.pages, r.body.pageRevisions], [[], {}], "pages and versions:");
+});
+// A view that names a missing column breaks every read of it, so the page
+// list and the page versions above fail together and each hides the other.
+// Here only ONE statement fails, with the driver's own error shape, on a
+// healthy store with a page: the read that names the column is the only one hit.
+const failingSql = async (name, pattern, message, fn) => {
+  const inst = await withTenant(T[name], async () => (await import("../lib/db.js")).currentDatabase());
+  const send = inst.libsql.execute;
+  inst.libsql.execute = (stmt, ...rest) =>
+    pattern.test(typeof stmt === "string" ? stmt : stmt?.sql || "") ? Promise.reject(Object.assign(new Error(`SQLITE_ERROR: ${message}`), { name: "LibsqlError", code: "SQLITE_ERROR" })) : send(stmt, ...rest);
+  try {
+    return await fn();
+  } finally {
+    delete inst.libsql.execute;
+  }
+};
+const PAGE_LIST_SQL = /select "slug", "title", "enabled", "updated_at"(, "family")? from "cms_pages"/;
+const PAGE_REVS_SQL = /select "slug", "revision" from "cms_pages"/;
+row("load", "only the page list's read fails \"no such column\" on a column it never expected missing", () => failingSql("words", PAGE_LIST_SQL, "no such column: nosuch_col", () => storefrontGet("words")), { status: 503, code: "DATABASE_NOT_READY", cls: "infrastructure" });
+row("load", "only the page versions' read fails \"no such column\" on a column it never expected missing", () => failingSql("words", PAGE_REVS_SQL, "no such column: nosuch_col", () => storefrontGet("words")), { status: 503, code: "DATABASE_NOT_READY", cls: "infrastructure" });
+// ...while the expected old shapes of those two reads still load
+row("load", "the page versions' read on a store from before revisions (0006) loads, with no versions", () => failingSql("words", PAGE_REVS_SQL, "no such column: revision", () => storefrontGet("words")), { status: 200 }, (r) => {
+  eq(r.body.pageRevisions, {}, "versions:");
+  ok(r.body.pages.some((p) => p.slug === "partner-network"), "the page is still listed");
+});
+row("load", "Publishing's load when the approvals table is a view over a table that's gone: 503, not \"no approval\"", () => releasesGet("apprview"), { status: 503, code: "DATABASE_NOT_READY", cls: "infrastructure" });
 
 // --- preview -----------------------------------------------------------------------
 row("preview", "unsaved hero and sections both wrong", async () => storefront("ok", { previewCandidate: { hero: { title: "" }, home_sections: [{ id: "sec_dd44", kind: "rich_text", html: "" }] } }, { preview: await previewTok("ok") }), { status: 422, code: "VALIDATION_FAILED", cls: "validation" }, (r) => {
@@ -410,6 +530,12 @@ row("publish", "reading the drafts fails", () => releases("broken", { action: "p
 // classifier reads the driver's error, never the wrapper's words).
 row("publish", "reading the pages fails (blocks read fine)", () => releases("nopages", { action: "publish" }), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" });
 row("publish", "reading the slug redirects fails", () => releases("noredir", { action: "publish" }), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" });
+// P1-FIX-C: "no such table" anywhere used to read as "no redirects yet", so
+// this publish went live with every slug redirect dropped
+row("publish", "the slug redirects read names a table that's gone (not an old store): nothing ships, no redirect is dropped", () => releases("redirview", { action: "publish" }), { status: 503, code: "DATABASE_NOT_READY", cls: "infrastructure" }, async () => {
+  const live = await withTenant(T.redirview, async () => (await import("../lib/db.js")).db.selectFrom("release_state").select("live_release_id").where("id", "=", 1).executeTakeFirst());
+  eq(live?.live_release_id ?? null, null, "nothing went live:");
+});
 // before DOC-04: 422 with the raw SQLite text of the catalog lookup
 row("publish", "the catalog lookup behind link checks fails", () => releases("links", { action: "publish" }), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" });
 row("publish", "release table missing", () => releases("norel", { action: "publish" }), { status: 503, code: "DATABASE_NOT_READY", cls: "infrastructure" });
@@ -571,6 +697,137 @@ await t("the AI service not answering is named as the AI service, not as the sto
   }
 });
 
+// --- P1-FIX-C: the offer go-back route (c513d27) -------------------------------------
+// Before c513d27 an unknown error was re-thrown (Next's HTML 500 page) and a
+// database failure fell through the same way. The order scan below checks the
+// shape of the catch; these check what it answers.
+console.log("— the offer go-back route (/api/admin/offers/[id]/revert)");
+const revertRoute = async (name, id, body = {}) => {
+  const route = await import("../app/api/admin/offers/[id]/revert/route.js");
+  const res = await route.POST(
+    {
+      url: `http://${T[name].id}.test/api/admin/offers/${id}/revert`,
+      cookies: { get: (n) => (n === "_admin" ? { value: OWNER } : undefined) },
+      headers: { get: (k) => ({ host: `${T[name].id}.test` })[k.toLowerCase()] ?? null },
+      json: async () => body,
+    },
+    { params: Promise.resolve({ id }) },
+  );
+  const json = await res.json();
+  if (process.env.FM_SHOW) console.log(`   → ${res.status} ${JSON.stringify(json).slice(0, 260)}`);
+  return { status: res.status, body: json };
+};
+const offerRow = (name, id) => withTenant(T[name], async () => (await import("../lib/db.js")).db.selectFrom("offers").select(["config", "previous_config"]).where("id", "=", id).executeTakeFirst());
+await t("go back: a database that doesn't answer → 503 with the plain message, never a 4xx", async () => {
+  check(await revertRoute("down", "o-prev"), { status: 503, code: "DATABASE_UNAVAILABLE", cls: "infrastructure", label: "go back, database down", doing: "save" });
+});
+await t("go back: reading the offer fails → 503 with the plain message", async () => {
+  check(await revertRoute("nooffers", "o-prev"), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure", label: "go back, reads fail", doing: "save" });
+});
+await t("go back: each of the store's refusals keeps its status and its exact body, and changes nothing", async () => {
+  const before = await offerRow("offers", "o-prev");
+  const cases = [
+    ["o-none", {}, 404, { error: "This offer no longer exists.", code: "NOT_FOUND" }],
+    ["o-bundle", {}, 409, { error: "This offer belongs to a bundle. Change it where you edit the bundle.", code: "NOT_HERE" }],
+    ["o-fresh", {}, 409, { error: "There are no earlier settings for this offer.", code: "NO_PREVIOUS" }],
+    ["o-prev", { expect: "2020-01-01T00:00:00.000Z" }, 409, { error: "This offer changed while you were looking at it. Close it and open it again to see its settings now.", code: "CHANGED" }],
+    ["o-badprev", {}, 422, { error: "The earlier settings can't be used any more.", code: "OFFER_INVALID" }],
+  ];
+  for (const [id, body, status, want] of cases) eq(await revertRoute("offers", id, body), { status, body: want }, `${id}:`);
+  eq(await offerRow("offers", "o-prev"), before, "the offer is unchanged:");
+});
+await t("go back: an error that is neither the store's nor the database's → JSON 500 INTERNAL_ERROR, the raw text kept out", async () => {
+  const inst = await withTenant(T.offers, async () => (await import("../lib/db.js")).currentDatabase());
+  const send = inst.libsql.execute;
+  inst.libsql.execute = (stmt, ...rest) => (/from "offers"/i.test(typeof stmt === "string" ? stmt : stmt?.sql || "") ? Promise.reject(new TypeError("boom: a bug of ours")) : send(stmt, ...rest));
+  try {
+    const r = await revertRoute("offers", "o-prev");
+    eq([r.status, r.body.code], [500, "INTERNAL_ERROR"], "answer:");
+    readable(r.body.error, "internal");
+    ok(/Something went wrong on our side/.test(r.body.error), `plain words: "${r.body.error}"`);
+    ok(!/boom/.test(JSON.stringify(r.body)), "the raw text stays in the log");
+  } finally {
+    delete inst.libsql.execute;
+  }
+});
+
+// --- P1-FIX-C: only the expected old shape counts as "not there yet" ----------------
+console.log("— schema errors that aren't a store from before a migration");
+await t("the live pointer read failing on some other table is an error, never \"no release yet\" (which serves drafts to shoppers)", async () => {
+  const { getLiveReleaseState } = await import("../lib/releases.js");
+  const s = await withTenant(T.relview, () => getLiveReleaseState());
+  eq(s.state, "error", `state: ${JSON.stringify(s)}`);
+  eq((await withTenant(T.bare, () => getLiveReleaseState())).state, "none", "a store with no release tables yet:");
+});
+// The page save clears any redirect FROM its slug. That clean-up swallowed every
+// error ("pre-migration tenants lack the table"), so a save answered 200 while
+// an old redirect kept sending visitors away from the page. The page row and
+// the redirects are still two writes (DOC-04's known limit: the answer then
+// says nothing was saved, though the row is); DOC-02's single write ends that.
+await t("a page save whose redirect clean-up fails is never answered as a success", async () => {
+  const r = await storefront("redirview", { page: { slug: "fm-redirclean", title: "Clean", sections: [{ kind: "text", heading: "H", body: ["x"] }] }, revision: null });
+  ok(r.status >= 500, `answered ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+  ok(!("issues" in r.body) && /^[A-Z_]+$/.test(String(r.body.code)), `a coded infrastructure answer: ${JSON.stringify(r.body)}`);
+  readable(r.body.error, "redirect clean-up");
+});
+{
+  // The page editor's server load (a server component), compiled with Next's
+  // SWC and run against the real tenant databases; the editor itself is a stub
+  // that keeps its props. DOC-04's known limit: this load had no test.
+  const { createRequire } = await import("node:module");
+  const require = createRequire(import.meta.url);
+  const swc = require("next/dist/build/swc/index.js");
+  await swc.loadBindings();
+  const file = join(root, "app/(console)/admin/(authed)/storefront/pages/[slug]/page.js");
+  const { code } = await swc.transform(await readFile(file, "utf8"), {
+    filename: file,
+    jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" },
+    module: { type: "commonjs" },
+  });
+  const PageEditor = () => null;
+  const stubs = { "next/headers": await import(FM_HEADERS), "@/components/admin/cms/PageEditor": { PageEditor } };
+  const mod = { exports: {} };
+  new Function("require", "module", "exports", code)(
+    (id) => (id in stubs ? stubs[id] : id.startsWith("@/") ? require(join(root, id.endsWith(".js") ? id.slice(2) : `${id.slice(2)}.js`)) : require(id)),
+    mod,
+    mod.exports,
+  );
+  const EditorPage = mod.exports.default;
+  const openEditor = async (name, slug) => {
+    globalThis.__fmRequest = { host: `${T[name].id}.test`, cookies: { _admin: OWNER } };
+    try {
+      return { el: await EditorPage({ params: Promise.resolve({ slug }), searchParams: Promise.resolve({}) }) };
+    } catch (error) {
+      return { error };
+    } finally {
+      globalThis.__fmRequest = null;
+    }
+  };
+  const isNotFound = (e) => /NEXT_HTTP_ERROR_FALLBACK;404|NEXT_NOT_FOUND/.test(String(e?.digest || e?.message || ""));
+  await t("page editor load: a page whose reads fail \"no such column\" goes to the console's error screen, not a 404", async () => {
+    const r = await openEditor("nocol", "kept");
+    ok(r.error, `it opened the editor: ${JSON.stringify(r.el?.props?.page)}`);
+    ok(!isNotFound(r.error), `it answered 404: ${r.error.message}`);
+    eq(issuesModule.infraKind(r.error), "schema", "the database's own error reaches the error boundary:");
+  });
+  await t("page editor load: only the page's own read fails \"no such column\" (its versions read fine): the error screen, not a 404", async () => {
+    const r = await failingSql("words", /from "cms_pages" where "slug" = \?/, "no such column: nosuch_col", () => openEditor("words", "partner-network"));
+    ok(r.error && !isNotFound(r.error), `answered: ${r.error?.message ?? JSON.stringify(r.el?.props?.page)}`);
+    eq(issuesModule.infraKind(r.error), "schema", "the database's own error reaches the error boundary:");
+    const fine = await openEditor("words", "partner-network");
+    eq(fine.el?.props?.page?.slug, "partner-network", "without the failure, the page opens:");
+  });
+  await t("page editor load: on a store from before page families, the page opens in the editor", async () => {
+    const r = await openEditor("nofamily", "kept");
+    ok(!r.error, `failed: ${r.error?.message}`);
+    eq([r.el.type, r.el.props.mode, r.el.props.page.slug, r.el.props.page.family, r.el.props.revision], [PageEditor, "edit", "kept", "page", 1], "editor:");
+  });
+  await t("page editor load: on a store from before content pages, a page that isn't there is a 404, as before", async () => {
+    const r = await openEditor("nopagestable", "kept");
+    ok(r.error && isNotFound(r.error), `answered: ${r.error?.message ?? "the editor"}`);
+  });
+}
+
 // Every catch in an /api/admin route: the route's own known answers first
 // (`if (e?.code === …) return …`, `if (e?.problems) return …`), then the
 // database check, then the catch-all. The known answers come first so a
@@ -585,6 +842,7 @@ await t("every catch-all in an /api/admin route answers its own refusals, then c
   };
   await walk("app/api/admin");
   ok(files.length >= 30, `found the routes (${files.length}):`);
+  const KNOWN_ANSWER = /^\s*if \(e\?\.[a-z]+(?: === "[A-Z_]+"(?: \|\| e\?\.code === "[A-Z_]+")?)?\) return NextResponse\.json\(/i;
   const wrong = [];
   let catches = 0;
   let known = 0;
@@ -605,11 +863,16 @@ await t("every catch-all in an /api/admin route answers its own refusals, then c
       }
       for (const l of block.slice(0, infraAt)) {
         if (/^\s*\/\//.test(l)) continue;
-        if (/^\s*if \(e\?\.[a-z]+(?: === "[A-Z_]+"(?: \|\| e\?\.code === "[A-Z_]+")?)?\) return NextResponse\.json\(/i.test(l)) {
+        if (KNOWN_ANSWER.test(l)) {
           known++;
           continue;
         }
         wrong.push(`${f}:${i + 1} runs something other than a known answer before the database check: ${l.trim().slice(0, 80)}`);
+      }
+      // P1-FIX-C (DOC-04 review): a known answer AFTER the check is caught by
+      // what it is, not only through the count below
+      for (const l of block.slice(infraAt + 1)) {
+        if (KNOWN_ANSWER.test(l) || /^\s*if \(e\?\.[a-z]+\b/i.test(l)) wrong.push(`${f}:${i + 1} answers one of its own refusals after the database check: ${l.trim().slice(0, 80)}`);
       }
       if (!block.slice(infraAt + 1).some((l) => /return NextResponse\.json\(/.test(l))) wrong.push(`${f}:${i + 1} has no catch-all after the database check`);
     });

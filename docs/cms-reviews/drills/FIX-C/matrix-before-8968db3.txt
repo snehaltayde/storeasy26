@@ -1,0 +1,125 @@
+— save
+✓ save: hero with no title → 422 VALIDATION_FAILED
+✓ save: two homepage sections wrong at once → 422 VALIDATION_FAILED
+✓ save: page with an empty section and no title → 422 VALIDATION_FAILED
+✓ save: template with no name → 422 VALIDATION_FAILED
+✓ save: a bad redirect is refused before anything is written → 422 VALIDATION_FAILED
+✓ save: someone else saved first (stale revision) → 409 CMS_CONFLICT
+✓ save: two first saves race (block) → 409 CMS_CONFLICT
+✓ save: two first saves race (page) → 409 CMS_CONFLICT
+✓ save: no revision sent → 428 REVISION_REQUIRED
+✓ save: two operations in one request → 400 AMBIGUOUS_OPERATION
+✓ save: a page that isn't an object → 400 MALFORMED
+✓ save: signed out → 401
+✓ save: read-only role (support) → 403
+✓ save: template that no longer exists → 404 NOT_FOUND
+✓ save: database doesn't answer (block) → 503 DATABASE_UNAVAILABLE
+✓ save: database doesn't answer (page) → 503 DATABASE_UNAVAILABLE
+✓ save: database went read-only (block) → 503 DATABASE_UNAVAILABLE
+✓ save: database went read-only (reset to default) → 503 DATABASE_UNAVAILABLE
+✓ save: database went read-only (page) → 503 DATABASE_UNAVAILABLE
+✓ save: database never migrated (block) → 503 DATABASE_NOT_READY
+✓ save: database never migrated (page) → 503 DATABASE_NOT_READY
+✓ save: templates table missing (save as template) → 503 DATABASE_NOT_READY
+✓ save: templates table missing (start from a template) → 503 DATABASE_NOT_READY
+✓ save: reading the current version fails (block) → 503 DATABASE_ERROR
+✓ save: reading the current version fails (reset to default) → 503 DATABASE_ERROR
+✓ save: reading the current version fails (page) → 503 DATABASE_ERROR
+[ALERT:critical] [fmok] App error [cms-api] TypeError: boom: a bug of ours {"fingerprint":"63b86eaf","count":1,"op":"savePage"}
+✓ save: a bug on our side → 500 INTERNAL_ERROR
+[ALERT:critical] [fmnotnull] App error [cms-api] LibsqlError: SQLITE_CONSTRAINT: NOT NULL constraint failed: nn_guard.x {"fingerprint":"6d70397a","count":1,"op":"saveBlock"}
+✓ save: a broken rule that isn't a race (NOT NULL) is ours, not someone else's edit → 500 INTERNAL_ERROR
+✓ save: saved, then the editor's refresh fails → 503 SAVED_RELOAD_FAILED
+✗ save: saved, then the editor's refresh fails on a column nobody expected to be missing (not an old store) → 503 SAVED_RELOAD_FAILED
+   saved, then the editor's refresh fails on a column nobody expected to be missing (not an old store) status: expected 503, got 200
+— load
+✓ load: editor load when the database doesn't answer → 503 DATABASE_UNAVAILABLE
+✓ load: editor load when reads fail → 503 DATABASE_ERROR
+✓ load: editor load when only the page reads fail → 503 DATABASE_ERROR
+✓ load: editor load when only the page list can't be read → 503 DATABASE_ERROR
+✓ load: editor load when only the page versions can't be read (the editor would save against none) → 503 DATABASE_ERROR
+✓ load: editor load on a store from before page families, when the page list can't be read → 503 DATABASE_ERROR
+✗ load: editor load when the page reads name a column that isn't there (a broken schema, not an old store) → 503 DATABASE_NOT_READY
+   editor load when the page reads name a column that isn't there (a broken schema, not an old store) status: expected 503, got 200
+✓ load: a store from before page families still loads, with its page → 200
+✓ load: a store from before content pages still loads, with none → 200
+✗ load: only the page list's read fails "no such column" on a column it never expected missing → 503 DATABASE_NOT_READY
+   only the page list's read fails "no such column" on a column it never expected missing status: expected 503, got 200
+✗ load: only the page versions' read fails "no such column" on a column it never expected missing → 503 DATABASE_NOT_READY
+   only the page versions' read fails "no such column" on a column it never expected missing status: expected 503, got 200
+✓ load: the page versions' read on a store from before revisions (0006) loads, with no versions → 200
+✗ load: Publishing's load when the approvals table is a view over a table that's gone: 503, not "no approval" → 503 DATABASE_NOT_READY
+   Publishing's load when the approvals table is a view over a table that's gone: 503, not "no approval" status: expected 503, got 200
+— preview
+✓ preview: unsaved hero and sections both wrong → 422 VALIDATION_FAILED
+✓ preview: no preview open → 409 NO_PREVIEW
+✓ preview: a block the preview can't show → 400 UNKNOWN_BLOCK
+✓ preview: preview table missing (tenant before migration 0016) → 503 DATABASE_NOT_READY
+✓ preview: database went read-only → 503 DATABASE_UNAVAILABLE
+✓ preview: database doesn't answer → 503 DATABASE_UNAVAILABLE
+✓ preview: opening a preview needs no database → 200
+— publish
+✓ publish: hero has no title → 422 VALIDATION_FAILED
+✓ publish: banner links to a collection that isn't in the catalog → 422 VALIDATION_FAILED
+✓ publish: drafts changed since review → 409 DRAFTS_CHANGED
+✓ publish: schedule time in the past → 422 VALIDATION_FAILED
+✓ publish: staff can't publish → 403
+✓ publish: undo to a version that doesn't exist → 404 NOT_FOUND
+✓ publish: cancel a release that isn't scheduled → 404
+✓ publish: database doesn't answer → 503 DATABASE_UNAVAILABLE
+✓ publish: database went read-only → 503 DATABASE_UNAVAILABLE
+✓ publish: reading the drafts fails → 503 DATABASE_ERROR
+✓ publish: reading the pages fails (blocks read fine) → 503 DATABASE_ERROR
+✓ publish: reading the slug redirects fails → 503 DATABASE_ERROR
+✗ publish: the slug redirects read names a table that's gone (not an old store): nothing ships, no redirect is dropped → 503 DATABASE_NOT_READY
+   the slug redirects read names a table that's gone (not an old store): nothing ships, no redirect is dropped status: expected 503, got 200
+✓ publish: the catalog lookup behind link checks fails → 503 DATABASE_ERROR
+✓ publish: release table missing → 503 DATABASE_NOT_READY
+✓ publish: Publishing page load when the database doesn't answer → 503 DATABASE_UNAVAILABLE
+✓ publish: published, then the panel's refresh fails → 200
+— the console client (components/admin/cms/api.js)
+✓ client: no connection → a plain message, not a validation list
+✓ client: a gateway's HTML error page → a plain message with the status
+✓ client: a 5xx from our server keeps its plain message and code, and is never a validation list
+✓ client: saved, then the server's refresh failed → it reads the view once more, and the editor carries on with the new revision
+✓ client: saved, and the re-read fails too → the answer still says it was saved, never a conflict or a validation list
+✓ client: a 422 keeps the structured issues and words each one
+— the other /api/admin routes
+✓ a real /api/admin route (upsells) answers a database failure 503 with a plain message, not its 422 catch-all
+✓ a bundle refusal that quotes a product called "Network Switch 8-port" keeps its 422 and its reasons
+✓ deleting an image used on the page "partner-network" keeps its 409 "still used" guard (the only way to force-delete)
+✓ the AI service not answering is named as the AI service, not as the store's data
+— the offer go-back route (/api/admin/offers/[id]/revert)
+✓ go back: a database that doesn't answer → 503 with the plain message, never a 4xx
+✓ go back: reading the offer fails → 503 with the plain message
+✓ go back: each of the store's refusals keeps its status and its exact body, and changes nothing
+✓ go back: an error that is neither the store's nor the database's → JSON 500 INTERNAL_ERROR, the raw text kept out
+— schema errors that aren't a store from before a migration
+✗ the live pointer read failing on some other table is an error, never "no release yet" (which serves drafts to shoppers)
+   state: {"state":"none"} expected "error", got "none"
+✗ a page save whose redirect clean-up fails is never answered as a success
+   answered 200: {"ok":true,"blocks":{"announcement":{"enabled":false,"text":"","href":""},"hero":{"title":"Ready","highlight":"Failure redirview","subtitle":"Browse the full catalog and check out in a few easy steps. expected truthy
+✗ page editor load: a page whose reads fail "no such column" goes to the console's error screen, not a 404
+   it answered 404: NEXT_HTTP_ERROR_FALLBACK;404 expected truthy
+✗ page editor load: only the page's own read fails "no such column" (its versions read fine): the error screen, not a 404
+   answered: NEXT_HTTP_ERROR_FALLBACK;404 expected truthy
+✓ page editor load: on a store from before page families, the page opens in the editor
+✓ page editor load: on a store from before content pages, a page that isn't there is a 404, as before
+✓ every catch-all in an /api/admin route answers its own refusals, then checks for a database failure, then falls back
+✓ no save, preview or publish validator builds position text any more ("Section 2 (banner): …", "section 1: …")
+✓ worded for a screen that already names the block, a hero issue doesn't repeat "Hero"; elsewhere it does
+✓ our own errors are never infrastructure, whatever words they quote (product titles, page slugs, experiment names)
+✓ driver and network errors are classified by their names and codes
+✓ failure() keeps a deliberate refusal's status and words (e.expose), and maps a NOT NULL failure to 500
+✓ two sections sent with the same id: each issue names the id its own section is saved under
+✓ each publish warning is filed under its own document and section (announcement, hero, menu, banner), and reads with one colon
+✓ a product-page accordion issue names its accordion from the field path
+— the Publishing panel (components/admin/ReleasesAdmin.js), on stand-in hooks
+✓ Publish now: the warnings banner says where each warning is, as the card does before publishing
+✓ Schedule: the same warnings, worded the same way
+✓ Publish now when the panel can't refresh: the banner says it went live and to reload, never that it failed
+— the matrix covers what the code can answer
+✓ every infrastructure code the module can produce appears in the matrix
+✓ each infrastructure message says what happened to the founder's work, in plain words
+
+91 passed, 10 failed

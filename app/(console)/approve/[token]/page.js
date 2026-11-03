@@ -4,7 +4,7 @@ import { approvalByToken, currentDraftHash } from "@/lib/platform/agency";
 import { previewToken } from "@/lib/releases";
 import { siteName } from "@/lib/site";
 import ApprovalDecision from "@/components/ApprovalDecision";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { tenantId } from "@/lib/tenant-context";
 import { Banner } from "@/components/console/Banner";
 import { KeyValue } from "@/components/console/bits";

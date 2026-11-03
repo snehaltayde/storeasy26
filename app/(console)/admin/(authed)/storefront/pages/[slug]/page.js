@@ -3,10 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { getContentPage, pageRevisions } from "@/lib/cms/store";
 import { normalizePageSections } from "@/lib/cms/schemas";
-import { infraKind } from "@/lib/cms/issues";
+import { notMigratedYet } from "@/lib/schema-shape";
 import { db } from "@/lib/db";
 import { PageEditor } from "@/components/admin/cms/PageEditor";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 // S52: the page editor route. /admin/storefront/pages/new creates (optionally
 // duplicating ?from=<slug>); any other slug edits that page. The editor itself
@@ -46,7 +46,8 @@ async function loadPage(slug) {
     // table missing (pre-migration tenant) → defaults below. DOC-04: any other
     // failure is a failed load (the console's error screen, with Retry), never
     // a 404 or the built-in default shown in place of the founder's page.
-    if (infraKind(e) !== "schema") throw e;
+    // P1-FIX-C: that includes every other schema error ("no such column").
+    if (!notMigratedYet(e, { table: "cms_pages" })) throw e;
   }
   const page = await getContentPage(slug);
   return page ? { ...page, enabled: true } : null;

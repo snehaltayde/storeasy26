@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { storefrontView } from "@/lib/cms/view";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
 import HomeEditor from "@/components/admin/cms/HomeEditor";
 

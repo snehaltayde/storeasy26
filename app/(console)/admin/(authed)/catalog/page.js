@@ -7,7 +7,7 @@ import CatalogAdmin from "@/components/admin/CatalogAdmin";
 import { BundlesPanel, QuizPanel } from "@/components/admin/CommercePanels";
 import { listBundles } from "@/lib/bundles";
 import { listQuizzes } from "@/lib/quiz";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
 
 export const dynamic = "force-dynamic";

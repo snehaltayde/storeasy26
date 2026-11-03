@@ -288,7 +288,11 @@ const alive = (pid) => {
     return e.code === "EPERM";
   }
 };
-const ps = (pid, field) => spawnSync("ps", ["-p", String(pid), "-o", `${field}=`], { encoding: "utf8", env: { ...process.env, LC_ALL: "C" } }).stdout?.trim() || "";
+// LC_ALL and TZ pinned: `lstart` is printed in the caller's locale and local
+// time, so a seed run with another TZ read a different start time for the same
+// running launcher, thought it was gone, and went on to clear its pid file
+// (P1-HARNESS review; fixed in P1-FIX-C).
+const ps = (pid, field) => spawnSync("ps", ["-p", String(pid), "-o", `${field}=`], { encoding: "utf8", env: { ...process.env, LC_ALL: "C", TZ: "UTC" } }).stdout?.trim() || "";
 const commandOf = (pid) => ps(pid, "command");
 const startTimeOf = (pid) => ps(pid, "lstart");
 
@@ -326,9 +330,12 @@ export function runningHarness(dataDir) {
   if (!launcher?.pid || launcher.pid === process.pid) return null;
   const same = sameProcess(launcher);
   if (same === true) return info;
-  if (same === false) return null;
-  // No start time recorded: a live process whose command names the launcher
-  // script counts as running, so a harness is never treated as a leftover.
+  if (same === false && !alive(launcher.pid)) return null;
+  // No start time recorded, or one that doesn't match (P1-FIX-C: the time
+  // zone, or ps on Linux working the start out from boot time, can shift it):
+  // a live process whose command names the launcher script still counts as
+  // running. Refusing to start is the safe mistake; wiping a running harness's
+  // data is not.
   const cmd = commandOf(launcher.pid);
   const script = launcher.script ? basename(launcher.script) : "dev-design.js";
   return cmd.includes(script) || cmd.includes("dev-design.js") ? info : null;

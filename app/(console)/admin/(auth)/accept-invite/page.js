@@ -1,6 +1,6 @@
 import AcceptInviteForm from "@/components/admin/AcceptInviteForm";
 import { siteName } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Accept invitation", robots: { index: false } };

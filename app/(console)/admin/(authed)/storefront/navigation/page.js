@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { storefrontView } from "@/lib/cms/view";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
 import NavigationEditor from "@/components/admin/cms/NavigationEditor";
 

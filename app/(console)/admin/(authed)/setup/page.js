@@ -4,7 +4,7 @@ import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { buildChecklist } from "@/lib/admin/onboarding";
 import SetupAdmin from "@/components/admin/SetupAdmin";
 import { PageHeader } from "@/components/console/PageHeader";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Setup · Admin", robots: { index: false } };

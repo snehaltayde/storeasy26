@@ -7,7 +7,7 @@
 // console route, the tick route, the scheduled and operator routes, the worker,
 // the queue and real tenant databases.
 //   pnpm test:first-sync
-import { readFile, rm } from "node:fs/promises";
+import { readFile, rm, chmod } from "node:fs/promises";
 import { registerHooks, createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
@@ -53,7 +53,7 @@ for (const k of ["TYPESENSE_HOST", "SHOPIFY_STORE_DOMAIN", "SHOPIFY_ADMIN_TOKEN"
   delete process.env[k];
 }
 
-const TENANTS = ["connect", "kill", "fail", "prune", "write", "gen", "callers", "cli", "nocreds", "deny", "members", "notick", "gaps"];
+const TENANTS = ["connect", "kill", "fail", "prune", "write", "gen", "callers", "cli", "nocreds", "deny", "members", "notick", "gaps", "dbfail", "dbro"];
 const dbs = [".test-fsync-default.db", ".test-fsync-platform.db", ...TENANTS.map((t) => `.test-fsync-${t}.db`)];
 for (const f of dbs) await rm(join(root, f), { force: true });
 
@@ -375,6 +375,14 @@ const inT = (name, fn) => withTenant(tenants[name], fn);
 const fresh = async (name) => (tenants[name] = await C.getTenant(`fs-${name}`));
 
 for (const name of TENANTS) await mkTenant(name, { connected: name === "connect" ? false : name === "nocreds" ? "none" : true });
+// P1-FIX-C: two linked stores whose own database fails. dbfail: every read of
+// its sync record fails (a plain SQLite error). dbro: the file went read-only.
+{
+  const c = createClient({ url: "file:.test-fsync-dbfail.db" });
+  await c.executeMultiple("ALTER TABLE sync_runs RENAME TO sync_runs_data; CREATE VIEW sync_runs AS SELECT *, nosuch_fn(1) AS boom FROM sync_runs_data;");
+  c.close?.();
+  await chmod(join(root, ".test-fsync-dbro.db"), 0o444);
+}
 
 const owner = await I.createUser({ email: "owner@fsync.test", password: "owner-pass-fsync" });
 const helper = await I.createUser({ email: "support@fsync.test", password: "support-pass-fsync" });
@@ -691,6 +699,21 @@ console.log("— a failed page: a plain message and a retry");
     eq(status, 409, "status:");
     eq(body.error, "Storeasy isn't linked to your Shopify store. Contact support to link it, then try again.", "error:");
   });
+
+  // P1-FIX-C, c513d27: what lands in Sync now's catch is the store's database
+  // or a missing link (Shopify is only called after the answer). A database
+  // failure answers 503 about the store's data, never "Shopify didn't answer".
+  for (const [name, code, why] of [
+    ["dbfail", "DATABASE_ERROR", "reading the store's sync record fails"],
+    ["dbro", "DATABASE_UNAVAILABLE", "the store's database went read-only"],
+  ]) {
+    await t(`Sync now when ${why}: 503 ${code} about the store's data, not about Shopify`, async () => {
+      const { status, body } = await json(await quiet(() => postSync(name)));
+      eq([status, body.ok, body.code], [503, false, code], `answer: ${JSON.stringify(body)}`);
+      ok(/^We couldn't reach your store's data just now, so this couldn't load\. Try again in a minute\.$/.test(body.error), `plain words about the store's data: "${body.error}"`);
+      ok(!/Shopify|SQLITE|nosuch|readonly/i.test(body.error), `no raw text, and Shopify isn't blamed: "${body.error}"`);
+    });
+  }
 }
 
 // =====================================================================================
@@ -1230,6 +1253,38 @@ console.log("— an existing store's collections stay whole while a sync runs or
     await inT("members", () => S.writeCollection({ ...adminCollection(big), products: { nodes: fewer.map((id) => ({ id })) } }));
     eq(await live(), 298, "live members:");
     eq(await order(), fewer, "order:");
+  });
+
+  // P1-FIX-C (GEN-02 review): the old members of a long collection go only at
+  // its LAST member page (lib/sync.js membersStep). The 300-member cases above
+  // have one member page, so cleaning up on every page passed them all. With
+  // 600 members there are two; a refresh that fails on the second must leave
+  // all 600 live, not the 500 seen so far.
+  await t("a 600-member collection: Shopify fails on its second member page; all 600 stay live while it retries and after the run fails", async () => {
+    const catalog600 = Array.from({ length: 600 }, (_, i) => mkProduct(i));
+    const huge = mkCollection(2, catalog600.map((p) => p.id));
+    Object.assign(shop, { products: catalog600, collections: [huge, small], pageMs: 0, fault: null });
+    try {
+      await letLeasesLapse("members");
+      await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE tenant_id = 'fs-members' AND status IN ('pending', 'leased')");
+      await inT("members", () => libsql.execute("UPDATE sync_runs SET status = 'failed', lease_owner = NULL, lease_until = NULL WHERE status = 'running'"));
+      const res = await inT("members", () => S.runCatalogSync());
+      eq([res.products, await live(huge)], [600, 600], "baseline (products, members):");
+      let memberPages = 0;
+      shop.fault = (c) => (c.op === "CollectionProducts" && ++memberPages >= 2 ? { status: 503 } : null);
+      await quiet(() => invoke("refresh", () => postSync("members")));
+      const mid = await latest("members");
+      eq([mid.status, mid.phase], ["running", "members"], "waiting on the second member page:");
+      eq(await live(huge), 600, "live members while the queue retries:");
+      const final = await tickUntilDone("members", 12);
+      eq(final.status, "failed", "run:");
+      ok(memberPages >= 2, `the refresh reached the second member page (${memberPages} member page calls)`);
+      eq(await live(huge), 600, "live members after the run failed (it had 600 before):");
+      eq(await live(small), 3, "the short collection:");
+    } finally {
+      shop.fault = null;
+      Object.assign(shop, { products: catalog, collections: [big, small] });
+    }
   });
 }
 

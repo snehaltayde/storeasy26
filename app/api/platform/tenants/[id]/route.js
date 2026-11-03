@@ -19,7 +19,7 @@ const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status
 export async function GET(request, { params }) {
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const { id } = await params;
-  const tenant = await getTenant(id);
+  const tenant = await getTenant(id, { fresh: true }); // the operator's next view after a save shows it
   if (!tenant) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const secretsPresent = Object.fromEntries(Object.keys(tenant.secrets || {}).map((k) => [k, true]));
@@ -75,7 +75,9 @@ const HOST_RE = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{2,5})?$/;
 const bad = (error) => NextResponse.json({ ok: false, error }, { status: 400 });
 
 async function applyUpdate(id, u) {
-  const current = await getTenant(id);
+  // fresh: `site` below is merged from this read, so a cached copy would undo
+  // a founder's save from the last 30 seconds (P1-FIX-C)
+  const current = await getTenant(id, { fresh: true });
   if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const patch = {};
   const config = {};

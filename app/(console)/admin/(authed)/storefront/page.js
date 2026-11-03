@@ -11,7 +11,7 @@ import { Badge, StatusBadge } from "@/components/console/Badge";
 import { Banner } from "@/components/console/Banner";
 import { EmptyState } from "@/components/console/bits";
 import { diffItemInfo, BLOCK_INFO, pageUrl, FAMILY_LABELS } from "@/components/admin/cms/labels";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { issueText } from "@/lib/cms/issues";
 
 // S52: the Storefront OVERVIEW — published state, what's changed since live,

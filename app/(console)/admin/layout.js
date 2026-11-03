@@ -1,7 +1,7 @@
 import { activeSupportGrant } from "@/lib/platform/support";
 import { openIncidentsFor } from "@/lib/platform/incidents";
 import { currentTenant } from "@/lib/tenant-context";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { Banner } from "@/components/console/Banner";
 
 // Admin section layout (S34 / OP10, restyled S50): ONE place for the

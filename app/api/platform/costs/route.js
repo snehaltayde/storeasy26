@@ -36,7 +36,9 @@ export async function POST(request) {
       if (!t) return NextResponse.json({ error: "unknown tenant" }, { status: 404 });
       const amount = body.budget.amount == null ? null : Number(body.budget.amount);
       if (amount != null && (!Number.isFinite(amount) || amount <= 0)) return NextResponse.json({ error: "budget must be a positive number (or null to clear)" }, { status: 422 });
-      await patchTenant(t.id, { config: { ...t.config, cost_budget: amount } });
+      // only the budget: patchTenant merges it into the row as it is now. Spreading
+      // the (cached) config here wrote back an old copy of every other setting.
+      await patchTenant(t.id, { config: { cost_budget: amount } });
       await audit({ actor: "operator", action: "costs.budget", tenantId: t.id, diff: { cost_budget: amount } });
       return NextResponse.json({ ok: true, tenant: t.id, cost_budget: amount });
     }

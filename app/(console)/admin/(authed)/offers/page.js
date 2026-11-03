@@ -4,7 +4,7 @@ import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { listOffers } from "@/lib/offers/store";
 import { offerTargetNames, storeCurrency } from "@/lib/offers/catalog";
 import OffersAdmin from "@/components/admin/OffersAdmin";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Offers · Admin", robots: { index: false } };

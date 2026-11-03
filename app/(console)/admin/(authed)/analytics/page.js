@@ -4,7 +4,7 @@ import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { funnel, topProducts, searchTerms, campaignViews, deviceSplit, coverage, salesRollup } from "@/lib/reporting";
 import { formatMoney } from "@/lib/format";
 import ExportCsv from "@/components/admin/ExportCsv";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
 import { Card, CardHeader } from "@/components/console/Card";
 import { Badge } from "@/components/console/Badge";

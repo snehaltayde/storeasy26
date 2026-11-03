@@ -1,0 +1,56 @@
+✓ ports default to today's 3017 for Next, and three database ports from 18017
+✓ DESIGN_PORT and DESIGN_SQLD_PORT move every port
+✓ NEGATIVE: a port that isn't a number, or is out of range, is refused in plain words
+✓ NEGATIVE: a web port inside the database ports is refused
+✓ sqld is found through SQLD_BIN first
+✓ then PATH, in PATH order
+✓ then ~/.turso/sqld
+✓ NEGATIVE: sqld missing everywhere fails with a plain message that says how to fix it
+✓ NEGATIVE: SQLD_BIN pointing at nothing is reported, not silently skipped
+✓ THE BUG: Next is never handed a file: database URL; every database is a local http server
+✓ hosted values from the shell or .env.local are blanked, and Next keeps an empty value over .env.local
+✓ every hosted key is blanked even when the shell and .env.local set it, and the database token too
+✓ NEGATIVE: every variable the app reads, or .env.example lists, is either blanked, set by the harness or kept on purpose
+✓ NEGATIVE: the seed writes only to a local harness database
+✓ NEGATIVE: the real seed script refuses a hosted URL in any of its three database settings before opening any database, and never prints the full URL
+✓ NEGATIVE: the seed run without the harness says how to run it
+✓ new migrations since the last seed are noticed
+✓ no code edit: the storefront still declares the edge runtime, and the harness never touches app/
+✗ the harness data folder and credentials are gitignored; screenshots are not
+    .design-data/ must be ignored
+✓ seed: empties .design-data, starts one database server per database in it, seeds over http, then stops them all
+✓ NEGATIVE: a failed seed says so plainly, stops the servers and leaves no seeded marker
+✓ dev: Next gets http database URLs; SIGTERM to the harness stops Next and every database server
+✓ dev: Next gets http database URLs; SIGINT to the harness stops Next and every database server
+✓ dev: a Ctrl-C to the whole process group stops everything, exits 0, and reports no database as stopped by itself
+✓ dev: a second Ctrl-C while stopping doesn't cut the stop short
+✓ dev: when Next stops by itself, the harness stops the databases and exits with Next's code
+✓ dev: an existing seed is reused, and a new migration since then is pointed out
+✓ NEGATIVE: a second harness, or a seed, while one is running is refused and leaves the running one alone
+✓ NEGATIVE: started the way pnpm starts it (a relative script name), a second harness or a seed is refused and the running one keeps working
+✓ NEGATIVE: a pid file with no start times (an older harness) still never treats a live harness as left over
+✗ NEGATIVE: a seed or a second dev run in another time zone is refused, and the running harness keeps its pid file, servers and data
+    seed with TZ=UTC: ✗ Port 37305, for the platform database, is already in use. Another harness or app may be running. Stop it, or set DESIGN_SQLD_PORT to a free port.
+    
+✗ NEGATIVE: a live launcher whose recorded start time doesn't match still counts as running; stopLeftovers keeps its pid file and signals nothing
+    runningHarness should still see the live launcher
+✓ the pid file records each process with its start time, the ports and Next
+✓ dev: a database server that stops by itself after startup stops the harness with a plain message
+✓ Next and the servers left behind by a harness that was killed outright are stopped, by their recorded PID, on the next start
+✗ the servers a killed harness left behind are recognised and stopped by a start in another time zone
+    timed out waiting for the stand-in Next on 31300
+    
+✓ NEGATIVE: a recorded PID that now belongs to some other program is never signalled
+✓ NEGATIVE: sqld missing: plain message, nothing started, no data folder made
+✓ NEGATIVE: a busy database port: plain message naming the port and the setting, nothing started
+✓ NEGATIVE: a busy web port stops dev with a plain message naming DESIGN_PORT; a seed doesn't need that port
+✓ NEGATIVE: a database server that dies while starting: plain message pointing at its log, the others stopped
+✓ drills use the installed Chrome: CHROME_BIN first, then the usual places, never a download
+✓ NEGATIVE: a drill with no harness running says how to start one
+✓ NEGATIVE: a drill never attaches to a server that isn't this checkout's harness (another checkout's, or another app)
+✓ a drill attaches to this checkout's own running harness on that port
+✓ drill page facts: an error page, sideways scroll and broken images are noticed; a normal page is not flagged
+✓ a known issue's check fails visibly without failing the drill, and says so when it starts passing
+✓ screenshots are scaled down until they fit in 300KB
+✓ a drill writes into docs/cms-reviews/drills/<id>/, and a re-run removes only screenshots its earlier run made
+45 passed, 4 failed

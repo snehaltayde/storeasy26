@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { listMedia, mediaUrl } from "@/lib/media";
 import MediaAdmin from "@/components/admin/MediaAdmin";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
 
 export const dynamic = "force-dynamic";

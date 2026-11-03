@@ -62,7 +62,7 @@ const { createClient } = await import("@libsql/client");
 const C = await import("../lib/platform/control.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { db, libsql, currentDatabase } = await import("../lib/db.js");
-const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+const { loadMigrations, runMigrations, checkLedger } = await import("../lib/platform/migrate.js");
 const { hasColumns, __schemaCompat } = await import("../lib/schema-compat.js");
 
 const MIGRATIONS = await loadMigrations("tenant");
@@ -182,6 +182,34 @@ await t("deploy order: migrate --all exits 0, then --check exits 0 and says it i
   const r = cli(["--check"]);
   eq(r.status, 0, `--check after migrating (output: ${r.out.trim()}):`);
   ok(r.stdout.includes(`✓ all 2 tenant(s) hold every migration up to ${NEWEST}. Safe to deploy.`), r.out);
+});
+
+// P1-FIX-C (MIG-05 review): a ledger AHEAD of this code is the rollback-deploy
+// case (newer code migrated the tenant, then an older build is deployed). It
+// holds everything this code needs, so it passes, with a note. Nothing tested it.
+await t("a tenant whose ledger holds a migration this code doesn't ship (a rollback deploy): --check exits 0, with a note", async () => {
+  const c = clientFor(".test-compat-gate-a.db");
+  await c.execute({ sql: "INSERT INTO schema_migrations (id, checksum, applied_at) VALUES ('9999_from_newer_code', 'abc', ?)", args: [new Date().toISOString()] });
+  c.close();
+  try {
+    const one = await (async () => {
+      const cc = clientFor(".test-compat-gate-a.db");
+      try {
+        return await checkLedger(cc, MIGRATIONS);
+      } finally {
+        cc.close();
+      }
+    })();
+    same([one.current, one.missing, one.edited, one.unknown], [true, [], [], ["9999_from_newer_code"]], "checkLedger");
+    const r = cli(["--check"]);
+    eq(r.status, 0, `--check (output: ${r.out.trim()}):`);
+    ok(r.stdout.includes(`✓ ca: current, all ${MIGRATIONS.length} migrations up to ${NEWEST} (its ledger also holds 9999_from_newer_code, which this code does not ship)`), r.out);
+    ok(r.stdout.includes("Safe to deploy."), r.out);
+  } finally {
+    const d = clientFor(".test-compat-gate-a.db");
+    await d.execute("DELETE FROM schema_migrations WHERE id = '9999_from_newer_code'");
+    d.close();
+  }
 });
 
 // A store with no ledger at all, and one whose database can't be opened.
@@ -379,11 +407,70 @@ await t("only plain table and column names are accepted", async () => {
   }
 });
 
-await t("lib/schema-compat.js is edge-safe: no node: imports, only ./db.js", async () => {
-  const src = (await readFile(join(ROOT, "lib/schema-compat.js"), "utf8")).replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
-  const imports = [...src.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map((m) => m[1]);
-  same(imports, ["./db.js"], "imports");
+await t("lib/schema-compat.js is edge-safe: no node: imports, only ./db.js and the import-free ./schema-shape.js", async () => {
+  const strip = async (f) => (await readFile(join(ROOT, f), "utf8")).replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
+  const importsOf = (src) => [...src.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map((m) => m[1]);
+  const src = await strip("lib/schema-compat.js");
+  same(importsOf(src), ["./db.js", "./schema-shape.js"], "imports");
   ok(!/\bnode:|\brequire\(|\bprocess\.|\bBuffer\b/.test(src), "uses a Node-only API");
+  const shape = await strip("lib/schema-shape.js");
+  same(importsOf(shape), [], "schema-shape.js imports");
+  ok(!/\bnode:|\brequire\(|\bprocess\.|\bBuffer\b/.test(shape), "schema-shape.js uses a Node-only API");
+});
+
+// P1-FIX-C: only the expected pre-migration shape counts as "absent". A view
+// or schema that is broken some other way ("no such column: <something else>")
+// is not remembered as absent: the caller's own query then meets the real error.
+await t("a probe that fails with some OTHER missing column (a broken view) is not remembered as absent", async () => {
+  __schemaCompat.forget();
+  await inT("spare", () => libsql.executeMultiple("CREATE TABLE compat_view_data (id TEXT, wanted TEXT); CREATE VIEW compat_view AS SELECT id, nosuch_col AS wanted FROM compat_view_data;"));
+  const inst = await inT("spare", () => currentDatabase());
+  const spy = spyOn(inst);
+  try {
+    eq(await inT("spare", () => hasColumns("compat_view", ["wanted"])), false, "during the failure:");
+    eq(await inT("spare", () => hasColumns("compat_view", ["wanted"])), false, "next call:");
+    eq(spy.seen.length, 2, `asked again each time (not remembered as absent): ${JSON.stringify(spy.seen)}`);
+  } finally {
+    spy.stop();
+    await inT("spare", () => libsql.executeMultiple("DROP VIEW compat_view; DROP TABLE compat_view_data;"));
+  }
+});
+
+await t("the expected shapes, from a local file and from sqld over HTTP, and nothing else", async () => {
+  const { notMigratedYet } = await import("../lib/schema-shape.js");
+  const drv = (message, cause) => Object.assign(new Error(message), { name: "LibsqlError", code: "SQLITE_ERROR", ...(cause ? { cause } : {}) });
+  const spec = { table: "order_items", columns: ["catalog_title", "sku"] };
+  for (const msg of [
+    "SQLITE_ERROR: no such column: catalog_title",
+    "SQL_INPUT_ERROR: SQL input error: no such column: sku (at offset 7)",
+    "SQLITE_ERROR: no such column: order_items.sku",
+    "SQLITE_UNKNOWN: SQLite error: table order_items has no column named catalog_title",
+    "SQLITE_ERROR: no such table: order_items",
+    "SQLITE_UNKNOWN: SQLite error: no such table: main.order_items",
+  ]) {
+    eq(notMigratedYet(drv(msg), spec), true, `${msg}:`);
+  }
+  for (const msg of [
+    "SQLITE_ERROR: no such column: nosuch", // a view naming something gone
+    "SQLITE_ERROR: no such column: skus",
+    "SQLITE_ERROR: no such table: order_items_data", // the table a view reads is gone
+    "SQLITE_UNKNOWN: SQLite error: no such table: main.order_items_old",
+    "SQLITE_ERROR: no such column: other_table.sku",
+    "SQLITE_BUSY: database is locked",
+    "SQLITE_UNKNOWN: SQLite error: malformed JSON",
+  ]) {
+    eq(notMigratedYet(drv(msg), spec), false, `${msg}:`);
+  }
+  // only the driver's own errors are read, and a wrapper is read through its cause
+  eq(notMigratedYet(new Error("no such column: sku"), spec), false, "our own error quoting the words:");
+  eq(notMigratedYet(new Error("snapshot failed", { cause: drv("SQLITE_ERROR: no such column: sku") }), spec), true, "a wrapper with the driver's error as cause:");
+  let threw = false;
+  try {
+    notMigratedYet(drv("x"), { table: "order_items; DROP TABLE x" });
+  } catch {
+    threw = true;
+  }
+  ok(threw, "a table name that isn't plain is refused");
 });
 
 // =============================================================================

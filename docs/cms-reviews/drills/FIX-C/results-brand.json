@@ -1,0 +1,75 @@
+{
+  "id": "FIX-C",
+  "part": "brand",
+  "title": "P1-FIX-C: the console shows a founder's save at once; a broken schema isn't an old store — brand",
+  "ranAt": "2026-11-03T13:24:06.261Z",
+  "harness": "http://localhost:3201",
+  "chrome": "156.0.8078.80",
+  "passed": 7,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "brand: before the save, Publishing has nothing to publish"
+    },
+    {
+      "ok": true,
+      "label": "brand: Save brand answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "brand: right after Save brand, Publishing has something to publish (Publish now enabled)"
+    },
+    {
+      "ok": true,
+      "label": "brand: the change list names the brand",
+      "detail": "What will publish\nUnpublished changes\n\nEach chip links to its editor. This is the item-level draft-vs-live difference — exactly what the next publish changes.\n\nPreview draft\nNo enabled privacy policy page — add one before launch (checkout links to it)\nNo enabled terms/refund page — add one before la"
+    },
+    {
+      "ok": true,
+      "label": "brand: Publish now answers 200, not 409",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "brand: the toast says it is live",
+      "detail": [
+        "Published — live now."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "brand: the live release holds the saved accent",
+      "detail": [
+        {
+          "a": "#2563eb"
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "brand: baseline publish: {\"status\":200,\"toasts\":[\"Published — live now.\"]}"
+  ],
+  "screenshots": [
+    {
+      "name": "brand-publishing-at-once",
+      "file": "docs/cms-reviews/drills/FIX-C/brand-publishing-at-once.png",
+      "bytes": 41093,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "brand-published",
+      "file": "docs/cms-reviews/drills/FIX-C/brand-published.png",
+      "bytes": 41889,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/releases"
+    }
+  ]
+}

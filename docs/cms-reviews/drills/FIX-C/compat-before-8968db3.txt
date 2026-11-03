@@ -1,0 +1,38 @@
+— the deploy gate (--check), local file databases only
+✓ one tenant behind (a suspended one): --check exits 1, names it and the missing 0020_sync_runs_resumable
+✓ --check writes nothing: ledgers, tables and the audit log are unchanged
+✓ deploy order: migrate --all exits 0, then --check exits 0 and says it is safe
+✓ a tenant whose ledger holds a migration this code doesn't ship (a rollback deploy): --check exits 0, with a note
+✓ a tenant with no ledger is behind on everything, and --check does not create one
+✓ --check --tenant checks one store only
+✓ a migration file edited after it ran fails the check
+✓ a tenant whose database can't be read fails the check
+✓ a control plane with no tenants, or no tenants table, fails the check
+✓ without --all, --tenant or --check the CLI does nothing and says how to use it
+— optional columns, detected once per database
+✓ a present column: yes, asked once for 30 callers, with a SELECT and never a PRAGMA
+✓ an absent column: no, and callers inside the re-check window don't ask again
+✓ each database answers for itself
+✓ a column added while the instance is warm is used after the re-check window, then remembered
+✓ a probe that fails for another reason answers no for that call only, and is asked again
+✓ only plain table and column names are accepted
+✗ lib/schema-compat.js is edge-safe: no node: imports, only ./db.js and the import-free ./schema-shape.js
+    imports
+      older: ["./db.js"]
+    current: ["./db.js","./schema-shape.js"]
+✗ a probe that fails with some OTHER missing column (a broken view) is not remembered as absent
+    asked again each time (not remembered as absent): ["SELECT wanted FROM compat_view LIMIT 0"] expected 2, got 1
+✗ the expected shapes, from a local file and from sqld over HTTP, and nothing else
+    Cannot find module '/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/batch-c/build-fixc/base/lib/schema-shape.js' imported from /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/batch-c/build-fixc/base/scripts/test-schema-compat.js
+— storefront and order paths: a tenant at 0017_cms_approvals next to one at 0020_sync_runs_resumable
+✓ the older tenant really is at 0017_cms_approvals, a migration this code ships
+✓ cart: add, change quantity and read through the real /api/cart route, the same on both schemas
+✓ product page data: every loader the page calls returns the same on both schemas
+✓ search: the real /api/search route finds the product on both schemas
+✓ order creation: the checkout's createOrder saves the order, its lines and first event on both schemas
+✓ older schema: the order's lines leave out catalog_title and sku, and its snapshot still has them
+✓ current schema: the order's lines carry catalog_title and sku
+✓ orders ask about the columns once per database, never per order and never with a PRAGMA
+✓ a tenant migrated while the instance is warm: orders get the columns once the re-check window passes
+
+25 passed, 3 failed
