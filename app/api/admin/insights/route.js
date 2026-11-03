@@ -4,7 +4,8 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { listInsights, generateInsights, setInsightStatus, applyInsightDraft, aiBudget, aiConfigured, AI_MODEL } from "@/lib/ai/insights";
 import { tenantHandler } from "@/lib/tenant-request";
-import { legacyWritesRefusal } from "@/lib/cms-mode";
+import { writeRefusalBody } from "@/lib/content-writes";
+import { validationBody } from "@/lib/cms/issues";
 
 // AI insights admin API (S47 / BE32 + MC19). Honest states throughout: no
 // key = "not configured" (never a mock), budget spent = refused with the
@@ -27,13 +28,6 @@ export const POST = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.write");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
-  if (body.apply && !body.generate && !body.dismiss && !body.restore) {
-    // P2-GUARD: applying writes a hero or announcement draft. Until
-    // P2-WRITERS routes it through a mode-aware facade, a store on the new
-    // editor refuses it.
-    const refused = await legacyWritesRefusal({ route: "admin/insights" });
-    if (refused) return NextResponse.json(refused.body, { status: refused.status });
-  }
   try {
     if (body.generate) {
       const r = await generateInsights();
@@ -43,7 +37,8 @@ export const POST = tenantHandler(async (request) => {
     if (body.dismiss) return NextResponse.json({ ok: true, ...(await setInsightStatus(String(body.dismiss.id || ""), "dismissed")) });
     if (body.restore) return NextResponse.json({ ok: true, ...(await setInsightStatus(String(body.restore.id || ""), "proposed")) });
     if (body.apply) {
-      const r = await applyInsightDraft(String(body.apply.id || ""), Number(body.apply.index));
+      // P2-WRITERS: through lib/content-writes.js, which reads the mode itself
+      const r = await applyInsightDraft(String(body.apply.id || ""), Number(body.apply.index), { actor: auth.actor });
       await audit({ actor: auth.actor, action: "storefront.write", resource: `ai_insight:${r.id}`, diff: { applied: r.applied } });
       return NextResponse.json({ ok: true, ...r });
     }
@@ -51,6 +46,10 @@ export const POST = tenantHandler(async (request) => {
   } catch (e) {
     // the AI provider's own failures first: they are not the store's database
     if (e?.code === "AI_UNCONFIGURED" || e?.code === "AI_UNAVAILABLE") return NextResponse.json({ error: String(e.message).slice(0, 300), code: e.code }, { status: 503 });
+    // the draft door's own answers (lib/content-writes.js): every issue, then
+    // a deliberate refusal (409 concurrent edit, 409 store mode, stale document)
+    if (e?.issues) return NextResponse.json(validationBody(e.issues), { status: 422 });
+    if (e?.expose) return NextResponse.json(writeRefusalBody(e), { status: e.status });
     const infra = infraResponse(e, { route: "admin/insights" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300), code: e.code || null }, { status: 422 });

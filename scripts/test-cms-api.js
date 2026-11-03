@@ -5,9 +5,11 @@
 // requests leave storage unchanged — by re-reading rows, not by grepping
 // source.
 // P2-GUARD adds the side-by-side guard: with cms_state 'documents' every old
-// content writer (this API, catalog, upsells, brand, theme, experiment adopt,
-// insight apply, agency kit apply) answers 409 STORE_USES_DOCUMENTS and the
-// rows are unchanged; /api/admin/releases refuses every action and its GET is
+// content writer (this API, catalog, upsells, brand, theme) answers 409
+// STORE_USES_DOCUMENTS and the
+// rows are unchanged (P2-WRITERS moved experiment adopt, insight apply and
+// agency kit apply to lib/content-writes.js; scripts/test-writers.js covers
+// them); /api/admin/releases refuses every action and its GET is
 // the documents marker; a cms_state that can't be read is a 5xx, never a
 // go-ahead.
 //   pnpm test:cms-api
@@ -449,10 +451,11 @@ await t("candidate: unknown block → 400; invalid value → 422; publishing NEV
     ["brand PUT", () => route("admin/brand", "PUT", { brand: { accent: "#0f766e" } })],
     ["brand reset", () => route("admin/brand", "PUT", { reset: true })],
     ["theme POST (applyKit)", () => route("admin/theme", "POST", { action: "apply", kit: "glow" })],
-    ["experiments adopt", () => route("admin/experiments", "POST", { adopt: { slug: "hero-test", variant: "b" } })],
-    ["insights apply", () => route("admin/insights", "POST", { apply: { id: "ins-1", index: 0 } })],
-    ["partners agency kit apply", () => route("partners", "POST", { kit_apply: { kit: "akit_guard", tenant: "zd" } }, { cookies: { _agency: agentTok } })],
   ];
+  // P2-WRITERS: experiment adopt, insight apply and agency kit apply left this
+  // list. They no longer refuse in documents mode: lib/content-writes.js saves
+  // a doc_home or doc_announcement draft instead (scripts/test-writers.js).
+  // In 'migrating' they still refuse; that is checked there too.
 
   await t("P2-GUARD: with cms_state 'documents', every old content writer answers 409 STORE_USES_DOCUMENTS and the re-read rows are unchanged", async () => {
     await setMode("documents");

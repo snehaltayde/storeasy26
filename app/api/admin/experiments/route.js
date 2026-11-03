@@ -4,7 +4,9 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { listExperiments, upsertExperiment, startExperiment, setExperimentStatus, analyzeExperiment, adoptVariant } from "@/lib/experiments";
 import { tenantHandler } from "@/lib/tenant-request";
-import { legacyWritesRefusal } from "@/lib/cms-mode";
+import { writeRefusalBody } from "@/lib/content-writes";
+import { validationBody } from "@/lib/cms/issues";
+import * as documents from "@/lib/documents/service";
 
 // Experiments admin API (S47 / BE22 + MC18). The analysis endpoint is the
 // ONLY reader of results, and it blocks winner interpretation while running
@@ -35,12 +37,6 @@ export const POST = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.write");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
-  if (body.adopt && !body.experiment && !body.start && !body.pause && !body.complete) {
-    // P2-GUARD: adopting writes the hero draft. Until P2-WRITERS routes it
-    // through a mode-aware facade, a store on the new editor refuses it.
-    const refused = await legacyWritesRefusal({ route: "admin/experiments" });
-    if (refused) return NextResponse.json(refused.body, { status: refused.status });
-  }
   try {
     if (body.experiment) {
       const saved = await upsertExperiment(body.experiment);
@@ -59,12 +55,20 @@ export const POST = tenantHandler(async (request) => {
       return NextResponse.json({ ok: true, ...r });
     }
     if (body.adopt) {
-      const r = await adoptVariant(String(body.adopt.slug || ""), String(body.adopt.variant || ""));
+      // P2-WRITERS: the hero draft goes through lib/content-writes.js, which
+      // reads the store's mode itself (legacy block or doc_home draft). This
+      // Node route hands it the documents service (lib/experiments.js is on
+      // the storefront's edge path and can't import it).
+      const r = await adoptVariant(String(body.adopt.slug || ""), String(body.adopt.variant || ""), { actor: auth.actor, documents });
       await audit({ actor: auth.actor, action: "storefront.write", resource: `experiment:${r.slug}`, diff: { adopted: r.adopted } });
       return NextResponse.json({ ok: true, ...r });
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
   } catch (e) {
+    // the draft door's own answers (lib/content-writes.js): every issue, then
+    // a deliberate refusal (409 concurrent edit, 409 store mode, stale document)
+    if (e?.issues) return NextResponse.json(validationBody(e.issues), { status: 422 });
+    if (e?.expose) return NextResponse.json(writeRefusalBody(e), { status: e.status });
     if (e?.errors) return NextResponse.json({ error: String(e.message).slice(0, 300), errors: e.errors }, { status: 422 }); // the plan's own problems
     const infra = infraResponse(e, { route: "admin/experiments" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
