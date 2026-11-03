@@ -1,7 +1,7 @@
 {
   "id": "P1-HARNESS",
   "title": "P1-HARNESS: the storefront on the edge runtime, on the design harness, with no code edit",
-  "ranAt": "2026-11-03T13:11:20.191Z",
+  "ranAt": "2026-11-03T14:01:11.981Z",
   "harness": "http://localhost:3202",
   "chrome": "156.0.8078.80",
   "passed": 150,
@@ -30,7 +30,7 @@
     {
       "ok": true,
       "label": "home at 1440: not an error page",
-      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\n\n8 products · 3 collections\n\nVisibly brighter in 14 days\n\nOr y"
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\n\n8 products · 3 collections\n\nSkin first. Makeup second.\n\nClini"
     },
     {
       "ok": true,
@@ -209,7 +209,7 @@
     {
       "ok": true,
       "label": "home at 768: not an error page",
-      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\n\n8 products · 3 collections\n\nVisibly brighter in 14 days\n\nOr y"
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\n\n8 products · 3 collections\n\nSkin first. Makeup second.\n\nClini"
     },
     {
       "ok": true,
@@ -388,7 +388,7 @@
     {
       "ok": true,
       "label": "home at 375: not an error page",
-      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\n\n8 products · 3 collections\n\nVisibly brighter in 14 days\n\nOr your money"
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nBestsellers\nNight routine\nSerums\n\n8 products · 3 collections\n\nSkin first. Makeup second.\n\nClinically-tes"
     },
     {
       "ok": true,
@@ -796,7 +796,7 @@
     {
       "name": "home-1440",
       "file": "docs/cms-reviews/drills/P1-HARNESS/home-1440.png",
-      "bytes": 30535,
+      "bytes": 31963,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -859,7 +859,7 @@
     {
       "name": "home-768",
       "file": "docs/cms-reviews/drills/P1-HARNESS/home-768.png",
-      "bytes": 69198,
+      "bytes": 72647,
       "width": 720,
       "height": 960,
       "viewport": 768,
@@ -922,7 +922,7 @@
     {
       "name": "home-375",
       "file": "docs/cms-reviews/drills/P1-HARNESS/home-375.png",
-      "bytes": 35288,
+      "bytes": 38833,
       "width": 375,
       "height": 812,
       "viewport": 375,
@@ -1030,7 +1030,7 @@
     {
       "name": "designer-product-1440",
       "file": "docs/cms-reviews/drills/P1-HARNESS/designer-product-1440.png",
-      "bytes": 41525,
+      "bytes": 41129,
       "width": 720,
       "height": 450,
       "viewport": 1440,
