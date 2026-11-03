@@ -1,0 +1,486 @@
+{
+  "note": "SHA-256 of the lossless full-page captures the pixel comparison used. They are kept outside the repo; the PNGs next to this file are small visual copies.",
+  "build": "next build at 8968db3, next start on the design harness (edge runtime, local sqld), Chrome headless, deviceScaleFactor 1",
+  "shots": [
+    {
+      "set": "default",
+      "name": "account-1440",
+      "width": 1440,
+      "height": 900,
+      "bytes": 61087,
+      "sha256": "c72f1523a25ebd48744cf6779a22b72ecf093520af6e3188d614812261dda08d"
+    },
+    {
+      "set": "default",
+      "name": "account-375",
+      "width": 375,
+      "height": 1223,
+      "bytes": 53547,
+      "sha256": "1a3c61d92ac1229216b52d04ac9cac72bb0818e3dadd2b8d496bbad0a512673e"
+    },
+    {
+      "set": "default",
+      "name": "account-768",
+      "width": 768,
+      "height": 1024,
+      "bytes": 58624,
+      "sha256": "9b9fbc9d80c284ac7e142e61641e9be52abf9510f0fde698a6aa1cd0bfba26ed"
+    },
+    {
+      "set": "default",
+      "name": "cart-drawer-1440",
+      "width": 1440,
+      "height": 1733,
+      "bytes": 108807,
+      "sha256": "72ab59b86fa7e29072021e61ef7619ab03ba0dbd85c897d74d7349565ecb46d4"
+    },
+    {
+      "set": "default",
+      "name": "cart-drawer-375",
+      "width": 375,
+      "height": 2219,
+      "bytes": 66792,
+      "sha256": "29d7f1465cc8e6ee7f66365244e10681b814bb9457e3551399096b8c4c404456"
+    },
+    {
+      "set": "default",
+      "name": "cart-drawer-768",
+      "width": 768,
+      "height": 2496,
+      "bytes": 104690,
+      "sha256": "575fc037b37380fd60a84dbf89608ef70a26ed8ea47decdbfb963c18db2712aa"
+    },
+    {
+      "set": "default",
+      "name": "checkout-1440",
+      "width": 1440,
+      "height": 1193,
+      "bytes": 83355,
+      "sha256": "3075a1d0e73d7b8972d62c0eb67fad88a2124b52cc5791780867439af4f1aeae"
+    },
+    {
+      "set": "default",
+      "name": "checkout-375",
+      "width": 398,
+      "height": 1802,
+      "bytes": 77291,
+      "sha256": "cbb36ac0cc69cb00af91918c58a83531b342df74756e2f17dd6f256d6875b87f"
+    },
+    {
+      "set": "default",
+      "name": "checkout-768",
+      "width": 768,
+      "height": 1518,
+      "bytes": 80800,
+      "sha256": "8c46ebdff91050d96bbfcbed5137ec28bf8dc3a0c4a6813fdaa560828e52fd99"
+    },
+    {
+      "set": "default",
+      "name": "cms-page-1440",
+      "width": 1440,
+      "height": 900,
+      "bytes": 63274,
+      "sha256": "5ba1f7050ceaf3e3ad279e6c3e13b683307b11faa1b38624d9e95861dedb7d4d"
+    },
+    {
+      "set": "default",
+      "name": "cms-page-375",
+      "width": 375,
+      "height": 1250,
+      "bytes": 57103,
+      "sha256": "5ffc63f88c17b4b2579cb6caf90566f79708a8a95dc71e9aaea630eb07a584b1"
+    },
+    {
+      "set": "default",
+      "name": "cms-page-768",
+      "width": 768,
+      "height": 1024,
+      "bytes": 60701,
+      "sha256": "2d22614f4e2ce6d8b50086269cb7101937d1b976e71ea29c7ebd88049684abea"
+    },
+    {
+      "set": "default",
+      "name": "collection-1440",
+      "width": 1440,
+      "height": 1167,
+      "bytes": 67264,
+      "sha256": "9aa3261d5ac5de36e8b07e60bf59d1cf6fe8fba500b09e142d2ab1c356ab06d9"
+    },
+    {
+      "set": "default",
+      "name": "collection-375",
+      "width": 375,
+      "height": 1394,
+      "bytes": 61303,
+      "sha256": "d41f26be2b2ca2958f1c06a2f059c52bb6781a3fd392990eb1ee7db1e3c96620"
+    },
+    {
+      "set": "default",
+      "name": "collection-768",
+      "width": 768,
+      "height": 1212,
+      "bytes": 65804,
+      "sha256": "98afcfbcd60d43ac27ac0ee3ed7ba3ee4f8d5aabb34efe278a121e0cdaaf299d"
+    },
+    {
+      "set": "default",
+      "name": "collections-1440",
+      "width": 1440,
+      "height": 1065,
+      "bytes": 107315,
+      "sha256": "2414cb18f85e6091744ec8b22c9b9a4c22ae10510f8260e8e2b09ee3999b8c08"
+    },
+    {
+      "set": "default",
+      "name": "collections-375",
+      "width": 375,
+      "height": 1909,
+      "bytes": 129985,
+      "sha256": "637f5cd2cbc6f0c03f9b237a2e80af0b7035d7ce0857423a5fa78cfe01db94c2"
+    },
+    {
+      "set": "default",
+      "name": "collections-768",
+      "width": 768,
+      "height": 1421,
+      "bytes": 118388,
+      "sha256": "988cddefe4ca19a8876a00ce6fd43ecc2e30a549cb4b14fc89d07cde4c49062b"
+    },
+    {
+      "set": "default",
+      "name": "home-1440",
+      "width": 1440,
+      "height": 2393,
+      "bytes": 196679,
+      "sha256": "4d1d25431303a11ff7ca42a41ef9b70ace73998c0363b08ec3bb834cf66b3dcc"
+    },
+    {
+      "set": "default",
+      "name": "home-375",
+      "width": 375,
+      "height": 3501,
+      "bytes": 212817,
+      "sha256": "f1e59bccb9f8dfdf70e5a1a78ef4fd8894087ce2cede15b8e1d51a5171a8eb5d"
+    },
+    {
+      "set": "default",
+      "name": "home-768",
+      "width": 768,
+      "height": 3015,
+      "bytes": 213456,
+      "sha256": "6b4adaa5a416652f639a489f7027e61b10d78f4d298f81dd671cf20dbb8d3238"
+    },
+    {
+      "set": "default",
+      "name": "not-found-1440",
+      "width": 1440,
+      "height": 935,
+      "bytes": 68694,
+      "sha256": "e0f99d422bec114f7029153b86d629912927d3f9c6f47d7168fb14cad630abdf"
+    },
+    {
+      "set": "default",
+      "name": "not-found-375",
+      "width": 375,
+      "height": 1389,
+      "bytes": 64650,
+      "sha256": "eef9c6188662c5ce1ac7a2a7d47f74a50c66b5c13fb8ea791ce245541b184483"
+    },
+    {
+      "set": "default",
+      "name": "not-found-768",
+      "width": 768,
+      "height": 1047,
+      "bytes": 64964,
+      "sha256": "42c99ab546e9cc290c4b00c2d5a824952ac4df40444e4e0b46b4963c793a7fb0"
+    },
+    {
+      "set": "default",
+      "name": "product-1440",
+      "width": 1440,
+      "height": 1733,
+      "bytes": 94366,
+      "sha256": "32a1625afa4f861e4123983d90325c4127024bbb65223d923b55e392575c47d4"
+    },
+    {
+      "set": "default",
+      "name": "product-375",
+      "width": 375,
+      "height": 2161,
+      "bytes": 88984,
+      "sha256": "481e9e947ad87447ff167dfe4e590d7e329fb5e1a407c16076042d7afafd65b1"
+    },
+    {
+      "set": "default",
+      "name": "product-768",
+      "width": 768,
+      "height": 2438,
+      "bytes": 92330,
+      "sha256": "54e896695789a34d427e192f93c8577068b1d90065f52521e51da8d0093ee0b8"
+    },
+    {
+      "set": "default",
+      "name": "search-1440",
+      "width": 1440,
+      "height": 1065,
+      "bytes": 61731,
+      "sha256": "1223ccd15f39587cbe0d2bd9e3166ee48d41866f6ea958de638677ec27a047c9"
+    },
+    {
+      "set": "default",
+      "name": "search-375",
+      "width": 375,
+      "height": 1292,
+      "bytes": 56035,
+      "sha256": "a86e86835c8d08c7effd34c7cf2f2ef64f203370afca85121ddb42c496c61db3"
+    },
+    {
+      "set": "default",
+      "name": "search-768",
+      "width": 768,
+      "height": 1110,
+      "bytes": 60901,
+      "sha256": "92519aaa3838bc0c261700da26d08a3487ad2392844d32db47afada66886946d"
+    },
+    {
+      "set": "seeded",
+      "name": "account-1440",
+      "width": 1440,
+      "height": 900,
+      "bytes": 61702,
+      "sha256": "76e9f9bd5766eb3de081b6fa4149fef0e460aeb756303a4a49adcdb7e747fb6b"
+    },
+    {
+      "set": "seeded",
+      "name": "account-375",
+      "width": 375,
+      "height": 1225,
+      "bytes": 54077,
+      "sha256": "ec80942742d571fbc308dba50c26c7452ee6892c116d4f50da3cac2eb799c1c6"
+    },
+    {
+      "set": "seeded",
+      "name": "account-768",
+      "width": 768,
+      "height": 1024,
+      "bytes": 59422,
+      "sha256": "e4ffc860653c02d7cb2991f0285800e5a2037364ec620542ad29c650d05a53ae"
+    },
+    {
+      "set": "seeded",
+      "name": "cart-drawer-1440",
+      "width": 1440,
+      "height": 1733,
+      "bytes": 110674,
+      "sha256": "636752e18e663dac8a37babc42f05fbc3c7d17121b23029da613071082acc29b"
+    },
+    {
+      "set": "seeded",
+      "name": "cart-drawer-375",
+      "width": 375,
+      "height": 2225,
+      "bytes": 69489,
+      "sha256": "baf067e35a5dd5f681f1cd74b9ca63f9312da526f71f16219cb74cf6f80d55e8"
+    },
+    {
+      "set": "seeded",
+      "name": "cart-drawer-768",
+      "width": 768,
+      "height": 2500,
+      "bytes": 107197,
+      "sha256": "52eee91a13757bd8dffecee89de35c6ab832ca005316734ed8f0f7d1d2e8d9d8"
+    },
+    {
+      "set": "seeded",
+      "name": "checkout-1440",
+      "width": 1440,
+      "height": 1193,
+      "bytes": 84664,
+      "sha256": "5fc9c592d95ff9ff0a8f11143a06b4894e654490a6e865ba69223628c243268b"
+    },
+    {
+      "set": "seeded",
+      "name": "checkout-375",
+      "width": 398,
+      "height": 1802,
+      "bytes": 79355,
+      "sha256": "eb65b23e82a363affbf5337ee746bda3d4dd5b36376a475e8fc8e601d9ec55e3"
+    },
+    {
+      "set": "seeded",
+      "name": "checkout-768",
+      "width": 768,
+      "height": 1518,
+      "bytes": 82588,
+      "sha256": "610d45ba16c39fe95b1d05e5606013fea30e01a054b1ace800383cafa0a9cda9"
+    },
+    {
+      "set": "seeded",
+      "name": "cms-page-1440",
+      "width": 1440,
+      "height": 900,
+      "bytes": 64990,
+      "sha256": "c562effad402c6bc04c4b82e3779cceac7a79d5b099bb73fd241415e36240a48"
+    },
+    {
+      "set": "seeded",
+      "name": "cms-page-375",
+      "width": 375,
+      "height": 1254,
+      "bytes": 58680,
+      "sha256": "0bdf5fc8bb8c6208bca1e5a2d0c53fd853a0da5045f71c113c0dcc49c8a9345e"
+    },
+    {
+      "set": "seeded",
+      "name": "cms-page-768",
+      "width": 768,
+      "height": 1024,
+      "bytes": 62492,
+      "sha256": "9cfa1fc78389b3d84a96c84e03130e7b85e3a89bd4438af8900bc2fd09a08e2e"
+    },
+    {
+      "set": "seeded",
+      "name": "collection-1440",
+      "width": 1440,
+      "height": 1167,
+      "bytes": 67738,
+      "sha256": "06195384e9b8ab718da55e6c4d49f903e922bfa2a1892cba45627b834d803962"
+    },
+    {
+      "set": "seeded",
+      "name": "collection-375",
+      "width": 375,
+      "height": 1394,
+      "bytes": 62206,
+      "sha256": "e5641da88f9bc9e5ebbfe1782927a74d7660735f69f6ab4b9a3e477d568a985e"
+    },
+    {
+      "set": "seeded",
+      "name": "collection-768",
+      "width": 768,
+      "height": 1212,
+      "bytes": 66538,
+      "sha256": "7e0ae4a9da48aaf7469a795cf7cb788af3aa561c155405758fb20fa915687ba4"
+    },
+    {
+      "set": "seeded",
+      "name": "collections-1440",
+      "width": 1440,
+      "height": 1067,
+      "bytes": 107853,
+      "sha256": "822f298b1a55a507f88158204e7d9a318cb27c6f7b5214cfd45b1637d6f16c2a"
+    },
+    {
+      "set": "seeded",
+      "name": "collections-375",
+      "width": 375,
+      "height": 1911,
+      "bytes": 136730,
+      "sha256": "9d1e195e4310ff8a9bd79d97e0628c4436c2ae54000040fe76c5b81789b0c003"
+    },
+    {
+      "set": "seeded",
+      "name": "collections-768",
+      "width": 768,
+      "height": 1423,
+      "bytes": 122585,
+      "sha256": "8f1e414d9214a609bb5d0a79011c7a04a770eac653a69be14a7969cefc5be22b"
+    },
+    {
+      "set": "seeded",
+      "name": "home-1440",
+      "width": 1440,
+      "height": 2394,
+      "bytes": 197014,
+      "sha256": "40f7b8d4fb9f6f25d645a73d178e21fd435b405493f030a200874c783f2d99f4"
+    },
+    {
+      "set": "seeded",
+      "name": "home-375",
+      "width": 375,
+      "height": 3502,
+      "bytes": 215734,
+      "sha256": "66d0200b09d10c399901dfabfd85203e334de8fca4009eea9bd46a5a13504fed"
+    },
+    {
+      "set": "seeded",
+      "name": "home-768",
+      "width": 768,
+      "height": 3016,
+      "bytes": 214073,
+      "sha256": "cc8a55293ecb2d21784f9a7747ce7ecb7002e5ca00b51e31d1eb6d359dc4b0bf"
+    },
+    {
+      "set": "seeded",
+      "name": "not-found-1440",
+      "width": 1440,
+      "height": 937,
+      "bytes": 69775,
+      "sha256": "db605efd4d8479a75666da83831f93c9040260d12b8723506103b2fe83944e5c"
+    },
+    {
+      "set": "seeded",
+      "name": "not-found-375",
+      "width": 375,
+      "height": 1393,
+      "bytes": 66773,
+      "sha256": "f1b69c719d466024503a14e11f268ddcf84f65d98127a511aef6dfb6e3f8500a"
+    },
+    {
+      "set": "seeded",
+      "name": "not-found-768",
+      "width": 768,
+      "height": 1049,
+      "bytes": 66336,
+      "sha256": "27a05a750760f85184c21beeeecf90eb848b6fb9de24cc7efbdd17839f959bb0"
+    },
+    {
+      "set": "seeded",
+      "name": "product-1440",
+      "width": 1440,
+      "height": 1733,
+      "bytes": 97071,
+      "sha256": "638b26a273ed1fd54323a84a50c0c49d228e09904c2f3c3b62e761dc64677da9"
+    },
+    {
+      "set": "seeded",
+      "name": "product-375",
+      "width": 375,
+      "height": 2167,
+      "bytes": 91524,
+      "sha256": "41644a83b94fba3801cb05f2e375d4d57f84b835ba9acce4341e2000c886400d"
+    },
+    {
+      "set": "seeded",
+      "name": "product-768",
+      "width": 768,
+      "height": 2442,
+      "bytes": 96516,
+      "sha256": "d26d5fb5075621fa218fd8a2156ea2ed5e0d8d8654ef95433805a5762f101acc"
+    },
+    {
+      "set": "seeded",
+      "name": "search-1440",
+      "width": 1440,
+      "height": 1065,
+      "bytes": 62043,
+      "sha256": "4dec35f27e29aa8d8da6939f2f1900abf246eef9ce9cc2835022d381d3904a16"
+    },
+    {
+      "set": "seeded",
+      "name": "search-375",
+      "width": 375,
+      "height": 1292,
+      "bytes": 56576,
+      "sha256": "eb703e349384ac01aa70addf4fd518fb0d50f43e9b0cfa434187c06df1e9a26f"
+    },
+    {
+      "set": "seeded",
+      "name": "search-768",
+      "width": 768,
+      "height": 1110,
+      "bytes": 61405,
+      "sha256": "0e52057d6f1909158c309801c649efb4da8d220eda6f7241d6c756c7e29de18d"
+    }
+  ]
+}
