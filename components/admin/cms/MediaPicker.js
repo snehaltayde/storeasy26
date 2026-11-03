@@ -8,6 +8,7 @@ import { Input } from "@/components/console/fields";
 import { Banner } from "@/components/console/Banner";
 import { SkeletonText, EmptyState } from "@/components/console/bits";
 import { cx } from "@/components/console/cx";
+import { useToast } from "@/components/console/Toast";
 import { MediaUploadStatus } from "@/components/admin/MediaUploadStatus";
 import { uploadImage } from "@/lib/media-upload";
 import { UPLOAD_ACCEPT } from "@/lib/media-upload-plan";
@@ -22,6 +23,7 @@ export function MediaPicker({ open, onClose, onSelect }) {
   const [uploading, setUploading] = useState(null); // progress of the file in flight
   const [uploadErr, setUploadErr] = useState(null);
   const fileRef = useRef(null);
+  const toast = useToast();
 
   async function load() {
     setErr(null);
@@ -49,6 +51,7 @@ export function MediaPicker({ open, onClose, onSelect }) {
     if (fileRef.current) fileRef.current.value = "";
     if (r.ok) {
       await load();
+      if (r.notice) toast.info(r.notice); // a toast, because picking closes this dialog
       if (r.media?.url) onSelect?.({ url: r.media.url, alt: r.media.alt || "", id: r.media.id });
     } else {
       setUploadErr(r.message);

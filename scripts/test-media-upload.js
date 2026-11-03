@@ -106,17 +106,19 @@ const photoFile = (name, size, mime = "image/jpeg") => new File([bytesOf(mime, s
 // image (0.116 bytes per pixel at quality 0.85 for a 5MB source, measured with
 // sharp while building this; `detail` scales for busier pictures). Output carries
 // real magic bytes, so the real server accepts or refuses it on its own terms.
-function fakeCodec({ width = 4032, height = 3024, detail = 1, alpha = false, writesWebp = true, undecodable = false, nullBlobs = false, throwAbove = 0, encodedSize = null } = {}) {
-  const calls = { encode: [], decode: 0, hasAlpha: 0, closed: 0 };
+function fakeCodec({ width = 4032, height = 3024, detail = 1, alpha = false, writesWebp = true, undecodable = false, cannotTry = false, nullBlobs = false, throwAbove = 0, encodedSize = null } = {}) {
+  const calls = { encode: [], decode: 0, hasAlpha: 0, alphaSize: [], closed: 0 };
   return {
     calls,
     decode: async () => {
       calls.decode++;
       if (undecodable) throw new Error("The source image could not be decoded.");
+      if (cannotTry) return null;
       return { width, height, close: () => calls.closed++ };
     },
-    hasAlpha: async () => {
+    hasAlpha: async (_image, size) => {
       calls.hasAlpha++;
+      calls.alphaSize.push(size);
       return alpha;
     },
     encode: async (_image, step) => {
@@ -130,6 +132,23 @@ function fakeCodec({ width = 4032, height = 3024, detail = 1, alpha = false, wri
     },
   };
 }
+
+// Just enough real structure for isAnimated: PNG chunks and WebP RIFF chunks.
+const ascii = (text) => [...text].map((c) => c.charCodeAt(0));
+const pngChunk = (type, data = []) => [0, 0, data.length >> 8, data.length & 255, ...ascii(type), ...data, 0, 0, 0, 0];
+const pngOf = (...chunks) => new Uint8Array([...MAGIC["image/png"], ...chunks.flat()]);
+const webpOf = (fourcc, payload) => new Uint8Array([...ascii("RIFF"), 0, 0, 0, 0, ...ascii("WEBP"), ...ascii(fourcc), payload.length, 0, 0, 0, ...payload]);
+const ANIM_FLAG = 0x02;
+const ALPHA_FLAG = 0x10;
+const ANIMATED_WEBP = webpOf("VP8X", [ANIM_FLAG, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+const ANIMATED_PNG = pngOf(pngChunk("IHDR", new Array(13).fill(0)), pngChunk("acTL", [0, 0, 0, 3, 0, 0, 0, 0]), pngChunk("IDAT", [1, 2, 3]));
+const padded = (bytes, size) => {
+  const out = new Uint8Array(size);
+  out.set(bytes);
+  out[size - 1] = seed % 256;
+  out[size - 2] = ++seed >> 8;
+  return out;
+};
 
 // The real route handler, with what requireAdmin + tenantHandler actually read.
 const realSend = (cookie = ownerTok) => async (form, onPercent) => {
@@ -153,6 +172,9 @@ const neverSend = async () => {
 };
 const stored = (id) => inT(() => db.selectFrom("media").select(["id", "mime", "size", "width", "height", "variant", "parent_id", "filename"]).where("id", "=", id).executeTakeFirst());
 const thumbOf = (id) => inT(() => db.selectFrom("media").select(["id", "mime", "width", "height", "variant"]).where("parent_id", "=", id).executeTakeFirst());
+
+const mediaCount = () => inT(async () => (await db.selectFrom("media").select("id").execute()).length);
+const storedText = async (id) => new TextDecoder().decode((await inT(() => M.getMediaFile(id))).data);
 
 const LIMIT = 1_500_000;
 
@@ -218,6 +240,57 @@ await t("route: an SVG uploaded through the shared path is sanitized before it i
   includes(text, "<rect");
 });
 
+// The rest of the sanitizer and sniffer, through the real route. These compare the
+// exact stored bytes, so any weakening of lib/media.js shows up here.
+const SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg">';
+const svgThroughRoute = async (inner) => {
+  const r = await postDirect({ file: new File([`${SVG_OPEN}${inner}</svg>`], "logo.svg", { type: "image/svg+xml" }) });
+  eq(r.status, 200, `${inner}:`);
+  return (await storedText(r.json.media.id)).slice(SVG_OPEN.length, -"</svg>".length);
+};
+
+await t("route: every SVG element that can run or load something is stored without it", async () => {
+  for (const tag of ["script", "foreignObject", "iframe", "object", "embed", "animate", "set", "handler"]) {
+    eq(await svgThroughRoute(`<${tag} x="1"><b>inside</b></${tag}><rect/>`), "<rect/>", `${tag} with content:`);
+    eq(await svgThroughRoute(`<${tag} x="1"/><circle/>`), "<circle/>", `${tag} self-closed:`);
+  }
+  eq(await svgThroughRoute(`<IFRAME src="https://evil.example"></IFRAME><rect/>`), "<rect/>", "upper case:");
+  eq(await svgThroughRoute(`<animateTransform attributeName="x"/><rect/>`), "<rect/>", "animate family:");
+});
+
+await t("route: every event handler is stored without it, however it is quoted", async () => {
+  eq(await svgThroughRoute(`<rect onclick="a()" ONMOUSEOVER='b()' onfocus=c() width="9"/>`), `<rect width="9"/>`);
+});
+
+await t("route: unsafe links are stored without them, safe links are kept", async () => {
+  const unsafe = ["javascript:evil()", "JaVaScRiPt:evil()", "java\tscript:evil()", "data:text/html,x", "data:image/svg+xml;base64,AAAA", "http://evil.example/x.png", "//evil.example/x.png", "https:evil.example/x.png", "vbscript:evil()", "relative.png"];
+  for (const value of unsafe) {
+    for (const attr of ["href", "xlink:href", "src"]) eq(await svgThroughRoute(`<image ${attr}="${value}"/>`), "<image/>", `${attr}=${value}:`);
+    eq(await svgThroughRoute(`<image href='${value}'/>`), "<image/>", `single-quoted ${value}:`);
+  }
+  for (const value of ["#shape", "https://ok.example/x.png", "/api/media/med_1"]) {
+    const kept = `<image href="${value}"/>`;
+    eq(await svgThroughRoute(kept), kept, "kept:");
+  }
+});
+
+await t("route: files that only look like an image are refused and nothing is stored", async () => {
+  const encode = (text) => new TextEncoder().encode(text);
+  const cases = [
+    ["a RIFF file that isn't WebP", new Uint8Array([...ascii("RIFF"), 0, 0, 0, 0, ...ascii("WAVEfmt "), 0, 0, 0, 0]), "image/webp"],
+    ["PHP wearing an SVG", encode(`<?php system("id"); ?>${SVG_OPEN}</svg>`), "image/svg+xml"],
+    ["PHP after blank lines", encode(`\n\n  <?PHP echo 1; ?>${SVG_OPEN}</svg>`), "image/svg+xml"],
+    ["<svg buried past the sniff window", encode(`${"x".repeat(1000)}${SVG_OPEN}</svg>`), "image/svg+xml"],
+  ];
+  for (const [label, bytes, type] of cases) {
+    const before = await mediaCount();
+    const r = await postDirect({ file: new File([bytes], "a.bin", { type }) });
+    eq(r.status, 422, `${label}:`);
+    includes(r.json.errors.join(), "doesn't match", `${label}:`);
+    eq(await mediaCount(), before, `${label} stored nothing:`);
+  }
+});
+
 await t("route: read-only support is still refused, in plain words", async () => {
   const r = await U.uploadImage(photoFile("a.jpg", 2048), { codec: fakeCodec({ width: 800, height: 600 }), send: realSend(supportTok) });
   eq(r.ok, false);
@@ -226,6 +299,10 @@ await t("route: read-only support is still refused, in plain words", async () =>
 
 // ---- the size plan ------------------------------------------------------------
 console.log("— size plan");
+
+await t("the pickers offer image/*, so a HEIC can be picked and get a plain answer", () => {
+  eq(P.UPLOAD_ACCEPT, "image/*");
+});
 
 await t("classify: what happens to each kind of file", () => {
   const cases = [
@@ -301,6 +378,22 @@ await t("hasTransparency reads the alpha channel", () => {
   eq(P.hasTransparency(new Uint8ClampedArray([255, 255, 255, 0])), true);
 });
 
+await t("isAnimated reads the file's structure, not just its letters", () => {
+  eq(P.isAnimated(ANIMATED_WEBP), true, "animated webp:");
+  eq(P.isAnimated(ANIMATED_PNG), true, "apng:");
+  eq(P.isAnimated(webpOf("VP8X", [ALPHA_FLAG, 0, 0, 0, 0, 0, 0, 0, 0, 0])), false, "still webp with transparency:");
+  eq(P.isAnimated(webpOf("VP8 ", ascii("ANMF"))), false, "still webp with the letters in its picture data:");
+  eq(P.isAnimated(pngOf(pngChunk("IHDR", new Array(13).fill(0)), pngChunk("IDAT", ascii("acTL")), pngChunk("IEND"))), false, "still png with the letters in its picture data:");
+  eq(P.isAnimated(pngOf(pngChunk("IHDR"), pngChunk("IDAT"), pngChunk("acTL"))), false, "a late animation chunk doesn't count:");
+  eq(P.isAnimated(pngOf(pngChunk("tEXt", ascii("acTL")), pngChunk("IDAT"))), false, "the letters in a text note don't count:");
+  eq(P.isAnimated(pngOf(pngChunk("tEXt", ascii("acTL")), pngChunk("acTL"))), true, "found past other chunks:");
+  eq(P.isAnimated(ANIMATED_PNG.subarray(0, 12)), false, "cut off mid-chunk:");
+  eq(P.isAnimated(new Uint8Array(MAGIC["image/png"])), false, "signature only:");
+  eq(P.isAnimated(new Uint8Array(ascii("RIFF"))), false, "cut off RIFF:");
+  eq(P.isAnimated(new Uint8Array(0)), false, "empty:");
+  eq(P.isAnimated(new Uint8Array(MAGIC["image/jpeg"])), false, "jpeg:");
+});
+
 await t("keepOriginal: only when re-encoding gained nothing and the server takes the original", () => {
   eq(P.keepOriginal({ size: 500, encodedSize: 600, action: "resize" }), true, "grew:");
   eq(P.keepOriginal({ size: 500, encodedSize: 500, action: "resize" }), true, "same:");
@@ -331,7 +424,7 @@ await t("ACCEPTANCE: a 5MB phone photo uploads with no error, long edge >= 1920,
   eq(row.mime, "image/jpeg");
   ok(row.size <= LIMIT, `size ${row.size}:`);
   eq([row.width, row.height], [1920, 1440], "real dimensions recorded:");
-  eq(r.reduced, false);
+  eq(r.notice, null, "nothing to warn about:");
   const thumb = await thumbOf(r.media.id);
   eq([thumb.variant, thumb.width, thumb.height], ["thumb", 480, 360], "thumbnail attached:");
 });
@@ -366,6 +459,22 @@ await t("an extremely detailed photo shrinks below 1920 rather than fail, and sa
   eq(r.reduced, true);
 });
 
+await t("an image that ends up smaller tells the founder the final size", async () => {
+  const r = await U.uploadImage(photoFile("noise.jpg", 20_000_000), { codec: fakeCodec({ detail: 30 }), send: realSend() });
+  ok(r.ok, `uploaded (${r.message}):`);
+  const row = await stored(r.media.id);
+  ok(row.width < 1920, "shrunk:");
+  eq(r.notice, P.uploadMessage.madeSmaller("noise.jpg", row));
+  includes(r.notice, `${row.width}×${row.height}`);
+});
+
+await t("over the limit but already small: not called smaller unless it really shrank", async () => {
+  const same = await U.prepareImage(photoFile("small-dims.jpg", 2_000_000), fakeCodec({ width: 1000, height: 800 }));
+  eq([same.width, same.height, same.reduced], [1000, 800, false], "kept its size:");
+  const shrunk = await U.prepareImage(photoFile("logo.png", 2_000_000, "image/png"), fakeCodec({ width: 1000, height: 1000, alpha: true, writesWebp: false }));
+  eq([shrunk.width, shrunk.reduced], [800, true], "fell below its own size:");
+});
+
 await t("an image that can't fit gets a plain message and never reaches the server", async () => {
   const r = await U.uploadImage(photoFile("huge.png", 30_000_000, "image/png"), { codec: fakeCodec({ encodedSize: LIMIT + 1 }), send: neverSend });
   eq(r.ok, false);
@@ -380,6 +489,7 @@ await t("transparent PNG, browser writes WebP: stays transparent, never touches 
   eq(r.media.filename, "cutout.webp");
   ok(!codec.calls.encode.some((s) => s.mime === "image/jpeg"), "no jpeg encode:");
   eq(codec.calls.hasAlpha, 1);
+  eq(codec.calls.alphaSize, [{ width: 1920, height: 1920 }], "checked at the size it will be written, to save phone memory:");
 });
 
 await t("transparent PNG, browser can't write WebP (Safari): falls to PNG, never JPEG", async () => {
@@ -421,6 +531,13 @@ await t("an already small image goes up byte for byte, never upscaled or re-enco
   eq([r.thumb.width, r.thumb.height], [480, 320]);
 });
 
+await t("a preview the browser could only write as PNG (Safari) is stored as what it is", async () => {
+  const r = await U.uploadImage(photoFile("safari.jpg", 200_000), { codec: fakeCodec({ width: 1200, height: 800, writesWebp: false }), send: realSend() });
+  ok(r.ok, `uploaded (${r.message}):`);
+  const thumb = await thumbOf(r.media.id);
+  eq([thumb.variant, thumb.mime, thumb.width], ["thumb", "image/png", 480]);
+});
+
 await t("a tiny image gets no preview, as before", async () => {
   const codec = fakeCodec({ width: 300, height: 300 });
   const r = await U.prepareImage(photoFile("tiny.png", 5_000, "image/png"), codec);
@@ -433,6 +550,37 @@ await t("re-encoding that would grow the file keeps the original", async () => {
   const r = await U.prepareImage(file, fakeCodec({ width: 4000, height: 3000, encodedSize: 400_000 }));
   ok(r.file === file, "the same file:");
   eq([r.width, r.height], [4000, 3000], "its real dimensions:");
+});
+
+await t("an animated WebP or PNG within the limit goes up untouched, even when over 1920", async () => {
+  for (const [name, type, bytes] of [["anim.webp", "image/webp", ANIMATED_WEBP], ["anim.png", "image/png", ANIMATED_PNG]]) {
+    const file = new File([padded(bytes, 16_300)], name, { type });
+    const codec = fakeCodec({ width: 2400, height: 1200 });
+    const r = await U.uploadImage(file, { codec, send: realSend() });
+    ok(r.ok, `uploaded (${r.message}):`);
+    const row = await stored(r.media.id);
+    eq([row.mime, row.filename, row.size, row.width, row.height], [type, name, 16_300, 2400, 1200], `${name}:`);
+    eq(r.notice, null);
+    eq(codec.calls.encode.map((s) => s.quality), [0.82], "only the library preview was made:");
+    eq(codec.calls.hasAlpha, 0);
+  }
+});
+
+await t("an animated WebP or PNG over the limit gets a plain message: no silent still image", async () => {
+  for (const [name, type, bytes] of [["anim.webp", "image/webp", ANIMATED_WEBP], ["anim.png", "image/png", ANIMATED_PNG]]) {
+    const codec = fakeCodec({ width: 1000, height: 1000 });
+    const r = await U.uploadImage(new File([padded(bytes, LIMIT + 1)], name, { type }), { codec, send: neverSend });
+    eq(r.message, P.uploadMessage.animatedTooBig(name));
+    eq(codec.calls.encode, [], "nothing encoded:");
+    eq(codec.calls.closed, 1, "decoded image released:");
+  }
+});
+
+await t("a still WebP or PNG over 1920 is still made smaller", async () => {
+  const webp = await U.prepareImage(photoFile("still.webp", 500_000, "image/webp"), fakeCodec({ width: 2400, height: 1200, detail: 0.1 }));
+  eq([webp.file.type, webp.width], ["image/jpeg", 1920]);
+  const png = new File([padded(pngOf(pngChunk("IHDR", new Array(13).fill(0)), pngChunk("IDAT", ascii("acTL"))), 500_000)], "still.png", { type: "image/png" });
+  eq((await U.prepareImage(png, fakeCodec({ width: 2400, height: 1200, detail: 0.1 }))).width, 1920);
 });
 
 await t("SVG and GIF are left exactly as they are, with nothing encoded", async () => {
@@ -485,9 +633,27 @@ await t("a damaged photo too big to send: plain message", async () => {
   eq(r.message, P.uploadMessage.unreadable("broken.jpg"));
 });
 
-await t("a fake .jpg small enough to send: the server's magic-byte check refuses it, in plain words", async () => {
-  const r = await U.uploadImage(new File(["%PDF-1.7 pretending"], "photo.jpg", { type: "image/jpeg" }), { codec: fakeCodec({ undecodable: true }), send: realSend() });
-  eq(r.ok, false);
+await t("a damaged photo small enough to send: plain message, nothing stored", async () => {
+  for (const [name, type] of [["broken.jpg", "image/jpeg"], ["broken.png", "image/png"], ["broken.webp", "image/webp"]]) {
+    const r = await U.uploadImage(photoFile(name, 40_000, type), { codec: fakeCodec({ undecodable: true }), send: neverSend });
+    eq(r.ok, false);
+    eq(r.message, P.uploadMessage.unreadable(name));
+  }
+});
+
+await t("a browser with no way to try opening images: the server still decides, in plain words", async () => {
+  const fake = await U.uploadImage(new File(["%PDF-1.7 pretending"], "photo.jpg", { type: "image/jpeg" }), { codec: fakeCodec({ cannotTry: true }), send: realSend() });
+  eq(fake.message, P.uploadMessage.notWhatItSays("photo.jpg"));
+  const real = await U.uploadImage(photoFile("old-browser.jpg", 40_000), { codec: fakeCodec({ cannotTry: true }), send: realSend() });
+  ok(real.ok, `uploaded (${real.message}):`);
+  const row = await stored(real.media.id);
+  eq([row.mime, row.width, row.height], ["image/jpeg", 0, 0], "no dimensions known:");
+  const big = await U.uploadImage(photoFile("big.jpg", LIMIT + 1), { codec: fakeCodec({ cannotTry: true }), send: neverSend });
+  eq(big.message, P.uploadMessage.unreadable("big.jpg"), "can't be made smaller, so not sent:");
+});
+
+await t("a real image with the wrong name: the server's magic-byte check refuses it, in plain words", async () => {
+  const r = await U.uploadImage(new File([bytesOf("image/png", 2048)], "photo.jpg", { type: "image/jpeg" }), { codec: fakeCodec({ width: 800, height: 600 }), send: realSend() });
   eq(r.message, P.uploadMessage.notWhatItSays("photo.jpg"));
 });
 
@@ -531,6 +697,14 @@ await t("no connection, or a thrown send: plain words, never a raw error", async
   eq(thrown.message, P.uploadMessage.failed("a.jpg"));
 });
 
+await t("a 200 that isn't an ok from our route counts as a failure", async () => {
+  const r = await U.uploadImage(photoFile("a.jpg", 2048), { codec: fakeCodec({ width: 800, height: 600 }), send: async () => ({ status: 200, json: { ok: false } }) });
+  eq(r.ok, false);
+  eq(r.message, P.uploadMessage.failed("a.jpg"));
+  const page = await U.uploadImage(photoFile("a.jpg", 2048), { codec: fakeCodec({ width: 800, height: 600 }), send: async () => ({ status: 200, json: {} }) });
+  eq(page.message, P.uploadMessage.failed("a.jpg"), "a login page answering 200:");
+});
+
 // ---- plain words --------------------------------------------------------------
 console.log("— plain words");
 
@@ -553,12 +727,19 @@ await t("status codes map to plain words, and unknown errors don't leak", () => 
 
 await t("no message uses technical words", () => {
   for (const fn of Object.values(P.uploadMessage)) {
-    const m = fn("x.jpg");
+    const m = fn("x.jpg", { width: 800, height: 533 });
     for (const bad of ["mime", "MIME", "canvas", "decode", "422", "magic", "sanitiz", "undefined", "Error"]) ok(!m.includes(bad), `"${m}" has ${bad}:`);
   }
 });
 
+await t("the HEIC advice works on any device", () => {
+  const m = P.uploadMessage.heic("IMG_1.HEIC");
+  includes(m, "JPEG");
+  for (const bad of ["iPhone", "Safari"]) ok(!m.includes(bad), `"${m}" has ${bad}:`);
+});
+
 await t("the stated GIF and SVG limits match the server", () => {
+  includes(P.uploadMessage.animatedTooBig("x"), `${M.MEDIA_MIME["image/webp"].max / 1e6}MB`);
   includes(P.uploadMessage.tooBig("x"), `${M.MEDIA_MIME["image/gif"].max / 1e6}MB`);
   includes(P.uploadMessage.tooBig("x"), `${M.MEDIA_MIME["image/svg+xml"].max / 1e3}KB`);
 });
@@ -588,6 +769,25 @@ await t("browserCodec asks for upright photos, and asks the canvas for what the 
     eq([seen.mime, seen.quality, seen.draw], ["image/jpeg", 0.85, [0, 0, 1920, 1440]]);
     eq(ctx.imageSmoothingQuality, "high");
     eq(U.browserCodec.hasAlpha({}, { width: 1, height: 1 }), false, "opaque pixels:");
+    const calls = [];
+    globalThis.createImageBitmap = async (_file, options) => {
+      calls.push(options);
+      if (options) throw new TypeError("'from-image' is not a valid enum value");
+      return { width: 2, height: 2 };
+    };
+    eq((await U.browserCodec.decode(new Blob(["x"]))).width, 2, "a browser that rejects the option still decodes:");
+    eq(calls.length, 2);
+    eq(calls[1], undefined, "second try has no option:");
+    calls.length = 0;
+    globalThis.createImageBitmap = async (_file, options) => {
+      calls.push(options);
+      throw Object.assign(new Error("The source image could not be decoded."), { name: "InvalidStateError" });
+    };
+    let threw = null;
+    await U.browserCodec.decode(new Blob(["x"])).catch((e) => (threw = e.name));
+    eq([threw, calls.length], ["InvalidStateError", 1], "damage is not retried:");
+    delete globalThis.createImageBitmap;
+    eq(await U.browserCodec.decode(new Blob(["x"])), null, "no way to try:");
     ctx.getImageData = () => {
       throw new Error("SecurityError");
     };
@@ -625,6 +825,11 @@ await t("xhrSend posts to the route, reports percent, and survives bad answers",
     p = U.xhrSend(new FormData(), () => {});
     made.onerror();
     eq(await p, { status: 0, json: {} }, "no answer:");
+    for (const event of ["onabort", "ontimeout"]) {
+      p = U.xhrSend(new FormData(), () => {});
+      made[event]();
+      eq(await p, { status: 0, json: {} }, `${event}:`);
+    }
   } finally {
     delete globalThis.XMLHttpRequest;
   }
@@ -644,6 +849,105 @@ await t("MediaAdmin and MediaPicker both upload through uploadImage and hold no 
     includes(s, "<MediaUploadStatus progress={uploading} />", `${rel}:`);
     for (const bad of ["createImageBitmap", "FormData", 'method: "POST"', "toBlob", "image/png,image/jpeg"]) ok(!s.includes(bad), `${rel} still has ${bad}:`);
   }
+});
+
+// Components are JSX, which plain node can't import, but these handlers are plain
+// JS. So take their real source text and run it with stand-ins for the React parts.
+async function sliceOf(rel, from, to) {
+  const s = await source(rel);
+  const start = s.indexOf(from);
+  const end = s.indexOf(to, start);
+  ok(start >= 0 && end > start, `${rel} no longer has ${from}:`);
+  return s.slice(start, end);
+}
+const offlineFetch = async () => {
+  throw new TypeError("Failed to fetch");
+};
+const FAILED_UPLOAD = { ok: false, message: "The upload didn't go through. Check your connection and try again." };
+
+async function libraryUpload({ result, fetch = async () => ({ json: async () => ({ ok: true, media: ["fresh"] }) }) }) {
+  const state = { uploading: "in flight", error: null, media: null, toasts: [], input: { value: "C:\\fakepath\\IMG_0042.jpg" } };
+  const body = await sliceOf("components/admin/MediaAdmin.js", "async function refresh()", "async function saveAlt");
+  const make = new Function("fetch", "uploadImage", "setUploading", "setError", "setMedia", "toast", "fileRef", `${body}\nreturn upload;`);
+  const upload = make(
+    (...args) => {
+      state.inputAtRefresh = state.input.value;
+      return fetch(...args);
+    },
+    async () => result,
+    (v) => (state.uploading = v),
+    (v) => (state.error = v),
+    (v) => (state.media = v),
+    { success: (m) => state.toasts.push(m) },
+    { current: state.input }
+  );
+  await upload([{ name: "IMG_0042.jpg" }]);
+  return state;
+}
+
+async function pickerUpload({ result }) {
+  const state = { uploading: "in flight", error: "old error", selected: [], loads: 0, toasts: [], input: { value: "C:\\fakepath\\IMG_0042.jpg" } };
+  const body = await sliceOf("components/admin/cms/MediaPicker.js", "async function upload(file)", "const filtered = useMemo");
+  const make = new Function("uploadImage", "setUploading", "setUploadErr", "load", "onSelect", "toast", "fileRef", `${body}\nreturn upload;`);
+  const upload = make(
+    async () => result,
+    (v) => (state.uploading = v),
+    (v) => (state.error = v),
+    async () => state.loads++,
+    (v) => state.selected.push(v),
+    { info: (m) => state.toasts.push(m) },
+    { current: state.input }
+  );
+  await upload({ name: "IMG_0042.jpg" });
+  return state;
+}
+
+await t("library, connection down: the message shows, the same photo can be picked again, nothing rejects", async () => {
+  const s = await libraryUpload({ result: FAILED_UPLOAD, fetch: offlineFetch });
+  eq(s.error, FAILED_UPLOAD.message);
+  eq(s.input.value, "", "input reset so the retry fires:");
+  eq(s.inputAtRefresh, "", "reset before the refresh, which may never answer:");
+  eq(s.uploading, null);
+});
+
+await t("library, uploaded: list refreshed, input reset, the right words shown", async () => {
+  const plain = await libraryUpload({ result: { ok: true, media: {}, notice: null } });
+  eq([plain.toasts, plain.media, plain.input.value, plain.uploading], [["IMG_0042.jpg uploaded"], ["fresh"], "", null]);
+  const smaller = await libraryUpload({ result: { ok: true, media: {}, notice: "made smaller" } });
+  eq(smaller.toasts, ["made smaller"]);
+  const reused = await libraryUpload({ result: { ok: true, media: { deduped: true }, notice: null } });
+  includes(reused.toasts[0], "already in the library");
+});
+
+await t("picker, failed: the message shows, the same photo can be picked again, nothing is picked", async () => {
+  const s = await pickerUpload({ result: FAILED_UPLOAD });
+  eq([s.error, s.input.value, s.uploading, s.selected, s.toasts], [FAILED_UPLOAD.message, "", null, [], []]);
+});
+
+await t("picker, uploaded: the new image is picked, and a shrunk one says so", async () => {
+  const media = { url: "/api/media/med_1", alt: "Hero", id: "med_1" };
+  const plain = await pickerUpload({ result: { ok: true, media, notice: null } });
+  eq([plain.selected, plain.loads, plain.input.value, plain.uploading, plain.error, plain.toasts], [[media], 1, "", null, null, []]);
+  const smaller = await pickerUpload({ result: { ok: true, media, notice: "made smaller" } });
+  eq(smaller.toasts, ["made smaller"]);
+  eq(smaller.selected, [media]);
+});
+
+await t("picker grid shows the preview when there is one", async () => {
+  const body = await sliceOf("components/admin/cms/MediaPicker.js", "const thumbOf =", "return (\n    <Dialog");
+  const thumbOf = new Function(`${body}\nreturn thumbOf;`)();
+  eq(thumbOf({ url: "/api/media/med_1", variants: [{ variant: "thumb", id: "med_2" }] }), "/api/media/med_2");
+  eq(thumbOf({ url: "/api/media/med_1", variants: [] }), "/api/media/med_1");
+});
+
+await t("the JSX shows what the handlers set", async () => {
+  const admin = await source("components/admin/MediaAdmin.js");
+  includes(admin, '{error && <Banner tone="danger">{error}</Banner>}');
+  includes(admin, "onChange={(e) => e.target.files?.length && upload([...e.target.files])}");
+  const picker = await source("components/admin/cms/MediaPicker.js");
+  includes(picker, '{uploadErr && <Banner tone="danger">{uploadErr}</Banner>}');
+  includes(picker, "onChange={(e) => upload(e.target.files?.[0])}");
+  includes(await source("components/admin/MediaUploadStatus.js"), "{progressLabel(progress)}");
 });
 
 await t("nothing else in the console posts files to the media route", async () => {

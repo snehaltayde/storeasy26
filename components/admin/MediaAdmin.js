@@ -50,12 +50,14 @@ export default function MediaAdmin({ initial, readOnly = false }) {
           return;
         }
         if (r.media.deduped) toast.success(`${file.name} was already in the library — reused`);
-        else toast.success(r.reduced ? `${file.name} uploaded (made a little smaller so it fits)` : `${file.name} uploaded`);
+        else toast.success(r.notice || `${file.name} uploaded`);
       }
     } finally {
       setUploading(null);
-      await refresh();
+      // Reset first. If the connection is down the refresh fails too, and a file
+      // left in the input means picking it again does nothing.
       if (fileRef.current) fileRef.current.value = "";
+      await refresh().catch(() => {});
     }
   }
 
@@ -103,7 +105,7 @@ export default function MediaAdmin({ initial, readOnly = false }) {
             onChange={(e) => e.target.files?.length && upload([...e.target.files])}
             className="mx-auto block rounded text-sm text-fg-muted focus-ring file:mr-3 file:rounded-ctl file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary-fg hover:file:bg-primary-hover disabled:opacity-50"
           />
-          <p className="mt-2 text-xs text-fg-subtle">Photos are made smaller for you before they upload. GIFs can be up to 1.5MB and SVGs up to 300KB. Duplicates are detected and reused.</p>
+          <p className="mt-2 text-xs text-fg-subtle">Photos are made smaller for you before they upload. GIFs and animated images can be up to 1.5MB and SVGs up to 300KB. Duplicates are detected and reused.</p>
         </Card>
       )}
 
