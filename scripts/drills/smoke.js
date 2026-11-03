@@ -1,7 +1,9 @@
 // pnpm drill:smoke — one shopper journey on the design harness, to prove the
 // browser runner works end to end: a product page at 375, 768 and 1440 wide,
 // add to cart, the drawer opens with the item, then close it and open it
-// again from the header. Screenshots go to docs/cms-reviews/drills/smoke/.
+// again from the header. Then a first add to cart at 768 and 375, noting what
+// a tap on the drawer's Checkout button hits while the cookie banner is up.
+// Screenshots go to docs/cms-reviews/drills/smoke/.
 import { WIDTHS, drawerOpen } from "../drill.js";
 
 export const id = "smoke";
@@ -35,26 +37,14 @@ export default async function smoke(drill) {
   const cartRes = await added;
   drill.check(cartRes.status() === 200, "adding to cart: POST /api/cart answers 200", cartRes.status());
 
-  await page.waitForFunction(() => {
-    const d = document.querySelector('[role="dialog"][aria-label="Shopping cart"]');
-    return d && d.getBoundingClientRect().left < window.innerWidth - 10;
-  }, null, { timeout: 15_000 }).catch(() => {});
-  await page.waitForTimeout(600); // the slide-in transition
+  await waitForDrawer(page);
   const drawer = page.getByRole("dialog", { name: "Shopping cart" });
   drill.check(await drawerOpen(page), "adding to cart opens the drawer");
   drill.check((await drawer.innerText()).includes(PRODUCT.title), `the drawer lists "${PRODUCT.title}"`);
   await drill.shoot(page, "drawer-after-add");
   // Reported, not checked: what a first-time shopper's tap on "Checkout →" lands on
   // while the cookie banner is still up.
-  const onCheckout = await page.evaluate(() => {
-    const link = [...document.querySelectorAll('[aria-label="Shopping cart"] a[href="/checkout"]')][0];
-    if (!link) return "no Checkout link in the drawer";
-    const r = link.getBoundingClientRect();
-    if (r.bottom > window.innerHeight) return `the Checkout link is below the window (bottom ${Math.round(r.bottom)}px, window ${window.innerHeight}px)`;
-    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    return link.contains(hit) ? "the Checkout link itself" : `something else on top of it: <${hit?.tagName.toLowerCase()}> "${(hit?.innerText || "").trim().slice(0, 60)}"`;
-  });
-  drill.note(`1440px, cookie banner not yet answered: a tap on the drawer's "Checkout →" hits ${onCheckout}`);
+  drill.note(`1440px, cookie banner not yet answered: a tap on the drawer's "Checkout →" hits ${await checkoutTapTarget(page)}`);
 
   await drawer.getByRole("button", { name: "Close cart" }).click();
   await page.waitForTimeout(600);
@@ -69,4 +59,42 @@ export default async function smoke(drill) {
   await drill.shoot(page, "drawer-from-header");
 
   await context.close();
+
+  // The same first add to cart at the two smaller widths, each a first-time
+  // shopper who hasn't answered the cookie banner (finding 2 in P1-HARNESS).
+  for (const width of [768, 375]) {
+    const ctx = await drill.context({ width });
+    const p = await ctx.newPage();
+    await drill.open(p, PRODUCT.path, { width });
+    const posted = p.waitForResponse((r) => r.url().endsWith("/api/cart") && r.request().method() === "POST", { timeout: 60_000 });
+    await p.getByRole("button", { name: "Add to cart", exact: true }).filter({ visible: true }).first().click();
+    drill.check((await posted).status() === 200, `${width}px: adding to cart, POST /api/cart answers 200`);
+    await waitForDrawer(p);
+    drill.check(await drawerOpen(p), `${width}px: adding to cart opens the drawer`);
+    drill.note(`${width}px, cookie banner not yet answered: a tap on the drawer's "Checkout →" hits ${await checkoutTapTarget(p)}`);
+    await drill.shoot(p, `drawer-after-add-${width}`);
+    await ctx.close();
+  }
+}
+
+async function waitForDrawer(page) {
+  await page
+    .waitForFunction(() => {
+      const d = document.querySelector('[role="dialog"][aria-label="Shopping cart"]');
+      return d && d.getBoundingClientRect().left < window.innerWidth - 10;
+    }, null, { timeout: 15_000 })
+    .catch(() => {});
+  await page.waitForTimeout(600); // the slide-in transition
+}
+
+// What a tap in the middle of the drawer's "Checkout →" lands on.
+function checkoutTapTarget(page) {
+  return page.evaluate(() => {
+    const link = [...document.querySelectorAll('[aria-label="Shopping cart"] a[href="/checkout"]')][0];
+    if (!link) return "no Checkout link in the drawer";
+    const r = link.getBoundingClientRect();
+    if (r.bottom > window.innerHeight) return `the Checkout link is below the window (bottom ${Math.round(r.bottom)}px, window ${window.innerHeight}px)`;
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return link.contains(hit) ? "the Checkout link itself" : `something else on top of it: <${hit?.tagName.toLowerCase()}> "${(hit?.innerText || "").trim().slice(0, 60)}"`;
+  });
 }

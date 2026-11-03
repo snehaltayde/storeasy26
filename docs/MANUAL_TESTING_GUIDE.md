@@ -16,7 +16,7 @@ design/visual QA pass for the S50 console redesign.
 
 | Environment | Start | URL(s) | Use it for |
 |---|---|---|---|
-| **Design harness** (recommended for console and storefront review) | `pnpm dev:design` (it seeds itself the first time; `pnpm seed:design` starts fresh) | http://localhost:3017 | The storefront on the **edge runtime**, exactly as deployed code declares it, plus all three consoles, with rich seeded data (8 products in 3 collections, every order status, returns, offers, experiments, automations, incident, agency). Local databases (sqld); nothing hosted is touched. Needs `sqld` (see "How the design harness runs" below). |
+| **Design harness** (recommended for console and storefront review) | `pnpm dev:design` (it seeds itself the first time; `pnpm seed:design` starts fresh) | http://localhost:3017 | The storefront on the **edge runtime**, exactly as deployed code declares it, plus all three consoles, with rich seeded data (8 products in 3 collections, every order status, returns, offers, experiments, automations, incident, agency). Local databases (sqld), and the known hosted keys are blanked. Needs `sqld` (see "How the design harness runs" below). |
 | **Local dev** | `pnpm dev` | BeastLife: http://localhost:3007 · Demo tenant: http://127.0.0.1:3007 · Marketing: http://site.localhost:3007 | Storefront testing (browse, cart, checkout, wishlist, quiz, PWA) against the staging Turso DBs, plus consoles with real data. |
 | **Hosted demo** | already deployed | your hosted tenant domains | Final authed walkthroughs — same checklists as below. |
 
@@ -43,17 +43,26 @@ before starting the harness (and vice versa).
   After a new migration lands, `pnpm dev:design` says so; run `pnpm seed:design`.
 - **Stopping.** Ctrl-C (or SIGTERM to the harness) stops Next and every
   database server. If the harness was killed outright, the next start stops
-  the database servers it left behind, by the PIDs it recorded.
-- **Hosted keys are blanked.** Database tokens, Shopify, Razorpay, Typesense,
-  mail, analytics forwarding, alert webhooks and `COOKIE_DOMAIN` are set empty
-  for the harness, even if `.env.local` has them, so nothing hosted can be
-  reached from it.
+  the Next and database servers it left behind, by the PIDs and start times it
+  recorded. If a database server stops by itself while the harness runs, the
+  harness says which one, points at its log, and stops.
+- **One harness per checkout.** A second `pnpm dev:design`, or a
+  `pnpm seed:design`, while one is running is refused and leaves the running
+  one alone. Stop it with Ctrl-C first.
+- **The known hosted keys are blanked.** Database tokens, Shopify, Razorpay,
+  Typesense, mail, analytics forwarding, alert webhooks, `COOKIE_DOMAIN` and
+  `PLATFORM_SITE_HOSTS` are set empty for the harness, even if `.env.local` has
+  them. `ANTHROPIC_API_KEY` is passed through on purpose, so AI insights reach
+  Anthropic if your shell has a key. The list is in `scripts/design-harness.js`;
+  a unit test fails when the app reads a variable that isn't on it.
 - **Browser drills.** With the harness running: `pnpm drill:smoke` (a product
   page at 375, 768 and 1440 wide, add to cart, the drawer) and `pnpm drill:edge`
   (every storefront page on the edge runtime, maintenance, the Designer). They
   drive the installed desktop Chrome headless (never a download), sign in with
   `.design-env`, and write small screenshots plus `results.json` to
-  `docs/cms-reviews/drills/<id>/`. Add `--start` to have a drill start and
+  `docs/cms-reviews/drills/<id>/`. A drill only attaches to this checkout's own
+  harness on `DESIGN_PORT`; anything else on that port is refused. A check
+  marked KNOWN is a known issue, reported but not failing the drill. Add `--start` to have a drill start and
   stop the harness itself, `--headed` to watch. New journeys go in
   `scripts/drills/`; the helpers are in `scripts/drill.js`. See
   `docs/cms-reviews/P1-HARNESS.md`.

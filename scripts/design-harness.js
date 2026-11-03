@@ -17,7 +17,7 @@ import { randomBytes } from "node:crypto";
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { homedir } from "node:os";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -72,6 +72,40 @@ export const BLANKED_ENV = [
   "PLATFORM_URL",
   "PLATFORM_SECRET_NEXT",
   "VERCEL_URL",
+  // Not hosted, but a value from .env.local naming localhost would turn the
+  // harness storefront into the marketing site.
+  "PLATFORM_SITE_HOSTS",
+];
+
+// Read by the app and passed through to the harness on purpose. None of them
+// reaches a hosted service, except ANTHROPIC_API_KEY: AI insights keep working
+// if the owner's shell has a key. test:design-harness fails when the app or
+// .env.example names a variable that is in neither list, so a new hosted key
+// can't slip through unblanked.
+export const KEPT_ENV = [
+  "ANTHROPIC_API_KEY",
+  "AI_INSIGHTS_MODEL",
+  "ADMIN_PASSWORD", // the env default store's console password; the design store has its own
+  "CRON_SECRET", // only compared with incoming requests
+  "ORDER_LINK_SECRET", // signs order-status links locally
+  "MAIL_FROM",
+  "NODE_ENV",
+  "SHOPIFY_API_VERSION",
+  "PLATFORM_SUPPORT_EMAIL",
+  "RATE_LIMIT_DISABLED",
+  "GA4_DEBUG_MODE",
+  "GA4_MP_EVENTS",
+  "ERRORS_ALERT_EVERY_MS",
+  "EVENTS_BACKOFF_MS",
+  "EVENTS_MAX_ATTEMPTS",
+  "FLAG_CACHE_MS",
+  "ORDER_LINK_TTL_DAYS",
+  "PLATFORM_BILLING_GRACE_DAYS",
+  "PLATFORM_CACHE_MS",
+  "PLATFORM_STALE_MS",
+  "SHOPIFY_SYNC_BACKOFF_MS",
+  "SHOPIFY_SYNC_MAX_ATTEMPTS",
+  "SHOPIFY_SYNC_STALE_MS",
 ];
 
 // A problem the person running the harness can fix. Printed as one plain line, no stack.
@@ -167,12 +201,24 @@ export function isPortBusy(port, host = "127.0.0.1", timeoutMs = 400) {
   });
 }
 
-async function assertPortsFree(ports, { includeNext }) {
+async function busyPort(ports, { includeNext }) {
   const list = [...(includeNext ? [["the web server", "DESIGN_PORT", ports.next]] : []), ...Object.entries(ports.sqld).map(([k, p]) => [`the ${k} database`, "DESIGN_SQLD_PORT", p])];
   for (const [what, name, port] of list) {
-    if ((await isPortBusy(port)) || (await isPortBusy(port, "::1"))) {
-      throw new HarnessError(`Port ${port}, for ${what}, is already in use. Another harness or app may be running. Stop it, or set ${name} to a free port.`);
-    }
+    if ((await isPortBusy(port)) || (await isPortBusy(port, "::1"))) return { what, name, port };
+  }
+  return null;
+}
+
+// waitMs: after stopping leftovers, give their ports a moment to close.
+async function assertPortsFree(ports, { includeNext, waitMs = 0 }) {
+  const started = Date.now();
+  let busy = await busyPort(ports, { includeNext });
+  while (busy && Date.now() - started < waitMs) {
+    await new Promise((r) => setTimeout(r, 200));
+    busy = await busyPort(ports, { includeNext });
+  }
+  if (busy) {
+    throw new HarnessError(`Port ${busy.port}, for ${busy.what}, is already in use. Another harness or app may be running. Stop it, or set ${busy.name} to a free port.`);
   }
 }
 
@@ -242,7 +288,25 @@ const alive = (pid) => {
     return e.code === "EPERM";
   }
 };
-const commandOf = (pid) => spawnSync("ps", ["-p", String(pid), "-o", "command="], { encoding: "utf8" }).stdout?.trim() || "";
+const ps = (pid, field) => spawnSync("ps", ["-p", String(pid), "-o", `${field}=`], { encoding: "utf8", env: { ...process.env, LC_ALL: "C" } }).stdout?.trim() || "";
+const commandOf = (pid) => ps(pid, "command");
+const startTimeOf = (pid) => ps(pid, "lstart");
+
+// A process as the pid file records it: its PID and when it started. A PID can
+// later belong to another program; the same PID with the same start time can't.
+// The start time is read from ps, so it doesn't matter how the process was
+// started (pnpm runs the launcher as `node scripts/dev-design.js`, a relative
+// name, while process.argv[1] is an absolute path).
+export const processStamp = (pid) => ({ pid, started: startTimeOf(pid) });
+
+// true: the recorded process is still running. false: it is gone, or its PID
+// now belongs to something else. null: still a live PID, but the record has no
+// start time to compare.
+export function sameProcess(rec) {
+  if (!rec?.pid || !alive(rec.pid)) return false;
+  if (!rec.started) return null;
+  return startTimeOf(rec.pid) === rec.started;
+}
 
 export function readPidfile(dataDir) {
   try {
@@ -254,39 +318,57 @@ export function readPidfile(dataDir) {
 const writePidfile = (dataDir, info) => writeFileSync(join(dataDir, PIDFILE), JSON.stringify(info, null, 2));
 const clearPidfile = (dataDir) => rmSync(join(dataDir, PIDFILE), { force: true });
 
-// A harness is running if the launcher recorded in the pid file is still
-// alive and still the same script.
+// A harness is running if the launcher recorded in the pid file is still the
+// same live process. Returns the pid file's contents, or null.
 export function runningHarness(dataDir) {
   const info = readPidfile(dataDir);
-  if (!info?.launcher?.pid || info.launcher.pid === process.pid) return null;
-  if (!alive(info.launcher.pid)) return null;
-  const cmd = commandOf(info.launcher.pid);
-  return info.launcher.script && cmd.includes(info.launcher.script) ? info.launcher : null;
+  const launcher = info?.launcher;
+  if (!launcher?.pid || launcher.pid === process.pid) return null;
+  const same = sameProcess(launcher);
+  if (same === true) return info;
+  if (same === false) return null;
+  // No start time recorded: a live process whose command names the launcher
+  // script counts as running, so a harness is never treated as a leftover.
+  const cmd = commandOf(launcher.pid);
+  const script = launcher.script ? basename(launcher.script) : "dev-design.js";
+  return cmd.includes(script) || cmd.includes("dev-design.js") ? info : null;
 }
 
-// sqld this harness started earlier and left behind (the launcher was killed
-// outright). Each is stopped by its recorded PID, and only if its command line
-// still names this harness's data folder.
+const stopPid = async (pid) => {
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    return false;
+  }
+  for (let i = 0; i < 80 && alive(pid); i++) await new Promise((r) => setTimeout(r, 100));
+  if (alive(pid)) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {}
+  }
+  return true;
+};
+
+// Processes a harness started and left behind when it was killed outright:
+// its Next and its sqld. Never while that harness is still running. Each is
+// stopped by its recorded PID, and only if that PID still has the recorded
+// start time and its command line still names what the harness ran (the data
+// folder for sqld, the Next script for Next).
 export async function stopLeftovers(dataDir, log = () => {}) {
   const info = readPidfile(dataDir);
   if (!info) return [];
+  if (runningHarness(dataDir)) return [];
+  const targets = [
+    ...(info.next ? [{ ...info.next, what: "the web server" }] : []),
+    ...(info.sqld || []).map((s) => ({ ...s, what: "a local database server", match: resolve(dataDir) })),
+  ];
   const stopped = [];
-  for (const s of info.sqld || []) {
-    if (!s?.pid || !alive(s.pid)) continue;
-    if (!commandOf(s.pid).includes(resolve(dataDir))) continue;
-    try {
-      process.kill(s.pid, "SIGTERM");
-    } catch {
-      continue;
-    }
-    for (let i = 0; i < 50 && alive(s.pid); i++) await new Promise((r) => setTimeout(r, 100));
-    if (alive(s.pid)) {
-      try {
-        process.kill(s.pid, "SIGKILL");
-      } catch {}
-    }
-    stopped.push(s.pid);
-    log(`• stopped a local database server left over from an earlier run (pid ${s.pid})`);
+  for (const t of targets) {
+    if (!t?.pid || !t.match || sameProcess(t) === false) continue;
+    if (!commandOf(t.pid).includes(t.match)) continue;
+    if (!(await stopPid(t.pid))) continue;
+    stopped.push(t.pid);
+    log(`• stopped ${t.what} left over from an earlier run (pid ${t.pid})`);
   }
   clearPidfile(dataDir);
   return stopped;
@@ -390,10 +472,10 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
 
   const other = runningHarness(dataDir);
   if (other) {
-    throw new HarnessError(`The design harness is already running (pid ${other.pid}). Stop it with Ctrl-C in its terminal first${mode === "seed" ? ", then seed again" : ""}.`);
+    throw new HarnessError(`The design harness is already running (pid ${other.launcher.pid}). Stop it with Ctrl-C in its terminal first${mode === "seed" ? ", then seed again" : ""}.`);
   }
-  if (existsSync(dataDir)) await stopLeftovers(dataDir, log);
-  await assertPortsFree(ports, { includeNext: mode === "dev" });
+  const leftovers = existsSync(dataDir) ? await stopLeftovers(dataDir, log) : [];
+  await assertPortsFree(ports, { includeNext: mode === "dev", waitMs: leftovers.length ? 10_000 : 0 });
 
   const fileEnv = ensureCredentials(root, log);
   const childEnv = harnessEnv(env, fileEnv, ports);
@@ -405,25 +487,54 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
   let stopping = null;
   const stopAll = () =>
     (stopping ??= (async () => {
+      for (const s of servers) s.stopping = true;
       if (nextChild) await stopChild(nextChild, { graceMs: 10_000 });
       await Promise.all(servers.map((s) => stopChild(s.child)));
       clearPidfile(dataDir);
     })());
 
+  // What the pid file says this harness started, so a later start can tell a
+  // running harness from one that was killed outright and left processes behind.
+  const pidInfo = { launcher: { ...processStamp(process.pid), script: script || "" }, ports };
+  const savePidfile = () => writePidfile(dataDir, { ...pidInfo, startedAt: new Date().toISOString() });
+
+  // A database server that stops by itself after it came up (a crash, or
+  // something else killing it) stops the harness with a plain message, instead
+  // of Next serving errors with nothing said.
+  let died = null;
+  let onDied = () => {};
+  const diedMessage = (s) =>
+    `The local database server for ${s.key} stopped by itself${s.exit.code != null ? ` (exit code ${s.exit.code})` : s.exit.signal ? ` (${s.exit.signal})` : ""}. Its log is ${s.logFile}.` +
+    (tail(s.logFile, 4) ? `\n${tail(s.logFile, 4)}` : "");
+  const watchDatabases = () => {
+    for (const s of servers) {
+      s.child.once("exit", (code, signal) => {
+        // A Ctrl-C in the terminal reaches sqld directly too. Give the
+        // harness's own signal handler a moment to say it is stopping.
+        setTimeout(() => {
+          if (s.stopping || signalled || died) return;
+          s.exit = { code, signal };
+          died = s;
+          onDied(s);
+        }, 500);
+      });
+    }
+  };
+
   const startDatabases = async () => {
     mkdirSync(dataDir, { recursive: true });
+    died = null;
     servers = DATABASES.map((d) => startSqld({ bin: sqld.bin, key: d.key, port: ports.sqld[d.key], dataDir }));
-    writePidfile(dataDir, {
-      launcher: { pid: process.pid, script: script || "" },
-      sqld: servers.map((s) => ({ key: s.key, pid: s.child.pid, port: s.port })),
-      startedAt: new Date().toISOString(),
-    });
+    pidInfo.sqld = servers.map((s) => ({ key: s.key, ...processStamp(s.child.pid), port: s.port }));
+    delete pidInfo.next;
+    savePidfile();
     try {
       for (const s of servers) await waitForHealth(s.url, s.child, { logFile: s.logFile, label: s.key });
     } catch (e) {
       await stopAll();
       throw e;
     }
+    watchDatabases();
   };
 
   // A Ctrl-C reaches this process twice under pnpm (once from the terminal,
@@ -452,7 +563,9 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
     await stopAll();
     stopping = null;
     if (r.code !== 0) {
-      throw new HarnessError(`Seeding failed${r.error ? `: ${r.error.message}` : ""}. The harness data is incomplete, so the next pnpm dev:design seeds again. Fix the error above, then run pnpm seed:design.`);
+      throw new HarnessError(
+        `${died ? `${diedMessage(died)}\n` : ""}Seeding failed${r.error ? `: ${r.error.message}` : ""}. The harness data is incomplete, so the next pnpm dev:design seeds again. Fix the error above, then run pnpm seed:design.`,
+      );
     }
     writeFileSync(join(dataDir, SEEDED), JSON.stringify({ at: new Date().toISOString(), ports: ports.sqld, migrations: migrationNames(root) }, null, 2));
   };
@@ -483,12 +596,21 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
     log(`• local databases up: ${servers.map((s) => `${s.key} ${s.port}`).join(", ")} (data in ${DATA_DIR_NAME}/)`);
     log(`• storefront and consoles: http://localhost:${ports.next}  (merchant /admin/login, operator /platform; passwords in ${ENV_FILE_NAME})`);
     nextChild = spawn(next[0], next[1], { cwd: root, env: childEnv, stdio: "inherit" });
-    const code = await new Promise((done) => {
-      nextChild.once("error", () => done(1));
-      nextChild.once("exit", (c, signal) => done(c ?? (signal ? 1 : 0)));
+    if (nextChild.pid) {
+      pidInfo.next = { ...processStamp(nextChild.pid), port: ports.next, match: next[1][0] };
+      savePidfile();
+    }
+    const outcome = await new Promise((done) => {
+      nextChild.once("error", () => done({ code: 1 }));
+      nextChild.once("exit", (c, signal) => done({ code: c ?? (signal ? 1 : 0) }));
+      onDied = (s) => done({ died: s });
+      if (died) done({ died });
     });
     await stopAll();
-    return signalled ? 0 : code;
+    if (outcome.died && !signalled) {
+      throw new HarnessError(`${diedMessage(outcome.died)}\nThe harness stopped Next too. Start it again with pnpm dev:design.`);
+    }
+    return signalled ? 0 : outcome.code;
   } catch (e) {
     await stopAll();
     throw e;

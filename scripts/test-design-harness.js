@@ -7,7 +7,8 @@
 // on the edge runtime and Chrome are exercised by `pnpm drill:edge` and
 // `pnpm drill:smoke`, which are drills, not test suites.
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import http from "node:http";
 import { randomBytes } from "node:crypto";
 import { createRequire } from "node:module";
 import net from "node:net";
@@ -151,6 +152,43 @@ await t("hosted values from the shell or .env.local are blanked, and Next keeps 
   ok(/if\(typeof \w+\[\w+\]==="undefined"&&typeof \w+\[\w+\]==="undefined"\)\{\w+\[\w+\]=/.test(src), `${nextEnvFile}: @next/env no longer keeps a preset (even empty) value over .env.local; re-check BLANKED_ENV`);
 });
 
+// Pinned here on purpose, apart from BLANKED_ENV: dropping a name from that
+// list (or moving it to KEPT_ENV) must turn this suite red.
+const MUST_BLANK = [
+  "TURSO_DB_URL", "TURSO_DB_AUTH_TOKEN", "DATABASE_AUTH_TOKEN", "TURSO_API_TOKEN", "TURSO_ORG", "TURSO_GROUP",
+  "RESEND_API_KEY",
+  "TYPESENSE_HOST", "TYPESENSE_PORT", "TYPESENSE_PROTOCOL", "TYPESENSE_ADMIN_API_KEY", "TYPESENSE_COLLECTION",
+  "SHOPIFY_STORE_DOMAIN", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET", "SHOPIFY_STOREFRONT_TOKEN", "SHOPIFY_STOREFRONT_PRIVATE_TOKEN", "NEXT_PUBLIC_SHOPIFY_DOMAIN",
+  "NEXT_PUBLIC_RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET", "RAZORPAY_WEBHOOK_SECRET",
+  "PLATFORM_RAZORPAY_KEY_ID", "PLATFORM_RAZORPAY_KEY_SECRET", "PLATFORM_RAZORPAY_WEBHOOK_SECRET",
+  "ALERT_WEBHOOK_URL", "GA4_API_SECRET", "META_CAPI_TOKEN", "META_TEST_EVENT_CODE", "NEXT_PUBLIC_GA4_MEASUREMENT_ID", "NEXT_PUBLIC_META_PIXEL_ID",
+  "COOKIE_DOMAIN", "PLATFORM_URL", "PLATFORM_SECRET_NEXT", "VERCEL_URL", "PLATFORM_SITE_HOSTS",
+];
+
+await t("every hosted key is blanked even when the shell and .env.local set it, and the database token too", () => {
+  const shell = Object.fromEntries([...MUST_BLANK, "PLATFORM_DB_TOKEN"].map((k) => [k, `real-${k}`]));
+  const env = H.harnessEnv({ ...shell, PATH: "/usr/bin" }, {}, H.harnessPorts({}));
+  const leaked = [...MUST_BLANK, "PLATFORM_DB_TOKEN"].filter((k) => env[k] !== "");
+  eq(leaked, [], "names that still carry a value into the harness");
+});
+
+await t("NEGATIVE: every variable the app reads, or .env.example lists, is either blanked, set by the harness or kept on purpose", () => {
+  const names = new Set();
+  const scan = (dir) => {
+    for (const f of readdirSync(join(ROOT, dir), { recursive: true })) {
+      if (!/\.(m?js|jsx)$/.test(f)) continue;
+      for (const m of readFileSync(join(ROOT, dir, f), "utf8").matchAll(/\bprocess\.env\.([A-Z][A-Z0-9_]+)/g)) names.add(m[1]);
+    }
+  };
+  for (const dir of ["app", "lib", "components"]) scan(dir);
+  for (const m of readFileSync(join(ROOT, ".env.example"), "utf8").matchAll(/^([A-Z][A-Z0-9_]+)=/gm)) names.add(m[1]);
+  ok(names.size > 30, `the scan found only ${names.size} names; is it still reading the app?`);
+  const setByHarness = Object.keys(H.harnessEnv({}, { DESIGN_ADMIN_PASSWORD: "x", PLATFORM_ADMIN_PASSWORD: "y" }, H.harnessPorts({})));
+  const known = new Set([...H.BLANKED_ENV, ...H.KEPT_ENV, ...setByHarness]);
+  eq([...names].filter((n) => !known.has(n)).sort(), [], "not classified: add each to BLANKED_ENV (reaches something hosted) or KEPT_ENV (safe to pass) in scripts/design-harness.js");
+  eq(H.KEPT_ENV.filter((n) => MUST_BLANK.includes(n)), [], "a hosted key is in KEPT_ENV");
+});
+
 await t("NEGATIVE: the seed writes only to a local harness database", () => {
   eq(H.assertLocalDbUrl("X", "http://127.0.0.1:18018"), "http://127.0.0.1:18018", "local accepted");
   for (const url of ["libsql://shop.example.invalid", "https://shop.example.invalid", "file:.design-tenant.db", "http://10.0.0.5:8080", "http://127.0.0.1"]) {
@@ -159,21 +197,20 @@ await t("NEGATIVE: the seed writes only to a local harness database", () => {
   throwsPlain(() => H.assertLocalDbUrl("DATABASE_URL", undefined), ["DATABASE_URL is missing", "pnpm seed:design"]);
 });
 
-await t("NEGATIVE: the real seed script refuses a hosted URL before opening any database, and never prints the full URL", () => {
-  const r = spawnSync(process.execPath, [join(ROOT, "scripts/seed-design-preview.js")], {
-    cwd: work,
-    encoding: "utf8",
-    env: {
-      PATH: process.env.PATH,
-      DESIGN_ADMIN_PASSWORD: "x",
-      PLATFORM_DB_URL: "libsql://shop.example.invalid?authToken=SECRET-TOKEN-VALUE",
-      DATABASE_URL: "http://127.0.0.1:18019",
-      DESIGN_TENANT_DB_URL: "http://127.0.0.1:18018",
-    },
-  });
-  eq(r.status, 1, `exit code (stderr: ${r.stderr})`);
-  ok(r.stderr.includes("PLATFORM_DB_URL must point at a local harness database"), r.stderr);
-  ok(!r.stderr.includes("SECRET-TOKEN-VALUE"), "the query string (where a token could sit) must not be printed");
+await t("NEGATIVE: the real seed script refuses a hosted URL in any of its three database settings before opening any database, and never prints the full URL", () => {
+  // Ports 1 to 3: local in form, but nothing listens there, so even a broken
+  // check can't write into a harness running on the default ports.
+  const local = { PLATFORM_DB_URL: "http://127.0.0.1:1", DESIGN_TENANT_DB_URL: "http://127.0.0.1:2", DATABASE_URL: "http://127.0.0.1:3" };
+  for (const name of Object.keys(local)) {
+    const r = spawnSync(process.execPath, [join(ROOT, "scripts/seed-design-preview.js")], {
+      cwd: work,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, DESIGN_ADMIN_PASSWORD: "x", ...local, [name]: "libsql://shop.example.invalid?authToken=SECRET-TOKEN-VALUE" },
+    });
+    eq(r.status, 1, `${name}: exit code (stderr: ${r.stderr})`);
+    ok(r.stderr.includes(`${name} must point at a local harness database`), `${name}: ${r.stderr}`);
+    ok(!r.stderr.includes("SECRET-TOKEN-VALUE"), `${name}: the query string (where a token could sit) must not be printed`);
+  }
   ok(!existsSync(join(work, "platform.db")), "nothing was opened");
 });
 
@@ -352,8 +389,14 @@ async function setup({ migrations = ["0001_a.sql"] } = {}) {
   return s;
 }
 
-function start(mode, s, extraEnv = {}) {
-  const child = spawn(process.execPath, [WRAPPER, mode, s.root], { env: { ...s.env, ...extraEnv }, stdio: ["ignore", "pipe", "pipe"] });
+// relative: start the harness the way pnpm runs `node scripts/dev-design.js`,
+// by a relative script name from its own folder, so its command line doesn't
+// hold the absolute path that process.argv[1] has.
+// group: the harness leads its own process group, so the test can send a
+// signal to the whole group the way a terminal's Ctrl-C does.
+function start(mode, s, extraEnv = {}, { relative = false, group = false } = {}) {
+  const args = relative ? [WRAPPER.slice(fakes.length + 1), mode, s.root] : [WRAPPER, mode, s.root];
+  const child = spawn(process.execPath, args, { cwd: relative ? fakes : undefined, env: { ...s.env, ...extraEnv }, stdio: ["ignore", "pipe", "pipe"], detached: group });
   wrappers.push(child);
   let out = "";
   child.stdout.on("data", (c) => (out += c));
@@ -404,8 +447,8 @@ await t("NEGATIVE: a failed seed says so plainly, stops the servers and leaves n
   ok(!existsSync(join(s.dataDir, "seeded.json")), "seeded.json must not exist");
 });
 
-async function startDev(s, extraEnv) {
-  const run = start("dev", s, extraEnv);
+async function startDev(s, extraEnv, opts) {
+  const run = start("dev", s, extraEnv, opts);
   await until(async () => existsSync(join(s.logs, "next.json")) && (await portOpen(s.ports.next)), `the stand-in Next on ${s.ports.next}\n${run.output()}`);
   return run;
 }
@@ -435,6 +478,22 @@ for (const signal of ["SIGTERM", "SIGINT"]) {
     ok(!existsSync(join(s.dataDir, "harness.pid.json")), "pid file removed");
   });
 }
+
+// A terminal's Ctrl-C reaches every process in the group at once, so sqld
+// exits on its own SIGINT at the same moment the harness starts stopping. That
+// must read as a normal stop, not as "a database server stopped by itself".
+await t("dev: a Ctrl-C to the whole process group stops everything, exits 0, and reports no database as stopped by itself", async () => {
+  const s = await setup();
+  const run = await startDev(s, {}, { group: true });
+  const servers = sqldPids(s);
+  const next = JSON.parse(readFileSync(join(s.logs, "next.json"), "utf8"));
+  process.kill(-run.child.pid, "SIGINT");
+  const { code } = await Promise.race([run.done, sleep(15_000).then(() => ({ code: "still running 15 seconds after Ctrl-C" }))]);
+  eq(code, 0, `exit code\n${run.output()}`);
+  ok(!run.output().includes("stopped by itself"), run.output());
+  await until(() => !alive(next.pid) && servers.every((x) => !alive(x.pid)), "everything to stop", 10_000);
+  ok(!existsSync(join(s.dataDir, "harness.pid.json")), "pid file left behind");
+});
 
 // Under pnpm a Ctrl-C arrives twice: from the terminal and passed on by pnpm.
 // Seen on a real run: the second one killed the harness half way through
@@ -488,19 +547,102 @@ await t("NEGATIVE: a second harness, or a seed, while one is running is refused 
   await first.done;
 });
 
-await t("servers left behind by a harness that was killed outright are stopped, by their recorded PID, on the next start", async () => {
+// The review's repro: under pnpm the launcher's command line is
+// `node scripts/dev-design.js` (relative), the old check compared it with the
+// absolute process.argv[1], decided nothing was running, and killed the
+// running harness's sqld as "left over"; the seed then wiped its data.
+await t("NEGATIVE: started the way pnpm starts it (a relative script name), a second harness or a seed is refused and the running one keeps working", async () => {
   const s = await setup();
-  const first = await startDev(s);
+  const first = await startDev(s, {}, { relative: true });
+  const servers = sqldPids(s);
+  const next = JSON.parse(readFileSync(join(s.logs, "next.json"), "utf8"));
+  for (const [mode, relative] of [["seed", true], ["dev", true], ["seed", false], ["dev", false]]) {
+    const second = start(mode, s, {}, { relative });
+    const { code } = await second.done;
+    eq(code, 1, `${mode} (${relative ? "relative" : "absolute"} name): exit code\n${second.output()}`);
+    ok(second.output().includes("already running") && !second.output().includes("left over"), `${mode}: ${second.output()}`);
+  }
+  for (const x of servers) ok(alive(x.pid), `the running harness's database server ${x.pid} was stopped`);
+  ok(alive(next.pid) && (await portOpen(s.ports.next)), "the running harness's Next was stopped");
+  for (const i of [0, 1, 2]) ok(await portOpen(s.ports.sqld + i), `database port ${s.ports.sqld + i} closed under the running harness`);
+  ok(existsSync(join(s.dataDir, "seeded.json")), "the running harness's data was wiped");
+  eq(readJsonl(join(s.logs, "seed.jsonl")).length, 1, "only the first start seeded");
+  ok(first.child.exitCode === null, `the first harness stopped:\n${first.output()}`);
+  first.child.kill("SIGTERM");
+  eq((await first.done).code, 0, "the first harness still stops cleanly");
+});
+
+await t("NEGATIVE: a pid file with no start times (an older harness) still never treats a live harness as left over", async () => {
+  const s = await setup();
+  mkdirSync(s.dataDir, { recursive: true });
+  // A live process whose command line names the launcher script, and a "sqld" naming this data folder.
+  const launcher = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)", "scripts/dev-design.js"], { stdio: "ignore" });
+  const db = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)", join(s.dataDir, "platform.sqld")], { stdio: "ignore" });
+  wrappers.push(launcher, db);
+  await sleep(200);
+  writeFileSync(join(s.dataDir, "harness.pid.json"), JSON.stringify({ launcher: { pid: launcher.pid, script: "/elsewhere/scripts/dev-design.js" }, sqld: [{ key: "platform", pid: db.pid, port: s.ports.sqld }] }));
+  try {
+    const run = start("seed", s);
+    eq((await run.done).code, 1, `exit code\n${run.output()}`);
+    ok(run.output().includes("already running"), run.output());
+    ok(alive(db.pid), "the live harness's database server was signalled");
+    ok(H.runningHarness(s.dataDir), "runningHarness should see it");
+    eq(await H.stopLeftovers(s.dataDir), [], "stopLeftovers must not stop anything while the harness runs");
+    ok(alive(db.pid), "stopLeftovers signalled a live harness's server");
+  } finally {
+    launcher.kill("SIGKILL");
+    db.kill("SIGKILL");
+  }
+});
+
+await t("the pid file records each process with its start time, the ports and Next", async () => {
+  const s = await setup();
+  const run = await startDev(s);
+  const info = JSON.parse(readFileSync(join(s.dataDir, "harness.pid.json"), "utf8"));
+  const next = JSON.parse(readFileSync(join(s.logs, "next.json"), "utf8"));
+  eq(info.launcher.pid, run.child.pid, "launcher pid");
+  eq(info.next?.pid, next.pid, "Next pid");
+  eq(info.ports, { next: s.ports.next, sqld: { platform: s.ports.sqld, tenant: s.ports.sqld + 1, default: s.ports.sqld + 2 } }, "ports");
+  for (const x of [info.launcher, info.next, ...info.sqld]) ok(/\d{2}:\d{2}:\d{2}/.test(x.started || ""), `no start time for pid ${x.pid}: ${JSON.stringify(x)}`);
+  eq(H.sameProcess(info.launcher), true, "the launcher is recognised as itself");
+  eq(H.sameProcess({ pid: info.launcher.pid, started: "Thu Jan  1 00:00:00 1970" }), false, "the same PID with another start time is another process");
+  run.child.kill("SIGTERM");
+  await run.done;
+});
+
+await t("dev: a database server that stops by itself after startup stops the harness with a plain message", async () => {
+  const s = await setup();
+  const run = await startDev(s);
+  const [platform, tenant, def] = sqldPids(s);
+  const next = JSON.parse(readFileSync(join(s.logs, "next.json"), "utf8"));
+  process.kill(tenant.pid, "SIGKILL");
+  // Bounded: if the harness doesn't notice, fail here instead of hanging the suite.
+  const { code } = await Promise.race([run.done, sleep(10_000).then(() => ({ code: "still running 10 seconds after its tenant database server died" }))]);
+  eq(code, 1, `exit code\n${run.output()}`);
+  ok(run.output().includes("The local database server for tenant stopped by itself") && run.output().includes("tenant.log") && run.output().includes("pnpm dev:design"), run.output());
+  ok(!run.output().includes("    at "), "no stack trace");
+  await until(() => !alive(next.pid) && !alive(platform.pid) && !alive(def.pid), "Next and the other database servers to stop", 10_000);
+  ok(!existsSync(join(s.dataDir, "harness.pid.json")), "pid file left behind");
+});
+
+await t("Next and the servers left behind by a harness that was killed outright are stopped, by their recorded PID, on the next start", async () => {
+  const s = await setup();
+  const first = await startDev(s, {}, { relative: true });
   const servers = sqldPids(s);
   const next = JSON.parse(readFileSync(join(s.logs, "next.json"), "utf8"));
   first.child.kill("SIGKILL");
   await first.done;
-  process.kill(next.pid, "SIGTERM"); // the test's own stand-in Next, orphaned by the SIGKILL
-  await until(() => !alive(next.pid), "stand-in Next to stop");
+  await sleep(300);
+  ok(alive(next.pid) && (await portOpen(s.ports.next)), "a SIGKILLed harness can't stop its Next; it should be left over here");
   for (const x of servers) ok(alive(x.pid), "a SIGKILLed harness can't stop its servers; they should be left over here");
+  rmSync(join(s.logs, "next.json")); // so startDev waits for the new Next, not the leftover one
   const again = await startDev(s);
-  ok(again.output().includes("left over from an earlier run"), again.output());
+  ok(again.output().includes(`stopped the web server left over from an earlier run (pid ${next.pid})`), again.output());
+  ok(again.output().includes("stopped a local database server left over from an earlier run"), again.output());
+  ok(!alive(next.pid), `leftover Next ${next.pid} still running`);
   for (const x of servers) ok(!alive(x.pid), `leftover server ${x.pid} still running`);
+  const now = JSON.parse(readFileSync(join(s.logs, "next.json"), "utf8"));
+  ok(now.pid !== next.pid && alive(now.pid), "the new harness runs its own Next on the same port");
   again.child.kill("SIGTERM");
   await again.done;
 });
@@ -610,6 +752,105 @@ await t("NEGATIVE: a drill with no harness running says how to start one", async
   }
   ok(err instanceof D.DrillError, `expected a DrillError, got ${err}`);
   ok(err.message.includes(`isn't running at http://localhost:${next}`) && err.message.includes(`DESIGN_PORT=${next} pnpm dev:design`) && err.message.includes("--start"), err.message);
+});
+
+const serveRobots = (port) =>
+  new Promise((done) => {
+    const server = http.createServer((req, res) => {
+      res.writeHead(200);
+      res.end("User-agent: *");
+    });
+    server.listen(port, "127.0.0.1", () => done(server));
+  });
+
+await t("NEGATIVE: a drill never attaches to a server that isn't this checkout's harness (another checkout's, or another app)", async () => {
+  const { next } = await freePorts();
+  const server = await serveRobots(next);
+  const root = join(work, "attach-foreign");
+  mkdirSync(root, { recursive: true });
+  try {
+    for (const start of [false, true]) {
+      let err = null;
+      try {
+        await D.connectHarness({ env: { DESIGN_PORT: String(next) }, root, start, log: () => {} });
+      } catch (e) {
+        err = e;
+      }
+      ok(err instanceof D.DrillError, `start ${start}: expected a DrillError, got ${err}`);
+      ok(err.message.includes(`Something is answering at http://localhost:${next}, but it isn't this checkout's design harness`), err.message);
+    }
+  } finally {
+    server.close();
+  }
+});
+
+await t("a drill attaches to this checkout's own running harness on that port", async () => {
+  const { next } = await freePorts();
+  const server = await serveRobots(next);
+  const root = join(work, "attach-own");
+  mkdirSync(join(root, ".design-data"), { recursive: true });
+  writeFileSync(join(root, ".design-env"), "DESIGN_ADMIN_PASSWORD=design-test\n");
+  const launcher = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  wrappers.push(launcher);
+  await sleep(200);
+  try {
+    const pid = (port) => writeFileSync(join(root, ".design-data", "harness.pid.json"), JSON.stringify({ launcher: H.processStamp(launcher.pid), ports: { next: port } }));
+    pid(next);
+    const h = await D.connectHarness({ env: { DESIGN_PORT: String(next) }, root, log: () => {} });
+    eq([h.baseUrl, h.started, h.creds.DESIGN_ADMIN_PASSWORD], [`http://localhost:${next}`, false, "design-test"], "attached");
+    pid(next + 1); // this checkout's harness runs, but on another port
+    const err = await D.connectHarness({ env: { DESIGN_PORT: String(next) }, root, log: () => {} }).catch((e) => e);
+    ok(err instanceof D.DrillError && err.message.includes("isn't this checkout's design harness"), String(err?.message || err));
+  } finally {
+    launcher.kill("SIGKILL");
+    server.close();
+  }
+});
+
+// pageFacts runs inside Chrome; here it runs against a stand-in DOM, so the
+// error-page and sideways-scroll facts every drill check rests on are covered
+// without a browser.
+await t("drill page facts: an error page, sideways scroll and broken images are noticed; a normal page is not flagged", () => {
+  const run = ({ text = "", innerWidth = 375, scrollWidth = 375, images = [] }) => {
+    const saved = ["document", "window", "location"].map((k) => [k, Object.getOwnPropertyDescriptor(globalThis, k)]);
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: { body: { innerText: text }, title: "T", querySelectorAll: (sel) => (sel === "h1" ? [{ innerText: " Heading " }] : []), documentElement: { scrollWidth }, images },
+    });
+    Object.defineProperty(globalThis, "window", { configurable: true, value: { innerWidth } });
+    Object.defineProperty(globalThis, "location", { configurable: true, value: { pathname: "/p", search: "?q=1" } });
+    try {
+      return D.pageFacts();
+    } finally {
+      for (const [k, d] of saved) d ? Object.defineProperty(globalThis, k, d) : delete globalThis[k];
+    }
+  };
+  const normal = run({ text: "Radiance Glow Serum ₹1,299" });
+  eq([normal.errorPage, normal.overflowX, normal.path, normal.h1], [false, false, "/p?q=1", ["Heading"]], "normal page");
+  for (const text of ["Something went wrong", "This page couldn’t load", "This page couldn't load", "Application error: a client-side exception"]) {
+    ok(run({ text }).errorPage, `"${text}" should be an error page`);
+  }
+  eq(run({ scrollWidth: 376 }).overflowX, false, "1px of rounding is not sideways scroll");
+  eq(run({ scrollWidth: 377 }).overflowX, true, "2px wider than the window is sideways scroll");
+  eq(run({ innerWidth: 1440, scrollWidth: 1600 }).scrollWidth, 1600, "scroll width reported");
+  const imgs = run({ images: [{ complete: true, naturalWidth: 0, currentSrc: "/broken.jpg" }, { complete: true, naturalWidth: 10, src: "/ok.jpg" }, { complete: false, naturalWidth: 0, src: "/loading.jpg" }] });
+  eq([imgs.images, imgs.brokenImages], [3, ["/broken.jpg"]], "broken images");
+});
+
+await t("a known issue's check fails visibly without failing the drill, and says so when it starts passing", () => {
+  const root = join(work, "known-root");
+  const lines = [];
+  const d = new D.Drill({ id: "known", harness: { baseUrl: "http://localhost:1" }, browser: { version: () => "test" }, root, log: (l) => lines.push(l) });
+  d.check(true, "plain pass");
+  d.check(false, "leaks content", "found 3", { known: "finding 5" });
+  d.check(true, "fixed already", undefined, { known: "finding 9" });
+  let res = d.finish();
+  eq([res.passed, res.failed, res.knownFailures, d.failures.length], [2, 0, 1, 0], "counts");
+  ok(lines.some((l) => l.startsWith("KNOWN leaks content") && l.includes("[finding 5]")), lines.join("\n"));
+  ok(res.notes.some((n) => n.includes("finding 9 looks fixed")), JSON.stringify(res.notes));
+  d.check(false, "a real failure");
+  res = d.finish();
+  eq([res.failed, d.failures.length], [1, 1], "an unmarked failure still fails");
 });
 
 await t("screenshots are scaled down until they fit in 300KB", async () => {

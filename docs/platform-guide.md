@@ -487,7 +487,8 @@ too. -->
   "design" with every status seeded (orders in all 7 states, returns,
   offers, experiments, automations, incident, agency + grant + approval),
   generated test credentials in gitignored `.design-env`. For reviewing
-  console changes with real-shaped data; touches nothing hosted.
+  console changes with real-shaped data; local databases, and the known
+  hosted keys blanked (`ANTHROPIC_API_KEY` passes through on purpose).
   Since P1-HARNESS it runs one local `sqld` per database (platform, store,
   default) with data in gitignored `.design-data/`, so the storefront serves
   on the edge runtime with no code edit; Ctrl-C stops Next and sqld together.

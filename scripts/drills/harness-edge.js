@@ -6,7 +6,10 @@
 // Screenshots and results.json go to docs/cms-reviews/drills/P1-HARNESS/.
 //
 // It switches maintenance on through the operator console and always switches
-// it off again before it ends.
+// it off again before it ends. Checks marked known are expected to fail until
+// an app bug outside the harness is fixed (P1-HARNESS finding 5: a closed store
+// still ships its content in the page source; finding 6: checkout scrolls
+// sideways at 375). They are reported but don't fail the drill.
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -78,17 +81,46 @@ function textContrast(page, text) {
   }, text);
 }
 
-async function pageCheck(drill, page, { name, path, all = [], any = [] }, { width = 1440 } = {}) {
+// knownOverflow: { width: "finding N" } for sideways scroll already reported.
+async function pageCheck(drill, page, { name, path, all = [], any = [], knownOverflow = {} }, { width = 1440 } = {}) {
   const res = await drill.open(page, path, { width });
   const f = await drill.facts(page);
-  drill.check(res.status === 200, `${name} (${path}): answers 200`, res.status);
-  drill.check(res.headers["x-edge-runtime"] === "1", `${name}: rendered on the edge runtime (x-edge-runtime: 1)`, res.headers["x-edge-runtime"] ?? "header absent");
-  drill.check(!f.errorPage, `${name}: not an error page`, f.text.slice(0, 160));
+  const at = `${name} at ${width}`;
+  drill.check(res.status === 200, `${at} (${path}): answers 200`, res.status);
+  drill.check(res.headers["x-edge-runtime"] === "1", `${at}: rendered on the edge runtime (x-edge-runtime: 1)`, res.headers["x-edge-runtime"] ?? "header absent");
+  drill.check(!f.errorPage, `${at}: not an error page`, f.text.slice(0, 160));
   const missing = all.filter((m) => !f.text.includes(m));
-  drill.check(!missing.length, `${name}: shows real content (${all.map((m) => `"${m}"`).join(", ")})`, `missing ${missing.join(", ")}`);
-  if (any.length) drill.check(any.some((m) => f.text.includes(m)), `${name}: shows one of ${any.map((m) => `"${m}"`).join(" / ")}`);
+  drill.check(!missing.length, `${at}: shows real content (${all.map((m) => `"${m}"`).join(", ")})`, `missing ${missing.join(", ")}`);
+  if (any.length) drill.check(any.some((m) => f.text.includes(m)), `${at}: shows one of ${any.map((m) => `"${m}"`).join(" / ")}`);
+  drill.check(!f.overflowX, `${at}: no sideways scroll`, `page is ${f.scrollWidth}px wide in a ${f.viewport}px window`, { known: knownOverflow[width] });
   await drill.shoot(page, `${name}-${width}`);
   return f;
+}
+
+// Console errors, page errors, failed requests and 4xx/5xx answers on a page,
+// for as long as it is watched. A request cut off by the next navigation
+// (net::ERR_ABORTED) is counted apart: the drill moves on before the page
+// finishes, which a shopper reading the page wouldn't.
+function watchErrors(page) {
+  const seen = { console: [], page: [], failed: [], status: [], aborted: 0 };
+  page.on("console", (m) => m.type() === "error" && seen.console.push(`${m.text().slice(0, 200)} (${m.location()?.url || page.url()})`));
+  page.on("pageerror", (e) => seen.page.push(String(e?.message || e).slice(0, 200)));
+  page.on("requestfailed", (r) => {
+    const why = r.failure()?.errorText || "";
+    if (why.includes("ERR_ABORTED")) seen.aborted++;
+    else seen.failed.push(`${r.method()} ${r.url()} ${why}`);
+  });
+  page.on("response", (r) => r.status() >= 400 && seen.status.push(`${r.status()} ${r.request().method()} ${r.url()}`));
+  return seen;
+}
+
+// What the raw response for a signed-out visitor carries: the page's HTML, or
+// the data a client-side navigation fetches (RSC: 1). Plain fetch, no cookies.
+async function rawContains(baseUrl, path, marks, { rsc = false } = {}) {
+  const r = await fetch(`${baseUrl}${path}`, { headers: rsc ? { RSC: "1" } : {} });
+  const body = await r.text();
+  const found = marks.map((m) => [m, body.split(m).length - 1]).filter(([, n]) => n > 0);
+  return { status: r.status, found: found.map(([m, n]) => `"${m}" ${n} time${n === 1 ? "" : "s"}`) };
 }
 
 export default async function harnessEdge(drill) {
@@ -100,12 +132,11 @@ export default async function harnessEdge(drill) {
   const diff = spawnSync("git", ["diff", "--quiet", "HEAD", "--", "app"], { cwd: root });
   drill.check(diff.status === 0, "git diff HEAD -- app is empty (no runtime flip or other app edit in the working tree)", `git exit ${diff.status}`);
 
-  // ---- 2. storefront pages, anonymous shopper ----
+  // ---- 2. storefront pages, anonymous shopper, at 1440, 768 and 375 ----
   const shopper = await drill.context();
   const page = await shopper.newPage();
-  for (const p of PAGES) await pageCheck(drill, page, p);
-  await pageCheck(drill, page, PAGES[0], { width: 375 });
-  await pageCheck(drill, page, PAGES[1], { width: 375 });
+  const errors = watchErrors(page);
+  for (const width of [1440, 768, 375]) for (const p of PAGES) await pageCheck(drill, page, p, { width });
 
   // ---- 3. cart (edge route handler) and checkout's first step ----
   await drill.open(page, "/products/glow-serum", { width: 1440 });
@@ -120,7 +151,12 @@ export default async function harnessEdge(drill) {
   const cartJson = await cartGet.json().catch(() => ({}));
   drill.check(cartGet.status() === 200 && (cartJson.items || []).some((i) => i.title?.includes(PRODUCT)), "cart: GET /api/cart answers 200 and holds the product", cartGet.status());
   drill.check(edgeFunctionInDev(root, "/api/cart/route"), "cart: Next compiled /api/cart as an edge function (.next/dev/server/app/api/cart/route/middleware-manifest.json)");
-  await pageCheck(drill, page, { name: "checkout", path: "/checkout", all: ["Contact & shipping address", PRODUCT] });
+  // Finding 6: the checkout step row doesn't wrap, so a phone-width checkout scrolls sideways.
+  const checkout = { name: "checkout", path: "/checkout", all: ["Contact & shipping address", PRODUCT], knownOverflow: { 375: "finding 6" } };
+  for (const width of [1440, 768, 375]) await pageCheck(drill, page, checkout, { width });
+  drill.check(!errors.console.length && !errors.page.length, "storefront: no console errors or page errors on any page above", [...errors.console, ...errors.page].slice(0, 8));
+  drill.check(!errors.failed.length && !errors.status.length, "storefront: no failed requests and no 4xx/5xx answers on any page above", [...errors.failed, ...errors.status].slice(0, 8));
+  drill.note(`storefront: ${errors.aborted} request${errors.aborted === 1 ? " was" : "s were"} cut off by the drill's next navigation (net::ERR_ABORTED), not counted as failures`);
   await shopper.close();
 
   // ---- 4. the console's Designer and its draft preview ----
@@ -235,7 +271,7 @@ export default async function harnessEdge(drill) {
     drill.check(Boolean(closed), "maintenance: a signed-out shopper gets the maintenance page with the founder's message");
     if (closed) {
       drill.check(closed.res.headers["x-edge-runtime"] === "1", "maintenance: the closed page is rendered on the edge runtime", closed.res.headers["x-edge-runtime"] ?? "header absent");
-      drill.check(!closed.f.text.includes("Festive sale"), "maintenance: no store content behind it (no announcement bar)");
+      drill.check(!closed.f.text.includes("Festive sale"), "maintenance: no store content visible (no announcement bar)");
       await drill.shoot(vPage, "maintenance-1440");
       const contrast = await textContrast(vPage, CLOSED_MESSAGE);
       if (contrast) drill.note(`maintenance: the founder's message is ${contrast.color} on ${contrast.background}, contrast ${contrast.ratio}:1 (WCAG asks 4.5:1 for body text)`);
@@ -243,6 +279,22 @@ export default async function harnessEdge(drill) {
       // can take up to the same 30 seconds to notice.
       const pdp = await waitFor("/products/glow-serum", (f) => f.text.includes(CLOSED_MESSAGE));
       drill.check(Boolean(pdp) && !pdp.f.text.includes(PRODUCT), "maintenance: a product page shows the maintenance page too, not the product", pdp ? pdp.res.status : "still the product after 45 seconds");
+      const policy = await waitFor("/policies/shipping", (f) => f.text.includes(CLOSED_MESSAGE));
+      drill.check(Boolean(policy) && !policy.f.text.includes("Orders dispatch within 24 hours"), "maintenance: a CMS page shows the maintenance page too, not the policy", policy ? policy.res.status : "still the policy after 45 seconds");
+
+      // Finding 5: what the visitor sees is the closed page, but the page's
+      // source and its client-side data still carry the store. Known to fail
+      // until the maintenance fix (a separate item) lands.
+      const LEAKS = [
+        { path: "/", marks: ["Shop bestsellers", PRODUCT, "Festive sale"], what: "the home page's raw HTML" },
+        { path: "/products/glow-serum", marks: [PRODUCT, "1299", "1,299"], what: "the product page's raw HTML" },
+        { path: "/policies/shipping", marks: ["Orders dispatch within 24 hours"], what: "the CMS page's raw HTML" },
+        { path: "/products/glow-serum", marks: [PRODUCT], what: "a client-side fetch of the product page (RSC: 1)", rsc: true },
+      ];
+      for (const l of LEAKS) {
+        const r = await rawContains(drill.baseUrl, l.path, l.marks, { rsc: l.rsc });
+        drill.check(r.status < 500 && !r.found.length, `maintenance: ${l.what} carries no store content (${l.marks.map((m) => `"${m}"`).join(", ")})`, `status ${r.status}; found ${r.found.join(", ") || "nothing"}`, { known: "finding 5" });
+      }
     }
   } finally {
     const off = await setMaintenance(false).catch(() => 0);

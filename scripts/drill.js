@@ -21,7 +21,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { harnessPorts, readCredentials, ROOT, HarnessError } from "./design-harness.js";
+import { DATA_DIR_NAME, harnessPorts, readCredentials, ROOT, HarnessError, runningHarness } from "./design-harness.js";
 
 export const WIDTHS = [375, 768, 1440];
 const HEIGHTS = { 375: 812, 768: 1024, 1440: 900 };
@@ -79,11 +79,23 @@ const isUp = async (baseUrl) => {
   }
 };
 
-// Attach to a running harness, or (start: true) start one for this run.
+// Attach to a running harness, or (start: true) start one for this run. A
+// drill only attaches to this checkout's own harness: one recorded as running
+// in its .design-data/ on that port. Anything else on the port (another
+// checkout's harness, another app) is refused, so a drill never switches
+// maintenance on in someone else's store.
 export async function connectHarness({ start = false, env = process.env, root = ROOT, log = console.log } = {}) {
   const { next } = harnessPorts(env);
   const baseUrl = `http://localhost:${next}`;
-  if (await isUp(baseUrl)) return { baseUrl, port: next, creds: readCredentials(root), started: false, stop: async () => {} };
+  if (await isUp(baseUrl)) {
+    const ours = runningHarness(join(root, DATA_DIR_NAME));
+    if (ours?.ports?.next !== next) {
+      throw new DrillError(
+        `Something is answering at ${baseUrl}, but it isn't this checkout's design harness (${root}). It may be another checkout's harness or another app. Stop it, or start this checkout's harness on free ports, for example DESIGN_PORT=3027 DESIGN_SQLD_PORT=18080 pnpm dev:design, and run the drill with the same DESIGN_PORT.`,
+      );
+    }
+    return { baseUrl, port: next, creds: readCredentials(root), started: false, stop: async () => {} };
+  }
   if (!start) {
     throw new DrillError(
       `The design harness isn't running at ${baseUrl}. Start it with ${next === 3017 ? "" : `DESIGN_PORT=${next} `}pnpm dev:design, wait for "Ready", then run the drill again. Or add --start to have the drill start and stop it.`,
@@ -122,6 +134,25 @@ export async function compressShot(buf, { maxBytes = MAX_SHOT_BYTES } = {}) {
     }
   }
   throw new DrillError(`A screenshot stayed over ${Math.round(maxBytes / 1024)}KB even at its smallest (${Math.round(out.length / 1024)}KB). Take a smaller one (no fullPage).`);
+}
+
+// DOM facts, computed inside the page (Drill.facts passes it to
+// page.evaluate, so it may only use the page's own globals). Exported so the
+// unit test can run it against a stand-in DOM.
+export function pageFacts() {
+  const text = document.body?.innerText || "";
+  return {
+    path: location.pathname + location.search,
+    title: document.title,
+    h1: [...document.querySelectorAll("h1")].map((h) => h.innerText.trim()).filter(Boolean),
+    viewport: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    overflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
+    images: document.images.length,
+    brokenImages: [...document.images].filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.currentSrc || i.src).slice(0, 5),
+    errorPage: /Something went wrong|This page couldn.t load|Application error/i.test(text),
+    text,
+  };
 }
 
 export class Drill {
@@ -185,21 +216,7 @@ export class Drill {
 
   // DOM facts about the open page.
   facts(page) {
-    return page.evaluate(() => {
-      const text = document.body?.innerText || "";
-      return {
-        path: location.pathname + location.search,
-        title: document.title,
-        h1: [...document.querySelectorAll("h1")].map((h) => h.innerText.trim()).filter(Boolean),
-        viewport: window.innerWidth,
-        scrollWidth: document.documentElement.scrollWidth,
-        overflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
-        images: document.images.length,
-        brokenImages: [...document.images].filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.currentSrc || i.src).slice(0, 5),
-        errorPage: /Something went wrong|This page couldn.t load|Application error/i.test(text),
-        text,
-      };
-    });
+    return page.evaluate(pageFacts);
   }
 
   // Screenshot into docs/cms-reviews/drills/<id>/<name>.png, small.
@@ -233,11 +250,22 @@ export class Drill {
     return out;
   }
 
-  check(ok, label, detail) {
-    const entry = { ok: Boolean(ok), label, ...(detail !== undefined ? { detail } : {}) };
+  // known: a check that is expected to fail until a named issue is fixed
+  // elsewhere (for example "finding 5"). Its failure is recorded and printed as
+  // KNOWN, and doesn't fail the drill; when it starts passing, the drill says
+  // so, so the marker can be removed.
+  check(ok, label, detail, { known } = {}) {
+    const entry = { ok: Boolean(ok), label, ...(detail !== undefined ? { detail } : {}), ...(known ? { known } : {}) };
     this.checks.push(entry);
-    this.log(`${entry.ok ? "ok  " : "FAIL"} ${label}${!entry.ok && detail !== undefined ? ` (${typeof detail === "string" ? detail : JSON.stringify(detail)})` : ""}`);
+    const mark = entry.ok ? "ok  " : known ? "KNOWN" : "FAIL";
+    this.log(`${mark} ${label}${!entry.ok && detail !== undefined ? ` (${typeof detail === "string" ? detail : JSON.stringify(detail)})` : ""}${!entry.ok && known ? ` [${known}]` : ""}`);
+    if (entry.ok && known) this.note(`"${label}" passes now, so ${known} looks fixed: remove its known marker in the drill`);
     return entry.ok;
+  }
+
+  // Failed checks that aren't known issues.
+  get failures() {
+    return this.checks.filter((c) => !c.ok && !c.known);
   }
 
   note(text) {
@@ -257,15 +285,16 @@ export class Drill {
     for (const s of earlier) {
       if (s?.name && /^[\w.-]+$/.test(s.name) && !keep.has(s.name)) rmSync(join(this.dir, `${s.name}.png`), { force: true });
     }
-    const failed = this.checks.filter((c) => !c.ok).length + (error ? 1 : 0);
+    const failed = this.failures.length + (error ? 1 : 0);
     const results = {
       id: this.id,
       title: this.title,
       ranAt: new Date().toISOString(),
       harness: this.baseUrl,
       chrome: this.browser?.version?.() ?? null,
-      passed: this.checks.length - this.checks.filter((c) => !c.ok).length,
+      passed: this.checks.filter((c) => c.ok).length,
       failed,
+      knownFailures: this.checks.filter((c) => !c.ok && c.known).length,
       ...(error ? { aborted: String(error.message || error) } : {}),
       checks: this.checks,
       notes: this.notes,
@@ -332,11 +361,12 @@ export async function main(argv = process.argv.slice(2)) {
     if (browser) await browser.close().catch(() => {});
     if (harness?.started) await harness.stop();
     if (results) {
-      console.log(`\n${results.passed} passed, ${results.failed} failed. Screenshots and results.json in ${relative(ROOT, drill.dir)}/`);
+      const known = results.knownFailures ? `, ${results.knownFailures} known failure${results.knownFailures === 1 ? "" : "s"} (expected until the issue named next to each is fixed)` : "";
+      console.log(`\n${results.passed} passed, ${results.failed} failed${known}. Screenshots and results.json in ${relative(ROOT, drill.dir)}/`);
     }
   }
   if (!drill) return 1;
-  return error || drill.checks.some((c) => !c.ok) ? 1 : 0;
+  return error || drill.failures.length ? 1 : 0;
 }
 
 // Not a top-level await: journeys import this module, so it must finish

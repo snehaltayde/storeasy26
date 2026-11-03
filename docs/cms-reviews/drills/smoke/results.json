@@ -1,11 +1,12 @@
 {
   "id": "smoke",
   "title": "Smoke: product page at three widths, add to cart, open the drawer",
-  "ranAt": "2026-11-03T09:07:11.647Z",
-  "harness": "http://localhost:3027",
+  "ranAt": "2026-11-03T10:06:38.546Z",
+  "harness": "http://localhost:3046",
   "chrome": "156.0.8078.80",
-  "passed": 27,
+  "passed": 31,
   "failed": 0,
+  "knownFailures": 0,
   "checks": [
     {
       "ok": true,
@@ -133,10 +134,28 @@
     {
       "ok": true,
       "label": "the reopened drawer still lists the item"
+    },
+    {
+      "ok": true,
+      "label": "768px: adding to cart, POST /api/cart answers 200"
+    },
+    {
+      "ok": true,
+      "label": "768px: adding to cart opens the drawer"
+    },
+    {
+      "ok": true,
+      "label": "375px: adding to cart, POST /api/cart answers 200"
+    },
+    {
+      "ok": true,
+      "label": "375px: adding to cart opens the drawer"
     }
   ],
   "notes": [
-    "1440px, cookie banner not yet answered: a tap on the drawer's \"Checkout →\" hits something else on top of it: <div> \"We use analytics and advertising cookies to understand shopp\""
+    "1440px, cookie banner not yet answered: a tap on the drawer's \"Checkout →\" hits something else on top of it: <div> \"We use analytics and advertising cookies to understand shopp\"",
+    "768px, cookie banner not yet answered: a tap on the drawer's \"Checkout →\" hits something else on top of it: <div> \"Settings\nNo thanks\nAllow all\"",
+    "375px, cookie banner not yet answered: a tap on the drawer's \"Checkout →\" hits something else on top of it: <div> \"We use analytics and advertising cookies to understand shopp\""
   ],
   "screenshots": [
     {
@@ -182,6 +201,24 @@
       "width": 720,
       "height": 450,
       "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "drawer-after-add-768",
+      "file": "docs/cms-reviews/drills/smoke/drawer-after-add-768.png",
+      "bytes": 49878,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "drawer-after-add-375",
+      "file": "docs/cms-reviews/drills/smoke/drawer-after-add-375.png",
+      "bytes": 17962,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
       "path": "/products/glow-serum"
     }
   ]
