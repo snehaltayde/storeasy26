@@ -37,7 +37,6 @@ search box returns real products.
 | `SHOPIFY_CLIENT_ID` / `SHOPIFY_CLIENT_SECRET` | yes | Dev Dashboard app credentials (post-Jan-2026 flow) |
 | `SHOPIFY_STOREFRONT_TOKEN` | auto | minted by `pnpm shopify:token --write` |
 | `SHOPIFY_API_VERSION` | no | defaults to `2025-10` |
-| `NEXT_PUBLIC_SHOPIFY_DOMAIN` | no | customer domain for cart→checkout permalinks |
 | `DATABASE_URL` | no | defaults to `file:local.db`; set `libsql://…` for Turso |
 | `DATABASE_AUTH_TOKEN` | for Turso | Turso auth token |
 | `TYPESENSE_HOST` / `TYPESENSE_ADMIN_API_KEY` | no | until set, search uses the DB fallback |
@@ -53,6 +52,8 @@ search box returns real products.
 | `pnpm sync:search` | reindex Typesense from the local DB (no Shopify pull) |
 | `pnpm seed:demo` | seed a tiny demo catalog (no Shopify needed) |
 | `pnpm shopify:token` | mint a Storefront token from the app client/secret (`--write` saves it) |
+| `pnpm test` | run every test suite except `test:perf`; see [docs/operations.md](docs/operations.md#tests-shop-06) |
+| `pnpm hooks:enable` | run `pnpm test` before every commit (off by default) |
 
 ## How it works
 

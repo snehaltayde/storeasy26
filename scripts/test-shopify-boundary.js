@@ -1,0 +1,687 @@
+// Decision 2 as a failing test (SHOP-01 to SHOP-04, SHOP-06): content is never
+// written back to Shopify. Only orders and admin data go there.
+//   node scripts/test-shopify-boundary.js          (pnpm test:shopify-boundary)
+//
+// Two halves. Source scans read every file in lib, app, components and scripts
+// for mutations, Admin REST calls, OAuth scopes and Shopify cart links. Payload
+// checks run the real push and cancel code against a fake Shopify and lock what
+// is sent. Fully isolated: throwaway libSQL file, fake transports, no network.
+//
+// This file is the one file the scans skip, because it has to name what it bans.
+import { rm, readFile, readdir, stat } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join, relative } from "node:path";
+
+process.env.TURSO_DB_URL = "";
+process.env.TURSO_DB_AUTH_TOKEN = "";
+process.env.DATABASE_URL = "file:.test-shopify-boundary.db";
+process.env.SHOPIFY_STORE_DOMAIN = "boundary-test.myshopify.com";
+process.env.ALERT_WEBHOOK_URL = "";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(here, "..");
+const SELF = "scripts/test-shopify-boundary.js";
+await rm(join(ROOT, ".test-shopify-boundary.db"), { force: true });
+
+const { libsql, db } = await import("../lib/db.js");
+await libsql.executeMultiple(await readFile(join(ROOT, "lib/schema.sql"), "utf8"));
+const O = await import("../lib/orders.js");
+const P = await import("../lib/shopify-push.js");
+const { cancelOrder } = await import("../lib/order-cancel.js");
+const { registerWebhooks, WEBHOOK_TOPICS } = await import("../lib/platform/shopify-webhooks.js");
+const { mintStorefrontToken } = await import("../lib/shopify-admin.js");
+const { OAUTH_SCOPES } = await import("../lib/platform/oauth.js");
+const { withTenant } = await import("../lib/tenant-context.js");
+const { evaluateOffers } = await import("../lib/offers/engine.js");
+
+// --- harness ---------------------------------------------------------------
+let pass = 0;
+let fail = 0;
+async function t(name, fn) {
+  try {
+    await fn();
+    pass++;
+    console.log(`✓ ${name}`);
+  } catch (e) {
+    fail++;
+    console.error(`✗ ${name}\n    ${e.message}`);
+  }
+}
+const eq = (got, want, label = "") => {
+  const g = JSON.stringify(got);
+  const w = JSON.stringify(want);
+  if (g !== w) throw new Error(`${label} expected ${w}, got ${g}`);
+};
+const ok = (cond, label) => {
+  if (!cond) throw new Error(label || "expected truthy");
+};
+const sorted = (xs) => [...new Set(xs)].sort();
+const listIn = (hits) => hits.map((h) => `\n      ${h}`).join("");
+
+// --- the source scanners -----------------------------------------------------
+const SCAN_DIRS = ["lib", "app", "components", "scripts"];
+
+async function walk(dir, out = []) {
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    if (entry.name === "node_modules") continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) await walk(full, out);
+    else if (entry.isFile()) out.push(full);
+  }
+  return out;
+}
+
+async function sourceFiles(dirs = SCAN_DIRS) {
+  const files = [];
+  for (const dir of dirs) {
+    for (const full of await walk(join(ROOT, dir))) {
+      const path = relative(ROOT, full).split("\\").join("/");
+      if (path === SELF) continue;
+      const buf = await readFile(full);
+      if (buf.includes(0)) continue; // binary
+      files.push({ path, text: buf.toString("utf8") });
+    }
+  }
+  return files;
+}
+
+function skipBalanced(text, start, open, close) {
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === open) depth++;
+    else if (text[i] === close && --depth === 0) return i + 1;
+  }
+  return text.length;
+}
+
+const skipBlank = (text, start) => {
+  let i = start;
+  while (i < text.length) {
+    if (/[\s,]/.test(text[i])) i++;
+    else if (text[i] === "#") while (i < text.length && text[i] !== "\n") i++;
+    else break;
+  }
+  return i;
+};
+
+// Root fields of one selection set, as "name(args)" with spaces removed. Anything
+// that cannot be named from the source (an interpolated field, a fragment, a
+// document that never closes) comes back as <unreadable>, which no list allows.
+function rootFields(text, open) {
+  const fields = [];
+  const end = skipBalanced(text, open, "{", "}");
+  if (end === text.length && text[end - 1] !== "}") return ["<unreadable>"];
+  let i = skipBlank(text, open + 1);
+  while (i < end - 1) {
+    const name = /^[A-Za-z_]\w*/.exec(text.slice(i, end));
+    if (!name) return [...fields, "<unreadable>"];
+    let field = name[0];
+    i = skipBlank(text, i + field.length);
+    if (text[i] === ":") {
+      const aliasOf = skipBlank(text, i + 1);
+      const real = /^[A-Za-z_]\w*/.exec(text.slice(aliasOf, end));
+      if (!real) return [...fields, "<unreadable>"];
+      field = real[0];
+      i = skipBlank(text, aliasOf + field.length);
+    }
+    let args = "";
+    if (text[i] === "(") {
+      const close = skipBalanced(text, i, "(", ")");
+      args = text.slice(i, close).replace(/\s+/g, "");
+      i = skipBlank(text, close);
+    }
+    if (text[i] === "{") i = skipBlank(text, skipBalanced(text, i, "{", "}"));
+    fields.push(field + args);
+  }
+  return fields;
+}
+
+// Every GraphQL mutation written in a piece of source text. Prose that uses the
+// word ("a duplicate-mutation guard") has no selection set and is ignored. A
+// string that starts with "mutation" but has no readable document is a mutation
+// built at run time, so it counts as unreadable instead of being skipped.
+function findMutations(text) {
+  const found = [];
+  const re = /\bmutation\b/g;
+  let m;
+  while ((m = re.exec(text))) {
+    let i = skipBlank(text, m.index + "mutation".length);
+    const name = /^[A-Za-z_]\w*/.exec(text.slice(i));
+    if (name) i = skipBlank(text, i + name[0].length);
+    if (text[i] === "(") i = skipBlank(text, skipBalanced(text, i, "(", ")"));
+    if (text[i] === "{") {
+      found.push(...rootFields(text, i));
+      continue;
+    }
+    const opensString = /["'`]\s*$/.test(text.slice(Math.max(0, m.index - 3), m.index));
+    const closesString = /^["'`]/.test(text.slice(m.index + "mutation".length));
+    if (opensString && !closesString) found.push("<unreadable>");
+  }
+  return found;
+}
+
+const fieldName = (field) => field.split("(")[0];
+
+// Shopify mutation names read as resource + verb. This catches one written
+// anywhere, even outside a document (a comment, a string assembled later), which
+// is what "adding productUpdate anywhere fails" asks for.
+const MUTATION_NAME =
+  /\b(?:product|productVariant|productVariants|collection|metafield|metafields|metaobject|metaobjects|metaobjectDefinition|page|article|blog|comment|theme|themeFiles|menu|file|files|translation|translations|publishable|publication|customer|discount|discountCode|discountAutomatic|tags|urlRedirect|shop|priceList|stagedUploads|inventory|order|draftOrder|refund|fulfillment|fulfillmentOrder|webhookSubscription|storefrontAccessToken|bulkOperation|location|market|giftCard|sellingPlanGroup|scriptTag)(?:[A-Z][A-Za-z]*?)?(?:Create|Update|Delete|Set|Upsert|Add|Remove|Register|Publish|Unpublish|Reorder|Duplicate|Adjust|Activate|Deactivate|Cancel|Complete|Capture|MarkAsPaid)\b/g;
+
+const findMutationNames = (text) => [...text.matchAll(MUTATION_NAME)].map((m) => m[0]);
+
+// There is no way to read the HTTP method reliably from source, so any Admin API
+// URL other than graphql.json counts as a REST write until someone reviews it.
+function findAdminRest(text) {
+  const hits = [];
+  for (const m of text.matchAll(/\/admin\/api\//g)) {
+    const rest = text.slice(m.index + m[0].length, m.index + m[0].length + 80);
+    if (!/^(?:\$\{[^}]*\}|[\w.-]+)\/graphql\.json/.test(rest)) hits.push(`${m[0]}${rest.split(/[\s"'`]/)[0]}`);
+  }
+  for (const m of text.matchAll(/\/admin\/(?!api\/|oauth\/)[^\s"'`]*\.json\b/g)) hits.push(m[0]);
+  for (const m of text.matchAll(/\/admin\/oauth\/([\w.-]*)/g)) {
+    if (!["access_token", "authorize"].includes(m[1])) hits.push(m[0]);
+  }
+  return hits;
+}
+
+// Shopify cart and checkout links, not this app's own cart paths and imports.
+function findShopifyCartLinks(text) {
+  const patterns = [
+    /\bcheckoutUrl\b/g,
+    /\bNEXT_PUBLIC_SHOPIFY_DOMAIN\b/g,
+    /\/cart\/(?:\$\{|\d|add\b|clear\b|change\b|update\b)/g,
+    /https?:\/\/[^\s"'`]*\/cart\b/g,
+    /https?:\/\/(?!checkout\.razorpay\.com)[^\s"'`]*\/checkouts?\b/g,
+  ];
+  return patterns.flatMap((re) => [...text.matchAll(re)].map((m) => m[0]));
+}
+
+const WRITE_SCOPE_TOKEN = /\b(?:unauthenticated_|customer_)?write_[a-z_]+\b/g;
+const SCOPE_AT_STRING_START = /["'`](?:unauthenticated_|customer_)?(?:read|write)_[a-z_]+(?:,|["'`])/g;
+
+const files = await sourceFiles();
+const prodFiles = files.filter((f) => !/^scripts\/test-/.test(f.path));
+
+// ===========================================================================
+// SHOP-01: mutation allowlist
+// ===========================================================================
+const ALLOWED_MUTATIONS = [
+  "draftOrderCreate",
+  "draftOrderComplete",
+  "orderCancel",
+  "webhookSubscriptionCreate",
+  "webhookSubscriptionUpdate",
+  "storefrontAccessTokenCreate",
+];
+
+// Known, labelled exception: the Session 8 spike is a one-off script run by hand.
+// It also tried orderCreate. Only that name, only in that file, and never imported.
+const SPIKE = "scripts/spike-order-push.js";
+const SPIKE_ONLY = ["orderCreate"];
+
+// Every mutation document in the codebase, with its exact arguments. Moving or
+// adding one, or adding an argument (a new free-text one, say), is a reviewed
+// change to this list.
+const MUTATION_DOCUMENTS = [
+  "lib/order-cancel.js::orderCancel(orderId:$id,reason:$reason,refund:false,restock:true,notifyCustomer:false,staffNote:$staffNote)",
+  "lib/platform/shopify-webhooks.js::webhookSubscriptionCreate(topic:$topic,webhookSubscription:$sub)",
+  "lib/platform/shopify-webhooks.js::webhookSubscriptionUpdate(id:$id,webhookSubscription:$sub)",
+  "lib/shopify-admin.js::storefrontAccessTokenCreate(input:$input)",
+  "lib/shopify-push.js::draftOrderComplete(id:$id,paymentPending:$pending)",
+  "lib/shopify-push.js::draftOrderCreate(input:$input)",
+  `${SPIKE}::draftOrderComplete(id:$id,paymentPending:false)`,
+  `${SPIKE}::draftOrderCreate(input:$input)`,
+  `${SPIKE}::orderCreate(order:$order)`,
+];
+
+await t("SHOP-01: scanners catch what they must and ignore prose", async () => {
+  eq(findMutations("gql(`mutation { productUpdate(input: $i) { product { id } } }`)"), ["productUpdate(input:$i)"], "anonymous:");
+  eq(findMutations("`mutation Save($i: ProductInput!) {\n  productUpdate(input: $i) { userErrors { message } }\n}`").map(fieldName), ["productUpdate"], "named:");
+  eq(findMutations("`mutation($id: ID!) { a: orderCancel(orderId: $id) { job { id } } productSet(x: 1) { id } }`").map(fieldName), ["orderCancel", "productSet"], "alias + two roots:");
+  eq(findMutations("`mutation { ${FIELD}(input: $i) { id } }`"), ["<unreadable>"], "interpolated:");
+  eq(findMutations("`mutation { ...Save }`"), ["<unreadable>"], "fragment:");
+  eq(findMutations('"mutation " + op'), ["<unreadable>"], "built at run time:");
+  eq(findMutations("// every mutation hits the edge\nconst mutation = sub ? A : B; gql(mutation, vars); a duplicate-mutation guard"), [], "prose:");
+  eq(findMutationNames("// see productUpdate later"), ["productUpdate"], "name in a comment:");
+  eq(findMutationNames("const x = 'productVariantsBulkUpdate' + metafieldsSet"), ["productVariantsBulkUpdate", "metafieldsSet"], "bare names:");
+  eq(findMutationNames("priceAtAdd giftPickerOpen orderCancelUserErrors setPage"), [], "ordinary identifiers:");
+
+  ok(findAdminRest("fetch(`https://${shop}/admin/api/2025-10/products/1.json`, { method: 'PUT' })").length, "versioned REST write");
+  ok(findAdminRest("fetch(`https://${shop}/admin/api/${v}/products.json`, { method: 'POST' })").length, "interpolated version REST write");
+  ok(findAdminRest("const base = `https://${shop}/admin/api/${v}`;").length, "bare Admin base URL");
+  ok(findAdminRest("fetch(`https://${shop}/admin/products/1.json`)").length, "unversioned REST");
+  ok(findAdminRest("fetch(`https://${shop}/admin/oauth/access_scopes.json`)").length, "other oauth endpoint");
+  eq(findAdminRest("`https://${storeDomain()}/admin/api/${API_VERSION()}/graphql.json`"), [], "graphql.json:");
+  eq(findAdminRest("`https://${d}/admin/oauth/access_token` `https://${d}/admin/oauth/authorize?x=1` href='/admin/orders'"), [], "oauth + console path:");
+
+  ok(findShopifyCartLinks("return `https://${domain}/cart/${parts}`;").length, "cart permalink");
+  ok(findShopifyCartLinks("`https://x.myshopify.com/cart/123:1`").length, "literal permalink");
+  ok(findShopifyCartLinks("`https://${d}/checkouts/abc`").length, "checkout link");
+  eq(findShopifyCartLinks('import x from "@/components/cart/CartContext"; fetch("/api/cart"); // navigation/cart/wishlist'), [], "own cart paths:");
+  eq(findShopifyCartLinks('"https://checkout.razorpay.com/v1/checkout.js"'), [], "payment script:");
+});
+
+await t("SHOP-01: every GraphQL mutation in lib, app, components, scripts is on the allowlist", async () => {
+  const bad = [];
+  for (const f of files) {
+    const allowed = f.path === SPIKE ? [...ALLOWED_MUTATIONS, ...SPIKE_ONLY] : ALLOWED_MUTATIONS;
+    for (const field of findMutations(f.text)) {
+      if (!allowed.includes(fieldName(field))) bad.push(`${f.path}: ${field}`);
+    }
+  }
+  eq(bad.length, 0, `Decision 2: only orders and admin data go to Shopify. Mutations not on the allowlist:${listIn(bad)}\n   `);
+});
+
+await t("SHOP-01: no Shopify write mutation name appears outside the allowlist, even in a comment", async () => {
+  const bad = [];
+  for (const f of files) {
+    const allowed = f.path === SPIKE ? [...ALLOWED_MUTATIONS, ...SPIKE_ONLY] : ALLOWED_MUTATIONS;
+    for (const name of findMutationNames(f.text)) {
+      if (!allowed.includes(name)) bad.push(`${f.path}: ${name}`);
+    }
+  }
+  eq(bad.length, 0, `Decision 2: write mutation names found:${listIn(bad)}\n   `);
+});
+
+await t("SHOP-01: the mutation documents are exactly the known list, with their exact arguments", async () => {
+  const found = files.flatMap((f) => findMutations(f.text).map((field) => `${f.path}::${field}`));
+  eq(sorted(found).filter((d) => !MUTATION_DOCUMENTS.includes(d)), [], "mutation documents not on the list:");
+  eq(sorted(MUTATION_DOCUMENTS).filter((d) => !found.includes(d)), [], "listed mutation documents no longer found:");
+  eq(sorted(found.map((d) => fieldName(d.split("::")[1])).filter((n) => !SPIKE_ONLY.includes(n))), sorted(ALLOWED_MUTATIONS), "every allowed mutation still in use:");
+});
+
+await t("SHOP-01: the spike stays a labelled one-off that nothing imports", async () => {
+  const importers = files.filter((f) => f.path !== SPIKE && /from\s+["'][^"']*spike-order-push|import\(["'][^"']*spike-order-push/.test(f.text));
+  eq(importers.map((f) => f.path), [], "importers:");
+  const pkg = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
+  eq(Object.entries(pkg.scripts).filter(([, cmd]) => cmd.includes("spike-order-push")).map(([k]) => k), [], "package.json scripts:");
+  ok(files.find((f) => f.path === SPIKE)?.text.startsWith("// Session 8 SPIKE"), "spike keeps its label");
+});
+
+await t("SHOP-01: no REST call to the Admin API, and the Admin token header stays in known files", async () => {
+  const rest = files.flatMap((f) => findAdminRest(f.text).map((h) => `${f.path}: ${h}`));
+  eq(rest.length, 0, `Admin API must go through graphql.json so the mutation list can see it:${listIn(rest)}\n   `);
+  const tokenUsers = files.filter((f) => /x-shopify-access-token/i.test(f.text)).map((f) => f.path);
+  eq(sorted(tokenUsers), sorted(["lib/shopify-admin.js", SPIKE]), "files sending the Admin token:");
+});
+
+await t("SHOP-01: the allowed write scopes are exactly write_orders and write_draft_orders", async () => {
+  const scopes = OAUTH_SCOPES.split(",");
+  eq(new Set(scopes).size, scopes.length, "no duplicate scopes:");
+  eq(sorted(scopes.filter((s) => s.includes("write"))), ["write_draft_orders", "write_orders"], "write scopes:");
+});
+
+// Not Shopify scopes: an audit field (lib/platform/rotate.js) and the placeholder
+// comments use for "the write scope of x" (lib/platform/oauth.js).
+const NOT_SCOPES = ["write_key_fp", "write_x"];
+
+await t("SHOP-01: no other write_* scope is named anywhere in the source", async () => {
+  const bad = [];
+  for (const f of files) {
+    for (const m of f.text.matchAll(WRITE_SCOPE_TOKEN)) {
+      if (!["write_orders", "write_draft_orders", ...NOT_SCOPES].includes(m[0])) bad.push(`${f.path}: ${m[0]}`);
+    }
+  }
+  eq(bad.length, 0, `Write scopes not allowed (if this is not a Shopify scope, add it to NOT_SCOPES here):${listIn(bad)}\n   `);
+});
+
+await t("SHOP-01: there is one scope list in the codebase", async () => {
+  const declarations = files.flatMap((f) => [...f.text.matchAll(/\b\w*SCOPES\s*=(?!=)/g)].map((m) => `${f.path}: ${m[0].trim()}`));
+  eq(declarations, ["lib/platform/oauth.js: OAUTH_SCOPES ="], "scope list declarations:");
+  const literals = prodFiles.filter((f) => f.path !== "lib/platform/oauth.js" && SCOPE_AT_STRING_START.test(f.text));
+  SCOPE_AT_STRING_START.lastIndex = 0;
+  eq(literals.map((f) => f.path), [], "scope names written as strings outside the list:");
+  const params = files.flatMap((f) => [...f.text.matchAll(/[?&]scope=([^\s"'`&]*)/g)].map((m) => [f.path, m[1]]));
+  eq(sorted(params.map(([p]) => p)), ["lib/platform/oauth.js", "scripts/shopify-oauth.js"], "files building an authorize URL:");
+  for (const [path, value] of params) eq(value, "${encodeURIComponent(OAUTH_SCOPES)}", `${path} scope param:`);
+});
+
+await t("SHOP-01: the one-time OAuth script still loads with the shared list", async () => {
+  // It exits before listening when no app credentials are set, so this only
+  // proves the import resolves. Credentials are stripped from the child's env.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("SHOPIFY_")));
+  const r = spawnSync(process.execPath, [join(ROOT, "scripts/shopify-oauth.js")], { env, encoding: "utf8" });
+  eq(r.status, 1, "exit code:");
+  ok(r.stderr.includes("Need SHOPIFY_STORE_DOMAIN"), `expected the missing-credentials message, got: ${r.stderr.slice(0, 300)}`);
+});
+
+// ===========================================================================
+// SHOP-02: an order push cannot carry content
+// ===========================================================================
+const LINE_KEYS = ["quantity", "variantId"];
+const GIFT_LINE_KEYS = ["appliedDiscount", "quantity", "variantId"];
+const GIFT_DISCOUNT = { valueType: "PERCENTAGE", value: 100, title: "Free gift", description: "FREE_GIFT offer" };
+
+const PRODUCT_ID = "gid://shopify/Product/9001";
+const VARIANT_ID = "gid://shopify/ProductVariant/9002";
+const GIFT_PRODUCT_ID = "gid://shopify/Product/9003";
+const GIFT_VARIANT_ID = "gid://shopify/ProductVariant/9004";
+
+// What the catalog says, deliberately different from what the order froze.
+const CATALOG_STRINGS = {
+  title: "CATALOG-TITLE-SENTINEL",
+  description: "CATALOG-DESCRIPTION-SENTINEL",
+  description_html: "<p>CATALOG-HTML-SENTINEL</p>",
+  product_type: "CATALOG-TYPE-SENTINEL",
+  vendor: "CATALOG-VENDOR-SENTINEL",
+  tags: JSON.stringify(["CATALOG-TAG-SENTINEL"]),
+  featured_image: "https://cdn.test/CATALOG-IMAGE-SENTINEL.png",
+  featured_image_alt: "CATALOG-ALT-SENTINEL",
+};
+const CATALOG_VARIANT_STRINGS = {
+  title: "CATALOG-VARIANT-TITLE-SENTINEL",
+  sku: "CATALOG-SKU-SENTINEL",
+  image_url: "https://cdn.test/CATALOG-VARIANT-IMAGE-SENTINEL.png",
+};
+// What the cart froze on the order.
+const ORDER_STRINGS = {
+  title: "ORDER-TITLE-SENTINEL",
+  variantTitle: "ORDER-VARIANT-TITLE-SENTINEL",
+  image: "https://cdn.test/ORDER-IMAGE-SENTINEL.png",
+  handle: "order-handle-sentinel",
+  // Named by OVL-06 as coming to snapshots. They must not reach Shopify either.
+  catalog_title: "ORDER-CATALOG-TITLE-SENTINEL",
+  sku: "ORDER-SKU-SENTINEL",
+};
+
+// OVL-03 HOOK. No overlay layer exists yet, so today the only other title in play
+// is the catalog's. SHOP-02 extends here once OVL-03 lands: write OVERLAY_TITLE
+// through the real overlay writer in seedOverlay(), and build the order's cart
+// through the effective read instead of the hand-made CART. OVERLAY_TITLE is
+// already in the list below, so the assertion needs no change.
+const OVERLAY_TITLE = "OVERLAY-TITLE-SENTINEL";
+async function seedOverlay() {
+  // OVL-03: nothing to write until the overlay table exists.
+}
+
+// The sentinel inside each value, so a URL or JSON wrapper cannot hide it.
+const sentinelOf = (s) => /[A-Z-]+-SENTINEL|order-handle-sentinel/.exec(s)[0];
+const CONTENT_THAT_MUST_NOT_REACH_SHOPIFY = [
+  OVERLAY_TITLE,
+  ...[...Object.values(CATALOG_STRINGS), ...Object.values(CATALOG_VARIANT_STRINGS), ...Object.values(ORDER_STRINGS)].map(sentinelOf),
+];
+
+const CART = {
+  items: [{ variantId: VARIANT_ID, productId: PRODUCT_ID, price: 1000, quantity: 2, lineTotal: 2000, discount: 0, ...ORDER_STRINGS }],
+  gifts: [{ variantId: GIFT_VARIANT_ID, productId: GIFT_PRODUCT_ID, ...ORDER_STRINGS }],
+  appliedOffers: [{ id: "o1", label: "Launch offer", amount: 100 }],
+  couponStatus: null,
+  subtotal: 2000,
+  discountTotal: 100,
+  total: 1900,
+  currency: "INR",
+};
+const CONTACT = { email: "shopper@example.test", phone: "9000000012", name: "Boundary Tester" };
+const ADDRESS = { line1: "12 Sync St", line2: "Floor 2", city: "Pune", state: "MH", pincode: "411001", country: "India" };
+
+let seq = 0;
+async function seedOrder({ method = "razorpay", paid = true, cart = CART, shipping } = {}) {
+  const o = await O.createOrder({
+    cart,
+    contact: CONTACT,
+    address: ADDRESS,
+    paymentMethod: method,
+    idempotencyKey: `boundary-${++seq}`,
+    razorpayOrderId: method === "razorpay" ? `order_B${seq}` : null,
+    ...(shipping ? { shipping } : {}),
+  });
+  if (paid && method === "razorpay") await O.markOrderPaid(o.id, { razorpayPaymentId: `pay_B${seq}` });
+  return o.id;
+}
+
+function fakeShopify(total = CART.total) {
+  const calls = [];
+  const gql = async (query, variables) => {
+    calls.push({ query, variables });
+    if (query.includes("draftOrderCreate"))
+      return { draftOrderCreate: { draftOrder: { id: "gid://shopify/DraftOrder/1", name: "#D1" }, userErrors: [] } };
+    if (query.includes("draftOrderComplete"))
+      return {
+        draftOrderComplete: {
+          draftOrder: {
+            id: variables.id,
+            status: "COMPLETED",
+            order: { id: "gid://shopify/Order/1", name: "#T1", displayFinancialStatus: "PAID", totalPriceSet: { shopMoney: { amount: String(total) } } },
+          },
+          userErrors: [],
+        },
+      };
+    if (query.includes("orderCancel")) return { orderCancel: { job: { id: "j1" }, orderCancelUserErrors: [] } };
+    return { orders: { nodes: [] }, draftOrders: { nodes: [] } };
+  };
+  gql.calls = calls;
+  return gql;
+}
+
+// A hand-built order with every optional part present, so every path shows up.
+const fullOrder = (overrides = {}) => ({
+  id: "BL-BOUNDARY1",
+  email: CONTACT.email,
+  total: 1900,
+  shipping_total: 49,
+  razorpay_order_id: "order_X",
+  razorpay_payment_id: "pay_X",
+  snapshot: {
+    items: [{ variantId: VARIANT_ID, quantity: 2, ...ORDER_STRINGS, description: "ORDER-DESCRIPTION-SENTINEL", vendor: "ORDER-VENDOR-SENTINEL" }],
+    gifts: [{ variantId: GIFT_VARIANT_ID, ...ORDER_STRINGS, quantity: 9 }],
+    appliedOffers: [{ id: "o1", label: "Launch offer", amount: 100 }],
+    totals: { discountTotal: 100, shippingTotal: 49 },
+    shipping: { method: "standard", label: "Standard shipping" },
+    contact: CONTACT,
+    address: ADDRESS,
+  },
+  ...overrides,
+});
+
+await t("SHOP-02: a paid line item carries only variantId and quantity", async () => {
+  const input = P.buildDraftOrderInput(fullOrder());
+  eq(Object.keys(input.lineItems[0]).sort(), LINE_KEYS, "line item keys:");
+  eq(input.lineItems[0], { variantId: VARIANT_ID, quantity: 2 }, "line item:");
+});
+
+await t("SHOP-02: a gift line carries only variantId, quantity and the fixed discount", async () => {
+  const input = P.buildDraftOrderInput(fullOrder());
+  eq(Object.keys(input.lineItems[1]).sort(), GIFT_LINE_KEYS, "gift keys:");
+  eq(input.lineItems[1], { variantId: GIFT_VARIANT_ID, quantity: 1, appliedDiscount: GIFT_DISCOUNT }, "gift line:");
+});
+
+await t("SHOP-02: content on the snapshot (title, handle, image, sku, catalog_title) stays out of the draft", async () => {
+  const wire = JSON.stringify(P.buildDraftOrderInput(fullOrder()));
+  for (const s of [...Object.values(ORDER_STRINGS), "ORDER-DESCRIPTION-SENTINEL", "ORDER-VENDOR-SENTINEL"]) {
+    ok(!wire.includes(s), `${s} reached the draft order`);
+  }
+});
+
+await t("SHOP-02: through the real push, a catalog title different from the order title appears nowhere", async () => {
+  await db.insertInto("products").values({ id: PRODUCT_ID, handle: "boundary-product", available: 1, ...CATALOG_STRINGS }).execute();
+  await db.insertInto("variants").values({ id: VARIANT_ID, product_id: PRODUCT_ID, available: 1, ...CATALOG_VARIANT_STRINGS }).execute();
+  await seedOverlay();
+  ok(CATALOG_STRINGS.title !== ORDER_STRINGS.title, "the fixture must have two different titles");
+
+  const id = await seedOrder();
+  const gql = fakeShopify();
+  const r = await P.pushOrderToShopify(id, { gql });
+  ok(r.ok, `push failed: ${JSON.stringify(r)}`);
+  eq(gql.calls.length, 3, "find, create, complete:");
+
+  const everythingSent = JSON.stringify(gql.calls);
+  for (const s of CONTENT_THAT_MUST_NOT_REACH_SHOPIFY) ok(!everythingSent.includes(s), `${s} reached Shopify`);
+
+  const { lineItems } = gql.calls[1].variables.input;
+  eq(lineItems.map((l) => Object.keys(l).sort()), [LINE_KEYS, GIFT_LINE_KEYS], "line item keys on the wire:");
+});
+
+// ===========================================================================
+// SHOP-04: every free-text route, by name
+// ===========================================================================
+// Merchant-typed or merchant-set text that reaches Shopify. All of it is order
+// data, not content write-back, so it is consistent with Decision 2.
+const MERCHANT_TEXT_ROUTES = {
+  "discount description": { path: "appliedDiscount.description", from: "offer and bundle titles, through the offer engine's label" },
+  "discount title": { path: "appliedDiscount.title", from: "the store name" },
+  "shipping title": { path: "shippingLine.title", from: "the shipping label, which can carry a merchant's zone label" },
+  note: { path: "note", from: "a fixed sentence with our order id, which carries the store's order-id prefix" },
+  tags: { path: "tags[]", from: "a fixed tag and our order id" },
+};
+const CANCEL_STAFF_NOTE = { variable: "staffNote", from: "the reason typed when cancelling an order" };
+
+const ADDRESS_PATHS = ["firstName", "lastName", "address1", "address2", "city", "province", "zip", "country", "phone"];
+// Typed by the shopper, for delivery. Not merchant text and not content.
+const SHOPPER_PATHS = ["email", ...["shippingAddress", "billingAddress"].flatMap((a) => ADDRESS_PATHS.map((k) => `${a}.${k}`))];
+// Ids, amounts, and strings fixed in code.
+const FIXED_PATHS = [
+  "appliedDiscount.value",
+  "appliedDiscount.valueType",
+  "customAttributes[].key",
+  "customAttributes[].value",
+  "lineItems[].appliedDiscount.description",
+  "lineItems[].appliedDiscount.title",
+  "lineItems[].appliedDiscount.value",
+  "lineItems[].appliedDiscount.valueType",
+  "lineItems[].quantity",
+  "lineItems[].variantId",
+  "shippingLine.price",
+];
+const KNOWN_PATHS = [...Object.values(MERCHANT_TEXT_ROUTES).map((r) => r.path), ...SHOPPER_PATHS, ...FIXED_PATHS];
+
+// Paths of every value, in the form that goes over the wire.
+function leaves(value, path = "", out = []) {
+  if (Array.isArray(value)) for (const v of value) leaves(v, `${path}[]`, out);
+  else if (value && typeof value === "object") for (const [k, v] of Object.entries(value)) leaves(v, path ? `${path}.${k}` : k, out);
+  else out.push({ path, value });
+  return out;
+}
+const wireLeaves = (value) => leaves(JSON.parse(JSON.stringify(value)));
+
+await t("SHOP-04: the route list names all six: discount description and title, shipping title, note, tags, cancel staff note", async () => {
+  eq(Object.keys(MERCHANT_TEXT_ROUTES).sort(), ["discount description", "discount title", "note", "shipping title", "tags"], "draft order routes:");
+  eq(CANCEL_STAFF_NOTE.variable, "staffNote", "cancel route:");
+});
+
+await t("SHOP-04: a draft order holds only known fields, so a new free-text field fails here", async () => {
+  const found = sorted(wireLeaves(P.buildDraftOrderInput(fullOrder())).map((l) => l.path));
+  const unknown = found.filter((p) => !KNOWN_PATHS.includes(p));
+  eq(unknown, [], "New field sent to Shopify. Decide whether it is order data, then name it in this test:");
+  eq(found, sorted(KNOWN_PATHS), "every known field still sent:");
+});
+
+await t("SHOP-04: a real order's draft (COD, nothing optional) holds no unknown field either", async () => {
+  const id = await seedOrder({ method: "cod", cart: { ...CART, gifts: [], appliedOffers: [], discountTotal: 0, total: 2000 } });
+  const order = await O.getOrder(id);
+  const unknown = sorted(wireLeaves(P.buildDraftOrderInput(order)).map((l) => l.path)).filter((p) => !KNOWN_PATHS.includes(p));
+  eq(unknown, [], "unknown fields:");
+});
+
+await t("SHOP-04: each piece of merchant text reaches Shopify only through its named field", async () => {
+  const STORE = "STORE-NAME-SENTINEL";
+  const OFFER = "OFFER-LABEL-SENTINEL";
+  const SHIP = "SHIP-LABEL-SENTINEL";
+  const PREFIX = "PREFIX-SENTINEL";
+  const input = withTenant({ id: "boundary", config: { site: { name: STORE } } }, () =>
+    P.buildDraftOrderInput(
+      fullOrder({
+        id: `${PREFIX}-1`,
+        snapshot: {
+          ...fullOrder().snapshot,
+          appliedOffers: [{ id: "o1", label: OFFER, amount: 100 }],
+          shipping: { method: "standard", label: SHIP },
+        },
+      }),
+    ),
+  );
+  const whereIs = (needle) => sorted(wireLeaves(input).filter((l) => String(l.value).includes(needle)).map((l) => l.path));
+  eq(whereIs(OFFER), [MERCHANT_TEXT_ROUTES["discount description"].path], "offer label:");
+  eq(whereIs(STORE), [MERCHANT_TEXT_ROUTES["discount title"].path], "store name:");
+  eq(whereIs(SHIP), [MERCHANT_TEXT_ROUTES["shipping title"].path], "shipping label:");
+  eq(whereIs(PREFIX), sorted(["note", "tags[]", "customAttributes[].value"]), "order id:");
+  eq(input.tags, ["storeasy26", `${PREFIX}-1`], "tags are the fixed tag and the order id:");
+  eq(input.customAttributes.map((a) => a.key).sort(), ["bl_order_id", "captured_amount_inr", "channel", "razorpay_order_id", "razorpay_payment_id"], "custom attribute keys:");
+});
+
+await t("SHOP-04: a bundle's title reaches Shopify as the discount description, capped at 250 characters", async () => {
+  const BUNDLE_TITLE = `BUNDLE-TITLE-SENTINEL ${"x".repeat(300)}`;
+  // Same shape as syncOffer in lib/bundles.js.
+  const offer = { id: "bundle:b1", type: "BUNDLE", scope: "line", priority: 5, title: BUNDLE_TITLE, items: [{ variantId: "v-a", quantity: 1 }, { variantId: "v-b", quantity: 1 }], price: 2500 };
+  const line = (id, price) => ({ variantId: id, productId: `p-${id}`, handle: id, tags: [], price, quantity: 1 });
+  const { appliedOffers } = evaluateOffers([line("v-a", 2000), line("v-b", 1000)], { offers: [offer] });
+  eq(appliedOffers.map((o) => o.label), [BUNDLE_TITLE], "engine label:");
+  const { appliedDiscount } = P.buildDraftOrderInput(fullOrder({ snapshot: { ...fullOrder().snapshot, appliedOffers } }));
+  ok(appliedDiscount.description.startsWith("BUNDLE-TITLE-SENTINEL"), "bundle title in the description");
+  eq(appliedDiscount.description.length, 250, "description length:");
+});
+
+await t("SHOP-04: the cancel reason reaches Shopify only as the staff note", async () => {
+  const REASON = "CANCEL-REASON-SENTINEL";
+  const id = await seedOrder({ method: "cod" });
+  await db.updateTable("orders").set({ shopify_order_id: "gid://shopify/Order/55" }).where("id", "=", id).execute();
+  const gql = fakeShopify();
+  const r = await cancelOrder(id, { reason: REASON, gql });
+  ok(r.ok, JSON.stringify(r));
+  eq(gql.calls.length, 1, "one call:");
+  const { variables, query } = gql.calls[0];
+  eq(variables, { id: "gid://shopify/Order/55", reason: "OTHER", staffNote: `storeasy26: ${REASON}` }, "cancel variables:");
+  eq(wireLeaves(variables).filter((l) => String(l.value).includes(REASON)).map((l) => l.path), [CANCEL_STAFF_NOTE.variable], "reason:");
+  ok(!query.includes(REASON), "reason stays out of the document");
+});
+
+await t("SHOP-04: the admin mutations carry no merchant text at all", async () => {
+  const seen = [];
+  const gql = async (query, variables) => {
+    seen.push(variables);
+    if (query.includes("webhookSubscriptions(")) return { webhookSubscriptions: { nodes: [{ id: "w1", topic: WEBHOOK_TOPICS[0], endpoint: { callbackUrl: "https://old.test/hook" } }] } };
+    return { webhookSubscriptionCreate: { webhookSubscription: { id: "w2" }, userErrors: [] }, webhookSubscriptionUpdate: { webhookSubscription: { id: "w1" }, userErrors: [] } };
+  };
+  const callbackUrl = "https://new.test/hook";
+  await registerWebhooks({ id: "boundary", name: "MERCHANT-NAME-SENTINEL", config: {} }, { callbackUrl, gql });
+  const writes = seen.filter(Boolean).filter((v) => v.sub);
+  ok(writes.length === WEBHOOK_TOPICS.length, `one write per topic, got ${writes.length}`);
+  for (const v of writes) {
+    eq(Object.keys(v).sort(), v.id ? ["id", "sub"] : ["sub", "topic"], "webhook variables:");
+    eq(v.sub, { callbackUrl }, "webhook subscription:");
+  }
+
+  const realFetch = globalThis.fetch;
+  const bodies = [];
+  globalThis.fetch = async (_url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ data: { storefrontAccessTokenCreate: { storefrontAccessToken: { accessToken: "t", title: "x" }, userErrors: [] } } }), { status: 200 });
+  };
+  try {
+    await mintStorefrontToken("fake-admin-token");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  eq(bodies[0].variables, { input: { title: "storeasy26 catalog sync" } }, "storefront token variables:");
+});
+
+// ===========================================================================
+// SHOP-03: the dead Shopify checkout link
+// ===========================================================================
+await t("SHOP-03: no Shopify cart or checkout link in lib, app, components", async () => {
+  const bad = (await sourceFiles(["lib", "app", "components"])).flatMap((f) => findShopifyCartLinks(f.text).map((h) => `${f.path}: ${h}`));
+  eq(bad.length, 0, `A Shopify cart link shows Shopify titles and skips the offer engine:${listIn(bad)}\n   `);
+});
+
+// ===========================================================================
+// SHOP-06: the check is wired up
+// ===========================================================================
+await t("SHOP-06: pnpm test, the workflow and the hook all reach this suite", async () => {
+  const pkg = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
+  eq(pkg.scripts.test, "node scripts/run-tests.js", "test script:");
+  eq(pkg.scripts["test:shopify-boundary"], "node scripts/test-shopify-boundary.js", "suite script:");
+
+  const workflow = await readFile(join(ROOT, ".github/workflows/test.yml"), "utf8");
+  ok(/^on:\s*\n\s+push:/m.test(workflow), "the workflow runs on push");
+  ok(/run: pnpm test\s*$/m.test(workflow), "the workflow runs pnpm test");
+
+  const hook = await readFile(join(ROOT, ".githooks/pre-commit"), "utf8");
+  ok(/^pnpm test$/m.test(hook), "the hook runs pnpm test");
+  ok(((await stat(join(ROOT, ".githooks/pre-commit"))).mode & 0o111) !== 0, "the hook is executable");
+});
+
+// ----------------------------------------------------------------------------
+console.log(`\n${pass} passed, ${fail} failed`);
+await rm(join(ROOT, ".test-shopify-boundary.db"), { force: true });
+process.exit(fail ? 1 : 0);

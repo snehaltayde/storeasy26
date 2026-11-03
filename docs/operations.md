@@ -63,6 +63,28 @@ lazy (4 priority above the fold) · PDP 124ms · `/api/search` at full index
 ~1.2s PDP, CLS 0) still applies — the render path is unchanged; the consent
 banner is `position:fixed` (no CLS). Re-run Lighthouse after major UI changes.
 
+## Tests (SHOP-06)
+
+`pnpm test` runs every `test:*` suite in `package.json` except `test:perf` (a
+measurement), one at a time, prints one line per suite, shows the output of any
+that failed and exits non-zero. It takes about 25 seconds. It needs no secrets
+and no network. A suite stuck for 2 minutes is stopped and counted as failed
+(`TEST_SUITE_TIMEOUT_MS` changes that). A `scripts/test-*.js` file with no
+`test:*` script fails the run, because it would otherwise never run.
+
+- **On push:** `.github/workflows/test.yml` runs `pnpm test`. It does nothing
+  until this repo is pushed to GitHub.
+- **Before each commit:** `.githooks/pre-commit` runs the same `pnpm test`. It is
+  off until you run `pnpm hooks:enable` once. That sets `core.hooksPath` in the
+  repo's shared git config, so it applies to every worktree of this clone at once.
+  To turn it off: `git config --unset core.hooksPath`. The hook checks the files
+  on disk, including changes that are not staged.
+
+`pnpm test:shopify-boundary` is the suite that enforces Decision 2 (content is
+never written back to Shopify). If it fails on a change you meant to make, read
+its message before touching its lists: a new mutation, write scope or field sent
+to Shopify is a product decision, not a test fix.
+
 ## Related runbooks
 
 [docs/refunds.md](./refunds.md) — manual refund/cancel flows (Razorpay + Shopify + ledger).

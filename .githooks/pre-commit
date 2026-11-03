@@ -1,0 +1,13 @@
+#!/bin/sh
+# Required local check (SHOP-06): the same `pnpm test` the workflow runs. It takes
+# about 25 seconds. Not on by default: run `pnpm hooks:enable` once to turn it on.
+# It checks the files on disk, including changes you have not staged.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+# git sets these for hooks. They would point any git call in a suite at this commit.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE
+pnpm test
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo "Commit stopped: pnpm test failed. See the failed suites above." >&2
+fi
+exit "$status"
