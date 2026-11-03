@@ -436,6 +436,7 @@ const UNSAFE_NO_WORDS = [
   ['<video src="vbscript:x" controls></video><p>Hi</p>', "<p>Hi</p>"],
   ['<audio controls src="java&#x73;cript:x"></audio><p>Hi</p>', "<p>Hi</p>"],
   ['<embed src=" "></embed><p>Hi</p>', "<p>Hi</p>"],
+  ['<video controls></video src="/a"><p>Hi</p>', "<p>Hi</p>"],
   ['<img srcset="javascript:x" alt="A" /><p>Hi</p>', '<img alt="A" /><p>Hi</p>'],
   ['<picture><source srcset="/a.webp"><img src="/a.jpg" alt="A"></picture>', '<img src="/a.jpg" alt="A" />'],
   ['<img src="/a.jpg" srcset="/a.jpg 2x" data-src="/b.jpg" alt="A" />', '<img src="/a.jpg" alt="A" />'],

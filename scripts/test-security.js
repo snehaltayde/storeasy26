@@ -431,6 +431,7 @@ await t("text inside a dropped element is still dropped, with or without a comme
   eq(sanitizeHtml("<svg><!-- </svg> --><text>x</text></svg><p>Hi</p>"), "<p>Hi</p>");
   eq(sanitizeHtml("<style><!-- a > b --></style><p>Hi</p>"), "<p>Hi</p>");
   eq(sanitizeHtml("<script><!-- never closed"), "");
+  eq(sanitizeHtml("<style><!-- > </style><p>Hi</p>"), "<p>Hi</p>", "a comment opener inside a style doesn't hide what follows:");
 });
 
 console.log(`\nSecurity gate: ${pass} passed, ${fail} failed`);
