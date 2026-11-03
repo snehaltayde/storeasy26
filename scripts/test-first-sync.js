@@ -53,7 +53,7 @@ for (const k of ["TYPESENSE_HOST", "SHOPIFY_STORE_DOMAIN", "SHOPIFY_ADMIN_TOKEN"
   delete process.env[k];
 }
 
-const TENANTS = ["connect", "kill", "fail", "prune", "write", "gen", "callers", "cli", "nocreds", "deny"];
+const TENANTS = ["connect", "kill", "fail", "prune", "write", "gen", "callers", "cli", "nocreds", "deny", "members", "notick", "gaps"];
 const dbs = [".test-fsync-default.db", ".test-fsync-platform.db", ...TENANTS.map((t) => `.test-fsync-${t}.db`)];
 for (const f of dbs) await rm(join(root, f), { force: true });
 
@@ -152,7 +152,7 @@ async function invoke(label, fn) {
 
 // --- the fake Shopify -------------------------------------------------------------
 const SHOP = "fsync-test.myshopify.com";
-const shop = { products: [], collections: [], pageMs: 0, calls: [], fault: null };
+const shop = { products: [], collections: [], pageMs: 0, calls: [], fault: null, countPrecision: "EXACT" };
 const enc = (i) => Buffer.from(`at:${i}`).toString("base64");
 const dec = (c) => (c ? Number(Buffer.from(c, "base64").toString().slice(3)) : 0);
 function pageOf(list, cursor, size) {
@@ -239,7 +239,7 @@ function answer(op, v) {
       return { product: p ? { variants: adminVariants(p, v.cursor, 100) } : null };
     }
     case "AdminProductsCount":
-      return { productsCount: { count: shop.products.length, precision: "EXACT" } };
+      return { productsCount: { count: shop.products.length, precision: shop.countPrecision } };
     case "AdminCollections": {
       const pg = pageOf(shop.collections, v.cursor, 50);
       return { collections: { pageInfo: pg.pageInfo, nodes: pg.nodes.map(adminCollection) } };
@@ -284,7 +284,7 @@ globalThis.fetch = async (url, init = {}) => {
   }
   const { query, variables = {} } = JSON.parse(init.body || "{}");
   const op = /^\s*query\s+(\w+)/.exec(query)?.[1] || "anonymous";
-  const call = { op, cursor: variables.cursor ?? null, id: variables.id ?? null, storefront: !u.includes("/admin/") };
+  const call = { op, cursor: variables.cursor ?? null, id: variables.id ?? null, storefront: !u.includes("/admin/"), signal: Boolean(init.signal) };
   shop.calls.push(call);
   clock.t += shop.pageMs;
   if (invocation && clock.t - invocation.start > ROUTE_LIMIT_MS) {
@@ -295,6 +295,14 @@ globalThis.fetch = async (url, init = {}) => {
   if (f === "hang") {
     invocation?.kill();
     return new Promise(() => {});
+  }
+  // Shopify never answers, but the caller's own timeout (if it set one) ends the wait
+  if (f === "stall") {
+    return new Promise((_, reject) => {
+      if (!init.signal) return;
+      if (init.signal.aborted) reject(init.signal.reason);
+      init.signal.addEventListener("abort", () => reject(init.signal.reason), { once: true });
+    });
   }
   if (f?.status) return new Response(f.body || "upstream trouble", { status: f.status });
   return Response.json({ data: answer(op, variables) });
@@ -1125,6 +1133,345 @@ console.log("— every caller still works");
 }
 
 // =====================================================================================
+console.log("— an existing store's collections stay whole while a sync runs or fails");
+
+{
+  // Review fix round 1, problem 1: memberships past the first 250 were deleted
+  // when a collection's first page was written and only came back with its
+  // member page, so a failed or interrupted sync left shoppers a shorter
+  // collection.
+  const catalog = Array.from({ length: 300 }, (_, i) => mkProduct(i));
+  const big = mkCollection(0, catalog.map((p) => p.id));
+  const small = mkCollection(1, [pid(1), pid(2), pid(3)]);
+  const live = (c = big) => count("members", "collection_products", `WHERE collection_id = '${c.id}'`);
+  const order = async (c = big) =>
+    (await inT("members", () => libsql.execute(`SELECT product_id FROM collection_products WHERE collection_id = '${c.id}' ORDER BY position`))).rows.map((r) => r.product_id);
+  const hangOnce = (op) => {
+    let hung = false;
+    return (c) => (c.op === op && !hung ? ((hung = true), "hang") : null);
+  };
+
+  // Each case starts from the same place, whatever the one before it left:
+  // an existing store whose last sync is complete, 300 members live.
+  const baseline = async () => {
+    Object.assign(shop, { products: catalog, collections: [big, small], pageMs: 0, fault: null });
+    await letLeasesLapse("members");
+    await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE tenant_id = 'fs-members' AND status IN ('pending', 'leased')");
+    await inT("members", () => libsql.execute("UPDATE sync_runs SET status = 'failed', lease_owner = NULL, lease_until = NULL WHERE status = 'running'"));
+    const res = await inT("members", () => S.runCatalogSync());
+    eq([res.products, await live(), await live(small)], [300, 300, 3], "baseline (products, members, short collection):");
+  };
+
+  await t("Shopify fails on the member page of a refresh: all 300 members stay live while it retries and after the run fails", async () => {
+    await baseline();
+    shop.fault = (c) => (c.op === "CollectionProducts" ? { status: 503 } : null);
+    await quiet(() => invoke("refresh", () => postSync("members")));
+    const mid = await latest("members");
+    eq([mid.status, mid.phase], ["running", "members"], "waiting on the member page:");
+    eq(await live(), 300, "live members while the queue retries:");
+    const final = await tickUntilDone("members", 12);
+    shop.fault = null;
+    eq(final.status, "failed", "run:");
+    eq(await live(), 300, "live members after the run failed (it had 300 before):");
+    eq(await live(small), 3, "the short collection:");
+    const { body } = await getSync("members", supportTok);
+    ok(/keeps everything/.test(body.sync.detail), `detail: ${body.sync.detail}`);
+  });
+
+  await t("between a collection's first page and its member page, shoppers still see every member", async () => {
+    await baseline();
+    shop.fault = hangOnce("CollectionProducts");
+    const out = await quiet(() => invoke("refresh", () => postSync("members")));
+    shop.fault = null;
+    ok(out.killed, "killed on the member page");
+    eq((await latest("members")).phase, "members", "phase:");
+    eq(await live(), 300, "interim live members:");
+    await letLeasesLapse("members");
+    const final = await tickUntilDone("members");
+    eq(final.status, "complete", "run:");
+    eq(await live(), 300, "live members after:");
+    eq(await order(), big.members, "Shopify's order:");
+  });
+
+  await t("what Shopify dropped from a collection goes once the whole collection is read, not before", async () => {
+    const big2 = { ...big, members: big.members.filter((m) => m !== pid(5) && m !== pid(270)) };
+    const small2 = { ...small, members: [pid(1), pid(3)] };
+    await baseline();
+    shop.collections = [big2, small2];
+    shop.fault = hangOnce("CollectionProducts");
+    await quiet(() => invoke("refresh", () => postSync("members")));
+    shop.fault = null;
+    eq(await live(small), 2, "a collection read in one page is exact at once:");
+    eq(await live(), 300, "the long one keeps its old members until its last page:");
+    await letLeasesLapse("members");
+    const final = await tickUntilDone("members");
+    eq(final.status, "complete", "run:");
+    eq(await live(), 298, "the two dropped members are gone now:");
+    eq(await order(), big2.members, "Shopify's order:");
+    shop.collections = [big, small];
+  });
+
+  await t("a webhook that rewrites a collection while a sync is reading it isn't undone by the sync's tidy-up", async () => {
+    await baseline();
+    shop.fault = hangOnce("CollectionProducts");
+    await quiet(() => invoke("refresh", () => postSync("members")));
+    shop.fault = null;
+    // the collections/update webhook: the whole collection, refetched
+    await inT("members", () => S.writeCollection({ ...adminCollection(big), products: { nodes: big.members.map((id) => ({ id })) } }));
+    await letLeasesLapse("members");
+    const final = await tickUntilDone("members");
+    eq(final.status, "complete", "run:");
+    eq(await live(), 300, "live members:");
+  });
+
+  await t("a webhook refetch of a collection replaces its members: one Shopify dropped is gone at once", async () => {
+    await baseline();
+    const fewer = big.members.filter((m) => m !== pid(10) && m !== pid(280));
+    await inT("members", () => S.writeCollection({ ...adminCollection(big), products: { nodes: fewer.map((id) => ({ id })) } }));
+    eq(await live(), 298, "live members:");
+    eq(await order(), fewer, "order:");
+  });
+}
+
+// =====================================================================================
+console.log("— no tick: the console alone gets a killed sync going again");
+
+{
+  // Review fix round 1, problem 2: a job left 'leased' by a killed slice was
+  // never given to the console poll or to Try again, so without a tick the
+  // sync could not be recovered.
+  const catalog = Array.from({ length: 150 }, (_, i) => mkProduct(i));
+  const colls = [mkCollection(1, [pid(1), pid(2)])];
+  const fetched = async () => Number((await latest("notick")).products_fetched);
+  const jobOf = async () => (await J.listJobs({ tenant: "fs-notick" })).filter((j) => j.type === "catalog_sync")[0];
+  const hangOnPage = (n) => {
+    let pages = 0;
+    return (c) => (c.op === "AdminProducts" && ++pages === n ? "hang" : null);
+  };
+  const ownerPoll = () => invoke("poll", () => adminSync.GET(req(consoleUrl("notick"), { cookies: { _admin: ownerTok } })));
+  const tickCount = () => invocations.filter((x) => x.label.startsWith("tick")).length;
+  let ticksBefore;
+
+  await t("a manual sync whose slice is killed mid-page: run at its last page, job left leased", async () => {
+    ticksBefore = tickCount();
+    Object.assign(shop, { products: catalog, collections: colls, pageMs: 1000, fault: hangOnPage(3) });
+    const out = await quiet(() => invoke("manual sync", () => postSync("notick")));
+    shop.fault = null;
+    ok(out.killed, "killed");
+    eq(await fetched(), 60, "products in:");
+    eq((await jobOf()).status, "leased", "job:");
+  });
+
+  await t("…once both leases lapse, one owner poll moves it forward", async () => {
+    await letLeasesLapse("notick");
+    shop.fault = hangOnPage(3); // the poll's own slice gets two pages in, then is killed too
+    const out = await quiet(() => ownerPoll());
+    shop.fault = null;
+    ok(out.killed, "the poll's slice ran (and was killed on its third page)");
+    eq(await fetched(), 120, "two more pages in:");
+  });
+
+  await t("…and after sitting an hour (stalled), one Try again moves it forward and finishes it", async () => {
+    await letLeasesLapse("notick");
+    await inT("notick", () => libsql.execute({ sql: "UPDATE sync_runs SET updated_at = ?", args: [new Date(Date.now() - 3_600_000).toISOString()] }));
+    eq((await getSync("notick", supportTok)).body.sync.state, "stalled", "view before:");
+    const out = await quiet(() => invoke("try again", () => postSync("notick", { retry: true })));
+    const { status, body } = await json(out.value);
+    eq([status, body.action], [202, "resumed"], "answer:");
+    const run = await latest("notick");
+    eq(run.status, "complete", "run:");
+    eq(await count("notick", "products"), 150, "products:");
+    eq(tickCount(), ticksBefore, "no tick ran:");
+    // two killed runners had used two attempts; the founder's Try again starts a fresh budget
+    eq(Number((await jobOf()).attempts), 1, "attempts used after Try again:");
+  });
+
+  await t("Try again now during a backoff runs the sync at once instead of waiting for it", async () => {
+    await inT("notick", () => libsql.execute("DELETE FROM sync_runs"));
+    shop.fault = (c) => (c.op === "AdminProducts" && c.cursor === enc(60) ? { status: 500 } : null);
+    await quiet(() => invoke("manual sync", () => postSync("notick")));
+    shop.fault = null;
+    const job = await jobOf();
+    ok(job.status === "pending" && Date.parse(job.run_after) > Date.now(), `backing off: ${JSON.stringify([job.status, job.run_after])}`);
+    eq((await getSync("notick", supportTok)).body.sync.state, "retrying", "view:");
+    const out = await quiet(() => invoke("try again now", () => postSync("notick", { retry: true })));
+    eq((await json(out.value)).body.action, "resumed", "action:");
+    eq((await latest("notick")).status, "complete", "run:");
+    eq(tickCount(), ticksBefore, "no tick ran:");
+  });
+}
+
+// =====================================================================================
+console.log("— cases the first review found untested");
+
+{
+  const catalog = Array.from({ length: 60 }, (_, i) => mkProduct(i));
+  const colls = [mkCollection(1, [pid(1), pid(2)])];
+  const reset = async () => {
+    Object.assign(shop, { products: catalog, collections: colls, pageMs: 0, fault: null, countPrecision: "EXACT" });
+    await inT("gaps", () => libsql.executeMultiple("DELETE FROM sync_runs; DELETE FROM products; DELETE FROM variants; DELETE FROM product_images; DELETE FROM collections; DELETE FROM collection_products;"));
+    await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE tenant_id = 'fs-gaps'");
+  };
+  const syncGaps = () => inT("gaps", () => S.runCatalogSync().catch((e) => ({ error: e.message })));
+  const future = () => new Date(Date.now() + 60_000).toISOString();
+
+  await t("a collection handle reused by a new Shopify collection doesn't block the sync on the old row", async () => {
+    await reset();
+    await inT("gaps", () =>
+      libsql.batch(
+        [
+          { sql: "INSERT INTO collections (id, handle, title, sync_generation, synced_at) VALUES ('gid://shopify/Collection/1', 'group-1', 'Deleted upstream', 'sync_old', '2020-01-01T00:00:00.000Z')" },
+          { sql: "INSERT INTO collection_products (collection_id, product_id, position) VALUES ('gid://shopify/Collection/1', ?, 0)", args: [pid(9)] },
+        ],
+        "write",
+      ),
+    );
+    const res = await syncGaps();
+    ok(!res.error, `sync failed: ${res.error}`);
+    eq(await count("gaps", "collections", "WHERE id = 'gid://shopify/Collection/1'"), 0, "old collection gone:");
+    eq(await count("gaps", "collection_products", "WHERE collection_id = 'gid://shopify/Collection/1'"), 0, "its memberships gone:");
+    eq(await count("gaps", "collection_products", `WHERE collection_id = '${colls[0].id}'`), 2, "the new one's members:");
+  });
+
+  await t("a product whose image list shrinks keeps only Shopify's images", async () => {
+    await reset();
+    shop.products = catalog.map((p, i) => (i === 0 ? mkProduct(0, { images: 3 }) : p));
+    ok(!(await syncGaps()).error, "first sync");
+    eq(await count("gaps", "product_images", `WHERE product_id = '${pid(0)}'`), 3, "before:");
+    shop.products = catalog.map((p, i) => (i === 0 ? mkProduct(0, { images: 1 }) : p));
+    ok(!(await syncGaps()).error, "second sync");
+    eq(await count("gaps", "product_images", `WHERE product_id = '${pid(0)}'`), 1, "after:");
+    shop.products = catalog;
+  });
+
+  await t("a sync from before resumable runs, stuck at running, is closed off and a fresh one starts", async () => {
+    await reset();
+    await inT("gaps", () => libsql.execute({ sql: "INSERT INTO sync_runs (id, status, started_at) VALUES ('sync_pre0020', 'running', ?)", args: [new Date().toISOString()] }));
+    const out = await quiet(() => invoke("sync", () => postSync("gaps")));
+    eq((await json(out.value)).body.action, "started", "action:");
+    const old = (await runs("gaps")).find((r) => r.id === "sync_pre0020");
+    eq(old.status, "failed", "old run:");
+    ok(/older sync/.test(old.error), `old run's note: ${old.error}`);
+    eq((await latest("gaps")).status, "complete", "the fresh run:");
+  });
+
+  await t("the queue giving up never fails a run a live runner still holds", async () => {
+    await reset();
+    const { run } = await inT("gaps", () => S.requestCatalogSync());
+    await inT("gaps", () => libsql.execute({ sql: "UPDATE sync_runs SET lease_owner = 'other', lease_until = ? WHERE id = ?", args: [future(), run.id] }));
+    await inT("gaps", () => S.failSyncRun(run.id, "gave up"));
+    eq((await latest("gaps")).status, "running", "with no owner:");
+    await inT("gaps", () => S.failSyncRun(run.id, "gave up", { owner: "other" }));
+    eq((await latest("gaps")).status, "failed", "by its own runner:");
+  });
+
+  await t("an \"at least N\" product count is not shown as the total", async () => {
+    await reset();
+    shop.countPrecision = "AT_LEAST";
+    ok(!(await syncGaps()).error, "sync");
+    shop.countPrecision = "EXACT";
+    eq((await latest("gaps")).products_total, null, "products_total:");
+  });
+
+  await t("the last step's answer lost: the same slice still reports the run complete", async () => {
+    await reset();
+    const { run } = await inT("gaps", () => S.requestCatalogSync());
+    dbFault = once((sql) => (/SET status = 'complete'/.test(sql) ? "lost-no-retry" : null));
+    const res = await inT("gaps", () => S.runSyncSlice(run.id, { mode: "inline" })).catch((e) => ({ error: e.message }));
+    dbFault = null;
+    eq([res.error, res.status, res.lost], [undefined, "complete", undefined], "slice:");
+    eq((await latest("gaps")).status, "complete", "run:");
+  });
+
+  await t("Try again on a run from another Shopify API starts fresh instead of reusing its position", async () => {
+    await reset();
+    shop.fault = (c) => (c.op === "AdminProducts" && c.cursor === enc(30) ? { status: 401 } : null);
+    await quiet(() => invoke("sync", () => postSync("gaps")));
+    shop.fault = null;
+    const failed = await latest("gaps");
+    eq(failed.status, "failed", "first run:");
+    await inT("gaps", () => libsql.execute({ sql: "UPDATE sync_runs SET source = 'storefront' WHERE id = ?", args: [failed.id] }));
+    const out = await quiet(() => invoke("try again", () => postSync("gaps", { retry: true })));
+    eq((await json(out.value)).body.action, "started", "action:");
+    ok((await latest("gaps")).id !== failed.id, "a new run");
+  });
+
+  await t("a slice that finds another runner on the run waits for that runner's lease", async () => {
+    await reset();
+    await json(await postSync("gaps"));
+    globalThis.__fsyncAfter.length = 0; // nothing runs yet
+    const run = await latest("gaps");
+    const until = future();
+    await inT("gaps", () => libsql.execute({ sql: "UPDATE sync_runs SET lease_owner = 'other', lease_until = ? WHERE id = ?", args: [until, run.id] }));
+    const job = (await J.listJobs({ tenant: "fs-gaps" })).find((j) => j.type === "catalog_sync" && j.status === "pending");
+    const ran = await quiet(() => W.runJobById(job.id, { budgetMs: 45_000 }));
+    eq(ran?.requeued, true, "requeued:");
+    const after = (await J.listJobs({ tenant: "fs-gaps" })).find((j) => j.id === job.id);
+    eq([after.status, after.run_after], ["pending", until], "job:");
+  });
+
+  await t("a prune for a run whose row is gone writes nothing (no stand-in row, no deletes)", async () => {
+    await reset();
+    await plantStale("gaps");
+    const res = await inT("gaps", () => S.pruneGeneration({ id: "sync_gone", phase: "prune", pages_done: 0, started_at: new Date().toISOString() }, "suite").catch((e) => ({ threw: e.message })));
+    ok(res.lost || res.threw, `refused: ${JSON.stringify(res).slice(0, 160)}`);
+    ok(await hasRow("gaps", pid(999001)), "stale row kept");
+    eq(await count("gaps", "sync_runs", "WHERE id = 'sync_gone'"), 0, "no stand-in run row:");
+  });
+
+  await t("errors: a 404 has its own plain message; a 5xx whose body mentions 401 is retried, not final", async () => {
+    eq(V.plainSyncError("Admin GraphQL HTTP 404: Not Found"), "Shopify couldn't find your store. Contact support to check the store address, then try again.", "404:");
+    const fiveHundred = "Admin GraphQL HTTP 503: <html>upstream answered 401 Unauthorized, 403, 404</html>";
+    eq(S.isPermanentSyncError(new Error(fiveHundred)), false, "503 with 401 in its body is permanent:");
+    eq(V.plainSyncError(fiveHundred), "Shopify didn't answer. This usually clears up on its own. Try again in a few minutes.", "503 message:");
+    eq(S.isPermanentSyncError(new Error('Admin GraphQL HTTP 401: {"errors":"Invalid API key"}')), true, "401:");
+    eq(S.isPermanentSyncError(new Error("client-credentials grant failed (403): denied")), true, "grant 403:");
+    eq(S.isPermanentSyncError(new Error("Shopify HTTP 404: Not Found")), true, "storefront 404:");
+    eq(S.isPermanentSyncError(new Error("No Shopify credentials for this tenant")), true, "no link:");
+    eq(S.isPermanentSyncError(new Error("The operation was aborted due to timeout")), false, "timeout:");
+  });
+
+  await t("a Shopify call that never answers ends at the sync's own time limit, as a retry with a plain message", async () => {
+    await reset();
+    const was = S.SYNC_TIMING.SHOPIFY_CALL_MS;
+    ok(was > 0 && was <= 20_000, `a time limit per Shopify call is set (${was})`);
+    S.SYNC_TIMING.SHOPIFY_CALL_MS = 50;
+    // AbortSignal.timeout's timer doesn't hold the process open (a server's
+    // does); keep the suite alive while the call waits for it
+    const keepAlive = setInterval(() => {}, 1000);
+    try {
+      const { run } = await inT("gaps", () => S.requestCatalogSync());
+      shop.fault = (c) => (c.op === "AdminProducts" && c.cursor === enc(30) ? "stall" : null);
+      const err = await inT("gaps", () => S.runSyncSlice(run.id, { mode: "queued" })).then(() => null, (e) => e);
+      ok(err, "the slice ended with an error instead of hanging");
+      const after = await latest("gaps");
+      eq([after.status, Number(after.products_fetched)], ["running", 30], "run (the queue retries it):");
+      const { view } = await inT("gaps", () => S.catalogSyncStatus());
+      eq(view.message, "Shopify didn't answer. This usually clears up on its own. Try again in a few minutes.", "message:");
+      ok(callsSince(0, "AdminProducts").slice(-2).every((c) => c.signal), "catalog reads carry the time limit");
+    } finally {
+      clearInterval(keepAlive);
+      S.SYNC_TIMING.SHOPIFY_CALL_MS = was;
+      shop.fault = null;
+    }
+  });
+
+  await t("the setup step counts as done once a sync completes, even when Shopify has no products", async () => {
+    await reset();
+    shop.products = [];
+    shop.collections = [];
+    ok(!(await syncGaps()).error, "sync");
+    const { buildChecklist } = await import("../lib/admin/onboarding.js");
+    await fresh("gaps");
+    const list = await inT("gaps", () => buildChecklist());
+    const step = list.items?.find((s) => s.id === "catalog");
+    eq(step?.done, true, `catalog step: ${JSON.stringify(step)}`);
+    ok(/no products yet/.test(step.hint), `hint: ${step.hint}`);
+    Object.assign(shop, { products: catalog, collections: colls });
+  });
+}
+
+// =====================================================================================
 console.log("— the console card, rendered");
 
 {
@@ -1164,7 +1511,9 @@ console.log("— the console card, rendered");
   await t("running: headline, N of M, and a progress bar at the right value", async () => {
     const html = render(view(run()));
     ok(html.includes("Bringing in your products from Shopify"), html);
-    ok(html.includes("240 of 600 products so far"), html);
+    ok(html.includes("240 of 600 products so far. Big stores can take a while."), `two sentences, each with its full stop: ${html}`);
+    ok(view(run({ products_total: null })).detail.startsWith("240 products so far. "), "without a total too");
+    ok(/so far\. Your store keeps everything/.test(view(run({ status: "failed", error: "x" })).detail), "failed detail");
     ok(/role="progressbar"[^>]*aria-valuenow="40"/.test(html), `bar: ${html}`);
     ok(!html.includes("<button"), "no buttons while it simply runs");
   });
@@ -1193,6 +1542,27 @@ console.log("— the console card, rendered");
     ok(!render(done).includes("<button"), "dashboard: no button once done");
     ok(/>Refresh from Shopify<\/button>/.test(render(done, { showStart: true })), "settings: refresh");
     ok(!render(view(run({ status: "failed", error: "x" })), { canRun: false }).includes("<button"), "support sees no button");
+  });
+
+  await t("a store with no Shopify link is not offered a start that can only fail", async () => {
+    const v = view(null, { linked: false });
+    eq(v.canStart, false, "canStart:");
+    eq(v.detail, "Storeasy isn't linked to your Shopify store yet. Contact support to link it.", "detail:");
+    const html = render(v);
+    ok(!html.includes("<button"), `no button: ${html}`);
+    ok(!render(view({ status: "complete", products: 8, collections: 1, finished_at: new Date().toISOString() }, { hasComplete: true, linked: false }), { showStart: true }).includes("<button"), "no refresh either");
+    const { view: live } = await inT("nocreds", () => S.catalogSyncStatus());
+    eq([live.state, live.canStart], ["none", false], "the real status of a store with no link:");
+  });
+
+  await t("a refresh of a store that already has its products warns instead of alarming", async () => {
+    const failed = view(run({ status: "failed", error: "Admin GraphQL HTTP 502", lease_owner: null, lease_until: null }), { hasComplete: true });
+    eq(failed.headline, "The latest refresh from Shopify didn't finish", "headline:");
+    const html = render(failed);
+    ok(html.includes('data-tone="warning"') && !html.includes('data-tone="danger"'), `tone: ${html}`);
+    ok(/>Try again<\/button>/.test(html), "still offers Try again");
+    eq(view(run(), { hasComplete: true }).headline, "Refreshing your products from Shopify", "running refresh:");
+    ok(render(view(run({ status: "failed", error: "x" }))).includes('data-tone="danger"'), "a first sync that failed is still red");
   });
 
   await t("the card's own requests are the ones the route answers (Try again → resume)", async () => {
@@ -1235,6 +1605,7 @@ await t("the connect callback queues the sync instead of running it in after(); 
 await t("the dashboard shows the card while a sync isn't complete; settings uses it too", async () => {
   const dash = await readFile(join(root, "app/(console)/admin/(authed)/dashboard/page.js"), "utf8");
   ok(/catalogSyncStatus\(\)/.test(dash) && /state !== "complete"/.test(dash) && /<SyncProgress/.test(dash), "dashboard card");
+  ok(/v\.firstSync \|\| v\.state === "failed" \|\| v\.state === "stalled"/.test(dash), "a refresh shows on the dashboard only when it needs the founder");
   const settings = await readFile(join(root, "components/admin/SettingsAdmin.js"), "utf8");
   ok(/<SyncProgress/.test(settings) && !/Syncing — this can take a minute/.test(settings), "settings card");
 });

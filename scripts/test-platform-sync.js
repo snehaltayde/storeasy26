@@ -149,6 +149,12 @@ await t("patchTenant merges config/secrets and keeps everything else", async () 
 // --- single-entity sync with injected gql ---------------------------------------
 const T1 = { id: "t1", name: "T1", status: "active", dbUrl: "file:.test-psync-t1.db", dbToken: null, config: {}, secrets: {} };
 await withTenant(T1, () => libsql.executeMultiple(schema));
+// fixture rule: ledger on top of raw schema, as every real tenant has it
+// (GEN-02's 0020 gives memberships the columns webhook writes now fill)
+{
+  const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+  await withTenant(T1, async () => runMigrations(libsql, await loadMigrations("tenant")));
+}
 
 const productNode = (over = {}) => ({
   id: "gid://shopify/Product/1",

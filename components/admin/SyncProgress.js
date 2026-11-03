@@ -44,12 +44,16 @@ export function SyncProgressBody({ view, busy = false, error = null, canRun = tr
   const working = state === "running" || state === "retrying";
   const retryLabel = state === "retrying" ? "Try again now" : "Try again";
   const startLabel = state === "none" ? "Bring in products" : "Refresh from Shopify";
+  // A refresh of a store that already has its products is a warning, not an
+  // alarm: the store keeps working on what it had.
+  const tone = state === "retrying" || view.firstSync === false ? "warning" : "danger";
+  const canStartHere = view.canStart && (state === "none" || showStart);
   return (
     <div className="space-y-3">
       <div aria-live="polite" className="space-y-1.5">
         <p className="text-sm font-medium text-fg">{view.headline}</p>
         {view.message && (
-          <Banner tone={state === "retrying" ? "warning" : "danger"}>
+          <Banner tone={tone}>
             <p>{view.message}</p>
           </Banner>
         )}
@@ -76,14 +80,14 @@ export function SyncProgressBody({ view, busy = false, error = null, canRun = tr
           <p>{error}</p>
         </Banner>
       )}
-      {canRun && (view.canRetry || (showStart && view.canStart) || state === "none") && (
+      {canRun && (view.canRetry || canStartHere) && (
         <div className="flex flex-wrap gap-2">
           {view.canRetry && (
             <Button variant="primary" busy={busy} icon={<RotateCcw size={14} aria-hidden />} onClick={onRetry}>
               {retryLabel}
             </Button>
           )}
-          {!view.canRetry && (state === "none" || showStart) && view.canStart && (
+          {!view.canRetry && canStartHere && (
             <Button variant={state === "none" ? "primary" : "secondary"} busy={busy} icon={<RefreshCw size={14} aria-hidden />} onClick={onStart}>
               {startLabel}
             </Button>

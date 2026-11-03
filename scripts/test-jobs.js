@@ -292,6 +292,20 @@ await t("a handler that has more to do requeues its job: pending, due, fresh att
   eq((await J.listJobs({})).find((j) => j.id === id).run_after, later, "a requeue can wait for another runner:");
 });
 
+await t("makeJobDue takes over a job whose runner was killed (lease ran out), never one a live runner holds", async () => {
+  await C.platformDb().execute("UPDATE jobs SET status = 'done' WHERE status IN ('pending','leased')");
+  const { id } = await J.enqueueJob({ type: "catalog_sync", idempotencyKey: "k-killed" });
+  const set = (until) => C.platformDb().execute({ sql: "UPDATE jobs SET status = 'leased', attempts = 3, lease_until = ? WHERE id = ?", args: [until, id] });
+  const row = async () => (await J.listJobs({})).find((j) => j.id === id);
+  await set(new Date(Date.now() + 60_000).toISOString());
+  await J.makeJobDue(id);
+  eq((await row()).status, "leased", "a live lease is left alone:");
+  await set(new Date(Date.now() - 1_000).toISOString());
+  await J.makeJobDue(id);
+  const r = await row();
+  same([r.status, Number(r.attempts), r.lease_until, r.run_after], ["pending", 0, null, null], "a lapsed lease becomes due, with a fresh budget:");
+});
+
 // --- stats + retention ---------------------------------------------------------------
 await t("queueStats + prune: counts are sane; OLD done rows age out, recent done + dead stay", async () => {
   const stats = await J.queueStats();

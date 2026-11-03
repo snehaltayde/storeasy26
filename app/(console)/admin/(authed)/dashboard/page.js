@@ -57,9 +57,12 @@ export default async function AdminDashboardPage({ searchParams }) {
       catalogSyncStatus().catch(() => null),
     ]),
   );
-  // GEN-02: while products are coming in (or didn't finish), that is the
-  // first thing the founder sees, with progress or a plain retry.
-  const syncCard = sync?.view && sync.view.state !== "complete" ? sync.view : null;
+  // GEN-02: while a store's first products are coming in (or didn't finish),
+  // that is the first thing the founder sees, with progress or a plain retry.
+  // A refresh of a store that already has its products only shows here when
+  // it needs the founder (it failed or stopped); Settings shows the rest.
+  const v = sync?.view;
+  const syncCard = v && v.state !== "complete" && (v.firstSync || v.state === "failed" || v.state === "stalled") ? v : null;
 
   const byDay = new Map(rollup.series.map((d) => [d.day, d]));
   const dayKey = (msAgo) => dayInTz(new Date(Date.now() - msAgo).toISOString(), rollup.tz);
