@@ -49,10 +49,10 @@ export const PUT = tenantHandler(async (request, { params }) => {
     await audit({ actor: auth.actor, action: "offers.write", resource: `offer:${id}`, diff: { type: saved.type, enabled: saved.enabled } });
     return NextResponse.json({ ok: true, offer: saved });
   } catch (e) {
+    if (e?.code === "OFFER_INVALID") return NextResponse.json({ error: String(e.message), errors: e.errors }, { status: 422 });
     const infra = infraResponse(e, { route: "admin/offers/[id]" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
-    const status = e?.code === "OFFER_INVALID" ? 422 : 400;
-    return NextResponse.json({ error: String(e?.message || e), errors: e?.errors }, { status });
+    return NextResponse.json({ error: String(e?.message || e), errors: e?.errors }, { status: 400 });
   }
 });
 

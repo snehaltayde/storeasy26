@@ -2,7 +2,8 @@
 // DevTools protocol, against the design harness on a private port. Kept with
 // the screenshots so the drill can be re-run; not part of `pnpm test`.
 // Reads the local test password from the gitignored .design-env and never
-// prints it. Scenarios: page | designer | publish | dbdown (needs lock.mjs).
+// prints it. Scenarios: page | designer | publish | dbdown (needs lock.mjs),
+// and from fix round 1: media | warnings.
 //   node scripts/dev-design.js seed
 //   node docs/cms-reviews/drills/DOC-04/serve.mjs "$PWD" 3164 &
 //   node docs/cms-reviews/drills/DOC-04/drill.mjs "$PWD" 3164 9333 docs/cms-reviews/drills/DOC-04 page
@@ -175,6 +176,58 @@ try {
     await waitFor(`document.body.textContent.includes("Fix before publishing")`, "publish issues", 30000);
     note("D6 publish issues", await evaluate(`(() => { const b = [...document.querySelectorAll('[role="alert"]')].find((x) => x.textContent.includes("Fix before publishing")); return b ? [...b.querySelectorAll("li")].map((l) => l.textContent.trim()) : null; })()`));
     await shot("D6-publish-panel-issue-from-id");
+  }
+
+  // Fix round 1, D8: an image used on a page whose slug says "network". The
+  // Media screen's Delete must reach the "still referenced" guard (the only
+  // way to force-delete), not "We couldn't reach your store's data".
+  if (scenario === "media") {
+    const up = await evaluate(`(async () => {
+      const c = document.createElement("canvas"); c.width = 8; c.height = 8;
+      const g = c.getContext("2d"); g.fillStyle = "#2f6f4f"; g.fillRect(0, 0, 8, 8);
+      const blob = await new Promise((r) => c.toBlob(r, "image/png"));
+      const fd = new FormData(); fd.append("file", blob, "partners-doc04.png"); fd.append("alt", "Our partners");
+      const r = await fetch("/api/admin/media", { method: "POST", body: fd });
+      return { status: r.status, body: await r.json().catch(() => null) };
+    })()`);
+    note("D8 upload", { status: up.status, id: up.body?.media?.id || null, error: up.body?.error || null });
+    const url = up.body?.media?.url;
+    const made = await api("PUT", "/api/admin/storefront", { page: { slug: "partner-network", title: "Partner network", sections: [{ kind: "image", src: url, alt: "Our partners" }] }, revision: null });
+    note("D8 page partner-network", made.status);
+    await nav("/admin/media", "!!document.querySelector('[aria-label=\"Delete partners-doc04.png\"]')", "media library");
+    await clickLabel("Delete partners-doc04.png");
+    await sleep(400);
+    await clickText("Delete");
+    await waitFor(`document.body.textContent.includes("Still referenced") || document.body.textContent.includes("couldn't reach")`, "delete answer", 30000);
+    await sleep(400);
+    note("D8 dialog", await evaluate(`(() => { const d = [...document.querySelectorAll('[role="dialog"], dialog')].map((x) => x.textContent.replace(/\\s+/g, " ").trim()).filter(Boolean); return d; })()`));
+    note("D8 shows the store-data message", await evaluate(`document.body.textContent.includes("couldn't reach your store's data")`));
+    await shot("D8-media-delete-still-referenced");
+  }
+
+  // Fix round 1, D9: after Publish now, the warnings banner at the top says
+  // where each warning is (announcement, hero, menu, banner section).
+  if (scenario === "warnings") {
+    const view = await api("GET", "/api/admin/storefront");
+    const rev = view.body.revisions;
+    const put = async (block, value) => note(`D9 save ${block}`, (await api("PUT", "/api/admin/storefront", { block, value, revision: rev[block] ?? null })).status);
+    await put("announcement", { ...view.body.blocks.announcement, enabled: true, text: view.body.blocks.announcement.text || "Monsoon sale", href: "/another-odd" });
+    await put("hero", { ...view.body.blocks.hero, primary: { label: view.body.blocks.hero.primary?.label || "Shop", href: "/x-odd" } });
+    const sections = view.body.blocks.home_sections.filter((s) => s.kind !== "banner" || s.title);
+    await put("home_sections", [...sections, { id: "sec_drill9", kind: "banner", title: "Partner week", text: "", label: "See partners", href: "/odd-route", enabled: true }]);
+    note("D9 banner section number", sections.length + 1);
+    await nav("/admin/releases", "!!document.querySelector('main')", "releases");
+    await waitFor(`[...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "Publish now" && !b.disabled)`, "publish enabled", 30000);
+    note("D9 card warnings before publishing", await evaluate(`[...document.querySelectorAll("li")].map((l) => l.textContent.trim()).filter((t) => t.includes("isn't a storefront route"))`));
+    await clickText("Publish now", 0);
+    await sleep(500);
+    await clickText("Publish now", 1); // the dialog's confirm
+    await waitFor(`[...document.querySelectorAll("p")].some((p) => p.textContent.includes("isn't a storefront route"))`, "result warnings", 30000);
+    await sleep(500);
+    note("D9 banner after Publish now", await evaluate(`[...document.querySelectorAll("p")].map((p) => p.textContent.trim()).filter((t) => t.includes("isn't a storefront route"))`));
+    await evaluate("window.scrollTo(0, 0)");
+    await sleep(300);
+    await shot("D9-publish-result-warnings-located");
   }
 
   if (scenario === "dbdown") {

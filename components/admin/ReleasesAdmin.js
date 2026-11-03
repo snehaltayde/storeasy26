@@ -6,12 +6,11 @@ import { CircleCheck, ExternalLink } from "lucide-react";
 import { localInputToIso } from "@/lib/admin/schedule";
 import { diffItemInfo } from "@/components/admin/cms/labels";
 import { startPreview, NETWORK_ERROR } from "@/components/admin/cms/api";
-import { issueText } from "@/lib/cms/issues";
-
 // DOC-04: publish issues are the same structured shape as save issues. The
 // server sends no positions; "Section 2 (Banner / CTA)" is worked out here
-// from each issue's section id against the sections being published.
-const issueLines = (issues, sections, severity) => (issues || []).filter((i) => i.severity === severity).map((i) => issueText(i, { sections }));
+// from each issue's section id against the sections being published, both
+// before publishing and in the warnings that come back after it.
+import { issueLines, resultWarningLines } from "@/lib/cms/issues";
 import { Card, CardHeader } from "@/components/console/Card";
 import { Badge, StatusBadge } from "@/components/console/Badge";
 import { Banner } from "@/components/console/Banner";
@@ -65,6 +64,9 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.ok) {
         if (json.releases) setData(json); // every mutating POST returns the full view
+        // DOC-04: the change went through but the view couldn't be read, so
+        // what this page shows is out of date. Say so; don't claim a failure.
+        if (json.notice) setResultWarnings([json.notice]);
         return json;
       }
       // S53 (0B-1): the publish was bound to the hash we DISPLAYED; drafts
@@ -263,7 +265,7 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
                 const json = await call({ action: "schedule", note, at: iso, expectedDraftHash: data.draftHash });
                 if (json.ok) {
                   toast.success(`Scheduled for ${when(json.scheduled?.scheduledFor)} — the pending release is in the history below.`);
-                  setResultWarnings(json.scheduled?.warnings || []);
+                  setResultWarnings([...(json.notice ? [json.notice] : []), ...resultWarningLines(json.scheduled)]);
                   setNote("");
                   setAt("");
                 }
@@ -357,7 +359,7 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
           const json = await call({ action: "publish", note, expectedDraftHash: data.draftHash });
           if (!json.ok) throw new Error(json.error); // keeps the dialog open, shows the reason
           toast.success("Published — live now.");
-          setResultWarnings(json.published?.warnings || []);
+          setResultWarnings([...(json.notice ? [json.notice] : []), ...resultWarningLines(json.published)]);
           setNote("");
         }}
       />

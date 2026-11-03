@@ -1,0 +1,38 @@
+{
+  "when": "2026-11-03T10:15:48.580Z",
+  "base": "http://localhost:3291",
+  "log": [
+    [
+      "login status",
+      200
+    ],
+    [
+      "D8 upload",
+      {
+        "status": 200,
+        "id": "med_0fe44665b0c66af363",
+        "error": null
+      }
+    ],
+    [
+      "D8 page partner-network",
+      200
+    ],
+    [
+      "D8 dialog",
+      [
+        "Still referenced — delete anyway?This file is still referenced:page:partner-networkDeleting it leaves broken images there (and in any older release you roll back to).CancelDelete anyway"
+      ]
+    ],
+    [
+      "D8 shows the store-data message",
+      false
+    ]
+  ],
+  "shots": [
+    [
+      "D8-media-delete-still-referenced",
+      64026
+    ]
+  ]
+}

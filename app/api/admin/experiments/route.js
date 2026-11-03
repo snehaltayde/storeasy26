@@ -58,8 +58,9 @@ export const POST = tenantHandler(async (request) => {
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
   } catch (e) {
+    if (e?.errors) return NextResponse.json({ error: String(e.message).slice(0, 300), errors: e.errors }, { status: 422 }); // the plan's own problems
     const infra = infraResponse(e, { route: "admin/experiments" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
-    return NextResponse.json({ error: String(e?.message || e).slice(0, 300), ...(e.errors ? { errors: e.errors } : {}) }, { status: 422 });
+    return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }
 });

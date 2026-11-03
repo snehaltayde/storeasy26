@@ -241,8 +241,14 @@ await t("links to /journal, /quiz, /bundles, /wishlist, /account no longer warn"
   );
   const snap = await inTenant(() => R.snapshotContent());
   const v = await inTenant(() => R.validateRelease(snap.content));
-  const navWarnings = v.warnings.filter((w) => /nav/.test(w) && /isn't a storefront route/.test(w));
+  // DOC-04: the messages no longer say "Header nav …", so filter on where each
+  // issue is filed, not its words (filtering on /nav/ found nothing, ever)
+  const navUnknown = (i) => i.documentId === "doc_header" && i.code === "LINK_UNKNOWN_ROUTE";
+  const navWarnings = v.issues.filter(navUnknown).map((i) => i.message);
   eq(navWarnings.length, 0, `spurious warnings: ${navWarnings.join(" | ")}`);
+  // and the same filter does catch one when there is one
+  const bad = await inTenant(() => R.validateRelease({ ...snap.content, blocks: { ...snap.content.blocks, nav_header: [{ label: "Blog", href: "/blog" }] } }));
+  eq(bad.issues.filter(navUnknown).length, 1, "a real unknown route is caught:");
   await inTenant(() => S.deleteBlock("nav_header"));
 });
 

@@ -67,9 +67,9 @@ export const POST = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "storefront.write", resource: `media:${original.id}`, diff: { filename: original.filename, size: original.size, thumb: !!thumbRow } });
     return NextResponse.json({ ok: true, media: shape(original), thumb: thumbRow ? shape(thumbRow) : null });
   } catch (e) {
+    if (e?.code === "MEDIA_INVALID") return NextResponse.json({ error: e.message, errors: e.errors }, { status: 422 });
     const infra = infraResponse(e, { route: "admin/media" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
-    if (e.code === "MEDIA_INVALID") return NextResponse.json({ error: e.message, errors: e.errors }, { status: 422 });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }
 });
@@ -100,9 +100,10 @@ export const DELETE = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "storefront.write", resource: `media:${id}`, diff: { deleted: true, forced: body.force === true } });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
+    // the "still used on …" guard is the only way to the force-delete, so it comes first
+    if (e?.code === "MEDIA_IN_USE") return NextResponse.json({ error: e.message, code: e.code, usage: e.usage }, { status: 409 });
     const infra = infraResponse(e, { route: "admin/media" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
-    if (e.code === "MEDIA_IN_USE") return NextResponse.json({ error: e.message, code: e.code, usage: e.usage }, { status: 409 });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 422 });
   }
 });

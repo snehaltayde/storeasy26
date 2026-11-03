@@ -1,0 +1,48 @@
+{
+  "when": "2026-11-03T10:16:00.900Z",
+  "base": "http://localhost:3291",
+  "log": [
+    [
+      "login status",
+      200
+    ],
+    [
+      "D9 save announcement",
+      200
+    ],
+    [
+      "D9 save hero",
+      200
+    ],
+    [
+      "D9 save home_sections",
+      200
+    ],
+    [
+      "D9 banner section number",
+      3
+    ],
+    [
+      "D9 card warnings before publishing",
+      [
+        "Hero: the primary button links to \"/x-odd\", which isn't a storefront route this platform serves — double-check it",
+        "Announcement bar: \"/another-odd\" isn't a storefront route this platform serves — double-check it",
+        "Section 3 (Banner / CTA): \"/odd-route\" isn't a storefront route this platform serves — double-check it"
+      ]
+    ],
+    [
+      "D9 banner after Publish now",
+      [
+        "Hero: the primary button links to \"/x-odd\", which isn't a storefront route this platform serves — double-check it",
+        "Announcement bar: \"/another-odd\" isn't a storefront route this platform serves — double-check it",
+        "Section 3 (Banner / CTA): \"/odd-route\" isn't a storefront route this platform serves — double-check it"
+      ]
+    ]
+  ],
+  "shots": [
+    [
+      "D9-publish-result-warnings-located",
+      95508
+    ]
+  ]
+}

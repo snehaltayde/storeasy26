@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { getContentPage, pageRevisions } from "@/lib/cms/store";
 import { normalizePageSections } from "@/lib/cms/schemas";
+import { infraKind } from "@/lib/cms/issues";
 import { db } from "@/lib/db";
 import { PageEditor } from "@/components/admin/cms/PageEditor";
 import { tfetch } from "@/lib/tenant-request";
@@ -41,8 +42,11 @@ async function loadPage(slug) {
         window_end: row.window_end || null,
       };
     }
-  } catch {
-    /* table missing (pre-migration tenant) → defaults below */
+  } catch (e) {
+    // table missing (pre-migration tenant) → defaults below. DOC-04: any other
+    // failure is a failed load (the console's error screen, with Retry), never
+    // a 404 or the built-in default shown in place of the founder's page.
+    if (infraKind(e) !== "schema") throw e;
   }
   const page = await getContentPage(slug);
   return page ? { ...page, enabled: true } : null;
@@ -68,7 +72,7 @@ export default async function StorefrontPageEditorPage({ params, searchParams })
     return <PageEditor mode="create" page={initial} revision={null} fromMissing={Boolean(from && !source)} tenantTemplates={tenantTemplates} />;
   }
 
-  const [page, revs] = await tfetch(async () => [await loadPage(slug), await pageRevisions()]);
+  const [page, revs] = await tfetch(async () => [await loadPage(slug), await pageRevisions({ strict: true })]);
   if (!page) notFound();
   return <PageEditor mode="edit" page={page} revision={revs[slug] ?? null} />;
 }

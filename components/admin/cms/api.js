@@ -35,8 +35,21 @@ async function call(url, options) {
   return { ok: true, ...data };
 }
 
-const put = (body) =>
-  call("/api/admin/storefront", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+// DOC-04 fix round 1: SAVED_RELOAD_FAILED means the save went through but the
+// server couldn't read the editor's view back. Ask for the view once more; if
+// that works, the editor carries on as after any save, with the new revision
+// (without it, the next Save would conflict with the founder's own save). If
+// it fails too, the answer stands: it says the changes were saved, and to
+// reload. Only for the operations whose success IS the view.
+const VIEW_OPS = ["block", "page", "deletePage"];
+const put = async (body) => {
+  const r = await call("/api/admin/storefront", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (r.code === "SAVED_RELOAD_FAILED" && VIEW_OPS.some((k) => body[k] !== undefined)) {
+    const view = await call("/api/admin/storefront");
+    if (view.ok) return view;
+  }
+  return r;
+};
 
 export const getStorefrontView = () => call("/api/admin/storefront");
 
