@@ -109,6 +109,37 @@ The full list goes to the owner when all six phases are done. Each entry names t
 - [ ] **(Fix round 1) A real store that resets its brand, on staging.** On a tenant with its own colours live and a theme pinned, press Reset on the Brand screen, then Publish. Pass: it publishes, and the store shows the platform's default look. Then apply the Pulse kit with "use its colours" ticked and publish. Pass: it publishes and the Brand screen shows no "Hard to read" banner.
 - [ ] **(Fix round 1) A new store on Glow, on staging.** On a newly provisioned tenant (no brand), apply the Glow kit with both boxes unticked and publish. Pass: it publishes, and on your phone the header and hero green text is readable on the cream background.
 
+### Saves show at once, and a broken table is not a missing page (FIX-C)
+- [ ] **Staging with several instances.** Save shipping rates in Settings and reload at once, five times. Save the brand, open Publishing at once, then click Publish now. Pass: every reload shows the saved rates and no "You haven't set your own shipping rates yet", Publishing lists the brand change at once, and Publish now answers 200, not 409.
+- [ ] **Turso read-your-writes.** Confirm the control-plane database on staging and production is one Turso location read over HTTP, with no embedded or read replica serving console reads. Pass: yes, or a decision on how console reads reach the primary.
+- [ ] **Hosted blips.** The fresh read of the store's row has no retry on Turso's occasional "fetch failed". On staging, watch the console for a day. Pass: no "Service temporarily unavailable" screens; if there are some, ask for a retry.
+- [ ] **Staging schema fault.** On a throwaway staging tenant, break `cms_pages` (for example a view naming a missing column), open a page in the page editor, then save in the Designer. Pass: "This page hit an error" with Try again, then "Your changes were saved, but this page couldn't refresh…" after the save. Never a 404, never a silent save.
+- [ ] **Safari and a real phone:** the Settings reload and the Publishing panel after a brand save. Pass: saved values show at once, nothing scrolls sideways.
+- [ ] **Decisions:**
+  - Shopper-facing settings (shipping rates, store name, checkout mode, payment key, maintenance) still reach shoppers up to 30 seconds late per instance. Accept, or version them too? (See also the rate mismatch below, which is being fixed.)
+  - A store before its first Publish can show shoppers the old brand for up to 30 seconds after a save. Accept?
+  - Other "old store" reads still treat any failure as empty (wishlist, bundles, automations, customers, experiments, notifications, media usage, history, templates, insights, content pages, slug redirects, support, incidents). Tighten them in a later item?
+  - Client approvals (`/api/approve`) still compare against a brand up to 30 seconds old. Accept?
+
+### Experiments stay out of the preview (PV-08)
+- [ ] **Safari on a Mac and an iPhone.** Open the Designer with a hero test running, then "Open preview in a new tab". Pass: your own title shows in both, the purple note reads well at phone width, and "See the test" opens Experiments at that test in a new tab while the Designer keeps what you typed.
+- [ ] **Staging with a real hero test.** Note the Results counts. Type, save and reload in the Designer, open a preview tab, browse the live store while signed in, and once leave the Designer open for over an hour before saving. Pass: no recorded `POST /api/exp`, and the exposure counts are unchanged.
+- [ ] **Production after deploy:** repeat that on a real store with a running test. Pass: previewing and browsing while signed in never raise the counts.
+- [ ] **A real Razorpay test payment on staging** (email snehal@mediastic.in, cancel each order after). In a browser that was counted as a shopper, sign in, open the Designer, then pay online. Pass: no new conversion. Then pay from a private window that never signed in. Pass: one conversion.
+- [ ] **Decisions:**
+  - A browser signed in to the console always sees your live hero, never the test's other version, and is never counted, on the live store too. Note: this holds only on the domain where you signed in; on another domain of the same store (www vs bare, platform subdomain vs custom domain) you are counted. Right, or do you want a "see what shoppers see" option?
+  - A client opening an approval link sees the purple "A test is running…" note with a console link they may not be able to open. Keep or hide?
+  - Approve the wording of both notes, including the screen-reader text "(opens in a new tab)".
+  - Should the Home page editor's hero card carry the same note?
+
+### Speed baseline (PERF-04)
+- [ ] **OQ-11:** may engineers read real tenant sizes (counts of products, variants, collections, pages, posts, media, offers) for pavos or BeastLife? If yes, the perf fixture is resized to match.
+- [ ] **OQ-19:** approve a private staging deploy of one test tenant, only for measurement. Without it, hosted numbers and budgets (and PERF-03, PERF-05, PERF-07) wait for the hosting phase.
+- [ ] **Hosted numbers, once staging exists:** measure the same 11 requests on staging (TTFB, total, bytes, Turso reads, edge memory). Pass: a hosted run in `docs/perf/` with kind "hosted". Then write the first budgets into `docs/perf/budgets.json` and check that `node scripts/perf-report.js check <run> --budget docs/perf/budgets.json` passes, and fails when one number is pushed over. (The `test:perf-tools` guards that say "no hosted numbers yet" change at that point.)
+- [ ] **Fixture size:** 400 products with about 3 options each, 30 collections, 20 pages, 60 posts, 12 home sections, 8 offers, 4 bundles. Does that look like a store you would onboard?
+- [ ] **On Vercel staging, compression:** the home page response carries `Content-Encoding: br` or `gzip`. (Locally it does not.)
+- (Library photos through `next/image` answering 400 locally is being fixed, not left for you.)
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
