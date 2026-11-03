@@ -210,6 +210,45 @@ No owner checks for this item.
 - [ ] P2-SECTIONS or OVL: home product rails read collection_overrides directly (lib/cms/section-data.js); pass v4 pins instead.
 - [ ] P2-SECTIONS: move the home page to resolvedHomePage before a v4 store can hide its hero, because resolvedHero returns null on v4 when the hero is hidden.
 
+## Phase 2, batch 4
+
+### Publish one document or a set in one commit (P2-PUBLISH)
+- [ ] CI sqld install (unchanged from P2-ATOM owner check 1): approve the libsql-server release source and SHA-256 before anyone adds the step to .github/workflows/test.yml. test:publish-service now needs sqld too, like test:publish.
+- [ ] Hosted Turso on a staging tenant in documents mode: one publish; two publishes of different pages at once (both live); two of the same page (one 409); a publish while another connection holds BEGIN IMMEDIATE (ends live or 'busy', never half-written); a lost answer after commit (success, single rows); replica read right after a publish.
+- [ ] Confirm the wording: 'Publishing is busy, try again in a moment: nothing was published. Your live store hasn't changed.', 'Your publish may have gone live. Reload to check.', the SLUG_TAKEN message, and 'Someone else published this page at the same moment…'.
+- [ ] Confirm these decisions: set cap 200; 3 attempts before 'busy'; 404 for MISSING_DOCUMENT; a hidden section never blocks its document's publish; storefront.publish (owners and admins) for both publish and publishSet.
+- [ ] ED-03: the editor must hold autosaves while a publish runs, or autosave can starve publish.
+- [ ] DR-1/DR-2/DR-3 stand; move no real store to documents mode until the plan section 6 cutover gates (P2-SECTIONS home-page gate, OVL before MIG) are met.
+- [ ] Browser drill of a policy typo publish while the home draft is dirty (P2-DRILLS), once a Publish button exists.
+
+### Other content writers go through one door (P2-WRITERS)
+- [ ] OC-W1 Desktop Chrome drill on the design harness, using your own ports (not run):
+  - On a legacy test store whose hero has two buttons and a badge, adopt a hero variant and apply an AI hero idea. The Designer preview should show the new copy with the founder's buttons and badge.
+  - Then switch the test store to documents mode and adopt again. The answer should say to publish from the editor; the doc_home draft should hold the change while the storefront stays unchanged.
+- [ ] OC-W2 Confirm these intended behaviour changes on legacy stores:
+  - AI hero drafts are now merged over the current hero, so buttons and badge are kept.
+  - Agency and theme kit payloads are now validated, so a payload the editor would refuse gets 422 instead of being stored.
+  - Agency kit sections get newly minted ids.
+  - Each of these writes now adds an audit row and a history entry.
+  - On a documents store, a kit keeps the founder's hero image.
+- [ ] OC-W3 Before any store changes mode: MIG-03 must move the mode check into the write itself. Today it is a separate check just before the write (same as OC-G3).
+- [ ] OC-W4 The CI sqld download (source and checksum) still needs your approval. Nothing under .github/ was changed.
+- [ ] OC-W5 On hosted Turso: adopt once on a staging legacy store and once on a staging documents test store, and re-read each afterwards.
+- [ ] Known limit to note: the theme route answers a hero conflict with 422 instead of 409. Its catch-all is outside this item's files. Nothing is overwritten.
+
+### Preview sessions show saved drafts on documents stores (P2-PREVIEW)
+- [ ] DR-3: run migration 0022 (pnpm tenant:migrate -- --all, then --check must exit 0) before this code deploys.
+- [ ] CI sqld install (carried over from P2-ATOM): approve the libsql-server release and its checksum. .github/ was not touched.
+- [ ] Look at a documents-mode preview yourself in desktop Chrome on the design harness: the bar's words, the Show them / Hide them toggle, an empty banner's placeholder, and that a private window sees only live content.
+- [ ] Hosted Turso, on a staging tenant in documents mode: create a session, preview, toggle and revoke; also preview from another region right after a save (replica lag).
+- [ ] Confirm the founder-facing words: the colours note and toggle, the other-tab note, and the unfinished-section note.
+- [ ] Decide between a per-tab overlay (spec 8.8's set of documents with an open editor tab) and showing every saved draft, before ED-02 builds the editor side.
+
+### Document service fixes from the batch 3 reviews (P2-DOCFIX)
+- [ ] doc_cart capability ruling (upsells.write or storefront.*). Until then, document writes to doc_cart answer 409 CART_NOT_AVAILABLE. When it is decided, remove refuseCart in lib/documents/service.js and set the capability in lib/admin/documents-api.js.
+- [ ] CI sqld install (carried from P2-ATOM): .github/ was not touched. Approve the libsql-server release and its SHA-256, then add the step from docs/cms-reviews/P2-ATOM.md owner check 1.
+- [ ] Hosted Turso, on a staging tenant in documents mode: create a page while the network drops the answer (it must answer 200, never 'Another page already uses ...'), and check that rows read per autosave stay flat as publish_log grows.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
