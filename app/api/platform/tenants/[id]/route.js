@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { verifyPlatformToken, PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 import { sameOrigin } from "@/lib/origin-check";
 import { patchTenant, getTenant, listTenants, platformDb } from "@/lib/platform/control.js";
 import { audit } from "@/lib/platform/audit";
-import { syncTenantCatalog } from "@/lib/sync.js";
+import { startCatalogSync, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
 import { withTenant } from "@/lib/tenant-context.js";
 import { slog } from "@/lib/log";
 
@@ -175,8 +175,12 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// POST — full catalog sync for this tenant (operator "sync now").
+// POST — full catalog sync for this tenant (operator "sync now"). GEN-02:
+// queued and resumable like every full sync — starts (or joins the run under
+// way), kicks the first slice after the response, and answers 202 with the
+// run's progress; the queue finishes it.
 export async function POST(request, { params }) {
+  const started = Date.now();
   if (!sameOrigin(request)) return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const { id } = await params;
@@ -186,10 +190,15 @@ export async function POST(request, { params }) {
     return NextResponse.json({ ok: false, error: `tenant is ${tenant.status}` }, { status: 409 });
   }
   try {
-    const r = await syncTenantCatalog(tenant);
-    slog("tenant_synced", { tenant: id, products: r.products, collections: r.collections, via: "platform-console" });
-    await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.sync", tenantId: id, diff: { products: r.products, collections: r.collections } });
-    return NextResponse.json({ ok: true, products: r.products, collections: r.collections, searchIndexed: r.search?.indexed ?? 0 });
+    const { run, action } = await withTenant(tenant, () =>
+      startCatalogSync({ startedBy: "operator", defer: after, budgetMs: Math.max(0, KICK_BUDGET_MS - (Date.now() - started)) }),
+    );
+    slog("tenant_sync_queued", { tenant: id, run: run.id, action, via: "platform-console" });
+    await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.sync", tenantId: id, diff: { run: run.id, action } });
+    return NextResponse.json(
+      { ok: true, queued: true, action, runId: run.id, products: Number(run.products_fetched || 0), collections: Number(run.collections_fetched || 0) },
+      { status: 202 },
+    );
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e?.message || e).slice(0, 300) }, { status: 500 });
   }

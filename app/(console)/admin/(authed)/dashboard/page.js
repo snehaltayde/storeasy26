@@ -6,6 +6,9 @@ import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { salesRollup, freshness, coverage, discrepancies, dayInTz } from "@/lib/reporting";
 import { listContactMessages } from "@/lib/notifications";
 import { buildChecklist } from "@/lib/admin/onboarding";
+import { catalogSyncStatus } from "@/lib/sync";
+import { roleAllows } from "@/lib/platform/authz";
+import SyncProgress from "@/components/admin/SyncProgress";
 import { formatMoney } from "@/lib/format";
 import { tfetch } from "@/lib/tenant-request";
 import { PageHeader } from "@/components/console/PageHeader";
@@ -43,7 +46,7 @@ export default async function AdminDashboardPage({ searchParams }) {
   const sp = await searchParams;
   const days = RANGES.includes(Number(sp?.days)) ? Number(sp.days) : 30;
 
-  const [rollup, fresh, cov, issues, inbox, checklist] = await tfetch(async () =>
+  const [rollup, fresh, cov, issues, inbox, checklist, sync] = await tfetch(async () =>
     Promise.all([
       salesRollup({ days }),
       freshness(),
@@ -51,8 +54,12 @@ export default async function AdminDashboardPage({ searchParams }) {
       discrepancies(),
       listContactMessages({ limit: 50 }),
       buildChecklist().catch(() => ({ supported: false })),
+      catalogSyncStatus().catch(() => null),
     ]),
   );
+  // GEN-02: while products are coming in (or didn't finish), that is the
+  // first thing the founder sees, with progress or a plain retry.
+  const syncCard = sync?.view && sync.view.state !== "complete" ? sync.view : null;
 
   const byDay = new Map(rollup.series.map((d) => [d.day, d]));
   const dayKey = (msAgo) => dayInTz(new Date(Date.now() - msAgo).toISOString(), rollup.tz);
@@ -97,6 +104,12 @@ export default async function AdminDashboardPage({ searchParams }) {
           </div>
         }
       />
+
+      {syncCard && (
+        <div className="mb-4">
+          <SyncProgress initial={syncCard} canRun={roleAllows(actor.role, "sync.run")} />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Today so far" value={money(today?.net || 0)} sub={today ? `${today.orders} order${today.orders === 1 ? "" : "s"}` : "no sales yet today"} tone={today ? undefined : "muted"} />

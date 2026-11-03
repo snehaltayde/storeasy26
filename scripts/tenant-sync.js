@@ -1,4 +1,6 @@
 // Full catalog sync for ONE tenant (Session 21):  pnpm tenant:sync <slug>
+// GEN-02: the same page-by-page run the queue drives, here run to the end in
+// one process; if a queued sync is already under way it continues that one.
 import { getTenant } from "../lib/platform/control.js";
 import { syncTenantCatalog } from "../lib/sync.js";
 import { libsql } from "../lib/db.js";
@@ -23,7 +25,7 @@ try {
   await withTenant(tenant, async () => runMigrations(libsql, await loadMigrations("tenant")));
   const res = await syncTenantCatalog(tenant, { log });
   process.stdout.write("\n");
-  console.log(`✓ tenant "${slug}": ${res.products} products, ${res.collections} collections` + (res.search?.error ? ` (search degraded: ${res.search.error.slice(0, 60)})` : ` (search indexed: ${res.search.indexed})`));
+  console.log(`✓ tenant "${slug}": ${res.products} products, ${res.collections} collections` + (res.search?.error ? ` (search degraded: ${res.search.error.slice(0, 60)})` : ` (search indexed: ${res.search?.indexed ?? 0})`));
   process.exit(0);
 } catch (e) {
   console.error(`\n✗ tenant sync failed: ${e.message}`);

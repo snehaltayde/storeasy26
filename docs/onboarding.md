@@ -48,10 +48,17 @@ signed-in operator, or append `&secret=$CRON_SECRET`), have the PARTNER click
 Install/Approve on the Shopify screen. The callback stores the permanent
 admin token encrypted, registers the 11 webhooks (catalog ×6, app/uninstalled,
 refunds, fulfillments ×2, orders/cancelled — https platform URLs only; on
-localhost run `pnpm webhooks:register <slug>` later), and kicks the first
-sync. Big catalogs: run `pnpm tenant:sync <slug>` yourself. Shopify implies
-read access when write is granted (write_orders covers read_orders) — the
-scope check knows this (S51).
+localhost run `pnpm webhooks:register <slug>` later), and queues the first
+sync (GEN-02). The sync is a recorded run that goes one Shopify page at a
+time and remembers where it is, so any catalog size finishes: the first
+~45 seconds run straight after the callback, and the job tick
+(`/api/jobs/tick`, OQ-19) or the store console, while it is open, carry it on
+from there. The merchant's dashboard shows progress, and a failure with a
+plain message and a Try again button that resumes where it stopped. With no
+tick configured and nobody watching the console, a big catalog waits until
+one of them runs. `pnpm tenant:sync <slug>` still works and joins a sync
+already under way. Shopify implies read access when write is granted
+(write_orders covers read_orders) — the scope check knows this (S51).
 
 ## 4. Domain
 

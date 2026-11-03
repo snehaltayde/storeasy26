@@ -5,7 +5,7 @@ import { sendAlert } from "@/lib/alerts";
 import { registerWebhooks } from "@/lib/platform/shopify-webhooks.js";
 import { exchangeCodeForToken } from "@/lib/shopify-admin.js";
 import { withTenant } from "@/lib/tenant-context.js";
-import { syncTenantCatalog } from "@/lib/sync.js";
+import { startCatalogSync, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
 import { slog } from "@/lib/log";
 
 // Shopify OAuth callback (Session 21). NOT operator-gated — Shopify redirects
@@ -13,7 +13,9 @@ import { slog } from "@/lib/log";
 // tenant, Shopify's own hmac param is verified with THAT tenant's app secret,
 // and the shop param must match the tenant's configured store. On success the
 // permanent Admin token is stored encrypted, webhooks are registered, and the
-// initial catalog sync starts after the response.
+// first catalog sync is QUEUED (GEN-02): a recorded, resumable run whose
+// first slice starts after the response and whose rest the queue finishes —
+// any catalog size, no CLI step.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -74,6 +76,7 @@ const failPage = (reason) =>
   });
 
 export async function GET(request) {
+  const started = Date.now();
   const params = request.nextUrl.searchParams;
 
   const state = verifyState(params.get("state"));
@@ -134,14 +137,19 @@ export async function GET(request) {
         : `failed: ${results.error}`;
     }
 
-    // Initial catalog pull — best-effort here (big catalogs: pnpm tenant:sync).
-    after(async () => {
+    // First catalog sync: recorded and queued BEFORE the response, so it
+    // survives this function ending; its first slice runs after the response.
+    let syncQueued = true;
+    try {
       const fresh = await getTenant(tenant.id);
-      await syncTenantCatalog(fresh).then(
-        (r) => slog("initial_sync_done", { tenant: tenant.id, products: r.products, collections: r.collections }),
-        (e) => console.error(`[connect] initial sync failed for ${tenant.id}: ${e?.message || e}`),
+      const { run, action } = await withTenant(fresh, () =>
+        startCatalogSync({ startedBy: "connect", defer: after, budgetMs: Math.max(0, KICK_BUDGET_MS - (Date.now() - started)) }),
       );
-    });
+      slog("initial_sync_queued", { tenant: tenant.id, run: run.id, action });
+    } catch (e) {
+      syncQueued = false;
+      console.error(`[connect] could not queue the first sync for ${tenant.id}: ${e?.message || e}`);
+    }
 
     const firstDomain = (tenant.domains || [])[0];
     const storeOrigin = firstDomain
@@ -150,7 +158,11 @@ export async function GET(request) {
     return page({
       ok: true,
       title: "Store connected",
-      lead: `<b>${esc(tenant.name)}</b> is now linked to <span style="font-family:ui-monospace,monospace;font-size:13px">${esc(shop)}</span>. The first catalog sync is running in the background.`,
+      lead:
+        `<b>${esc(tenant.name)}</b> is now linked to <span style="font-family:ui-monospace,monospace;font-size:13px">${esc(shop)}</span>. ` +
+        (syncQueued
+          ? "Your products are on their way in. The store console shows how far along it is."
+          : "Your products haven't started coming in yet. Open the store console and press Bring in products."),
       rows: [
         ["Admin token", `<span style="color:#059669;font-weight:600">saved</span>`],
         ["Webhooks", esc(webhooks)],

@@ -5,6 +5,8 @@ import { settingsView } from "@/lib/admin/settings";
 import { currentTenant } from "@/lib/tenant-context.js";
 import { siteName } from "@/lib/site";
 import { db } from "@/lib/db";
+import { catalogSyncStatus } from "@/lib/sync";
+import { roleAllows } from "@/lib/platform/authz";
 import SettingsAdmin from "@/components/admin/SettingsAdmin";
 import OpsPanels from "@/components/admin/OpsPanels";
 import { PageHeader } from "@/components/console/PageHeader";
@@ -21,7 +23,7 @@ const SECTIONS = [
   { id: "payments", label: "Payments" },
   { id: "tracking", label: "Tracking" },
   { id: "shipping", label: "Shipping" },
-  { id: "catalog-sync", label: "Catalog sync" },
+  { id: "catalog-sync", label: "Products from Shopify" },
   { id: "password", label: "Password" },
   { id: "team", label: "Team" },
   { id: "agency-access", label: "Agency access" },
@@ -59,7 +61,7 @@ export default async function AdminSettingsPage() {
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
-  const [view, name] = await tfetch(async () => {
+  const [view, name, syncProgress] = await tfetch(async () => {
     let counts = null;
     try {
       const [p, c] = await Promise.all([
@@ -70,14 +72,16 @@ export default async function AdminSettingsPage() {
     } catch {
       counts = null;
     }
-    return [settingsView(currentTenant(), { counts }), siteName()];
+    // GEN-02: the sync card reads the sync's own record
+    const sync = await catalogSyncStatus().catch(() => null);
+    return [settingsView(currentTenant(), { counts }), siteName(), sync?.view ?? null];
   });
 
   return (
     <>
       <PageHeader title="Settings" description="Store configuration — changes go live without a deploy." />
       <SectionNav />
-      <SettingsAdmin initial={view} />
+      <SettingsAdmin initial={view} syncProgress={syncProgress} canRunSync={roleAllows(actor.role, "sync.run")} />
       {/* S43: Team (MC23) · Agency (AG02) · Domains & SEO (MC21) · Privacy
           (MC25) · Audit (MC26) · Help (MC27) */}
       <OpsPanels role={actor.role} />

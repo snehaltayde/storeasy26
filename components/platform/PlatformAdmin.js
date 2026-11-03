@@ -437,7 +437,7 @@ export default function PlatformAdmin() {
     setSyncing((s) => ({ ...s, [id]: true }));
     clearFail(id);
     const data = await fetch(`/api/platform/tenants/${id}`, { method: "POST" }).then((r) => r.json()).catch(() => ({}));
-    if (data.ok) toast.success(`${id}: synced ${data.products}p/${data.collections}c`);
+    if (data.ok) toast.success(`${id}: sync ${data.action === "joined" ? "already running" : "queued"} (${data.runId}) — the queue finishes it; progress shows in the store console`);
     else fail(id, `Sync failed: ${data.error || "?"}`);
     setSyncing((s) => ({ ...s, [id]: false }));
     refresh();
