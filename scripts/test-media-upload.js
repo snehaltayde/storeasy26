@@ -503,18 +503,34 @@ await t("sniffImage agrees with the server's check on every case the server test
   eq(P.sniffImage(new TextEncoder().encode("<svg></svg>")), null, "svg isn't its job:");
 });
 
-await t("when to skip: within the limit, and a short side no larger than the target", () => {
+await t("when to skip: within the limit, unless both sides are over the target and it is no wider than 16:9", () => {
   const go = (size, width, height, action = "resize") => P.shouldResize({ size, width, height, action });
   eq(go(LIMIT, 1920, 1080), false, "exactly at both limits:");
   eq(go(200_000, 800, 600), false, "small:");
   eq(go(LIMIT + 1, 800, 600), true, "over the bytes:");
   eq(go(500_000, 1921, 1921), true, "both sides over the target:");
+  eq(go(500_000, 2600, 2200), true, "a photo-shaped picture:");
   eq(go(LIMIT, 1920, 5000), false, "short side at the target, however long:");
   eq(go(LIMIT, 5000, 1920), false, "the same, on its side:");
-  eq(go(500_000, 1921, 5000), true, "short side just over the target:");
   eq(go(209_179, 1080, 5000), false, "a long size chart:");
   eq(go(62_000, 4000, 400), false, "a wide strip:");
+  // the verifier's cases: re-encoding these could only cut the short side to 1080
+  eq(go(1_109_354, 1921, 5000), false, "long, short side just over the target:");
+  eq(go(1_109_354, 5000, 1921), false, "the same, on its side:");
+  eq(go(1_321_451, 2000, 6000), false, "long, short side well over the target:");
+  eq(go(LIMIT, 7000, 1921), false, "as wide as the 7000x1900 that is kept whole:");
+  eq(go(LIMIT, 6000, 2000), false, "3:1:");
+  // the 16:9 line, exactly where fitEdges changes from the long edge to the short one
+  eq(go(LIMIT, 3840, 2160), true, "exactly 16:9:");
+  eq(go(LIMIT, 2160, 3840), true, "exactly 16:9, upright:");
+  eq(go(LIMIT, 3841, 2160), false, "1px wider than 16:9:");
+  eq(go(LIMIT, 2160, 3841), false, "1px taller than 16:9:");
+  eq(go(LIMIT, 3413, 1921), true, "just inside 16:9 with the short side just over:");
+  // over the limit the shape doesn't matter: the server won't take it as it is
+  eq(go(LIMIT + 1, 1921, 5000), true, "long and over the bytes:");
+  eq(go(LIMIT + 1, 7000, 1921), true, "wide and over the bytes:");
   eq(go(1000, 10, 10, "convert"), true, "the server can't take it as it is:");
+  eq(go(1000, 1080, 5000, "convert"), true, "nor a long one:");
 });
 
 await t("fitEdges: a normal photo goes by its long edge, never upscales and keeps the aspect", () => {
@@ -729,11 +745,54 @@ await t("over 1920 and within the limit, with a short side at or under 1920: unt
   }
 });
 
-await t("both sides over 1920 and within the limit: still made smaller, short side kept", async () => {
+await t("both sides over 1920, within the limit and no wider than 16:9: still made smaller", async () => {
   const photo = await U.prepareImage(photoFile("big.jpg", 900_000), fakeCodec({ width: 2600, height: 2200, detail: 0.1 }));
   eq([photo.file.type, photo.width, photo.height, photo.reduced], ["image/jpeg", 1920, 1625, false]);
-  const long = await U.prepareImage(photoFile("wide.jpg", 900_000), fakeCodec({ width: 6000, height: 2000, detail: 0.1 }));
-  eq([long.width, long.height, long.reduced], [3240, 1080, false]);
+  const wide = await U.prepareImage(photoFile("wide169.jpg", 900_000), fakeCodec({ width: 3840, height: 2160, detail: 0.1 }));
+  eq([wide.file.type, wide.width, wide.height, wide.reduced], ["image/jpeg", 1920, 1080, false], "exactly 16:9:");
+});
+
+// The verifier's probe: these were re-encoded, cut to a 1080 short side and reported
+// as a plain success. Sizes are the real JPEG fixtures it made in Chrome.
+const LONG_WITHIN = [
+  { name: "long-1921x5000.jpg", size: 1_109_354, width: 1921, height: 5000 },
+  { name: "long-2000x6000.jpg", size: 1_321_451, width: 2000, height: 6000 },
+  { name: "wide-7000x1921.jpg", size: 1_400_000, width: 7000, height: 1921 },
+  { name: "wide-6000x2000.jpg", size: 900_000, width: 6000, height: 2000 },
+];
+
+await t("LONG: within the limit with a short side over 1920, a long image still goes up untouched", async () => {
+  for (const { name, size, width, height } of LONG_WITHIN) {
+    const file = photoFile(name, size);
+    const codec = fakeCodec({ width, height });
+    const prepared = await U.prepareImage(file, codec);
+    ok(prepared.file === file, `${name} the same file:`);
+    eq([prepared.width, prepared.height, !!prepared.reduced], [width, height, false], `${name}:`);
+    eq(codec.calls.encode.map((s) => s.quality), [0.82], `${name} only the library preview was made:`);
+    eq(codec.calls.hasAlpha, 0, `${name} never got as far as re-encoding:`);
+  }
+});
+
+await t("LONG: the same files through the real route are stored byte for byte at their full size, with no notice", async () => {
+  for (const { name, size, width, height } of LONG_WITHIN) {
+    const file = photoFile(name, size);
+    const body = new Uint8Array(await file.arrayBuffer());
+    const r = await U.uploadImage(file, { codec: fakeCodec({ width, height }), send: realSend() });
+    ok(r.ok, `${name} uploaded (${r.message}):`);
+    const row = await stored(r.media.id);
+    eq([row.mime, row.size, row.width, row.height, row.filename], ["image/jpeg", size, width, height, name], `${name}:`);
+    eq((await inT(() => M.getMediaFile(r.media.id))).data.toString(), body.toString(), `${name} same bytes:`);
+    eq(r.notice, null, `${name}:`);
+    ok(await thumbOf(r.media.id), `${name} preview attached:`);
+  }
+});
+
+await t("LONG: over the limit, a long image with a short side over 1920 has to be written smaller and keeps 1080", async () => {
+  // the server won't take it as it is, so this is the one place its short side is cut
+  const tall = await U.prepareImage(photoFile("long-big.jpg", 3_000_000), fakeCodec({ width: 1921, height: 5000 }));
+  eq([tall.file.type, tall.width, tall.height, tall.reduced], ["image/jpeg", 1080, 2811, false]);
+  const wide = await U.prepareImage(photoFile("wide-big.jpg", 3_000_000), fakeCodec({ width: 7000, height: 1921 }));
+  eq([wide.width, wide.height, wide.reduced], [3935, 1080, false]);
 });
 
 await t("a busy photo walks down the quality steps but stays at 1920", async () => {
@@ -872,8 +931,8 @@ await t("re-encoding that would grow the file keeps the original", async () => {
 
 await t("an animated WebP or PNG within the limit goes up untouched, even when over 1920", async () => {
   for (const [name, type, bytes] of [["anim.webp", "image/webp", ANIMATED_WEBP], ["anim.png", "image/png", ANIMATED_PNG]]) {
-    // 2400x2200 reaches the animation check; 2400x1200 is untouched before it gets there
-    for (const [width, height] of [[2400, 2200], [2400, 1200]]) {
+    // 2400x2200 reaches the animation check; 2400x1200 and 2000x6000 are untouched before it gets there
+    for (const [width, height] of [[2400, 2200], [2400, 1200], [2000, 6000]]) {
       const file = new File([padded(bytes, 16_300)], name, { type });
       const codec = fakeCodec({ width, height });
       const r = await U.uploadImage(file, { codec, send: realSend() });
@@ -983,6 +1042,12 @@ await t("a real image with the wrong name, small in bytes and size: the server's
   const before = await mediaCount();
   const r = await U.uploadImage(new File([bytesOf("image/png", 2048)], "photo.jpg", { type: "image/jpeg" }), { codec: fakeCodec({ width: 800, height: 600 }), send: realSend() });
   eq(r.message, P.uploadMessage.notWhatItSays("photo.jpg"));
+  eq(await mediaCount(), before);
+  // a long one within the limit is never re-encoded either, so it gets the same answer
+  const codec = fakeCodec({ width: 2000, height: 6000 });
+  const long = await U.uploadImage(new File([bytesOf("image/png", 900_000)], "long.jpg", { type: "image/jpeg" }), { codec, send: realSend() });
+  eq(long.message, P.uploadMessage.notWhatItSays("long.jpg"), "long, within the limit:");
+  eq(codec.calls.hasAlpha, 0, "never re-encoded:");
   eq(await mediaCount(), before);
 });
 
