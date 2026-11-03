@@ -1,4 +1,6 @@
-// Atomic publish suite (P2-ATOM: PUB-01, DOC-01, PUB-02 batch acceptance).
+// Atomic publish suite (P2-ATOM: PUB-01, DOC-01, PUB-02 batch acceptance;
+// hardened by P2-HARDEN: version and release id clashes, BAD_BUILD,
+// MISSING_DOCUMENT, the reconcile's release-row proof).
 //   pnpm test:publish
 //
 // Proves lib/documents/commit.js before anything depends on it:
@@ -117,7 +119,7 @@ async function snapshot(client) {
 
 // A publish build: one new version per document, a list made from `prev` with
 // only those documents changed, one log row each. Ids are minted once here.
-async function makeBuild(client, docIds, { prev, overrides = {} } = {}) {
+async function makeBuild(client, docIds, { prev, overrides = {}, verIds = {} } = {}) {
   const live = prev || (await pointerOf(client));
   const prevList = L.isV4List(live.list) ? live.list : L.emptyList(1, SINGLETONS);
   const setId = ids.setId();
@@ -130,7 +132,7 @@ async function makeBuild(client, docIds, { prev, overrides = {} } = {}) {
     const body = { type: doc.type, sections: [{ id: "s1", type: "rich_text", settings: { text: `${id} ${setId}` } }] };
     const canonical = stableStringify(body);
     const hash = await sha256Hex(canonical);
-    const v = { id: ids.verId(), document_id: id, kind: "published", body: canonical, body_hash: hash, schema_version: 1, created_at: NOW };
+    const v = { id: verIds[id] || ids.verId(), document_id: id, kind: "published", body: canonical, body_hash: hash, schema_version: 1, created_at: NOW };
     versions.push(v);
     documents.push({ id, revision: Number(doc.revision), published_version_id: v.id, published_hash: hash });
     log.push({ id: ids.logId(), document_id: id, action: "publish", from_version_id: prevList.documents[id]?.version ?? null, to_version_id: v.id });
@@ -202,6 +204,72 @@ async function commonCases(name, client, { commit }) {
     const r = await commit(b);
     eq(r.outcome, "lost", "outcome:");
     await assertNothingWritten(client, b, before);
+  });
+
+  await t(`${name}: a build reusing another document's version id never reports ok, and nothing is written (P2-HARDEN)`, async () => {
+    const home = await makeBuild(client, ["doc_home"]);
+    eq((await commit(home)).outcome, "ok", "publish doc_home:");
+    const taken = home.versions[0].id;
+    eq((await pointerOf(client)).list.documents.doc_home.version, taken, "doc_home is live at the reused id:");
+    const ownerRow = async () => ({ ...(await client.execute({ sql: "SELECT document_id, body_hash FROM document_versions WHERE id = ?", args: [taken] })).rows[0] });
+    const owner = await ownerRow();
+    // (a) the id of doc_home's live version, reused for doc_footer with the very
+    //     same body, so only the document differs
+    const other = await makeBuild(client, ["doc_footer"], { verIds: { doc_footer: taken } });
+    other.versions[0] = { ...other.versions[0], body: home.versions[0].body, body_hash: owner.body_hash };
+    // (b) the same id reused for doc_home itself, with a different body, so only
+    //     the body differs
+    const sameDoc = await makeBuild(client, ["doc_home"], { verIds: { doc_home: taken } });
+    ok(sameDoc.versions[0].body_hash !== owner.body_hash, "case (b) needs a different body");
+    for (const [label, b] of [["other document", other], ["same document, other body", sameDoc]]) {
+      const before = await snapshot(client);
+      const r = await commit(b);
+      ok(r.outcome !== "ok", `${label}: reported ok`);
+      eq(r.outcome, "failed", `${label} outcome:`);
+      eq(r.code, "VERSION_ID_CLASH", `${label} code:`);
+      eq(await snapshot(client), before, `${label} database changed:`);
+      eq(Number((await client.execute({ sql: "SELECT count(*) AS n FROM releases WHERE id = ?", args: [b.releaseId] })).rows[0].n), 0, `${label} release row:`);
+      eq(Number((await client.execute({ sql: "SELECT count(*) AS n FROM publish_log WHERE id = ?", args: [b.log[0].id] })).rows[0].n), 0, `${label} log row:`);
+      eq(await ownerRow(), owner, `${label} the old row:`);
+    }
+  });
+
+  await t(`${name}: a build reusing an existing release id never reports ok (the content_hash check in the flip guard) (P2-HARDEN)`, async () => {
+    const a = await makeBuild(client, ["doc_header"]);
+    eq((await commit(a)).outcome, "ok", "publish a:");
+    const c = await makeBuild(client, ["doc_p_faq"]);
+    eq((await commit(c)).outcome, "ok", "publish c:");
+    // (a) an older release id; (b) the live release id (the retry term matches it)
+    for (const [label, reused] of [["older release", a.releaseId], ["live release", c.releaseId]]) {
+      const b = await makeBuild(client, ["doc_footer"], { overrides: { releaseId: reused } });
+      const before = await snapshot(client);
+      const relBefore = (await client.execute({ sql: "SELECT content, content_hash, published_at FROM releases WHERE id = ?", args: [reused] })).rows.map((x) => ({ ...x }));
+      const r = await commit(b);
+      ok(r.outcome !== "ok", `${label}: reported ok`);
+      eq(r.outcome, "failed", `${label} outcome:`);
+      eq(r.code, "RELEASE_ID_CLASH", `${label} code:`);
+      eq(await snapshot(client), before, `${label} database changed:`);
+      eq(before.pointer, c.releaseId, `${label} pointer:`);
+      eq((await client.execute({ sql: "SELECT content, content_hash, published_at FROM releases WHERE id = ?", args: [reused] })).rows.map((x) => ({ ...x })), relBefore, `${label} the old release row:`);
+    }
+  });
+
+  await t(`${name}: a build naming a document missing from the documents table fails (MISSING_DOCUMENT), not lost; a real revision race still loses (P2-HARDEN)`, async () => {
+    const b = await makeBuild(client, ["doc_home"]);
+    b.documents.push({ id: "doc_ghost", revision: 1, published_version_id: null, published_hash: null });
+    const before = await snapshot(client);
+    const r = await commit(b);
+    eq(r.outcome, "failed", "outcome:");
+    eq(r.code, "MISSING_DOCUMENT", "code:");
+    eq(r.missing, ["doc_ghost"], "missing:");
+    await assertNothingWritten(client, b, before);
+    const race = await makeBuild(client, ["doc_home"]);
+    await client.execute("UPDATE documents SET revision = revision + 1 WHERE id = 'doc_home'");
+    const before2 = await snapshot(client);
+    const r2 = await commit(race);
+    eq(r2.outcome, "lost", "the revision race:");
+    ok(!r2.code, "a loss carries no failure code");
+    await assertNothingWritten(client, race, before2);
   });
 
   await t(`${name}: a version with a null body fails loudly, nothing written, pointer unchanged (no silent skip)`, async () => {
@@ -444,6 +512,63 @@ await t("the publish statements are in the planned order and never use INSERT OR
   ok(!/\.transaction\(/.test(src.replace(/^\s*\/\/.*$/gm, "")), "commit.js must not use transaction()");
 });
 
+await t("a malformed build returns {failed, code BAD_BUILD} with no database call (P2-HARDEN)", async () => {
+  let calls = 0;
+  const spy = { batch: async () => { calls++; return []; }, execute: async () => { calls++; return { rows: [] }; } };
+  const good = () => ({
+    releaseId: "rel_0000000000000001",
+    pointer: null,
+    list: L.emptyList(1, SINGLETONS),
+    versions: [{ id: "ver_0000000000000001", document_id: "doc_home", body: "{}", body_hash: "h1", schema_version: 1 }],
+    documents: [{ id: "doc_home", revision: 1, published_version_id: "ver_0000000000000001", published_hash: "h1" }],
+    log: [{ id: "log_0000000000000001", document_id: "doc_home" }],
+    setId: "set_0000000000000001",
+  });
+  const cases = [
+    ["undefined revision", (b) => { b.documents[0].revision = undefined; }],
+    ["revision as a string", (b) => { b.documents[0].revision = "1"; }],
+    ["revision 1.5", (b) => { b.documents[0].revision = 1.5; }],
+    ["a document without an id", (b) => { delete b.documents[0].id; }],
+    ["a document named twice", (b) => { b.documents.push({ ...b.documents[0] }); }],
+    ["no documents", (b) => { b.documents = []; }],
+    ["no release id", (b) => { delete b.releaseId; }],
+    ["a blank release id", (b) => { b.releaseId = " "; }],
+    ["a version without an id", (b) => { delete b.versions[0].id; }],
+    ["a version without a document_id", (b) => { b.versions[0].document_id = undefined; }],
+    ["a version without a body_hash", (b) => { delete b.versions[0].body_hash; }],
+    ["a version id used twice", (b) => { b.versions.push({ ...b.versions[0] }); }],
+    ["a log row without an id", (b) => { delete b.log[0].id; }],
+    ["a pointer that is a number", (b) => { b.pointer = 7; }],
+    ["no list", (b) => { delete b.list; }],
+    ["a schema_version of NaN (caught in the arguments)", (b) => { b.versions[0].schema_version = NaN; }],
+    ["a note that is an object (caught in the arguments)", (b) => { b.note = { x: 1 }; }],
+    ["not an object", () => null],
+  ];
+  for (const [label, edit] of cases) {
+    let b = good();
+    const replaced = edit(b);
+    if (replaced === null) b = null;
+    calls = 0;
+    const r = await commitPublishBatch(b, { client: spy });
+    eq(r.outcome, "failed", `${label} outcome:`);
+    eq(r.code, "BAD_BUILD", `${label} code:`);
+    ok(Array.isArray(r.problems) && r.problems.length > 0, `${label}: no problems listed`);
+    eq(calls, 0, `${label} database calls:`);
+  }
+  let e = null;
+  try {
+    const b = good();
+    b.documents[0].revision = undefined;
+    await publishStatements(b);
+  } catch (err) {
+    e = err;
+  }
+  eq(e?.code, "BAD_BUILD", "publishStatements throws BAD_BUILD:");
+  calls = 0;
+  eq((await commitPublishBatch(good(), { client: spy })).outcome, "ok", "the good build:");
+  eq(calls, 1, "the good build makes one batch call:");
+});
+
 // ---------- migration 0021 and export -----------------------------------------
 
 console.log("— migration 0021 and the tenant export");
@@ -651,6 +776,37 @@ try {
     eq(r.reconciled, true, "reconciled:");
     ok((await pointerOf(direct)).pointer !== b.releaseId, "the pointer has moved on");
     eq(await rowsOfBuild(direct, b), { versions: 1, releases: 1, log: 1 }, "our rows:");
+  });
+
+  await t("sqld, reconcile reports ok through this build's release row after a later publish replaced our document (P2-HARDEN)", async () => {
+    const b = await makeBuild(direct, ["doc_p_about"]);
+    proxy.resetCounters();
+    proxy.commitThenDrop(1);
+    // Our batch commits and the answer is lost. Before the reconcile, someone
+    // publishes doc_p_about again, so neither the pointer nor the live list
+    // names this build any more: only its release row proves it committed.
+    const orig = noRetry.execute.bind(noRetry);
+    let replaced = null;
+    const client = {
+      batch: (...a) => noRetry.batch(...a),
+      execute: async (...a) => {
+        if (!replaced) {
+          replaced = await makeBuild(direct, ["doc_p_about"]);
+          eq((await commitPublishBatch(replaced, { client: direct })).outcome, "ok", "the publish on top:");
+        }
+        return orig(...a);
+      },
+    };
+    const r = await commitPublishBatch(b, { client });
+    proxy.pass();
+    eq(proxy.counters.committedThenDropped, 1, "dropped after commit:");
+    const live = await pointerOf(direct);
+    ok(live.pointer !== b.releaseId, "the pointer has moved on");
+    ok(live.list.documents.doc_p_about.version !== b.versions[0].id, "our document was replaced in the live list");
+    eq(live.list.documents.doc_p_about.version, replaced.versions[0].id, "the later version is live:");
+    eq(r.outcome, "ok", "outcome:");
+    eq(r.reconciled, true, "reconciled:");
+    eq(await rowsOfBuild(direct, b), { versions: 1, releases: 1, log: 1 }, "our rows, once:");
   });
 
   await t("sqld, drop_before once, HEAD lib/db.js: the retried batch succeeds once, with single rows", async () => {
