@@ -629,6 +629,35 @@ await t("no lib/registry file imports react, next/* or node:*, directly or throu
   ok([...seen].some((f) => f.endsWith("lib/cms/issues.js")), "the walk follows imports out of lib/registry");
 });
 
+await t("P2-FIX4: each issue carries its class (issueClass), without changing the DOC-04 shape or the JSON sent to the editor", async () => {
+  const V = await import("../lib/registry/validate.js");
+  const r = validate(
+    home([
+      sec("hero", "sec_h1", { title: "Hi" }),
+      sec("rich_text", "sec_r1", { title: 42, html: { not: "a string" } }),
+      sec("banner", "sec_r2", { title: "", text: "" }),
+    ]),
+    { mode: "draft" },
+  );
+  const cls = (code, sectionId) => V.issueClass(r.issues.find((i) => i.code === code && i.sectionId === sectionId));
+  eq(cls("INVALID_VALUE", "sec_r1"), "structure", "a title that is not text:");
+  eq(r.issues.filter((i) => i.sectionId === "sec_r1" && i.code === "INVALID_VALUE").length, 2, "title and html both reported:");
+  ok(r.issues.filter((i) => i.sectionId === "sec_r1").every((i) => V.issueClass(i) === "structure"), "both are structure");
+  const empty = r.issues.find((i) => i.sectionId === "sec_r2" && i.severity === "incomplete");
+  ok(empty, "an incomplete banner is reported");
+  eq(V.issueClass(empty), "incomplete", "an empty banner:");
+  // a sanitizer refusal is structure too
+  const s = validate(home([sec("hero", "sec_h1", { title: "Hi" }), sec("rich_text", "sec_r3", { title: "T", html: "<p>a</p><iframe src=x>words inside</iframe>" })]), { mode: "publish" });
+  for (const i of s.issues.filter((x) => x.sectionId === "sec_r3" && x.severity === "error")) eq(V.issueClass(i), "structure", `${i.code}:`);
+  // every issue the validator makes has a class, and it never shows in the shape
+  for (const i of [...r.issues, ...s.issues]) {
+    ok(["structure", "invalid", "incomplete", "warning"].includes(V.issueClass(i)), `${i.code} has a class (${V.issueClass(i)})`);
+    deq(Object.keys(i), ISSUE_KEYS, `${i.code} keys:`);
+    ok(!("cls" in JSON.parse(JSON.stringify(i))), "not in the JSON");
+  }
+  eq(V.issueClass({ code: "X" }), null, "an issue made elsewhere:");
+});
+
 await t("every issue has the DOC-04 shape and no message matches /Section \\d+ \\(/", async () => {
   // a few more broken bodies, so every check's wording is seen
   validate(null, { mode: "draft" });

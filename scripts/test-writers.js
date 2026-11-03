@@ -553,6 +553,42 @@ await t("kit apply in legacy works as today: pin, brand defaults and the hero pr
   eq((await inL(() => Store.getBlockRow("hero"))).value.title, K.KITS.glow.presets.hero.title, "hero unchanged:");
 });
 
+await t("P2-FIX4: a kit apply that loses the hero race answers success with a plain note; the theme and brand are applied, the colleague's hero is kept", async () => {
+  await withTenant(await C.getTenant("wl"), () => K.applyKit("pulse", { actor: ACTOR, withPresets: false }));
+  const COLLEAGUE = { ...FOUNDER_HERO, title: "The colleague's hero, saved just now" };
+  let raced = 0;
+  W.__contentWriteTestHooks.beforeWrite = async ({ mode }) => {
+    if (mode !== "legacy" || raced++) return;
+    await inL(() => Store.setBlock("hero", COLLEAGUE)); // lands between the kit's read and its write
+  };
+  let r;
+  try {
+    r = await route("legacy", "admin/theme", { action: "apply", kit: "glow" });
+  } finally {
+    W.__contentWriteTestHooks.beforeWrite = null;
+  }
+  eq(raced, 1, "the race happened:");
+  eq(r.status, 200, `answer: ${JSON.stringify(r.body).slice(0, 300)}`);
+  eq(r.body.ok, true, "ok:");
+  eq(r.body.note, "Your theme and brand were applied. The hero wasn't changed, because someone else edited it just now.", "the note:");
+  eq(r.body.applied.note, K.HERO_RACE_NOTE, "applied carries it too:");
+  eq(r.body.applied.presets, [], "no preset written:");
+  ok(!/nothing was saved/i.test(JSON.stringify(r.body)), "never says nothing was saved");
+  const t2 = await C.getTenant("wl");
+  eq([t2.config.theme.kit, t2.config.brand.accent], ["glow", K.KITS.glow.brand.accent], "theme and brand applied:");
+  eq((await inL(() => Store.getBlockRow("hero"))).value.title, COLLEAGUE.title, "the colleague's hero untouched:");
+  // the library call answers the same way
+  W.__contentWriteTestHooks.beforeWrite = async ({ mode }) => {
+    if (mode === "legacy") await inL(() => Store.setBlock("hero", COLLEAGUE));
+  };
+  try {
+    const lib = await withTenant(await C.getTenant("wl"), () => K.applyKit("pulse", { actor: ACTOR }));
+    eq([lib.theme.kit, lib.presets, lib.note], ["pulse", [], K.HERO_RACE_NOTE], "applyKit:");
+  } finally {
+    W.__contentWriteTestHooks.beforeWrite = null;
+  }
+});
+
 // ======================================================================================
 console.log("— the grep guard");
 

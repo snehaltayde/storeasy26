@@ -627,6 +627,224 @@ await t("publishing what is already live is skipped (no new release); the set is
 });
 
 // =========================================================================================
+console.log("— P2-FIX4: structure never inherited, a late commit, and the untested rules");
+
+// A draft written straight into the row, past saveDraft (as a bug, a migration
+// or a bypass could leave it), at a new revision.
+const rawDraft = async (id, b, store = "docs") => raw[store].execute({ sql: "UPDATE documents SET draft = ?, draft_hash = ?, revision = revision + 1 WHERE id = ?", args: [JSON.stringify(b), await R.documentHash(b), id] });
+const indexEntries = async (store = "docs") => {
+  const e = (await pointerOf(store)).list.indexes.journal;
+  return e ? J.journalEntriesOf(await versionBody(e.version, store)) : [];
+};
+
+await t("FIX4 structure: a HIDDEN section with a non-string html (and an object title) is refused at publish; nothing goes live and no raw object reaches a version", async () => {
+  const d = await create("docs", "page", { body: page("hidden-raw", "Hidden raw", "Words.") });
+  const bad = body("page", { meta: { slug: "hidden-raw", title: "Hidden raw" }, sections: [textSec("sec_t1", "Hidden raw", "Words."), sec("rich_text", "sec_hr1", { title: { evil: 1 }, html: { not: "a string" } }, { enabled: false })] });
+  await rawDraft(d.id, bad);
+  const before = await dump();
+  const r = await publishApi("docs", d.id);
+  eq(r.status, 422, `status: ${JSON.stringify(r.body).slice(0, 400)}`);
+  eq(r.body.code, "VALIDATION_FAILED", "code:");
+  const errs = r.body.issues.filter((i) => i.sectionId === "sec_hr1" && i.severity === "error");
+  eq(errs.map((i) => [i.code, i.field]).sort(), [["INVALID_VALUE", "html"], ["INVALID_VALUE", "title"]], "both block, though the section is hidden:");
+  ok(errs.every((i) => !/hidden, so it doesn't stop publishing/.test(i.message)), "never worded as a warning");
+  await unchanged(before, "hidden structure");
+  eq((await pointerOf()).list.documents[d.id], undefined, "not live:");
+  eq(await sql("SELECT count(*) AS n FROM document_versions WHERE body LIKE '%a string%' AND kind = 'published'"), [{ n: 0 }], "no published version holds the raw object:");
+});
+
+await t("FIX4 structure: an enabled section UNCHANGED from live with title 42 is refused at publish (a typo elsewhere doesn't carry it through)", async () => {
+  const d = await create("docs", "page", { body: page("title-42", "Title 42", "Words.") });
+  const old = body("page", { meta: { slug: "title-42", title: "Title 42" }, sections: [textSec("sec_t1", "Title 42", "Words."), sec("text", "sec_n42", { title: 42, body: ["Live already."] })] });
+  await liveFixture(d.id, old); // live through the commit, past publish validation
+  const liveEntry = (await pointerOf()).list.documents[d.id];
+  await rawDraft(d.id, { ...old, meta: { ...old.meta, title: "Title 42 (typo fixed)" } });
+  const before = await dump();
+  const r = await publishApi("docs", d.id);
+  eq(r.status, 422, `status: ${JSON.stringify(r.body).slice(0, 400)}`);
+  const e = r.body.issues.find((i) => i.sectionId === "sec_n42" && i.field === "title");
+  eq([e?.code, e?.severity], ["INVALID_VALUE", "error"], "the inherited title 42 blocks:");
+  ok(!/already live like this/.test(e.message), "not worded as inherited");
+  await unchanged(before, "inherited structure");
+  eq((await pointerOf()).list.documents[d.id], liveEntry, "the live entry is unchanged:");
+  // the minimal inherited rule still holds for what is not structure (an incomplete banner)
+  const ok2 = body("page", { meta: { slug: "title-42", title: "Title 42" }, sections: [textSec("sec_t1", "Title 42", "Words."), sec("banner", "sec_b42", { title: "", text: "" })] });
+  await liveFixture(d.id, ok2);
+  await rawDraft(d.id, { ...ok2, meta: { ...ok2.meta, title: "Title 42 again" } });
+  const w = published(await publishApi("docs", d.id), "an inherited incomplete banner");
+  ok(w.issues.some((i) => i.sectionId === "sec_b42" && i.severity === "warning"), "still only warns");
+});
+
+await t("FIX4 late commit: a {lost} whose batch actually committed after the read-back is reported as success, never 'someone else published'", async () => {
+  const d = await create("docs", "page", { body: page("late-commit", "Late commit", "Words.") });
+  const before = await pointerOf();
+  let calls = 0;
+  let first = null;
+  Pub.setPublishHooks({
+    commit: async (b) => {
+      calls++;
+      if (calls > 1) return commitPublishBatch(b);
+      first = b;
+      const real = await commitPublishBatch(b); // it really commits ...
+      eq(real.outcome, "ok", "the first batch commits:");
+      // ... and then the answer says lost, with the pointer from before it
+      return { lost: true, outcome: "lost", releaseId: b.releaseId, pointer: before.pointer, list: before.list, cause: new Error("fetch failed") };
+    },
+  });
+  const r = await publishApi("docs", d.id);
+  Pub.setPublishHooks({});
+  eq(r.status, 200, `status: ${JSON.stringify(r.body).slice(0, 400)}`);
+  ok(!/someone else/i.test(JSON.stringify(r.body)), "never 'someone else published'");
+  eq(r.body.release.id, first.releaseId, "the release that went live:");
+  eq(r.body.published, [{ id: d.id, versionId: first.documents[0].published_version_id, hash: first.documents[0].published_hash }], "its published version:");
+  const live = await pointerOf();
+  eq(live.pointer, first.releaseId, "live pointer:");
+  eq(live.list.documents[d.id].version, first.documents[0].published_version_id, "live entry:");
+  eq(calls, 2, "the second (rebuilt) batch was refused by the guard, then recognised:");
+  eq((await sql("SELECT count(*) AS n FROM publish_log WHERE document_id = ?", [d.id]))[0].n, 1, "one log row:");
+  eq((await sql("SELECT count(*) AS n FROM document_versions WHERE document_id = ? AND kind = 'published'", [d.id]))[0].n, 1, "one published version:");
+  // the audit is written for it, as for any success
+  eq((await C.platformDb().execute({ sql: "SELECT count(*) AS n FROM audit_log WHERE tenant_id = 'psdocs' AND action = 'storefront.publish' AND resource = ?", args: [`release:${first.releaseId}`] })).rows[0].n, 1, "audited:");
+});
+
+await t("FIX4 R1: the journal index is re-read on every attempt: a post published while another post's publish rebuilds stays in /journal", async () => {
+  const a = await create("docs", "journal", { body: page("r1-post-a", "R1 A", "A.", "journal") });
+  const b = await create("docs", "journal", { body: page("r1-post-b", "R1 B", "B.", "journal") });
+  let inner = null;
+  let attempts = 0;
+  Pub.setPublishHooks({
+    beforeCommit: async ({ attempt, build }) => {
+      if (build.documents[0].id !== a.id) return;
+      attempts = attempt;
+      if (attempt === 1) inner = await publishApi("docs", b.id);
+    },
+  });
+  const ra = published(await publishApi("docs", a.id), "post A");
+  Pub.setPublishHooks({});
+  published(inner, "post B");
+  eq(attempts, 2, "A rebuilt once:");
+  const entries = (await indexEntries()).filter((e) => e.slug.startsWith("r1-"));
+  eq(entries.map((e) => [e.slug, e.version]), [["r1-post-a", ra.published[0].versionId], ["r1-post-b", inner.body.published[0].versionId]], "both posts in the index:");
+  ok((await inT(() => Res.resolvedJournalEntries())).some((e) => e.slug === "r1-post-b"), "B in shoppers' journal");
+});
+
+await t("FIX4 R2 and R4: republishing a post replaces its index entry (no duplicate); the entry's enabled follows the post", async () => {
+  const p = await create("docs", "journal", { body: page("r2-post", "R2 first", "One.", "journal") });
+  published(await publishApi("docs", p.id), "first");
+  const cur = await current("docs", p.id);
+  await save("docs", cur, body("journal", { meta: { slug: "r2-post", title: "R2 second", enabled: false }, sections: [textSec("sec_t1", "R2", "Two.")] }));
+  const r = published(await publishApi("docs", p.id), "again, hidden");
+  const mine = (await indexEntries()).filter((e) => e.document === p.id);
+  eq(mine.map((e) => [e.slug, e.title, e.version, e.enabled]), [["r2-post", "R2 second", r.published[0].versionId, false]], "one entry, the new one, disabled:");
+  ok(!(await inT(() => Res.resolvedJournalEntries())).some((e) => e.slug === "r2-post"), "a disabled post is not listed for shoppers");
+});
+
+await t("FIX4 R5: an archived document is refused (409 DOCUMENT_ARCHIVED) with nothing written", async () => {
+  const d = await create("docs", "page", { body: page("r5-archived", "R5", "Words.") });
+  await raw.docs.execute({ sql: "UPDATE documents SET archived_at = ? WHERE id = ?", args: [new Date().toISOString(), d.id] });
+  const before = await dump();
+  const r = await publishApi("docs", d.id);
+  eq([r.status, r.body.code], [409, "DOCUMENT_ARCHIVED"], `refused: ${JSON.stringify(r.body).slice(0, 300)}`);
+  ok(/was archived, so nothing was published/.test(r.body.error), r.body.error);
+  await unchanged(before, "archived");
+});
+
+await t("FIX4 R6: a page may not take the slug of a live journal post (the index entries count)", async () => {
+  const post = await create("docs", "journal", { body: page("r6-shared", "R6 post", "Post.", "journal") });
+  published(await publishApi("docs", post.id), "the post");
+  // the post's draft moves away (unpublished), freeing the slug for a new draft
+  await save("docs", await current("docs", post.id), page("r6-moved", "R6 post", "Post.", "journal"));
+  const pg = await create("docs", "page", { body: page("r6-shared", "R6 page", "Page.") });
+  const before = await dump();
+  const r = await publishApi("docs", pg.id);
+  eq([r.status, r.body.code], [409, "SLUG_TAKEN"], `refused: ${JSON.stringify(r.body).slice(0, 300)}`);
+  eq(r.body.other, { id: post.id, title: "R6 post" }, "names the post:");
+  await unchanged(before, "slug vs post");
+});
+
+await t("FIX4 R19: the slug check runs on every attempt: a page made live at the same slug during the first attempt refuses the rebuild", async () => {
+  const x = await create("docs", "page", { body: page("r19-slug", "R19 X", "X.") });
+  const y = await create("docs", "page", { body: page("r19-other", "R19 Y", "Y.") });
+  let attempts = 0;
+  Pub.setPublishHooks({
+    beforeCommit: async ({ attempt, build }) => {
+      if (build.documents[0].id !== x.id) return;
+      attempts = attempt;
+      if (attempt === 1) await liveFixture(y.id, page("r19-slug", "R19 Y", "Y.")); // Y goes live at /r19-slug past the service
+    },
+  });
+  const r = await publishApi("docs", x.id);
+  Pub.setPublishHooks({});
+  eq([r.status, r.body.code], [409, "SLUG_TAKEN"], `refused on the rebuild: ${JSON.stringify(r.body).slice(0, 300)}`);
+  eq(attempts, 1, "no second batch was built:");
+  const rows = (await pointerOf()).list.pages.filter((p) => p.slug === "r19-slug");
+  eq(rows.map((p) => p.document), [y.id], "one live row at the slug:");
+});
+
+await t("FIX4 R11: a successful publish writes its audit row (storefront.publish, release:<id>)", async () => {
+  const d = await create("docs", "page", { body: page("r11-audit", "R11", "Words.") });
+  const r = published(await publishApi("docs", d.id), "audited");
+  const rows = (await C.platformDb().execute({ sql: "SELECT actor, action, resource, diff FROM audit_log WHERE tenant_id = 'psdocs' AND resource = ?", args: [`release:${r.release.id}`] })).rows;
+  eq(rows.length, 1, "one audit row:");
+  eq([rows[0].actor, rows[0].action], [ownerU.id, "storefront.publish"], "who and what:");
+  ok(String(rows[0].diff).includes(d.id), `names the document: ${rows[0].diff}`);
+});
+
+await t("FIX4 R15: publish_log.from_version_id records the version that was live before (null on a first publish)", async () => {
+  const d = await create("docs", "page", { body: page("r15-from", "R15", "One.") });
+  const v1 = published(await publishApi("docs", d.id), "first").published[0].versionId;
+  await save("docs", await current("docs", d.id), page("r15-from", "R15", "Two."));
+  const v2 = published(await publishApi("docs", d.id), "second").published[0].versionId;
+  const log = await sql("SELECT from_version_id, to_version_id FROM publish_log WHERE document_id = ? ORDER BY rowid", [d.id]);
+  eq(log.map((l) => [l.from_version_id, l.to_version_id]), [[null, v1], [v1, v2]], "from and to:");
+});
+
+await t("FIX4 R16: list.pages keeps a campaign's window_start and window_end (a scheduled campaign is not shown early)", async () => {
+  const c = await create("docs", "campaign", { body: body("campaign", { meta: { slug: "r16-sale", title: "R16 sale", window_start: "2099-01-01T00:00:00.000Z", window_end: "2099-02-01T00:00:00.000Z" }, sections: [textSec("sec_t1", "Sale", "Soon.")] }) });
+  published(await publishApi("docs", c.id), "campaign");
+  const row = (await pointerOf()).list.pages.find((p) => p.slug === "r16-sale");
+  eq([row?.window_start, row?.window_end], ["2099-01-01T00:00:00.000Z", "2099-02-01T00:00:00.000Z"], "the window:");
+  // the campaign route's own check (app/(storefront)/campaigns/[slug]) on what the reader returns
+  const { campaignVisible } = await import("../lib/cms/store.js");
+  eq(campaignVisible(await inT(() => Res.resolvedContentPage("r16-sale"))), false, "not shown before its window:");
+});
+
+await t("FIX4 R20: a document deleted while a lost publish re-reads answers the 'deleted' message (404), never a skip or a success", async () => {
+  const d = await create("docs", "page", { body: page("r20-gone", "R20", "Words.") });
+  const other = await create("docs", "page", { body: page("r20-stays", "R20 stays", "Words.") });
+  let calls = 0;
+  Pub.setPublishHooks({
+    commit: async () => {
+      calls++;
+      await raw.docs.execute({ sql: "DELETE FROM documents WHERE id = ?", args: [d.id] });
+      const live = await inT(() => pointerOf());
+      return { lost: true, outcome: "lost", pointer: live.pointer, list: live.list, cause: new Error("guard") };
+    },
+  });
+  const written = async () => canon({ releases: await sql("SELECT id FROM releases ORDER BY rowid"), state: await sql("SELECT * FROM release_state"), log: await sql("SELECT id FROM publish_log ORDER BY rowid"), published: await sql("SELECT id FROM document_versions WHERE kind = 'published' ORDER BY rowid") });
+  const before = await written();
+  const r = await publishSetApi("docs", [d.id, other.id]);
+  Pub.setPublishHooks({});
+  eq([r.status, r.body.code], [404, "DOCUMENT_DELETED"], `answer: ${JSON.stringify(r.body).slice(0, 300)}`);
+  eq(r.body.error, Pub.DELETED_MESSAGE, "words:");
+  eq(calls, 1, "no rebuild:");
+  eq(await written(), before, "nothing published:");
+  eq((await pointerOf()).list.documents[other.id], undefined, "the other page of the set is not live:");
+});
+
+await t("FIX4 DOC-10: meta.redirect_from publishes a redirect from the old address to the new slug, in the same release", async () => {
+  const d = await create("docs", "page", { body: page("old-addr", "Moving page", "Words.") });
+  published(await publishApi("docs", d.id), "at the old address");
+  await save("docs", await current("docs", d.id), body("page", { meta: { slug: "new-addr", title: "Moving page", redirect_from: ["old-addr"] }, sections: [textSec("sec_t1", "Moving page", "Words.")] }));
+  const r = published(await publishApi("docs", d.id), "moved");
+  const live = await pointerOf();
+  eq(live.pointer, r.release.id, "the same release:");
+  eq(live.list.redirects.filter((x) => x.document === d.id).map((x) => [x.from_slug, x.to_slug]), [["old-addr", "new-addr"]], "the redirect row:");
+  eq(live.list.pages.filter((p) => p.document === d.id).map((p) => p.slug), ["new-addr"], "the page row moved:");
+  eq(await inT(() => Res.resolvedSlugRedirect("old-addr")), "new-addr", "shoppers are sent on:");
+});
+
+// =========================================================================================
 console.log("— the API (storefront.publish, modes, product content)");
 
 await t("API: staff without storefront.publish get 403 with storage unchanged; a legacy-mode tenant gets 409; product_content gives a plain refusal", async () => {

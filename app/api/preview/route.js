@@ -30,15 +30,36 @@ function sameHostPath(referer, host) {
   }
 }
 
-const safePath = (p) => (typeof p === "string" && p.startsWith("/") && !p.startsWith("//") ? p : "/");
+// Where to send the browser: a path on THIS store, or the home page (P2-FIX4).
+// The URL parser forgives a lot: "/\evil.com" reads as "//evil.com", tabs and
+// newlines are dropped ("/\t/evil.com" too), and a server or proxy further on
+// may decode "%2F" or "%5C". So a value is kept only when it is a plain
+// root-relative path with no backslash, no control character, no encoded
+// slash or backslash in its path part, and when the URL it resolves to is on
+// this request's own origin. Anything else is "/". The GET answers with this
+// redirect even for a bad token, so this is what stops the switch being an
+// open redirect off the store's domain.
+function destination(p, origin) {
+  const home = new URL("/", origin);
+  if (typeof p !== "string" || !p.startsWith("/") || p.startsWith("//")) return home;
+  if (/[\\\u0000-\u001f\u007f]/.test(p)) return home;
+  const pathPart = p.split(/[?#]/, 1)[0];
+  if (/%(?:2f|5c)/i.test(pathPart) || /%25/i.test(pathPart)) return home; // encoded "/" or "\", or an encoded "%" (double encoding)
+  let u;
+  try {
+    u = new URL(p, origin);
+  } catch {
+    return home;
+  }
+  return u.origin === home.origin ? u : home;
+}
 
 export const GET = tenantHandler(async (request) => {
   const params = request.nextUrl.searchParams;
-  const to = safePath(params.get("to"));
   // Host-header origin, NOT nextUrl.origin: tenant hosts (pavos.localhost,
   // custom domains) otherwise get bounced to the server's bind address — a
   // cross-origin 302 that kills the console's cookie-mint fetch with CORS.
-  const dest = new URL(to, requestOrigin(request));
+  const dest = destination(params.get("to"), requestOrigin(request));
 
   if (params.get("exit")) {
     const res = NextResponse.redirect(dest, 302);
@@ -65,8 +86,7 @@ export const GET = tenantHandler(async (request) => {
 
 export const POST = tenantHandler(async (request) => {
   const form = await request.formData().catch(() => null);
-  const to = safePath(form?.get("to") || sameHostPath(request.headers.get("referer"), request.headers.get("host")));
-  const dest = new URL(to, requestOrigin(request));
+  const dest = destination(form?.get("to") || sameHostPath(request.headers.get("referer"), request.headers.get("host")), requestOrigin(request));
   if (!sameOrigin(request)) return new NextResponse("Cross-origin request rejected", { status: 403 });
   const parsed = await readPreviewToken(request.cookies.get(PREVIEW_COOKIE)?.value || "");
   if (!parsed?.sid) return NextResponse.redirect(dest, 303); // no session preview here: nothing to change

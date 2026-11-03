@@ -40,7 +40,10 @@ export const POST = tenantHandler(async (request) => {
   try {
     const r = await applyKit(String(body.kit || ""), { actor: auth.actor, withPresets: body.withPresets !== false, withBrand: body.withBrand !== false });
     // this request's tenant context predates the patch — answer with the pin we just wrote
-    return NextResponse.json({ ok: true, applied: r, ...view(), theme: r.theme, upgradeAvailable: false });
+    // r.note: the theme and brand were applied but the hero preset was not
+    // (someone else edited the hero just now); said plainly, never "nothing
+    // was saved" (P2-FIX4)
+    return NextResponse.json({ ok: true, applied: r, ...(r.note ? { note: r.note } : {}), ...view(), theme: r.theme, upgradeAvailable: false });
   } catch (e) {
     const infra = infraResponse(e, { route: "admin/theme" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });

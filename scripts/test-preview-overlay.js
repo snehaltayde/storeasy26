@@ -65,7 +65,7 @@ process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 process.env.PLATFORM_SITE_HOSTS = "";
 
-const TENANTS = ["pd", "pn", "pl", "pa", "pf", "px"];
+const TENANTS = ["pd", "pn", "pl", "pa", "pf", "px", "pv"];
 const dbs = [".test-pvo-default.db", ".test-pvo-platform.db", ".test-pvo-m21.db", ...TENANTS.map((t) => `.test-pvo-${t}.db`)];
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
@@ -175,6 +175,7 @@ const PL = await tenant("pl", { mode: "legacy" }); // legacy, today's preview
 const PA = await tenant("pa"); // documents, another store (cross-store tokens)
 const PF = await tenant("pf"); // documents, broken on purpose (failure rows)
 const PX = await tenant("px"); // documents, product_content and other tabs
+const PV = await tenant("pv"); // documents, but a legacy (v3) release is live (P2-FIX4)
 const HOST = (T) => `${T.id}.test`;
 const inT = (T, fn) => withTenant(T, fn);
 
@@ -182,7 +183,7 @@ const inT = (T, fn) => withTenant(T, fn);
 const ownerU = await I.createUser({ email: "asha@pv.test", name: "Asha Rao", password: "owner-pass-pv" });
 const otherU = await I.createUser({ email: "ravi@pv.test", name: "Ravi", password: "other-pass-pv" });
 const supportU = await I.createUser({ email: "help@pv.test", name: "Help", password: "support-pass-pv" });
-for (const T of [PD, PN, PL, PA, PF, PX]) {
+for (const T of [PD, PN, PL, PA, PF, PX, PV]) {
   await I.addMembership(ownerU.id, T.id, "owner");
   await I.addMembership(otherU.id, T.id, "owner");
   await I.addMembership(supportU.id, T.id, "support");
@@ -573,6 +574,77 @@ await t("the preview bar's form (POST /api/preview) flips the session in this br
   eq((await asRequest(PD, () => Res.contentSource(), tok)).overlay.showDesign, false, "off:");
 });
 
+// P2-FIX4: /api/preview never sends a browser off the store's own origin.
+await t("FIX4 open redirect: every hostile 'to' lands on '/' of the store's own origin (GET with or without a valid token, and the bar's POST); good paths are kept", async () => {
+  const route = await import(pathToFileURL(join(ROOT, "app/api/preview/route.js")).href);
+  const get = (query) => {
+    const u = new URL(`https://pd.test/api/preview${query}`);
+    return route.GET({ headers: new Headers({ host: "pd.test" }), nextUrl: u, url: u.href, cookies: { get: () => undefined } });
+  };
+  const withTo = (to, extra = {}) => {
+    const p = new URLSearchParams({ ...extra, to });
+    return get(`?${p}`);
+  };
+  const HOSTILE = [
+    "/\\evil.com",
+    "/%5Cevil.com",
+    "/%5cevil.com",
+    "//evil.com",
+    "/%2F%2Fevil.com",
+    "/%2f/evil.com",
+    "/%252F%252Fevil.com",
+    "/\t/evil.com",
+    "/\n/evil.com",
+    "/\r\n/evil.com",
+    "/\\/evil.com",
+    "\\\\evil.com",
+    "https://evil.com",
+    "https:evil.com",
+    "javascript:alert(1)",
+    " //evil.com",
+    "",
+  ];
+  const home = "https://pd.test/";
+  const s = await newSession(PD);
+  // every miss is collected, so a failing run names each input that escaped
+  const escaped = [];
+  for (const to of HOSTILE) {
+    for (const [label, r] of [
+      ["no token", await withTo(to)],
+      ["a bad token", await withTo(to, { token: "p.1.x" })],
+      ["a valid token", await withTo(to, { token: s.token })],
+      ["exit", await withTo(to, { exit: "1" })],
+    ]) {
+      if (r.status !== 302 || r.headers.get("location") !== home) escaped.push(`${JSON.stringify(to)} (${label}) -> ${r.status} ${r.headers.get("location")}`);
+    }
+  }
+  // the exact links from the review, as a browser sends them
+  for (const q of ["?to=/%5Cevil.com", "?to=/%5cevil.com", "?to=/%09/evil.com", "?to=%2F%2Fevil.com", "?to=/%0A/evil.com", "?token=bad&to=/%5Cevil.com"]) {
+    const loc = (await get(q)).headers.get("location");
+    if (loc !== home) escaped.push(`${q} -> ${loc}`);
+  }
+  if (escaped.length) throw new Error(`${escaped.length} hostile inputs left the store's origin or missed '/': ${escaped.join(" | ")}`);
+  // good paths are kept
+  for (const [to, want] of [
+    ["/products/x?y=1#z", "https://pd.test/products/x?y=1#z"],
+    ["/", "https://pd.test/"],
+    ["/collections/serums", "https://pd.test/collections/serums"],
+    ["/search?q=a%2Fb", "https://pd.test/search?q=a%2Fb"],
+  ]) {
+    eq((await withTo(to)).headers.get("location"), want, `${to} (no token):`);
+    eq((await withTo(to, { token: s.token })).headers.get("location"), want, `${to} (valid token):`);
+  }
+  // the bar's POST: a hostile form field or Referer lands on '/' too
+  const post = (fields, referer) => {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(fields)) form.set(k, v);
+    return route.POST({ headers: new Headers({ host: "pd.test", ...(referer ? { referer } : {}) }), cookies: { get: () => undefined }, formData: async () => form, url: "https://pd.test/api/preview", nextUrl: new URL("https://pd.test/api/preview") });
+  };
+  for (const to of HOSTILE.filter(Boolean)) eq((await post({ design: "on", to })).headers.get("location"), home, `POST ${JSON.stringify(to)}:`);
+  eq((await post({ design: "on" }, "https://pd.test/policies/shipping?x=1")).headers.get("location"), "https://pd.test/policies/shipping?x=1", "POST back to the bar's page:");
+  eq((await post({ design: "on" }, "https://evil.com/x")).headers.get("location"), home, "POST with another site's Referer:");
+});
+
 // =====================================================================================
 console.log("— 5. refusals");
 // =====================================================================================
@@ -639,6 +711,58 @@ await t("an old-format token on a documents store gives live only; on a legacy s
   eq(r.status, 409, "create on legacy:");
   eq(r.body.code, "STORE_USES_LEGACY", "code:");
   eq(await inT(PL, async () => Number((await libsql.execute("SELECT count(*) AS n FROM preview_sessions")).rows[0].n)), 0, "no session written:");
+});
+
+// P2-FIX4: the contentSource branches the review found unpinned.
+await t("FIX4: a 'migrating' store with a valid token keeps today's legacy draft preview (old and new token formats)", async () => {
+  const ltok = await inT(PL, () => R.previewToken());
+  await inT(PL, () => libsql.execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1"));
+  try {
+    const src = await asRequest(PL, () => Res.contentSource(), withToken(ltok));
+    eq(src.mode, "draft", "migrating preview mode:");
+    eq(src.preview, true, "preview:");
+    eq(src.overlay, undefined, "no overlay:");
+    eq(await asRequest(PL, () => Res.resolvedHero(), withToken(ltok)).then((h) => h.title), "Legacy draft hero", "the draft shows:");
+    const stok = await inT(PL, () => R.previewToken({ sid: "ps_00000000000000bb" }));
+    eq((await asRequest(PL, () => Res.contentSource(), withToken(stok))).mode, "draft", "a session-format token too:");
+    eq(await asRequest(PL, () => Res.resolvedHero()).then((h) => h.title), "Legacy live hero", "shoppers keep the live release:");
+  } finally {
+    await inT(PL, () => libsql.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1"));
+  }
+});
+
+await t("FIX4: when the store's mode can't be read (getCmsMode throws), a valid token gets LIVE content, not drafts (pinned: before P2-PREVIEW it got the legacy draft preview)", async () => {
+  const ltok = await inT(PL, () => R.previewToken());
+  eq(await asRequest(PL, () => Res.resolvedHero(), withToken(ltok)).then((h) => h.title), "Legacy draft hero", "before: the draft preview:");
+  // cms_state readable as a table name, but every read of it fails
+  await inT(PL, () => libsql.executeMultiple("ALTER TABLE cms_state RENAME TO cms_state_kept; CREATE TABLE gone (x); CREATE VIEW cms_state AS SELECT * FROM gone; DROP TABLE gone;"));
+  try {
+    const { CmsModeUnavailableError, getCmsMode } = await import("../lib/cms-mode.js");
+    const e = await inT(PL, () => getCmsMode()).then(() => null, (x) => x);
+    ok(e instanceof CmsModeUnavailableError, `getCmsMode throws: ${e?.message}`);
+    const src = await asRequest(PL, () => Res.contentSource(), withToken(ltok));
+    eq(src.preview, false, "no preview:");
+    eq(src.mode, "live", "live:");
+    eq(await asRequest(PL, () => Res.resolvedHero(), withToken(ltok)).then((h) => h.title), "Legacy live hero", "live content, never the draft:");
+  } finally {
+    await inT(PL, () => libsql.executeMultiple("DROP VIEW cms_state; ALTER TABLE cms_state_kept RENAME TO cms_state;"));
+  }
+  eq(await asRequest(PL, () => Res.resolvedHero(), withToken(ltok)).then((h) => h.title), "Legacy draft hero", "repaired:");
+});
+
+await t("FIX4: a documents store whose live release is a legacy (v3) one gives a session token live content only", async () => {
+  await inT(PV, async () => {
+    await libsql.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES ('rel_pv3', ?, 'h3', '', NULL, ?, NULL, ?)", args: [JSON.stringify({ v: 3, blocks: { hero: { title: "V3 live hero" } }, pages: [] }), NOW, NOW] });
+    await libsql.execute("UPDATE release_state SET live_release_id = 'rel_pv3' WHERE id = 1");
+  });
+  await createDraft(PV, "home", body("home", { sections: [sec("hero", "sec_hero", { title: "A v4 draft hero" })] }));
+  const s = await newSession(PV);
+  const src = await asRequest(PV, () => Res.contentSource(), withToken(s.token));
+  eq(src.preview, false, "no preview:");
+  eq(src.overlay, undefined, "no overlay:");
+  eq(src.mode, "live", "live:");
+  eq(src.v, undefined, "the legacy release, not a v4 list:");
+  eq(await asRequest(PV, () => Res.resolvedHero(), withToken(s.token)).then((h) => h.title), "V3 live hero", "the live v3 hero, never the draft:");
 });
 
 // =====================================================================================
@@ -897,14 +1021,39 @@ await t("migration 0022 is additive, re-runs cleanly, and tenant-migrate --check
   ok(out.includes(`✓ pd: current, all ${MIGRATIONS.length} migrations up to 0022_preview_sessions`), `pd current at 0022:\n${out.slice(0, 600)}`);
 });
 
-await t("token formats: the new token carries its sid and binds it; the old format still verifies; inPreview uses the same reader", async () => {
+await t("token formats: the new token carries its sid and binds it; the old format still verifies", async () => {
   const s = await newSession(PD);
   same(await inT(PD, () => R.readPreviewToken(s.token)), { exp: Number(s.token.split(".")[1]), sid: s.sid }, "new format:");
   const old = await inT(PD, () => R.previewToken());
   same(await inT(PD, () => R.readPreviewToken(old)), { exp: Number(old.split(".")[1]), sid: null }, "old format:");
   eq(await inT(PA, () => R.readPreviewToken(s.token)), null, "another store:");
-  const src = await readFile(join(ROOT, "lib/tenant-request.js"), "utf8");
-  ok(/readPreviewToken/.test(src), "lib/tenant-request.js inPreview reads tokens with readPreviewToken");
+});
+
+await t("FIX4: inPreview (lib/tenant-request.js) counts both token formats: a founder's preview reads the store's row fresh, a shopper or a bad token keeps the cached row", async () => {
+  const TR = await import("../lib/tenant-request.js");
+  const nameNow = (cookies) => asRequest(PD, async () => (await TR.requestResolution()).tenant?.config?.site?.name ?? null, cookies);
+  const setName = (n) => C.platformDb().execute({ sql: "UPDATE tenants SET config = json_set(config, '$.site.name', ?) WHERE id = 'pd'", args: [n] });
+  const keep = process.env.PLATFORM_CACHE_MS;
+  process.env.PLATFORM_CACHE_MS = "600000"; // the cache holds for this test
+  const s = await newSession(PD);
+  const oldTok = await inT(PD, () => R.previewToken());
+  try {
+    await setName("PV pd Store");
+    await C.getTenant("pd", { fresh: true }); // warm this instance's cache
+    eq(await nameNow({}), "PV pd Store", "warm:");
+    await setName("Saved just now");
+    eq(await nameNow({}), "PV pd Store", "a shopper keeps the cached row:");
+    eq(await nameNow(withToken("garbage")), "PV pd Store", "a bad token keeps the cached row:");
+    const [p, exp, sid, sig] = s.token.split(".");
+    eq(await nameNow(withToken(`${p}.${exp}.${sid}.${sig[0] === "0" ? "1" : "0"}${sig.slice(1)}`)), "PV pd Store", "a tampered session token keeps the cached row:");
+    eq(await nameNow(withToken(s.token)), "Saved just now", "a session token (p.<exp>.<sid>.<hmac>) reads the row fresh:");
+    await setName("Saved again");
+    eq(await nameNow(withToken(oldTok)), "Saved again", "an old-format token (p.<exp>.<hmac>) reads the row fresh:");
+  } finally {
+    await setName("PV pd Store");
+    process.env.PLATFORM_CACHE_MS = keep;
+    await C.getTenant("pd", { fresh: true });
+  }
 });
 
 await t("edge safety: no node:* import in lib/preview-sessions.js or anything it and the readers import", async () => {
