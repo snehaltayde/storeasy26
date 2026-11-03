@@ -32,6 +32,7 @@ const { withTenant } = await import("../lib/tenant-context.js");
 const { db } = await import("../lib/db.js");
 const { handleStorefrontPut } = await import("../lib/admin/cms-api.js");
 const { getContentPage, validatePageSections } = await import("../lib/cms/store.js");
+const { sanitizeHtml } = await import("../lib/sanitize.js");
 const { normalizePageSections } = await import("../lib/cms/schemas.js");
 const { componentFor } = await import("../lib/cms/registry.js");
 const R = await import("../lib/releases.js");
@@ -311,6 +312,20 @@ const LOSES_WORDS = [
   ['<p>Before</p><embed src="/x"><p>After the embed</p>', "After the embed"],
   ["<p>Before</p><svg><text>Drawn words</text></svg>", "Drawn words"],
   ['<p>Before</p><iframe src="/x"><p>Never closed</p>', "Never closed"],
+  // a colon or a hyphen doesn't make it a tag, and it still parses as one
+  ["Call <tel:9876543210> now.", "<tel:9876543210>"],
+  ["<Price:500> only.", "<Price:500>"],
+  ["Use <code:SAVE10> at checkout.", "<code:SAVE10>"],
+  ["Mix <m:500> grams.", "<m:500>"],
+  ["<sku:123>Blue</sku:123> shoes.", "<sku:123>Blue</sku:123>"],
+  ["<m:500>Flour</m:500> mix.", "<m:500>Flour</m:500>"],
+  ["Save <b free-shipping> today.", "<b free-shipping>"],
+  // a real tag's name, on its own, with nothing closing it
+  ["Click the <link> below.", "<link>"],
+  ["Send your <address> and <time>.", "<address> and <time>"],
+  ["Pick a <title> first.", "<title>"],
+  ["</time> comes before <time> here.", "<time>"],
+  ["Ends with <script>", "<script>"],
 ];
 
 await t(`stray brackets (${LOSES_WORDS.length} cases, both fields): refused, quoting the words, row untouched`, async () => {
@@ -375,6 +390,21 @@ const UNSAFE_NO_WORDS = [
   ['<a href="/x"title="y">Hi</a>', '<a href="/x" title="y">Hi</a>'],
   ["<P ALIGN=center>Hi<BR/></P >", "<p>Hi<br /></p>"],
   ["Under 5 < 10", "Under 5 &lt; 10"],
+  // real HTML still saves: a tag that closes, Word's own tags, data-* and aria-*
+  ["<address>Hi</address>", "Hi"],
+  ["<time>Hi</time>", "Hi"],
+  ['<st1:country-region w:st="on">Hi</st1:country-region>', "Hi"],
+  ['<w:sdt>Hi</w:sdt><o:p/><v:shape id="x"/>', "Hi"],
+  ["<m:oMath>Hi</m:oMath><x:Row>there</x:Row>", "Hithere"],
+  ["<p data-sale aria-hidden>Hi</p>", "<p>Hi</p>"],
+  ["Hi<wbr>there", "Hithere"],
+  ["<table><colgroup><col><col></colgroup><tr><td>Hi</td></tr></table>", "<table><tr><td>Hi</td></tr></table>"],
+  // an address that only runs code, or no address at all, costs no link
+  ['<a href="vbscript:x">Hi</a>', "<a>Hi</a>"],
+  ['<a href="java&#x73;cript:alert(1)">Hi</a>', "<a>Hi</a>"],
+  ['<a href="">Hi</a>', "<a>Hi</a>"],
+  ['<a href=" ">Hi</a>', "<a>Hi</a>"],
+  ['<iframe src="video.mp4"></iframe><p>Hi</p>', "<p>Hi</p>"],
 ];
 
 await t(`unsafe parts with no words in them (${UNSAFE_NO_WORDS.length} cases, both fields) still save, every word kept`, async () => {
@@ -390,13 +420,31 @@ await t(`unsafe parts with no words in them (${UNSAFE_NO_WORDS.length} cases, bo
   }
 });
 
-await t("what was stored is never refused or changed by saving it again", async () => {
+await t("what these saves stored is not refused or changed by saving it again", async () => {
   for (const [, stored] of UNSAFE_NO_WORDS) {
     for (const [field, section] of htmlField(stored)) {
       const [clean] = validatePageSections([section]);
       eq(field === "rich" ? clean.html : clean.items[0].a, stored, `${field} ${stored}:`);
     }
   }
+});
+
+await t("a row the old code cut mid-tag saves again, unless encoding its < takes it past the limit", async () => {
+  const oldCut = (limit, tail) => sanitizeHtml("x".repeat(limit - 10) + '<a href="https://a.example/">y</a>').slice(0, tail);
+  const insert = (slug, html) => inT(() => db.insertInto("cms_pages").values({ slug, title: "T", description: "", sections: JSON.stringify([{ id: `sec_${slug}`, kind: "rich", heading: "", html }]), enabled: 1, revision: 1, updated_at: "2026-01-01T00:00:00.000Z", family: "page", schema_version: 2 }).execute());
+
+  await insert("old-cut-short", oldCut(10000, 10003));
+  const short = await save("old-cut-short", await reload("old-cut-short"), 1);
+  eq(short.status, 200, `under the limit: "${short.body.error}"`);
+
+  const cut = oldCut(20000, 20000);
+  ok(cut.endsWith('xxxx<a href="h') && cut.length === 20000, "fixture:");
+  await insert("old-cut", cut);
+  const before = await row("old-cut");
+  const res = await save("old-cut", await reload("old-cut"), 1);
+  await refused("old-cut", res, "cut at the limit");
+  eq(res.body.error, "section 1: the content is too long (20003 characters, the limit is 20000)", "message:");
+  eq(await row("old-cut"), before, "row unchanged:");
 });
 
 await t("a link near the limit stays accepted however many times it is saved, with no edit", async () => {
@@ -412,15 +460,69 @@ await t("a link near the limit stays accepted however many times it is saved, wi
   }
 });
 
+await t("a typed nofollow or sponsored stays on a link with a target, through save and reload", async () => {
+  const typed = '<a href="https://x.example" target="_blank" rel="nofollow sponsored">x</a>';
+  const stored = '<a href="https://x.example" target="_blank" rel="nofollow sponsored noopener noreferrer">x</a>';
+  const res = await save("rel-seo", form({ kind: "rich", heading: "", html: typed }));
+  eq(res.status, 200, "save:");
+  const [back] = await reload("rel-seo");
+  eq(back.html, stored, "stored:");
+  eq(validatePageSections([{ kind: "rich", html: stored }])[0].html, stored, "saved again:");
+});
+
 await t("a row already holding repeated rel attributes shrinks back on its next save", () => {
   const doubled = '<a href="/x" target="_blank" rel="noopener noreferrer" rel="noopener noreferrer">x</a>';
   eq(validatePageSections([{ kind: "rich", html: doubled }])[0].html, '<a href="/x" target="_blank" rel="noopener noreferrer">x</a>', "html:");
 });
 
+// --- link and image addresses the founder typed -------------------------------
+console.log("— a link or image address that saving would remove");
+
+// [typed, the address the refusal must quote]
+const LOSES_ADDRESS = [
+  ['<a href="tel:+919876543210">Call us</a>', "tel:+919876543210"],
+  ['<a href="sms:+919876543210">Text us</a>', "sms:+919876543210"],
+  ['<a href="whatsapp://send?phone=919876543210">WhatsApp</a>', "whatsapp://send?phone=919876543210"],
+  ['<a href="www.store.com/sale">Sale</a>', "www.store.com/sale"],
+  ["<a href=contact>Contact</a>", "contact"],
+  ['<a href="//cdn.example/x">Sale</a>', "//cdn.example/x"],
+  ['<img src="photo.jpg" alt="Photo">', "photo.jpg"],
+  ['<img src="data:image/png;base64,AAAA" alt="Pasted">', "data:image/png;base64,AAAA"],
+];
+
+await t(`addresses (${LOSES_ADDRESS.length} cases, both fields): refused, quoting the address, row untouched`, async () => {
+  let n = 0;
+  for (const [typed, address] of LOSES_ADDRESS) {
+    for (const [field, section] of htmlField(typed)) {
+      const slug = `addr-${n++}`;
+      const before = await seed(slug);
+      const res = await save(slug, form(section), before.revision);
+      const label = `${field} ${typed}`;
+      await refused(slug, res, label);
+      ok(res.body.error.includes(`"${address}"`), `${label} quotes the address, got "${res.body.error}":`);
+      ok(res.body.error.startsWith(field === "rich" ? "section 1:" : "section 1, question 1:"), `${label} position, got "${res.body.error}":`);
+      eq(await row(slug), before, `${label} row unchanged:`);
+    }
+  }
+});
+
+await t("addresses that work are stored as typed", async () => {
+  const typed = '<a href="https://x.example/a">a</a><a href="http://x.example/b">b</a><a href="/c">c</a><a href="#d">d</a><a href="mailto:hi@store.example">e</a><img src="/api/media/a" alt="f" />';
+  const res = await save("addr-ok", form({ kind: "rich", heading: "", html: typed }));
+  eq(res.status, 200, `save: "${res.body.error}"`);
+  eq((await reload("addr-ok"))[0].html, typed, "stored:");
+});
+
+await t("sanitizeHtml itself still returns the same text for an address it removes", () => {
+  eq(sanitizeHtml('<a href="tel:+919876543210">Call us</a>'), "<a>Call us</a>", "html:");
+  eq(sanitizeHtml('<noscript><img src="photo.jpg"></noscript><p>Hi</p>'), "<p>Hi</p>", "dropped element:");
+  eq(validatePageSections([{ kind: "rich", html: '<noscript><img src="photo.jpg"></noscript><p>Hi</p>' }])[0].html, "<p>Hi</p>", "an address inside a dropped element holds no link:");
+});
+
 // --- invisible and unusable input --------------------------------------------
 console.log("— characters that show nothing, and image links");
 
-const INVISIBLE = ["\u200B", "\u200C", "\u200D", "\u2060", "\uFEFF", "\u00AD", "\u00A0", " \u200B \u200D "];
+const INVISIBLE = ["\u200B", "\u200C", "\u200D", "\u2060", "\uFEFF", "\u00AD", "\u00A0", " \u200B \u200D ", "\u200E", "\u200F", "\uFE0F", "\u2800", "\u3164", "\u034F", "\u2062", "\u202A", "\u180E", "\u115F", "\u1160", "\uFFA0", "\u0001"];
 
 await t(`a section holding only invisible characters (${INVISIBLE.length} kinds) counts as empty`, async () => {
   const before = await seed("invisible");
@@ -447,6 +549,30 @@ await t("an invisible heading beside real text is no heading, and an invisible p
   ]);
   eq([a.heading, a.body], ["", ["Real words."]], "invisible heading:");
   eq([b.heading, b.body], ["Real heading", ["Real words."]], "invisible paragraph:");
+});
+
+// Sanitized HTML that a shopper would see as nothing, in both HTML fields.
+const EMPTY_MARKUP = ["<p></p>", "<p> </p>", "<br>", "<p>&nbsp;</p>", "&nbsp;", "&#160;", "<div></div>", "<p>\u200B</p>", "<p>&#8203;</p>", '<a href="/x"></a>', "<script>x</script>", "<!-- a note -->"];
+
+await t(`only empty markup (${EMPTY_MARKUP.length} kinds, both fields) counts as empty, row untouched`, async () => {
+  const before = await seed("empty-markup");
+  for (const typed of EMPTY_MARKUP) {
+    for (const [field, section] of htmlField(typed)) {
+      const res = await save("empty-markup", form(section), before.revision);
+      await refused("empty-markup", res, `${field} ${typed}`);
+      ok(res.body.error.includes(field === "rich" ? "this section is empty" : "answer required"), `${field} ${typed} message, got "${res.body.error}":`);
+    }
+  }
+  eq(await row("empty-markup"), before, "row unchanged:");
+});
+
+await t("a picture or a dividing line alone is content; so is one real word in empty tags", async () => {
+  for (const typed of ['<img src="/api/media/a" alt="Photo" />', "<hr />", "<p>&nbsp;</p><p>Hi</p>", "<p>5 &lt; 6</p>"]) {
+    for (const [field, section] of htmlField(typed)) {
+      const [clean] = validatePageSections([section]);
+      eq(field === "rich" ? clean.html : clean.items[0].a, typed, `${field} ${typed}:`);
+    }
+  }
 });
 
 await t("the same characters inside real words are stored untouched (scripts and emoji need them)", async () => {
@@ -725,6 +851,14 @@ await t("PageEditor saves through sectionsPayload and keeps no filter of its own
   ok(/sections: sectionsPayload\(form\.sections\)/.test(src), "buildPayload:");
   ok(/const sections = sectionsPayload\(form\.sections\);/.test(src), "save as template:");
   ok(!/sections\.filter\(\(s\) => !editEmpty/.test(src), "no local drop:");
+});
+
+await t("PageEditor copy matches the rule, and each badge shows the number refusals use", async () => {
+  const src = await source("components/admin/cms/PageEditor.js");
+  ok(!/sections are dropped|dropped on save/i.test(src), "copy no longer says empty sections are dropped:");
+  ok(src.includes("A section can't be saved empty"), "copy says a section can't be saved empty:");
+  ok(src.includes('placeholder="Heading (optional)"') && !src.includes("Section heading (required)"), "heading placeholder:");
+  ok(/<Badge tone="neutral">\s*\{i \+ 1\}\. \{SECTION_LABELS\[s\.kind\]/.test(src), "badge number:");
 });
 
 // ----------------------------------------------------------------------------

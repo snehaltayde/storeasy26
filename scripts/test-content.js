@@ -82,6 +82,9 @@ await t("dangling '<' is neutralized; a with target gains rel", async () => {
   includes(out, 'rel="noopener noreferrer"');
   eq(sanitizeHtml(out), out); // sanitizing again doesn't add another rel (AU-05)
   eq(sanitizeHtml('<a rel="opener" href="/x" target="_blank">x</a>'), '<a href="/x" target="_blank" rel="noopener noreferrer">x</a>');
+  const seo = sanitizeHtml('<a rel="nofollow Sponsored opener" href="/x" target="_blank">x</a>');
+  eq(seo, '<a href="/x" target="_blank" rel="nofollow sponsored noopener noreferrer">x</a>'); // search-engine words stay
+  eq(sanitizeHtml(seo), seo);
 });
 
 await t("typical Shopify description markup passes through intact", async () => {
