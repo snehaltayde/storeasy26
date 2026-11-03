@@ -9,6 +9,8 @@ import { tenantHandler } from "@/lib/tenant-request";
 //       | { saveDraft: {id, body}, revision }
 //       | { discardDraft: id, revision } | { archive: id, revision }
 //       | { restoreVersion: {id, versionId}, revision }         storefront.write
+//   PUT { publish: {id, draftHash}, revision }
+//       | { publishSet: [{id, revision, draftHash}, …] }        storefront.publish
 // Exactly ONE operation per request, parsed before it is authorized. Writes
 // answer 409 STORE_USES_LEGACY unless the store is in documents mode. The
 // handler lives in lib/admin/documents-api.js so scripts/test-documents.js

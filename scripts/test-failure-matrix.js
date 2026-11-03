@@ -566,14 +566,17 @@ row("publish", "published, then the panel's refresh fails", () => releases("noap
 // document, the version) and the re-read after it still work: the row must
 // then show the write did NOT happen, and the answer must be a 5xx with a code
 // and "nothing was saved", never a 422.
-const failingBatch = async (name, pattern, fn) => {
+// P2-PUBLISH: `makeError` picks the database's answer (default: a corrupt
+// database), so the publish rows can force a refused statement or a busy lock.
+const corrupt = () => Object.assign(new Error("SQLITE_ERROR: disk image is malformed"), { name: "LibsqlError", code: "SQLITE_CORRUPT" });
+const failingBatch = async (name, pattern, fn, makeError = corrupt) => {
   const inst = await withTenant(T[name], async () => (await import("../lib/db.js")).currentDatabase());
   const send = inst.libsql.batch;
   let refused = 0;
   inst.libsql.batch = (stmts, ...rest) => {
     if ((stmts || []).some((st) => pattern.test(typeof st === "string" ? st : st?.sql || ""))) {
       refused++;
-      return Promise.reject(Object.assign(new Error("SQLITE_ERROR: disk image is malformed"), { name: "LibsqlError", code: "SQLITE_CORRUPT" }));
+      return Promise.reject(makeError());
     }
     return send.call(inst.libsql, stmts, ...rest);
   };
@@ -636,6 +639,73 @@ row("save", "documents: no revision sent", () => documents("docs", { archive: DO
 row("save", "documents: a store still on the current editor", () => documents("ok", { createDocument: { type: "home" } }), { status: 409, code: "STORE_USES_LEGACY", cls: "refusal" });
 row("save", "documents: two operations in one request", () => documents("docs", { getDocument: DOCS_PAGE.id, archive: DOCS_PAGE.id, revision: 1 }), { status: 400, code: "AMBIGUOUS_OPERATION", cls: "refusal" });
 row("save", "documents: read-only role (support)", () => documents("docs", { archive: DOCS_PAGE.id, revision: 1 }, { admin: SUPPORT }), { status: 403, cls: "refusal" });
+
+// --- publishing documents (P2-PUBLISH) -------------------------------------------------
+// The publish batch is the one carrying the pointer flip. Only that batch is
+// broken, so the reads around it (the documents, the live list, the commit's
+// own read-back) still work and prove nothing was written.
+const PUBLISH_BATCH = /^UPDATE release_state SET live_release_id/;
+const publishDump = (name) =>
+  withTenant(T[name], async () => {
+    const { libsql } = await import("../lib/db.js");
+    const out = [];
+    for (const table of ["documents", "document_versions", "publish_log", "releases", "release_state"]) out.push((await libsql.execute(`SELECT * FROM ${table} ORDER BY rowid`)).rows.map((r) => ({ ...r })));
+    return JSON.stringify(out);
+  });
+const DOCS_PUB = await withTenant(T.docs, async () => {
+  const body = { schema: 1, type: "page", meta: { slug: "fm-pub", title: "Publish me", description: "", enabled: true, effective_at: null, window_start: null, window_end: null, redirect_from: [] }, sections: [{ id: "sec_fmp1", kind: "text", v: 1, enabled: true, settings: { title: "Hi", body: ["Words."] }, blocks: [] }] };
+  return (await DocsService.createDocument({ type: "page", body, actor: { kind: "merchant", id: owner.id } })).document;
+});
+const pubNow = () => withTenant(T.docs, () => DocsService.getDocument(DOCS_PUB.id));
+const publishDoc = async (opts = {}, d = null) => {
+  const cur = d || (await pubNow());
+  return documents("docs", { publish: { id: cur.id, draftHash: cur.draftHash }, revision: cur.revision }, opts);
+};
+const withPublishDump = async (fn) => {
+  const before = await publishDump("docs");
+  const res = await fn();
+  res.__before = before;
+  return res;
+};
+const publishUnchanged = async (before, label) => eq(await publishDump("docs"), before, `${label}: storage changed:`);
+row("publish", "documents: the database refuses the publish batch", () =>
+  withPublishDump(() => failingBatch("docs", PUBLISH_BATCH, () => publishDoc(), () => Object.assign(new Error("SQLITE_CONSTRAINT: NOT NULL constraint failed: document_versions.body"), { name: "LibsqlError", code: "SQLITE_CONSTRAINT_NOTNULL" }))),
+  { status: 500, code: "PUBLISH_FAILED", cls: "infrastructure" },
+  (r) => publishUnchanged(r.__before, "refused publish batch"),
+);
+row("publish", "documents: the database stays locked through every publish attempt", () =>
+  withPublishDump(() => failingBatch("docs", PUBLISH_BATCH, () => publishDoc(), () => Object.assign(new Error("SQLITE_BUSY: database is locked"), { name: "LibsqlError", code: "SQLITE_BUSY" }))),
+  { status: 503, code: "PUBLISH_BUSY", cls: "infrastructure" },
+  async (r) => {
+    ok(r.body.error.startsWith("Publishing is busy, try again in a moment"), `busy words: ${r.body.error}`);
+    await publishUnchanged(r.__before, "busy publish");
+  },
+);
+row("publish", "documents: the database doesn't answer", () => documents("down", { publish: { id: "doc_home", draftHash: "x" }, revision: 1 }), { status: 503, code: "DATABASE_UNAVAILABLE", cls: "infrastructure" });
+row("publish", "documents: someone saved after the founder reviewed", async () => {
+  const d = await pubNow();
+  return documents("docs", { publish: { id: d.id, draftHash: d.draftHash }, revision: d.revision - 1 });
+}, { status: 409, code: "DOCUMENT_CHANGED", cls: "refusal" }, async (r) => eq(r.body.current?.revision, (await pubNow()).revision, "the current version rides along:"));
+row("publish", "documents: an empty home page", () =>
+  withTenant(T.docs, async () => {
+    const home = (await DocsService.createDocument({ type: "home", body: { schema: 1, type: "home", meta: {}, sections: [] }, actor: { kind: "merchant", id: owner.id } })).document;
+    return publishDoc({}, home);
+  }),
+  { status: 422, code: "VALIDATION_FAILED", cls: "validation" },
+  (r) => eq(r.body.issues.find((i) => i.code === "HOME_EMPTY")?.message, "Your home page is empty. Add a section or restore the last published version.", "exact words:"),
+);
+row("publish", "documents: product content can't be published yet", () =>
+  withTenant(T.docs, async () => publishDoc({}, (await DocsService.createDocument({ type: "product_content", entityId: "gid://shopify/Product/77", actor: { kind: "merchant", id: owner.id } })).document)),
+  { status: 409, code: "PUBLISH_NOT_AVAILABLE", cls: "refusal" },
+);
+row("publish", "documents: a store still on the current editor", () => documents("ok", { publish: { id: "doc_home", draftHash: "x" }, revision: 1 }), { status: 409, code: "STORE_USES_LEGACY", cls: "refusal" });
+row("publish", "documents: staff can't publish", () => publishDoc({ admin: STAFF }), { status: 403, cls: "refusal" });
+row("publish", "documents: no draft hash sent", async () => documents("docs", { publish: { id: DOCS_PUB.id }, revision: (await pubNow()).revision }), { status: 428, code: "REVIEW_REQUIRED", cls: "refusal" });
+row("publish", "documents: the publish goes through after all that", () => publishDoc(), { status: 200 }, async (r) => {
+  eq(r.body.published.map((p) => p.id), [DOCS_PUB.id], "published:");
+  const live = await withTenant(T.docs, async () => (await (await import("../lib/db.js")).libsql.execute("SELECT live_release_id FROM release_state WHERE id = 1")).rows[0]);
+  eq(live?.live_release_id, r.body.release.id, "the release really is live:");
+});
 
 // --- run the matrix ------------------------------------------------------------------
 for (const area of ["save", "load", "preview", "publish"]) {
