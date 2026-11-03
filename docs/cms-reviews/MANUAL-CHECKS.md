@@ -104,6 +104,10 @@ The full list goes to the owner when all six phases are done. Each entry names t
   - Stores using the Pulse kit's own colours: their link and wordmark accent now use a darker lime (links #588a0c become #456c09) because the old shade read at 4.15:1. Keep?
   - Field outlines are about 1.3:1 on every store. Accessibility guidance asks 3:1 for a field's outline. Change them?
   - The suggested fix is the nearest colour that passes (for dark text on black it suggests a mid grey, #80808e). Would you rather it suggest near-white or near-black?
+  - (Fix round 1) The platform default look's own hard-to-read pairs above are no longer shown to founders at all, and never stop a publish, even right after a store resets from its own readable colours (its faint grey text goes from about 4.9:1 back to 2.6:1). Should the Brand screen say so, or stay quiet as now?
+  - (Fix round 1) A store with no brand on the Glow kit now shows a darker green for the header wordmark and hero highlight (#4d7c0f and #3f6212 instead of #a3e635, which read at 1.46:1 on Glow's cream). Happy with that shade?
+- [ ] **(Fix round 1) A real store that resets its brand, on staging.** On a tenant with its own colours live and a theme pinned, press Reset on the Brand screen, then Publish. Pass: it publishes, and the store shows the platform's default look. Then apply the Pulse kit with "use its colours" ticked and publish. Pass: it publishes and the Brand screen shows no "Hard to read" banner.
+- [ ] **(Fix round 1) A new store on Glow, on staging.** On a newly provisioned tenant (no brand), apply the Glow kit with both boxes unticked and publish. Pass: it publishes, and on your phone the header and hero green text is readable on the cream background.
 
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
