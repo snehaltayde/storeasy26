@@ -893,6 +893,42 @@ console.log("— P2-VGATE: the reader version gate");
       await putTenant("vg", ".test-rel-vg.db");
     }
   });
+
+  // Fix round 1: a glow store's curtain now really renders as glow-1 (light
+  // hero #fff1ee). Its "Scheduled maintenance" pill must use the kit-corrected
+  // hero accent, and the CSS for it must be written even with no brand.
+  await t("rendered: a glow store's maintenance pill is readable on the light hero, with and without a brand", async () => {
+    const B = await import("../lib/brand.js");
+    const heroBg = B.kitSurfaces("glow-1").hero.bg;
+    await putTenant("vg", ".test-rel-vg.db", { ...BASE_CONFIG("vg"), maintenance: { enabled: true, message: "Back soon" } });
+    const VGM = await C.getTenant("vg");
+    await new Promise((r) => setTimeout(r, 80)); // PLATFORM_CACHE_MS
+    const pill = (html) => html.match(/<p class="([^"]*)"><span class="([^"]*)"><\/span> Scheduled maintenance/);
+    const heroAccent = (html) => html.match(/--sf-hero-accent:(#[0-9a-fA-F]{6})/)?.[1];
+    try {
+      for (const [label, brand] of [
+        ["test brand #7c3aed", V3.brand],
+        ["no brand", null],
+      ]) {
+        await putLive(VGM, { ...V3, brand });
+        const html = await render(Layout, "vg.test");
+        ok(/will be right back\./.test(html), `${label}: not the curtain`);
+        eq(kit(html), "glow-1", `${label}: kit:`);
+        const m = pill(html);
+        ok(m, `${label}: no maintenance pill`);
+        ok(/\btext-sf-hero-accent\b/.test(m[1]) && !/\btext-accent-400\b/.test(m[1]), `${label}: pill text is not the hero accent role: ${m[1]}`);
+        ok(/\bbg-sf-hero-accent\b/.test(m[2]) && !/\bbg-accent-400\b/.test(m[2]), `${label}: pill dot is not the hero accent role: ${m[2]}`);
+        const accent = heroAccent(html);
+        ok(accent, `${label}: no --sf-hero-accent in the curtain's CSS (falls back to the raw accent-400)`);
+        const ratio = B.contrastRatio(accent, heroBg);
+        ok(ratio >= 4.5, `${label}: pill text ${accent} on ${heroBg} is ${ratio.toFixed(2)}:1, under 4.5:1`);
+      }
+      // no brand on a glow store: the kit's own correction
+      eq(heroAccent(await render(Layout, "vg.test")), "#3f6212", "no brand glow hero accent:");
+    } finally {
+      await putTenant("vg", ".test-rel-vg.db");
+    }
+  });
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

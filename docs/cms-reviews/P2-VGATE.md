@@ -9,7 +9,7 @@ This is the author's own report. Reviewers should re-read the code.
 | Stage | Status |
 |---|---|
 | Implemented | Yes, on this branch |
-| Locally tested | Yes. `pnpm test`: 57 of 57 suites passed in 107.1 s. `test:releases` 34 passed, 0 failed, 1.1 s in the gate (2.7 s on its own). Nine deliberate breaks, eight caught (see "Do the tests bite?"). `pnpm build` passed. Its 2 warnings are the ones that were already there (`next.config.mjs`, traced through `lib/platform/migrate.js`), not from this item |
+| Locally tested | Yes. After fix round 1: `pnpm test` 57 of 57 suites passed in 104.8 s, `test:releases` 35 passed, 0 failed. First round: 57 of 57 in 107.1 s, `test:releases` 34 passed, 1.1 s in the gate (2.7 s on its own). Nine deliberate breaks, eight caught (see "Do the tests bite?"). `pnpm build` passed. Its 2 warnings are the ones that were already there (`next.config.mjs`, traced through `lib/platform/migrate.js`), not from this item |
 | Browser verified | Yes, on the design harness on this Mac (ports 3420 and 4420 to 4422), in the Claude desktop app's built-in browser at 1440 x 900. Not Safari, not a phone. See "Browser evidence" |
 | Staging verified | **NOT DONE. Staging is unverified.** |
 | Production enabled | **NOT DONE.** Nothing pushed, merged or deployed. No tenant changed mode. No migration |
@@ -91,7 +91,7 @@ On the design harness (`DESIGN_PORT=3420 DESIGN_SQLD_PORT=4420`), with this bran
 - **DR-1.** The gate protects rollbacks only back to this deploy. A rollback to `a6d028e` or earlier while any v4 pointer exists renders the empty default site with no error.
 - **DR-2.** Before this deploys, the fleet's live `v` values must be 1, 2 or 3. Any other value is an error page after this deploy (it was served as a snapshot before).
 - **The tab title still names the store and product** on a v4 release. `generateMetadata` reads the store's config and the catalog, not the release, and this item doesn't change it. Seen in the drill: "Radiance Glow Serum 30ml · Design Demo Co". The page source also still holds catalog text in the metadata (the harness's finding 5, already recorded).
-- **The maintenance page now shows the store's real brand and theme** on a store whose release reads fine. Before, it always used the platform default look, because it got promises, not values. This is what the page was meant to do (S43, "the branded closed page"), but shoppers on a closed store will see a change. Its brand CSS is built without the kit's corrections (`brandCssVars` without `{ kit }`), unchanged from before.
+- **The maintenance page now shows the store's real brand and theme** on a store whose release reads fine. Before, it always used the platform default look, because it got promises, not values. This is what the page was meant to do (S43, "the branded closed page"), but shoppers on a closed store will see a change. Fix round 1: because the curtain now gets the store's real kit, a glow store's curtain has the light hero (#fff1ee). Its "Scheduled maintenance" pill used the raw `accent-400`, and the brand CSS was built without `{ kit }`: lime #a3e635 on #fff1ee with no brand (about 1.37:1), #9e6df2 with the test brand (about 3.22:1). Now the curtain builds its brand CSS with `{ kit }`, also when there is no brand (as `chromeData` does), and the pill and its dot use `text-sf-hero-accent` / `bg-sf-hero-accent`, the role the storefront hero uses. On a glow store with no brand that is #3f6212. On pulse-1 (dark hero) `--sf-hero-accent` defaults to `accent-400`, so the dark curtain looks as before.
 - **The fixed chrome links stay** on the error page: the wordmark, "Shop all" / "All collections" (`/collections`), Contact, wishlist, account and cart. They are part of the layout, not the store's nav.
 - **The maintenance branch may conflict** with the unmerged `claude/musing-williamson-4c86b3` branch (the closed-store title work), which touches the same part of the layout. Merge with care.
 - `getLiveRelease()` (console pages, `releaseDiff`, `brandReadability`) still returns a v4 row as if it were a snapshot. No v4 row can exist until P2-ATOM's writer, and P2-READ and P2-PUBLISH own those readers.
@@ -99,13 +99,13 @@ On the design harness (`DESIGN_PORT=3420 DESIGN_SQLD_PORT=4420`), with this bran
 
 ## Tests
 
-`scripts/test-releases.js` (P2-VGATE block, 9 tests). It now imports `scripts/support/request-cache.js` first and stubs `next/headers` per simulated request. One existing test changed: "expectedDraftHash binds the publish …" counted rows through `listReleases`. That now hides unstamped rows, which would have made the check weaker, so it counts the `releases` table directly.
+`scripts/test-releases.js` (P2-VGATE block, 10 tests). Fix round 1 added "rendered: a glow store's maintenance pill is readable on the light hero, with and without a brand": it renders the real layout for a closed glow store with the test brand and with no brand, checks kit `glow-1`, that the pill and dot use the hero accent role, that `--sf-hero-accent` is in the curtain's CSS and reaches 4.5:1 on the glow hero, and that no brand gives #3f6212. It failed before the fix (pill text was `text-accent-400`). It now imports `scripts/support/request-cache.js` first and stubs `next/headers` per simulated request. One existing test changed: "expectedDraftHash binds the publish …" counted rows through `listReleases`. That now hides unstamped rows, which would have made the check weaker, so it counts the `releases` table directly.
 
 ## Owner checks
 
 - **DR-1:** never roll back past the P2-VGATE deploy while any v4 pointer exists.
 - **DR-2:** before P2-VGATE deploys, run on every tenant: `SELECT DISTINCT json_extract(r.content,'$.v') FROM release_state s JOIN releases r ON r.id=s.live_release_id`. Confirm the only values are 1, 2 or 3.
-- Look at the maintenance page of a closed test store after deploy: it now shows the store's brand and theme (see Known limits).
+- Look at the maintenance page of a closed test store after deploy: it now shows the store's brand and theme (see Known limits). On a glow-kit store, check the "Scheduled maintenance" label is easy to read on the light background.
 - On staging, check the console's release list still shows the live release and scheduled releases (`listReleases` filter).
 
 ## Files

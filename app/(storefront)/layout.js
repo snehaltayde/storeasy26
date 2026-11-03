@@ -225,13 +225,18 @@ export default async function RootLayout({ children }) {
       // name, a brand built from a promise, and the rejection went unhandled.
       // Now any failure to read them shows the neutral curtain.
       const [name, brand, theme] = await tfetch(async () => [siteName(), await resolvedBrand(), await resolvedTheme()]).catch(() => NEUTRAL_CURTAIN);
-      const brandCss = brand ? brandCssVars(resolveBrand(brand)) : "";
+      // Fix round 1: the curtain's kit is now the store's real one (a glow
+      // store gets the light hero), so the accent is corrected against that
+      // kit, and a store with no brand still gets the kit's own correction,
+      // as chromeData does.
+      const kit = kitAttr(theme);
+      const brandCss = brandCssVars(brand ? resolveBrand(brand) : null, { kit });
       return (
-        <html lang="en" data-kit={kitAttr(theme)} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
+        <html lang="en" data-kit={kit} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
           {brandCss ? <style id="brand-vars" precedence="default" href="brand-vars">{brandCss}</style> : null}
           <body className="flex min-h-full flex-col items-center justify-center bg-hero px-6 text-center text-hero-fg antialiased">
-            <p className="inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-accent-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent-400" /> Scheduled maintenance
+            <p className="inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-sf-hero-accent">
+              <span className="h-1.5 w-1.5 rounded-full bg-sf-hero-accent" /> Scheduled maintenance
             </p>
             <h1 className="mt-5 max-w-xl font-display text-4xl font-extrabold tracking-tight">{name} will be right back.</h1>
             <p className="mt-4 max-w-md text-hero-muted">
