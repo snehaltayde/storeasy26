@@ -1,31 +1,42 @@
-// Design-preview seed (S50). Builds a LOCAL, file-DB environment with
-// realistic data for reviewing the redesigned consoles — every status the
-// UI can render, so screenshots exercise real states, not lorem ipsum.
+// Design-preview seed (S50). Builds a LOCAL environment with realistic data
+// for reviewing the storefront and the consoles — every status the UI can
+// render, so screenshots exercise real states, not lorem ipsum.
+// Since P1-HARNESS it writes over http to the harness's own local sqld
+// servers (scripts/dev-design.js starts them, empties them first, and passes
+// their URLs), so the storefront can run on the edge runtime.
 // Credentials are LOCAL TEST VALUES from env (scripts/dev-design.js
 // generates them into .design-env on first run; nothing hosted, nothing
 // real). Deliberately non-default brand on the tenant, to prove tenant
 // brand variables no longer leak into the console.
 //   pnpm seed:design
-import { readFile, rm } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { HarnessError, assertLocalDbUrl } from "./design-harness.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-
-process.env.TURSO_DB_URL = "";
-process.env.RESEND_API_KEY = "";
-process.env.DATABASE_URL = "file:.design-default.db";
-process.env.PLATFORM_DB_URL = "file:.design-platform.db";
-process.env.PLATFORM_DB_TOKEN = "";
-process.env.PLATFORM_SECRET = process.env.PLATFORM_SECRET || "design-preview-secret";
 
 const ADMIN_PW = process.env.DESIGN_ADMIN_PASSWORD;
 if (!ADMIN_PW) {
   console.error("DESIGN_ADMIN_PASSWORD missing — run via `pnpm seed:design` / `pnpm dev:design` (scripts/dev-design.js supplies it).");
   process.exit(1);
 }
-
-for (const f of [".design-default.db", ".design-platform.db", ".design-tenant.db"]) await rm(join(here, "..", f), { force: true });
+// Refuse anything but the harness's local servers, before any module opens a client.
+let TENANT_DB_URL;
+try {
+  assertLocalDbUrl("PLATFORM_DB_URL", process.env.PLATFORM_DB_URL);
+  assertLocalDbUrl("DATABASE_URL", process.env.DATABASE_URL);
+  TENANT_DB_URL = assertLocalDbUrl("DESIGN_TENANT_DB_URL", process.env.DESIGN_TENANT_DB_URL);
+} catch (e) {
+  if (!(e instanceof HarnessError)) throw e;
+  console.error(`✗ ${e.message}`);
+  process.exit(1);
+}
+process.env.TURSO_DB_URL = "";
+process.env.RESEND_API_KEY = "";
+process.env.PLATFORM_DB_TOKEN = "";
+process.env.PLATFORM_SECRET = process.env.PLATFORM_SECRET || "design-preview-secret";
+const PORT = process.env.DESIGN_PORT || "3017";
 
 const C = await import("../lib/platform/control.js");
 const { withTenant } = await import("../lib/tenant-context.js");
@@ -39,7 +50,7 @@ await C.upsertTenant({
   id: "design",
   name: "Design Demo Co",
   domains: ["localhost", "127.0.0.1"],
-  dbUrl: "file:.design-tenant.db",
+  dbUrl: TENANT_DB_URL,
   config: {
     currency: "INR",
     merchant_timezone: "Asia/Kolkata",
@@ -83,6 +94,17 @@ await withTenant(t, async () => {
   }
   for (const [id, handle, title] of [["gid://c/1", "bestsellers", "Bestsellers"], ["gid://c/2", "serums", "Serums"], ["gid://c/3", "night-routine", "Night routine"]]) {
     await libsql.execute({ sql: "INSERT INTO collections (id, handle, title) VALUES (?,?,?)", args: [id, handle, title] });
+  }
+  // P1-HARNESS: collections hold products, so collection pages and product
+  // rails show real items (S57 had to add these by hand for its drill).
+  for (const [collectionId, productIds] of [
+    ["gid://c/1", ["gid://p/1", "gid://p/2", "gid://p/3", "gid://p/7"]],
+    ["gid://c/2", ["gid://p/1", "gid://p/4"]],
+    ["gid://c/3", ["gid://p/2", "gid://p/8", "gid://p/6"]],
+  ]) {
+    for (const [position, productId] of productIds.entries()) {
+      await libsql.execute({ sql: "INSERT INTO collection_products (collection_id, product_id, position) VALUES (?,?,?)", args: [collectionId, productId, position] });
+    }
   }
 
   // ---- orders: every status the UI renders ----------------------------------
@@ -277,7 +299,10 @@ const inv = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner
 await A.acceptGrant(inv.token, { tenantId: "design", actorEmail: "owner@design.test" });
 await A.createClientApproval({ agencyId: agency.id, tenantId: "design", note: "Homepage refresh for the winter drop" });
 
-console.log("✓ design-preview seeded: tenant 'design' on file DBs (.design-*.db)");
-console.log("  merchant: http://localhost:3017/admin/login — empty email + the setup password from .design-env");
-console.log("  operator: http://localhost:3017/platform   — the platform password from .design-env");
+console.log("✓ design-preview seeded: tenant 'design' on the harness's local databases (.design-data/)");
+// The origin is a variable so the Shopify boundary scan (test:shopify-boundary)
+// reads this as one of the app's own console pages, as its rules intend.
+const harnessUrl = `http://localhost:${PORT}`;
+console.log(`  merchant: ${harnessUrl}/admin/login — empty email + the setup password from .design-env`);
+console.log(`  operator: ${harnessUrl}/platform   — the platform password from .design-env`);
 process.exit(0);

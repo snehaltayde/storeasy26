@@ -53,6 +53,8 @@ next-env.d.ts
 platform.db
 *.db
 
-# S50 design-preview harness (local file DBs + generated test creds)
+# S50 design-preview harness (generated test creds; file DBs before P1-HARNESS)
 .design-env
 .design-*.db
+# P1-HARNESS: the harness's local sqld data, logs and pid file
+/.design-data/

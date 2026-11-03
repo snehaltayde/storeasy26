@@ -8,7 +8,7 @@ design/visual QA pass for the S50 console redesign.
 > - Test orders on real/staging storefronts always use **snehal@mediastic.in**, and every test order gets **cancelled afterwards** (admin → order → Cancel, or `pnpm order:cancel`).
 > - Never run `vercel deploy --prod` or `pnpm push:shopify` as part of testing.
 > - Credentials live in gitignored env files (`.env.local`, `.design-env`). Read them locally (`cat .design-env`); never paste them into chats, issues, or screenshots.
-> - The design-harness databases are throwaway files — reseeding (`pnpm seed:design`) wipes and rebuilds them, so feel free to mutate anything there.
+> - The design-harness databases are throwaway local databases (in `.design-data/`) — reseeding (`pnpm seed:design`) wipes and rebuilds them, so feel free to mutate anything there.
 
 ---
 
@@ -16,7 +16,7 @@ design/visual QA pass for the S50 console redesign.
 
 | Environment | Start | URL(s) | Use it for |
 |---|---|---|---|
-| **Design harness** (recommended for console testing) | `pnpm seed:design` then `pnpm dev:design` | http://localhost:3017 | All three consoles with rich seeded data (every order status, returns, offers, experiments, automations, incident, agency). File DBs; nothing hosted is touched. **The storefront 500s here by design** (storefront is edge runtime; file DBs are Node-only) — consoles only. |
+| **Design harness** (recommended for console and storefront review) | `pnpm dev:design` (it seeds itself the first time; `pnpm seed:design` starts fresh) | http://localhost:3017 | The storefront on the **edge runtime**, exactly as deployed code declares it, plus all three consoles, with rich seeded data (8 products in 3 collections, every order status, returns, offers, experiments, automations, incident, agency). Local databases (sqld); nothing hosted is touched. Needs `sqld` (see "How the design harness runs" below). |
 | **Local dev** | `pnpm dev` | BeastLife: http://localhost:3007 · Demo tenant: http://127.0.0.1:3007 · Marketing: http://site.localhost:3007 | Storefront testing (browse, cart, checkout, wishlist, quiz, PWA) against the staging Turso DBs, plus consoles with real data. |
 | **Hosted demo** | already deployed | your hosted tenant domains | Final authed walkthroughs — same checklists as below. |
 
@@ -24,6 +24,39 @@ Only one Next dev server can run per project directory — stop the 3007 server
 before starting the harness (and vice versa).
 
 **Reset harness data at any time:** stop the server, `pnpm seed:design`, start again.
+
+### How the design harness runs (P1-HARNESS)
+
+- **Why sqld.** The storefront runs on the edge runtime, and the edge database
+  client can only reach a database over http, never a local file. So the harness
+  starts `sqld` (the local libSQL server) once per database and gives Next
+  `http://127.0.0.1` addresses. No code is edited: `runtime = "edge"` stays.
+- **Getting sqld.** The harness looks for it in `SQLD_BIN`, then your `PATH`,
+  then `~/.turso/sqld` (where the Turso CLI puts it). If none is there it stops
+  with a plain message saying how to install it.
+- **Ports.** Web: `DESIGN_PORT` (default 3017). Databases: three ports in a row
+  from `DESIGN_SQLD_PORT` (default 18017: platform, store, default). Example:
+  `DESIGN_PORT=3027 DESIGN_SQLD_PORT=18080 pnpm dev:design`. A busy port stops
+  the harness with a message naming it.
+- **Data.** `.design-data/` (gitignored): one folder per database, its log, and
+  a pid file. The old `.design-*.db` files are no longer used and can be deleted.
+  After a new migration lands, `pnpm dev:design` says so; run `pnpm seed:design`.
+- **Stopping.** Ctrl-C (or SIGTERM to the harness) stops Next and every
+  database server. If the harness was killed outright, the next start stops
+  the database servers it left behind, by the PIDs it recorded.
+- **Hosted keys are blanked.** Database tokens, Shopify, Razorpay, Typesense,
+  mail, analytics forwarding, alert webhooks and `COOKIE_DOMAIN` are set empty
+  for the harness, even if `.env.local` has them, so nothing hosted can be
+  reached from it.
+- **Browser drills.** With the harness running: `pnpm drill:smoke` (a product
+  page at 375, 768 and 1440 wide, add to cart, the drawer) and `pnpm drill:edge`
+  (every storefront page on the edge runtime, maintenance, the Designer). They
+  drive the installed desktop Chrome headless (never a download), sign in with
+  `.design-env`, and write small screenshots plus `results.json` to
+  `docs/cms-reviews/drills/<id>/`. Add `--start` to have a drill start and
+  stop the harness itself, `--headed` to watch. New journeys go in
+  `scripts/drills/`; the helpers are in `scripts/drill.js`. See
+  `docs/cms-reviews/P1-HARNESS.md`.
 
 ---
 
@@ -123,7 +156,7 @@ The old single Storefront screen is now a CMS with its own routes, all deep-link
 ### 4.5 Theme · Brand · Publishing
 - **Theme**: applying a kit asks explicitly before replacing your brand colors or hero copy (both off by default); kit cards preview from their real swatches.
 - **Brand**: the accent ladder, sample button and contrast warnings update live while you type (debounced); Save only enables when dirty; reset is honestly labeled "Reset to platform default".
-- **Publishing** (`/admin/releases`): the "What will publish" card lists exactly which blocks/pages/brand/theme changed since live — publish confirms with that list; scheduling states its honest limits (snapshot taken now, no re-validation) and pending schedules can be **cancelled** from history; rollback copy states drafts stay untouched, and after a rollback the diff recomputes against the old live. Verify a published change on the storefront on 3007 (the harness storefront 500s by design).
+- **Publishing** (`/admin/releases`): the "What will publish" card lists exactly which blocks/pages/brand/theme changed since live — publish confirms with that list; scheduling states its honest limits (snapshot taken now, no re-validation) and pending schedules can be **cancelled** from history; rollback copy states drafts stay untouched, and after a rollback the diff recomputes against the old live. Verify a published change on the harness storefront (http://localhost:3017, signed out or in a private window) or on 3007.
 
 ### 4.6 Offers · Upsells
 - Three seeded offers in three states: "Serum duo" **active**, "FESTIVE10" **scheduled**, "Free lip mask" **draft/disabled** — statuses and dates render correctly.
@@ -175,7 +208,11 @@ The old single Storefront screen is now a CMS with its own routes, all deep-link
 
 ---
 
-## 7. Storefront — on 3007 (not the harness)
+## 7. Storefront — on 3007, or the harness where noted
+
+Browse, search, cart, checkout's first steps, account sign-in, CMS pages and
+maintenance also work on the harness (edge runtime, seeded catalog). Anything
+that needs Shopify, a real payment or real email stays on 3007 or hosted.
 
 - **Browse:** home, collections, PDP on both localhost (BeastLife) and 127.0.0.1 (demo) — each shows its own brand. site.localhost shows the marketing site. An unknown host 404s.
 - **Search:** header search returns products; zero-result searches render a friendly state.
@@ -212,7 +249,8 @@ string from the chip tooltip if relevant. Console errors
 
 ## 10. Known limitations (so you don't chase them)
 
-- Harness storefront 500s — by design (edge runtime can't open file DBs). Test storefront on 3007.
+- Harness storefront: fixed in P1-HARNESS (it used to fail on every page because the edge runtime can't open file databases). It needs `sqld` installed.
+- Harness hero: a running hero experiment can show its variant title instead of your draft, even in the Designer preview (P1-HARNESS finding).
 - Harness emails never send (`RESEND_API_KEY` empty) — automation "email" actions queue/report, not deliver.
 - AI Insights needs `ANTHROPIC_API_KEY`; without it the honest unconfigured state **is** the correct behavior.
 - Dark mode doesn't exist — consoles are deliberately light-only.

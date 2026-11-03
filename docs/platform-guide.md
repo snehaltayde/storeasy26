@@ -483,11 +483,19 @@ too. -->
   confirmation gained one); one-time passwords/codes render in shown-once
   SecretReveals.
 - **Design-preview harness**: `pnpm seed:design` + `pnpm dev:design`
-  (launch.json "storeasy-design", port 3017) — local file-DB tenant
+  (launch.json "storeasy-design", port 3017) — local tenant
   "design" with every status seeded (orders in all 7 states, returns,
   offers, experiments, automations, incident, agency + grant + approval),
   generated test credentials in gitignored `.design-env`. For reviewing
   console changes with real-shaped data; touches nothing hosted.
+  Since P1-HARNESS it runs one local `sqld` per database (platform, store,
+  default) with data in gitignored `.design-data/`, so the storefront serves
+  on the edge runtime with no code edit; Ctrl-C stops Next and sqld together.
+  Ports: `DESIGN_PORT` (3017) and `DESIGN_SQLD_PORT` (18017, three in a row).
+  Browser drills (`pnpm drill:smoke`, `pnpm drill:edge`, helpers in
+  `scripts/drill.js`) drive the installed Chrome through playwright-core and
+  write screenshots to `docs/cms-reviews/drills/<id>/`.
+  See `docs/MANUAL_TESTING_GUIDE.md` §1 and `docs/cms-reviews/P1-HARNESS.md`.
 
 One console per tenant, served on that tenant's own host. **Auth**: password login →
 tenant-bound session cookie (§3.9); rotating the password revokes all sessions.
