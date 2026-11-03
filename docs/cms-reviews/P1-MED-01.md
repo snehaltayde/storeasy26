@@ -10,13 +10,13 @@ This is the author's own report. Reviewers should re-read the code.
 |---|---|
 | Implemented | YES, on branch `cms/p1-med01` |
 | Locally tested | YES for logic, the wiring and the real server route. Real pixels are NOT tested: node has no canvas, so every encode in the suite comes from a stand-in. |
-| Browser verified | **NOT DONE.** One-off headless Chrome probes ran `lib/media-upload*.js` alone on a local page (see "Fix round 1" and "Fix round 2"). No console screen, no real upload, no Safari, no phone. See "Browser drill still needed". |
+| Browser verified | **NOT DONE.** One-off headless Chrome probes ran `lib/media-upload*.js` alone on a local page (see "Fix round 1", "Fix round 2" and "Fix round 3"). No console screen, no real upload, no Safari, no phone. See "Browser drill still needed". |
 | Staging verified | NOT DONE |
 | Production enabled | NOT DONE |
 
 ## What was built
 
-- `lib/media-upload-plan.js` (new, pure, no imports): what to do with each kind of file, when to skip, target long edge (1920), the ordered encode steps, the preview size, animated file detection, the founder's messages, and the mapping from server answers to plain words.
+- `lib/media-upload-plan.js` (new, pure, no imports): what to do with each kind of file, when to skip, target long edge (1920) and the short edge a long image keeps, the ordered encode steps, the preview size, animated file detection, the founder's messages, and the mapping from server answers to plain words.
 - `lib/media-upload.js` (new, browser-safe): `uploadImage`, the one upload path. It decodes, plans, encodes until something fits, makes the preview, and posts with XHR so upload percent can be reported. The canvas and the network are injectable, so node can run the whole path.
 - `components/admin/MediaUploadStatus.js` (new): the shared progress banner.
 - `components/admin/MediaAdmin.js`, `components/admin/cms/MediaPicker.js`: both now call `uploadImage`. Their own upload, thumbnail and dimension code is gone. Copy no longer leads with size limits.
@@ -28,13 +28,15 @@ This is the author's own report. Reviewers should re-read the code.
 
 | File | Result |
 |---|---|
-| JPEG over the limit or over 1920px | JPEG, long edge 1920, qualities 0.85, 0.78, 0.7, 0.62, 0.55 in turn |
-| Too detailed for all of those | Shrinks to 1600 then 1280 (qualities 0.7, 0.6). A toast gives the final size, in both the library and the picker. |
-| PNG or WebP with no transparency, over the limit or over 1920px | Same, written as JPEG, file renamed |
+| JPEG over the limit, or within the limit with both sides over 1920px | JPEG, long edge 1920 (a long image goes by the "Long image" row), qualities 0.85, 0.78, 0.7, 0.62, 0.55 in turn |
+| Too detailed for all of those | Shrinks to 1600 then 1280 (qualities 0.7, 0.6). A toast gives the final size. |
+| PNG or WebP with no transparency, over the limit, or within the limit with both sides over 1920px | Same, written as JPEG, file renamed |
 | PNG or WebP with transparency, whatever the file is called | WebP steps. If the browser can't write WebP (Safari answers with a PNG), PNG at 1920, 1600, 1280, 1024, 800. **Never a JPEG step**, so never flattened onto black. If the transparency check itself can't run, the image counts as transparent. Only bytes that really start `FF D8 FF` skip the check. |
-| Within the limit and no larger than 1920px | The same `File` object goes up, no upscale, no re-encode. Preview only, using the old rule (wider than 480px). |
-| Over 1920px and within the limit, but re-encoding doesn't shrink it | Original is kept |
-| Animated WebP or PNG within the limit, over 1920px | The same `File` goes up, still animated, at its full size. Only the preview is made. |
+| Within the limit, with a short side of 1920px or less, however long the other side is (a 1080x5000 size chart, a 4000x400 strip, a 2400x1200 picture) | Its bytes go up unchanged, no upscale, no re-encode. It is the same `File` object unless its type had to be filled in or standardised (empty type, older type name), then a new `File` with the same bytes and name and the standard type. Preview only, using the old rule (wider than 480px). |
+| Long image, wider than 16:9, that does get re-encoded: over the limit (1170x6000), or within the limit with both sides over 1920px (6000x2000) | The short side decides. At each size tried it keeps at least 9/16 of that size: 1080 at 1920, 900 at 1600, 720 at 1280, and for PNG 576 at 1024, 450 at 800. Never upscaled, so 4000x400 stays 4000x400. The long side never passes 8192, whatever the short side wants. 1170x6000 becomes 1080x5538. |
+| Any re-encoded image whose long side ends below 1920, or whose short side ends below 1080 (each measured against its own size if it started smaller) | A toast gives the final size, in both the library and the picker. A 4032x3024 photo at 1920x1440 and a 1170x6000 screenshot at 1080x5538 stay quiet. |
+| Both sides over 1920px and within the limit, but re-encoding doesn't shrink it | Original is kept |
+| Animated WebP or PNG within the limit, any size | Its bytes go up unchanged, still animated, at their full size. Only the preview is made. |
 | Animated WebP or PNG over the limit | Plain message, nothing sent. Shrinking it would stop the animation. |
 | GIF, SVG | Left as they are, nothing encoded, server rules apply. An oversized one is refused by the server and the founder reads plain words. |
 | HEIC the browser can open (Safari) | JPEG, even when small, because the server refuses HEIC |
@@ -42,28 +44,28 @@ This is the author's own report. Reviewers should re-read the code.
 | Other image types (AVIF and so on) | Same as HEIC, with the general "couldn't open" message. The same with an empty type and a `.avif` name. |
 | Older type names (`image/jpg`, `image/pjpeg`, `image/x-png`, `image/apng`) | Treated as the standard type, so the rows above apply. A small one goes up with its bytes unchanged. |
 | Empty type and a name we know (including `.jfif` and `.apng`) | The name fills in the type |
-| Empty type and no name we know | The first bytes decide. JPEG, PNG, WebP and GIF follow their rows above. Anything else that opens becomes a JPEG. Anything that won't open gets "isn't an image". |
+| Empty type and no name we know | The first bytes decide. JPEG, PNG, WebP and GIF follow their rows above. Anything else that opens is checked for transparency: solid becomes a JPEG, see-through becomes WebP (PNG in Safari). Anything that won't open gets "isn't an image". |
 | Not an image, as the browser reports it | Plain message, nothing decoded, nothing sent |
 | An empty file | Plain "is empty" message, nothing decoded, nothing sent |
 | Can't fit under the limit | Plain message, nothing sent |
 | JPEG, PNG or WebP the browser can't open, any size | Plain "couldn't open" message, nothing sent. The server only checks the first bytes, so a damaged JPEG with a good header would otherwise be stored and show as a broken image. |
-| A still image with the wrong name, small in bytes and in pixels (PNG bytes called `.jpg`) | Opens fine, goes to the server, and the magic-byte check refuses it in plain words. |
-| A still image with the wrong name, over the limit or over 1920px | The first bytes decide, not the name. Transparent stays transparent (WebP, or PNG in Safari), never a JPEG step. Solid becomes a JPEG. It uploads. If re-encoding wouldn't shrink it, it falls back to the row above. |
-| An animated PNG or WebP, or a GIF, with the wrong name, over the limit or over 1920px | Plain "isn't really the kind of image" message, nothing encoded, nothing sent. Never made still. The small ones get the same message from the server. |
+| A still image with the wrong name, within the limit with a short side of 1920px or less (PNG bytes called `.jpg`) | Opens fine, goes to the server, and the magic-byte check refuses it in plain words. |
+| A still image with the wrong name, over the limit or with both sides over 1920px | The first bytes decide, not the name. Transparent stays transparent (WebP, or PNG in Safari), never a JPEG step. Solid becomes a JPEG. It uploads. If re-encoding wouldn't shrink it, it falls back to the row above. |
+| An animated PNG or WebP, or a GIF, with the wrong name, over the limit or with both sides over 1920px | Plain "isn't really the kind of image" message, nothing encoded, nothing sent. Never made still. The others get the same message from the server. |
 | A browser with no `createImageBitmap` at all | Nothing can be checked here, so small files go to the server, which decides. No dimensions and no preview. |
 
 ## Acceptance
 
 Tags: unit = plain node. There is no JSX-capable runner in the repo yet (spec 8.15), so nothing here is tagged rendered. Component behaviour is covered by source scan plus the browser drill.
 
-Evidence command for all unit rows: `pnpm test:media-upload` → **100 passed, 0 failed**. Quoted names are test names.
+Evidence command for all unit rows: `pnpm test:media-upload` → **116 passed, 0 failed**. Quoted names are test names.
 
 | # | Item | Tag | Status | Evidence |
 |---|---|---|---|---|
 | 1 | A 5MB phone photo uploads with no error, with a long edge of at least 1920px after resize and within the server limit | unit + browser drill | Logic passes through the real route. **Real photo NOT browser verified.** | "ACCEPTANCE: a 5MB phone photo uploads...": a 5,000,000 byte 4032x3024 file through `uploadImage` with a stand-in encoder, into the real `POST` handler and real `saveMedia`. The stored row is checked: 1920x1440, within 1.5MB, thumbnail attached. Drill 1. |
 | 2 | MediaPicker and MediaAdmin use one upload path | unit (source scan) + browser drill | Passes scan. **Not browser verified.** | "MediaAdmin and MediaPicker both upload through uploadImage and hold no copy of their own"; "nothing else in the console posts files to the media route". Drill 2. |
 | 3 | Negative: a file that is not an image is refused with a plain message | unit + browser drill | Passes. **Not browser verified.** | "NEGATIVE: a file that isn't an image...", "a damaged photo small enough to send...", "every real server refusal maps to plain words" (feeds real `validateUpload` output through the mapper). Drill 7. |
-| 4 | Negative: SVG sanitizing and magic-byte checks still run on the server, exactly as they were | unit | Passes on the real route, comparing the exact stored bytes | "route: every SVG element that can run or load something..." (script, foreignObject, iframe, object, embed, animate, set, handler), "route: every event handler...", "route: unsafe links..." (javascript, data, http, protocol-relative and others; safe links kept), "route: files that only look like an image..." (RIFF that isn't WebP, the `<?php` guard, the sniff window; asserts nothing stored), "route: an SVG is measured and sniffed after cleaning...", "route: a PNG signature with nothing after it...", "route: PNG bytes declared as JPEG...", "magic-byte sniffing still decides...", "magic-byte sniffing checks every byte...", "route: the stored file name is cleaned...", "route: a bad preview never costs the photo". `git diff 939d630 -- lib/media.js` is empty. These pin the cases they list, not every possible change to `lib/media.js`. |
+| 4 | Negative: SVG sanitizing and magic-byte checks still run on the server, exactly as they were | unit | Passes. The source text is pinned by hash, and the real route is run on the cases listed, comparing the exact stored bytes. | "the server's rules are exactly the text they were...": sha256 of the source text of `MEDIA_MIME`, `sniffMime`, `sanitizeSvg`, `validateUpload` and `saveMedia`'s sanitize line. The pinned values were computed from `git show 939d630:lib/media.js`, so they are the baseline's. Any edit there fails until someone changes the pin on purpose, a comment included. See "Known limits" for what it doesn't reach. Route cases: "route: every SVG element that can run or load something..." (script, foreignObject, iframe, object, embed, animate, set, handler), "route: every event handler..." (spaces around `=` too), "route: a closing tag with a space...", "route: an SVG posted as the preview...", "route: unsafe links..." (javascript, data, http, protocol-relative and others, spaces around `=`, a tab hiding `//`; safe links kept), "route: files that only look like an image..." (RIFF that isn't WebP, the `<?php` guard, the sniff window; asserts nothing stored), "route: an SVG is measured and sniffed after cleaning...", "route: a PNG signature with nothing after it...", "route: PNG bytes declared as JPEG...", "magic-byte sniffing still decides...", "magic-byte sniffing checks every byte...", "route: the stored file name is cleaned...", "route: a bad preview never costs the photo". `git diff 939d630 -- lib/media.js` is empty. |
 
 Items from the task brief beyond the spec's list:
 
@@ -73,21 +75,25 @@ Items from the task brief beyond the spec's list:
 | Size planning is a pure function plain node can test | unit | Passes | "— size plan" section; "lib/media-upload.js stays browser-safe: no server imports" |
 | Transparent PNG is not flattened, whatever the file is called | unit + browser drill | Plan and path pass. One-off Chrome probe of the module passes. **Not verified on a console screen or in Safari.** | "steps: a transparent image never gets a JPEG step", both "transparent PNG" path tests, "wrong name, see-through picture...". Drill 3. |
 | Already small image: no upscale, no needless recompress | unit | Passes | "an already small image goes up byte for byte...", "re-encoding that would grow the file keeps the original" |
+| A long image isn't silently shrunk: untouched within the limit, keeps its short side over it, and the founder is told if it can't | unit + browser drill | Passes with a stand-in encoder and through the real route. One-off Chrome probe of the module passes. **Not verified on a console screen, in Safari or on a phone.** | "LONG: a 1080x5000 size chart...", "LONG: a 4000x400 strip..." (two), "LONG: a 1170x6000 screenshot..." (two), "LONG: a transparent 1170x6000...", "LONG: a very long file...", "fitEdges: ..." (three), "endedUpSmaller: ...", "when to skip...". Drill 11. |
 | Animated PNG, animated WebP and GIF are not silently flattened, whatever the file is called | unit + browser drill | Passes. Real Chrome probed. **Display not verified.** Animated AVIF and HEIC are the exception, see "Known limits". | "isAnimated reads the file's structure...", "an animated WebP or PNG within the limit...", "...over the limit...", "wrong name, moving picture or GIF...", "an animated PNG the browser calls image/apng...". Drill 8. |
 | Retry works after a failed upload, in both places | unit + browser drill | Real handler source passes. **Not browser verified.** | "library, connection down...", "picker, failed...". Drill 7. |
 | SVG and GIF left as they are | unit | Passes | "SVG and GIF are left exactly as they are...", "a GIF over the limit..." |
 | HEIC the browser can't decode gets a plain message | unit + browser drill | Passes with a stand-in decode failure. **Real browsers not verified.** | "HEIC this browser can't open...", "HEIC this browser can open (Safari)...". Drill 5. |
 | Can't compress under the limit gets a plain message | unit | Passes | "an image that can't fit...", "transparent PNG too detailed for PNG in Safari..." |
-| Progress, not a size error | unit + browser drill | Labels, order and the idle check pass. The banner's place in the JSX is scanned with comments stripped, not rendered. **Display not verified.** | "progress: the founder sees stages...", "the progress banner draws nothing while idle...", "MediaAdmin and MediaPicker both upload...". Drill 2. |
+| The library's hint leads with what happens to a photo, in plain words | unit (source scan) | Passes. Scanned with comments stripped, not rendered. | "the library's hint leads with..." pins the wording and refuses the old limits-first copy and "sanitized" |
+| Progress, not a size error | unit + browser drill | Labels, order, whole-number percent, the status role and the idle check pass. The banner's place in the JSX is scanned with comments stripped, not rendered. **Display not verified.** | "progress: the founder sees stages...", "the progress banner draws nothing while idle...", "MediaAdmin and MediaPicker both upload...". Drill 2. |
 | Closing the picker during an upload doesn't fill the spot | unit + browser drill | Real handler source passes. **Not browser verified.** | "picker closed during an upload...", "picker closed during an upload that fails...", "picker: every open and every close counts...". Drill 2. |
 
 ### Do the tests bite?
 
-Three one-off mutation runs (each break applied, `test:media-upload` run, file restored), not committed.
+Four one-off mutation runs of my own (each break applied, `test:media-upload` run, file restored), not committed. Each run has its own list of breaks, chosen for that round.
 
 - First build: ten breaks, all red: server limit raised, magic-byte check removed, SVG sanitizing skipped in `saveMedia`, a JPEG step added for transparent images, upscale allowed, target lowered to 1600, always re-encode, trusting the requested output type (the Safari case), HEIC message dropped, picker moved off the shared path.
 - Fix round 1: 68 breaks, **0 survived**. That covers every survivor the review listed, plus each fix made in this round being undone. On its first pass 4 survived, each now pinned: a browser with no decoder and a too-big file, a preview stored as what it really is, the library resetting its input before the refresh, and a crude letter-scan in the PNG check.
 - Fix round 2: 62 breaks, 61 red. That covers every survivor this review listed, plus each fix being undone. The one survivor is removing the `b.length >= 12` guard from the WebP sniff, which changes nothing: the last byte it checks is at position 11, so a shorter file already fails.
+- The final independent review ran its own 68 breaks on the code before fix round 3: 49 caught, 19 survived. 12 of the 19 are fixed in "Fix round 3". The other 7 are in "Known limits".
+- Fix round 3: 34 breaks, **0 survived**. That covers those 12 survivors, each part of the long-image fix being undone or moved to its boundary, and edits to the pinned text. Sanitizer breaks #51, #52, #53, #54 and #63 each fail both the pin and a route case. Sniff window #59 fails the pin only, because no route case was added for it.
 
 These prove the suite notices those particular breaks, not that it notices every break.
 
@@ -106,14 +112,15 @@ Synthetic images, so this only says the first step should normally fit. Drill 1 
 
 ## Suites
 
-Run with `pnpm run <suite>` on the final tree, each suite exiting 0.
+Run with `pnpm run <suite>` on the final code. Counts are passed/failed.
 
-- Related: test:media-upload 100/0, test:storefront 15/0, test:releases 25/0, test:agency 16/0, test:admin-console 9/0, test:cms-api 20/0, test:security 13/0, test:tenant-boundary 24/0 (passed/failed).
-- Every `test:*` except `test:perf`, 40 suites (the 39 at baseline plus test:media-upload), run four times on the final code. **One run had 0 failed. The other three each had 1 failed, always one of two suites that also fail at random on the baseline:**
-  - `test:shopify-push` failed 2 of the 4 full runs. Run on its own 25 times: 12 failures at 939d630, 5 on this branch. The failing tests change from run to run, and all are retry tests. Timing is the likely cause, but that wasn't confirmed.
-  - `test:cms-api` failed 1 of the 4 full runs, on "history: console saves trail...". Run on its own 40 times: 8 failures at 939d630, 8 on this branch.
+- Related: test:media-upload 116/0, test:storefront 15/0, test:releases 25/0, test:agency 16/0, test:admin-console 9/0, test:security 13/0, test:tenant-boundary 24/0, each exiting 0 in all four full runs below. test:cms-api is 20/0 when it passes, see below.
+- Every `test:*` except `test:perf`, 40 suites (the 39 at baseline plus test:media-upload), run four times one after another on this round's code. **No run was fully green. Each had 39 exit 0 and 1 fail, always one of two suites that also fail at random on the baseline:**
+  - `test:shopify-push` failed 2 of the 4 full runs, on "sweep recovers stale syncing_shopify..." and "transient failure retries via sweep...". Run on its own 10 times this round: 5 failures, on "transient failure retries via sweep..." and "backoff gates retries...". Earlier rounds, run on its own 25 times: 12 failures at 939d630, 5 on this branch. The failing test changes from run to run, and all are retry or sweep tests. Timing is the likely cause, but that wasn't confirmed.
+  - `test:cms-api` failed 2 of the 4 full runs, on "history: console saves trail...". Run on its own 10 times this round: 1 failure, the same test. Earlier rounds, run on its own 40 times: 8 failures at 939d630, 8 on this branch.
   - This branch changes nothing either suite imports, and they were left alone. The baseline note that all 39 pass holds only for a lucky run. Worth its own item, because a real failure in either suite is easy to wave away.
-- `pnpm build` exits 0 on this round's code and compiled the changed client components. Its two Turbopack warnings both trace through `lib/platform/migrate.js`, which this change doesn't touch. Round 1 recorded three.
+- `test:media-upload` run on its own 10 more times: 0 failures.
+- `pnpm build` exits 0 on this round's code and compiled the changed client components. It prints one Turbopack warning, tracing through `lib/platform/migrate.js`, which this change doesn't touch. Round 1 recorded three and round 2 two; why the number moves wasn't looked into.
 
 ## Fix round 1
 
@@ -136,7 +143,7 @@ One-off headless Chrome 156 probe of this branch's `lib/media-upload*.js`, with 
 | Animated WebP, 3 frames, 2400x1200, 16,300 bytes | Sent as `anim.webp`, same size and type, 2400x1200 |
 | 40,000 bytes starting FF D8 FF E0, then filler | "We couldn't open", nothing sent |
 | A real JPEG cut in half | "We couldn't open", nothing sent |
-| Real still WebP, 2400x1200 | Still resized to 1920x960 |
+| Real still WebP, 2400x1200 | Still resized to 1920x960. Fix round 3 changed this: within the limit it now goes up untouched. |
 | Sideways phone photo, with the browser forced to reject the `imageOrientation` option | 1440x1920, the same result as without forcing |
 | Detailed transparent PNG, with `toBlob` forced to answer WebP requests with PNG | Stored 800x800. Notice: "cutout.png" uploaded. It had to be made smaller to fit, so it's now 800×800 pixels and could look soft on a big banner. |
 
@@ -174,6 +181,35 @@ One-off headless Chrome 156 probe of this branch's `lib/media-upload*.js`, inlin
 
 How often real devices send these older type names was not measured, and whether Chrome reports `image/apng` for a picked `.apng` file was not checked, because a script can't set a file input. Drill 7 covers the names a browser really sends.
 
+## Fix round 3
+
+The final independent review. Each finding was checked against the code first, and the long-image finding was reproduced before the fix: 1080x5000 went to 415x1920, 1170x6000 to 374x1920, 4000x400 to 1920x192, none with a notice.
+
+| Finding | Result |
+|---|---|
+| Long images were silently and permanently shrunk, because the plan only looked at the long edge | Fixed, see the "Long image" rows in "How each case is handled". Within the limit, a short side of 1920px or less now uploads untouched. Over the limit, the short side is planned for as well. `reduced` now looks at both edges. |
+| The proof that the server rules stay exactly as they are could be defeated by realistic weakening | Fixed. Exact source text pinned by hash, plus route cases for the four unpinned inputs and an SVG posted as the preview. `lib/media.js` still unchanged. |
+| Tests that couldn't fail | Fixed. The still WebP fixture now has the animation bit set where a VP8X flag would be, and a still lossy WebP with that bit goes through the path too. The stand-in image can't be used once closed. The HEIC path test checks the preview. |
+| One claim in that finding didn't hold: that dropping `await` from `return await untouched()` would lose the preview in a real browser | Not a real bug either way. `browserCodec.encode` draws onto its canvas before its first `await`, so it runs before `close()` even without the `await`. The stand-in was tightened as asked, and has to wait a tick before it looks, or that break still passes. It is a stricter test, not a fix to a live bug. |
+| Founder copy and progress wiring weren't pinned | Fixed. The hint's wording, a whole-number percent, `role="status"` and `aria-live` are now checked. |
+| This packet overclaimed in three places | Fixed: a second way to land below 1920 ("Differences from the spec"), a see-through file with no type becoming WebP, and the same-`File` exception. The see-through case now has a test. |
+
+One-off headless Chrome probe of this branch's `lib/media-upload*.js`, inlined into one local page, with real canvases and a stand-in send. It covers only that code, not a console screen. Fixtures are synthetic, made with sharp.
+
+| Fixture | Result |
+|---|---|
+| Size chart, JPEG, 1080x5000, 209,159 bytes | Same size in bytes, 1080x5000, preview 480x2222, no notice |
+| Strip, JPEG, 4000x400, 62,556 bytes | Same size in bytes, 4000x400, preview 480x48, no notice |
+| Picture, JPEG, 2400x1200, 111,195 bytes | Same size in bytes, 2400x1200, no notice |
+| Long screenshot, PNG, 1170x6000, 18.1MB | JPEG, 1080x5538, 725KB, no notice. Was 374x1920. |
+| Noisy long PNG, 1170x6000, 19.8MB | JPEG, 900x4615, 1.23MB. Notice: "noisy-long-1170x6000.png" uploaded. It had to be made smaller to fit, so it's now 900×4615 pixels and could look soft on a big banner. |
+| See-through long PNG, 1170x6000, 24.7MB | WebP, 900x4615, 1.44MB, corner `0,0,0,0`, with the same notice |
+| Noisy strip, PNG, 4000x400, 4.6MB | JPEG, 4000x400, 905KB, no notice |
+| Tall PNG, 300x6000, 3.4MB | JPEG, 300x6000, 103KB, no notice. No preview, because it is not wider than 480. Was 96x1920. |
+| Very long PNG, 1000x30000, 77MB | JPEG, 273x8192, 170KB, with the notice |
+| Square JPEG, 2600x2600, 262KB | JPEG, 1920x1920, 180KB, no notice |
+| Noisy photo, JPEG, 4032x3024, 6.2MB | JPEG, 1920x1440, 505KB, no notice |
+
 ## Browser drill still needed
 
 Run on `pnpm dev:design`, signed in as owner, and commit screenshots or a recording per spec 8.15. Do each upload from both Storefront → Media (MediaAdmin) and an image field's picker (MediaPicker) unless noted.
@@ -185,15 +221,18 @@ Run on `pnpm dev:design`, signed in as owner, and commit screenshots or a record
 5. **HEIC.** (a) iPhone Safari: pick a HEIC from Photos. With `accept="image/*"` iOS is expected to hand over a JPEG. Confirm it does and that it uploads. (b) Mac Safari: a `.heic` file, expect it to arrive as JPEG in the library. (c) Chrome on Mac or Windows: a `.heic` file, expect the plain HEIC message and no POST in the network panel. (d) Android Chrome: confirm the gallery offers photos and what a HEIC does there. (e) The oldest iOS Safari we support: a large phone photo uploads and isn't called damaged.
 6. **Small and unchanged.** An 800px JPEG under 1.5MB: the stored file has the same size in bytes as the original. A 300px PNG: no "+thumb". Nothing looks blurred or grown.
 7. **Refusals in plain words.** A PDF (choose "All files"): plain "isn't an image". A PDF renamed `.jpg`, and a damaged JPEG with a good header: plain "couldn't open", no POST in the network panel. A small PNG renamed `.jpg` (under 1.5MB and under 1920px): plain "isn't really the kind of image". A zero-byte `.jpg`: plain "is empty", no POST. A photo with no file extension, and a `.jfif`: uploads. Note the type each one reports, if a browser tool shows it. A GIF over 1.5MB and an SVG over 300KB: plain "too big". Network off during upload: plain "didn't go through", in both the library and the picker. With the network still off, re-pick the same file in each and confirm it starts again and says the same thing. Turn the network on, re-pick once more, and confirm it uploads.
-8. **SVG, GIF and animated files.** A small SVG with a script: stored version has no script (open `/api/media/<id>`). An animated GIF stays animated. An animated WebP and an animated PNG over 1920px and under 1.5MB stay animated, with the file name unchanged. The same over 1.5MB: plain "animated image and it's too big". An animated PNG, an animated WebP and a GIF each renamed `.jpg`, over 1.5MB or over 1920px: plain "isn't really the kind of image", no POST. A file named `.apng`: follows the animated PNG rules.
+8. **SVG, GIF and animated files.** A small SVG with a script: stored version has no script (open `/api/media/<id>`). An animated GIF stays animated. An animated WebP and an animated PNG over 1920px and under 1.5MB stay animated, with the file name unchanged. The same over 1.5MB: plain "animated image and it's too big". An animated PNG, an animated WebP and a GIF each renamed `.jpg`, over 1.5MB or with both sides over 1920px: plain "isn't really the kind of image", no POST. The same files within 1.5MB and with a short side of 1920px or less: the same words, after a POST the server refuses. A file named `.apng`: follows the animated PNG rules.
 9. **Phones.** On a real iPhone and Android, a large photo from the camera (`image/*` also offers the camera) completes without the tab crashing or running out of memory. Try a 48MP photo if a device has one: decoding it is the heaviest step and is not bounded in code.
 10. **Hosted limit.** On staging, not on the harness: one full-size upload with a preview, to confirm the hosting platform's request limit isn't reached and the XHR path works through the proxy.
+11. **Long images.** From both places, in Chrome and Safari and on a real iPhone. A real 1080x5000 size chart under 1.5MB: same size in bytes, 1080x5000, no notice, sharp and readable at full size. A real long phone screenshot over 1.5MB: about 1080 wide, still readable, no notice. A 4000x400 strip: stays 4000x400. A very long, very detailed file that can't keep its width: a toast gives the final size. A file over 1.5MB with a long side past 8192: lands at 8192 and doesn't crash the tab. These write a far taller canvas than a normal photo does, and whether a phone copes at 8192 is unknown. Also look at how a long image sits in the library grid and on a real page, because it is now stored long rather than shrunk.
 
 ## Differences from the spec, and decisions
 
 - **`accept` changed to `image/*`** in both pickers. The old explicit list stopped a HEIC on a Mac or Android being picked at all, so the plain message could never appear. My understanding is that iOS turns HEIC into JPEG for `image/*` as it did for the old list, and would stop doing so if HEIC were listed explicitly, but I could not check that here: drill 5(a).
-- **A photo can end up below 1920px** in one case: it doesn't fit at 1920 even at quality 0.55. It then goes to 1600 or 1280 rather than being refused, because the founder asked for a photo to work, and a toast gives the final size. The spec's 1920 target holds for a normal 5MB photo. If reviewers want a hard 1920 floor, remove `LAST_RESORT` and the message path already handles it.
-- **Over 1920px but within the limit is resized.** "Already small" is read as small in bytes AND in size, and the original is kept if re-encoding doesn't shrink it.
+- **A photo can end up below 1920px** in two cases: it doesn't fit at 1920 even at quality 0.55, or the canvas fails or runs out of memory at the larger sizes. It then goes to 1600 or 1280 rather than being refused, because the founder asked for a photo to work, and a toast gives the final size. The spec's 1920 target holds for a normal 5MB photo. If reviewers want a hard 1920 floor, remove `LAST_RESORT` and the message path already handles it.
+- **Within the limit, a file is resized only when both sides are over 1920px.** This round's instruction was that a file within the byte limit whose short side is at or below about 1920 uploads untouched. That is broader than long images: an ordinary 2400x1200 or 2560x1440 picture within the limit now also stays at its full size, where the previous two rounds made it 1920 wide. The server limit still caps the bytes, and at 939d630 these files went up untouched too. A file with both sides over 1920 is still resized, and the original is kept if re-encoding doesn't shrink it.
+- **The short side's 9/16 share and the 8192 cap are my choices.** 9/16 is the point where a normal photo stops being affected: anything no wider than 16:9 still goes by its long side. 8192 was picked so the canvas stays well under the area limits I understand phones to have, which I could not check here (drill 11). Without a cap, a 1000x30000 file over the limit would try a canvas that may fail, and the founder would read "may be damaged".
+- **`reduced` measures against what a good upload keeps, not against the original.** A 4032x3024 photo at 1920x1440 loses over half its short side and looks fine, so it stays quiet, as the acceptance test expects. A short side below 1080, or below its own size if it started smaller, gets the toast.
 - **The "made smaller" notice is a toast in the picker, not a banner.** Picking an image closes the dialog, so a banner inside it would disappear at once. The toast provider sits in the console root layout, so the toast outlives the dialog. It shows for 5 seconds.
 - **HEIC advice no longer assumes an iPhone:** "Save it as a JPEG first, or upload it from a phone browser that can open it."
 - **Small files the browser can't open are now refused here,** where before they went to the server. A browser with no `createImageBitmap` still sends them, so it isn't locked out.
@@ -207,10 +246,19 @@ Run on `pnpm dev:design`, signed in as owner, and commit screenshots or a record
 - **Reading the whole file before re-encoding** now applies to JPEGs too, because the name can't be trusted. A phone photo's file is small next to its decoded image, so this adds little to the memory drill 9 is checking.
 - **The spec's citations were accurate** against 939d630: `lib/media.js:9-10`, `lib/media.js:15-21`, `MediaAdmin.js:73`, `MediaPicker.js:47`.
 
-## Known limits, not fixed
+## Known limits
+
+Deliberately left.
+
+- **The source pin covers text, not everything the server does.** It covers `MEDIA_MIME`, `sniffMime`, `sanitizeSvg`, `validateUpload` and the one sanitize line in `saveMedia`. The rest of `saveMedia` (dedupe, the stored row), `app/api/admin/media/route.js` and the code that serves the file aren't pinned; route tests cover the cases they list. The pin also fails on a harmless edit such as a comment, on purpose.
+- **The sniff window (1000 bytes) is proven by the pin, not by behaviour.** Only an `<svg` past the window has a route case. One inside it, near the edge, doesn't.
+- **Mutation survivors left alone.** All from the final review's run, all small: #4 the `DataView` offset in the PNG check, which only matters for a file passed as part of a larger buffer; #7 the HEIC sequence type names; #9 and #10 the fallbacks for an empty file name; #16 a zero width in the preview rule; #32 the status check in `uploadImage`, because `json.ok` also catches it; #66 the route's skipping of a preview for a deduped upload.
+- **Files within the limit keep their full pixel size** when the short side is 1920px or less, so a 7000x1900 file under 1.5MB is stored and served at that size. The bytes are capped by the server limit either way.
+- **A long image's preview is long too.** The rule is still 480 wide, so 1080x5000 gets a 480x2222 preview, and one 480px wide or narrower gets none. The library grid crops it. Not rendered here (drill 11).
+- **Long images are harder on a phone.** Writing 1080x5538 takes about twice the canvas of 1920x1440, and more near the 8192 cap. A failure falls to the next size, then to a message. Not tried on a real phone (drills 9 and 11).
 
 - **Animated AVIF and HEIC sequences** are written from their first frame with no warning, under their own name or called `.jpg`, because their structure isn't read. The server can't take those formats anyway, so nothing that used to work has changed.
-- **A wrongly named still image gets a different answer depending on size.** A big PNG called `.jpg` uploads. A small one is refused with "isn't really the kind of image", because it goes up unchanged and the server's check runs. Sending a small one under its real type would make both upload, but it changes what the wrong-name drill and the server refusal mean here, so it needs a decision of its own.
+- **A wrongly named still image gets a different answer depending on size.** A big PNG called `.jpg` uploads. One within the limit with a short side of 1920px or less is refused with "isn't really the kind of image", because it goes up unchanged and the server's check runs. Sending that one under its real type would make both upload, but it changes what the wrong-name drill and the server refusal mean here, so it needs a decision of its own.
 - **A HEIC with no type and no extension** gets "isn't an image" in a browser that can't open it, which isn't true. Only the first bytes of JPEG, PNG, WebP and GIF are recognised.
 - **Closing the picker during an upload** doesn't cancel it. It carries on with nothing on screen until its toast. Reopening the picker shows the banner again.
 - **Damage the browser can still open.** A photo with some bad picture data can decode with a smeared area, pass, and be stored. A damaged GIF is left to the server, which only checks the first bytes, as it did before.

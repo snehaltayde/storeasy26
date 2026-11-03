@@ -5,6 +5,7 @@
 // Real pixels through a real canvas can't run here: that is the browser drill
 // listed in docs/cms-reviews/P1-MED-01.md.
 //   pnpm test:media-upload
+import { createHash } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -106,6 +107,8 @@ const photoFile = (name, size, mime = "image/jpeg") => new File([bytesOf(mime, s
 // image (0.116 bytes per pixel at quality 0.85 for a 5MB source, measured with
 // sharp while building this; `detail` scales for busier pictures). Output carries
 // real magic bytes, so the real server accepts or refuses it on its own terms.
+// Like a real decoded image it can't be used once closed. It looks after a tick, so
+// a caller that closes the image without waiting for the encode is caught too.
 function fakeCodec({ width = 4032, height = 3024, detail = 1, alpha = false, writesWebp = true, undecodable = false, cannotTry = false, nullBlobs = false, throwAbove = 0, encodedSize = null } = {}) {
   const calls = { encode: [], decode: 0, hasAlpha: 0, alphaSize: [], closed: 0 };
   return {
@@ -114,15 +117,27 @@ function fakeCodec({ width = 4032, height = 3024, detail = 1, alpha = false, wri
       calls.decode++;
       if (undecodable) throw new Error("The source image could not be decoded.");
       if (cannotTry) return null;
-      return { width, height, close: () => calls.closed++ };
+      const image = {
+        width,
+        height,
+        close: () => {
+          image.closed = true;
+          calls.closed++;
+        },
+      };
+      return image;
     },
-    hasAlpha: async (_image, size) => {
+    hasAlpha: async (image, size) => {
       calls.hasAlpha++;
       calls.alphaSize.push(size);
+      await null;
+      if (image.closed) throw new Error("the image was closed before it was read");
       return alpha;
     },
-    encode: async (_image, step) => {
+    encode: async (image, step) => {
       calls.encode.push(step);
+      await null;
+      if (image.closed) throw new Error("the image was closed before it was written");
       if (throwAbove && Math.max(step.width, step.height) > throwAbove) throw new Error("canvas too large");
       if (nullBlobs) return null;
       const mime = step.mime === "image/webp" && !writesWebp ? "image/png" : step.mime;
@@ -233,6 +248,40 @@ await t("magic-byte sniffing checks every byte of each signature, and each forma
   }
 });
 
+// The brief says these stay exactly as they are, proven by test. The route cases
+// below pin what they do for the inputs they list. This pins their exact source
+// text, so ANY edit fails here until someone changes the pin on purpose.
+const SERVER_RULE_PINS = {
+  MEDIA_MIME: "3f1f38b2bf5ed3904bf92ca37015df546d384bc344f9bf969a49f47a208dd2f5",
+  sniffMime: "5c92a6127c84982419155511e8d0ad809826f7e2d86acad1664b825bc7b16e75",
+  sanitizeSvg: "782c3afb176bafa2b10eca150b70ca9bc5e3e61e6d72b6aa97083ab7967b3c96",
+  validateUpload: "6431bb9b354d040d8a8477a7f794a88e58da0f698d30c39e0b3d052841092f36",
+  "saveMedia's sanitize line": "41bf910df248491b145a6455c59832a80fcf9fc07679bd38dff6d4d140187a4c",
+};
+
+await t("the server's rules are exactly the text they were: limits, magic-byte check, SVG cleaning, validation", async () => {
+  const text = await readFile(join(root, "lib/media.js"), "utf8");
+  const block = (from, to) => {
+    const start = text.indexOf(from);
+    const end = text.indexOf(to, start);
+    ok(start >= 0 && end > start, `lib/media.js no longer has ${from}:`);
+    return text.slice(start, end + to.length);
+  };
+  const sanitizeLines = block("export async function saveMedia(", "\n}\n").split("\n").filter((line) => line.includes("sanitizeSvg"));
+  eq(sanitizeLines.length, 1, "saveMedia cleans SVG in exactly one place:");
+  const current = {
+    MEDIA_MIME: block("export const MEDIA_MIME = {", "\n};\n"),
+    sniffMime: block("export function sniffMime(", "\n}\n"),
+    sanitizeSvg: block("export function sanitizeSvg(", "\n}\n"),
+    validateUpload: block("export function validateUpload(", "\n}\n"),
+    "saveMedia's sanitize line": sanitizeLines[0],
+  };
+  for (const [name, want] of Object.entries(SERVER_RULE_PINS)) {
+    const got = createHash("sha256").update(current[name]).digest("hex");
+    if (got !== want) throw new Error(`${name} in lib/media.js changed (now ${got}). These rules must stay as they are. If this change is meant, update the pin in scripts/test-media-upload.js.`);
+  }
+});
+
 await t("route: a PNG signature with nothing after it is refused and nothing is stored", async () => {
   const before = await mediaCount();
   const r = await postDirect({ file: new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "a.png", { type: "image/png" }) });
@@ -294,8 +343,8 @@ await t("route: an SVG uploaded through the shared path is sanitized before it i
 });
 
 // The rest of the sanitizer and sniffer, through the real route. These compare the
-// exact stored bytes for the cases listed. That catches a weakening of those cases,
-// not every possible change to lib/media.js.
+// exact stored bytes for the cases listed. Other edits to the rules are caught by the
+// source pin above.
 const SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg">';
 const svgThroughRoute = async (inner) => {
   const r = await postDirect({ file: new File([`${SVG_OPEN}${inner}</svg>`], "logo.svg", { type: "image/svg+xml" }) });
@@ -314,6 +363,23 @@ await t("route: every SVG element that can run or load something is stored witho
 
 await t("route: every event handler is stored without it, however it is quoted", async () => {
   eq(await svgThroughRoute(`<rect onclick="a()" ONMOUSEOVER='b()' onfocus=c() width="9"/>`), `<rect width="9"/>`);
+  eq(await svgThroughRoute(`<rect onclick = "x()"/>`), "<rect/>", "spaces around the equals sign:");
+});
+
+await t("route: a closing tag with a space after its name still ends the element", async () => {
+  eq(await svgThroughRoute("<script>x</script ><rect/>"), "<rect/>");
+});
+
+await t("route: an SVG posted as the preview is stored clean too", async () => {
+  const r = await postDirect({
+    file: photoFile("with-svg-thumb.jpg", 2048),
+    thumb: new File([`${SVG_OPEN}<script>evil()</script><rect onclick="evil()" r="${++seed}"/></svg>`], "thumb.svg", { type: "image/svg+xml" }),
+    thumbWidth: "480",
+    thumbHeight: "360",
+  });
+  eq(r.status, 200);
+  ok(r.json.thumb, "stored as the preview:");
+  eq(await storedText(r.json.thumb.id), `${SVG_OPEN}<rect r="${seed}"/></svg>`);
 });
 
 await t("route: unsafe links are stored without them, safe links are kept", async () => {
@@ -322,6 +388,8 @@ await t("route: unsafe links are stored without them, safe links are kept", asyn
     for (const attr of ["href", "xlink:href", "src"]) eq(await svgThroughRoute(`<image ${attr}="${value}"/>`), "<image/>", `${attr}=${value}:`);
     eq(await svgThroughRoute(`<image href='${value}'/>`), "<image/>", `single-quoted ${value}:`);
   }
+  eq(await svgThroughRoute(`<a href = "javascript:x()"/>`), "<a/>", "spaces around the equals sign:");
+  eq(await svgThroughRoute(`<image href="/\t/evil.example/x.png"/>`), "<image/>", "a tab hiding a protocol-relative link:");
   for (const value of ["#shape", "https://ok.example/x.png", "/api/media/med_1"]) {
     const kept = `<image href="${value}"/>`;
     eq(await svgThroughRoute(kept), kept, "kept:");
@@ -435,21 +503,57 @@ await t("sniffImage agrees with the server's check on every case the server test
   eq(P.sniffImage(new TextEncoder().encode("<svg></svg>")), null, "svg isn't its job:");
 });
 
-await t("when to skip: only small in bytes AND in size", () => {
+await t("when to skip: within the limit, and a short side no larger than the target", () => {
   const go = (size, width, height, action = "resize") => P.shouldResize({ size, width, height, action });
   eq(go(LIMIT, 1920, 1080), false, "exactly at both limits:");
   eq(go(200_000, 800, 600), false, "small:");
   eq(go(LIMIT + 1, 800, 600), true, "over the bytes:");
-  eq(go(500_000, 1921, 1000), true, "over the edge:");
-  eq(go(500_000, 1000, 1921), true, "portrait over the edge:");
+  eq(go(500_000, 1921, 1921), true, "both sides over the target:");
+  eq(go(LIMIT, 1920, 5000), false, "short side at the target, however long:");
+  eq(go(LIMIT, 5000, 1920), false, "the same, on its side:");
+  eq(go(500_000, 1921, 5000), true, "short side just over the target:");
+  eq(go(209_179, 1080, 5000), false, "a long size chart:");
+  eq(go(62_000, 4000, 400), false, "a wide strip:");
   eq(go(1000, 10, 10, "convert"), true, "the server can't take it as it is:");
 });
 
-await t("fitLongEdge never upscales and keeps the aspect", () => {
-  eq(P.fitLongEdge(4032, 3024, 1920), { width: 1920, height: 1440 });
-  eq(P.fitLongEdge(3024, 4032, 1920), { width: 1440, height: 1920 });
-  eq(P.fitLongEdge(800, 600, 1920), { width: 800, height: 600 });
-  eq(P.fitLongEdge(10000, 1, 1920), { width: 1920, height: 1 }, "never collapses to zero:");
+await t("fitEdges: a normal photo goes by its long edge, never upscales and keeps the aspect", () => {
+  eq(P.fitEdges(4032, 3024, 1920), { width: 1920, height: 1440 });
+  eq(P.fitEdges(3024, 4032, 1920), { width: 1440, height: 1920 });
+  eq(P.fitEdges(3840, 2160, 1920), { width: 1920, height: 1080 }, "exactly 16:9:");
+  eq(P.fitEdges(800, 600, 1920), { width: 800, height: 600 });
+  eq(P.fitEdges(4032, 3024, 1280), { width: 1280, height: 960 });
+});
+
+await t("fitEdges: a long image goes by its short edge, so it stays readable", () => {
+  eq(P.fitEdges(1170, 6000, 1920), { width: 1080, height: 5538 }, "long screenshot:");
+  eq(P.fitEdges(6000, 1170, 1920), { width: 5538, height: 1080 }, "on its side:");
+  eq(P.fitEdges(1080, 5000, 1920), { width: 1080, height: 5000 }, "already at the floor:");
+  eq(P.fitEdges(4000, 400, 1920), { width: 4000, height: 400 }, "never upscaled to reach the floor:");
+  eq(P.fitEdges(1170, 6000, 1600), { width: 900, height: 4615 }, "the floor falls with the size being tried:");
+  eq(P.fitEdges(1170, 6000, 800), { width: 450, height: 2308 });
+});
+
+await t("fitEdges: nothing is ever written longer than a canvas can be trusted with", () => {
+  eq(P.fitEdges(1000, 30000, 1920), { width: 273, height: 8192 });
+  eq(P.fitEdges(30000, 1000, 1920), { width: 8192, height: 273 });
+  eq(P.fitEdges(1000, 8192, 1920), { width: 1000, height: 8192 }, "exactly at the cap:");
+  eq(P.fitEdges(100000, 1, 1920), { width: 8192, height: 1 }, "never collapses to zero:");
+});
+
+await t("endedUpSmaller: told when an edge fell below what a good upload keeps, not otherwise", () => {
+  const smaller = (w, h, toW, toH) => P.endedUpSmaller({ width: w, height: h }, { width: toW, height: toH });
+  eq(smaller(4032, 3024, 1920, 1440), false, "a normal photo at the target:");
+  eq(smaller(4032, 3024, 1919, 1439), true, "just under the long target:");
+  eq(smaller(3840, 2160, 1920, 1080), false, "16:9 at the target:");
+  eq(smaller(1000, 800, 1000, 800), false, "kept its own size:");
+  eq(smaller(1000, 800, 800, 640), true, "fell below its own size:");
+  eq(smaller(1170, 6000, 1080, 5538), false, "a long image keeping the short floor:");
+  eq(smaller(1170, 6000, 1079, 5533), true, "just under the short floor:");
+  eq(smaller(800, 6000, 800, 6000), false, "narrower than the floor and unchanged:");
+  eq(smaller(800, 6000, 700, 5250), true, "narrower than the floor and cut:");
+  eq(smaller(1170, 6000, 374, 1920), true, "the old 374x1920 would have told the founder:");
+  eq(smaller(4000, 400, 1920, 192), true, "the old 1920x192 too:");
 });
 
 await t("steps: a photo starts at 1920 and holds it through every quality step before shrinking", () => {
@@ -489,7 +593,8 @@ await t("isAnimated reads the file's structure, not just its letters", () => {
   eq(P.isAnimated(ANIMATED_WEBP), true, "animated webp:");
   eq(P.isAnimated(ANIMATED_PNG), true, "apng:");
   eq(P.isAnimated(webpOf("VP8X", [ALPHA_FLAG, 0, 0, 0, 0, 0, 0, 0, 0, 0])), false, "still webp with transparency:");
-  eq(P.isAnimated(webpOf("VP8 ", ascii("ANMF"))), false, "still webp with the letters in its picture data:");
+  // byte 20 is the flags byte only in VP8X; here it is picture data with the same bit set
+  eq(P.isAnimated(webpOf("VP8 ", [ANIM_FLAG, ...ascii("ANMF")])), false, "still webp with the flag bit and the letters in its picture data:");
   eq(P.isAnimated(pngOf(pngChunk("IHDR", new Array(13).fill(0)), pngChunk("IDAT", ascii("acTL")), pngChunk("IEND"))), false, "still png with the letters in its picture data:");
   eq(P.isAnimated(pngOf(pngChunk("IHDR"), pngChunk("IDAT"), pngChunk("acTL"))), false, "a late animation chunk doesn't count:");
   eq(P.isAnimated(pngOf(pngChunk("tEXt", ascii("acTL")), pngChunk("IDAT"))), false, "the letters in a text note don't count:");
@@ -546,6 +651,89 @@ await t("progress: the founder sees stages and a percentage, in order, then no s
   const seen = [];
   await U.uploadImage(photoFile("a.jpg", 5_000_000), { codec: fakeCodec(), send: realSend(), onProgress: (p) => seen.push(P.progressLabel(p)) });
   eq(seen, ["Getting a.jpg ready…", "Uploading a.jpg… 0%", "Uploading a.jpg… 40%", "Saving a.jpg…"]);
+});
+
+await t("LONG: a 1080x5000 size chart within the limit goes up untouched", async () => {
+  const file = photoFile("sizechart.jpg", 209_179);
+  const codec = fakeCodec({ width: 1080, height: 5000 });
+  const prepared = await U.prepareImage(file, codec);
+  ok(prepared.file === file, "the same file:");
+  eq([prepared.width, prepared.height, !!prepared.reduced], [1080, 5000, false]);
+  eq(codec.calls.encode.map((s) => s.quality), [0.82], "only the library preview was made:");
+  eq([prepared.thumb.width, prepared.thumb.height], [480, 2222]);
+  const r = await U.uploadImage(file, { codec: fakeCodec({ width: 1080, height: 5000 }), send: realSend() });
+  ok(r.ok, `uploaded (${r.message}):`);
+  const row = await stored(r.media.id);
+  eq([row.mime, row.size, row.width, row.height, row.filename], ["image/jpeg", 209_179, 1080, 5000, "sizechart.jpg"]);
+  eq(r.notice, null);
+});
+
+await t("LONG: a 4000x400 strip within the limit goes up untouched", async () => {
+  const file = photoFile("strip.jpg", 62_000);
+  const codec = fakeCodec({ width: 4000, height: 400 });
+  const r = await U.prepareImage(file, codec);
+  ok(r.file === file, "the same file:");
+  eq([r.width, r.height, !!r.reduced], [4000, 400, false]);
+  eq(codec.calls.encode.map((s) => s.quality), [0.82], "only the library preview was made:");
+});
+
+await t("LONG: a 4000x400 strip over the limit is written at its own size, and nothing needs saying", async () => {
+  const r = await U.uploadImage(photoFile("strip-big.jpg", 2_000_000), { codec: fakeCodec({ width: 4000, height: 400 }), send: realSend() });
+  ok(r.ok, `uploaded (${r.message}):`);
+  const row = await stored(r.media.id);
+  eq([row.width, row.height], [4000, 400]);
+  ok(row.size <= LIMIT, "fits:");
+  eq(r.notice, null);
+});
+
+await t("LONG: a 1170x6000 screenshot over the limit keeps its width through the real route, and nothing needs saying", async () => {
+  const codec = fakeCodec({ width: 1170, height: 6000 });
+  const r = await U.uploadImage(photoFile("longshot.png", 18_000_000, "image/png"), { codec, send: realSend() });
+  ok(r.ok, `uploaded (${r.message}):`);
+  const row = await stored(r.media.id);
+  eq([row.mime, row.width, row.height, row.filename], ["image/jpeg", 1080, 5538, "longshot.jpg"]);
+  ok(row.size <= LIMIT, "fits:");
+  eq(r.notice, null);
+  eq(codec.calls.alphaSize, [{ width: 1080, height: 5538 }], "transparency looked at, at the size it will be written:");
+  const thumb = await thumbOf(r.media.id);
+  eq([thumb.width, thumb.height], [480, 2461], "preview attached:");
+});
+
+await t("LONG: a 1170x6000 screenshot too detailed to keep its width is told the final size", async () => {
+  const r = await U.uploadImage(photoFile("busylong.png", 18_000_000, "image/png"), { codec: fakeCodec({ width: 1170, height: 6000, detail: 10 }), send: realSend() });
+  ok(r.ok, `uploaded (${r.message}):`);
+  const row = await stored(r.media.id);
+  eq([row.width, row.height], [900, 4615], "shrunk, and still far wider than the old 374:");
+  eq(r.notice, P.uploadMessage.madeSmaller("busylong.png", row));
+});
+
+await t("LONG: a transparent 1170x6000 stays transparent, and PNG sizes fall with their own floor (Safari)", async () => {
+  const codec = fakeCodec({ alpha: true, width: 1170, height: 6000, writesWebp: false, detail: 0.3 });
+  const r = await U.prepareImage(photoFile("cutout-long.png", 18_000_000, "image/png"), codec);
+  eq([r.file.type, r.width, r.height, r.reduced], ["image/png", 576, 2954, true]);
+  ok(r.file.size <= LIMIT, "fits:");
+  ok(!codec.calls.encode.some((s) => s.mime === "image/jpeg"), "no jpeg encode:");
+});
+
+await t("LONG: a very long file over the limit stops at the longest size a canvas can be trusted with, and says so", async () => {
+  const r = await U.prepareImage(photoFile("huge-long.jpg", 3_000_000), fakeCodec({ width: 1000, height: 30000 }));
+  eq([r.width, r.height, r.reduced], [273, 8192, true]);
+});
+
+await t("over 1920 and within the limit, with a short side at or under 1920: untouched, whatever the shape", async () => {
+  for (const [width, height] of [[2400, 1200], [1200, 2400], [2560, 1920]]) {
+    const file = photoFile("ordinary.jpg", 500_000);
+    const r = await U.prepareImage(file, fakeCodec({ width, height }));
+    ok(r.file === file, `${width}x${height} the same file:`);
+    eq([r.width, r.height], [width, height]);
+  }
+});
+
+await t("both sides over 1920 and within the limit: still made smaller, short side kept", async () => {
+  const photo = await U.prepareImage(photoFile("big.jpg", 900_000), fakeCodec({ width: 2600, height: 2200, detail: 0.1 }));
+  eq([photo.file.type, photo.width, photo.height, photo.reduced], ["image/jpeg", 1920, 1625, false]);
+  const long = await U.prepareImage(photoFile("wide.jpg", 900_000), fakeCodec({ width: 6000, height: 2000, detail: 0.1 }));
+  eq([long.width, long.height, long.reduced], [3240, 1080, false]);
 });
 
 await t("a busy photo walks down the quality steps but stays at 1920", async () => {
@@ -679,19 +867,24 @@ await t("re-encoding that would grow the file keeps the original", async () => {
   const r = await U.prepareImage(file, fakeCodec({ width: 4000, height: 3000, encodedSize: 400_000 }));
   ok(r.file === file, "the same file:");
   eq([r.width, r.height], [4000, 3000], "its real dimensions:");
+  ok(r.thumb, "and its preview, which needs the image still open:");
 });
 
 await t("an animated WebP or PNG within the limit goes up untouched, even when over 1920", async () => {
   for (const [name, type, bytes] of [["anim.webp", "image/webp", ANIMATED_WEBP], ["anim.png", "image/png", ANIMATED_PNG]]) {
-    const file = new File([padded(bytes, 16_300)], name, { type });
-    const codec = fakeCodec({ width: 2400, height: 1200 });
-    const r = await U.uploadImage(file, { codec, send: realSend() });
-    ok(r.ok, `uploaded (${r.message}):`);
-    const row = await stored(r.media.id);
-    eq([row.mime, row.filename, row.size, row.width, row.height], [type, name, 16_300, 2400, 1200], `${name}:`);
-    eq(r.notice, null);
-    eq(codec.calls.encode.map((s) => s.quality), [0.82], "only the library preview was made:");
-    eq(codec.calls.hasAlpha, 0);
+    // 2400x2200 reaches the animation check; 2400x1200 is untouched before it gets there
+    for (const [width, height] of [[2400, 2200], [2400, 1200]]) {
+      const file = new File([padded(bytes, 16_300)], name, { type });
+      const codec = fakeCodec({ width, height });
+      const r = await U.uploadImage(file, { codec, send: realSend() });
+      ok(r.ok, `uploaded (${r.message}):`);
+      const row = await stored(r.media.id);
+      eq([row.mime, row.filename, row.size, row.width, row.height], [type, name, 16_300, width, height], `${name} ${width}x${height}:`);
+      eq(r.notice, null);
+      eq(codec.calls.encode.map((s) => s.quality), [0.82], "only the library preview was made:");
+      eq(codec.calls.hasAlpha, 0);
+      ok(r.thumb, `${name} ${width}x${height} preview made while the image was still open:`);
+    }
   }
 });
 
@@ -706,10 +899,13 @@ await t("an animated WebP or PNG over the limit gets a plain message: no silent 
 });
 
 await t("a still WebP or PNG over 1920 is still made smaller", async () => {
-  const webp = await U.prepareImage(photoFile("still.webp", 500_000, "image/webp"), fakeCodec({ width: 2400, height: 1200, detail: 0.1 }));
+  const webp = await U.prepareImage(photoFile("still.webp", 500_000, "image/webp"), fakeCodec({ width: 2400, height: 2200, detail: 0.1 }));
   eq([webp.file.type, webp.width], ["image/jpeg", 1920]);
   const png = new File([padded(pngOf(pngChunk("IHDR", new Array(13).fill(0)), pngChunk("IDAT", ascii("acTL"))), 500_000)], "still.png", { type: "image/png" });
-  eq((await U.prepareImage(png, fakeCodec({ width: 2400, height: 1200, detail: 0.1 }))).width, 1920);
+  eq((await U.prepareImage(png, fakeCodec({ width: 2400, height: 2200, detail: 0.1 }))).width, 1920);
+  // a still lossy WebP whose picture data has the animation bit set where a VP8X flag would be
+  const lossy = new File([padded(webpOf("VP8 ", [ANIM_FLAG, 0, 0, 0]), 500_000)], "lossy.webp", { type: "image/webp" });
+  eq((await U.prepareImage(lossy, fakeCodec({ width: 2400, height: 2200, detail: 0.1 }))).width, 1920, "not mistaken for animated:");
 });
 
 await t("SVG and GIF are left exactly as they are, with nothing encoded", async () => {
@@ -747,6 +943,8 @@ await t("HEIC this browser can open (Safari): becomes a JPEG, even when small", 
   ok(r.ok, `uploaded (${r.message}):`);
   const row = await stored(r.media.id);
   eq([row.mime, row.filename, row.width], ["image/jpeg", "IMG_8.jpg", 1920]);
+  const thumb = await thumbOf(r.media.id);
+  eq([thumb.variant, thumb.width, thumb.height], ["thumb", 480, 360], "gets a preview like any photo:");
 });
 
 await t("NEGATIVE: a file that isn't an image is refused in plain words before anything runs", async () => {
@@ -908,10 +1106,12 @@ await t("no type and no useful name: a damaged photo isn't called 'not an image'
   eq(r.message, P.uploadMessage.unreadable("camera_upload"));
 });
 
-await t("no type and bytes we don't know: if it opens it becomes a JPEG; if not, it isn't an image", async () => {
+await t("no type and bytes we don't know: if it opens it becomes a JPEG (WebP if see-through); if not, it isn't an image", async () => {
   const opens = await U.uploadImage(new File([new Uint8Array(4096)], "camera_upload", { type: "" }), { codec: fakeCodec({ width: 800, height: 600 }), send: realSend() });
   ok(opens.ok, `uploaded (${opens.message}):`);
   eq([opens.media.filename, opens.media.mime], ["camera_upload.jpg", "image/jpeg"]);
+  const seeThrough = await U.prepareImage(new File([new Uint8Array(4096)], "camera_upload", { type: "" }), fakeCodec({ width: 800, height: 600, alpha: true }));
+  eq(seeThrough.file.type, "image/webp", "a see-through one is never a JPEG:");
   for (const name of ["notes.txt", "noextension", "invoice.pdf"]) {
     const r = await U.uploadImage(new File(["some words"], name, { type: "" }), { codec: fakeCodec({ undecodable: true }), send: neverSend });
     eq(r.message, P.uploadMessage.notImage(name), `${name}:`);
@@ -1088,11 +1288,12 @@ await t("xhrSend posts to the route, reports percent, and survives bad answers",
     let p = U.xhrSend(new FormData(), (n) => percents.push(n));
     eq([made.method, made.url], ["POST", "/api/admin/media"]);
     made.upload.onprogress({ lengthComputable: true, loaded: 1, total: 4 });
+    made.upload.onprogress({ lengthComputable: true, loaded: 1, total: 3 });
     made.upload.onprogress({ lengthComputable: false });
     Object.assign(made, { status: 200, responseText: '{"ok":true}' });
     made.onload();
     eq(await p, { status: 200, json: { ok: true } });
-    eq(percents, [25]);
+    eq(percents, [25, 33], "whole numbers:");
     p = U.xhrSend(new FormData(), () => {});
     Object.assign(made, { status: 413, responseText: "<html>Request Entity Too Large</html>" });
     made.onload();
@@ -1281,7 +1482,16 @@ await t("the JSX shows what the handlers set", async () => {
   includes(picker, "busy={!!uploading}", "picker button waits for the upload:");
   const input = await sliceOf("components/admin/cms/MediaPicker.js", "<input\n", "/>");
   ok(!input.includes("disabled"), "the picker's hidden input stays usable, the button opens it:");
-  includes(await code("components/admin/MediaUploadStatus.js"), "{progressLabel(progress)}");
+  const banner = await code("components/admin/MediaUploadStatus.js");
+  includes(banner, "{progressLabel(progress)}");
+  includes(banner, 'role="status"', "screen readers hear the progress:");
+  includes(banner, 'aria-live="polite"', "screen readers hear the progress:");
+});
+
+await t("the library's hint leads with what happens to a photo, in plain words, not with limits", async () => {
+  const admin = await code("components/admin/MediaAdmin.js");
+  includes(admin, "Photos are made smaller for you before they upload. GIFs and animated images can be up to 1.5MB and SVGs up to 300KB. Duplicates are detected and reused.");
+  for (const bad of ["up to 1.5MB ·", "sanitized", "PNG, JPEG, WebP, GIF"]) ok(!admin.includes(bad), `the library still says ${bad}:`);
 });
 
 await t("nothing else in the console posts files to the media route", async () => {
