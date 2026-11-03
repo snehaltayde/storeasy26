@@ -138,14 +138,28 @@ The full list goes to the owner when all six phases are done. Each entry names t
 - [ ] **Hosted numbers, once staging exists:** measure the same 11 requests on staging (TTFB, total, bytes, Turso reads, edge memory). Pass: a hosted run in `docs/perf/` with kind "hosted". Then write the first budgets into `docs/perf/budgets.json` and check that `node scripts/perf-report.js check <run> --budget docs/perf/budgets.json` passes, and fails when one number is pushed over. (The `test:perf-tools` guards that say "no hosted numbers yet" change at that point.)
 - [ ] **Fixture size:** 400 products with about 3 options each, 30 collections, 20 pages, 60 posts, 12 home sections, 8 offers, 4 bundles. Does that look like a store you would onboard?
 - [ ] **On Vercel staging, compression:** the home page response carries `Content-Encoding: br` or `gzip`. (Locally it does not.)
-- (Library photos through `next/image` answering 400 locally is being fixed, not left for you.)
+- (Library photos through `next/image` answering 400 locally was fixed in batch D, P1-IMAGES.)
 
 ## Phase 1, batch D
+
+### Checkout charges the amount on the button, or nothing (P1-RATES)
+- [ ] **Staging, cash.** Change the shipping rates, then within 30 seconds place a cash order as snehal@mediastic.in. Pass: "Shipping changed — your new total is ₹X. Review and place order." appears, the button changes to ₹X, and pressing again places the order at ₹X. Cancel the order after.
+- [ ] **Staging, Razorpay test mode.** The same with Pay online. Pass: the first press is refused with no Razorpay window; after the redraw, the Razorpay window's amount equals the Pay button. Cancel the order after.
+- [ ] **Decisions:**
+  - Approve the wording "Shipping changed — your new total is ₹1,507. Review and place order." and "Your total changed — your new total is ₹X. Review and place order."
+  - A browser tab opened before the deploy sends no amount, so it can't place an order until reloaded. Accept, or allow such requests for a short time after deploy?
+  - Should the checkout page itself read the rates fresh, so shoppers rarely see the refusal? It costs one control-plane read per checkout view.
+
+### Library photos show again (P1-IMAGES)
+- [ ] **Vercel staging.** Open a product with media-library photos, a collection page and the cart. Pass: every photo shows, and the Network tab shows `/api/media/...` answering 200, not `/_next/image`.
+- [ ] **Same photo, two stores.** On staging, open store A's `/api/media/<id>` on store B's domain. Pass: 404.
+- [ ] **Page weight on a phone.** Library photos are now sent at full size (no smaller copies per width yet). Open a collection page with library photos on a mid-range phone and note the bytes. Pass: acceptable; if not, PERF-06 (smaller copies per width) moves up.
 
 ### Two hard-to-read texts, and the colour pairs TOK missed (P1-CONTRAST)
 - [ ] **On your phone, on staging.** On a store with no brand, save a product that has no photo for later, open `/wishlist`, then open a policy page and, with an item in the cart, apply a working coupon. Pass: the "?" where the photo would be, the "Home" link at the top of the policy page, "Contact us" at its foot, and "Coupon" and "Remove" on the applied coupon are all easy to read in daylight. Chrome on the harness measured 4.8:1 or better on six looks.
 - [ ] **Decisions:**
   - Every store, the default look included, now shows a darker grey for the wishlist's missing-photo "?" (#52525c, was #d4d4d8), the content pages' "Home" and "Contact us" links (#71717b, was #9f9fa9) and the words "Coupon" and "Remove" on an applied coupon (#52525c, was #71717b). These are the only default-look pixels this item changes. Keep?
+  - About 1 in 1,000 unusual brands (a coloured background) that published before would now be refused at publish, because the applied-coupon words read under 4.5:1 on them. Stores already live with such a brand get a warning, not a refusal. Also, about 1 in 100 accent-only brands get a slightly different link colour on every page from the added pairs. Fine?
   - A store using the Pulse kit's own colours is still not pixel-equal to the same store with no brand: its lime surfaces are #a8eb43, not #a3e635, because a brand builds its own accent ladder. A shopper can't see it. It would take using the platform's built-in lime ladder whenever the accent is exactly #84cc16. Leave it?
 
 ## Bug-fix branches (not yet merged to main)
@@ -154,6 +168,7 @@ The full list goes to the owner when all six phases are done. Each entry names t
   - In Razorpay test mode, stop the database during verify. Pass: the checkout page waits about 30 seconds, then shows "Confirming your payment", with a sensible message when no status link comes back.
   - After the pending message, press Pay again. Pass: Razorpay refuses a second payment for the same order.
   - On staging, once the duplicate-push fix lands: a browser callback and a webhook arriving together still produce one Shopify order.
+  - A second, different payment on an already-paid order is now refused and, through the webhook, logged as NEEDS ATTENTION. Decide who watches for that line and refunds the second payment in Razorpay. Through the background retry queue it is only flagged after 5 attempts, as a plain job failure; say if that should be faster or louder.
 - [ ] **Closed store sends nothing** (`claude/musing-williamson-4c86b3`). Only local `next start` on the edge runtime was tested.
   - On a staging tenant with maintenance on: a signed-out product page shows the closed page, view-source has no product title or description, and the tab reads "<Store> will be right back". A signed-in founder sees the real site.
   - On a phone and an installed PWA, with a tab open when maintenance starts, tap a product. Decide whether what it shows until reload is acceptable.
