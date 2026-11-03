@@ -300,7 +300,11 @@ async function publish(T, items, { journal } = {}) {
 }
 
 // A saved draft, through the real document service (validated, sanitized).
+// doc_cart is the exception: the service refuses cart writes until the owner
+// rules on its capability (P2-DOCFIX, CART_NOT_AVAILABLE), so its draft row
+// is written directly. The overlay must still show a cart draft that exists.
 async function saveDraft(T, id, b) {
+  if (id === "doc_cart") return inT(T, () => upsertDocument(id, b));
   return inT(T, async () => {
     const rev = Number((await libsql.execute({ sql: "SELECT revision FROM documents WHERE id = ?", args: [id] })).rows[0].revision);
     return Svc.saveDraft({ id, revision: rev, body: b, actor: { kind: "merchant", id: ownerU.id } });
