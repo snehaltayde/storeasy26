@@ -537,6 +537,66 @@ await t("order creation: the checkout's createOrder saves the order, its lines a
   eq(moved.status, "syncing_shopify", "transition at the older schema:");
 });
 
+// ---- OVL-06's columns (migration 0018) at the older schema ---------------------
+const columnsOf = async (id, table) => inT(id, async () => (await libsql.execute(`PRAGMA table_info(${table})`)).rows.map((r) => r.name));
+const linesOf = async (id, orderId) => inT(id, async () => (await libsql.execute({ sql: "SELECT * FROM order_items WHERE order_id = ? ORDER BY position", args: [orderId] })).rows.map((r) => ({ ...r })));
+const freshCart = async (id) =>
+  inT(id, async () => {
+    const { createCart, addItem } = await import("../lib/cart.js");
+    const cartId = `compat-fresh-${++keySeq}`;
+    await createCart(cartId);
+    await addItem(cartId, V1, 1);
+    return cartId;
+  });
+
+await t("older schema: the order's lines leave out catalog_title and sku, and its snapshot still has them", async () => {
+  ok(!(await columnsOf("old", "order_items")).includes("catalog_title"), "the older tenant already has catalog_title");
+  const order = await inT("old", async () => placeOrder(await freshCart("old")));
+  const lines = await linesOf("old", order.id);
+  ok(lines.length === 1 && !("catalog_title" in lines[0]) && !("sku" in lines[0]), `lines: ${JSON.stringify(lines)}`);
+  same([order.snapshot.items[0].catalog_title, order.snapshot.items[0].sku], ["Whey Gold", "WG-1KG"], "snapshot");
+});
+
+await t("current schema: the order's lines carry catalog_title and sku", async () => {
+  const order = await inT("cur", async () => placeOrder(await freshCart("cur")));
+  const [line] = await linesOf("cur", order.id);
+  same([line.catalog_title, line.sku], ["Whey Gold", "WG-1KG"], "line");
+});
+
+await t("orders ask about the columns once per database, never per order and never with a PRAGMA", async () => {
+  __schemaCompat.forget();
+  const spies = { old: spyOn(await inT("old", () => currentDatabase())), cur: spyOn(await inT("cur", () => currentDatabase())) };
+  try {
+    for (let i = 0; i < 3; i++) {
+      for (const id of ["old", "cur"]) await inT(id, async () => placeOrder(await freshCart(id)));
+    }
+    for (const [id, spy] of Object.entries(spies)) {
+      eq(spy.seen.filter((s) => /catalog_title/.test(s) && /^SELECT/.test(s)).length, 1, `${id} probes:`);
+      ok(!spy.seen.some((s) => /pragma/i.test(s)), `${id} sent a PRAGMA`);
+    }
+  } finally {
+    spies.old.stop();
+    spies.cur.stop();
+  }
+});
+
+await t("a tenant migrated while the instance is warm: orders get the columns once the re-check window passes", async () => {
+  __schemaCompat.forget();
+  __schemaCompat.setRecheckMs(80);
+  try {
+    const before = await inT("old", async () => placeOrder(await freshCart("old")));
+    ok(!("catalog_title" in (await linesOf("old", before.id))[0]), "had the column before migrating");
+    await inT("old", () => runMigrations(libsql, MIGRATIONS));
+    const inside = await inT("old", async () => placeOrder(await freshCart("old")));
+    eq((await linesOf("old", inside.id))[0].catalog_title, null, "inside the window, the column exists but is left out:");
+    await sleep(120);
+    const after = await inT("old", async () => placeOrder(await freshCart("old")));
+    same([(await linesOf("old", after.id))[0].catalog_title, (await linesOf("old", after.id))[0].sku], ["Whey Gold", "WG-1KG"], "after the window");
+  } finally {
+    __schemaCompat.forget();
+  }
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 process.exit(fail ? 1 : 0);
