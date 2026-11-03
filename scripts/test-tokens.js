@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const B = await import("../lib/brand.js");
 const { comparePixels } = await import("./pixel-diff.js");
+const { drawnPairs, classRole } = await import("./token-pairs.js");
 
 let pass = 0;
 let fail = 0;
@@ -494,6 +495,132 @@ await t("every pair names roles that exist, a known kind, and a renderer file th
   eq(new Set(ids).size, ids.length, "pair ids unique:");
 });
 
+// P1-CONTRAST: pairs, not just roles. scripts/token-pairs.js reads every
+// storefront file for a text role drawn over a background role, on one
+// element or nested inside one (see its header for what it can't see).
+// Every pair it finds must be in PAIRS, or below with the reason it is not
+// a real pair. An entry the scan no longer finds fails, so the list only
+// shrinks.
+const PAIR_SCAN_EXEMPT = [
+  {
+    pair: "on-inverse-muted|surface",
+    file: "app/(storefront)/collections/[handle]/page.js",
+    reason: "The filter chip's count. It turns on-inverse-muted only when the chip is active and inverse (pair on-inverse-muted); the scan can't tie the count's `active ?` to the chip's.",
+  },
+  {
+    pair: "text-faint|inverse",
+    file: "app/(storefront)/collections/[handle]/page.js",
+    reason: "The same count, the other way round: text-faint only on the inactive chip, which is the page surface (pair text-faint).",
+  },
+];
+const scanPairs = () => {
+  const out = [];
+  for (const rel of storefrontFiles()) {
+    if (allowed(rel)) continue;
+    for (const p of drawnPairs(readFileSync(join(ROOT, rel), "utf8"), B.ROLE_IDS)) out.push({ ...p, file: rel });
+  }
+  return out;
+};
+
+await t("the pair scan finds a pair on one element, across a template's branches, through a same-file constant, nested, and under inherited text", () => {
+  const src = `
+    const activeCls = (i) => (i === active ? "bg-sf-surface-sunken" : "hover:bg-sf-surface-muted");
+    const STATUS = { a: "bg-sf-success-soft text-sf-success", b: "bg-sf-warning-soft text-sf-warning" };
+    export default function X({ on, s }) {
+      return (
+        <div className="bg-sf-surface-muted">
+          {/* a comment before a tag */}
+          <p className="text-sf-text-body">Nothing here</p>
+          <button className={\`px-2 text-sf-accent-text \${on ? "bg-sf-accent-soft" : "hover:bg-sf-surface-sunken"}\`}>Go</button>
+          <span className={\`block text-sf-text-soft \${activeCls(1)}\`}>x</span>
+          <span className={STATUS[s]}>ok</span>
+          <span className="bg-sf-inverse">plain words</span>
+          <i className="text-sf-mark disabled:bg-sf-surface-strong placeholder:text-sf-text-faint" />
+        </div>
+      );
+    }`;
+  const got = new Set(drawnPairs(src, B.ROLE_IDS).map((p) => `${p.fg}|${p.bg}`));
+  for (const want of ["text-body|surface-muted", "accent-text|accent-soft", "accent-text|surface-sunken", "text-soft|surface-sunken", "text-soft|surface-muted", "success|success-soft", "warning|warning-soft", "foreground|inverse", "mark|surface-muted"])
+    ok(got.has(want), `missed ${want}; found ${[...got].join(", ")}`);
+  for (const not of ["success|warning-soft", "warning|success-soft", "mark|surface-strong", "text-faint|surface-muted"]) ok(!got.has(not), `${not} is not drawn, but the scan found it`);
+});
+
+await t("the pair scan finds each pair the TOK review found missing, in the real files", () => {
+  const found = scanPairs();
+  const at = (pair, file) => found.some((p) => `${p.fg}|${p.bg}` === pair && p.file === file);
+  ok(at("text-body|surface-muted", "app/(storefront)/search/page.js"), "the search page's no-results panel");
+  ok(at("text-body|surface-muted", "components/cart/CartDrawer.js"), "the cart drawer's button on hover");
+  ok(at("accent-text|surface-sunken", "components/SearchBox.js"), "the search box's View all on hover");
+  ok(at("on-overlay|media", "components/CollectionCard.js"), "collection names on the card");
+  ok(found.length >= 200, `only ${found.length} drawn pairs found: the scan is broken`);
+});
+
+await t("every pair a storefront renderer draws is in PAIRS (pairs, not just roles)", () => {
+  const listed = new Set(B.PAIRS.map((p) => `${p.fg}|${p.bg}`));
+  const exempt = (p) => PAIR_SCAN_EXEMPT.some((e) => e.pair === `${p.fg}|${p.bg}` && e.file === p.file);
+  const missing = [...new Set(scanPairs().filter((p) => !listed.has(`${p.fg}|${p.bg}`) && !exempt(p)).map((p) => `${p.fg} on ${p.bg} (${p.file}:${p.line}, ${p.how})`))];
+  ok(!missing.length, `pairs drawn but not in PAIRS:\n      ${missing.join("\n      ")}`);
+});
+
+await t("each pair the scan is excused from has a reason and is still found", () => {
+  const found = scanPairs();
+  for (const e of PAIR_SCAN_EXEMPT) {
+    ok(e.reason.length > 40, `${e.pair}: a written reason`);
+    ok(!B.PAIRS.some((p) => `${p.fg}|${p.bg}` === e.pair), `${e.pair} is in PAIRS now: remove the exemption`);
+    ok(found.some((p) => `${p.fg}|${p.bg}` === e.pair && p.file === e.file), `${e.pair} in ${e.file} is no longer found: remove the exemption`);
+  }
+});
+
+// The two pairs batch C's drills measured under 4.5:1 (P1-DRILLS-C findings
+// 2 and 4), on every look a shopper can get: no brand on both kits, the
+// Pulse kit's own brand, and both test themes.
+const LOOKS = {
+  "no brand, Pulse": [null, "pulse-1"],
+  "no brand, Glow": [null, "glow-1"],
+  "the Pulse kit's brand": [{ accent: "#84cc16", background: "#ffffff", foreground: "#0a0a0b" }, "pulse-1"],
+  "the Glow kit's brand": [{ accent: "#e11d48", background: "#fffbf7", foreground: "#1c1917" }, "glow-1"],
+  "light test theme": [{ accent: "#c2410c", background: "#fffdf8", foreground: "#1c1917" }, "glow-1"],
+  "dark test theme": [{ accent: "#2dd4bf", background: "#0b0f17", foreground: "#f1f5f9" }, "pulse-1"],
+};
+const rolesOfClass = (cls) => {
+  const text = [];
+  const bg = [];
+  for (const tok of cls.split(/\s+/)) {
+    const r = classRole(tok, B.ROLE_IDS);
+    if (r && !tok.includes(":")) (r.kind === "text" ? text : bg).push(r.role);
+  }
+  return { text, bg };
+};
+const readableEverywhere = (fg, bg, what) => {
+  for (const [look, [brand, kit]] of Object.entries(LOOKS)) {
+    const { roles } = B.brandRoles(brand, kit);
+    const ratio = B.contrastRatio(roles[fg], roles[bg]);
+    ok(ratio >= 4.5, `${what}, ${look}: ${fg} ${roles[fg]} on ${bg} ${roles[bg]} is ${ratio.toFixed(2)}:1`);
+    ok(B.PAIRS.some((p) => p.fg === fg && p.bg === bg && p.kind === "text"), `${what}: ${fg} on ${bg} is not a text pair in PAIRS`);
+  }
+};
+
+await t("FINDING 4: the wishlist's missing-photo \"?\" is 4.5:1 or better on every look, the default one included", () => {
+  const src = readFileSync(join(ROOT, "components/WishlistPage.js"), "utf8");
+  const m = /className="([^"]*)">\?</.exec(src);
+  ok(m, 'the "?" placeholder is gone from WishlistPage.js: update this test');
+  const { text, bg } = rolesOfClass(m[1]);
+  eq(text.length, 1, `text roles on the "?": ${text}`);
+  eq(bg.length, 1, `background roles on the "?": ${bg}`);
+  readableEverywhere(text[0], bg[0], 'the wishlist "?"');
+});
+
+await t("FINDING 2: the content page's links (Home, Contact us) are 4.5:1 or better on every look, the Pulse kit's brand included", () => {
+  const src = readFileSync(join(ROOT, "components/ContentPage.js"), "utf8");
+  const links = [...src.matchAll(/<Link\b[^>]*?className="([^"]*)"[^>]*>\s*([^<]+?)\s*</g)].map((m) => ({ cls: m[1], label: m[2] }));
+  for (const label of ["Home", "Contact us"]) ok(links.some((l) => l.label === label), `no "${label}" link with a className in ContentPage.js: ${JSON.stringify(links)}`);
+  for (const l of links) {
+    const { text } = rolesOfClass(l.cls);
+    eq(text.length, 1, `"${l.label}" sets its own text role (it inherited the faint grey before):`);
+    readableEverywhere(text[0], "surface", `"${l.label}"`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // the pixel comparison tool
 // ---------------------------------------------------------------------------
@@ -710,6 +837,63 @@ await t("what the page renders is what the matrix measures: every corrected or d
   }
 });
 
+// P1-CONTRAST (TOK review, R12): every correction the matrix counts on is
+// written into the CSS, for many brands, not only the eight above.
+await t("R12: every accent correction and tint brandRoles makes is a --sf- line in brandCssVars, for 200 random brands, five named ones and no brand, on both kits", () => {
+  let seed = 11;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const hex = () => "#" + [0, 0, 0].map(() => Math.floor(rnd() * 256).toString(16).padStart(2, "0")).join("");
+  const brands = [null, PULSE_BRAND, WHITE_BLUE, BLACK_ACCENT, SEEDED];
+  for (let i = 0; i < 100; i++) brands.push({ accent: hex() }, { accent: hex(), background: hex(), foreground: hex() });
+  let corrections = 0;
+  for (const brand of brands)
+    for (const kit of ["pulse-1", "glow-1"]) {
+      const resolved = brand ? B.resolveBrand(brand) : null;
+      const css = B.brandCssVars(resolved, { kit });
+      const { roles, ladder, corrections: list } = B.brandRoles(resolved, kit);
+      for (const c of list) {
+        corrections++;
+        ok(css.includes(`--sf-${c.role}:${c.to};`), `${JSON.stringify(brand)} on ${kit}: ${c.role} corrected to ${c.to} but the CSS says ${/--sf-[\w-]+:[^;]+;/.exec(css.slice(css.indexOf(`--sf-${c.role}:`)))?.[0] || "nothing"}`);
+      }
+      for (const r of B.ROLES.filter((x) => x.from.startsWith("tint:"))) {
+        const step = r.from.split(":")[1];
+        if (roles[r.id] !== ladder[step]) ok(css.includes(`--sf-${r.id}:${roles[r.id]};`), `${JSON.stringify(brand)} on ${kit}: tint ${r.id} ${roles[r.id]} not written`);
+      }
+    }
+  ok(corrections > 100, `only ${corrections} corrections across the brands: the sweep is not exercising roleCssLines`);
+});
+
+// P1-CONTRAST (TOK review): the storefront layout must send a store with no
+// brand its kit's corrections. The chrome's brandCss expression is read from
+// app/(storefront)/layout.js and run as written (the layout itself needs Next).
+await t("the storefront layout's chrome calls brandCssVars for a store with no brand (Glow gets its corrected accents)", () => {
+  const src = readFileSync(join(ROOT, "app/(storefront)/layout.js"), "utf8");
+  const start = src.indexOf("async function chromeData(");
+  const end = src.indexOf("\nasync function ", start + 10);
+  ok(start >= 0 && end > start, "chromeData is gone from the layout: update this test");
+  const body = src.slice(start, end);
+  const lines = [...body.matchAll(/^\s*brandCss:\s*(.+),\s*$/gm)].map((m) => m[1]);
+  ok(lines.length >= 1, "the chrome sets no brandCss");
+  const live = lines.filter((e) => e.trim() !== '""');
+  eq(live.length, 1, `one brandCss expression besides the error fallback (${JSON.stringify(lines)}):`);
+  const Kits = { kitAttr: (theme) => `${theme?.kit || "pulse"}-${theme?.version || 1}` };
+  let run;
+  try {
+    run = Function("brandCssVars", "resolveBrand", "kitAttr", "brand", "theme", `"use strict"; return (${live[0]});`);
+  } catch (e) {
+    throw new Error(`the layout's brandCss expression doesn't parse: ${live[0]} (${e.message})`);
+  }
+  const shown = (brand, theme) => run(B.brandCssVars, B.resolveBrand, Kits.kitAttr, brand, theme);
+  const glow = shown(null, { kit: "glow", version: 1 });
+  eq(glow, B.brandCssVars(null, { kit: "glow-1" }), "no brand on Glow:");
+  ok(/--sf-header-accent:#[0-9a-f]{6};/.test(glow) && /--sf-hero-accent:#[0-9a-f]{6};/.test(glow), `no brand on Glow must carry the corrected accents: ${glow}`);
+  eq(shown(null, null), "", "no brand, no theme (the default look) writes nothing:");
+  eq(shown(PULSE_BRAND, { kit: "pulse", version: 1 }), B.brandCssVars(B.resolveBrand(PULSE_BRAND), { kit: "pulse-1" }), "the Pulse kit's brand:");
+  eq(shown(SEEDED, { kit: "glow", version: 1 }), B.brandCssVars(B.resolveBrand(SEEDED), { kit: "glow-1" }), "a brand on Glow gets Glow's corrections:");
+  // and the page writes what the chrome computed, guarded only by being non-empty
+  ok(/\{chrome\.brandCss \? <style id="brand-vars"[^>]*>\{chrome\.brandCss\}<\/style> : null\}/.test(src), "the layout no longer writes chrome.brandCss into <style id=\"brand-vars\">");
+});
+
 await t("a theme kit change counts as a change: a pair the new kit breaks blocks even when the brand is the same as live", () => {
   B.KIT_SURFACES["tok-test-1"] = { header: { ...B.KIT_SURFACES["pulse-1"].header }, hero: { bg: "#ffffff", fg: "#111111", muted: "#dddddd" } };
   try {
@@ -919,6 +1103,31 @@ await t("a theme-only change is checked at publish (no brand, a kit whose own he
     const v = await inTk(() => Rel.validateRelease({ blocks: {}, pages: [], brand: null, theme: { kit: "toktest", version: 1 } }, { live: null }));
     ok(v.issues.some((i) => i.code === "BRAND_PAIR" && i.severity === "error" && /Hero subtitle/.test(i.message)), JSON.stringify(v.issues));
   } finally {
+    delete Kits.KITS.toktest;
+    delete B.KIT_SURFACES["toktest-1"];
+  }
+});
+
+// P1-CONTRAST (TOK review, R2): the same, through Publish now on a real
+// tenant: no brand saved, only the theme changes, and publishing is refused.
+await t("R2, real routes: a store with no brand that only changes its theme kit is checked at Publish now, and refused", async () => {
+  const Kits = await import("../lib/themes/kits.js");
+  const was = (await C.getTenant("tk")).config?.theme ?? null;
+  eq((await putBrand({ reset: true })).status, 200, "brand reset:");
+  await C.patchTenant("tk", { config: { theme: { kit: "pulse", version: 1 } } });
+  let r = await publish();
+  eq(r.status, 200, `no brand on Pulse publishes first: ${pubErr(r)}`);
+  Kits.KITS.toktest = { ...Kits.KITS.pulse, id: "toktest", version: 1, label: "Tok test" };
+  B.KIT_SURFACES["toktest-1"] = { header: { ...B.KIT_SURFACES["pulse-1"].header }, hero: { bg: "#ffffff", fg: "#111111", muted: "#dddddd" } };
+  try {
+    await C.patchTenant("tk", { config: { theme: { kit: "toktest", version: 1 } } });
+    eq(await storedBrand(), null, "still no brand:");
+    r = await publish();
+    eq(r.status, 422, `a theme whose hero subtitle is unreadable must not publish: ${pubErr(r)}`);
+    const i = (r.body.issues || []).find((x) => x.code === "BRAND_PAIR" && x.severity === "error");
+    ok(i && /Hero subtitle/.test(i.message), JSON.stringify(r.body.issues));
+  } finally {
+    await C.patchTenant("tk", { config: { theme: was } });
     delete Kits.KITS.toktest;
     delete B.KIT_SURFACES["toktest-1"];
   }

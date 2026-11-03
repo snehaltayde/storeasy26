@@ -333,7 +333,8 @@ export const parts = {
 
   async "c-rest-themes"(drill) {
     const orig = await liveRelease();
-    const EMAIL = `p1c-themes-${Date.now().toString(36)}@design.test`;
+    // DRILL_ORDER_EMAIL: the address the test order and sign-in use (P1-CONTRAST used snehal@mediastic.in)
+    const EMAIL = process.env.DRILL_ORDER_EMAIL || `p1c-themes-${Date.now().toString(36)}@design.test`;
     // a quiz and a bundle in the local DB (the seed has neither)
     const now = new Date().toISOString();
     await sql("tenant", [

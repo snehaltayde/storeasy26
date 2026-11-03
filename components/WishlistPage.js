@@ -24,7 +24,10 @@ function Row({ item, onRemove }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={item.image} alt="" className={`h-14 w-14 rounded-sf-small object-cover ${dim ? "opacity-40 grayscale" : ""}`} />
       ) : (
-        <span className="flex h-14 w-14 items-center justify-center rounded-sf-small bg-sf-surface-sunken text-sf-mark">?</span>
+        // P1-CONTRAST: the missing-photo "?" is muted text on the image well
+        // (pair text-muted-sunken), readable on every look, the default one too.
+        // It was the mark role (1.34:1 on the default look, 4.19:1 on Glow).
+        <span className="flex h-14 w-14 items-center justify-center rounded-sf-small bg-sf-surface-sunken text-sf-text-muted">?</span>
       )}
       <span className="min-w-0 flex-1">
         {item.state === "gone" ? (

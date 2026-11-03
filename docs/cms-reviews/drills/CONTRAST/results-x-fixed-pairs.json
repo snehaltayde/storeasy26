@@ -1,0 +1,1771 @@
+{
+  "id": "CONTRAST",
+  "part": "x-fixed-pairs",
+  "title": "P1-CONTRAST: the wishlist mark, content page links and the pairs TOK missed — x-fixed-pairs",
+  "ranAt": "2026-11-03T17:24:31.900Z",
+  "harness": "http://localhost:3271",
+  "chrome": "156.0.8078.80",
+  "passed": 72,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 375: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 375: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 375: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 375: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 375: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#3f6212",
+          "bg": "#f7fee7",
+          "ratio": 6.84,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#4d7c0f",
+          "bg": "#f7fee7",
+          "ratio": 4.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 375: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#3f6212",
+          "bg": "#f7fee7",
+          "ratio": 6.84,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#4d7c0f",
+          "bg": "#f7fee7",
+          "ratio": 4.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 1440: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 1440: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 1440: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 1440: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 1440: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#3f6212",
+          "bg": "#f7fee7",
+          "ratio": 6.84,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#4d7c0f",
+          "bg": "#f7fee7",
+          "ratio": 4.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-pulse at 1440: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#3f6212",
+          "bg": "#f7fee7",
+          "ratio": 6.84,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#4d7c0f",
+          "bg": "#f7fee7",
+          "ratio": 4.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 375: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 375: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 375: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 375: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 375: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#3f6212",
+          "bg": "#f7fee7",
+          "ratio": 6.84,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#4d7c0f",
+          "bg": "#f7fee7",
+          "ratio": 4.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 375: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#3f6212",
+          "bg": "#f7fee7",
+          "ratio": 6.84,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#4d7c0f",
+          "bg": "#f7fee7",
+          "ratio": 4.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 1440: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 1440: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 1440: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 1440: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 1440: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#3f6212",
+          "bg": "#f7fee7",
+          "ratio": 6.84,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#4d7c0f",
+          "bg": "#f7fee7",
+          "ratio": 4.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no-brand-glow at 1440: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#3f6212",
+          "bg": "#f7fee7",
+          "ratio": 6.84,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#4d7c0f",
+          "bg": "#f7fee7",
+          "ratio": 4.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f7fee7",
+          "ratio": 7.46,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 375: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 375: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 375: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 375: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 375: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f2fce3",
+          "ratio": 7.28,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#456c09",
+          "bg": "#f2fce3",
+          "ratio": 5.82,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#456c09",
+          "bg": "#f2fce3",
+          "ratio": 5.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f2fce3",
+          "ratio": 7.28,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 375: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f2fce3",
+          "ratio": 7.28,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#456c09",
+          "bg": "#f2fce3",
+          "ratio": 5.82,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#456c09",
+          "bg": "#f2fce3",
+          "ratio": 5.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f2fce3",
+          "ratio": 7.28,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 1440: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 1440: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 1440: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 1440: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 1440: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f2fce3",
+          "ratio": 7.28,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#456c09",
+          "bg": "#f2fce3",
+          "ratio": 5.82,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#456c09",
+          "bg": "#f2fce3",
+          "ratio": 5.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f2fce3",
+          "ratio": 7.28,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "pulse-brand at 1440: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#f2fce3",
+          "ratio": 7.28,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#456c09",
+          "bg": "#f2fce3",
+          "ratio": 5.82,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#456c09",
+          "bg": "#f2fce3",
+          "ratio": 5.82,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#f2fce3",
+          "ratio": 7.28,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 375: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 375: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 375: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 375: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 375: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#e5ecfd",
+          "ratio": 6.52,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#093084",
+          "bg": "#e5ecfd",
+          "ratio": 10.04,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#0b3ca8",
+          "bg": "#e5ecfd",
+          "ratio": 7.97,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#e5ecfd",
+          "ratio": 6.52,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 375: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#e5ecfd",
+          "ratio": 6.52,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#093084",
+          "bg": "#e5ecfd",
+          "ratio": 10.04,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#0b3ca8",
+          "bg": "#e5ecfd",
+          "ratio": 7.97,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#e5ecfd",
+          "ratio": 6.52,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 1440: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 1440: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#52525c",
+          "bg": "#f4f4f5",
+          "ratio": 7.02,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 1440: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 1440: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#71717b",
+          "bg": "#ffffff",
+          "ratio": 4.83,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 1440: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#e5ecfd",
+          "ratio": 6.52,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#093084",
+          "bg": "#e5ecfd",
+          "ratio": 10.04,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#0b3ca8",
+          "bg": "#e5ecfd",
+          "ratio": 7.97,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#e5ecfd",
+          "ratio": 6.52,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "blue-accent at 1440: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#52525c",
+          "bg": "#e5ecfd",
+          "ratio": 6.52,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#093084",
+          "bg": "#e5ecfd",
+          "ratio": 10.04,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#0b3ca8",
+          "bg": "#e5ecfd",
+          "ratio": 7.97,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#52525c",
+          "bg": "#e5ecfd",
+          "ratio": 6.52,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 375: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#615f5c",
+          "bg": "#f5f3ee",
+          "ratio": 5.74,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 375: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#615f5c",
+          "bg": "#f5f3ee",
+          "ratio": 5.74,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 375: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#666461",
+          "bg": "#fffdf8",
+          "ratio": 5.8,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#666461",
+          "bg": "#fffdf8",
+          "ratio": 5.8,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 375: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#666461",
+          "bg": "#fffdf8",
+          "ratio": 5.8,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#666461",
+          "bg": "#fffdf8",
+          "ratio": 5.8,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 375: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#615f5c",
+          "bg": "#fde9e0",
+          "ratio": 5.43,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#672104",
+          "bg": "#fde9e0",
+          "ratio": 9.97,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#832a05",
+          "bg": "#fde9e0",
+          "ratio": 7.79,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#615f5c",
+          "bg": "#fde9e0",
+          "ratio": 5.43,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 375: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#615f5c",
+          "bg": "#fde9e0",
+          "ratio": 5.43,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#672104",
+          "bg": "#fde9e0",
+          "ratio": 9.97,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#832a05",
+          "bg": "#fde9e0",
+          "ratio": 7.79,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#615f5c",
+          "bg": "#fde9e0",
+          "ratio": 5.43,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 1440: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#615f5c",
+          "bg": "#f5f3ee",
+          "ratio": 5.74,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 1440: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#615f5c",
+          "bg": "#f5f3ee",
+          "ratio": 5.74,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 1440: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#666461",
+          "bg": "#fffdf8",
+          "ratio": 5.8,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#666461",
+          "bg": "#fffdf8",
+          "ratio": 5.8,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 1440: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#666461",
+          "bg": "#fffdf8",
+          "ratio": 5.8,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#666461",
+          "bg": "#fffdf8",
+          "ratio": 5.8,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 1440: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#615f5c",
+          "bg": "#fde9e0",
+          "ratio": 5.43,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#672104",
+          "bg": "#fde9e0",
+          "ratio": 9.97,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#832a05",
+          "bg": "#fde9e0",
+          "ratio": 7.79,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#615f5c",
+          "bg": "#fde9e0",
+          "ratio": 5.43,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "light at 1440: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#615f5c",
+          "bg": "#fde9e0",
+          "ratio": 5.43,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#672104",
+          "bg": "#fde9e0",
+          "ratio": 9.97,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#832a05",
+          "bg": "#fde9e0",
+          "ratio": 7.79,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#615f5c",
+          "bg": "#fde9e0",
+          "ratio": 5.43,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 375: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#abafb4",
+          "bg": "#151921",
+          "ratio": 7.98,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 375: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#abafb4",
+          "bg": "#151921",
+          "ratio": 7.98,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 375: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#8f9398",
+          "bg": "#0b0f17",
+          "ratio": 6.21,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#8f9398",
+          "bg": "#0b0f17",
+          "ratio": 6.21,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 375: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#8f9398",
+          "bg": "#0b0f17",
+          "ratio": 6.21,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#8f9398",
+          "bg": "#0b0f17",
+          "ratio": 6.21,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 375: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#abafb4",
+          "bg": "#0f272b",
+          "ratio": 7.08,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#20b2a0",
+          "bg": "#0f272b",
+          "ratio": 5.9,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#20b2a0",
+          "bg": "#0f272b",
+          "ratio": 5.9,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#abafb4",
+          "bg": "#0f272b",
+          "ratio": 7.08,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 375: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#abafb4",
+          "bg": "#0f272b",
+          "ratio": 7.08,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#20b2a0",
+          "bg": "#0f272b",
+          "ratio": 5.9,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#20b2a0",
+          "bg": "#0f272b",
+          "ratio": 5.9,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#abafb4",
+          "bg": "#0f272b",
+          "ratio": 7.08,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 1440: the wishlist shows one missing-photo \"?\"",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#abafb4",
+          "bg": "#151921",
+          "ratio": 7.98,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 1440: the \"?\" is 4.5:1 or better",
+      "detail": [
+        {
+          "text": "?",
+          "fg": "#abafb4",
+          "bg": "#151921",
+          "ratio": 7.98,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 1440: the policy page has its Home and Contact us links",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#8f9398",
+          "bg": "#0b0f17",
+          "ratio": 6.21,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#8f9398",
+          "bg": "#0b0f17",
+          "ratio": 6.21,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 1440: Home and Contact us are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Home",
+          "fg": "#8f9398",
+          "bg": "#0b0f17",
+          "ratio": 6.21,
+          "need": 4.5
+        },
+        {
+          "text": "Contact us",
+          "fg": "#8f9398",
+          "bg": "#0b0f17",
+          "ratio": 6.21,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 1440: the applied coupon shows its words",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#abafb4",
+          "bg": "#0f272b",
+          "ratio": 7.08,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#20b2a0",
+          "bg": "#0f272b",
+          "ratio": 5.9,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#20b2a0",
+          "bg": "#0f272b",
+          "ratio": 5.9,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#abafb4",
+          "bg": "#0f272b",
+          "ratio": 7.08,
+          "need": 4.5
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "dark at 1440: the applied coupon's words are 4.5:1 or better",
+      "detail": [
+        {
+          "text": "Coupon",
+          "fg": "#abafb4",
+          "bg": "#0f272b",
+          "ratio": 7.08,
+          "need": 4.5
+        },
+        {
+          "text": "CONTRAST10",
+          "fg": "#20b2a0",
+          "bg": "#0f272b",
+          "ratio": 5.9,
+          "need": 4.5
+        },
+        {
+          "text": "· −₹130",
+          "fg": "#20b2a0",
+          "bg": "#0f272b",
+          "ratio": 5.9,
+          "need": 4.5
+        },
+        {
+          "text": "Remove",
+          "fg": "#abafb4",
+          "bg": "#0f272b",
+          "ratio": 7.08,
+          "need": 4.5
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "setup: coupon CONTRAST10 inserted into the local DB (removed afterwards)",
+    "live release back to rel_90423d83aae33bb2; coupon CONTRAST10 removed"
+  ],
+  "screenshots": [
+    {
+      "name": "x-fixed-pairs/no-brand-pulse-wishlist-375",
+      "bytes": 14680
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-pulse-policy-375",
+      "bytes": 14251
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-pulse-coupon-375",
+      "bytes": 8202
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-pulse-wishlist-1440",
+      "bytes": 2593
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-pulse-policy-1440",
+      "bytes": 3004
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-pulse-coupon-1440",
+      "bytes": 2702
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-glow-wishlist-375",
+      "bytes": 14795
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-glow-policy-375",
+      "bytes": 14355
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-glow-coupon-375",
+      "bytes": 8202
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-glow-wishlist-1440",
+      "bytes": 2742
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-glow-policy-1440",
+      "bytes": 3505
+    },
+    {
+      "name": "x-fixed-pairs/no-brand-glow-coupon-1440",
+      "bytes": 2993
+    },
+    {
+      "name": "x-fixed-pairs/pulse-brand-wishlist-375",
+      "bytes": 14287
+    },
+    {
+      "name": "x-fixed-pairs/pulse-brand-policy-375",
+      "bytes": 13723
+    },
+    {
+      "name": "x-fixed-pairs/pulse-brand-coupon-375",
+      "bytes": 9451
+    },
+    {
+      "name": "x-fixed-pairs/pulse-brand-wishlist-1440",
+      "bytes": 2891
+    },
+    {
+      "name": "x-fixed-pairs/pulse-brand-policy-1440",
+      "bytes": 2690
+    },
+    {
+      "name": "x-fixed-pairs/pulse-brand-coupon-1440",
+      "bytes": 2648
+    },
+    {
+      "name": "x-fixed-pairs/blue-accent-wishlist-375",
+      "bytes": 14822
+    },
+    {
+      "name": "x-fixed-pairs/blue-accent-policy-375",
+      "bytes": 14299
+    },
+    {
+      "name": "x-fixed-pairs/blue-accent-coupon-375",
+      "bytes": 8936
+    },
+    {
+      "name": "x-fixed-pairs/blue-accent-wishlist-1440",
+      "bytes": 2756
+    },
+    {
+      "name": "x-fixed-pairs/blue-accent-policy-1440",
+      "bytes": 2755
+    },
+    {
+      "name": "x-fixed-pairs/blue-accent-coupon-1440",
+      "bytes": 2868
+    },
+    {
+      "name": "x-fixed-pairs/light-wishlist-375",
+      "bytes": 16871
+    },
+    {
+      "name": "x-fixed-pairs/light-policy-375",
+      "bytes": 16123
+    },
+    {
+      "name": "x-fixed-pairs/light-coupon-375",
+      "bytes": 9541
+    },
+    {
+      "name": "x-fixed-pairs/light-wishlist-1440",
+      "bytes": 3205
+    },
+    {
+      "name": "x-fixed-pairs/light-policy-1440",
+      "bytes": 3690
+    },
+    {
+      "name": "x-fixed-pairs/light-coupon-1440",
+      "bytes": 2968
+    },
+    {
+      "name": "x-fixed-pairs/dark-wishlist-375",
+      "bytes": 14715
+    },
+    {
+      "name": "x-fixed-pairs/dark-policy-375",
+      "bytes": 13915
+    },
+    {
+      "name": "x-fixed-pairs/dark-coupon-375",
+      "bytes": 8689
+    },
+    {
+      "name": "x-fixed-pairs/dark-wishlist-1440",
+      "bytes": 2702
+    },
+    {
+      "name": "x-fixed-pairs/dark-policy-1440",
+      "bytes": 2682
+    },
+    {
+      "name": "x-fixed-pairs/dark-coupon-1440",
+      "bytes": 3061
+    }
+  ]
+}
