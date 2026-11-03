@@ -34,7 +34,8 @@ const I = await import("../lib/platform/identity.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { db } = await import("../lib/db.js");
 const { handleStorefrontPut } = await import("../lib/admin/cms-api.js");
-const { getContentPage, validatePageSections } = await import("../lib/cms/store.js");
+const pageStore = await import("../lib/cms/store.js");
+const { getContentPage, validatePageSections } = pageStore;
 const { sanitizeHtml } = await import("../lib/sanitize.js");
 const { normalizePageSections } = await import("../lib/cms/schemas.js");
 const { componentFor } = await import("../lib/cms/registry.js");
@@ -316,6 +317,17 @@ await t("a question number counts the rows on screen, including the blank ones t
   const res = await save("faq-rows", sent);
   eq(issuesOf(res).map((i) => i.field), ["items.1.a"], "the server's index is into what was sent:");
   eq(shown(res), ["section 1, question 3: answer required"], "the banner's number is the row on screen:");
+});
+
+await t("two sections sent with the same id: each issue names the id its own section would be saved under", () => {
+  const { checkPageSections } = pageStore;
+  const { issues, value } = checkPageSections([
+    { id: "sec_same1", kind: "image", src: "", alt: "" },
+    { id: "sec_same1", kind: "image", src: "", alt: "" },
+  ]);
+  eq(issues.map((i) => i.sectionId), value.map((s) => s.id), "issue ids are the saved ids:");
+  eq(issues[0].sectionId, "sec_same1", "the first keeps its id:");
+  ok(issues[1].sectionId !== "sec_same1", `the second gets its own: ${issues[1].sectionId}`);
 });
 
 await t("no refusal anywhere in this suite's server messages carries a position", () => {

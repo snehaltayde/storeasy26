@@ -1,0 +1,54 @@
+{
+  "when": "2026-11-03T09:00:50.137Z",
+  "base": "http://localhost:3164",
+  "log": [
+    [
+      "login status",
+      200
+    ],
+    [
+      "page create",
+      200
+    ],
+    [
+      "D1 page banner",
+      [
+        "Couldn't save",
+        "section 2: add a heading or some text, or remove this section.",
+        "section 3: choose an image, or remove this section.",
+        "section 4: saving would lose these words: \"<500 and >\". This usually comes from < or > signs. Reword them or remove them, then save again."
+      ]
+    ],
+    [
+      "D2 scrolled to",
+      "pe-sec-sec_dc4cc386"
+    ],
+    [
+      "D2 scrollY",
+      466
+    ],
+    [
+      "D3 banner after move",
+      [
+        "Couldn't save",
+        "section 3: add a heading or some text, or remove this section.",
+        "section 2: choose an image, or remove this section.",
+        "section 4: saving would lose these words: \"<500 and >\". This usually comes from < or > signs. Reword them or remove them, then save again."
+      ]
+    ]
+  ],
+  "shots": [
+    [
+      "D1-page-editor-three-issues",
+      87912
+    ],
+    [
+      "D2-page-editor-line-scrolls-to-image",
+      42387
+    ],
+    [
+      "D3-page-editor-renumbered-after-move",
+      91204
+    ]
+  ]
+}

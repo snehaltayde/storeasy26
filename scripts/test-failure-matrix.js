@@ -8,12 +8,23 @@
 // a founder can act on, and a database failure must never come back as a
 // validation problem (422, or anything carrying an issue list).
 //   pnpm test:failure-matrix
-import { readFile, rm, chmod, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { readFile, rm, chmod, writeFile, readdir } from "node:fs/promises";
+import { registerHooks } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
+
+// Route files use the "@/" alias; resolve it the way test:media-upload does,
+// so one /api/admin route runs for real below.
+registerHooks({
+  resolve(spec, ctx, next) {
+    if (spec.startsWith("@/")) return next(pathToFileURL(join(root, `${spec.slice(2)}.js`)).href, ctx);
+    if (/^next\/(server|headers|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
+    return next(spec, ctx);
+  },
+});
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -106,6 +117,8 @@ const breakReads = (c, table) => c.executeMultiple(`ALTER TABLE ${table} RENAME 
   const br = await build(FILES.broken);
   await breakReads(br, "cms_blocks");
   await breakReads(br, "cms_pages");
+  // a delete that "succeeds" touching nothing, so only the read after it can tell
+  await br.execute("CREATE TRIGGER blocks_delete_nothing INSTEAD OF DELETE ON cms_blocks BEGIN SELECT 1; END");
   // links: content reads fine, but the catalog lookup behind link checks fails
   const ln = await build(FILES.links);
   await ln.execute({ sql: "INSERT INTO cms_blocks (key, value, updated_at, revision, schema_version) VALUES ('hero', ?, '2026-01-01', 1, 1)", args: [JSON.stringify({ title: "Hi", primary: { label: "Shop", href: "/collections/gear" } })] });
@@ -253,6 +266,7 @@ row("save", "templates table missing (save as template)", () => storefront("old"
 row("save", "templates table missing (start from a template)", () => storefront("old", { useTemplate: "tpl_any" }), { status: 503, code: "DATABASE_NOT_READY", cls: "infrastructure" });
 // before DOC-04 this read failure came back as 409 "edited by someone else"
 row("save", "reading the current version fails (block)", () => storefront("broken", { block: "hero", value: { title: "Typed" }, revision: 1 }), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" });
+row("save", "reading the current version fails (reset to default)", () => storefront("broken", { block: "hero", reset: true, revision: 3 }), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" });
 row("save", "reading the current version fails (page)", () => storefront("broken", { page: { slug: "p", title: "P", sections: [{ kind: "text", heading: "H", body: ["x"] }] }, revision: 1 }), { status: 503, code: "DATABASE_ERROR", cls: "infrastructure" });
 row("save", "a bug on our side", () => storefront("ok", { page: { get slug() { throw new TypeError("boom: a bug of ours"); }, title: "x" }, revision: null }), { status: 500, code: "INTERNAL_ERROR", cls: "infrastructure" });
 row("load", "editor load when the database doesn't answer", () => storefrontGet("down"), { status: 503, code: "DATABASE_UNAVAILABLE", cls: "infrastructure" });
@@ -340,6 +354,7 @@ await t("client: no connection → a plain message, not a validation list", asyn
   }, () => api.saveBlock("hero", { title: "x" }, 1));
   eq([r.ok, r.code], [false, "NETWORK"], "result:");
   readable(r.error, "network");
+  ok(/nothing was saved/.test(r.error) && /still here/.test(r.error) && !/network error|failed to fetch/i.test(r.error), `says what happened to the edits, in plain words: "${r.error}"`);
   ok(!r.errors && !r.issues, "no validation list:");
 });
 await t("client: a gateway's HTML error page → a plain message with the status", async () => {
@@ -359,6 +374,84 @@ await t("client: a 422 keeps the structured issues and words each one", async ()
   const r = await withFetch(async () => ({ ok: false, status: served.status, json: async () => served.body }), () => api.saveBlock("nav_header", [], null));
   eq(r.issues, served.body.issues, "issues:");
   eq(r.errors, ["Header menu, item 1: needs a label and a path/URL"], "worded on the client, from the field path:");
+});
+
+// --- the rest of the console API ----------------------------------------------------
+console.log("— the other /api/admin routes");
+await t("a real /api/admin route (upsells) answers a database failure 503 with a plain message, not its 422 catch-all", async () => {
+  const route = await import("../app/api/admin/upsells/route.js");
+  const res = await route.POST({
+    cookies: { get: (n) => (n === "_admin" ? { value: OWNER } : undefined) },
+    headers: { get: (k) => ({ host: `${T.down.id}.test` })[k.toLowerCase()] ?? null },
+    json: async () => ({ kind: "cart_upsell", targetHandles: ["tee"], title: "Pairs well" }),
+  });
+  const body = await res.json();
+  if (process.env.FM_SHOW) console.log(`   → ${res.status} ${JSON.stringify(body).slice(0, 260)}`);
+  check({ status: res.status, body }, { status: 503, code: "DATABASE_UNAVAILABLE", cls: "infrastructure", label: "upsells" });
+});
+await t("every catch-all in an /api/admin route checks for a database failure first", async () => {
+  const files = [];
+  const walk = async (dir) => {
+    for (const e of await readdir(join(root, dir), { withFileTypes: true })) {
+      if (e.isDirectory()) await walk(`${dir}/${e.name}`);
+      else if (e.name === "route.js") files.push(`${dir}/${e.name}`);
+    }
+  };
+  await walk("app/api/admin");
+  ok(files.length >= 30, `found the routes (${files.length}):`);
+  const missing = [];
+  let catches = 0;
+  for (const f of files) {
+    const lines = (await readFile(join(root, f), "utf8")).split("\n");
+    lines.forEach((line, i) => {
+      if (!/\} catch \(e\) \{\s*$/.test(line)) return;
+      catches++;
+      if (/infraResponse\(e\b/.test(lines[i + 1] || "")) return;
+      // a catch that already answers every error 5xx can't mislabel one as a 4xx
+      if (/status: 5\d\d \}/.test(lines.slice(i + 1, i + 4).join("\n")) && !/status: 4\d\d/.test(lines.slice(i + 1, i + 4).join("\n"))) return;
+      missing.push(`${f}:${i + 1}`);
+    });
+  }
+  ok(catches >= 20, `found the catch-alls (${catches}):`);
+  eq(missing, [], "catch-alls without the check:");
+});
+
+// --- the negative: no position text leaves the server ------------------------------
+await t("no save, preview or publish validator builds position text any more (\"Section 2 (banner): …\", \"section 1: …\")", async () => {
+  const files = ["lib/cms/validate.js", "lib/cms/store.js", "lib/cms/templates-store.js", "lib/releases.js", "lib/admin/cms-api.js", "lib/admin/releases-api.js"];
+  const POSITION_TEXT = /[`"'](?:[Ss]ection|[Hh]ome section|Nav item|Accordion|question)\s+(?:\$\{|\d)|,\s*question \$\{/;
+  const found = [];
+  for (const f of files) {
+    (await readFile(join(root, f), "utf8")).split("\n").forEach((line, i) => {
+      if (!/^\s*\/\//.test(line) && POSITION_TEXT.test(line)) found.push(`${f}:${i + 1}: ${line.trim().slice(0, 90)}`);
+    });
+  }
+  eq(found, [], "position text in a server message:");
+});
+
+// --- unit: the wording an editor gets ---------------------------------------------------
+await t("worded for a screen that already names the block, a hero issue doesn't repeat \"Hero\"; elsewhere it does", () => {
+  const hero = issuesModule.issue({ documentId: "doc_home", sectionId: "hero", field: "title", code: "REQUIRED", message: "Hero title is required" });
+  eq(issuesModule.issueText(hero, { documentLabels: false }), "Hero title is required", "in the Designer's hero banner:");
+  eq(issuesModule.issueText(hero), "Hero: Hero title is required", "in a list of everything:");
+  const nav = issuesModule.issue({ documentId: "doc_footer", field: "items.1.children.0", code: "REQUIRED", message: "needs a label and a path/URL" });
+  eq(issuesModule.issueText(nav), "Footer menu, item 2, sub-item 1: needs a label and a path/URL", "a menu sub-item:");
+  const wrapped = new Error("release snapshot failed", { cause: Object.assign(new Error("disk"), { name: "LibsqlError", code: "SQLITE_IOERR" }) });
+  eq(issuesModule.infraKind(wrapped), "unavailable", "a wrapped driver error is seen through its cause:");
+  eq(issuesModule.infraKind(new Error("window end must be after window start")), null, "an ordinary error is not infrastructure:");
+});
+
+// --- unit: ids are stamped before checking --------------------------------------------
+await t("two sections sent with the same id: each issue names the id its own section is saved under", async () => {
+  const { validateBlock } = await import("../lib/cms/validate.js");
+  const r = validateBlock("home_sections", [
+    { id: "sec_dup1", kind: "banner", title: "", text: "", href: "/" },
+    { id: "sec_dup1", kind: "banner", title: "", text: "", href: "/" },
+  ]);
+  const named = r.issues.map((i) => i.sectionId);
+  eq(named[0], "sec_dup1", "first keeps its id:");
+  ok(named[1] !== "sec_dup1" && /^sec_/.test(named[1]), `second is minted its own: ${named}`);
+  eq(named, r.value.map((s) => s.id), "the ids the sections are saved under:");
 });
 
 // --- coverage of the matrix itself -----------------------------------------------------

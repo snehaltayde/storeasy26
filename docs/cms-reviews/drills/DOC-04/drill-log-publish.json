@@ -1,0 +1,26 @@
+{
+  "when": "2026-11-03T09:01:28.842Z",
+  "base": "http://localhost:3164",
+  "log": [
+    [
+      "login status",
+      200
+    ],
+    [
+      "D6 save banner with dead link",
+      200
+    ],
+    [
+      "D6 publish issues",
+      [
+        "Section 3 (Banner / CTA): \"/collections/not-a-collection\" points at a collection that doesn't exist in the catalog"
+      ]
+    ]
+  ],
+  "shots": [
+    [
+      "D6-publish-panel-issue-from-id",
+      88375
+    ]
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "when": "2026-11-03T09:01:08.969Z",
+  "base": "http://localhost:3164",
+  "log": [
+    [
+      "login status",
+      200
+    ],
+    [
+      "D4 designer banner",
+      [
+        "Couldn't save the homepage sections",
+        "Section 3 (Banner / CTA): needs a title or text"
+      ]
+    ],
+    [
+      "D5 selected",
+      "Banner / CTA"
+    ]
+  ],
+  "shots": [
+    [
+      "D4-designer-refusal",
+      80382
+    ],
+    [
+      "D5-designer-line-selects-section",
+      80267
+    ]
+  ]
+}
