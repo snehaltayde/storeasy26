@@ -14,7 +14,7 @@ import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { resolveBrand, brandCssVars } from "@/lib/brand";
-import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolvedContentPageList, resolvedSurfaceTemplates, contentSource } from "@/lib/content/resolve";
+import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolvedContentPageList, resolvedSurfaceTemplates, contentSource, isContentUnavailable } from "@/lib/content/resolve";
 import { kitAttr } from "@/lib/themes/kits";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
@@ -127,8 +127,8 @@ async function chromeData() {
         footerVariant: surfaces.footer || "columns",
       };
     });
-  } catch {
-    return {
+  } catch (e) {
+    const neutral = {
       name: "Store",
       logo: { text1: "Store", text2: "" },
       footerTagline: "",
@@ -146,8 +146,18 @@ async function chromeData() {
       headerVariant: "standard",
       footerVariant: "columns",
     };
+    // P2-VGATE: published content can't be read (a release that can't be
+    // read, or a v4 release before its reader exists). The page itself shows
+    // the error surface; the chrome around it must show nothing of the store.
+    // Empty nav lists, not null: null makes Header and Footer list the
+    // catalog's collections instead.
+    if (isContentUnavailable(e)) return { ...neutral, navHeader: [], navFooter: [] };
+    return neutral;
   }
 }
+
+// The maintenance curtain's name, brand and theme when they can't be read.
+const NEUTRAL_CURTAIN = ["Store", null, null];
 
 async function initialCart() {
   try {
@@ -209,14 +219,24 @@ export default async function RootLayout({ children }) {
     const jar = await cookies();
     const bypass = jar.get("_admin") || jar.get("_platform") || jar.get("_mx");
     if (!bypass) {
-      const [name, brand, theme] = await tfetch(async () => [siteName(), resolvedBrand(), resolvedTheme()]).catch(() => ["Store", null, null]);
-      const brandCss = brand ? brandCssVars(resolveBrand(brand)) : "";
+      // P2-VGATE: brand and theme are awaited inside tfetch. Before, the array
+      // held their promises, so a ContentUnavailableError (a v4 release
+      // included) never reached this catch: the curtain showed the store's
+      // name, a brand built from a promise, and the rejection went unhandled.
+      // Now any failure to read them shows the neutral curtain.
+      const [name, brand, theme] = await tfetch(async () => [siteName(), await resolvedBrand(), await resolvedTheme()]).catch(() => NEUTRAL_CURTAIN);
+      // Fix round 1: the curtain's kit is now the store's real one (a glow
+      // store gets the light hero), so the accent is corrected against that
+      // kit, and a store with no brand still gets the kit's own correction,
+      // as chromeData does.
+      const kit = kitAttr(theme);
+      const brandCss = brandCssVars(brand ? resolveBrand(brand) : null, { kit });
       return (
-        <html lang="en" data-kit={kitAttr(theme)} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
+        <html lang="en" data-kit={kit} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
           {brandCss ? <style id="brand-vars" precedence="default" href="brand-vars">{brandCss}</style> : null}
           <body className="flex min-h-full flex-col items-center justify-center bg-hero px-6 text-center text-hero-fg antialiased">
-            <p className="inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-accent-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent-400" /> Scheduled maintenance
+            <p className="inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-sf-hero-accent">
+              <span className="h-1.5 w-1.5 rounded-full bg-sf-hero-accent" /> Scheduled maintenance
             </p>
             <h1 className="mt-5 max-w-xl font-display text-4xl font-extrabold tracking-tight">{name} will be right back.</h1>
             <p className="mt-4 max-w-md text-hero-muted">

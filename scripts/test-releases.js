@@ -3,12 +3,50 @@
 // drafts, publish validation (required slots, dead catalog links, brand
 // contrast), scheduled publish through the real jobs queue, and preview
 // token expiry/tamper/tenant-binding.
+// P2-VGATE adds the reader version gate: v1-v3 read as before (compared with
+// outputs recorded from a6d028e), v4 fails closed, anything else is an error,
+// one statement per request for pointer plus release (request-cache stub),
+// listReleases hiding lost-race rows, and the storefront layout's chrome and
+// maintenance page rendered (Next's SWC) on ContentUnavailableError.
 //   pnpm test:releases
+// request-cache must load before any app module that imports react.
+import "./support/request-cache.js";
 import { readFile, rm } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { createRequire, registerHooks } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { dirname, join, relative, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(here, "..");
+
+// One simulated request at a time for next/headers (the rendered layout).
+// Outside one, headers() and cookies() throw, as Next's own do.
+const HEADERS_STUB =
+  "data:text/javascript," +
+  encodeURIComponent(`
+const req = () => {
+  const r = globalThis.__vgateRequest;
+  if (!r) throw new Error("next/headers was called outside a request");
+  return r;
+};
+export async function headers() {
+  const r = req();
+  return { get: (n) => (String(n).toLowerCase() === "host" ? r.host : null) };
+}
+export async function cookies() {
+  const r = req();
+  return { get: (n) => (Object.hasOwn(r.cookies, n) ? { name: n, value: r.cookies[n] } : undefined) };
+}
+`);
+registerHooks({
+  resolve(spec, ctx, next) {
+    if (spec === "next/headers") return { url: HEADERS_STUB, shortCircuit: true, format: "module" };
+    if (spec.startsWith("@/")) return next(pathToFileURL(join(ROOT, spec.slice(2) + (/\.\w+$/.test(spec) ? "" : ".js"))).href, ctx);
+    if (/^next\/(server|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
+    return next(spec, ctx);
+  },
+});
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -18,7 +56,9 @@ process.env.PLATFORM_DB_TOKEN = "";
 process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
-const dbs = [".test-rel-default.db", ".test-rel-platform.db", ".test-rel-t1.db"];
+process.env.PLATFORM_SITE_HOSTS = "";
+
+const dbs = [".test-rel-default.db", ".test-rel-platform.db", ".test-rel-t1.db", ".test-rel-vg.db", ".test-rel-vgbare.db", ".test-rel-vgl.db"];
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 
 const C = await import("../lib/platform/control.js");
@@ -267,14 +307,16 @@ await t("publishReleaseById on an unknown id fails (job dead-letters, pointer sa
 console.log("— S53 (0B-1): reviewed candidate binding + no partial snapshots");
 
 await t("expectedDraftHash binds the publish: mismatch is DRAFTS_CHANGED, match publishes", async () => {
-  const before = (await inTenant(() => R.listReleases({ limit: 50 }))).releases.length;
+  // every row, not listReleases: that hides a never-published, unscheduled row (P2-VGATE)
+  const rowCount = async () => Number((await inTenant(() => libsql.execute("SELECT count(*) AS n FROM releases"))).rows[0].n);
+  const before = await rowCount();
   try {
     await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" }, expectedDraftHash: "sha-of-something-older" }));
     throw new Error("expected DRAFTS_CHANGED");
   } catch (e) {
     if (e.code !== "DRAFTS_CHANGED") throw e;
   }
-  const after = (await inTenant(() => R.listReleases({ limit: 50 }))).releases.length;
+  const after = await rowCount();
   if (after !== before) throw new Error("a refused publish must not create a release row");
   const snap = await inTenant(() => R.snapshotContent());
   const r = await inTenant(() => R.createRelease({ actor: { kind: "merchant", id: "u1" }, expectedDraftHash: snap.hash }));
@@ -470,6 +512,424 @@ await t("approval: binds to the exact candidate; a draft edit silently withdraws
   await inTenant(() => A.approveCandidate({ expectedHash: snap2.hash, actor: "merchant:reviewer2" }));
   eq((await inTenant(A.currentApproval))?.actor, "merchant:reviewer2");
 });
+
+// --- P2-VGATE: the reader version gate -----------------------------------------
+console.log("— P2-VGATE: the reader version gate");
+{
+  const Res = await import("../lib/content/resolve.js");
+  const { runRequest, watchStatements } = await import("./support/request-cache.js");
+  const { currentDatabase } = await import("../lib/db.js");
+
+  // "vg": a store whose live release this block swaps (v1..v4, broken ones).
+  // "vgl": a legacy store with a good v3 release, a brand and a theme.
+  // "vgbare": no release tables at all (pre-migration).
+  const ok = (v, m) => {
+    if (!v) throw new Error(m);
+  };
+  const same = (got, want, m = "") => {
+    if (JSON.stringify(got) !== JSON.stringify(want)) throw new Error(`${m} expected ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
+  };
+  const BASE_CONFIG = (id) => ({ site: { name: `VGate ${id} Store` }, brand: { accent: "#7c3aed" }, theme: { kit: "glow", version: 1 } });
+  const putTenant = (id, file, config = BASE_CONFIG(id)) =>
+    C.upsertTenant({ id, name: `VGate ${id}`, domains: [`${id}.test`], dbUrl: `file:${file}`, config, secrets: { order_link_secret: `${id}-secret` } });
+  const tenantDb = async (id, file, { migrate = true } = {}) => {
+    await putTenant(id, file);
+    const T = await C.getTenant(id);
+    await withTenant(T, async () => {
+      await libsql.executeMultiple(schema);
+      if (migrate) await runMigrations(libsql, tenantMigrations);
+      // a catalog, so the collections scroller has something to list
+      await libsql.execute("INSERT INTO collections (id, handle, title, synced_at) VALUES ('gid://shopify/Collection/77', 'vg-serums', 'VG Serums', '2026-01-01')");
+      await libsql.execute("INSERT INTO products (id, handle, title, price_min, price_max, currency, available, synced_at) VALUES ('gid://shopify/Product/77', 'vg-p', 'VG P', 100, 100, 'INR', 1, '2026-01-01')");
+      await libsql.execute("INSERT INTO collection_products (collection_id, product_id, position) VALUES ('gid://shopify/Collection/77', 'gid://shopify/Product/77', 0)");
+    });
+    return T;
+  };
+  const VG = await tenantDb("vg", ".test-rel-vg.db");
+  const VGL = await tenantDb("vgl", ".test-rel-vgl.db");
+  const VGBARE = await tenantDb("vgbare", ".test-rel-vgbare.db", { migrate: false });
+  const inVg = (fn) => withTenant(VG, fn);
+
+  // content: an object (stored canonical) or a raw string (stored as is)
+  let seq = 0;
+  const putLive = async (T, content, { id = `rel_vg_${++seq}`, published = true } = {}) => {
+    await withTenant(T, async () => {
+      await libsql.execute({
+        sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES (?, ?, ?, '', NULL, ?, NULL, ?)",
+        args: [id, typeof content === "string" ? content : R.stableStringify(content), `h_${id}`, new Date(Date.now() + seq).toISOString(), published ? new Date().toISOString() : null],
+      });
+      await libsql.execute({ sql: "UPDATE release_state SET live_release_id = ? WHERE id = 1", args: [id] });
+    });
+    return id;
+  };
+  const V3 = {
+    v: 3,
+    blocks: {
+      hero: { title: "VG live hero" },
+      announcement: { enabled: true, text: "VG live announcement" },
+      nav_header: [{ label: "VG Nav", href: "/collections/vg-serums" }],
+      nav_footer: [{ label: "VG Foot", href: "/about" }],
+      home_sections: [{ id: "sec_vg11", kind: "new", title: "VG new", limit: 4 }],
+    },
+    pages: [{ slug: "about", title: "About VG", description: "", sections: [], enabled: true }],
+    brand: { accent: "#7c3aed" },
+    theme: { kit: "glow", version: 1 },
+    product_overrides: [],
+    collection_pins: [],
+    placements: [],
+    redirects: [],
+  };
+  // a v4 row as P2-ATOM's writer will store it: a list of document versions
+  const V4 = { v: 4, list: { doc_header: "dv_1", doc_announcement: "dv_2" }, hash: "x" };
+  // every getter the storefront has, with arguments
+  const GETTERS = [
+    ["resolvedAnnouncement", []],
+    ["resolvedHero", []],
+    ["resolvedHomeSections", []],
+    ["resolvedNav", ["header"]],
+    ["resolvedNav", ["footer"]],
+    ["resolvedCollectionsIndex", []],
+    ["resolvedPdpExtras", []],
+    ["resolvedContentPage", ["about"]],
+    ["resolvedContentPageList", []],
+    ["resolvedBrand", []],
+    ["resolvedTheme", []],
+    ["resolvedSurfaceTemplates", []],
+    ["resolvedSurfaceTemplateFor", ["product", "gid://shopify/Product/77"]],
+    ["resolvedProductOverride", ["gid://shopify/Product/77"]],
+    ["resolvedCollectionPins", ["vg-serums"]],
+    ["resolvedPdpPairs", ["gid://shopify/Product/77"]],
+    ["resolvedCartUpsell", [[]]],
+    ["resolvedSlugRedirect", ["old"]],
+  ];
+  for (const [fn] of GETTERS) if (typeof Res[fn] !== "function") throw new Error(`resolve.js has no ${fn}: update this list`);
+
+  await t("v1, v2 and v3 releases: getLiveReleaseState, contentSource and every resolved* getter answer as a6d028e did", async () => {
+    // scripts/support/legacy-release-outputs.js was run inside an a6d028e
+    // checkout to record the fixture; this runs the same file here and now.
+    const out = join(ROOT, ".test-rel-legacy-outputs.json");
+    try {
+      const r = spawnSync(process.execPath, [join(here, "support/legacy-release-outputs.js"), out], { cwd: ROOT, encoding: "utf8", timeout: 60_000 });
+      if (r.status !== 0) throw new Error(`recorder failed: ${r.stderr || r.stdout}`);
+      const now = JSON.parse(await readFile(out, "utf8"));
+      const then = JSON.parse(await readFile(join(here, "fixtures/legacy-release-outputs.a6d028e.json"), "utf8"));
+      eq(Object.keys(now.fixtures).join(), "v1,v2,v3", "fixtures:");
+      for (const [name, rec] of Object.entries(now.fixtures)) {
+        // the one addition: release.v, the envelope version (P2-VGATE)
+        const rel = rec.getLiveReleaseState?.ok?.release;
+        if (!rel) throw new Error(`${name}: not live: ${JSON.stringify(rec.getLiveReleaseState)}`);
+        eq(rel.v, Number(name.slice(1)), `${name} release.v:`);
+        delete rel.v;
+        const want = then.fixtures[name];
+        eq(Object.keys(rec).length, Object.keys(want).length, `${name} outputs:`);
+        for (const k of Object.keys(want)) {
+          if (JSON.stringify(rec[k]) !== JSON.stringify(want[k])) throw new Error(`${name} ${k} differs from a6d028e:\n now  ${JSON.stringify(rec[k]).slice(0, 300)}\n then ${JSON.stringify(want[k]).slice(0, 300)}`);
+        }
+      }
+    } finally {
+      await rm(out, { force: true });
+    }
+  });
+
+  await t("a v4 release is live with v 4, contentSource throws ContentUnavailableError (READER_NOT_READY), and no getter returns anything", async () => {
+    const id = await putLive(VG, V4);
+    const s = await inVg(() => R.getLiveReleaseState());
+    eq(s.state, "live", "state:");
+    eq(s.release.v, 4, "release.v:");
+    eq(s.release.id, id, "release:");
+    const src = await inVg(() => Res.contentSource().then(() => null, (e) => e));
+    if (!(src instanceof Res.ContentUnavailableError)) throw new Error(`contentSource: expected ContentUnavailableError, got ${src ? src.message : "an answer"}`);
+    eq(src.detail?.code, "READER_NOT_READY", "detail.code:");
+    eq(Res.isContentUnavailable(src), true, "isContentUnavailable:");
+    for (const [fn, args] of GETTERS) {
+      const got = await inVg(() => Res[fn](...args).then((v) => ({ v }), (e) => ({ e })));
+      if (!got.e) throw new Error(`${fn}(${args.map((a) => JSON.stringify(a))}) answered ${JSON.stringify(got.v)?.slice(0, 200)} on a v4 release`);
+      if (fn !== "resolvedContentPageList" && !Res.isContentUnavailable(got.e)) throw new Error(`${fn}: threw ${got.e.message}, not ContentUnavailableError`);
+    }
+    // explicitly: the home page never falls back to DEFAULT_HOME_SECTIONS
+    const home = await inVg(() => Res.resolvedHomeSections().then((v) => v, (e) => e));
+    if (!Res.isContentUnavailable(home)) throw new Error(`resolvedHomeSections: ${JSON.stringify(home)}`);
+  });
+
+  await t("v0, v5, v99, '3' (a string), a missing v and content that is not an object are each state 'error', and the storefront fails closed", async () => {
+    const cases = [
+      ["v0", { ...V3, v: 0 }],
+      ["v5", { ...V3, v: 5 }],
+      ["v99", { ...V3, v: 99 }],
+      ["'3'", { ...V3, v: "3" }],
+      ["v 3.0001", { ...V3, v: 3.0001 }],
+      ["v true", { ...V3, v: true }],
+      ["no v", (({ v, ...rest }) => rest)(V3)],
+      ["v null", { ...V3, v: null }],
+      ["an array", "[1,2,3]"],
+      ["an array with v", Object.assign([], { v: 3 })],
+      ["a string", '"v3"'],
+      ["a number", "3"],
+      ["null", "null"],
+      ["not JSON", "{v:3"],
+    ];
+    for (const [label, content] of cases) {
+      await putLive(VG, content);
+      const s = await inVg(() => R.getLiveReleaseState());
+      if (s.state !== "error") throw new Error(`${label}: expected error, got ${s.state} (v ${JSON.stringify(s.release?.v)})`);
+      const e = await inVg(() => Res.contentSource().then(() => null, (x) => x));
+      if (!Res.isContentUnavailable(e)) throw new Error(`${label}: contentSource did not fail closed`);
+    }
+  });
+
+  await t("request-cache stub: 8 getters in parallel in one request read pointer plus release in ONE statement; a pointer with no row is still 'error'; no release tables is still 'none'", async () => {
+    await putLive(VG, V3);
+    const isReleaseRead = (sql) => /release_state|"releases"|\breleases\b/i.test(sql);
+    const eight = () =>
+      Promise.all([
+        Res.resolvedAnnouncement(),
+        Res.resolvedHero(),
+        Res.resolvedHomeSections(),
+        Res.resolvedNav("header"),
+        Res.resolvedNav("footer"),
+        Res.resolvedBrand(),
+        Res.resolvedTheme(),
+        Res.resolvedSurfaceTemplates(),
+      ]);
+    const one = await inVg(() => runRequest(() => watchStatements(currentDatabase().libsql, eight)));
+    const reads = one.statements.filter(isReleaseRead);
+    eq(reads.length, 1, `release statements in one request (${JSON.stringify(reads)}):`);
+    if (!/release_state/i.test(reads[0]) || !/join/i.test(reads[0])) throw new Error(`not one joined read: ${reads[0]}`);
+    eq(one.result[1].title, "VG live hero", "the getters read the live release:");
+    // a second request reads again (the memo is per request), and the stub
+    // is what makes the count: with no request scope every getter reads
+    const two = await inVg(() => runRequest(() => watchStatements(currentDatabase().libsql, eight)));
+    eq(two.statements.filter(isReleaseRead).length, 1, "second request:");
+    const bare = await inVg(() => watchStatements(currentDatabase().libsql, eight));
+    eq(bare.statements.filter(isReleaseRead).length, 8, "outside runRequest (no memo):");
+
+    // a pointer naming no row: error, one statement
+    await inVg(() => libsql.execute("UPDATE release_state SET live_release_id = 'rel_vg_ghost' WHERE id = 1"));
+    const ghost = await inVg(() => runRequest(() => watchStatements(currentDatabase().libsql, () => R.getLiveReleaseState())));
+    eq(ghost.result.state, "error", "pointer with no row:");
+    eq(ghost.statements.filter(isReleaseRead).length, 1, "pointer with no row, statements:");
+    const ghostSrc = await inVg(() => runRequest(() => Res.contentSource().then(() => null, (e) => e)));
+    if (!Res.isContentUnavailable(ghostSrc)) throw new Error("pointer with no row: contentSource did not fail closed");
+    // no pointer: none
+    await inVg(() => libsql.execute("UPDATE release_state SET live_release_id = NULL WHERE id = 1"));
+    eq((await inVg(() => runRequest(() => R.getLiveReleaseState()))).state, "none", "no pointer:");
+    // no release tables: none (drafts serve, as before the first publish)
+    const noTables = await withTenant(VGBARE, () => runRequest(() => R.getLiveReleaseState()));
+    if (noTables.state !== "none") throw new Error(`no release tables: expected none, got ${noTables.state} (${noTables.error || ""})`);
+    eq((await withTenant(VGBARE, () => runRequest(() => Res.contentSource()))).mode, "draft", "no release tables, contentSource:");
+  });
+
+  await t("listReleases hides a never-published, unscheduled row but lists the live row even with published_at null, plus past and scheduled rows", async () => {
+    await inVg(async () => {
+      await libsql.execute("DELETE FROM releases");
+      const row = (id, at, scheduled, published) =>
+        libsql.execute({
+          sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES (?, ?, ?, '', NULL, ?, ?, ?)",
+          args: [id, R.stableStringify(V3), `h_${id}`, at, scheduled, published],
+        });
+      await row("rel_l_past", "2026-01-01T00:00:00.000Z", null, "2026-01-01T00:00:01.000Z");
+      await row("rel_l_sched", "2026-01-02T00:00:00.000Z", "2099-01-01T00:00:00.000Z", null);
+      await row("rel_l_lost", "2026-01-03T00:00:00.000Z", null, null);
+      await row("rel_l_live", "2026-01-04T00:00:00.000Z", null, null); // flipped, not yet stamped
+      await libsql.execute("UPDATE release_state SET live_release_id = 'rel_l_live' WHERE id = 1");
+    });
+    const list = await inVg(() => R.listReleases({ limit: 50 }));
+    eq(list.releases.map((r) => r.id).join(), "rel_l_live,rel_l_sched,rel_l_past", "listed:");
+    eq(list.live, "rel_l_live", "live:");
+    // and with no pointer at all, the unstamped rows are both hidden
+    await inVg(() => libsql.execute("UPDATE release_state SET live_release_id = NULL WHERE id = 1"));
+    eq((await inVg(() => R.listReleases({ limit: 50 }))).releases.map((r) => r.id).join(), "rel_l_sched,rel_l_past", "no pointer:");
+  });
+
+  // ---- the storefront layout, rendered (Next's SWC, as test-preview-experiments does) ----
+  const require = createRequire(import.meta.url);
+  const React = require("react");
+  const { renderToStaticMarkup } = require("react-dom/server");
+  const swc = require("next/dist/build/swc/index.js");
+  await swc.loadBindings();
+  const compile = async (file) =>
+    (
+      await swc.transform(await readFile(file, "utf8"), {
+        filename: file,
+        jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" },
+        module: { type: "commonjs" },
+      })
+    ).code;
+  const toFile = (from, id) => {
+    const p = id.startsWith("@/") ? join(ROOT, id.slice(2)) : resolve(dirname(from), id);
+    return p.endsWith(".js") ? p : `${p}.js`;
+  };
+  const isJsx = (file) => /^(app|components)\//.test(relative(ROOT, file));
+  async function loadJsx(file, stubs = {}, seen = new Map()) {
+    if (seen.has(file)) return seen.get(file);
+    const mod = { exports: {} };
+    seen.set(file, mod.exports);
+    const code = await compile(file);
+    const deps = new Map();
+    for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
+      if (id in stubs || deps.has(id)) continue;
+      if (id === "react" || id === "react/jsx-runtime") continue;
+      if (id.startsWith("@/") || id.startsWith(".")) {
+        const target = toFile(file, id);
+        deps.set(id, isJsx(target) ? await loadJsx(target, stubs, seen) : await import(pathToFileURL(target).href));
+      } else if (id === "next/headers") deps.set(id, await import("next/headers"));
+      else deps.set(id, require(id));
+    }
+    const req = (id) => {
+      if (id in stubs) return stubs[id];
+      if (id === "react") return React;
+      if (id === "react/jsx-runtime") return require("react/jsx-runtime");
+      if (deps.has(id)) return deps.get(id);
+      throw new Error(`unresolved import "${id}" in ${relative(ROOT, file)}`);
+    };
+    new Function("require", "module", "exports", code)(req, mod, mod.exports);
+    seen.set(file, mod.exports);
+    return mod.exports;
+  }
+  const nothing = { __esModule: true, default: () => null };
+  const passthrough = ({ children }) => React.createElement(React.Fragment, null, children);
+  const font = () => ({ variable: "" });
+  const STUBS = {
+    "next/font/google": { Geist: font, Geist_Mono: font, Fraunces: font },
+    "../globals.css": {},
+    "next/link": { __esModule: true, default: ({ href, children, prefetch, ...rest }) => React.createElement("a", { href, ...rest }, children) },
+    "./SearchBox": nothing,
+    "./cart/CartButton": nothing,
+    "@/components/cart/CartContext": { CartProvider: passthrough },
+    "@/components/cart/CartDrawer": nothing,
+    "@/components/ServiceWorkerRegister": nothing,
+    "@/components/analytics/ConsentBanner": nothing,
+    "@/components/analytics/Pixels": nothing,
+    "@/components/analytics/ErrorReporter": nothing,
+    "@/components/site/SiteNav": nothing,
+    "@/components/preview/PreviewBridge": nothing,
+  };
+  const Layout = (await loadJsx(join(ROOT, "app/(storefront)/layout.js"), STUBS)).default;
+  // the same layout, with one chrome getter failing for a reason that is not
+  // ContentUnavailableError (a bug of ours): "other chrome failures"
+  const LayoutBuggy = (
+    await loadJsx(join(ROOT, "app/(storefront)/layout.js"), {
+      ...STUBS,
+      "@/lib/content/resolve": {
+        ...Res,
+        resolvedSurfaceTemplates: async () => {
+          throw new TypeError("boom: a bug of ours");
+        },
+      },
+    })
+  ).default;
+  const render = async (L, host, cookies = {}) => {
+    globalThis.__vgateRequest = { host, cookies };
+    try {
+      return await runRequest(async () => renderToStaticMarkup(await L({ children: React.createElement("p", { id: "page" }, "page body") })));
+    } finally {
+      globalThis.__vgateRequest = null;
+    }
+  };
+  const scroller = (html) => /<nav class="border-t border-header-fg\/10">/.test(html);
+  const hasBrand = (html) => /id="brand-vars"|--accent-500:/.test(html);
+  const kit = (html) => html.match(/<html[^>]*data-kit="([^"]*)"/)?.[1];
+  // links into the catalog or the store's content (the fixed chrome links,
+  // "Shop all" -> /collections, /contact, /wishlist, /account, are not nav)
+  const navLinks = (html) => [...html.matchAll(/href="(\/collections\/[^"]+|\/about|\/policies\/[^"]+)"/g)].map((m) => m[1]);
+
+  await t("rendered: a normal v3 store shows its nav, announcement and brand (the control for the next tests)", async () => {
+    await putLive(VG, V3);
+    const html = await render(Layout, "vg.test");
+    ok(html.includes("VG Nav") && html.includes("VG live announcement"), "nav or announcement missing");
+    ok(hasBrand(html), "brand missing");
+    eq(kit(html), "glow-1", "kit:");
+    ok(html.includes("page body"), "page missing");
+  });
+
+  await t("rendered: on ContentUnavailableError (a v4 release) the chrome holds no nav links, no collections scroller, no announcement and no tenant brand", async () => {
+    await putLive(VG, V4);
+    const html = await render(Layout, "vg.test");
+    ok(html.includes("page body"), "page missing");
+    same(navLinks(html), [], "nav links:");
+    ok(!scroller(html), "the collections scroller shows (nav null, not [])");
+    ok(!/VG Serums|VG Nav|VG Foot/.test(html), "store links show");
+    ok(!/data-sec="announcement"/.test(html), "announcement shows");
+    ok(!hasBrand(html), "tenant brand CSS shows");
+    eq(kit(html), "pulse-1", "kit:");
+    ok(!/VGate vg Store/.test(html), "the store's name shows");
+    // and the same for a release that can't be read at all
+    await putLive(VG, { ...V3, v: 7 });
+    const bad = await render(Layout, "vg.test");
+    ok(!scroller(bad) && navLinks(bad).length === 0 && !hasBrand(bad), "unreadable release: store chrome shows");
+  });
+
+  await t("rendered: other chrome failures behave as before (neutral name and brand, the collections scroller, no announcement)", async () => {
+    await putLive(VG, V3);
+    const html = await render(LayoutBuggy, "vg.test");
+    ok(scroller(html) && html.includes("VG Serums"), "the collections scroller is gone (it showed before P2-VGATE)");
+    ok(!/data-sec="announcement"/.test(html), "announcement shows");
+    ok(!hasBrand(html), "brand shows");
+    ok(!/VGate vg Store/.test(html), "the store's name shows");
+  });
+
+  await t("rendered: the maintenance page on ContentUnavailableError uses the neutral name and brand", async () => {
+    await putTenant("vg", ".test-rel-vg.db", { ...BASE_CONFIG("vg"), maintenance: { enabled: true, message: "Back soon" } });
+    const VGM = await C.getTenant("vg");
+    await new Promise((r) => setTimeout(r, 80)); // PLATFORM_CACHE_MS
+    try {
+      await putLive(VGM, V4);
+      const html = await render(Layout, "vg.test");
+      ok(/Store will be right back\./.test(html), `not the neutral name: ${html.match(/<h1[\s\S]*?<\/h1>/)?.[0]}`);
+      ok(!/VGate vg Store/.test(html), "the store's name shows");
+      ok(!hasBrand(html), "tenant brand CSS shows");
+      eq(kit(html), "pulse-1", "kit:");
+      ok(!html.includes("page body"), "the page shows behind the curtain");
+      // a legacy store's curtain still reads its own name, brand and theme
+      await putLive(VGM, V3);
+      const ok3 = await render(Layout, "vg.test");
+      ok(/VGate vg Store will be right back\./.test(ok3), "a working store's curtain lost its name");
+      ok(hasBrand(ok3), "a working store's curtain lost its brand");
+      eq(kit(ok3), "glow-1", "a working store's kit:");
+      // a bypass cookie still sees the store
+      const team = await render(Layout, "vg.test", { _admin: "x" });
+      ok(team.includes("page body") && team.includes("VG Nav"), "the team bypass lost the store");
+    } finally {
+      await putTenant("vg", ".test-rel-vg.db");
+    }
+  });
+
+  // Fix round 1: a glow store's curtain now really renders as glow-1 (light
+  // hero #fff1ee). Its "Scheduled maintenance" pill must use the kit-corrected
+  // hero accent, and the CSS for it must be written even with no brand.
+  await t("rendered: a glow store's maintenance pill is readable on the light hero, with and without a brand", async () => {
+    const B = await import("../lib/brand.js");
+    const heroBg = B.kitSurfaces("glow-1").hero.bg;
+    await putTenant("vg", ".test-rel-vg.db", { ...BASE_CONFIG("vg"), maintenance: { enabled: true, message: "Back soon" } });
+    const VGM = await C.getTenant("vg");
+    await new Promise((r) => setTimeout(r, 80)); // PLATFORM_CACHE_MS
+    const pill = (html) => html.match(/<p class="([^"]*)"><span class="([^"]*)"><\/span> Scheduled maintenance/);
+    const heroAccent = (html) => html.match(/--sf-hero-accent:(#[0-9a-fA-F]{6})/)?.[1];
+    try {
+      for (const [label, brand] of [
+        ["test brand #7c3aed", V3.brand],
+        ["no brand", null],
+      ]) {
+        await putLive(VGM, { ...V3, brand });
+        const html = await render(Layout, "vg.test");
+        ok(/will be right back\./.test(html), `${label}: not the curtain`);
+        eq(kit(html), "glow-1", `${label}: kit:`);
+        const m = pill(html);
+        ok(m, `${label}: no maintenance pill`);
+        ok(/\btext-sf-hero-accent\b/.test(m[1]) && !/\btext-accent-400\b/.test(m[1]), `${label}: pill text is not the hero accent role: ${m[1]}`);
+        ok(/\bbg-sf-hero-accent\b/.test(m[2]) && !/\bbg-accent-400\b/.test(m[2]), `${label}: pill dot is not the hero accent role: ${m[2]}`);
+        const accent = heroAccent(html);
+        ok(accent, `${label}: no --sf-hero-accent in the curtain's CSS (falls back to the raw accent-400)`);
+        const ratio = B.contrastRatio(accent, heroBg);
+        ok(ratio >= 4.5, `${label}: pill text ${accent} on ${heroBg} is ${ratio.toFixed(2)}:1, under 4.5:1`);
+      }
+      // no brand on a glow store: the kit's own correction
+      eq(heroAccent(await render(Layout, "vg.test")), "#3f6212", "no brand glow hero accent:");
+    } finally {
+      await putTenant("vg", ".test-rel-vg.db");
+    }
+  });
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
