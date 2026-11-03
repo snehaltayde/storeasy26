@@ -326,6 +326,24 @@ const LOSES_WORDS = [
   ["Pick a <title> first.", "<title>"],
   ["</time> comes before <time> here.", "<time>"],
   ["Ends with <script>", "<script>"],
+  // looks like a comment or a doctype, and isn't one
+  ["Price <?500> today", "<?500>"],
+  ["Why <?> Because", "<?>"],
+  ["<?Free shipping over 500?> today", "<?Free shipping over 500?>"],
+  ["Offer <![sale]> today", "<![sale]>"],
+  ["Note <!doctype sale> today", "<!doctype sale>"],
+  ["Note <!doctype> today", "<!doctype>"],
+  // a closed-off name is still only a name
+  ["Click the <link/> below.", "<link/>"],
+  ["Send <address /> today", "<address />"],
+  ["Send <w:500/> today", "<w:500/>"],
+  // a real tag and an ordinary word, not an attribute of that tag
+  ["Keep <b required> here", "<b required>"],
+  ["The shop is <span open> today", "<span open>"],
+  ["Get a <p download> today", "<p download>"],
+  ["Keep <b =x> here", "<b =x>"],
+  // a comment nobody closed hides the rest, so it is refused
+  ["<p>Before</p><!-- not closed, these words go", "<!-- not closed, these words go"],
 ];
 
 await t(`stray brackets (${LOSES_WORDS.length} cases, both fields): refused, quoting the words, row untouched`, async () => {
@@ -378,10 +396,20 @@ await t(`clean words and HTML (${KEPT_AS_TYPED.length} cases, both fields): the 
 const UNSAFE_NO_WORDS = [
   ["<p>Hi</p><script>alert(1)</script>", "<p>Hi</p>"],
   ["<style>.x{color:red}</style><p>Hi</p>", "<p>Hi</p>"],
-  ['<p>Hi</p><iframe src="https://video.example/a" allowfullscreen></iframe>', "<p>Hi</p>"],
+  ["<p>Hi</p><iframe allowfullscreen></iframe>", "<p>Hi</p>"],
   ['<p onclick="x()" class="y" data-z>Hi</p>', "<p>Hi</p>"],
   ['<a href="javascript:alert(1)">Hi</a>', "<a>Hi</a>"],
   ["<!-- a note --><p>Hi</p>", "<p>Hi</p>"],
+  ["<p>Hi</p><!-- private note > do not show -->", "<p>Hi</p>"],
+  ["<!--[if gte mso 9]><xml><o:p>Word notes</o:p></xml><![endif]--><p>Hi</p>", "<p>Hi</p>"],
+  ["<![if !mso]><p>Hi</p><![endif]>", "<p>Hi</p>"],
+  ['<?xml version="1.0"?><p>Hi</p>', "<p>Hi</p>"],
+  ['<?xml:namespace prefix = o ns = "urn:schemas-microsoft-com:office:office" /><p>Hi</p>', "<p>Hi</p>"],
+  ["<!DOCTYPE html><p>Hi</p>", "<p>Hi</p>"],
+  ["<![CDATA[]]><p>Hi</p>", "<p>Hi</p>"],
+  ["<template>x</template><p>Hi</p>", "<p>Hi</p>"],
+  ["<iframe/>words</iframe>", "words"],
+  ['<input required disabled><p hidden>Hi</p><ol reversed><li>x</li></ol>', "<p>Hi</p><ol><li>x</li></ol>"],
   ["<p class=MsoNormal>Hi<o:p></o:p></p>", "<p>Hi</p>"],
   ['<noscript><img src="/x"></noscript><p>Hi</p>', "<p>Hi</p>"],
   ['<svg viewBox="0 0 1 1"><path d="M0 0"/></svg><p>Hi</p>', "<p>Hi</p>"],
@@ -404,7 +432,13 @@ const UNSAFE_NO_WORDS = [
   ['<a href="java&#x73;cript:alert(1)">Hi</a>', "<a>Hi</a>"],
   ['<a href="">Hi</a>', "<a>Hi</a>"],
   ['<a href=" ">Hi</a>', "<a>Hi</a>"],
-  ['<iframe src="video.mp4"></iframe><p>Hi</p>', "<p>Hi</p>"],
+  ['<iframe src="javascript:alert(1)"></iframe><p>Hi</p>', "<p>Hi</p>"],
+  ['<video src="vbscript:x" controls></video><p>Hi</p>', "<p>Hi</p>"],
+  ['<audio controls src="java&#x73;cript:x"></audio><p>Hi</p>', "<p>Hi</p>"],
+  ['<embed src=" "></embed><p>Hi</p>', "<p>Hi</p>"],
+  ['<img srcset="javascript:x" alt="A" /><p>Hi</p>', '<img alt="A" /><p>Hi</p>'],
+  ['<picture><source srcset="/a.webp"><img src="/a.jpg" alt="A"></picture>', '<img src="/a.jpg" alt="A" />'],
+  ['<img src="/a.jpg" srcset="/a.jpg 2x" data-src="/b.jpg" alt="A" />', '<img src="/a.jpg" alt="A" />'],
 ];
 
 await t(`unsafe parts with no words in them (${UNSAFE_NO_WORDS.length} cases, both fields) still save, every word kept`, async () => {
@@ -506,6 +540,62 @@ await t(`addresses (${LOSES_ADDRESS.length} cases, both fields): refused, quotin
   }
 });
 
+// [typed, the address the refusal must quote]. The addresses are often https,
+// which the plain-words check doesn't look at because the founder typed them.
+const LOSES_MEDIA = [
+  ['<p>Watch</p><iframe src="https://www.youtube.com/embed/abc" allowfullscreen></iframe>', "https://www.youtube.com/embed/abc"],
+  ['<iframe src="https://www.youtube.com/embed/abc"></iframe>', "https://www.youtube.com/embed/abc"],
+  ['<IFRAME SRC="https://player.example/1"></IFRAME>', "https://player.example/1"],
+  ["<iframe src=https://player.example/1></iframe><p>Watch</p>", "https://player.example/1"],
+  ['<iframe src="video.mp4"></iframe><p>Hi</p>', "video.mp4"],
+  ['<p>Watch</p><video src="https://cdn.example/a.mp4" controls></video>', "https://cdn.example/a.mp4"],
+  ['<video src="https://cdn.example/a.mp4"></video>', "https://cdn.example/a.mp4"],
+  ['<video controls><source src="https://cdn.example/a.mp4"></video><p>Watch</p>', "https://cdn.example/a.mp4"],
+  ['<audio src="https://cdn.example/a.mp3"></audio><p>Hear</p>', "https://cdn.example/a.mp3"],
+  ['<audio controls><source src="/a.mp3" type="audio/mpeg"></audio>', "/a.mp3"],
+  ['<source src="/a.mp4">', "/a.mp4"],
+  ['<embed src="https://cdn.example/a.swf">', "https://cdn.example/a.swf"],
+  ['<embed src="https://cdn.example/a.swf" /><p>Watch</p>', "https://cdn.example/a.swf"],
+  ['<object data="https://cdn.example/a.pdf"></object><p>Read</p>', "https://cdn.example/a.pdf"],
+  ['<object src="/a.swf"></object>', "/a.swf"],
+];
+const MEDIA_MESSAGE = (address) => `this page can't show embedded videos or sound yet, so saving would lose "${address}". Remove it or link to it instead.`;
+const LOSES_PICTURE = [
+  ['<img srcset="https://cdn.example/a.jpg 2x" alt="A"><p>x</p>', "https://cdn.example/a.jpg 2x"],
+  ['<img data-src="https://cdn.example/a.jpg" alt="A"><p>x</p>', "https://cdn.example/a.jpg"],
+  ['<img data-src="/a.jpg">', "/a.jpg"],
+  ['<IMG SRCSET="/a.jpg 1x, /b.jpg 2x">', "/a.jpg 1x, /b.jpg 2x"],
+  ['<img src="" data-src="/a.jpg" alt="A">', "/a.jpg"],
+  ['<img src="javascript:x" srcset="/a.jpg 2x" alt="A">', "/a.jpg 2x"],
+];
+const PICTURE_MESSAGE = (address) => `this page can't show this type of picture yet, so saving would lose "${address}". Add it as an image section, or remove it.`;
+
+const refusedQuoting = async (cases, message, prefix) => {
+  let n = 0;
+  for (const [typed, address] of cases) {
+    for (const [field, section] of htmlField(typed)) {
+      const slug = `${prefix}-${n++}`;
+      const before = await seed(slug);
+      const res = await save(slug, form(section), before.revision);
+      const label = `${field} ${typed}`;
+      eq(res.status, 422, `${label} status:`);
+      eq(res.body.error, `${field === "rich" ? "section 1" : "section 1, question 1"}: ${message(address)}`, `${label} message:`);
+      assertPlain(res.body.error.replace(address, ""), label);
+      eq(await row(slug), before, `${label} row unchanged:`);
+    }
+  }
+};
+
+await t(`embedded videos and sound (${LOSES_MEDIA.length} cases, both fields): refused, quoting the address, row untouched`, () => refusedQuoting(LOSES_MEDIA, MEDIA_MESSAGE, "media"));
+
+await t(`pictures held only in srcset or data-src (${LOSES_PICTURE.length} cases, both fields): refused, quoting the address, row untouched`, () => refusedQuoting(LOSES_PICTURE, PICTURE_MESSAGE, "picture"));
+
+await t("the same refusal reaches Save as template, with the right section number", async () => {
+  const res = await put({ saveTemplate: { name: "Video", family: "page", sections: sectionsPayload(form(noHeading, { kind: "rich", heading: "", html: '<iframe src="/v"></iframe>' })) } });
+  eq(res.status, 422, "status:");
+  eq(res.body.error, `section 2: ${MEDIA_MESSAGE("/v")}`, "message:");
+});
+
 await t("addresses that work are stored as typed", async () => {
   const typed = '<a href="https://x.example/a">a</a><a href="http://x.example/b">b</a><a href="/c">c</a><a href="#d">d</a><a href="mailto:hi@store.example">e</a><img src="/api/media/a" alt="f" />';
   const res = await save("addr-ok", form({ kind: "rich", heading: "", html: typed }));
@@ -552,7 +642,7 @@ await t("an invisible heading beside real text is no heading, and an invisible p
 });
 
 // Sanitized HTML that a shopper would see as nothing, in both HTML fields.
-const EMPTY_MARKUP = ["<p></p>", "<p> </p>", "<br>", "<p>&nbsp;</p>", "&nbsp;", "&#160;", "<div></div>", "<p>\u200B</p>", "<p>&#8203;</p>", '<a href="/x"></a>', "<script>x</script>", "<!-- a note -->"];
+const EMPTY_MARKUP = ["<p></p>", "<p> </p>", "<br>", "<p>&nbsp;</p>", "&nbsp;", "&#160;", "<div></div>", "<p>\u200B</p>", "<p>&#8203;</p>", '<a href="/x"></a>', "<script>x</script>", "<!-- a note -->", "<!-- a > note -->", "<p>&ensp;</p>", "<p>&emsp;</p>", "<p>&thinsp;</p>", "<p>&zwj;</p>", "<p>&zwnj;</p>", "<p>&nbsp</p>", "<p>&#160</p>", "<p>&#xa0;</p>", "<p>&#XA0;</p>", "<p>&#x200b;</p>"];
 
 await t(`only empty markup (${EMPTY_MARKUP.length} kinds, both fields) counts as empty, row untouched`, async () => {
   const before = await seed("empty-markup");
@@ -567,7 +657,7 @@ await t(`only empty markup (${EMPTY_MARKUP.length} kinds, both fields) counts as
 });
 
 await t("a picture or a dividing line alone is content; so is one real word in empty tags", async () => {
-  for (const typed of ['<img src="/api/media/a" alt="Photo" />', "<hr />", "<p>&nbsp;</p><p>Hi</p>", "<p>5 &lt; 6</p>"]) {
+  for (const typed of ['<img src="/api/media/a" alt="Photo" />', "<hr />", "<p>&nbsp;</p><p>Hi</p>", "<p>5 &lt; 6</p>", "<p>&nbspHi</p>"]) {
     for (const [field, section] of htmlField(typed)) {
       const [clean] = validatePageSections([section]);
       eq(field === "rich" ? clean.html : clean.items[0].a, typed, `${field} ${typed}:`);
@@ -642,6 +732,40 @@ await t("a blank section is refused in a template too, plainly", async () => {
   const res = await put({ saveTemplate: { name: "Blank", family: "page", sections: sectionsPayload(form(noHeading, blankSection("text", "n1"))) } });
   await refused("template", res, "template");
   ok(res.body.error.startsWith("section 2:"), `position, got "${res.body.error}":`);
+});
+
+const oldTemplate = (id, sections) => inT(() => db.insertInto("cms_templates").values({ id, name: "Old", family: "page", sections: JSON.stringify(sections), version: 1, revision: 1, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }).execute());
+
+await t("a template saved under older rules still opens, keeping what today's rules refuse, and the page's Save says what to fix", async () => {
+  const stale = { kind: "rich", heading: "Keep", html: "<p></p>" };
+  const staleFaq = { kind: "faq", heading: "Asked", items: [{ q: "Keep this question", a: "<p>&nbsp;</p>" }] };
+  const good = [{ kind: "text", heading: "Real", body: ["Real words"] }, { kind: "rich", heading: "", html: "<p>Good</p>" }];
+  await oldTemplate("tpl_old", [stale, good[0], staleFaq, good[1]]);
+  const used = await put({ useTemplate: "tpl_old" });
+  eq(used.status, 200, `open: "${used.body.error}"`);
+  const sections = used.body.template.sections;
+  eq(sections.map(({ id, ...rest }) => rest), [stale, good[0], staleFaq, good[1]], "nothing lost or changed:");
+  ok(sections.every((s) => /^sec_/.test(s.id)) && new Set(sections.map((s) => s.id)).size === 4, "fresh ids:");
+  const again = await put({ useTemplate: "tpl_old" });
+  ok(again.body.template.sections.every((s, i) => s.id !== sections[i].id), "ids differ per use:");
+
+  const edit = formSections(sections);
+  const refusedSave = await save("from-old-template", edit);
+  await refused("from-old-template", refusedSave, "stale section on Save");
+  eq(refusedSave.body.error, "section 1: this section is empty. Add some content, or remove this section.", "message on Save:");
+  eq(await row("from-old-template"), undefined, "nothing written:");
+  const fixed = await save("from-old-template", [{ ...edit[0], html: "<p>Now it has words</p>" }, edit[1], { ...edit[2], items: [{ q: "Keep this question", a: "<p>Now answered</p>" }] }, edit[3]]);
+  eq(fixed.status, 200, `saved once fixed: "${fixed.body.error}"`);
+});
+
+await t("a template name over the limit is refused, not cut", async () => {
+  const sections = sectionsPayload(form(noHeading));
+  const long = await put({ saveTemplate: { name: "n".repeat(81), family: "page", sections } });
+  eq(long.status, 422, "status:");
+  eq(long.body.error, "the template name is too long (81 characters, the limit is 80)", "message:");
+  const atLimit = await put({ saveTemplate: { name: "n".repeat(80), family: "page", sections } });
+  eq(atLimit.status, 200, "at the limit:");
+  eq(atLimit.body.template.name.length, 80, "stored whole:");
 });
 
 await t("the Save as template button sees real content: only all-blank sections count as empty", () => {
