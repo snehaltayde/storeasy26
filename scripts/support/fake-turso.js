@@ -28,6 +28,7 @@ export function fakeTurso(backing) {
     outage: false, // drop every request unexecuted
     // { match: RegExp, mode: "drop_before" | "commit_then_drop", before?, then? }: the
     // hooks are awaited, `before` ahead of running anything and `then` ahead of the drop.
+    // With no mode, the request runs and answers normally once `before` is done.
     faults: [],
     received: [], // the SQL of each statement that arrived, including dropped ones
   };

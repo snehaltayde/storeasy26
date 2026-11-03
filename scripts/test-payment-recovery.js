@@ -187,6 +187,9 @@ const INSERT_ORDER = /^insert into "orders"/i;
 const INSERT_ITEMS = /^insert into "order_items"/i;
 const INSERT_PAID_EVENT = /insert into "?order_events"?/i;
 
+// A second worker's own connection, straight to the same SQLite file.
+const DIRECT = { id: "direct", dbUrl: "file:.test-payment-recovery.db" };
+
 // --- 1. payment verify: unknown outcome on the paid write -----------------------
 
 await t("verify: paid write commits, response lost → customer sees success", async () => {
@@ -281,6 +284,41 @@ await t("verify: paid write lost and the order cancelled meanwhile → the same 
   eq(await paidEvents(o.orderId), 0, "paid events");
 });
 
+// The webhook pays the order and its follow-up work starts the Shopify push while the
+// browser's paid write is at the server: on its own connection, as it would be live.
+const webhookPaysAndPushBegins = (o, paymentId = o.paymentId) => () =>
+  withTenant(DIRECT, async () => {
+    await O.markOrderPaid(o.orderId, { razorpayPaymentId: paymentId, source: "webhook" });
+    await O.beginShopifySync(o.orderId);
+  });
+
+for (const [mode, how] of [
+  ["commit_then_drop", "paid write lost after running"],
+  ["drop_before", "paid write lost before running"],
+  [undefined, "no blip, between the read and the write"],
+]) {
+  await t(`verify: webhook pays and starts the push meanwhile (${how}) → success, not a refusal`, async () => {
+    const o = await pendingOrder();
+    turso.state.faults.push({ match: UPDATE_ORDER, mode, before: webhookPaysAndPushBegins(o) });
+    const r = await callVerify(o);
+    eq(r.status, 200, `status (${r.body.error})`);
+    eq(r.body.ok, true, "ok");
+    ok(r.body.confirmationPath, "confirmationPath");
+    eq((await orderRow(o.orderId)).status, "syncing_shopify", "the push is left to run");
+    await drainAfter();
+    await assertFullyPaid(o, "after verify");
+  });
+}
+
+await t("verify: a different payment lands meanwhile → still the different-payment refusal", async () => {
+  const o = await pendingOrder();
+  turso.state.faults.push({ match: UPDATE_ORDER, mode: "drop_before", before: webhookPaysAndPushBegins(o, "pay_other") });
+  const r = await callVerify(o);
+  eq(r.status, 400, "status");
+  ok(/different payment/i.test(r.body.error), `error (${r.body.error})`);
+  eq((await orderRow(o.orderId)).razorpay_payment_id, "pay_other", "payment id kept");
+});
+
 await t("verify then webhook: both fire, paid event and effects happen once", async () => {
   const o = await pendingOrder();
   eq((await callVerify(o)).status, 200, "verify");
@@ -363,9 +401,6 @@ const fakeShopify = (creates, onFind) => async (query, variables) => {
   await onFind?.();
   return { orders: { nodes: [] }, draftOrders: { nodes: [] } };
 };
-
-// The other pusher's own connection, straight to the same SQLite file.
-const DIRECT = { id: "direct", dbUrl: "file:.test-payment-recovery.db" };
 
 await t("push: the begin race's loser loses its response too → it stands down, one Shopify order", async () => {
   const o = await pendingOrder();
