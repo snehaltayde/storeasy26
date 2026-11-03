@@ -10,6 +10,10 @@
 // Options for http: --runs N (warm runs per route, default 50), --warmup N
 // (default 5), --count-runs N (default 5), --out DIR (default docs/perf),
 // --budget FILE, --only key,key, --no-write.
+// P2-PERF adds: --extra-routes (also measure /sitemap.xml, /api/upsell,
+// /offline and /manifest.webmanifest), --posts N (the journal post count, for
+// the route label only) and --stem NAME (the output file name, default
+// <date>-local-baseline). Without them a run is the PERF-04 run, unchanged.
 //
 // Three passes, each on its own `next start`:
 //   counts  Next talks to the databases through counting proxies
@@ -63,9 +67,19 @@ const log = (m) => console.log(m);
 // what gets measured
 // ---------------------------------------------------------------------------
 
-export function routesFor(measured) {
+export function routesFor(measured, { extra = false, journalPosts = 60 } = {}) {
   const cartCookie = `cart_session=${measured.cart.id}`;
   const html = { accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" };
+  // P2-PERF: the sitemap route itself, and the route handlers whose cache() is
+  // a no-op (plan section 2, spec 8.7).
+  const more = extra
+    ? [
+        { key: "sitemap", label: "Sitemap", path: "/sitemap.xml", headers: { accept: "application/xml,text/xml,*/*" }, expect: ["<urlset", `/collections/${measured.allCollection}`] },
+        { key: "upsell", label: "Cart upsell API", path: "/api/upsell?exclude=", headers: { accept: "application/json" }, json: (b) => b !== null && typeof b === "object" && Array.isArray(b.products) },
+        { key: "offline", label: "Offline page", path: "/offline", headers: html, expect: ["offline"] },
+        { key: "manifest", label: "Web app manifest", path: "/manifest.webmanifest", headers: { accept: "application/manifest+json,application/json" }, json: (b) => b !== null && typeof b === "object" && b.start_url === "/" },
+      ]
+    : [];
   return [
     { key: "home", label: "Home", path: "/", headers: html, expect: ["Shop by category", "Top rated"] },
     { key: "product", label: "Product page", path: `/products/${measured.productHandle}`, headers: html, expect: [measured.productTitle, "Pairs well with"] },
@@ -74,7 +88,7 @@ export function routesFor(measured) {
     { key: "collections", label: "/collections", path: "/collections", headers: html, expect: [measured.allTitle, measured.categoryTitle] },
     { key: "search", label: "Search", path: `/search?q=${encodeURIComponent(measured.searchTerm)}`, headers: html, expect: ["Results for"] },
     { key: "cms-page", label: "CMS page (a policy)", path: `/policies/${measured.policySlug}`, headers: html, expect: [measured.policyTitle] },
-    { key: "journal", label: "Journal index (60 posts)", path: "/journal", headers: html, expect: ["Journal"] },
+    { key: "journal", label: `Journal index (${journalPosts} posts)`, path: "/journal", headers: html, expect: ["Journal"] },
     { key: "cart-get", label: "Cart API, read (3 lines)", path: "/api/cart", headers: { accept: "application/json", cookie: cartCookie }, json: (b) => Array.isArray(b.items) && b.items.length === measured.cart.lines.length },
     {
       key: "cart-update",
@@ -86,6 +100,7 @@ export function routesFor(measured) {
       json: (b) => Array.isArray(b.items) && b.items.length === measured.cart.lines.length,
     },
     { key: "checkout", label: "Checkout, first step", path: "/checkout", headers: { ...html, cookie: cartCookie }, expect: ["shipping address"] },
+    ...more,
   ];
 }
 
@@ -234,7 +249,7 @@ function newestSource() {
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const o = { runs: 50, warmup: 5, countRuns: 5, out: "docs/perf", budget: null, only: null, build: false, write: true };
+  const o = { runs: 50, warmup: 5, countRuns: 5, out: "docs/perf", budget: null, only: null, build: false, write: true, extraRoutes: false, posts: 60, stem: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => {
@@ -253,6 +268,12 @@ function parseArgs(argv) {
     else if (a === "--only") o.only = next().split(",");
     else if (a === "--build") o.build = true;
     else if (a === "--no-write") o.write = false;
+    else if (a === "--extra-routes") o.extraRoutes = true;
+    else if (a === "--posts") o.posts = Number(next());
+    else if (a === "--stem") {
+      o.stem = next();
+      if (!/^[\w.-]+$/.test(o.stem)) throw new HarnessError("--stem takes a plain file name (letters, digits, dots, dashes).");
+    }
     else throw new HarnessError(`Unknown option "${a}" for http.`);
   }
   return o;
@@ -293,7 +314,7 @@ export async function runHttp(argv) {
 
   const machineAtStart = machineInfo();
   const fx = buildPerfFixture();
-  let routes = routesFor(fx.measured);
+  let routes = routesFor(fx.measured, { extra: opt.extraRoutes, journalPosts: opt.posts });
   if (opt.only) routes = routes.filter((r) => opt.only.includes(r.key));
   if (!routes.length) throw new HarnessError("--only matched no route.");
 
@@ -535,7 +556,7 @@ export async function runHttp(argv) {
     if (opt.write) {
       const outDir = resolve(ROOT, opt.out);
       mkdirSync(outDir, { recursive: true });
-      const stem = `${run.takenAt.slice(0, 10)}-local-baseline`;
+      const stem = opt.stem || `${run.takenAt.slice(0, 10)}-local-baseline`;
       writeFileSync(join(outDir, `${stem}.json`), `${JSON.stringify(run, null, 2)}\n`);
       writeFileSync(join(outDir, `${stem}.md`), markdown(run));
       log(`✓ wrote ${relative(ROOT, join(outDir, `${stem}.json`))} and ${stem}.md`);
@@ -573,6 +594,21 @@ async function readFixtureSizes(tenantUrl) {
     ]) {
       try {
         out[k] = Number((await c.execute(sql)).rows[0]?.n ?? 0);
+      } catch {
+        out[k] = null;
+      }
+    }
+    // P2-PERF: which content system the store runs on, and its documents
+    for (const [k, sql] of [
+      ["cmsMode", "SELECT mode n FROM cms_state WHERE id = 1"],
+      ["liveReleaseVersion", "SELECT json_extract(r.content, '$.v') n FROM releases r JOIN release_state s ON s.live_release_id = r.id"],
+      ["documents", "SELECT count(*) n FROM documents"],
+      ["journalDocuments", "SELECT count(*) n FROM documents WHERE type = 'journal' AND published_version_id IS NOT NULL"],
+      ["documentVersions", "SELECT count(*) n FROM document_versions"],
+    ]) {
+      try {
+        const v = (await c.execute(sql)).rows[0]?.n;
+        out[k] = v == null ? null : k === "cmsMode" ? String(v) : Number(v);
       } catch {
         out[k] = null;
       }

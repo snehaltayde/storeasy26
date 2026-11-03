@@ -1,0 +1,5034 @@
+{
+  "kind": "storeasy-perf-phase2",
+  "version": 1,
+  "takenOn": "2026-11-03",
+  "environment": {
+    "kind": "local",
+    "machine": {
+      "os": "Darwin 25.5.0 (macOS 26.5.1)",
+      "cpu": "Apple M5 Pro",
+      "cores": 15,
+      "memoryGB": 24,
+      "loadAverageAtStart": [
+        4.45,
+        3.21,
+        2.98
+      ],
+      "loadAverageAtEnd": [
+        4.29,
+        3.52,
+        3.13
+      ]
+    },
+    "node": "v26.0.0",
+    "next": "16.2.9",
+    "sqld": "sqld sqld 0.24.32 (40c272de 2025-02-14)",
+    "runtime": "storefront pages and /api/cart on the edge runtime (Next's local edge sandbox, not Vercel's)"
+  },
+  "budgets": "None. These are local numbers (kind: local), not budgets. Budgets wait for hosted numbers (PERF-04, OQ-19).",
+  "method": {
+    "warmRuns": 50,
+    "warmup": 5,
+    "countedRuns": 5,
+    "order": "warm runs go round the routes in turn, one request at a time, over one kept-alive connection",
+    "cold": "a fresh next start per route, then that route's first request on a new connection",
+    "ttfb": "from sending the request to receiving the response headers",
+    "total": "from sending the request to the last byte of the body",
+    "percentile": "nearest rank (p95 of 50 runs is the 48th fastest)",
+    "bytes": "response body as sent (gzip when offered), median; headers counted apart; firstVisitStatic is the /_next/static files the HTML names, fetched once each",
+    "db": "counted on the wire by a proxy in front of each sqld (scripts/perf-dbcount.js) and checked against sqld's own query counter; warm = the middle counted run, first = the first request that route's code served after next start (collection-all shares its code with collection, and cart-update with cart-get, so theirs is already warm); rowsRead is sqld's own rows_read; bytesDown is the database's answers as sent (sqld gzips them when the client asks), bytesDownDecoded what the page had to parse",
+    "shopper": "no cookies except the cart cookie on the cart and checkout routes, so the home page sees a first-time visitor; each request carries its own x-forwarded-for"
+  },
+  "baseline": {
+    "file": "docs/perf/2026-11-03-local-baseline.json",
+    "commit": "8968db3",
+    "routes": [
+      {
+        "key": "home",
+        "path": "/",
+        "reads": 24,
+        "roundTrips": 24,
+        "bytesDown": 64179,
+        "bytesDownDecoded": 664223,
+        "totalP50": 57.4
+      },
+      {
+        "key": "product",
+        "path": "/products/micronised-creatine-12",
+        "reads": 10,
+        "roundTrips": 10,
+        "bytesDown": 60354,
+        "bytesDownDecoded": 652995,
+        "totalP50": 37.6
+      },
+      {
+        "key": "collection",
+        "path": "/collections/protein",
+        "reads": 9,
+        "roundTrips": 9,
+        "bytesDown": 58420,
+        "bytesDownDecoded": 651952,
+        "totalP50": 37.7
+      },
+      {
+        "key": "collection-all",
+        "path": "/collections/shop-all",
+        "reads": 9,
+        "roundTrips": 9,
+        "bytesDown": 59433,
+        "bytesDownDecoded": 654370,
+        "totalP50": 40
+      },
+      {
+        "key": "collections",
+        "path": "/collections",
+        "reads": 4,
+        "roundTrips": 4,
+        "bytesDown": 56388,
+        "bytesDownDecoded": 638328,
+        "totalP50": 31.3
+      },
+      {
+        "key": "search",
+        "path": "/search?q=protein",
+        "reads": 4,
+        "roundTrips": 4,
+        "bytesDown": 56535,
+        "bytesDownDecoded": 643021,
+        "totalP50": 33.6
+      },
+      {
+        "key": "cms-page",
+        "path": "/policies/refund-policy",
+        "reads": 3,
+        "roundTrips": 3,
+        "bytesDown": 55355,
+        "bytesDownDecoded": 631928,
+        "totalP50": 28.8
+      },
+      {
+        "key": "journal",
+        "path": "/journal",
+        "reads": 3,
+        "roundTrips": 3,
+        "bytesDown": 55355,
+        "bytesDownDecoded": 631928,
+        "totalP50": 29.7
+      },
+      {
+        "key": "cart-get",
+        "path": "/api/cart",
+        "reads": 3,
+        "roundTrips": 3,
+        "bytesDown": 2249,
+        "bytesDownDecoded": 9925,
+        "totalP50": 4.7
+      },
+      {
+        "key": "cart-update",
+        "path": "/api/cart",
+        "reads": 3,
+        "roundTrips": 5,
+        "bytesDown": 2621,
+        "bytesDownDecoded": 10506,
+        "totalP50": 5.8
+      },
+      {
+        "key": "checkout",
+        "path": "/checkout",
+        "reads": 9,
+        "roundTrips": 9,
+        "bytesDown": 59850,
+        "bytesDownDecoded": 651777,
+        "totalP50": 37.3
+      }
+    ]
+  },
+  "runs": [
+    {
+      "label": "Before: legacy, v3 live",
+      "store": "legacy store, live v3 release (the perf seed)",
+      "posts": 60,
+      "build": "es8ihdvIYpyRLktsdJvbC",
+      "commit": "f893710",
+      "fixture": {
+        "name": "perf",
+        "sizes": {
+          "products": 400,
+          "variants": 1142,
+          "productImages": 1764,
+          "collections": 30,
+          "collectionMemberships": 1253,
+          "contentPages": 21,
+          "journalPosts": 60,
+          "campaigns": 4,
+          "offers": 12,
+          "bundles": 4,
+          "placements": 42,
+          "media": 32,
+          "mediaBytes": 4100174,
+          "liveReleaseBytes": 607929,
+          "cmsMode": "legacy",
+          "liveReleaseVersion": 3,
+          "documents": 0,
+          "journalDocuments": 0,
+          "documentVersions": 0,
+          "homeSections": 12,
+          "contentDigest": "331b3929e7a67fe9"
+        },
+        "seededAt": "2026-11-03T21:58:57.881Z"
+      },
+      "routes": [
+        {
+          "key": "home",
+          "path": "/",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 50.1,
+            "p95": 87.1,
+            "min": 43,
+            "max": 212.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 51.8,
+            "p95": 89.1,
+            "min": 44.7,
+            "max": 213.1
+          },
+          "cold": {
+            "ttfb": 434.4,
+            "total": 435.9
+          },
+          "sentBytes": 176666,
+          "db": {
+            "reads": 23,
+            "readsFirst": 25,
+            "roundTrips": 23,
+            "rowsRead": 5346,
+            "bytesDown": 63912,
+            "bytesDownDecoded": 663728,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"description\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" inner join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c"
+              },
+              {
+                "times": 5,
+                "rowsRead": 802,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 800,
+                "shape": "READ select \"handle\", \"title\", \"product_type\", \"price_min\", \"price_max\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" order by \"available\" desc, \"created_at\" desc limit ?"
+              },
+              {
+                "times": 5,
+                "rowsRead": 604,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 400,
+                "shape": "READ select count(\"id\") as \"n\" from \"products\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 30,
+                "shape": "READ select count(\"id\") as \"n\" from \"collections\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 15,
+                "shape": "READ select \"id\", \"handle\" from \"collections\" where \"id\" in (?, ?, ?, ?, ?)"
+              },
+              {
+                "times": 5,
+                "rowsRead": 7,
+                "shape": "READ select \"co\".\"pinned\" from \"collection_overrides\" as \"co\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"co\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select * from \"experiments\" where \"target_kind\" = ? and \"status\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "product",
+          "path": "/products/micronised-creatine-12",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 24.5,
+            "p95": 29.1,
+            "min": 21.4,
+            "max": 51.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 32.1,
+            "p95": 42,
+            "min": 28.7,
+            "max": 67.5
+          },
+          "cold": {
+            "ttfb": 381,
+            "total": 401.7
+          },
+          "sentBytes": 77855,
+          "db": {
+            "reads": 9,
+            "readsFirst": 11,
+            "roundTrips": 9,
+            "rowsRead": 1407,
+            "bytesDown": 60086,
+            "bytesDownDecoded": 652496,
+            "repeated": 3,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 2,
+                "rowsRead": 26,
+                "shape": "READ select * from \"product_images\" where \"product_id\" = ? order by \"position\" asc"
+              },
+              {
+                "times": 2,
+                "rowsRead": 26,
+                "shape": "READ select * from \"variants\" where \"product_id\" = ? order by \"position\" asc"
+              },
+              {
+                "times": 1,
+                "rowsRead": 9,
+                "shape": "READ select \"id\", \"handle\", \"title\", \"price_min\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" where \"id\" in (?, ?, ?) and \"available\" = ?"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"products\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collection",
+          "path": "/collections/protein",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 24.7,
+            "p95": 36.4,
+            "min": 22.6,
+            "max": 49.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 34,
+            "p95": 47,
+            "min": 30.7,
+            "max": 65
+          },
+          "cold": {
+            "ttfb": 377.5,
+            "total": 397.8
+          },
+          "sentBytes": 141998,
+          "db": {
+            "reads": 8,
+            "readsFirst": 10,
+            "roundTrips": 8,
+            "rowsRead": 1794,
+            "bytesDown": 58149,
+            "bytesDownDecoded": 651454,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 163,
+                "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+              },
+              {
+                "times": 1,
+                "rowsRead": 162,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 122,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"collections\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\" from \"collections\" where \"handle\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collection-all",
+          "path": "/collections/shop-all",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 24.4,
+            "p95": 27.9,
+            "min": 21.6,
+            "max": 46.9
+          },
+          "total": {
+            "runs": 50,
+            "p50": 37.1,
+            "p95": 41,
+            "min": 33.9,
+            "max": 65.5
+          },
+          "cold": {
+            "ttfb": 385.8,
+            "total": 407.7
+          },
+          "sentBytes": 172917,
+          "db": {
+            "reads": 8,
+            "readsFirst": 8,
+            "roundTrips": 8,
+            "rowsRead": 5766,
+            "bytesDown": 59165,
+            "bytesDownDecoded": 653872,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1617,
+                "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+              },
+              {
+                "times": 1,
+                "rowsRead": 1601,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1201,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"collections\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\" from \"collections\" where \"handle\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collections",
+          "path": "/collections",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 27.7,
+            "p95": 31.7,
+            "min": 23.9,
+            "max": 49.9
+          },
+          "total": {
+            "runs": 50,
+            "p50": 29.1,
+            "p95": 33.2,
+            "min": 25.4,
+            "max": 51.3
+          },
+          "cold": {
+            "ttfb": 389,
+            "total": 393.2
+          },
+          "sentBytes": 96553,
+          "db": {
+            "reads": 3,
+            "readsFirst": 5,
+            "roundTrips": 3,
+            "rowsRead": 2686,
+            "bytesDown": 56125,
+            "bytesDownDecoded": 637830,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 2,
+                "rowsRead": 2684,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "search",
+          "path": "/search?q=protein",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 27.6,
+            "p95": 30.4,
+            "min": 24.9,
+            "max": 45.4
+          },
+          "total": {
+            "runs": 50,
+            "p50": 29,
+            "p95": 31.7,
+            "min": 26.5,
+            "max": 47.1
+          },
+          "cold": {
+            "ttfb": 380.1,
+            "total": 394.7
+          },
+          "sentBytes": 128324,
+          "db": {
+            "reads": 3,
+            "readsFirst": 5,
+            "roundTrips": 3,
+            "rowsRead": 1797,
+            "bytesDown": 56271,
+            "bytesDownDecoded": 642525,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 453,
+                "shape": "READ select \"handle\", \"title\", \"featured_image\" as \"image\", \"price_min\" as \"price\", \"currency\", \"product_type\", \"available\" from \"products\" where (\"title\" like ? or \"product_type\" like ? or \"vendor\" like ? or \"tags\" like ?) order by \"available\" "
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cms-page",
+          "path": "/policies/refund-policy",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 25.7,
+            "p95": 29.7,
+            "min": 22.6,
+            "max": 42
+          },
+          "total": {
+            "runs": 50,
+            "p50": 26.6,
+            "p95": 31.2,
+            "min": 24.1,
+            "max": 42.3
+          },
+          "cold": {
+            "ttfb": 394.8,
+            "total": 395.7
+          },
+          "sentBytes": 57584,
+          "db": {
+            "reads": 2,
+            "readsFirst": 4,
+            "roundTrips": 2,
+            "rowsRead": 1344,
+            "bytesDown": 55090,
+            "bytesDownDecoded": 631431,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "journal",
+          "path": "/journal",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 27.1,
+            "p95": 37.1,
+            "min": 23.9,
+            "max": 45.7
+          },
+          "total": {
+            "runs": 50,
+            "p50": 28.1,
+            "p95": 37.5,
+            "min": 25.2,
+            "max": 47.3
+          },
+          "cold": {
+            "ttfb": 405.8,
+            "total": 406.9
+          },
+          "sentBytes": 96322,
+          "db": {
+            "reads": 2,
+            "readsFirst": 4,
+            "roundTrips": 2,
+            "rowsRead": 1344,
+            "bytesDown": 55090,
+            "bytesDownDecoded": 631431,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cart-get",
+          "path": "/api/cart",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 4.2,
+            "p95": 6.4,
+            "min": 3.5,
+            "max": 7.6
+          },
+          "total": {
+            "runs": 50,
+            "p50": 4.2,
+            "p95": 6.5,
+            "min": 3.5,
+            "max": 7.7
+          },
+          "cold": {
+            "ttfb": 323.4,
+            "total": 323.9
+          },
+          "sentBytes": 1614,
+          "db": {
+            "reads": 3,
+            "readsFirst": 5,
+            "roundTrips": 3,
+            "rowsRead": 29,
+            "bytesDown": 2247,
+            "bytesDownDecoded": 9925,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 18,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 10,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cart-update",
+          "path": "/api/cart",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 5.4,
+            "p95": 9.4,
+            "min": 4.6,
+            "max": 10.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 5.4,
+            "p95": 9.4,
+            "min": 4.7,
+            "max": 10.3
+          },
+          "cold": {
+            "ttfb": 305.5,
+            "total": 306
+          },
+          "sentBytes": 1614,
+          "db": {
+            "reads": 3,
+            "readsFirst": 3,
+            "roundTrips": 5,
+            "rowsRead": 31,
+            "bytesDown": 2621,
+            "bytesDownDecoded": 10507,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 18,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 10,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "WRITE update \"cart_items\" set \"quantity\" = ? where \"cart_id\" = ? and \"variant_id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "WRITE update \"carts\" set \"updated_at\" = ? where \"id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "checkout",
+          "path": "/checkout",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 32.4,
+            "p95": 37.5,
+            "min": 28.9,
+            "max": 57.9
+          },
+          "total": {
+            "runs": 50,
+            "p50": 33.7,
+            "p95": 39.1,
+            "min": 30.4,
+            "max": 59.4
+          },
+          "cold": {
+            "ttfb": 411.3,
+            "total": 412.2
+          },
+          "sentBytes": 55507,
+          "db": {
+            "reads": 8,
+            "readsFirst": 10,
+            "roundTrips": 8,
+            "rowsRead": 1402,
+            "bytesDown": 59584,
+            "bytesDownDecoded": 651280,
+            "repeated": 3,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 2,
+                "rowsRead": 36,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 20,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "sitemap",
+          "path": "/sitemap.xml",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 917.2,
+            "p95": 1339.1,
+            "min": 891.5,
+            "max": 1838.1
+          },
+          "total": {
+            "runs": 50,
+            "p50": 917.3,
+            "p95": 1339.2,
+            "min": 891.5,
+            "max": 1838.2
+          },
+          "cold": {
+            "ttfb": 1323.8,
+            "total": 1324.1
+          },
+          "sentBytes": 87705,
+          "db": {
+            "reads": 65,
+            "readsFirst": 67,
+            "roundTrips": 65,
+            "rowsRead": 556,
+            "bytesDown": 3409252,
+            "bytesDownDecoded": 39421416,
+            "repeated": 62,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 400,
+                "shape": "READ select \"handle\", \"updated_at\" from \"products\""
+              },
+              {
+                "times": 63,
+                "rowsRead": 126,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 30,
+                "shape": "READ select \"handle\", \"updated_at\" from \"collections\""
+              }
+            ]
+          }
+        },
+        {
+          "key": "upsell",
+          "path": "/api/upsell?exclude=",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 17.4,
+            "p95": 33.6,
+            "min": 15.9,
+            "max": 130.5
+          },
+          "total": {
+            "runs": 50,
+            "p50": 17.4,
+            "p95": 33.7,
+            "min": 16,
+            "max": 130.7
+          },
+          "cold": {
+            "ttfb": 276.4,
+            "total": 276.6
+          },
+          "sentBytes": 1050,
+          "db": {
+            "reads": 3,
+            "readsFirst": 3,
+            "roundTrips": 3,
+            "rowsRead": 33,
+            "bytesDown": 54964,
+            "bytesDownDecoded": 628674,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 22,
+                "shape": "READ select \"id\", \"product_id\", \"price\", \"currency\" from \"variants\" where \"product_id\" in (?, ?, ?) and \"available\" = ? order by \"position\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 9,
+                "shape": "READ select \"id\", \"handle\", \"title\", \"price_min\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" where \"id\" in (?, ?, ?) and \"available\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "offline",
+          "path": "/offline",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 15.3,
+            "p95": 29.8,
+            "min": 14.1,
+            "max": 60.1
+          },
+          "total": {
+            "runs": 50,
+            "p50": 15.4,
+            "p95": 30,
+            "min": 14.1,
+            "max": 60.2
+          },
+          "cold": {
+            "ttfb": 282.7,
+            "total": 282.9
+          },
+          "sentBytes": 1040,
+          "db": {
+            "reads": 1,
+            "readsFirst": 1,
+            "roundTrips": 1,
+            "rowsRead": 2,
+            "bytesDown": 54055,
+            "bytesDownDecoded": 625031,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "manifest",
+          "path": "/manifest.webmanifest",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 15.1,
+            "p95": 26,
+            "min": 14.2,
+            "max": 32.8
+          },
+          "total": {
+            "runs": 50,
+            "p50": 15.2,
+            "p95": 26.1,
+            "min": 14.2,
+            "max": 32.9
+          },
+          "cold": {
+            "ttfb": 269,
+            "total": 269.2
+          },
+          "sentBytes": 536,
+          "db": {
+            "reads": 1,
+            "readsFirst": 1,
+            "roundTrips": 1,
+            "rowsRead": 2,
+            "bytesDown": 54055,
+            "bytesDownDecoded": 625031,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "label": "Legacy, no release",
+      "store": "legacy store before its first publish",
+      "posts": 60,
+      "build": "es8ihdvIYpyRLktsdJvbC",
+      "commit": "f893710",
+      "fixture": {
+        "name": "perf",
+        "sizes": {
+          "products": 400,
+          "variants": 1142,
+          "productImages": 1764,
+          "collections": 30,
+          "collectionMemberships": 1253,
+          "contentPages": 21,
+          "journalPosts": 60,
+          "campaigns": 4,
+          "offers": 12,
+          "bundles": 4,
+          "placements": 42,
+          "media": 32,
+          "mediaBytes": 4100174,
+          "liveReleaseBytes": 0,
+          "cmsMode": "legacy",
+          "liveReleaseVersion": null,
+          "documents": 0,
+          "journalDocuments": 0,
+          "documentVersions": 0,
+          "homeSections": 12,
+          "contentDigest": "331b3929e7a67fe9"
+        },
+        "seededAt": "2026-11-03T22:00:51.807Z"
+      },
+      "routes": [
+        {
+          "key": "home",
+          "path": "/",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 40.2,
+            "p95": 45.2,
+            "min": 35.6,
+            "max": 57.1
+          },
+          "total": {
+            "runs": 50,
+            "p50": 41.8,
+            "p95": 46.7,
+            "min": 37.2,
+            "max": 58.8
+          },
+          "cold": {
+            "ttfb": 425.1,
+            "total": 426.8
+          },
+          "sentBytes": 176666,
+          "db": {
+            "reads": 32,
+            "readsFirst": 34,
+            "roundTrips": 32,
+            "rowsRead": 5436,
+            "bytesDown": 15708,
+            "bytesDownDecoded": 67627,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"description\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" inner join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c"
+              },
+              {
+                "times": 5,
+                "rowsRead": 802,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 800,
+                "shape": "READ select \"handle\", \"title\", \"product_type\", \"price_min\", \"price_max\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" order by \"available\" desc, \"created_at\" desc limit ?"
+              },
+              {
+                "times": 5,
+                "rowsRead": 604,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 400,
+                "shape": "READ select count(\"id\") as \"n\" from \"products\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 85,
+                "shape": "READ select \"slug\", \"title\", \"enabled\", \"updated_at\", \"family\" from \"cms_pages\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 30,
+                "shape": "READ select count(\"id\") as \"n\" from \"collections\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 15,
+                "shape": "READ select \"id\", \"handle\" from \"collections\" where \"id\" in (?, ?, ?, ?, ?)"
+              },
+              {
+                "times": 5,
+                "rowsRead": 7,
+                "shape": "READ select \"co\".\"pinned\" from \"collection_overrides\" as \"co\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"co\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 7,
+                "rowsRead": 5,
+                "shape": "READ select * from \"cms_blocks\" where \"key\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select * from \"experiments\" where \"target_kind\" = ? and \"status\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "product",
+          "path": "/products/micronised-creatine-12",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 18.4,
+            "p95": 21.2,
+            "min": 16.8,
+            "max": 26
+          },
+          "total": {
+            "runs": 50,
+            "p50": 25.4,
+            "p95": 28.5,
+            "min": 22.5,
+            "max": 42
+          },
+          "cold": {
+            "ttfb": 376.1,
+            "total": 397.4
+          },
+          "sentBytes": 77812,
+          "db": {
+            "reads": 19,
+            "readsFirst": 21,
+            "roundTrips": 19,
+            "rowsRead": 1537,
+            "bytesDown": 11287,
+            "bytesDownDecoded": 53950,
+            "repeated": 4,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 85,
+                "shape": "READ select \"slug\", \"title\", \"enabled\", \"updated_at\", \"family\" from \"cms_pages\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 41,
+                "shape": "READ select * from \"placements\" where \"kind\" = ? and \"source_product_id\" = ? and \"enabled\" = ? order by \"position\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 26,
+                "shape": "READ select * from \"product_images\" where \"product_id\" = ? order by \"position\" asc"
+              },
+              {
+                "times": 2,
+                "rowsRead": 26,
+                "shape": "READ select * from \"variants\" where \"product_id\" = ? order by \"position\" asc"
+              },
+              {
+                "times": 1,
+                "rowsRead": 9,
+                "shape": "READ select \"id\", \"handle\", \"title\", \"price_min\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" where \"id\" in (?, ?, ?) and \"available\" = ?"
+              },
+              {
+                "times": 6,
+                "rowsRead": 3,
+                "shape": "READ select * from \"cms_blocks\" where \"key\" = ?"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"products\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select * from \"product_overrides\" where \"product_id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collection",
+          "path": "/collections/protein",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 17.3,
+            "p95": 22.9,
+            "min": 15,
+            "max": 40.9
+          },
+          "total": {
+            "runs": 50,
+            "p50": 25,
+            "p95": 32.2,
+            "min": 23,
+            "max": 49.1
+          },
+          "cold": {
+            "ttfb": 373.8,
+            "total": 388
+          },
+          "sentBytes": 142041,
+          "db": {
+            "reads": 15,
+            "readsFirst": 17,
+            "roundTrips": 15,
+            "rowsRead": 1884,
+            "bytesDown": 8242,
+            "bytesDownDecoded": 50625,
+            "repeated": 2,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 163,
+                "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+              },
+              {
+                "times": 1,
+                "rowsRead": 162,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 122,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 85,
+                "shape": "READ select \"slug\", \"title\", \"enabled\", \"updated_at\", \"family\" from \"cms_pages\""
+              },
+              {
+                "times": 5,
+                "rowsRead": 3,
+                "shape": "READ select * from \"cms_blocks\" where \"key\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 3,
+                "shape": "READ select \"co\".\"pinned\" from \"collection_overrides\" as \"co\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"co\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"collections\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collection-all",
+          "path": "/collections/shop-all",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 17.1,
+            "p95": 23.4,
+            "min": 15.1,
+            "max": 24.8
+          },
+          "total": {
+            "runs": 50,
+            "p50": 28,
+            "p95": 35.8,
+            "min": 24.5,
+            "max": 49.4
+          },
+          "cold": {
+            "ttfb": 385.9,
+            "total": 403.1
+          },
+          "sentBytes": 172960,
+          "db": {
+            "reads": 15,
+            "readsFirst": 15,
+            "roundTrips": 15,
+            "rowsRead": 5854,
+            "bytesDown": 9200,
+            "bytesDownDecoded": 52877,
+            "repeated": 2,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1617,
+                "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+              },
+              {
+                "times": 1,
+                "rowsRead": 1601,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1201,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 85,
+                "shape": "READ select \"slug\", \"title\", \"enabled\", \"updated_at\", \"family\" from \"cms_pages\""
+              },
+              {
+                "times": 5,
+                "rowsRead": 3,
+                "shape": "READ select * from \"cms_blocks\" where \"key\" = ?"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"collections\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"co\".\"pinned\" from \"collection_overrides\" as \"co\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"co\".\"collection_id\" where \"c\".\"handle\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collections",
+          "path": "/collections",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 19.6,
+            "p95": 22.3,
+            "min": 17.3,
+            "max": 22.6
+          },
+          "total": {
+            "runs": 50,
+            "p50": 21,
+            "p95": 23.9,
+            "min": 18.8,
+            "max": 24.5
+          },
+          "cold": {
+            "ttfb": 382.2,
+            "total": 383.4
+          },
+          "sentBytes": 96596,
+          "db": {
+            "reads": 10,
+            "readsFirst": 12,
+            "roundTrips": 10,
+            "rowsRead": 2774,
+            "bytesDown": 6196,
+            "bytesDownDecoded": 36890,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 2,
+                "rowsRead": 2684,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 85,
+                "shape": "READ select \"slug\", \"title\", \"enabled\", \"updated_at\", \"family\" from \"cms_pages\""
+              },
+              {
+                "times": 5,
+                "rowsRead": 3,
+                "shape": "READ select * from \"cms_blocks\" where \"key\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "search",
+          "path": "/search?q=protein",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 20.1,
+            "p95": 26.8,
+            "min": 18,
+            "max": 36.1
+          },
+          "total": {
+            "runs": 50,
+            "p50": 21.6,
+            "p95": 28.6,
+            "min": 19.5,
+            "max": 37.3
+          },
+          "cold": {
+            "ttfb": 377.2,
+            "total": 378.5
+          },
+          "sentBytes": 128324,
+          "db": {
+            "reads": 9,
+            "readsFirst": 11,
+            "roundTrips": 9,
+            "rowsRead": 1885,
+            "bytesDown": 6087,
+            "bytesDownDecoded": 41098,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 453,
+                "shape": "READ select \"handle\", \"title\", \"featured_image\" as \"image\", \"price_min\" as \"price\", \"currency\", \"product_type\", \"available\" from \"products\" where (\"title\" like ? or \"product_type\" like ? or \"vendor\" like ? or \"tags\" like ?) order by \"available\" "
+              },
+              {
+                "times": 1,
+                "rowsRead": 85,
+                "shape": "READ select \"slug\", \"title\", \"enabled\", \"updated_at\", \"family\" from \"cms_pages\""
+              },
+              {
+                "times": 4,
+                "rowsRead": 3,
+                "shape": "READ select * from \"cms_blocks\" where \"key\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cms-page",
+          "path": "/policies/refund-policy",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 18.1,
+            "p95": 22.5,
+            "min": 15.3,
+            "max": 26.9
+          },
+          "total": {
+            "runs": 50,
+            "p50": 19.4,
+            "p95": 24,
+            "min": 16.7,
+            "max": 28.4
+          },
+          "cold": {
+            "ttfb": 378.4,
+            "total": 379.4
+          },
+          "sentBytes": 57627,
+          "db": {
+            "reads": 10,
+            "readsFirst": 12,
+            "roundTrips": 10,
+            "rowsRead": 1434,
+            "bytesDown": 7504,
+            "bytesDownDecoded": 40105,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 85,
+                "shape": "READ select \"slug\", \"title\", \"enabled\", \"updated_at\", \"family\" from \"cms_pages\""
+              },
+              {
+                "times": 4,
+                "rowsRead": 3,
+                "shape": "READ select * from \"cms_blocks\" where \"key\" = ?"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"cms_pages\" where \"slug\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "journal",
+          "path": "/journal",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 74.5,
+            "p95": 92.9,
+            "min": 69.1,
+            "max": 101
+          },
+          "total": {
+            "runs": 50,
+            "p50": 75.6,
+            "p95": 94.4,
+            "min": 70.5,
+            "max": 103.8
+          },
+          "cold": {
+            "ttfb": 460.8,
+            "total": 461.8
+          },
+          "sentBytes": 96279,
+          "db": {
+            "reads": 69,
+            "readsFirst": 71,
+            "roundTrips": 69,
+            "rowsRead": 1577,
+            "bytesDown": 105925,
+            "bytesDownDecoded": 548967,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 2,
+                "rowsRead": 170,
+                "shape": "READ select \"slug\", \"title\", \"enabled\", \"updated_at\", \"family\" from \"cms_pages\""
+              },
+              {
+                "times": 60,
+                "rowsRead": 60,
+                "shape": "READ select * from \"cms_pages\" where \"slug\" = ?"
+              },
+              {
+                "times": 4,
+                "rowsRead": 3,
+                "shape": "READ select * from \"cms_blocks\" where \"key\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cart-get",
+          "path": "/api/cart",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 3.7,
+            "p95": 9.1,
+            "min": 3.2,
+            "max": 13.4
+          },
+          "total": {
+            "runs": 50,
+            "p50": 3.7,
+            "p95": 9.1,
+            "min": 3.3,
+            "max": 13.5
+          },
+          "cold": {
+            "ttfb": 305.2,
+            "total": 305.7
+          },
+          "sentBytes": 1614,
+          "db": {
+            "reads": 3,
+            "readsFirst": 5,
+            "roundTrips": 3,
+            "rowsRead": 29,
+            "bytesDown": 2246,
+            "bytesDownDecoded": 9925,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 18,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 10,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cart-update",
+          "path": "/api/cart",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 4.9,
+            "p95": 9.3,
+            "min": 4.3,
+            "max": 12.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 4.9,
+            "p95": 9.3,
+            "min": 4.3,
+            "max": 12.3
+          },
+          "cold": {
+            "ttfb": 310,
+            "total": 310.5
+          },
+          "sentBytes": 1614,
+          "db": {
+            "reads": 3,
+            "readsFirst": 3,
+            "roundTrips": 5,
+            "rowsRead": 31,
+            "bytesDown": 2619,
+            "bytesDownDecoded": 10506,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 18,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 10,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "WRITE update \"cart_items\" set \"quantity\" = ? where \"cart_id\" = ? and \"variant_id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "WRITE update \"carts\" set \"updated_at\" = ? where \"id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "checkout",
+          "path": "/checkout",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 22.6,
+            "p95": 36.8,
+            "min": 20.9,
+            "max": 42.2
+          },
+          "total": {
+            "runs": 50,
+            "p50": 23.7,
+            "p95": 38.5,
+            "min": 21.6,
+            "max": 44
+          },
+          "cold": {
+            "ttfb": 394.7,
+            "total": 395.5
+          },
+          "sentBytes": 55464,
+          "db": {
+            "reads": 15,
+            "readsFirst": 17,
+            "roundTrips": 15,
+            "rowsRead": 1575,
+            "bytesDown": 11018,
+            "bytesDownDecoded": 67762,
+            "repeated": 4,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 2,
+                "rowsRead": 170,
+                "shape": "READ select \"slug\", \"title\", \"enabled\", \"updated_at\", \"family\" from \"cms_pages\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 36,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 20,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 4,
+                "rowsRead": 3,
+                "shape": "READ select * from \"cms_blocks\" where \"key\" = ?"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "sitemap",
+          "path": "/sitemap.xml",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 131,
+            "p95": 229.2,
+            "min": 121.2,
+            "max": 257.2
+          },
+          "total": {
+            "runs": 50,
+            "p50": 131,
+            "p95": 229.3,
+            "min": 121.2,
+            "max": 257.3
+          },
+          "cold": {
+            "ttfb": 444.7,
+            "total": 445
+          },
+          "sentBytes": 87705,
+          "db": {
+            "reads": 190,
+            "readsFirst": 192,
+            "roundTrips": 190,
+            "rowsRead": 786,
+            "bytesDown": 137398,
+            "bytesDownDecoded": 642874,
+            "repeated": 125,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 400,
+                "shape": "READ select \"handle\", \"updated_at\" from \"products\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 170,
+                "shape": "READ select \"slug\", \"title\", \"enabled\", \"updated_at\", \"family\" from \"cms_pages\""
+              },
+              {
+                "times": 63,
+                "rowsRead": 63,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 63,
+                "rowsRead": 63,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              },
+              {
+                "times": 60,
+                "rowsRead": 60,
+                "shape": "READ select * from \"cms_pages\" where \"slug\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 30,
+                "shape": "READ select \"handle\", \"updated_at\" from \"collections\""
+              }
+            ]
+          }
+        },
+        {
+          "key": "upsell",
+          "path": "/api/upsell?exclude=",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 3.9,
+            "p95": 5.3,
+            "min": 3.4,
+            "max": 6.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 3.9,
+            "p95": 5.4,
+            "min": 3.5,
+            "max": 6.4
+          },
+          "cold": {
+            "ttfb": 262.5,
+            "total": 262.7
+          },
+          "sentBytes": 1050,
+          "db": {
+            "reads": 5,
+            "readsFirst": 5,
+            "roundTrips": 5,
+            "rowsRead": 35,
+            "bytesDown": 1803,
+            "bytesDownDecoded": 5605,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 22,
+                "shape": "READ select \"id\", \"product_id\", \"price\", \"currency\" from \"variants\" where \"product_id\" in (?, ?, ?) and \"available\" = ? order by \"position\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 9,
+                "shape": "READ select \"id\", \"handle\", \"title\", \"price_min\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" where \"id\" in (?, ?, ?) and \"available\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select * from \"placements\" where \"kind\" = ? and \"enabled\" = ? order by \"position\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "offline",
+          "path": "/offline",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 1.8,
+            "p95": 2.6,
+            "min": 1.5,
+            "max": 3.1
+          },
+          "total": {
+            "runs": 50,
+            "p50": 1.8,
+            "p95": 2.6,
+            "min": 1.6,
+            "max": 3.1
+          },
+          "cold": {
+            "ttfb": 273,
+            "total": 273.2
+          },
+          "sentBytes": 1040,
+          "db": {
+            "reads": 2,
+            "readsFirst": 2,
+            "roundTrips": 2,
+            "rowsRead": 2,
+            "bytesDown": 492,
+            "bytesDownDecoded": 977,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "manifest",
+          "path": "/manifest.webmanifest",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 1.7,
+            "p95": 2.4,
+            "min": 1.5,
+            "max": 3.6
+          },
+          "total": {
+            "runs": 50,
+            "p50": 1.7,
+            "p95": 2.4,
+            "min": 1.5,
+            "max": 3.7
+          },
+          "cold": {
+            "ttfb": 257.7,
+            "total": 257.9
+          },
+          "sentBytes": 536,
+          "db": {
+            "reads": 2,
+            "readsFirst": 2,
+            "roundTrips": 2,
+            "rowsRead": 2,
+            "bytesDown": 492,
+            "bytesDownDecoded": 977,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT mode FROM cms_state WHERE id = ?"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "label": "v4, 0 posts",
+      "store": "documents store, v4 list",
+      "posts": 0,
+      "build": "es8ihdvIYpyRLktsdJvbC",
+      "commit": "f893710",
+      "fixture": {
+        "name": "perf",
+        "sizes": {
+          "products": 400,
+          "variants": 1142,
+          "productImages": 1764,
+          "collections": 30,
+          "collectionMemberships": 1253,
+          "contentPages": 21,
+          "journalPosts": 60,
+          "campaigns": 4,
+          "offers": 12,
+          "bundles": 4,
+          "placements": 42,
+          "media": 32,
+          "mediaBytes": 4100174,
+          "liveReleaseBytes": 10849,
+          "cmsMode": "documents",
+          "liveReleaseVersion": 4,
+          "documents": 33,
+          "journalDocuments": 0,
+          "documentVersions": 66,
+          "homeSections": 12,
+          "contentDigest": "331b3929e7a67fe9"
+        },
+        "seededAt": "2026-11-03T22:01:54.118Z"
+      },
+      "routes": [
+        {
+          "key": "home",
+          "path": "/",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 41.7,
+            "p95": 55.9,
+            "min": 35.3,
+            "max": 157.9
+          },
+          "total": {
+            "runs": 50,
+            "p50": 43.4,
+            "p95": 58.2,
+            "min": 36.9,
+            "max": 160.1
+          },
+          "cold": {
+            "ttfb": 636.3,
+            "total": 637.8
+          },
+          "sentBytes": 174867,
+          "db": {
+            "reads": 25,
+            "readsFirst": 27,
+            "roundTrips": 25,
+            "rowsRead": 5364,
+            "bytesDown": 16376,
+            "bytesDownDecoded": 61289,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"description\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" inner join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c"
+              },
+              {
+                "times": 5,
+                "rowsRead": 802,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 800,
+                "shape": "READ select \"handle\", \"title\", \"product_type\", \"price_min\", \"price_max\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" order by \"available\" desc, \"created_at\" desc limit ?"
+              },
+              {
+                "times": 5,
+                "rowsRead": 604,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 400,
+                "shape": "READ select count(\"id\") as \"n\" from \"products\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 30,
+                "shape": "READ select count(\"id\") as \"n\" from \"collections\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 15,
+                "shape": "READ select \"id\", \"handle\" from \"collections\" where \"id\" in (?, ?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 5,
+                "rowsRead": 7,
+                "shape": "READ select \"co\".\"pinned\" from \"collection_overrides\" as \"co\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"co\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 6,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select * from \"experiments\" where \"target_kind\" = ? and \"status\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "product",
+          "path": "/products/micronised-creatine-12",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 14.9,
+            "p95": 20.4,
+            "min": 12.5,
+            "max": 59.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 25,
+            "p95": 35.5,
+            "min": 21,
+            "max": 102
+          },
+          "cold": {
+            "ttfb": 435.3,
+            "total": 461.4
+          },
+          "sentBytes": 76989,
+          "db": {
+            "reads": 11,
+            "readsFirst": 13,
+            "roundTrips": 11,
+            "rowsRead": 3757,
+            "bytesDown": 11475,
+            "bytesDownDecoded": 46322,
+            "repeated": 3,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 2346,
+                "shape": "READ select \"p\".\"id\", \"p\".\"handle\", \"p\".\"title\", \"p\".\"price_min\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\", count(\"theirs\".\"collection_id\") as \"shared\" from \"collection_products\" as \"m"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 2,
+                "rowsRead": 26,
+                "shape": "READ select * from \"product_images\" where \"product_id\" = ? order by \"position\" asc"
+              },
+              {
+                "times": 2,
+                "rowsRead": 26,
+                "shape": "READ select * from \"variants\" where \"product_id\" = ? order by \"position\" asc"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"products\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collection",
+          "path": "/collections/protein",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 16,
+            "p95": 22.7,
+            "min": 12.3,
+            "max": 31.5
+          },
+          "total": {
+            "runs": 50,
+            "p50": 22.6,
+            "p95": 32.3,
+            "min": 19.6,
+            "max": 46.8
+          },
+          "cold": {
+            "ttfb": 472.3,
+            "total": 489.6
+          },
+          "sentBytes": 140401,
+          "db": {
+            "reads": 9,
+            "readsFirst": 11,
+            "roundTrips": 9,
+            "rowsRead": 1806,
+            "bytesDown": 9152,
+            "bytesDownDecoded": 44070,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 163,
+                "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+              },
+              {
+                "times": 1,
+                "rowsRead": 162,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 122,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"collections\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collection-all",
+          "path": "/collections/shop-all",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 15.7,
+            "p95": 22.8,
+            "min": 12.5,
+            "max": 24.8
+          },
+          "total": {
+            "runs": 50,
+            "p50": 26.7,
+            "p95": 34,
+            "min": 23.6,
+            "max": 39.5
+          },
+          "cold": {
+            "ttfb": 423.4,
+            "total": 450.5
+          },
+          "sentBytes": 171320,
+          "db": {
+            "reads": 9,
+            "readsFirst": 9,
+            "roundTrips": 9,
+            "rowsRead": 5778,
+            "bytesDown": 10164,
+            "bytesDownDecoded": 46485,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1617,
+                "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+              },
+              {
+                "times": 1,
+                "rowsRead": 1601,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1201,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"collections\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collections",
+          "path": "/collections",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 17.4,
+            "p95": 21.7,
+            "min": 15.4,
+            "max": 27.2
+          },
+          "total": {
+            "runs": 50,
+            "p50": 18.9,
+            "p95": 23.4,
+            "min": 16.9,
+            "max": 29.4
+          },
+          "cold": {
+            "ttfb": 393.2,
+            "total": 398.4
+          },
+          "sentBytes": 94913,
+          "db": {
+            "reads": 5,
+            "readsFirst": 7,
+            "roundTrips": 5,
+            "rowsRead": 2704,
+            "bytesDown": 8584,
+            "bytesDownDecoded": 35395,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 2,
+                "rowsRead": 2684,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 6,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "search",
+          "path": "/search?q=protein",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 18.8,
+            "p95": 26.6,
+            "min": 15.5,
+            "max": 36.5
+          },
+          "total": {
+            "runs": 50,
+            "p50": 19.7,
+            "p95": 27.9,
+            "min": 17.1,
+            "max": 38.1
+          },
+          "cold": {
+            "ttfb": 442.3,
+            "total": 443.6
+          },
+          "sentBytes": 126727,
+          "db": {
+            "reads": 4,
+            "readsFirst": 6,
+            "roundTrips": 4,
+            "rowsRead": 1809,
+            "bytesDown": 7151,
+            "bytesDownDecoded": 34809,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 453,
+                "shape": "READ select \"handle\", \"title\", \"featured_image\" as \"image\", \"price_min\" as \"price\", \"currency\", \"product_type\", \"available\" from \"products\" where (\"title\" like ? or \"product_type\" like ? or \"vendor\" like ? or \"tags\" like ?) order by \"available\" "
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cms-page",
+          "path": "/policies/refund-policy",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 15.4,
+            "p95": 20.5,
+            "min": 13.2,
+            "max": 27.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 16.6,
+            "p95": 21.1,
+            "min": 14.5,
+            "max": 28.3
+          },
+          "cold": {
+            "ttfb": 444.9,
+            "total": 445.9
+          },
+          "sentBytes": 55944,
+          "db": {
+            "reads": 4,
+            "readsFirst": 6,
+            "roundTrips": 4,
+            "rowsRead": 1357,
+            "bytesDown": 7319,
+            "bytesDownDecoded": 28633,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "journal",
+          "path": "/journal",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 13.5,
+            "p95": 17.5,
+            "min": 11.3,
+            "max": 20.7
+          },
+          "total": {
+            "runs": 50,
+            "p50": 14.5,
+            "p95": 17.8,
+            "min": 12.6,
+            "max": 22.6
+          },
+          "cold": {
+            "ttfb": 543.4,
+            "total": 545
+          },
+          "sentBytes": 40439,
+          "db": {
+            "reads": 3,
+            "readsFirst": 5,
+            "roundTrips": 3,
+            "rowsRead": 1356,
+            "bytesDown": 5969,
+            "bytesDownDecoded": 23715,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cart-get",
+          "path": "/api/cart",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 4.9,
+            "p95": 11.1,
+            "min": 3.8,
+            "max": 14.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 5,
+            "p95": 11.1,
+            "min": 3.9,
+            "max": 14.4
+          },
+          "cold": {
+            "ttfb": 425.9,
+            "total": 426.5
+          },
+          "sentBytes": 1614,
+          "db": {
+            "reads": 3,
+            "readsFirst": 5,
+            "roundTrips": 3,
+            "rowsRead": 29,
+            "bytesDown": 2246,
+            "bytesDownDecoded": 9925,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 18,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 10,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cart-update",
+          "path": "/api/cart",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 6.2,
+            "p95": 14.3,
+            "min": 5.1,
+            "max": 18.5
+          },
+          "total": {
+            "runs": 50,
+            "p50": 6.2,
+            "p95": 14.4,
+            "min": 5.2,
+            "max": 18.6
+          },
+          "cold": {
+            "ttfb": 407.8,
+            "total": 408.4
+          },
+          "sentBytes": 1614,
+          "db": {
+            "reads": 3,
+            "readsFirst": 3,
+            "roundTrips": 5,
+            "rowsRead": 31,
+            "bytesDown": 2615,
+            "bytesDownDecoded": 10507,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 18,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 10,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "WRITE update \"cart_items\" set \"quantity\" = ? where \"cart_id\" = ? and \"variant_id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "WRITE update \"carts\" set \"updated_at\" = ? where \"id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "checkout",
+          "path": "/checkout",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 20.9,
+            "p95": 36,
+            "min": 18,
+            "max": 45.9
+          },
+          "total": {
+            "runs": 50,
+            "p50": 22,
+            "p95": 36.8,
+            "min": 18.7,
+            "max": 47.6
+          },
+          "cold": {
+            "ttfb": 465.2,
+            "total": 466.1
+          },
+          "sentBytes": 53871,
+          "db": {
+            "reads": 9,
+            "readsFirst": 11,
+            "roundTrips": 9,
+            "rowsRead": 1414,
+            "bytesDown": 10458,
+            "bytesDownDecoded": 43564,
+            "repeated": 3,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 2,
+                "rowsRead": 36,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 20,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "sitemap",
+          "path": "/sitemap.xml",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 7.8,
+            "p95": 12.2,
+            "min": 6.7,
+            "max": 25.5
+          },
+          "total": {
+            "runs": 50,
+            "p50": 7.9,
+            "p95": 12.3,
+            "min": 6.8,
+            "max": 25.7
+          },
+          "cold": {
+            "ttfb": 409.5,
+            "total": 410
+          },
+          "sentBytes": 79898,
+          "db": {
+            "reads": 4,
+            "readsFirst": 6,
+            "roundTrips": 4,
+            "rowsRead": 434,
+            "bytesDown": 11526,
+            "bytesDownDecoded": 69896,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 400,
+                "shape": "READ select \"handle\", \"updated_at\" from \"products\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 30,
+                "shape": "READ select \"handle\", \"updated_at\" from \"collections\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 4,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "upsell",
+          "path": "/api/upsell?exclude=",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 2.4,
+            "p95": 3.9,
+            "min": 2,
+            "max": 4.8
+          },
+          "total": {
+            "runs": 50,
+            "p50": 2.5,
+            "p95": 3.9,
+            "min": 2,
+            "max": 4.9
+          },
+          "cold": {
+            "ttfb": 322.3,
+            "total": 322.7
+          },
+          "sentBytes": 28,
+          "db": {
+            "reads": 1,
+            "readsFirst": 1,
+            "roundTrips": 1,
+            "rowsRead": 2,
+            "bytesDown": 3871,
+            "bytesDownDecoded": 12713,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "offline",
+          "path": "/offline",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 3.5,
+            "p95": 6.1,
+            "min": 2.8,
+            "max": 9.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 3.5,
+            "p95": 6.2,
+            "min": 2.8,
+            "max": 9.4
+          },
+          "cold": {
+            "ttfb": 309.6,
+            "total": 309.9
+          },
+          "sentBytes": 1040,
+          "db": {
+            "reads": 2,
+            "readsFirst": 2,
+            "roundTrips": 2,
+            "rowsRead": 14,
+            "bytesDown": 4933,
+            "bytesDownDecoded": 17314,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "manifest",
+          "path": "/manifest.webmanifest",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 3.3,
+            "p95": 5.5,
+            "min": 2.6,
+            "max": 7.2
+          },
+          "total": {
+            "runs": 50,
+            "p50": 3.3,
+            "p95": 5.5,
+            "min": 2.6,
+            "max": 7.2
+          },
+          "cold": {
+            "ttfb": 383.4,
+            "total": 383.7
+          },
+          "sentBytes": 536,
+          "db": {
+            "reads": 2,
+            "readsFirst": 2,
+            "roundTrips": 2,
+            "rowsRead": 14,
+            "bytesDown": 4933,
+            "bytesDownDecoded": 17315,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "label": "v4, 200 posts",
+      "store": "documents store, v4 list",
+      "posts": 200,
+      "build": "es8ihdvIYpyRLktsdJvbC",
+      "commit": "f893710",
+      "fixture": {
+        "name": "perf",
+        "sizes": {
+          "products": 400,
+          "variants": 1142,
+          "productImages": 1764,
+          "collections": 30,
+          "collectionMemberships": 1253,
+          "contentPages": 21,
+          "journalPosts": 60,
+          "campaigns": 4,
+          "offers": 12,
+          "bundles": 4,
+          "placements": 42,
+          "media": 32,
+          "mediaBytes": 4100174,
+          "liveReleaseBytes": 37353,
+          "cmsMode": "documents",
+          "liveReleaseVersion": 4,
+          "documents": 233,
+          "journalDocuments": 200,
+          "documentVersions": 468,
+          "homeSections": 12,
+          "contentDigest": "331b3929e7a67fe9"
+        },
+        "seededAt": "2026-11-03T22:02:39.491Z"
+      },
+      "routes": [
+        {
+          "key": "home",
+          "path": "/",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 39.2,
+            "p95": 45.3,
+            "min": 36.4,
+            "max": 49.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 40.6,
+            "p95": 47,
+            "min": 37.6,
+            "max": 50.9
+          },
+          "cold": {
+            "ttfb": 538.5,
+            "total": 540.1
+          },
+          "sentBytes": 174867,
+          "db": {
+            "reads": 25,
+            "readsFirst": 27,
+            "roundTrips": 25,
+            "rowsRead": 5364,
+            "bytesDown": 30167,
+            "bytesDownDecoded": 89800,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"description\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" inner join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c"
+              },
+              {
+                "times": 5,
+                "rowsRead": 802,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 800,
+                "shape": "READ select \"handle\", \"title\", \"product_type\", \"price_min\", \"price_max\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" order by \"available\" desc, \"created_at\" desc limit ?"
+              },
+              {
+                "times": 5,
+                "rowsRead": 604,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 400,
+                "shape": "READ select count(\"id\") as \"n\" from \"products\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 30,
+                "shape": "READ select count(\"id\") as \"n\" from \"collections\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 15,
+                "shape": "READ select \"id\", \"handle\" from \"collections\" where \"id\" in (?, ?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 5,
+                "rowsRead": 7,
+                "shape": "READ select \"co\".\"pinned\" from \"collection_overrides\" as \"co\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"co\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 6,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select * from \"experiments\" where \"target_kind\" = ? and \"status\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "product",
+          "path": "/products/micronised-creatine-12",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 15.7,
+            "p95": 17.8,
+            "min": 13.1,
+            "max": 18.4
+          },
+          "total": {
+            "runs": 50,
+            "p50": 24.5,
+            "p95": 27.1,
+            "min": 21.7,
+            "max": 27.5
+          },
+          "cold": {
+            "ttfb": 377.5,
+            "total": 400.6
+          },
+          "sentBytes": 76989,
+          "db": {
+            "reads": 11,
+            "readsFirst": 13,
+            "roundTrips": 11,
+            "rowsRead": 3757,
+            "bytesDown": 25262,
+            "bytesDownDecoded": 74835,
+            "repeated": 3,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 2346,
+                "shape": "READ select \"p\".\"id\", \"p\".\"handle\", \"p\".\"title\", \"p\".\"price_min\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\", count(\"theirs\".\"collection_id\") as \"shared\" from \"collection_products\" as \"m"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 2,
+                "rowsRead": 26,
+                "shape": "READ select * from \"product_images\" where \"product_id\" = ? order by \"position\" asc"
+              },
+              {
+                "times": 2,
+                "rowsRead": 26,
+                "shape": "READ select * from \"variants\" where \"product_id\" = ? order by \"position\" asc"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"products\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collection",
+          "path": "/collections/protein",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 16.8,
+            "p95": 19.9,
+            "min": 14.3,
+            "max": 29.6
+          },
+          "total": {
+            "runs": 50,
+            "p50": 22.2,
+            "p95": 26.4,
+            "min": 20.2,
+            "max": 36.5
+          },
+          "cold": {
+            "ttfb": 373.8,
+            "total": 391.9
+          },
+          "sentBytes": 140401,
+          "db": {
+            "reads": 9,
+            "readsFirst": 11,
+            "roundTrips": 9,
+            "rowsRead": 1806,
+            "bytesDown": 22942,
+            "bytesDownDecoded": 72581,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 163,
+                "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+              },
+              {
+                "times": 1,
+                "rowsRead": 162,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 122,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"collections\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collection-all",
+          "path": "/collections/shop-all",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 16.6,
+            "p95": 18.2,
+            "min": 13.4,
+            "max": 18.8
+          },
+          "total": {
+            "runs": 50,
+            "p50": 25.6,
+            "p95": 28.4,
+            "min": 23.7,
+            "max": 28.5
+          },
+          "cold": {
+            "ttfb": 388.1,
+            "total": 412.3
+          },
+          "sentBytes": 171320,
+          "db": {
+            "reads": 9,
+            "readsFirst": 9,
+            "roundTrips": 9,
+            "rowsRead": 5778,
+            "bytesDown": 23950,
+            "bytesDownDecoded": 74997,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1617,
+                "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+              },
+              {
+                "times": 1,
+                "rowsRead": 1601,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1201,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"collections\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collections",
+          "path": "/collections",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 18.2,
+            "p95": 20.3,
+            "min": 16.4,
+            "max": 23.7
+          },
+          "total": {
+            "runs": 50,
+            "p50": 19.5,
+            "p95": 21.4,
+            "min": 17.1,
+            "max": 25.2
+          },
+          "cold": {
+            "ttfb": 389.6,
+            "total": 397.2
+          },
+          "sentBytes": 94913,
+          "db": {
+            "reads": 5,
+            "readsFirst": 7,
+            "roundTrips": 5,
+            "rowsRead": 2704,
+            "bytesDown": 22372,
+            "bytesDownDecoded": 63907,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 2,
+                "rowsRead": 2684,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 6,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "search",
+          "path": "/search?q=protein",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 18.5,
+            "p95": 21.5,
+            "min": 16.7,
+            "max": 22.7
+          },
+          "total": {
+            "runs": 50,
+            "p50": 20,
+            "p95": 23,
+            "min": 18.2,
+            "max": 24.2
+          },
+          "cold": {
+            "ttfb": 449.2,
+            "total": 450.5
+          },
+          "sentBytes": 126727,
+          "db": {
+            "reads": 4,
+            "readsFirst": 6,
+            "roundTrips": 4,
+            "rowsRead": 1809,
+            "bytesDown": 20936,
+            "bytesDownDecoded": 63321,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 453,
+                "shape": "READ select \"handle\", \"title\", \"featured_image\" as \"image\", \"price_min\" as \"price\", \"currency\", \"product_type\", \"available\" from \"products\" where (\"title\" like ? or \"product_type\" like ? or \"vendor\" like ? or \"tags\" like ?) order by \"available\" "
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cms-page",
+          "path": "/policies/refund-policy",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 16.5,
+            "p95": 20.2,
+            "min": 13.5,
+            "max": 21.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 17.9,
+            "p95": 20.6,
+            "min": 14.8,
+            "max": 21.9
+          },
+          "cold": {
+            "ttfb": 541,
+            "total": 542.9
+          },
+          "sentBytes": 55944,
+          "db": {
+            "reads": 4,
+            "readsFirst": 6,
+            "roundTrips": 4,
+            "rowsRead": 1357,
+            "bytesDown": 21109,
+            "bytesDownDecoded": 57146,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "journal",
+          "path": "/journal",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 25.3,
+            "p95": 38.2,
+            "min": 21.9,
+            "max": 50.9
+          },
+          "total": {
+            "runs": 50,
+            "p50": 26.9,
+            "p95": 40.4,
+            "min": 23.6,
+            "max": 52.7
+          },
+          "cold": {
+            "ttfb": 432.3,
+            "total": 433.9
+          },
+          "sentBytes": 222138,
+          "db": {
+            "reads": 4,
+            "readsFirst": 6,
+            "roundTrips": 4,
+            "rowsRead": 1357,
+            "bytesDown": 29823,
+            "bytesDownDecoded": 125056,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cart-get",
+          "path": "/api/cart",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 4.3,
+            "p95": 6.6,
+            "min": 3.4,
+            "max": 7.9
+          },
+          "total": {
+            "runs": 50,
+            "p50": 4.4,
+            "p95": 6.7,
+            "min": 3.5,
+            "max": 8
+          },
+          "cold": {
+            "ttfb": 361.5,
+            "total": 362
+          },
+          "sentBytes": 1614,
+          "db": {
+            "reads": 3,
+            "readsFirst": 5,
+            "roundTrips": 3,
+            "rowsRead": 29,
+            "bytesDown": 2254,
+            "bytesDownDecoded": 9925,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 18,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 10,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cart-update",
+          "path": "/api/cart",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 5.1,
+            "p95": 8.3,
+            "min": 4.5,
+            "max": 11
+          },
+          "total": {
+            "runs": 50,
+            "p50": 5.1,
+            "p95": 8.3,
+            "min": 4.5,
+            "max": 11.1
+          },
+          "cold": {
+            "ttfb": 320.2,
+            "total": 320.7
+          },
+          "sentBytes": 1614,
+          "db": {
+            "reads": 3,
+            "readsFirst": 3,
+            "roundTrips": 5,
+            "rowsRead": 31,
+            "bytesDown": 2628,
+            "bytesDownDecoded": 10507,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 18,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 10,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "WRITE update \"cart_items\" set \"quantity\" = ? where \"cart_id\" = ? and \"variant_id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "WRITE update \"carts\" set \"updated_at\" = ? where \"id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "checkout",
+          "path": "/checkout",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 20.8,
+            "p95": 28.9,
+            "min": 19,
+            "max": 31.8
+          },
+          "total": {
+            "runs": 50,
+            "p50": 22.2,
+            "p95": 30.3,
+            "min": 19.3,
+            "max": 33.3
+          },
+          "cold": {
+            "ttfb": 409.2,
+            "total": 410
+          },
+          "sentBytes": 53871,
+          "db": {
+            "reads": 9,
+            "readsFirst": 11,
+            "roundTrips": 9,
+            "rowsRead": 1414,
+            "bytesDown": 24260,
+            "bytesDownDecoded": 72077,
+            "repeated": 3,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 2,
+                "rowsRead": 36,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 20,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "sitemap",
+          "path": "/sitemap.xml",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 15.1,
+            "p95": 17.7,
+            "min": 13.1,
+            "max": 22
+          },
+          "total": {
+            "runs": 50,
+            "p50": 15.1,
+            "p95": 17.8,
+            "min": 13.1,
+            "max": 22
+          },
+          "cold": {
+            "ttfb": 319.1,
+            "total": 319.4
+          },
+          "sentBytes": 105797,
+          "db": {
+            "reads": 5,
+            "readsFirst": 7,
+            "roundTrips": 5,
+            "rowsRead": 435,
+            "bytesDown": 49176,
+            "bytesDownDecoded": 199749,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 400,
+                "shape": "READ select \"handle\", \"updated_at\" from \"products\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 30,
+                "shape": "READ select \"handle\", \"updated_at\" from \"collections\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 4,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "upsell",
+          "path": "/api/upsell?exclude=",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 4.5,
+            "p95": 6.1,
+            "min": 4,
+            "max": 6.6
+          },
+          "total": {
+            "runs": 50,
+            "p50": 4.5,
+            "p95": 6.1,
+            "min": 4.1,
+            "max": 6.6
+          },
+          "cold": {
+            "ttfb": 277.3,
+            "total": 277.4
+          },
+          "sentBytes": 28,
+          "db": {
+            "reads": 1,
+            "readsFirst": 1,
+            "roundTrips": 1,
+            "rowsRead": 2,
+            "bytesDown": 17659,
+            "bytesDownDecoded": 41223,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "offline",
+          "path": "/offline",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 5.4,
+            "p95": 7.7,
+            "min": 4.8,
+            "max": 8.2
+          },
+          "total": {
+            "runs": 50,
+            "p50": 5.4,
+            "p95": 7.8,
+            "min": 4.8,
+            "max": 8.3
+          },
+          "cold": {
+            "ttfb": 273.9,
+            "total": 274.1
+          },
+          "sentBytes": 1040,
+          "db": {
+            "reads": 2,
+            "readsFirst": 2,
+            "roundTrips": 2,
+            "rowsRead": 14,
+            "bytesDown": 18719,
+            "bytesDownDecoded": 45827,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "manifest",
+          "path": "/manifest.webmanifest",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 5.2,
+            "p95": 7.6,
+            "min": 4.8,
+            "max": 9.2
+          },
+          "total": {
+            "runs": 50,
+            "p50": 5.3,
+            "p95": 7.7,
+            "min": 4.8,
+            "max": 9.2
+          },
+          "cold": {
+            "ttfb": 297.4,
+            "total": 297.7
+          },
+          "sentBytes": 536,
+          "db": {
+            "reads": 2,
+            "readsFirst": 2,
+            "roundTrips": 2,
+            "rowsRead": 14,
+            "bytesDown": 18719,
+            "bytesDownDecoded": 45826,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "label": "v4, 1,000 posts",
+      "store": "documents store, v4 list",
+      "posts": 1000,
+      "build": "es8ihdvIYpyRLktsdJvbC",
+      "commit": "f893710",
+      "fixture": {
+        "name": "perf",
+        "sizes": {
+          "products": 400,
+          "variants": 1142,
+          "productImages": 1764,
+          "collections": 30,
+          "collectionMemberships": 1253,
+          "contentPages": 21,
+          "journalPosts": 60,
+          "campaigns": 4,
+          "offers": 12,
+          "bundles": 4,
+          "placements": 42,
+          "media": 32,
+          "mediaBytes": 4100174,
+          "liveReleaseBytes": 142953,
+          "cmsMode": "documents",
+          "liveReleaseVersion": 4,
+          "documents": 1033,
+          "journalDocuments": 1000,
+          "documentVersions": 2072,
+          "homeSections": 12,
+          "contentDigest": "331b3929e7a67fe9"
+        },
+        "seededAt": "2026-11-03T22:03:24.420Z"
+      },
+      "routes": [
+        {
+          "key": "home",
+          "path": "/",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 49,
+            "p95": 53.5,
+            "min": 44.8,
+            "max": 84.9
+          },
+          "total": {
+            "runs": 50,
+            "p50": 50,
+            "p95": 54.9,
+            "min": 46.4,
+            "max": 86.5
+          },
+          "cold": {
+            "ttfb": 550.4,
+            "total": 552.1
+          },
+          "sentBytes": 174867,
+          "db": {
+            "reads": 25,
+            "readsFirst": 27,
+            "roundTrips": 25,
+            "rowsRead": 5364,
+            "bytesDown": 83985,
+            "bytesDownDecoded": 203426,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"description\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" inner join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c"
+              },
+              {
+                "times": 5,
+                "rowsRead": 802,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 800,
+                "shape": "READ select \"handle\", \"title\", \"product_type\", \"price_min\", \"price_max\", \"compare_at_min\", \"currency\", \"available\", \"featured_image\", \"featured_image_alt\" from \"products\" order by \"available\" desc, \"created_at\" desc limit ?"
+              },
+              {
+                "times": 5,
+                "rowsRead": 604,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 400,
+                "shape": "READ select count(\"id\") as \"n\" from \"products\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 30,
+                "shape": "READ select count(\"id\") as \"n\" from \"collections\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 15,
+                "shape": "READ select \"id\", \"handle\" from \"collections\" where \"id\" in (?, ?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 5,
+                "rowsRead": 7,
+                "shape": "READ select \"co\".\"pinned\" from \"collection_overrides\" as \"co\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"co\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 6,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select * from \"experiments\" where \"target_kind\" = ? and \"status\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "product",
+          "path": "/products/micronised-creatine-12",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 25.7,
+            "p95": 28.4,
+            "min": 23.6,
+            "max": 37.2
+          },
+          "total": {
+            "runs": 50,
+            "p50": 34.6,
+            "p95": 38.8,
+            "min": 31.8,
+            "max": 46.4
+          },
+          "cold": {
+            "ttfb": 388.6,
+            "total": 409.7
+          },
+          "sentBytes": 76989,
+          "db": {
+            "reads": 11,
+            "readsFirst": 13,
+            "roundTrips": 11,
+            "rowsRead": 3757,
+            "bytesDown": 79073,
+            "bytesDownDecoded": 188446,
+            "repeated": 3,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 2346,
+                "shape": "READ select \"p\".\"id\", \"p\".\"handle\", \"p\".\"title\", \"p\".\"price_min\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\", count(\"theirs\".\"collection_id\") as \"shared\" from \"collection_products\" as \"m"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 2,
+                "rowsRead": 26,
+                "shape": "READ select * from \"product_images\" where \"product_id\" = ? order by \"position\" asc"
+              },
+              {
+                "times": 2,
+                "rowsRead": 26,
+                "shape": "READ select * from \"variants\" where \"product_id\" = ? order by \"position\" asc"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"products\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collection",
+          "path": "/collections/protein",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 26.4,
+            "p95": 29.3,
+            "min": 23.9,
+            "max": 31.3
+          },
+          "total": {
+            "runs": 50,
+            "p50": 32.4,
+            "p95": 36.2,
+            "min": 29.2,
+            "max": 37.3
+          },
+          "cold": {
+            "ttfb": 384.9,
+            "total": 402.3
+          },
+          "sentBytes": 140401,
+          "db": {
+            "reads": 9,
+            "readsFirst": 11,
+            "roundTrips": 9,
+            "rowsRead": 1806,
+            "bytesDown": 76751,
+            "bytesDownDecoded": 186191,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 163,
+                "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+              },
+              {
+                "times": 1,
+                "rowsRead": 162,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 122,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"collections\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collection-all",
+          "path": "/collections/shop-all",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 26.7,
+            "p95": 30.7,
+            "min": 24.3,
+            "max": 36.2
+          },
+          "total": {
+            "runs": 50,
+            "p50": 35.9,
+            "p95": 39.9,
+            "min": 32.9,
+            "max": 45.2
+          },
+          "cold": {
+            "ttfb": 403.4,
+            "total": 421.4
+          },
+          "sentBytes": 171320,
+          "db": {
+            "reads": 9,
+            "readsFirst": 9,
+            "roundTrips": 9,
+            "rowsRead": 5778,
+            "bytesDown": 77759,
+            "bytesDownDecoded": 188606,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1617,
+                "shape": "READ select \"p\".\"product_type\", count(\"p\".\"id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ? and "
+              },
+              {
+                "times": 1,
+                "rowsRead": 1601,
+                "shape": "READ select \"p\".\"handle\", \"p\".\"title\", \"p\".\"product_type\", \"p\".\"price_min\", \"p\".\"price_max\", \"p\".\"compare_at_min\", \"p\".\"currency\", \"p\".\"available\", \"p\".\"featured_image\", \"p\".\"featured_image_alt\" from \"products\" as \"p\" inner join \"collection_prod"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1201,
+                "shape": "READ select count(\"cp\".\"product_id\") as \"n\" from \"products\" as \"p\" inner join \"collection_products\" as \"cp\" on \"cp\".\"product_id\" = \"p\".\"id\" inner join \"collections\" as \"c\" on \"c\".\"id\" = \"cp\".\"collection_id\" where \"c\".\"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select * from \"collections\" where \"handle\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "collections",
+          "path": "/collections",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 28.3,
+            "p95": 30.6,
+            "min": 25.1,
+            "max": 34
+          },
+          "total": {
+            "runs": 50,
+            "p50": 29.3,
+            "p95": 32,
+            "min": 26.5,
+            "max": 35.5
+          },
+          "cold": {
+            "ttfb": 406.1,
+            "total": 407.1
+          },
+          "sentBytes": 94913,
+          "db": {
+            "reads": 5,
+            "readsFirst": 7,
+            "roundTrips": 5,
+            "rowsRead": 2704,
+            "bytesDown": 76183,
+            "bytesDownDecoded": 177512,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 2,
+                "rowsRead": 2684,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 6,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "search",
+          "path": "/search?q=protein",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 27.4,
+            "p95": 29.4,
+            "min": 24.7,
+            "max": 29.6
+          },
+          "total": {
+            "runs": 50,
+            "p50": 28.8,
+            "p95": 31,
+            "min": 26.3,
+            "max": 31.2
+          },
+          "cold": {
+            "ttfb": 401.9,
+            "total": 403.3
+          },
+          "sentBytes": 126727,
+          "db": {
+            "reads": 4,
+            "readsFirst": 6,
+            "roundTrips": 4,
+            "rowsRead": 1809,
+            "bytesDown": 74745,
+            "bytesDownDecoded": 176924,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 453,
+                "shape": "READ select \"handle\", \"title\", \"featured_image\" as \"image\", \"price_min\" as \"price\", \"currency\", \"product_type\", \"available\" from \"products\" where (\"title\" like ? or \"product_type\" like ? or \"vendor\" like ? or \"tags\" like ?) order by \"available\" "
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cms-page",
+          "path": "/policies/refund-policy",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 25.4,
+            "p95": 27.7,
+            "min": 22.5,
+            "max": 28.2
+          },
+          "total": {
+            "runs": 50,
+            "p50": 26.7,
+            "p95": 29.2,
+            "min": 23.8,
+            "max": 29.7
+          },
+          "cold": {
+            "ttfb": 386.1,
+            "total": 387.1
+          },
+          "sentBytes": 55944,
+          "db": {
+            "reads": 4,
+            "readsFirst": 6,
+            "roundTrips": 4,
+            "rowsRead": 1357,
+            "bytesDown": 74916,
+            "bytesDownDecoded": 170749,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "journal",
+          "path": "/journal",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 80.6,
+            "p95": 90.1,
+            "min": 77.7,
+            "max": 105.7
+          },
+          "total": {
+            "runs": 50,
+            "p50": 83.5,
+            "p95": 91.8,
+            "min": 79.3,
+            "max": 107.6
+          },
+          "cold": {
+            "ttfb": 458.9,
+            "total": 462.5
+          },
+          "sentBytes": 952430,
+          "db": {
+            "reads": 4,
+            "readsFirst": 6,
+            "roundTrips": 4,
+            "rowsRead": 1357,
+            "bytesDown": 119318,
+            "bytesDownDecoded": 527656,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cart-get",
+          "path": "/api/cart",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 4.2,
+            "p95": 5.5,
+            "min": 3.8,
+            "max": 6
+          },
+          "total": {
+            "runs": 50,
+            "p50": 4.3,
+            "p95": 5.5,
+            "min": 3.9,
+            "max": 6
+          },
+          "cold": {
+            "ttfb": 325.5,
+            "total": 326
+          },
+          "sentBytes": 1614,
+          "db": {
+            "reads": 3,
+            "readsFirst": 5,
+            "roundTrips": 3,
+            "rowsRead": 29,
+            "bytesDown": 2249,
+            "bytesDownDecoded": 9928,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 18,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 10,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "cart-update",
+          "path": "/api/cart",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 5,
+            "p95": 5.9,
+            "min": 4.4,
+            "max": 8.2
+          },
+          "total": {
+            "runs": 50,
+            "p50": 5,
+            "p95": 5.9,
+            "min": 4.4,
+            "max": 8.3
+          },
+          "cold": {
+            "ttfb": 303.8,
+            "total": 304.3
+          },
+          "sentBytes": 1614,
+          "db": {
+            "reads": 3,
+            "readsFirst": 3,
+            "roundTrips": 5,
+            "rowsRead": 31,
+            "bytesDown": 2626,
+            "bytesDownDecoded": 10512,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 18,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 10,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "WRITE update \"cart_items\" set \"quantity\" = ? where \"cart_id\" = ? and \"variant_id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "WRITE update \"carts\" set \"updated_at\" = ? where \"id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              }
+            ]
+          }
+        },
+        {
+          "key": "checkout",
+          "path": "/checkout",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 30.2,
+            "p95": 33.4,
+            "min": 28.3,
+            "max": 34
+          },
+          "total": {
+            "runs": 50,
+            "p50": 31.6,
+            "p95": 33.8,
+            "min": 29.4,
+            "max": 35.4
+          },
+          "cold": {
+            "ttfb": 436.9,
+            "total": 437.7
+          },
+          "sentBytes": 53871,
+          "db": {
+            "reads": 9,
+            "readsFirst": 11,
+            "roundTrips": 9,
+            "rowsRead": 1414,
+            "bytesDown": 78067,
+            "bytesDownDecoded": 185683,
+            "repeated": 3,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 1342,
+                "shape": "READ select \"c\".\"handle\", \"c\".\"title\", \"c\".\"image\", \"c\".\"image_alt\", count(\"cp\".\"product_id\") as \"product_count\" from \"collections\" as \"c\" left join \"collection_products\" as \"cp\" on \"cp\".\"collection_id\" = \"c\".\"id\" group by \"c\".\"handle\", \"c\".\"tit"
+              },
+              {
+                "times": 2,
+                "rowsRead": 36,
+                "shape": "READ select \"ci\".\"variant_id\", \"ci\".\"product_id\", \"ci\".\"quantity\", \"ci\".\"price_at_add\", \"v\".\"title\" as \"variant_title\", \"v\".\"sku\", \"v\".\"price\", \"v\".\"currency\" as \"v_currency\", \"v\".\"image_url\", \"v\".\"available\", \"p\".\"title\" as \"product_title\", \"p\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 20,
+                "shape": "READ select * from \"offers\" where \"enabled\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 2,
+                "rowsRead": 2,
+                "shape": "READ select \"id\", \"coupon_code\" from \"carts\" where \"id\" = ?"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "sitemap",
+          "path": "/sitemap.xml",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 42.3,
+            "p95": 48.9,
+            "min": 39.5,
+            "max": 62.1
+          },
+          "total": {
+            "runs": 50,
+            "p50": 42.4,
+            "p95": 49,
+            "min": 39.6,
+            "max": 62.2
+          },
+          "cold": {
+            "ttfb": 320.1,
+            "total": 320.4
+          },
+          "sentBytes": 209320,
+          "db": {
+            "reads": 5,
+            "readsFirst": 7,
+            "roundTrips": 5,
+            "rowsRead": 435,
+            "bytesDown": 192470,
+            "bytesDownDecoded": 715951,
+            "repeated": 1,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 400,
+                "shape": "READ select \"handle\", \"updated_at\" from \"products\""
+              },
+              {
+                "times": 1,
+                "rowsRead": 30,
+                "shape": "READ select \"handle\", \"updated_at\" from \"collections\""
+              },
+              {
+                "times": 2,
+                "rowsRead": 4,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              },
+              {
+                "times": 1,
+                "rowsRead": 1,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?)"
+              }
+            ]
+          }
+        },
+        {
+          "key": "upsell",
+          "path": "/api/upsell?exclude=",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 14.1,
+            "p95": 15.8,
+            "min": 13,
+            "max": 16.5
+          },
+          "total": {
+            "runs": 50,
+            "p50": 14.1,
+            "p95": 15.8,
+            "min": 13.1,
+            "max": 16.6
+          },
+          "cold": {
+            "ttfb": 270.9,
+            "total": 271.1
+          },
+          "sentBytes": 28,
+          "db": {
+            "reads": 1,
+            "readsFirst": 1,
+            "roundTrips": 1,
+            "rowsRead": 2,
+            "bytesDown": 71466,
+            "bytesDownDecoded": 154826,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "offline",
+          "path": "/offline",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 15.3,
+            "p95": 18,
+            "min": 13.7,
+            "max": 19
+          },
+          "total": {
+            "runs": 50,
+            "p50": 15.3,
+            "p95": 18,
+            "min": 13.8,
+            "max": 19
+          },
+          "cold": {
+            "ttfb": 290.7,
+            "total": 290.9
+          },
+          "sentBytes": 1040,
+          "db": {
+            "reads": 2,
+            "readsFirst": 2,
+            "roundTrips": 2,
+            "rowsRead": 14,
+            "bytesDown": 72528,
+            "bytesDownDecoded": 159429,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        },
+        {
+          "key": "manifest",
+          "path": "/manifest.webmanifest",
+          "status": 200,
+          "ttfb": {
+            "runs": 50,
+            "p50": 14.5,
+            "p95": 16.6,
+            "min": 13.8,
+            "max": 16.7
+          },
+          "total": {
+            "runs": 50,
+            "p50": 14.5,
+            "p95": 16.6,
+            "min": 13.9,
+            "max": 16.7
+          },
+          "cold": {
+            "ttfb": 272.1,
+            "total": 272.3
+          },
+          "sentBytes": 536,
+          "db": {
+            "reads": 2,
+            "readsFirst": 2,
+            "roundTrips": 2,
+            "rowsRead": 14,
+            "bytesDown": 72528,
+            "bytesDownDecoded": 159428,
+            "repeated": 0,
+            "stable": true,
+            "sqldAgrees": true,
+            "statements": [
+              {
+                "times": 1,
+                "rowsRead": 12,
+                "shape": "READ SELECT id, document_id, body, schema_version FROM document_versions WHERE id IN (?, ?, ?, ?)"
+              },
+              {
+                "times": 1,
+                "rowsRead": 2,
+                "shape": "READ select \"s\".\"live_release_id\" as \"live_release_id\", \"r\".\"id\" as \"id\", \"r\".\"content\" as \"content\", \"r\".\"content_hash\" as \"content_hash\", \"r\".\"published_at\" as \"published_at\", \"r\".\"note\" as \"note\" from \"release_state\" as \"s\" left join \"release"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
