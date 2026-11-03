@@ -2,7 +2,7 @@
   "id": "TOK-01-02",
   "part": "themes",
   "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — themes",
-  "ranAt": "2026-11-03T14:15:04.154Z",
+  "ranAt": "2026-11-03T15:14:50.875Z",
   "harness": "http://localhost:3204",
   "chrome": "156.0.8078.80",
   "passed": 20,

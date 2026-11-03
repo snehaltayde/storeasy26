@@ -75,8 +75,8 @@ const PALETTES = "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|gre
 const COLOUR_PROPS = "bg|text|border|border-[trblxy]|ring|ring-offset|divide|outline|fill|stroke|from|via|to|decoration|placeholder|caret|accent|shadow";
 // One class (variants such as hover: stripped) → the rule it breaks, or null.
 export const RULES = [
-  { id: "palette colour", re: new RegExp(`^(?:${COLOUR_PROPS})-(?:${PALETTES})(?:-\\d{2,3})?(?:\\/\\d+)?$`) },
-  { id: "accent ladder step (use an accent role)", re: /^(?:bg|text|border|ring|divide|outline|fill|stroke|from|via|to|decoration)-accent-(?:\d{2,3}|label)(?:\/\d+)?$/ },
+  { id: "palette colour", re: new RegExp(`^(?:${COLOUR_PROPS})-(?:${PALETTES})(?:-\\d{2,3})?(?:\\/(?:\\d+|\\[[^\\]]+\\]))?$`) },
+  { id: "accent ladder step (use an accent role)", re: /^(?:bg|text|border|ring|divide|outline|fill|stroke|from|via|to|decoration)-accent-(?:\d{2,3}|label)(?:\/(?:\d+|\[[^\]]+\]))?$/ },
   { id: "arbitrary colour value", re: /^[a-z-]+-\[[^\]]*(?:#[0-9a-fA-F]{3,8}|rgba?\(|hsla?\(|oklch\(|oklab\(|lab\(|color-mix)/ },
   { id: "pixel font size (use text-sf-2xs / text-sf-3xs or a Tailwind size)", re: /^text-\[\d+(?:\.\d+)?px\]$/ },
   { id: "radius step (use rounded-sf-card / -control / -small / -xs / -2xs, rounded-sf-button or rounded-full)", re: /^rounded(?:-[trblse]{1,2})?(?:-(?:xs|sm|md|lg|xl|2xl|3xl))?$/ },
@@ -173,7 +173,8 @@ export function lintSource(src) {
   for (const lit of stringLiterals(src)) {
     for (const raw of lit.split(/\s+/)) {
       if (!raw) continue;
-      const cls = raw.replace(/^!/, "").split(":").pop().replace(/^!/, "");
+      // Tailwind v4 also takes `!` at the end (text-zinc-900!)
+      const cls = raw.replace(/^!/, "").split(":").pop().replace(/^!/, "").replace(/!$/, "");
       const rule = RULES.find((r) => r.re.test(cls));
       if (rule) found.push({ cls: raw, rule: rule.id });
     }
@@ -182,6 +183,8 @@ export function lintSource(src) {
   // to a third party (Razorpay's own window theme in CheckoutFlow) is not
   // page style and is not matched.
   for (const m of src.matchAll(/style=\{\{[^}]*?\b(color|background|backgroundColor|borderColor)\s*:\s*["'`](#[0-9a-fA-F]{3,8}|rgba?\(|hsla?\()/g)) found.push({ cls: m[0].slice(m[0].indexOf(m[1])), rule: "inline style colour" });
+  // SVG paint attributes: fill="#…", stroke={"#…"}, stopColor="#…"
+  for (const m of src.matchAll(/\b(fill|stroke|stopColor|floodColor|lightingColor)=\{?\s*["'`](#[0-9a-fA-F]{3,8}|rgba?\(|hsla?\()/g)) found.push({ cls: m[0], rule: "SVG paint colour" });
   return found;
 }
 
@@ -207,9 +210,12 @@ await t("the lint catches each kind of hard-coded value, with variants and opaci
     const b = \`px-2 \${on ? "group-hover:text-accent-700" : "bg-accent-400"} text-accent-label\`;
     const c = "bg-[#ff0000] text-[rgb(1,2,3)] shadow-[0_1px_2px_rgba(0,0,0,0.1)]";
     const d = "text-[11px] rounded-2xl rounded-t-xl rounded rounded-[9px]";
-    const e = <div style={{ color: "#123456" }} />;`;
+    const e = <div style={{ color: "#123456" }} />;
+    const f = "text-zinc-900! bg-zinc-900/[0.5] hover:text-accent-700/[.8]";
+    const g = <svg><path fill="#ff0000" stroke={"#00ff00"} /><path fill="currentColor" stroke="none" /></svg>;`;
   const hits = lintSource(src).map((h) => h.cls);
-  for (const want of ["text-zinc-500", "hover:bg-white/95", "md:border-red-200", "group-hover:text-accent-700", "bg-accent-400", "text-accent-label", "bg-[#ff0000]", "text-[rgb(1,2,3)]", "shadow-[0_1px_2px_rgba(0,0,0,0.1)]", "text-[11px]", "rounded-2xl", "rounded-t-xl", "rounded", "rounded-[9px]"]) {
+  ok(lintSource(src).filter((h) => h.rule === "SVG paint colour").length === 2, `SVG paint: ${JSON.stringify(lintSource(src).filter((h) => h.rule === "SVG paint colour"))}`);
+  for (const want of ["text-zinc-900!", "bg-zinc-900/[0.5]", "hover:text-accent-700/[.8]", "text-zinc-500", "hover:bg-white/95", "md:border-red-200", "group-hover:text-accent-700", "bg-accent-400", "text-accent-label", "bg-[#ff0000]", "text-[rgb(1,2,3)]", "shadow-[0_1px_2px_rgba(0,0,0,0.1)]", "text-[11px]", "rounded-2xl", "rounded-t-xl", "rounded", "rounded-[9px]"]) {
     ok(hits.includes(want), `missed ${want}; caught ${JSON.stringify(hits)}`);
   }
   ok(lintSource(src).some((h) => h.rule === "inline style colour"), "missed the inline style colour");
@@ -624,6 +630,93 @@ await t("a malformed colour is still refused at save; readability never is", () 
   eq(B.validateBrand(DARK_TITLES).ok, true, "dark titles at save:");
 });
 
+// Fix round 1. The platform's own look (no brand, or the platform's white and
+// #0a0a0b) keeps the default greys and status colours, whose failing pairs
+// are the platform's, not the founder's: they never block and never show.
+const SEEDED = { accent: "#0d9488", background: "#fffdf8", foreground: "#1c1917", radius: "xl", type_scale: "large" };
+const PULSE_BRAND = { accent: "#84cc16", background: "#ffffff", foreground: "#0a0a0b", radius: "md", type_scale: "regular" };
+const WHITE_BLUE = { accent: "#2563eb", background: "#ffffff", foreground: "#0a0a0b" };
+await t("REGRESSION: over a store that had its own colours, a reset, the Pulse kit's brand and white/#0a0a0b with a new accent all publish", () => {
+  for (const [name, draft] of Object.entries({ reset: null, pulse: PULSE_BRAND, whiteBlue: WHITE_BLUE })) {
+    const r = B.checkBrand(draft, { kit: "pulse-1", live: B.resolveBrand(SEEDED), liveKit: "pulse-1" });
+    eq(r.ok, true, `${name} ok (${JSON.stringify(r.errors.map((e) => e.message))}):`);
+    eq(r.issues.length, 0, `${name}: the platform's own pairs are not reported (${JSON.stringify(r.issues.map((e) => e.message))}):`);
+    ok(r.inherited.length > 0, `${name}: the default look's failing pairs are still listed as the platform's own`);
+    eq(B.publishBlocked(draft, { kit: "pulse-1", live: B.resolveBrand(SEEDED), liveKit: "pulse-1" }), false, `${name} publishBlocked:`);
+  }
+});
+
+await t("the platform's own pairs excuse only identical colours: a brand that moves a grey still blocks", () => {
+  const r = B.checkBrand(BORDERLINE, { live: B.resolveBrand(SEEDED) });
+  eq(r.ok, false);
+  ok(r.failing.some((f) => f.severity === "error" && f.pair === "text-faint-sunken"), JSON.stringify(r.failing.map((f) => `${f.pair}:${f.severity}`)));
+});
+
+await t("NO BRAND on the Glow kit: header and hero accents are corrected against the kit, the page gets them, nothing blocks", () => {
+  const raw = B.contrastRatio(B.DEFAULT_ACCENT_LADDER[400], B.KIT_SURFACES["glow-1"].header.bg);
+  ok(raw < 3, `the uncorrected lime wordmark is ${raw.toFixed(2)}:1 on the cream header`);
+  const m = B.pairMatrix(null, "glow-1");
+  for (const id of ["header-accent", "hero-accent"]) ok(m.find((p) => p.id === id).pass, `${id} fails on Glow with no brand`);
+  const r = B.checkBrand(null, { kit: "glow-1" });
+  eq(r.ok, true, `first publish: ${JSON.stringify(r.errors.map((e) => e.message))}`);
+  eq(B.publishBlocked(null, { kit: "glow-1" }), false, "publishBlocked:");
+  ok(r.notes.some((n) => /header wordmark/.test(n)), `no note: ${JSON.stringify(r.notes)}`);
+  const css = B.brandCssVars(null, { kit: "glow-1" });
+  const hdr = m.find((p) => p.id === "header-accent").fgHex;
+  ok(css.includes(`--sf-header-accent:${hdr};`) && css.includes("--sf-hero-accent:"), css);
+  eq(B.brandCssVars(null, { kit: "pulse-1" }), "", "no brand on Pulse writes nothing (default look unchanged):");
+});
+
+// What the page renders, from the CSS the layout writes: each role's variable
+// as brandCssVars sets it, else its globals.css default, following var()s.
+function renderedRoles(brand, kit) {
+  const css = B.brandCssVars(brand, { kit });
+  const vars = Object.fromEntries([...css.matchAll(/--([\w-]+):([^;]+);/g)].map((m) => [m[1], m[2]]));
+  const k = B.KIT_SURFACES[kit];
+  const base = { background: "#ffffff", foreground: "#0a0a0b", "accent-label": "#0a0a0b" };
+  for (const [part, s] of Object.entries(k)) for (const [key, v] of Object.entries(s)) base[`${part}-${key}`] = v;
+  for (const [step, hex] of Object.entries(B.DEFAULT_ACCENT_LADDER)) base[`accent-${step}`] = hex;
+  for (const r of B.ROLES) base[`sf-${r.id}`] = r.css && r.css.startsWith("var(") ? r.css : r.hex;
+  const get = (name, depth = 0) => {
+    const v = vars[name] ?? base[name];
+    const m = /^var\(--([\w-]+)\)$/.exec(v || "");
+    return m && depth < 8 ? get(m[1], depth + 1) : v;
+  };
+  return Object.fromEntries(B.ROLES.map((r) => [r.id, String(get(`sf-${r.id}`)).toLowerCase()]));
+}
+await t("what the page renders is what the matrix measures: every corrected or derived role reaches the CSS", () => {
+  const cases = { seeded: [SEEDED, "pulse-1"], light: [TEST_THEMES.light.brand, "glow-1"], dark: [TEST_THEMES.dark.brand, "pulse-1"], black: [BLACK_ACCENT, "pulse-1"], pulse: [PULSE_BRAND, "pulse-1"], glowKit: [{ accent: "#e11d48", background: "#fffbf7", foreground: "#1c1917" }, "glow-1"], noBrandGlow: [null, "glow-1"], noBrandPulse: [null, "pulse-1"] };
+  const used = new Set(B.PAIRS.flatMap((p) => [p.fg, p.bg]));
+  for (const [name, [brand, kit]] of Object.entries(cases)) {
+    const { roles } = B.brandRoles(brand, kit);
+    const shown = renderedRoles(brand, kit);
+    const off = [...used].filter((id) => shown[id] !== roles[id]).map((id) => `${id} page ${shown[id]} vs matrix ${roles[id]}`);
+    ok(!off.length, `${name}: ${off.join(", ")}`);
+  }
+});
+
+await t("a theme kit change counts as a change: a pair the new kit breaks blocks even when the brand is the same as live", () => {
+  B.KIT_SURFACES["tok-test-1"] = { header: { ...B.KIT_SURFACES["pulse-1"].header }, hero: { bg: "#ffffff", fg: "#111111", muted: "#dddddd" } };
+  try {
+    const r = B.checkBrand(TEST_THEMES.light.brand, { kit: "tok-test-1", live: TEST_THEMES.light.brand, liveKit: "glow-1" });
+    ok(r.errors.some((e) => e.pairs.includes("hero-muted")), `not blocking: ${JSON.stringify(r.issues.map((i) => i.severity + " " + i.pair))}`);
+    const same = B.checkBrand(TEST_THEMES.light.brand, { kit: "tok-test-1", live: TEST_THEMES.light.brand, liveKit: "tok-test-1" });
+    ok(same.ok && same.warnings.some((w) => w.pairs.includes("hero-muted")), "the same kit live: a warning");
+  } finally {
+    delete B.KIT_SURFACES["tok-test-1"];
+  }
+});
+
+await t("a mid-tone background where no text colour reads gets a background suggestion, not none", () => {
+  const brand = { accent: "#0d9488", background: "#866ac7", foreground: "#746787" };
+  const r = B.checkBrand(brand);
+  const i = r.errors.find((e) => e.pairs.includes("body"));
+  ok(i && i.suggestion, `no suggestion: ${JSON.stringify(r.errors.map((e) => e.message))}`);
+  ok(/Try (text|background) colour #[0-9a-f]{6}\./.test(i.message), i.message);
+  const fixed = { ...brand, [i.suggestion.token]: i.suggestion.value };
+  ok(!B.checkBrand(fixed).failing.some((f) => f.severity === "error" && f.fix === "foreground"), `${i.suggestion.value} leaves text pairs failing`);
+});
+
 // ---------------------------------------------------------------------------
 // TOK-02 through the real routes, on a real tenant database
 // ---------------------------------------------------------------------------
@@ -746,6 +839,98 @@ await t("NEGATIVE: a black accent saves with a note that the hero highlight uses
   ok((r.json.notes || []).some((n) => /hero highlight/i.test(n)), `notes: ${JSON.stringify(r.json.notes)}`);
   const p = await publish();
   eq(p.status, 200, `publish ${p.status} ${JSON.stringify(p.body).slice(0, 200)}`);
+});
+
+// Fix round 1, through the founder's own calls: the Brand screen's save and
+// reset, the theme library's apply (the console's default: brand unticked),
+// and Publish.
+const themeRoute = await import("../app/api/admin/theme/route.js");
+const applyTheme = async (kit, withBrand) => {
+  const res = await inTk(() => themeRoute.POST(req({ action: "apply", kit, withBrand, withPresets: false })));
+  return { status: res.status, json: await res.json() };
+};
+const pubErr = (r) => `${r.status} ${JSON.stringify(r.body?.errors || r.body).slice(0, 400)}`;
+
+await t("REGRESSION, real routes: with a theme pinned and the store's own colours live, Reset, the Pulse kit with its brand, and white/#0a0a0b with a new accent each publish", async () => {
+  const goLive = async () => {
+    eq((await putBrand({ brand: SEEDED })).status, 200, "seeded saves:");
+    eq((await applyTheme("pulse", false)).status, 200, "pulse pinned:");
+    const r = await publish();
+    eq(r.status, 200, `seeded publishes: ${pubErr(r)}`);
+  };
+  await goLive();
+  const reset = await putBrand({ reset: true });
+  eq(reset.status, 200);
+  eq((reset.json.warnings || []).length, 0, `reset shows nothing hard to read: ${JSON.stringify(reset.json.warnings)}`);
+  let r = await publish();
+  eq(r.status, 200, `reset publishes: ${pubErr(r)}`);
+
+  await goLive();
+  eq((await applyTheme("pulse", true)).status, 200);
+  eq((await storedBrand())?.foreground, "#0a0a0b", "the kit's brand is the draft:");
+  r = await publish();
+  eq(r.status, 200, `the Pulse kit's brand publishes: ${pubErr(r)}`);
+
+  await goLive();
+  const s = await putBrand({ brand: WHITE_BLUE });
+  eq(s.status, 200);
+  eq(s.json.blocking, false, "nothing blocking:");
+  ok(!(s.json.warnings || []).some((w) => /#080808|#fcfcfc/.test(w)), `odd suggestions: ${JSON.stringify(s.json.warnings)}`);
+  r = await publish();
+  eq(r.status, 200, `white/#0a0a0b with a blue accent publishes: ${pubErr(r)}`);
+});
+
+await t("NO BRAND, real routes: a store with no brand and no theme applies the Glow kit the console's default way and publishes", async () => {
+  eq((await putBrand({ reset: true })).status, 200);
+  await C.patchTenant("tk", { config: { theme: null } });
+  let r = await publish();
+  eq(r.status, 200, `no brand, no theme publishes: ${pubErr(r)}`);
+  eq((await applyTheme("glow", false)).status, 200);
+  eq(await storedBrand(), null, "still no brand:");
+  r = await publish();
+  eq(r.status, 200, `Glow with no brand publishes: ${pubErr(r)}`);
+  // the Brand screen (its reset answer uses the same check as the page on
+  // arrival) explains the corrected wordmark even with no brand saved
+  const again = await putBrand({ reset: true });
+  ok((again.json.notes || []).some((n) => /header wordmark/.test(n)), `notes: ${JSON.stringify(again.json.notes)}`);
+});
+
+await t("a theme-only change is checked at publish (no brand, a kit whose own hero subtitle is unreadable)", async () => {
+  const Kits = await import("../lib/themes/kits.js");
+  const Rel = await import("../lib/releases.js");
+  Kits.KITS.toktest = { id: "toktest", version: 1 };
+  B.KIT_SURFACES["toktest-1"] = { header: { ...B.KIT_SURFACES["pulse-1"].header }, hero: { bg: "#ffffff", fg: "#111111", muted: "#dddddd" } };
+  try {
+    const v = await inTk(() => Rel.validateRelease({ blocks: {}, pages: [], brand: null, theme: { kit: "toktest", version: 1 } }, { live: null }));
+    ok(v.issues.some((i) => i.code === "BRAND_PAIR" && i.severity === "error" && /Hero subtitle/.test(i.message)), JSON.stringify(v.issues));
+  } finally {
+    delete Kits.KITS.toktest;
+    delete B.KIT_SURFACES["toktest-1"];
+  }
+});
+
+await t("the Publishing screen compares with the live store too: an unchanged failing pair is a warning there, not a blocker", async () => {
+  await inTk(async () => {
+    const id = "rel_toktestlive02";
+    const content = { v: 3, blocks: {}, pages: [], brand: B.resolveBrand(BORDERLINE), theme: null, product_overrides: [], collection_pins: [], placements: [], redirects: [] };
+    await tdb.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES (?, ?, ?, 'old', NULL, ?, NULL, ?)", args: [id, JSON.stringify(content), "y".repeat(64), new Date().toISOString(), new Date().toISOString()] });
+    await tdb.execute({ sql: "UPDATE release_state SET live_release_id = ? WHERE id = 1", args: [id] });
+  });
+  await C.patchTenant("tk", { config: { theme: null } });
+  const saved = await putBrand({ brand: { ...BORDERLINE, radius: "lg" } });
+  eq(saved.status, 200);
+  ok(saved.json.warnings.length > 0 && saved.json.blocking === false, `already-live warnings don't block: ${JSON.stringify(saved.json).slice(0, 300)}`);
+  const g = await inTk(() => RelApi.handleReleasesGet(req({})));
+  eq(g.status, 200);
+  const brandIssues = g.body.validation.issues.filter((i) => i.code === "BRAND_PAIR");
+  ok(brandIssues.length > 0 && brandIssues.every((i) => i.severity === "warning"), JSON.stringify(brandIssues));
+});
+
+await t("the save answer says whether a warning would stop a publish (the toast's words depend on it)", async () => {
+  const bad = await putBrand({ brand: DARK_TITLES });
+  eq(bad.json.blocking, true, "dark titles block:");
+  const fine = await putBrand({ brand: SEEDED });
+  eq(fine.json.blocking, false, "seeded doesn't:");
 });
 
 for (const f of DBS) await rm(join(ROOT, f), { force: true });

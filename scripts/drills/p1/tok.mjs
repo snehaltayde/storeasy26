@@ -487,6 +487,113 @@ export const parts = {
     }
   },
 
+  // Fix round 1 (review of a8dbaef), through the founder's real calls:
+  //   A  own colours live on a pinned Pulse kit, then Reset: publishes
+  //   B  own colours live, then the Pulse kit applied WITH its brand: publishes
+  //   C  no brand, no theme live, then the Glow kit applied the console's
+  //      default way (brand unticked): publishes, and shoppers see a readable
+  //      header wordmark and hero highlight on Glow's cream surfaces
+  // The console reads settings through a 30 s cache (P1-DRILLS finding 1), so
+  // each publish is retried until the live release carries the change; any
+  // 422 on the way is a failure (a stale read can only be an older, passing
+  // brand).
+  async fix1(drill) {
+    const orig = await liveRelease();
+    const [row] = await rows("platform", "SELECT json_extract(config,'$.brand') b, json_extract(config,'$.theme') t FROM tenants WHERE id = 'design'");
+    const savedBrand = JSON.parse(row?.b || "null");
+    const savedTheme = JSON.parse(row?.t || "null");
+    const SEEDED = savedBrand || { accent: "#0d9488", background: "#fffdf8", foreground: "#1c1917", radius: "xl", type_scale: "large" };
+    const ctx = await drill.context({ width: 1440 });
+    const page = await drill.signIn(ctx);
+    const api = (path, method, body) =>
+      page.evaluate(async ([p, m, b]) => {
+        const r = await fetch(p, { method: m, headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
+        return { status: r.status, json: await r.json().catch(() => ({})) };
+      }, [path, method, body]);
+    const live = async () => JSON.parse((await rows("tenant", "SELECT content FROM releases WHERE id = (SELECT live_release_id FROM release_state WHERE id = 1)"))[0].content);
+    // publish until `done(liveContent)`; returns every status seen
+    const publishUntil = async (done, label) => {
+      const seen = [];
+      for (let i = 0; i < 20; i++) {
+        const r = await api("/api/admin/releases", "POST", { action: "publish", note: `TOK fix1 ${label}` });
+        seen.push(r.status === 422 ? `422 ${(r.json.errors || []).join(" | ").slice(0, 400)}` : r.status);
+        if (r.status === 422) break;
+        if (done(await live())) return { ok: true, seen };
+        await page.waitForTimeout(4000);
+      }
+      return { ok: false, seen };
+    };
+    const setTheme = async (theme) => {
+      await sql("platform", "UPDATE tenants SET config = json_set(config, '$.theme', json(?)) WHERE id = 'design'", [JSON.stringify(theme)]);
+    };
+    const ownColoursLive = async (label) => {
+      drill.check((await api("/api/admin/brand", "PUT", { brand: SEEDED })).status === 200, `${label}: the store's own colours save`);
+      drill.check((await api("/api/admin/theme", "POST", { action: "apply", kit: "pulse", withBrand: false, withPresets: false })).status === 200, `${label}: the Pulse kit is pinned`);
+      const p = await publishUntil((c) => c.brand?.accent === SEEDED.accent && c.theme?.kit === "pulse", `${label} setup`);
+      drill.check(p.ok, `${label}: the store's own colours on a pinned Pulse kit are live`, p.seen);
+    };
+    try {
+      // A. Reset over a store that had its own colours
+      await ownColoursLive("A");
+      const reset = await api("/api/admin/brand", "PUT", { reset: true });
+      drill.check(reset.status === 200 && (reset.json.warnings || []).length === 0, "A: Reset answers 200 and shows nothing hard to read", reset.json.warnings);
+      const a = await publishUntil((c) => c.brand == null, "A reset");
+      drill.check(a.ok, "A: after Reset, the platform's own look publishes (was 422 at a8dbaef)", a.seen);
+
+      // B. The Pulse kit with its brand over a store that had its own colours
+      await ownColoursLive("B");
+      drill.check((await api("/api/admin/theme", "POST", { action: "apply", kit: "pulse", withBrand: true, withPresets: false })).status === 200, "B: the Pulse kit applied with its brand");
+      const b = await publishUntil((c) => c.brand?.foreground === "#0a0a0b" && c.brand?.accent === "#84cc16", "B pulse brand");
+      drill.check(b.ok, "B: the Pulse kit's own brand publishes (was 422 with 'Try text colour #080808' at a8dbaef)", b.seen);
+      await drill.open(page, "/admin/brand", { width: 1440 });
+      await page.waitForTimeout(800);
+      // exact: the screen's description also says "hard to read"
+      const hard = await page.getByText("Hard to read", { exact: true }).count();
+      drill.check(hard === 0, "B: the Brand screen shows no 'Hard to read' banner for the Pulse kit's brand", hard);
+      await drill.shoot(page, "fix1-brand-pulse-kit-brand");
+
+      // C. No brand, no theme live; then the Glow kit, brand unticked
+      await api("/api/admin/brand", "PUT", { reset: true });
+      await setTheme(null);
+      const c0 = await publishUntil((c) => c.brand == null && c.theme == null, "C base");
+      drill.check(c0.ok, "C: no brand and no theme are live", c0.seen);
+      drill.check((await api("/api/admin/theme", "POST", { action: "apply", kit: "glow", withBrand: false, withPresets: false })).status === 200, "C: the Glow kit applied with the brand box unticked");
+      const c1 = await publishUntil((c) => c.brand == null && c.theme?.kit === "glow", "C glow");
+      drill.check(c1.ok, "C: Glow with no brand publishes (was 422 'Header wordmark accent: #a3e635 on #fffbf7 … 1.46 to 1' at a8dbaef)", c1.seen);
+      let noted = false;
+      for (let i = 0; i < 12 && !noted; i++) {
+        await drill.open(page, "/admin/brand", { width: 1440 });
+        noted = (await page.getByText(/header wordmark would be #a3e635/).count()) > 0;
+        if (!noted) await page.waitForTimeout(4000);
+      }
+      drill.check(noted, "C: the Brand screen explains the darker wordmark shade even with no brand saved");
+      await drill.shoot(page, "fix1-brand-no-brand-glow");
+      const sctx = await shopper(drill, 1440);
+      const sp = await sctx.newPage();
+      await sp.goto("/", { waitUntil: "load" });
+      await settle(sp);
+      const kit = await sp.evaluate(() => document.documentElement.dataset.kit);
+      const accents = (await audit(sp)).filter((r) => /sf-(header|hero)-accent/.test(r.cls));
+      drill.check(kit === "glow-1" && accents.length > 0 && accents.every((r) => r.ratio >= (/sf-header-accent/.test(r.cls) ? 3 : 4.5)), "C: every header or hero accent text shoppers see on Glow is readable (1.46:1 before)", { kit, accents: accents.map(({ text, fg, bg, ratio, cls }) => ({ text, fg, bg, ratio, role: /header/.test(cls) ? "header" : "hero" })) });
+      // the harness logo has no second word, so the wordmark accent is not
+      // drawn: check the variable the page carries for it instead
+      const vars = await sp.evaluate(() => {
+        const s = getComputedStyle(document.documentElement);
+        return { header: s.getPropertyValue("--sf-header-accent").trim(), hero: s.getPropertyValue("--sf-hero-accent").trim(), headerBg: s.getPropertyValue("--header-bg").trim() };
+      });
+      drill.check(vars.header === "#4d7c0f" && vars.hero === "#3f6212", "C: the page carries the corrected header and hero accents (#4d7c0f, #3f6212) instead of the lime 400", vars);
+      await sp.mouse.move(1, 1);
+      await drill.shoot(sp, "fix1-storefront-no-brand-glow");
+      await sctx.close();
+    } finally {
+      await api("/api/admin/brand", "PUT", savedBrand ? { brand: savedBrand } : { reset: true }).catch(() => {});
+      await setTheme(savedTheme);
+      await pointLiveAt(orig.id);
+      drill.note(`brand put back to ${JSON.stringify(savedBrand)}, theme to ${JSON.stringify(savedTheme)}, live release back to ${orig.id}`);
+      await ctx.close();
+    }
+  },
+
   // P1-HARNESS finding 6: checkout with one item must not scroll sideways on
   // a phone. TOK_LABEL names the screenshot folder (before / after the fix).
   async width(drill) {

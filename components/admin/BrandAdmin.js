@@ -124,9 +124,11 @@ export default function BrandAdmin({ initial }) {
         toast.success(
           body.reset
             ? "Reset to the platform default look."
-            : json.warnings?.length
+            : json.blocking
               ? "Saved as a draft. Some colours are hard to read; fix them before you publish."
-              : "Saved as a draft — publish from Publishing to take it live.",
+              : json.warnings?.length
+                ? "Saved as a draft. Some colours are hard to read, but your live store already shows them, so you can still publish."
+                :"Saved as a draft — publish from Publishing to take it live.",
         );
       } else {
         setErrors(json.errors || [json.error || `Save failed (${res.status})`]);

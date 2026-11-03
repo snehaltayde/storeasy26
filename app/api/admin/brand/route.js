@@ -52,7 +52,7 @@ export const PUT = tenantHandler(async (request) => {
     await patchTenant(tenant.id, { config: { brand: null } });
     slog("brand_reset", {});
     await audit({ actor: auth.actor, action: "storefront.write", resource: "brand", diff: { reset: true } });
-    return NextResponse.json({ ok: true, ...view(null) });
+    return NextResponse.json({ ok: true, ...(await readability(null)), ...view(null) });
   }
 
   const r = validateBrand(body.brand);

@@ -19,8 +19,10 @@ export default async function AdminBrandPage() {
   const initial = await tfetch(async () => {
     const tenantBrand = currentTenant()?.config?.brand || null;
     const brand = resolveBrand(tenantBrand);
-    // TOK-02: what is hard to read shows on arrival too, not only after an edit
-    const { warnings, notes } = tenantBrand ? await brandReadability(brand) : { warnings: [], notes: [] };
+    // TOK-02: what is hard to read shows on arrival too, not only after an edit,
+    // and for a store with no brand of its own (its theme kit can still move
+    // the header and hero accents)
+    const { warnings, notes } = await brandReadability(tenantBrand ? brand : null);
     return { brand, customized: !!tenantBrand, shades: accentShades(brand.accent), default: DEFAULT_BRAND, warnings, notes };
   });
 

@@ -1,0 +1,65 @@
+— the lint: no hard-coded colours, radii or pixel sizes in storefront code
+  ✓ the lint catches each kind of hard-coded value, with variants and opacity
+  ✓ NEGATIVE: role classes, rounded-full, comments and visible copy are not flagged
+  ✓ THE LINT: no storefront component hard-codes a colour, radius or pixel size (outside the allowlist)
+  ✓ the allowlist is short, every entry has a reason, and every entry is still needed
+  ✓ the lint scans the storefront files that matter (cart, checkout, product card, footer, home)
+  ✓ rich text styles use roles: no fixed colour or radius left in the .rte block (links were lime on every store)
+— the role table
+  ✓ the spec's roles exist: surface, muted surface, text, muted text, border, accent, text on accent, sale, success, danger, header, hero
+  ✓ every role has its CSS variable in globals.css :root with the table's default, and a Tailwind colour
+  ✓ the default palette values are Tailwind's own (tailwindcss/theme.css), so a role renders exactly as its class did
+  ✓ the kit surfaces in lib/brand.js match the [data-kit] blocks and :root defaults in globals.css
+  ✓ the default accent ladder in lib/brand.js is the one globals.css carries
+— the default look is unchanged
+  ✓ no brand config: every role is today's value, nothing corrected
+  ✓ a brand with the platform's own colours (the Pulse kit's brand) keeps today's greys; only accent roles that read badly move
+  ✓ an accent-only brand rewrites only accent roles that had to move, never the neutral greys
+  ✓ radius roles are multiples of the brand radius that give today's Tailwind steps at the default md
+— a brand's own colours reach every role
+  ✓ a dark brand makes product titles light: the title role is the brand's text colour (was zinc-900 everywhere)
+  ✓ derived text roles keep today's order (strong to faint) and each passes on every surface it sits on
+  ✓ brandCssVars writes every derived role for a brand with its own colours, and nothing for kit or photo roles
+  ✓ roles are derived from the kit too: the same brand on Glow corrects the accent for Glow's light header
+— every role pair a renderer draws is in the matrix
+  ✓ every role used as a text colour by a storefront component is the foreground of a pair in PAIRS
+  ✓ every role used as a background by a storefront component is in PAIRS, or named as carrying no text
+  ✓ every pair names roles that exist, a known kind, and a renderer file that exists and uses its foreground
+— scripts/pixel-diff.js
+  ✓ comparePixels counts every changed pixel and its box; identical images give 0
+— TOK-02: the matrix (pure)
+  ✓ every pair a renderer uses passes on both test themes (light on Glow, dark on Pulse)
+  ✓ hero and header pairs are in the matrix and measured against the theme kit's own surfaces
+  ✓ a failing hero pair in a theme's look is reported in plain words (a stand-in kit with a pale subtitle)
+  ✓ every theme kit's own brand passes the whole matrix on its own kit
+  ✓ the platform default look's own failing pairs are exactly the known list (an owner decision, not fixed here)
+  ✓ THE BUG: the old single check passes a brand whose other pairs fail; the matrix finds them
+  ✓ NEGATIVE: dark background with dark product titles: refused, naming the pair and a suggestion that passes
+  ✓ the suggestion is the NEAREST passing colour: one step closer to the chosen colour fails
+  ✓ NEGATIVE: a black accent never gives a 2.08:1 hero highlight: corrected, and the save answer says so
+  ✓ unchanged failing pairs warn; changed ones block (comparison is by the colours the shopper sees)
+  ✓ a failing pair's group is one plain message, not one per pair
+  ✓ a malformed colour is still refused at save; readability never is
+  ✗ REGRESSION: over a store that had its own colours, a reset, the Pulse kit's brand and white/#0a0a0b with a new accent all publish
+    reset ok (["Secondary text on grey chips: #71717b on #f4f4f5 has a contrast of 4.39 to 1, and small text needs at least 4.5 to 1 (7 more colour pairs on your store have the same problem).","Footer wordmark accent: #65a30d on #fafafa has a contrast of 2.96 to 1, and large text needs at least 3 to 1 (1 more colour pair on your store has the same problem).","Error messages: #e7000b on #fef2f2 has a contrast of 4.36 to 1, and small text needs at least 4.5 to 1."]): expected true, got false
+  ✓ the platform's own pairs excuse only identical colours: a brand that moves a grey still blocks
+  ✗ NO BRAND on the Glow kit: header and hero accents are corrected against the kit, the page gets them, nothing blocks
+    header-accent fails on Glow with no brand
+  ✗ a mid-tone background where no text colour reads gets a background suggestion, not none
+    no suggestion: ["Product titles, prices and body text: #746787 on #866ac7 has a contrast of 1.22 to 1, and small text needs at least 4.5 to 1 (26 more colour pairs on your store have the same problem)."]
+— TOK-02: save and publish through the real code
+  ✓ save never fails midway through a custom colour: dark text on a dark background is SAVED, with a warning and a suggestion
+  ✓ the read-only preview call answers the same warnings and stores nothing
+  ✓ before the first publish, a saved brand that fails a pair is not shown to shoppers (drafts are the live store then)
+  ✓ NEGATIVE: publishing a dark background with dark product titles is refused, in plain words naming the pair
+  ✓ the suggested colour publishes
+  ✓ THE BUG, at publish: the old single check let a brand through whose text on light panels and grey chips fails
+  ✓ a pair that already failed on the live store and wasn't changed warns but does not block
+  ✓ NEGATIVE: a black accent saves with a note that the hero highlight uses a readable shade, and publishes
+  ✗ REGRESSION, real routes: with a theme pinned and the store's own colours live, Reset, the Pulse kit with its brand, and white/#0a0a0b with a new accent each publish
+    reset shows nothing hard to read: ["Secondary text on grey chips: #71717b on #f4f4f5 has a contrast of 4.39 to 1, and small text needs at least 4.5 to 1 (7 more colour pairs on your store have the same problem).","Footer wordmark accent: #65a30d on #fafafa has a contrast of 2.96 to 1, and large text needs at least 3 to 1 (1 more colour pair on your store has the same problem).","Error messages: #e7000b on #fef2f2 has a contrast of 4.36 to 1, and small text needs at least 4.5 to 1."] expected 0, got 3
+  ✗ NO BRAND, real routes: a store with no brand and no theme applies the Glow kit the console's default way and publishes
+    Glow with no brand publishes: 422 ["Header wordmark accent: #a3e635 on #fffbf7 has a contrast of 1.46 to 1, and large text needs at least 3 to 1 (1 more colour pair on your store has the same problem)."] expected 200, got 422
+  ✓ the save answer says whether a warning would stop a publish (the toast's words depend on it)
+
+45 passed, 5 failed
