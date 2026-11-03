@@ -1,0 +1,452 @@
+{
+  "id": "IMAGES",
+  "part": "dev",
+  "title": "P1-IMAGES: library photos on the storefront (perf fixture) — dev",
+  "ranAt": "2026-11-03T17:11:38.419Z",
+  "harness": "http://localhost:3261",
+  "chrome": "156.0.8078.80",
+  "passed": 63,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: the harness holds the perf fixture's 32 library images",
+      "detail": 32
+    },
+    {
+      "ok": true,
+      "label": "setup: a content page with a library image section",
+      "detail": "terms-of-service"
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: / answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: library photos are on the page, as their own /api/media url",
+      "detail": 58
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "home at 1440: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: /products/micronised-creatine-12 answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: library photos are on the page, as their own /api/media url",
+      "detail": 10
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product at 1440: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: /collections/protein answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: library photos are on the page, as their own /api/media url",
+      "detail": 40
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collection at 1440: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 1440: /collections/shop-all answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 1440: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 1440: library photos are on the page, as their own /api/media url",
+      "detail": 40
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 1440: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collection-all at 1440: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: /collections answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: library photos are on the page, as their own /api/media url",
+      "detail": 27
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: /search?q=protein answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: library photos are on the page, as their own /api/media url",
+      "detail": 36
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "search at 1440: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: /policies/terms-of-service answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: library photos are on the page, as their own /api/media url",
+      "detail": 1
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "cms-page at 1440: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "journal at 1440: /journal answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "journal at 1440: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "cart drawer after Add to cart: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "cart drawer after Add to cart: library photos are on the page, as their own /api/media url",
+      "detail": 14
+    },
+    {
+      "ok": true,
+      "label": "cart drawer after Add to cart: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "cart drawer after Add to cart: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "checkout answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "checkout with the cart: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "checkout with the cart: library photos are on the page, as their own /api/media url",
+      "detail": 1
+    },
+    {
+      "ok": true,
+      "label": "checkout with the cart: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "checkout with the cart: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "home at 375: / answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "home at 375: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "home at 375: library photos are on the page, as their own /api/media url",
+      "detail": 58
+    },
+    {
+      "ok": true,
+      "label": "home at 375: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "home at 375: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product at 375: /products/micronised-creatine-12 answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "product at 375: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product at 375: library photos are on the page, as their own /api/media url",
+      "detail": 10
+    },
+    {
+      "ok": true,
+      "label": "product at 375: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product at 375: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collection at 375: /collections/protein answers 200 with no error page",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "collection at 375: every image is drawn",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collection at 375: library photos are on the page, as their own /api/media url",
+      "detail": 40
+    },
+    {
+      "ok": true,
+      "label": "collection at 375: no library photo goes through /_next/image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collection at 375: no 4xx or 5xx from /_next/image or /api/media",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "home-1440: 58 of 58 images drawn (58 library photos as /api/media); 27 image responses, 0 failed",
+    "product-1440: 10 of 10 images drawn (10 library photos as /api/media); 9 image responses, 0 failed",
+    "collection-1440: 40 of 40 images drawn (40 library photos as /api/media); 12 image responses, 0 failed",
+    "collection-all-1440: 40 of 40 images drawn (40 library photos as /api/media); 24 image responses, 0 failed",
+    "collections-1440: 27 of 27 images drawn (27 library photos as /api/media); 8 image responses, 0 failed",
+    "search-1440: 36 of 36 images drawn (36 library photos as /api/media); 14 image responses, 0 failed",
+    "cms-page-1440: 1 of 1 images drawn (1 library photos as /api/media); 1 image responses, 0 failed",
+    "cart-drawer: 14 of 14 images drawn (14 library photos as /api/media); 3 image responses, 0 failed",
+    "checkout: 1 of 1 images drawn (1 library photos as /api/media); 1 image responses, 0 failed",
+    "home-375: 58 of 58 images drawn (58 library photos as /api/media); 27 image responses, 0 failed",
+    "product-375: 10 of 10 images drawn (10 library photos as /api/media); 9 image responses, 0 failed",
+    "collection-375: 40 of 40 images drawn (40 library photos as /api/media); 12 image responses, 0 failed"
+  ],
+  "screenshots": [
+    {
+      "name": "dev-home-1440",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-home-1440.png",
+      "bytes": 44788,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "dev-product-1440",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-product-1440.png",
+      "bytes": 87223,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "dev-collection-1440",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-collection-1440.png",
+      "bytes": 68481,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/protein"
+    },
+    {
+      "name": "dev-collection-all-1440",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-collection-all-1440.png",
+      "bytes": 28873,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/shop-all"
+    },
+    {
+      "name": "dev-collections-1440",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-collections-1440.png",
+      "bytes": 71811,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections"
+    },
+    {
+      "name": "dev-search-1440",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-search-1440.png",
+      "bytes": 69502,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/search"
+    },
+    {
+      "name": "dev-cms-page-1440",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-cms-page-1440.png",
+      "bytes": 50155,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/terms-of-service"
+    },
+    {
+      "name": "dev-cart-drawer-1440",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-cart-drawer-1440.png",
+      "bytes": 85976,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "dev-checkout-1440",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-checkout-1440.png",
+      "bytes": 22734,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "dev-home-375",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-home-375.png",
+      "bytes": 35030,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "dev-product-375",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-product-375.png",
+      "bytes": 120091,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "dev-collection-375",
+      "file": "docs/cms-reviews/drills/IMAGES/dev-collection-375.png",
+      "bytes": 55455,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/collections/protein"
+    }
+  ]
+}

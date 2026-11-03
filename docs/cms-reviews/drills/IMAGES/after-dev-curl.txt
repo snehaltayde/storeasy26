@@ -1,0 +1,4 @@
+# next dev, after the fix
+optimizer, library url: 400
+direct, store host: 200 image/webp 126358
+direct, another host: {"error":"Store not found","code":"TENANT_UNKNOWN"} 404
