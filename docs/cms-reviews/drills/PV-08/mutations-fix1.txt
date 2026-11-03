@@ -123,6 +123,7 @@ caught   F13 Designer link drops its new-tab hint — 32 passed, 1 failed
     Designer: the hero's settings say a test is running, name it, and link to its row
 
 36 of 37 caught
+(M8 was not applied in the run above: its target line's comment had changed in fix round 1, and the script then skipped it without a line. With the string updated, M8 was run alone, below. All 37 caught.)
 caught   M8 checkout online payment reads the raw cookie — 31 passed, 2 failed
     guard: the checkout route takes every conversion unit through conversionUnit, never the raw cookie
     guard: only the known, gated places pick, apply or count a variant (a new one must be gated, then listed here)
