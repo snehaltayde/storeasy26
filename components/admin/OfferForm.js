@@ -65,6 +65,7 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
   const simKey = offer && !problems.length ? JSON.stringify(offer) : "";
   async function simulate() {
     if (!simKey) return;
+    const key = simKey; // the result belongs to these exact rules
     const seq = ++simSeq.current;
     setSimBusy(true);
     try {
@@ -74,9 +75,9 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
         body: JSON.stringify({ offer, enabled: live }),
       });
       const data = await res.json().catch(() => ({ ok: false, errors: ["The example couldn't be worked out. Try again."] }));
-      if (seq === simSeq.current) setSim(data);
+      if (seq === simSeq.current) setSim({ ...data, key });
     } catch {
-      if (seq === simSeq.current) setSim({ ok: false, errors: ["The example couldn't load. Check your connection and try again."] });
+      if (seq === simSeq.current) setSim({ ok: false, key, errors: ["The example couldn't load. Check your connection and try again."] });
     } finally {
       if (seq === simSeq.current) setSimBusy(false);
     }
@@ -93,12 +94,15 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
     // simulate reads the offer behind simKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simKey]);
+  // An example for rules the founder has since changed is never shown next
+  // to the new sentence: until the new one arrives, the form says it's checking.
+  const simFresh = Boolean(sim && sim.key === simKey);
 
   const codeTaken =
     offer?.type === "COUPON" && offer.code && offers.some((o) => o.id !== id && o.type === "COUPON" && String(o.config?.code || "").toUpperCase() === offer.code);
   const warnings = offer
     ? [
-        ...offerWarnings(offer, { currency, freeItemValue: sim?.ok ? sim.facts?.maxTargetPrice : null }),
+        ...offerWarnings(offer, { currency, freeItemValue: simFresh && sim.ok ? sim.facts?.maxTargetPrice : null }),
         ...(codeTaken ? [`Another offer already uses the code ${offer.code}. Shoppers can only get one of them.`] : []),
       ]
     : [];
@@ -489,9 +493,11 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
                   <p className="mb-1.5 text-xs font-medium text-fg-muted">Example from your store</p>
                   {!simKey ? (
                     <p className="text-sm text-fg-subtle">The example appears when the rules are complete.</p>
-                  ) : simBusy && !sim ? (
-                    <SkeletonText lines={2} />
-                  ) : sim && sim.ok === false ? (
+                  ) : !simFresh ? (
+                    <p className="text-sm text-fg-subtle" aria-live="polite">
+                      Checking on your store&rsquo;s products…
+                    </p>
+                  ) : sim.ok === false ? (
                     <Banner tone="danger" title="The example couldn't be worked out">
                       <ul className="space-y-0.5">
                         {plainErrors(sim.errors || [sim.error], { currency }).map((m, i) => (
@@ -499,10 +505,8 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
                         ))}
                       </ul>
                     </Banner>
-                  ) : sim?.ok ? (
-                    <SimulatorResult sim={sim} />
                   ) : (
-                    <p className="text-sm text-fg-subtle">Checking on your store&rsquo;s products…</p>
+                    <SimulatorResult sim={sim} />
                   )}
                 </div>
 

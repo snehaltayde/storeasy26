@@ -428,6 +428,19 @@ await t("the simulator's check notices when the cart disagrees with the sentence
   ok(PLAIN.checkExample(c, accepted).differences.some((d) => d.startsWith("code accepted true")), "a code accepted below its minimum is caught");
 });
 
+await t("an example avoids a product whose discount would round to nothing, and says so when every one would", () => {
+  const sachet = { variantId: V(2), productId: G(2), handle: "s", title: "Sachet", variantTitle: "Default Title", productType: "Serums", tags: ["glow"], price: 0.4 };
+  const serum = { ...sachet, variantId: V(3), productId: G(3), handle: "t", title: "Serum", price: 1299 };
+  const steps = base("TIERED_QTY", { target: { kind: "tag", value: "glow" }, tiers: [{ minQty: 2, percent: 10 }] });
+  const plan = PLAIN.offerExamples(steps, [sachet, serum]);
+  eq([plan.example.lines[0].title, plan.example.expect.applies], ["Serum", true], "buy more: the product where 10% is worth something:");
+  const bx = PLAIN.offerExamples(base("BXGY", { target: { kind: "tag", value: "glow" }, buy: 1, free: 1 }), [sachet, serum]);
+  eq(bx.example.lines[0].title, "Serum", "buy some, too:");
+  const only = PLAIN.offerExamples(steps, [sachet]);
+  eq(only.example.text, "2 × Sachet: 10% off rounds to nothing on a cart this small.", "said plainly:");
+  eq([ENGINE.evaluateOffers(only.example.lines, { offers: [steps] }).discountTotal, only.example.expect.applies], [0, false], "and the engine agrees:");
+});
+
 await t("each example's words name the same numbers as the sentence", () => {
   const catalog = [{ variantId: V(1), productId: G(1), handle: "a", title: "Serum", variantTitle: "Default Title", productType: "Serums", tags: ["glow"], price: 1299 }];
   const ex = (o) => PLAIN.offerExamples(o, catalog, { currency: "INR" });
@@ -549,6 +562,28 @@ await t("going back restores the last settings, live on the next cart read, and 
   await inIN(() => STORE.revertOffer("bxgy-glow-deal"));
   eq((await cartDiscount(IN, lines)).discountTotal, 2598, "going back again returns to where the founder started:");
   await inIN(() => STORE.revertOffer("bxgy-glow-deal"));
+});
+
+await t("going back restores the schedule and the name too", async () => {
+  await inIN(() => STORE.upsertOffer({ offer: glowDeal(1) }));
+  await inIN(() => STORE.upsertOffer({ offer: glowDeal(1, { title: "Renamed deal" }), startsAt: "2027-01-01T00:00:00.000Z", endsAt: "2027-02-01T00:00:00.000Z" }));
+  const back = await inIN(() => STORE.revertOffer("bxgy-glow-deal"));
+  eq([back.label, back.starts_at, back.ends_at], ["Glow deal", null, null], "name and schedule as they were:");
+  eq([back.previous.label, back.previous.starts_at], ["Renamed deal", "2027-01-01T00:00:00.000Z"], "the undone ones are the way back:");
+  ok((await inIN(() => STORE.getActiveOffers())).some((o) => o.id === "bxgy-glow-deal"), "live again now, not from next year");
+});
+
+await t("a save that only reorders the stored settings never offers them as a way back", async () => {
+  const offer = base("COUPON", { id: "coupon-order", code: "ORDER", discount: { kind: "percent", value: 5 } });
+  // stored the way an older writer laid it out: same settings, keys in another order
+  const reordered = JSON.stringify(Object.fromEntries(Object.entries(offer).reverse()));
+  await inIN(() => db.insertInto("offers").values({ id: offer.id, type: offer.type, label: offer.title, enabled: 1, config: reordered, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" }).execute());
+  await inIN(() => STORE.upsertOffer({ offer }));
+  const raw = await inIN(() => db.selectFrom("offers").select("previous_config").where("id", "=", offer.id).executeTakeFirst());
+  ok(raw.previous_config, "the database kept a snapshot, because the text differs");
+  eq((await inIN(() => STORE.getOfferRow(offer.id))).previous, null, "but the same settings aren't offered as a way back:");
+  eq(await inIN(() => STORE.revertOffer(offer.id)).catch((e) => e.code), "NO_PREVIOUS", "going back says there's nothing:");
+  await inIN(() => STORE.deleteOffer(offer.id));
 });
 
 await t("going back keeps an offer that is off, off", async () => {
@@ -676,6 +711,9 @@ await t("routes: the simulator answers with the store's example, and refuses an 
   ok(r.body.example.agrees, "agrees");
   eq(r.body.facts.maxTargetPrice, 1899, "the dearest variant it covers:");
   eq((await route("of-in", "POST", "/api/admin/offers/simulate", { offer: { id: "x", type: "COUPON" } })).status, 422, "invalid:");
+  const steep = await json(await route("of-in", "POST", "/api/admin/offers/simulate", { offer: base("TIERED_QTY", { target: { kind: "tag", value: "glow" }, tiers: [{ minQty: 2, percent: 60 }] }) }));
+  eq(steep.body.warnings, ["Buying 2 or more takes 60% off. That's more than half off."], "the same warnings as the form:");
+  eq(r.body.warnings, [], "none for buy 2 get 1 on a ₹1,899 product:");
 });
 
 // ---- the form, on a small hook driver ------------------------------------------------------
@@ -797,6 +835,7 @@ async function mountForm(props, tenantId = "of-in") {
       await view.idle();
     },
     async idle() {
+      render(); // React re-renders after a state change, which is what schedules the check
       await sleep(400); // the form waits 350ms after the last change before it checks
       while (inflight.size) await Promise.all([...inflight]);
       render();
@@ -843,6 +882,24 @@ await t("Buy some, get some free: started by picking a product, no identifier ty
   eq(v.typed.filter((id) => !NUMBER_FIELDS.has(id)), [], "nothing but numbers typed:");
   eq((await cartDiscount(IN, [[V(1011), 3]])).discountTotal, 1299, "the next cart gets it:");
   await inIN(() => STORE.deleteOffer(post.body.offer.id));
+  v.unmount();
+});
+
+await t("an example for rules that have since changed is never shown next to the new sentence", async () => {
+  const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
+  v.choose("Buy some, get some free");
+  v.click("Choose a product");
+  const [cream] = await refItem(IN, "type=product&q=Night");
+  v.picker("Choose the product").props.onConfirm([cream]);
+  await v.idle();
+  ok(/^3 × Night Repair Cream/.test(v.find((n) => n.type?.name === "SimulatorResult", "example").props.sim.example.text), "the example for get 1 free");
+  v.type("offer-free", "2");
+  eq(v.sentence(), "Buy 2 of Night Repair Cream, get 2 free", "the new sentence at once:");
+  ok(!v.has((n) => n.type?.name === "SimulatorResult"), "the old example is gone");
+  ok(v.text().includes("Checking on your store’s products…"), "it says it's checking");
+  await v.idle();
+  const sim = v.find((n) => n.type?.name === "SimulatorResult", "the new example").props.sim;
+  ok(/^4 × Night Repair Cream/.test(sim.example.text) && sim.example.agrees, `new example: ${sim.example.text}`);
   v.unmount();
 });
 
@@ -1060,6 +1117,12 @@ await t("the model: new ids never collide, edits keep the id, and a saved 'handl
   eq(legacy.choice, "product", "handle shows as One product:");
   const back = MODEL.offerFromForm(legacy, { id: "serum-duo" });
   eq(back.target, { kind: "handle", value: "glow-serum" }, "kept exactly unless picked again:");
+  let f = MODEL.updateForm(MODEL.formFromOffer(null), { type: "BXGY" });
+  f = MODEL.updateForm(f, { target: { kind: "productId", value: G(1), label: "Serum" } });
+  eq(MODEL.updateForm(f, { choice: "product" }).target?.value, G(1), "choosing the same kind keeps the pick:");
+  f = MODEL.updateForm(f, { choice: "tag" });
+  eq(f.target, null, "switching to a tag clears the product, so no sentence claims a product the founder moved away from:");
+  eq(PLAIN.offerSentence(MODEL.offerFromForm(f, { id: "x-y-z" })), null, "no sentence until a tag is picked:");
   ok(MODEL.sameSettings({ type: "COUPON", code: "A", discount: { kind: "percent", value: 1 } }, { type: "COUPON", scope: "order", priority: 50, combinable: true, code: "A", discount: { value: 1, kind: "percent" } }), "defaults and key order don't count as a change");
 });
 
