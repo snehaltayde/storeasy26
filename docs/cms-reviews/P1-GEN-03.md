@@ -7,7 +7,7 @@ Branch `cms/p1-gen03`, cut from `939d630`. Spec: `docs/CMS_FULL_BUILD_SPEC.md:19
 | Stage | State |
 |---|---|
 | Implemented | Yes, on this branch |
-| Locally tested | Yes: 40 of 40 suites passed in the final run. `test:shopify-push` fails intermittently, also on the untouched baseline (see Test results). |
+| Locally tested | Yes: 40 of 40 suites passed in the final run (fix round 3). `test:shopify-push` fails intermittently, also on the untouched baseline (see Test results). |
 | Browser verified | **NOT DONE.** No browser or dev server in this batch. Tests marked "clicked" use a small hook driver in the suite, not a browser. |
 | Staging verified | **NOT DONE** |
 | Production enabled | **NOT DONE.** Nothing deployed or pushed. |
@@ -16,7 +16,7 @@ Branch `cms/p1-gen03`, cut from `939d630`. Spec: `docs/CMS_FULL_BUILD_SPEC.md:19
 
 | Item | Tag | Status | Evidence |
 |---|---|---|---|
-| A test fails if a banned string appears in storefront code. | unit | Locally tested | `node scripts/test-copy.js`: "banned strings: none in 159 storefront source files" passes. Each file is scanned per line and through SWC's parser, so wrapped text is caught. Planted-regression runs below all exit 1. |
+| A test fails if a banned string appears in storefront code. | unit | Locally tested | `node scripts/test-copy.js`: "banned strings: none in 159 storefront source files" passes. Each file is scanned per line and through SWC's parser, so wrapped text is caught. It catches the listed words only: **a word list can't catch every rewording** (see Known limits). |
 | Negative: an empty catalog shows shoppers no developer command. | rendered | Locally tested | "empty catalog (rendered): home…" and "…collections index…" compile the real `page.js` files with Next's SWC and render them with `react-dom/server`, against a tenant database with 0 products, and compare the page's whole text exactly. "empty catalog can fail" renders the old block and requires the failure. |
 
 The rendered tag has a limit: `app/(storefront)/page.js` runs with real repo, store and section-data modules, but `lib/content/resolve.js` is replaced by the draft getters it would call, because it needs a request. This is not a run through Next's server or the edge runtime. See the browser drills.
@@ -27,15 +27,15 @@ The clicked and route tests have limits too. The hook driver calls a component a
 
 | Item | Tag | Status | Evidence |
 |---|---|---|---|
-| Written inventory with a decision per string | manual | Done, with the limits in the next column | `docs/storefront-copy-inventory.md`. Pages and components: a one-off SWC script found every string a person can read in a row (fix round 2). `lib` and `app/api`: read by hand, so a string could be missed. Nothing keeps it current: new text with no row fails no test. |
+| Written inventory with a decision per string | manual | Done, with the limits in the next column | `docs/storefront-copy-inventory.md`. Pages and components: a one-off SWC script looked up each string written in the code (fix round 2). It can't see values that come from data, so it missed the raw order badge. `lib` and `app/api`: read by hand, which missed two contact form messages. A review found both, and both now have rows (fix round 3). Something similar could still be missing. Nothing keeps it current: new text with no row fails no test. |
 | Default shipping values made honest | rendered, clicked, unit | Locally tested | See Shipping below |
 | Shipping calculation unchanged | unit | Locally tested | `git diff 939d630 -- lib/shipping.js scripts/test-shipping.js` is empty. `node scripts/test-shipping.js`: 12 passed, 0 failed. |
 | BeastLife's stored content keeps working | unit | Locally tested | "BeastLife keeps its stored voice" stores a gym-voice hero and tagline and reads them back. `test:storefront`: its pages still serve only BeastLife. |
 
 ## What changed
 
-- **Copy:** the spec's known list, plus what the sweep found. The worst new finds were "(test mode)" and "Set NEXT_PUBLIC_RAZORPAY_KEY_ID to enable." on the checkout payment step, the internal rule name in shopper emails, and raw provider and database errors shown at checkout and on account forms.
-- **Sender:** a store's emails now go out as `{store name} <the MAIL_FROM address>`. All of them go through `deliverNotification`, including the few sent to the store itself. Invitations and password resets stay the platform's.
+- **Copy:** the spec's known list, plus what the sweep found. The worst new finds were "(test mode)" and "Set NEXT_PUBLIC_RAZORPAY_KEY_ID to enable." on the checkout payment step, the internal rule name in shopper emails, raw provider and database errors shown at checkout and on account forms, and Shopify's raw fulfillment value on the shopper's order list.
+- **Sender:** a store's emails now go out as `{store name} <the MAIL_FROM address>`. All of them go through `deliverNotification`, including the few sent to the store itself. The name is cut to 64 characters, and quoted unless it is only English letters, digits and spaces. Invitations and password resets stay the platform's.
 - **Empty home:** the default subtitle becomes "Our shop is opening soon.", and a button pointing at `#new` is hidden until there are products.
 - **New sections in the Home editor:** a new banner or rich text section now starts empty, with placeholders. Before, "Festive offer", "Shop now" and "Tell your story…" went live if a founder published without retyping.
 - **New files:** `components/EmptyCatalog.js`, `lib/shopper-errors.js`, `lib/brand-tenants.js`, `scripts/test-copy.js`, `docs/storefront-copy-inventory.md`.
@@ -54,11 +54,11 @@ Found by tracing, all in inventory section 4:
 
 ## Test results
 
-`pnpm test:copy` = `node scripts/test-copy.js`: **45 passed, 0 failed.**
+`pnpm test:copy` = `node scripts/test-copy.js`: **52 passed, 0 failed.**
 
 Related suites, in the final full run: `test:shipping` 12/0, `test:storefront` 15/0, `test:cms` 11/0, `test:commerce` 10/0, `test:admin-console` 9/0, `test:w6` 16/0, `test:sections` 15/0, `test:customers` 9/0.
 
-Every `test:*` except `test:perf`, run one after another through its package script, after the last code change in fix round 2: **40 suites, 0 failed.** An earlier full run in round 1 had 39 of 40, with only `test:shopify-push` failing (see below).
+Every `test:*` except `test:perf`, run one after another through its package script, after the last code change in fix round 3: **40 suites, 0 failed.** An earlier full run in round 1 had 39 of 40, with only `test:shopify-push` failing (see below). `test:shopify-push` passed in this run, which doesn't make it reliable.
 
 ```
 orders 27/0 · shipping 12/0 · shopify-push 13/0 · hardening 11/0 · offers-admin 8/0 · events 16/0
@@ -67,10 +67,10 @@ cms 11/0 · platform-ops 9/0 · tenant-boundary 24/0 · identity 22/0 · authz 1
 jobs 12/0 · sync-generations 8/0 · order-projection 14/0 · commerce 10/0 · privacy 11/0 · security 13/0
 content 19/0 · releases 25/0 · themes 10/0 · storefront 15/0 · surfaces 15/0 · billing 14/0
 provision 9/0 · reporting 6/0 · tenant-ops 9/0 · marketing 4/0 · customers 9/0 · commerce-exp 18/0
-growth 21/0 · agency 16/0 · w6 16/0 · copy 45/0
+growth 21/0 · agency 16/0 · w6 16/0 · copy 52/0
 ```
 
-`pnpm build`: exit 0, routes listed, after the last code change in fix round 2.
+`pnpm build`: exit 0, after the last code change in fix round 3. That proves it compiles, not that it runs on the edge runtime.
 
 ### One flaky suite, not caused by this branch
 
@@ -209,7 +209,7 @@ Each finding was checked against the code first. None was wrong.
 | "Ludicrous speed" and "Fresh drops" still reach some stores | **Not fixed: needs an owner decision.** Recorded as a known limit (deviation 10, inventory section 5). |
 | "`test:copy` guards this list" overclaimed | Fixed in part. New rules cover each row, and the sentence now says what isn't guarded. Round 2 found it still overclaimed for three changes, now fixed (below). |
 | Empty-catalog guard was narrow | Fixed. Rules for yarn, npx, `node scripts/`, "sync script" and "connect Shopify". Exact page text is asserted. |
-| `/api/cart` returned raw errors | Fixed by dropping the field. `shopperErrorMessage` would not have worked here: `addItem` throws a plain `Error` with the variant id in it, which that helper lets through. |
+| `/api/cart` returned raw errors | Fixed by dropping the field. `shopperErrorMessage` would not have worked here: `addItem` throws a plain `Error` with the variant id in it, which that helper let through at the time (fix round 3 changed it). |
 | Console and cart disagreed | Fixed. One definition, and a comparison of values rather than JSON strings. |
 | Empty home contradicted itself | Fixed, except the primary button (deviation 11). |
 
@@ -269,6 +269,110 @@ New files weren't part of this run. They are covered by the plants earlier in th
    ✗ home editor: a new section starts with nothing a shopper could be shown unedited
 ```
 
+## Fix round 3: what the final review found
+
+Each finding was checked against the code first and reproduced with a failing test before the fix. None was wrong.
+
+| Finding | Outcome |
+|---|---|
+| The order list showed Shopify's raw value, read as "PARTIALLY_FULFILLED", "IN_PROGRESS" or "UNFULFILLED" | Fixed in `app/(storefront)/account/page.js`. "fulfilled" reads "shipped" and "partially_fulfilled" reads "partly shipped". These are the two values the order status page already treats as shipped. Every other value uses the order's own label, then "processing". The old last step, showing the raw order status, is gone too. "account orders (rendered)" runs the real page and the real query on a real database, for 10 Shopify values, no value, and one made-up value with a made-up status. |
+| Other places that show this field | None found. The order status page uses it only to pick a step, the account order page doesn't read it, and shopper emails don't use it. A source check covers these files. `GET /api/account?view=orders` still returns it as written, but no screen calls that view (Known limits). |
+| Contact form messages had no row | Fixed. Both are in the Contact row. The badge has its own rows too. |
+| Shopper error filters too loose | Fixed. Checkout compares exact messages, with tests where allowed words are followed by raw text. Because a reworded server message would now quietly become the plain line, a test checks each message still exists in the route or the rate limiter. The account route now shows only `ShopperError`, which `lib/customers.js` and `requestReturn` in `lib/returns.js` throw. "SQLITE_BUSY: database is locked" as a plain `Error` gets the fallback, through the real route. The console's return actions keep plain errors, because no shopper route calls them. |
+| Sender name not quoted or capped | Fixed. Tests cover dots, apostrophes, `&`, `@`, accents, Hindi, control characters, the 64-character cut, and a cut that would split an emoji. **Not tested against the real email provider**: drill 11 is extended for it. |
+| Scan missed small rewordings | Partly fixed, as far as a word list can. New literal-only rules on shopper pages and components: setting names (`NEXT_PUBLIC_`, `*_DB_URL`, `*_API_KEY`, `.env`), "test mode", and vendor names in any case in JSX text, visible attributes and any string with a space. `window.Razorpay`, `method: "razorpay"`, `value="razorpay"` and the script URL stay allowed, and tests check that. **Other rewordings still pass** (Known limits). |
+
+New allowances in `ALLOWED`, each with its reason: the three `tenantOwnCfg(…, "NEXT_PUBLIC_…")` setting lookups, and the `.storeasy-…` CSS class names in the draft preview.
+
+**Plants, against real files:** 27 plants, 22 caught, 5 survived. All 5 survivors are wordings the list doesn't hold, and they are listed in Known limits.
+
+```
+[exit 1] badge: old expression back
+   ✗ account orders (rendered): the badge is plain words, never a raw value
+   ✗ account orders can fail: the old badge is caught when rendered
+[exit 1] badge: raw status as last fallback
+   ✗ account orders (rendered): the badge is plain words, never a raw value
+[exit 1] badge: raw value after the map
+   ✗ account orders (rendered): the badge is plain words, never a raw value
+[exit 1] badge: map to the raw value
+   ✗ account orders (rendered): the badge is plain words, never a raw value
+[exit 1] order detail prints the value
+   ✗ no other shopper screen or email prints the fulfillment value
+[exit 1] checkout: start-anchored regex back
+   ✗ checkout errors: raw provider and database text never passes
+   ✗ checkout (clicked): a failed order shows the shopper's line, never the server's text
+[exit 1] checkout route: message reworded, allow-list now stale
+   ✗ checkout errors: raw provider and database text never passes
+[exit 1] account: shape check back
+   ✗ account API: a real database error reaches the shopper as plain words
+   ✗ account API: a plain error with internal text never reaches the shopper
+   ✗ account errors: only messages marked for shoppers show
+   ✗ account errors: what the sign-in, profile and returns code throws still shows
+[exit 1] account: any message passes
+   ✗ account API: a real database error reaches the shopper as plain words
+   ✗ account API: a plain error with internal text never reaches the shopper
+   ✗ account errors: only messages marked for shoppers show
+[exit 1] customers: a plain Error again
+   ✗ account API: a real database error reaches the shopper as plain words
+   ✗ account errors: what the sign-in, profile and returns code throws still shows
+[exit 1] returns: a plain Error again
+   ✗ account errors: what the sign-in, profile and returns code throws still shows
+[exit 1] sender: dots unquoted again / no cap / control characters kept / cut can split a character (4 plants)
+   ✗ shopper emails carry the store's name and keep the verified address
+[exit 1] scan, in ReorderPanel: Couldn't reach shopify / Add NEXT_PUBLIC_… / TURSO_DB_URL is missing / Check your .env file / Payments are in test mode / Set RESEND_API_KEY (6 plants)
+   ✗ banned strings: none in 159 storefront source files
+[exit 1] scan: lowercase vendor in footer JSX text
+   ✗ banned strings: none in 159 storefront source files
+   ✗ footer (rendered): both variants carry the store's name and no catalog note
+[exit 0] Run npm sync first
+[exit 0] Run next dev first
+[exit 0] Sync the catalog from the console first.
+[exit 0] Payments run in sandbox
+[exit 0] Our payment gateway key is missing
+```
+
+The harness itself was wrong twice, and those runs don't count. "Run npm sync first" and "Run next dev first" first went into a line a suite test also plants into, so their exit 1 proved nothing. They were rerun on another line, where they survive. The first "checkout route" plant changed one of two copies of the message and survived. It was rerun changing both, and is caught, so a server message changed in only one of its two places wouldn't fail this check. A 28th plant was dropped because it tested nothing.
+
+## Known limits
+
+What is deliberately left, or can't be proved here.
+
+**The scan**
+
+- **It is a word list, so it can't catch every rewording.** "Run npm sync first", "Run next dev first", "Sync the catalog from the console first.", "Payments run in sandbox" and "Our payment gateway key is missing" all pass today. Passing it means no listed word is present, not that no developer text is.
+- Text put together at runtime from fragments isn't caught. A vendor name as a lone word outside JSX counts as code, unless it has its usual capital.
+- The new rules cover shopper pages and components. In `lib` and `app/api`, only the listed phrases fail. Console files aren't scanned.
+
+**Text that comes from data**
+
+- The scan reads code, not data. Only the order badge has a test for a raw value reaching the screen, so another one could exist. This one was found by a reviewer, not by the sweep.
+- Razorpay's own failure description is still shown as written (inventory section 3).
+- **Owner decision:** "Ludicrous speed", "Fresh drops" and the old new-section prefills already saved by a store still reach its shoppers (deviations 10 and 14).
+
+**The order badge**
+
+- Only "fulfilled" and "partially_fulfilled" have their own words. "in_progress", "on_hold" and the rest read as the order's own label, usually "processing".
+- A cancelled order that Shopify also marks fulfilled reads "shipped" on the list, while the order status page says cancelled. The badge has always put the fulfillment value first, and this round didn't change that order.
+- `GET /api/account?view=orders` still returns the raw value. No screen uses it.
+
+**Errors**
+
+- `/api/checkout`'s catch-all still returns raw text in its JSON (deviation 8). No screen shows it.
+- A new checkout message written for shoppers shows the plain line until it is added to the list, and a new thrown message on the account route shows "Something went wrong" until it is a `ShopperError`. Both fail safe.
+- `ShopperError` is checked with `instanceof`. Tests call the route directly, and the build only proves it compiles, so drill 13 checks it in a running app.
+
+**The sender**
+
+- How Resend treats a quoted name, or one with non-English letters, isn't tested. If it refuses one, that store's sign-in codes stop sending. Drill 11 covers this and **should be done before this reaches a real store**.
+- All stores share one address, replies go there, and the production `MAIL_FROM` wasn't read (deviation 12).
+
+**The rest**
+
+- The inventory has no completeness test, and its completeness check was a one-off script that isn't committed.
+- Pulse and Glow presets are unchanged (deviation 15).
+- No browser, staging or real payment was involved in any of this. The drills below are still to do.
+- `test:shopify-push` is still flaky and needs its own fix.
+
 ## Deviations and decisions to check
 
 1. **Runner.** Section 8.15 proposes a JSX runner such as Vitest. I added no dependency: `test-copy` uses the SWC build Next ships (`next/dist/build/swc`), which is a private path pinned by `next` 16.2.9. A Next upgrade could break the suite, loudly. It is not a replacement for the runner in 8.15.
@@ -290,7 +394,7 @@ New files weren't part of this run. They are covered by the plants earlier in th
 10. **Owner decision: old default words already saved.** "Ludicrous speed" and "Fresh drops" still reach shoppers on any non-BeastLife store that saved the Home editor before this change, because the editor prefills from the defaults, and a published release freezes what was saved. A local probe confirmed it: after saving the old text, `getHero().subtitle` and `getHomeSections()[0].title` return it. It also applies on an empty store, because `app/(storefront)/page.js` swaps the subtitle only when it equals the new default. Stores that never saved are unaffected, because `lib/releases.js` stores only customized blocks. Production wasn't read, so the number of stores is unknown. **Suggested:** count them with a read-only query, then run a one-off replacement of those two exact strings on non-BeastLife stores. It changes stored content and published releases, so it is not done here. Owner: you, then GEN-01 or a one-off script. The suite can't catch this, because it doesn't scan stored content.
 11. **Empty home.** "Shop all collections" stays on an empty home, so the page keeps one way forward, though it leads to "No collections to show yet" (GEN-01). The `#new` button is hidden on any empty hero that points at `#new`, even a customised one, because the link does nothing there. The review asked for this only on an uncustomised hero.
 12. **Sender.** Only the display name changed. Stores share one address, and replies go to it. The production `MAIL_FROM` wasn't read. If it is unset, Resend's `onboarding@resend.dev` is what shoppers see, which needs fixing whatever this branch does. Notifications sent to the store itself, such as contact-form copies, also carry the store's name now.
-13. **Vendor-name rule.** Razorpay, Shopify and Storeasy in visible text fail only in storefront pages and components. `lib` and `app/api` hold server errors and staff notes that name them legitimately, so only listed phrases fail there.
+13. **Vendor-name rule.** Razorpay, Shopify and Storeasy in visible text, in any case, fail only in storefront pages and components. `lib` and `app/api` hold server errors and staff notes that name them legitimately, so only listed phrases fail there.
 
 14. **Home editor: an unedited new section can't be saved.** Adding a banner or rich text section and saving without typing now shows the existing error, such as "Section 3 (banner): needs a title or text", and holds back the whole Home sections save until it is filled in or removed. That is what keeps these from publishing empty. The error wording wasn't changed. A store that already published "Festive offer", "Shop now" or "Tell your story…" keeps them (inventory section 5).
 15. **Preset copy unchanged.** Pulse and Glow still make unset promises if a founder applies a kit and accepts its copy. Listed for ED, not changed here.
@@ -309,5 +413,7 @@ On the harness, with a recording per section 8.15:
 8. **Footer:** both variants in place.
 9. **Cart on a real page:** the layout seeds `CartProvider` from the real cart (`app/(storefront)/layout.js`, not exercised by `test:copy`). The drawer shows the right nudge after adding to the cart.
 10. **Empty home:** the shorter hero looks right with one button, at 375 and 1440 wide.
-11. **A real email, on staging:** a sign-in code arrives showing the store's name as the sender.
+11. **A real email, on staging:** a sign-in code arrives showing the store's name as the sender. Repeat with a store name that has a dot ("St. Mark's") and one with non-English letters ("Café Noir"), since a refused sender would stop that store's sign-in codes.
 12. **Home editor:** add a banner and a rich text section. The placeholders read well, saving unedited shows the error, and typing a title lets it save.
+13. **Account errors in a running app:** a wrong sign-in code shows "That code isn't right — check the email and try again.", not "Something went wrong".
+14. **Order list:** a signed-in shopper with a shipped and a partly shipped order sees plain words on the badge, at 375 and 1440 wide. The badge is in capitals, so "PARTLY SHIPPED" should still fit.

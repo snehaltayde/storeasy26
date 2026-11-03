@@ -56,7 +56,8 @@ const eq = (a, b, m = "") => {
 // ---- layer 1: the banned-string scan -----------------------------------------
 
 // `only` limits a rule to some files. `literalsOnly` reads just the parser's
-// literal text, so window.Razorpay and comments can't trip it.
+// literal text, so window.Razorpay and comments can't trip it. `visibleOnly` reads
+// less than that (see visibleStrings), so method: "razorpay" can't trip it either.
 const SHOPPER_UI = (file) => /^(app\/\(storefront\)|components)\//.test(file);
 const BANNED = [
   // Known leaks named by the spec
@@ -90,6 +91,9 @@ const BANNED = [
   { label: "platform: Razorpay in copy", re: /(via Razorpay|load Razorpay|Razorpay is not configured|"Razorpay"\})/ },
   { label: "platform: vendor name in visible text", re: /\b(Razorpay|Shopify|Storeasy)\b/, only: SHOPPER_UI, literalsOnly: true },
   { label: "platform: hosting vendor in visible text", re: /\b(Vercel|Turso)\b/i, only: SHOPPER_UI, literalsOnly: true },
+  { label: "platform: vendor name, any case, in visible text", re: /\b(razorpay|shopify|storeasy)\b/i, only: SHOPPER_UI, literalsOnly: true, visibleOnly: true },
+  { label: "developer: env or key name in text", re: /NEXT_PUBLIC_|[A-Z]+_DB_URL|_API_KEY|\.env\b/, only: SHOPPER_UI, literalsOnly: true },
+  { label: "developer: test mode, any wording", re: /test mode/i, only: SHOPPER_UI, literalsOnly: true },
   { label: "wrong brand: BeastLife", re: /beastlife/i },
   { label: "wrong brand: Beast", re: /\bbeast\b/i },
   { label: "wrong brand: coupon code", re: /\b(BEAST10|FLAT200|SOLO25)\b/ },
@@ -112,7 +116,10 @@ const ALLOWED = [
   { file: "lib/offers/simulate.js", re: /./, why: "console offer simulator fixtures, never rendered to shoppers" },
   { file: "lib/content/templates.js", re: /\d–\d working days/, why: "console prefill a founder edits and saves; GEN-06 binds it to real settings" },
   { file: "lib/brand-tenants.js", re: /\["_default", "beastlife", "beastlife-staging"\]/, why: "tenant ids in the check that keeps BeastLife's pages on BeastLife" },
-  { file: "app/(storefront)/layout.js", re: /Storeasy — fast, branded|on your existing Shopify catalog|%s · Storeasy|>Storeasy</, why: "the platform-host branch only; a store's own address never reaches it" },
+  { file: "app/(storefront)/layout.js", re: /Storeasy — fast, branded|on your existing Shopify catalog|%s · Storeasy|>Storeasy<|^Storeasy$/, why: "the platform-host branch only; a store's own address never reaches it" },
+  { file: "app/(storefront)/layout.js", re: /tenantOwnCfg\("(ga4_measurement_id|meta_pixel_id)", "NEXT_PUBLIC_/, why: "the name of a setting, passed to the config lookup; never shown" },
+  { file: "app/(storefront)/checkout/page.js", re: /tenantOwnCfg\("razorpay_key_id", "NEXT_PUBLIC_RAZORPAY_KEY_ID"\)/, why: "the name of a setting, passed to the config lookup; never shown" },
+  { file: "components/preview/PreviewBridge.js", re: /\.storeasy-(selected|designing)/, why: "CSS class names in the founder's draft preview, not text" },
   { file: "lib/env-file.js", re: /\.env\.local/, why: "local CLI helper, not imported by any route" },
   { file: "lib/integrations.js", re: /pnpm webhooks:register/, why: "connect hint for the operator console" },
   { file: "lib/shopify-push.js", re: /paid via Razorpay/, why: "order note in Shopify admin, read by store staff; never content for shoppers" },
@@ -199,16 +206,52 @@ function literalText(ast) {
   return [...text, ...attrs].join(" ").replace(/\s+/g, " ");
 }
 
+// Strings a person can read, one by one: JSX text, what a JSX child or a visible
+// attribute prints, and any string with a space in it (a sentence, such as one
+// handed to setError). A single word outside JSX counts as code, so
+// method: "razorpay", window.Razorpay and a script URL stay allowed.
+const VISIBLE_ATTR = /^(alt|title|placeholder|label|aria-[\w-]+)$/;
+function visibleStrings(ast) {
+  const out = [];
+  const printed = (n) => {
+    if (!n) return;
+    if (n.type === "StringLiteral") out.push(n.value);
+    else if (n.type === "TemplateLiteral") n.quasis.forEach((q) => out.push(q.cooked ?? q.raw));
+    else if (n.type === "JSXExpressionContainer" || n.type === "ParenthesisExpression") printed(n.expression);
+    else if (n.type === "ConditionalExpression") [n.consequent, n.alternate].forEach(printed);
+    else if (n.type === "BinaryExpression" && ["||", "??", "&&", "+"].includes(n.operator)) [n.left, n.right].forEach(printed);
+  };
+  const visit = (node) => {
+    if (Array.isArray(node)) return node.forEach(visit);
+    if (!node || typeof node !== "object" || node.type === "ImportDeclaration") return;
+    if (node.type === "JSXText") out.push(node.value);
+    if (node.type === "JSXElement" || node.type === "JSXFragment") node.children.filter((c) => c.type === "JSXExpressionContainer").forEach(printed);
+    if (node.type === "JSXAttribute" && VISIBLE_ATTR.test(node.name?.value || "")) printed(node.value);
+    if (node.type === "StringLiteral" && /\s/.test(node.value.trim())) out.push(node.value);
+    if (node.type === "TemplateElement" && /\s/.test((node.cooked ?? node.raw).trim())) out.push(node.cooked ?? node.raw);
+    for (const [k, v] of Object.entries(node)) if (k !== "span") visit(v);
+  };
+  visit(ast);
+  return out;
+}
+
 // Whole file, whitespace collapsed: finds text the per-line scan can't, such as a
 // phrase wrapped across JSX lines. An allowance is per line, so it excuses only as
 // many hits as its own lines hold.
 async function scanParsed(file, src, already = []) {
-  const text = literalText(await swc.parse(src, { filename: file, isModule: true }));
+  const ast = await swc.parse(src, { filename: file, isModule: true });
+  const text = literalText(ast);
+  const visible = visibleStrings(ast);
   const allowed = ALLOWED.filter((a) => a.file === file);
   const lines = stripComments(src).split("\n");
   const findings = [];
   for (const rule of BANNED) {
     if (!applies(rule, file) || already.some((f) => f.label === rule.label)) continue;
+    if (rule.visibleOnly) {
+      const hit = visible.find((s) => rule.re.test(s) && !allowed.some((a) => a.re.test(s.trim())));
+      if (hit) findings.push({ file, line: "parsed", label: rule.label, text: hit.trim().slice(0, 120) });
+      continue;
+    }
     const all = new RegExp(rule.re.source, `${rule.re.flags}g`);
     const hits = [...text.matchAll(all)];
     if (!hits.length) continue;
@@ -280,6 +323,9 @@ await t("the scan fails: each banned rule catches planted text", async () => {
     "platform: Razorpay in copy": "Secure payment via Razorpay.",
     "platform: vendor name in visible text": "Powered by Shopify",
     "platform: hosting vendor in visible text": "Hosted on Vercel, data in Turso",
+    "platform: vendor name, any case, in visible text": "Couldn't reach shopify",
+    "developer: env or key name in text": "Add NEXT_PUBLIC_RAZORPAY_KEY_ID to enable.",
+    "developer: test mode, any wording": "Payments are in test mode",
     "wrong brand: BeastLife": "About BeastLife",
     "wrong brand: Beast": "Go Beast mode",
     "wrong brand: coupon code": "try BEAST10",
@@ -303,6 +349,10 @@ await t("the scan fails: each banned rule catches planted text", async () => {
 const plant = (file, from, to) => {
   const src = sources.get(file);
   ok(src.includes(from), `the plant target has moved in ${file}: ${from}`);
+  return src.replace(from, to);
+};
+const plant2 = (src, from, to) => {
+  ok(from.test(src), `the plant target has moved: ${from}`);
   return src.replace(from, to);
 };
 
@@ -329,6 +379,38 @@ await t("the scan fails: visible text that follows //", async () => {
   const planted = plant(f, "There is no store at this address.", "There is no store at this address. // run pnpm sync");
   eq(scanSource(f, planted).length, 0, "the per-line stripper blanks this, which is why the parsed scan exists:");
   ok((await scanFile(f, planted)).some((x) => x.label.includes("pnpm")), "visible text after // not caught");
+});
+
+await t("the scan fails: reworded developer text and vendor names in any case", async () => {
+  const f = "components/account/ReorderPanel.js";
+  const from = "Nothing from this order is available right now.";
+  for (const words of ["Couldn't reach shopify", "Add NEXT_PUBLIC_RAZORPAY_KEY_ID to enable.", "TURSO_DB_URL is missing", "Missing the RESEND_API_KEY value", "Check your .env file", "Payments are in test mode", "TEST MODE"]) {
+    ok((await scanFile(f, plant(f, from, words))).length, `passes the scan: ${words}`);
+  }
+  const shown = [
+    "<p>razorpay</p>",
+    "<p>{`shopify`}</p>",
+    '<p>{paid ? "storeasy" : "x"}</p>',
+    '<p>{name || "SHOPIFY"}</p>',
+    '<img alt="shopify" />',
+    '<input placeholder="razorpay" />',
+    '<button aria-label="razorpay" />',
+    '<a title={"storeasy"} />',
+  ];
+  for (const jsx of shown) ok((await scanFile("components/Footer.js", `export default ({ paid, name }) => ${jsx};`)).length, `passes the scan: ${jsx}`);
+});
+
+await t("the scan leaves code alone: vendor names that no one reads", async () => {
+  const code = [
+    'const go = () => new window.Razorpay({ method: "razorpay" });',
+    'const on = (m) => m === "razorpay";',
+    'export default ({ m }) => <p className={m === "razorpay" ? "a" : "b"}>{m === "razorpay" ? "Pay" : "Cash"}</p>;',
+    'export const f = () => <input type="radio" value="razorpay" onChange={() => pick("razorpay")} />;',
+    'const s = "https://checkout.razorpay.com/v1/checkout.js";',
+    "const k = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;",
+    'const key = "storeasy_recent_searches";',
+  ];
+  for (const src of code) eq(report(await scanFile("components/Footer.js", src)), "", `${src}:`);
 });
 
 await t("the parsed scan ignores real comments, wrapped or not", async () => {
@@ -898,6 +980,11 @@ const RAW_CHECKOUT_ERRORS = [
   { error: "Razorpay order create failed (500): {\"error\":{\"code\":\"BAD_REQUEST_ERROR\"}}" },
   { error: "Razorpay order create failed (500)" },
   { error: "Razorpay order create failed (429): Too many requests" },
+  // Allowed words first, raw text after
+  { error: "Too many requests to turso db acme-prod: quota exceeded" },
+  { error: "Please fill all required fields: SQLITE_CONSTRAINT orders.email" },
+  { error: "This checkout attempt no longer matches your cart. Please retry. SQLITE_BUSY" },
+  { error: "Online payment isn't available for this store right now. (Razorpay 401)" },
   { error: "SQLITE_ERROR: no such table: orders" },
   { error: "fetch failed" },
   { error: "Cannot read properties of undefined (reading 'id')", code: "X" },
@@ -910,6 +997,8 @@ await t("checkout errors: raw provider and database text never passes", () => {
   eq(friendlyCheckoutError(), PLAIN_CHECKOUT, "nothing:");
   for (const own of ["Please fill all required fields", "This checkout attempt no longer matches your cart. Please retry.", "Online payment isn't available for this store right now.", "Too many requests"]) {
     eq(friendlyCheckoutError({ error: own }), own, "written for shoppers:");
+    // The match is exact, so a reworded server message would quietly become the plain line.
+    ok(sources.get("app/api/checkout/route.js").includes(own) || sources.get("lib/rate-limit.js").includes(own), `no server sends this any more: ${own}`);
   }
   ok(/temporarily unavailable/.test(friendlyCheckoutError({ error: "x", code: "CHECKOUT_DISABLED" })), "paused checkout");
   ok(/session expired/.test(friendlyCheckoutError({ error: "Cart is empty" })), "expired cart");
@@ -1084,19 +1173,127 @@ await t("account API: a real database error reaches the shopper as plain words",
   eq(res.status, 422, "status:");
   eq(JSON.stringify(await res.json()), JSON.stringify({ error: "Something went wrong — please try again." }), "body:");
   const own = await route.POST(jsonPost("own.test", "/api/account", { action: "verify", email: "a@b.test", code: "123456" }));
-  const body = await own.json();
-  ok(body.error && !/sqlite|table/i.test(body.error) && body.error !== "Something went wrong — please try again.", `our own message should show: ${body.error}`);
+  eq((await own.json()).error, "No active code — request a new one.", "our own message:");
 });
 
-await t("account errors: our own messages show, internals don't", () => {
-  const { shopperErrorMessage } = shopperErrors;
+await t("account API: a plain error with internal text never reaches the shopper", async () => {
+  const customers = await import("../lib/customers.js");
+  const route = await loadRoute("account", {
+    "@/lib/customers": { ...customers, verifyOtp: async () => { throw new Error("SQLITE_BUSY: database is locked"); } },
+    "@/lib/returns": await import("../lib/returns.js"),
+    "@/lib/wishlist": await import("../lib/wishlist.js"),
+    "@/lib/shopper-errors": shopperErrors,
+  });
+  const res = await route.POST(jsonPost("own.test", "/api/account", { action: "verify", email: "a@b.test", code: "123456" }));
+  eq(JSON.stringify(await res.json()), JSON.stringify({ error: "Something went wrong — please try again." }), "body:");
+});
+
+await t("account errors: only messages marked for shoppers show", () => {
+  const { shopperErrorMessage, ShopperError } = shopperErrors;
   const fallback = "Something went wrong — please try again.";
-  eq(shopperErrorMessage(new Error("That code expired — request a new one."), fallback), "That code expired — request a new one.", "own copy:");
-  const dbError = Object.assign(new Error("SQLITE_ERROR: no such table: customers"), { name: "LibsqlError", code: "SQLITE_ERROR" });
-  eq(shopperErrorMessage(dbError, fallback), fallback, "database error:");
-  eq(shopperErrorMessage(new TypeError("fetch failed"), fallback), fallback, "network error:");
-  eq(shopperErrorMessage(Object.assign(new Error("boom"), { code: "X" }), fallback), fallback, "coded error:");
-  eq(shopperErrorMessage(null, fallback), fallback, "nothing:");
+  eq(shopperErrorMessage(new ShopperError("That code expired — request a new one."), fallback), "That code expired — request a new one.", "own copy:");
+  for (const raw of [
+    new Error("SQLITE_BUSY: database is locked"),
+    new Error("That code expired — request a new one."),
+    Object.assign(new Error("SQLITE_ERROR: no such table: customers"), { name: "LibsqlError", code: "SQLITE_ERROR" }),
+    new TypeError("fetch failed"),
+    Object.assign(new Error("boom"), { code: "X" }),
+    { name: "ShopperError", message: "looks the part" },
+    null,
+  ]) {
+    eq(shopperErrorMessage(raw, fallback), fallback, `${raw?.message}:`);
+  }
+});
+
+await t("account errors: what the sign-in, profile and returns code throws still shows", async () => {
+  const customers = await import("../lib/customers.js");
+  const { requestReturn, returnEligibility } = await import("../lib/returns.js");
+  const { shopperErrorMessage, ShopperError } = shopperErrors;
+  const shown = async (fn) => {
+    const e = await fn().then(() => null, (err) => err);
+    ok(e instanceof ShopperError, `not marked for shoppers: ${e?.message}`);
+    return shopperErrorMessage(e, "FALLBACK");
+  };
+  await inOwn(async () => {
+    eq(await shown(() => customers.requestOtp("not-an-email")), "That email doesn't look right.", "bad email:");
+    eq(await shown(() => customers.verifyOtp("nobody@b.test", "123456")), "No active code — request a new one.", "no code:");
+    eq(await shown(() => customers.updateCustomerProfile("nobody", { address: { line1: "" } })), "An address needs at least line 1, city and pincode.", "bad address:");
+    eq(await shown(() => requestReturn({ customerId: "nobody", orderId: "nope", reason: "x" })), returnEligibility(null).reason, "no such order:");
+  });
+  // Every throw in the shopper's account code is one a shopper may read.
+  ok(!/throw new Error\(/.test(sources.get("lib/customers.js")), "lib/customers.js throws a plain Error, which shoppers now can't read");
+  const asked = sources.get("lib/returns.js").match(/export async function requestReturn[\s\S]*?\n}\n/);
+  ok(asked && !/throw new Error\(/.test(asked[0]), "requestReturn throws a plain Error, which shoppers now can't read");
+});
+
+// ---- the shopper's order list
+
+const ACCOUNT_BADGES = [
+  // [fulfillment_status, status, what the badge must say]
+  ["fulfilled", "synced", "shipped"],
+  ["partially_fulfilled", "synced", "partly shipped"],
+  ["unfulfilled", "paid", "paid"],
+  ["unfulfilled", "cod_pending", "placed (COD)"],
+  ["in_progress", "synced", "processing"],
+  ["on_hold", "synced", "processing"],
+  ["open", "syncing_shopify", "processing"],
+  ["pending_fulfillment", "synced", "processing"],
+  ["request_declined", "synced", "processing"],
+  ["restocked", "cancelled", "cancelled"],
+  ["scheduled", "sync_failed", "processing"],
+  [null, "pending_payment", "payment pending"],
+  ["some_new_shopify_value", "another_new_status", "processing"],
+];
+const accountSrc = await readFile(join(ROOT, "app/(storefront)/account/page.js"), "utf8");
+let accountCustomer = null;
+async function accountBadges(src = accountSrc) {
+  const customers = await import("../lib/customers.js");
+  if (!accountCustomer) {
+    accountCustomer = { id: "cus_badges", email: "badges@b.test", name: "Asha", phone: "", address: null };
+    await inOwn(async () => {
+      await db.insertInto("customers").values({ id: accountCustomer.id, email: accountCustomer.email, name: "Asha", created_at: new Date().toISOString() }).execute();
+      for (const [i, [fulfillment_status, status]] of ACCOUNT_BADGES.entries()) {
+        await db.insertInto("orders").values({ id: `B-${i}`, idempotency_key: `badge-${i}`, customer_id: accountCustomer.id, status, fulfillment_status, total: 100, currency: "INR", snapshot: JSON.stringify({ items: [{ title: "Candle", quantity: 1 }] }), created_at: new Date().toISOString() }).execute();
+      }
+    });
+  }
+  const page = await loadComponent(src, {
+    "next/link": passthrough,
+    "next/headers": { cookies: async () => ({ get: () => ({ value: "token" }) }) },
+    // The session is the only stub: the orders come from the real query on a real database.
+    "@/lib/customers": { ...customers, customerFromToken: async () => accountCustomer },
+    "@/lib/format": format,
+    "@/components/account/AccountAuth": nothing,
+    "@/components/account/ProfileForm": nothing,
+    "@/lib/tenant-request": { tfetch: inOwn },
+  });
+  const html = renderToStaticMarkup(await page.default({ searchParams: Promise.resolve({}) }));
+  return Object.fromEntries([...html.matchAll(/font-mono[^>]*>(B-\d+)<.*?rounded bg-zinc-100[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]]));
+}
+const badgeProblems = (badges) =>
+  ACCOUNT_BADGES.flatMap(([raw, status, want], i) => {
+    const got = badges[`B-${i}`];
+    if (got === want && !got.includes("_") && got !== raw) return [];
+    return [`${raw}/${status} shows "${got}", wanted "${want}"`];
+  });
+
+await t("account orders (rendered): the badge is plain words, never a raw value", async () => {
+  const problems = badgeProblems(await accountBadges());
+  ok(problems.length === 0, problems.join("; "));
+});
+
+await t("account orders can fail: the old badge is caught when rendered", async () => {
+  const old = plant2(accountSrc, /\{orderBadge\(o\)\}/, "{o.fulfillment || STATUS_LABEL[o.status] || o.status}");
+  const problems = badgeProblems(await accountBadges(old)).join("; ");
+  ok(/partially_fulfilled\/synced shows "partially_fulfilled"/.test(problems), `the old badge passed: ${problems}`);
+  ok(/some_new_shopify_value/.test(problems), `the raw fallback passed: ${problems}`);
+});
+
+await t("no other shopper screen or email prints the fulfillment value", () => {
+  for (const f of ["app/(storefront)/orders/[orderId]/page.js", "app/(storefront)/account/orders/[orderId]/page.js", "lib/automations.js", "lib/notifications.js"]) {
+    const src = stripComments(sources.get(f));
+    ok(!/\{\s*(o|order)\.fulfillment(_status)?\b/.test(src) && !/\$\{[^}]*fulfillment_status/.test(src), `${f} prints the fulfillment value`);
+  }
 });
 
 await t("search API: a real database error leaves no error text in the response", async () => {
@@ -1147,6 +1344,19 @@ await t("shopper emails carry the store's name and keep the verified address", a
     eq(storeSender('Acme, "Candles" Inc'), '"Acme, Candles Inc" <hello@mail.example.test>', "a name with punctuation:");
     eq(storeSender("Evil <a@b.test>\r\nBcc: c@d.test"), '"Evil a@b.test Bcc: c@d.test" <hello@mail.example.test>', "a name can't add an address or a header:");
     eq(storeSender(""), "hello@mail.example.test", "no name:");
+    eq(storeSender("   "), "hello@mail.example.test", "only spaces:");
+    // Only letters, digits and spaces go unquoted (RFC 5322): every other character is quoted.
+    eq(storeSender("Acme Candles 24"), "Acme Candles 24 <hello@mail.example.test>", "plain name:");
+    for (const name of ["St. Mark's", "A.B. Foods", "Acme & Co", "Rock_n-Roll", "Tea: Leaf", "Ann@Home", "Café Noir", "दुकान"]) {
+      eq(storeSender(name), `"${name}" <hello@mail.example.test>`, `${name}:`);
+    }
+    eq(storeSender('St. back\\'), '"St. back" <hello@mail.example.test>', "a backslash can't escape the quote:");
+    eq(storeSender("Tab\tNull\u0000Bell\u0007Del\u007f"), "Tab Null Bell Del <hello@mail.example.test>", "control characters:");
+    // The cap: long names are cut, whole characters only, and stay valid.
+    eq(storeSender("x".repeat(300)), `${"x".repeat(64)} <hello@mail.example.test>`, "a long name:");
+    eq(storeSender(`${"x".repeat(63)} y`), `${"x".repeat(63)} <hello@mail.example.test>`, "no space left at the cut:");
+    eq(storeSender(`${"x".repeat(63)}😀😀`), `"${"x".repeat(63)}😀" <hello@mail.example.test>`, "a cut never splits a character:");
+    eq(storeSender(`${"x".repeat(60)}. ${"y".repeat(50)}`), `"${"x".repeat(60)}. yy" <hello@mail.example.test>`, "still quoted after the cut:");
 
     process.env.MAIL_FROM = "Storeasy <hello@mail.example.test>";
     const platformMail = await withBrowser([{ id: "m2" }], {}, async (calls) => {
