@@ -36,7 +36,7 @@
 //       docs/perf/2026-11-phase2-local.json and .md from perf-report runs
 //
 // The measurement itself is scripts/perf-report.js http (perf-http.js and
-// the unchanged perf-dbcount.js), with --extra-routes. See
+// perf-dbcount.js, whose counts are unchanged), with --extra-routes. See
 // docs/cms-reviews/P2-PERF.md for the exact commands.
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -256,7 +256,7 @@ export function phase2Report(runs, { baseline = null, takenOn } = {}) {
 
 - Taken: ${takenOn}. Machine: ${json.environment.machine?.cpu}, ${json.environment.machine?.cores} cores, ${json.environment.machine?.os}, Node ${json.environment.node}, Next ${json.environment.next}, ${json.environment.sqld}.
 - Runs (each its own \`node scripts/perf-report.js http --extra-routes\` on the same build): ${runs.map((r) => `**${r.label}** (${r.store}, build \`${r.run.environment.build.id}\`, commit \`${r.run.environment.git.commit}\`, load ${r.run.environment.machine.loadAverageAtStart.join("/")} at start)`).join("; ")}.
-- Database counts come from scripts/perf-dbcount.js (unchanged) in front of each sqld, checked against sqld's own query counter. Every count below was the same on all ${runs[0]?.run.method.countedRuns} counted runs of its route unless marked.
+- Database counts come from scripts/perf-dbcount.js in front of each sqld (P2-PERF fix round 2 added each statement's own result bytes to it; the counts are unchanged), checked against sqld's own query counter. Every count below was the same on all ${runs[0]?.run.method.countedRuns} counted runs of its route unless marked.
 
 ## Round trips and parsed bytes per request (warm)
 

@@ -9,10 +9,10 @@ This is the author's own report. Reviewers should re-read the code.
 | Stage | Status |
 |---|---|
 | Implemented | Yes, on this branch |
-| Locally tested | Yes (fix round 1, commit `5e5fa58`). `pnpm test:perf-docs` 12 passed, 0 failed (2.2 s in the gate). `pnpm test:publish-service` 26 passed, 0 failed (1.4 s). `pnpm test`: 66 of 66 suites passed in 118.3 s. Every new test was run against the code before the fix and fails there (see "Fix round 1"). `next build` passed (through `perf-report http --build`). Real-Next numbers for v4 taken again after the fix on the design harness (ports 3620 and 4620 to 4628) |
+| Locally tested | Yes (fix round 2, commit `8868fbb`). `pnpm test:perf-docs` 14 passed, 0 failed (2.4 s in the gate). `pnpm test:surfaces` 16 passed. `pnpm test:perf-tools` 26 passed. `pnpm test:publish-service` 26 passed. `pnpm test`: 66 of 66 suites passed in 118.7 s. Every new test was run against the code before its fix and fails there (see "Fix round 1" and "Fix round 2"). `next build` passed (through `perf-report http --build`). All five real-Next columns taken again on one build of `8868fbb` on the design harness (ports 3620 and 4620 to 4628) |
 | Browser verified | **NOT DONE.** No acceptance item here needs a browser. The real-Next runs did check every measured response: status 200, not the error page, the expected words on the page, and `x-edge-runtime: 1` on every storefront page |
 | Staging verified | **NOT DONE. Staging is unverified.** No hosted numbers (OQ-19) |
-| Production enabled | **NOT DONE.** Nothing pushed, merged or deployed. No real store changed mode. Nothing in `app/` or `components/` changed. Fix round 1 changed `lib/documents/publish.js` and `lib/documents/commit.js` (console publish only; no storefront read path) |
+| Production enabled | **NOT DONE.** Nothing pushed, merged or deployed. No real store changed mode. Fix round 1 changed `lib/documents/publish.js` and `lib/documents/commit.js` (console publish only). Fix round 2 changed storefront catalog reads that every store makes, legacy included: `app/(storefront)/layout.js`, `lib/repo.js`, `lib/cms/section-data.js`, `lib/experiments.js`. Shoppers see the same pages (see "Fix round 2") |
 
 No real store moves to documents mode. Only the unit test's own stores and the harness store (for the length of a run) are put in documents mode.
 
@@ -20,7 +20,7 @@ No real store moves to documents mode. Only the unit test's own stores and the h
 
 P2-READ made shoppers read a v4 release as a small list of document versions, so that a page reads only what it shows (PERF-01). Its unit tests counted statements on a hand-built list. This item measures the same thing on the perf fixture, published through the real publish service, at 0, 200 and 1,000 journal posts, both under the request-cache stub and through a real Next production build. It also reports the extra costs the plan asked for: the `cms_state` read that legacy stores with no release now pay, the journal-index read of an unlisted slug, and the route handlers whose `cache()` does nothing.
 
-**The headline:** the whole-release read is gone (home parses about 60 KB from the database instead of 648 KB), and the read counts hold: home and a policy page make 3 content statements, checkout and the footer read no page body, the sitemap and `/journal` read the journal index once. After fix round 1, journal posts are no longer in the release list, so what a page reads no longer grows with the number of posts: home parses 61,398 bytes at 200 posts and 61,428 at 1,000 (the difference is database answer noise; see the numbers). One acceptance item is still not met: home is about 60 KB, not under 50 KB, because about 40 KB of it is catalog reads (5b).
+**The headline:** the whole-release read is gone (home parses 49.3 KB from the database instead of 648.7 KB), and the read counts hold: home and a policy page make 3 content statements, checkout and the footer read no page body, the sitemap and `/journal` read the journal index once. After fix round 1, journal posts are no longer in the release list, so what a page reads no longer grows with the number of posts. After fix round 2, home no longer reads catalog it never shows, so it is under 50 KB: 50,391 bytes at 0 posts, 50,502 at 200 and 50,519 at 1,000 (1 KB = 1,024 bytes, as in the baseline; the limit is 51,200 bytes). All acceptance items pass.
 
 ## Design
 
@@ -68,30 +68,65 @@ New tests in `scripts/test-publish-service.js` (P2-PUBLISH's suite), run three w
 
 In `scripts/test-perf-docs.js` the "MEASURED" test (which pinned the growth) is replaced by "home and policy: the pointer read, and every content statement, returns identical bytes at 200 and 1,000 posts; at 0 posts the only difference is the journal index entry itself". It checks that no post is in `list.documents`, that the 200- and 1,000-post lists are the 0-post list plus its index entry, and that home's and the policy page's pointer bytes and content bytes are equal at 200 and 1,000 posts. Before the fix it fails. Unit numbers after the fix: the list is 10,849 bytes at 0 posts and 10,953 at 200 and at 1,000; home's pointer read 12,062 / 12,174 / 12,174 bytes; home's content bytes 20,457 / 20,569 / 20,569.
 
+## Fix round 2
+
+One blocker from review: acceptance 5b ("home parsed bytes drop from about 649 KB to under 50 KB") was not met at `0577a0d`. Home parsed about 60 KB on v4, about 40 KB of it catalog reads that legacy stores make too. Round 1 required the fix to land or the owner to waive the target. This round cuts the catalog share instead (commit `8868fbb`); no waiver is needed.
+
+**How the bytes were found.** `scripts/perf-dbcount.js` now also records each statement shape's own result bytes (`shapeBytes`: its columns and rows as JSON), and `scripts/perf-http.js` writes them as `bytes` on each statement. The counts are unchanged. Before the fix, home at 1,000 posts was: five rails 18,198 bytes, the pointer and list 12,688, the home and chrome versions 9,608, the header's and footer's collection list 6,263, newest products 3,621, the collections grid 2,513, the experiment 1,534, five pins reads 1,110, five rail counts 1,084, the rails' collection names 702, two catalog counts 434, plus about 150 bytes of answer framing per round trip (25 round trips).
+
+**What changed.** Each cut is something home read and never showed:
+- `app/(storefront)/layout.js`: the catalog's collections are only the Header's and Footer's fallback when the store has no menu of its own (`nav` null; both components ignore `collections` when `nav` is a list). The layout now reads them only when the header or the footer menu is not a list. This holds on every storefront page, not only home. The cost: a store without its own menus starts this read once its chrome is known, instead of alongside it (one database trip later; see Known limits).
+- `lib/repo.js` `getProductsInCollection`: a new option `withTotal: false` skips the count (`total` is then null). The home rails (`lib/cms/section-data.js`) use it; they only show products. The collection page still counts (default `true`).
+- `lib/repo.js` `collectionPinsByHandles` (new): every rail's pins in one statement, the same values `collectionPinsByHandle` gives (at most 24; `[]` for none, bad JSON or a pre-migration tenant). `section-data.js` reads it once and passes `pins` to each rail. A repo without it (the tests' fakes) keeps each rail's own read.
+- `lib/repo.js` `getCatalogStats`: both counts in one statement.
+- `lib/experiments.js` `runningExperimentFor`: selects `id, slug, name, target_kind, status, variants, salt` instead of every column. Serving uses slug, name, variants and salt (`heroVariantFor`, `assignVariant`); home is its only caller (test-preview-experiments checks that).
+- `lib/repo.js` `getFeaturedCollections`: no description (`CollectionCard` shows handle, title, image, alt and the count). Its only callers are the home grid and `perf-report`'s library mode.
+
+**Result** (real Next, one build of `8868fbb`): home on v4 parses 50,391 / 50,502 / 50,519 bytes at 0 / 200 / 1,000 posts (49.2 / 49.3 / 49.3 KB), in 14 round trips instead of 25. Split at 1,000 posts: rails 18,198, pointer and list 12,688, versions 9,608, newest 3,622, grid 1,955, experiment 873, collection names 702, pins 425, counts 296, framing about 2,150. Content is 22,296 bytes of it; the catalog 26,071.
+
+New tests, each run against the code before the fix:
+
+| Test | Before the fix | After |
+|---|---|---|
+| `test-perf-docs` "home on v4 reads no catalog it doesn't show …": at 0, 200 and 1,000 posts, no nav collections read (both menus custom) while both menus show, no rail count, one pins statement for 5 rails, one stats statement, an experiment read with no `*` and no `hypothesis`, no collection description | fails (nav collections read 1) | passes |
+| `test-perf-docs` "a store without its own menus still lists the catalog's collections …": legacy with no release, legacy with a live v3 release, and a new legacy store with a header menu only each read the collections once; the `/collections/protein` link shows in header and footer, or in the footer only beside the header menu | passes (guards the fallback) | passes |
+| `test-surfaces` "P2-PERF: home rails read all pins in one statement and keep the pinned order; no count is read": the batch equals the per-collection pins; a pinned rail shows the pinned product first, on two rails of the same collection; a missing collection gives none; one pins statement and no count for three rails; the collection page still counts 2; with no pins, Shopify order | fails (`collectionPinsByHandles` missing) | passes |
+| `test-perf-tools`, the proxy test: a byte count for every shape, all above zero, adding up to no more than the bytes parsed | (new assertions; the field did not exist) | passes |
+
+Each cut was also undone alone (script `mut2/run.py` in my scratch folder) and the suites run:
+
+| # | Break | Caught by |
+|---|---|---|
+| B11 | the layout always reads the nav collections | test-perf-docs, the v4 catalog test |
+| B12 | the rails keep the count | test-perf-docs and test-surfaces |
+| B13 | pins read per rail | test-perf-docs and test-surfaces |
+| B14 | the stats back to two statements | test-perf-docs |
+| B15 | the experiment back to `selectAll` | test-perf-docs |
+| B16 | the grid reads the description again | test-perf-docs |
+| B17 | the nav collections skipped when only one menu is the store's own | test-perf-docs, the fallback test |
+
 ## The local numbers (real Next)
 
-The v4 columns were taken again after fix round 1: one build (`5l1hOEW_X9jdtP97Qs80k`) of commit `5e5fa58`. The legacy columns are the first round's, one build (`es8ihdvIYpyRLktsdJvbC`) of commit `f893710` (nothing on the legacy read path changed). Both: `next build` then `next start` with the harness env, storefront on Next's local edge runtime, three local sqld, perf-dbcount proxies in front. Five counted runs per route, then 5 warm-up rounds and 50 timed rounds. Apple M5 Pro, Node 26.0.0, Next 16.2.9, sqld 0.24.32. Load average 4.3 to 7.7 at the start of each run: other agents shared the Mac, so treat small time differences as noise. Every count was the same on all 5 counted runs and agreed with sqld's own query counter.
+All five columns were taken again after fix round 2: one build (`IxZlyCgQffWdXqIxirCCi`) of commit `8868fbb`. `next build` then `next start` with the harness env, storefront on Next's local edge runtime, three local sqld, perf-dbcount proxies in front. Five counted runs per route, then 5 warm-up rounds and 50 timed rounds. Apple M5 Pro, Node 26.0.0, Next 16.2.9, sqld 0.24.32. Load average 3.3 to 4.8 at the start of each run (other agents shared the Mac). Every count was the same on all 5 counted runs and agreed with sqld's own query counter. Fix round 2 changed catalog reads legacy stores make too, so the legacy columns are not the code before phase 2 any more: the "before" for 5b is the PERF-04 baseline column.
 
-Round trips / parsed from the database, per request (warm):
+Round trips / parsed from the database, per request (warm; 1 KB = 1,024 bytes):
 
 | Route | PERF-04 baseline | Legacy, v3 live | Legacy, no release | v4, 0 posts | v4, 200 posts | v4, 1,000 posts |
 |---|---|---|---|---|---|---|
-| home | 24 / 648.7 KB | 23 / 648.2 KB | 32 / 66.0 KB | 25 / 59.9 KB | 25 / 60.0 KB | 25 / 60.0 KB |
-| product | 10 / 637.7 KB | 9 / 637.2 KB | 19 / 52.7 KB | 11 / 45.2 KB | 11 / 45.3 KB | 11 / 45.4 KB |
-| collection | 9 / 636.7 KB | 8 / 636.2 KB | 15 / 49.4 KB | 9 / 43.0 KB | 9 / 43.1 KB | 9 / 43.2 KB |
-| policy page | 3 / 617.1 KB | 2 / 616.6 KB | 10 / 39.2 KB | 4 / 28.0 KB | 4 / 28.1 KB | 4 / 28.1 KB |
-| `/journal` | 3 / 617.1 KB | 2 / 616.6 KB | 69 / 536.1 KB | 3 / 23.2 KB | 4 / 94.4 KB | 4 / 376.6 KB |
-| checkout | 9 / 636.5 KB | 8 / 636.0 KB | 15 / 66.2 KB | 9 / 42.5 KB | 9 / 42.7 KB | 9 / 42.7 KB |
+| home | 24 / 648.7 KB | 12 / 637.5 KB | 21 / 55.4 KB | 14 / 49.2 KB | 14 / 49.3 KB | 14 / 49.3 KB |
+| product | 10 / 637.7 KB | 8 / 631.0 KB | 18 / 46.4 KB | 10 / 39.0 KB | 10 / 39.1 KB | 10 / 39.1 KB |
+| collection | 9 / 636.7 KB | 7 / 629.9 KB | 14 / 43.2 KB | 8 / 36.8 KB | 8 / 36.9 KB | 8 / 36.9 KB |
+| policy page | 3 / 617.1 KB | 1 / 610.4 KB | 9 / 32.9 KB | 3 / 21.7 KB | 3 / 21.8 KB | 3 / 21.8 KB |
+| `/journal` | 3 / 617.1 KB | 1 / 610.4 KB | 68 / 529.8 KB | 2 / 16.9 KB | 3 / 88.1 KB | 3 / 370.4 KB |
+| checkout | 9 / 636.5 KB | 7 / 629.8 KB | 14 / 59.9 KB | 8 / 36.3 KB | 8 / 36.4 KB | 8 / 36.4 KB |
 | `/sitemap.xml` | not measured | 65 / 38.5 MB | 190 / 627.8 KB | 4 / 68.3 KB | 5 / 139.6 KB | 5 / 421.8 KB |
 | `/api/upsell` | not measured | 3 / 613.9 KB | 5 / 5.5 KB | 1 / 12.4 KB | 1 / 12.5 KB | 1 / 12.5 KB |
 | `/offline` | not measured | 1 / 610.4 KB | 2 / 977 B | 2 / 16.9 KB | 2 / 17.0 KB | 2 / 17.0 KB |
 | manifest | not measured | 1 / 610.4 KB | 2 / 977 B | 2 / 16.9 KB | 2 / 17.0 KB | 2 / 17.0 KB |
 
-Exact parsed bytes at 200 and at 1,000 posts: home 61,398 and 61,428; policy page 28,745 and 28,747; checkout 43,677 and 43,684; `/api/upsell` 12,825 and 12,826; `/offline` 17,427 and 17,427. These few bytes are not content: the cart routes, which read no content, move the same way between runs (`cart-get` 9,924, 9,925 and 9,928 bytes), most likely from variable-length numbers in each database answer. From 0 to 200 posts each v4 route grows once by about 112 bytes: the list's `indexes.journal` goes from null to one entry. The harness's live release list is 10,953 bytes at 200 and at 1,000 posts (it was 37,353 and 142,953 before the fix). Before the fix, home parsed 87.7 KB at 200 posts and 198.7 KB at 1,000.
+Exact parsed bytes at 200 and at 1,000 posts: home 50,502 and 50,519; policy page 22,346 and 22,349; checkout 37,277 and 37,285; `/api/upsell` 12,825 and 12,826. These few bytes are not content: the cart routes, which read no content, move the same way between runs (`cart-get` 9,925 and 9,928 bytes), from variable-length numbers in each database answer. From 0 to 200 posts each v4 route grows once by about 112 bytes: the list's `indexes.journal` goes from null to one entry. The harness's live release list is 10,953 bytes at 200 and at 1,000 posts.
 
-Total p50 in ms, warm (baseline / legacy v3 / v4 at 0, 200, 1,000): home 57.4 / 51.8 / 41.8, 41.5, 40.3; policy 28.8 / 26.6 / 16.6, 16.6, 16.4; `/journal` 29.7 / 28.1 / 14.7, 26.7, 72.5; sitemap – / 917.3 / 7.6, 10.6, 18.3. The full tables (p95, all 15 routes, collection-all, collections, search, cart) are in `docs/perf/2026-11-phase2-local.md`.
-
-The "legacy, v3 live" column is the "before" on this same build. It is one round trip below the PERF-04 baseline on every page that reads the release, because P2-VGATE reads the pointer and the release in one join.
+Total p50 in ms, warm (baseline / legacy v3 / v4 at 0, 200, 1,000): home 57.4 / 45.1 / 31.9, 31.7, 32.6; policy 28.8 / 25.4 / 14.6, 14.7, 15.2; `/journal` 29.7 / 27.3 / 13.4, 24.6, 72.2; sitemap – / 957.3 / 7.4, 10.8, 18.8. The full tables (p95, all 15 routes) are in `docs/perf/2026-11-phase2-local.md`.
 
 ## Acceptance
 
@@ -105,14 +140,14 @@ The "legacy, v3 live" column is the "before" on this same build. It is one round
 | 3 | unit: footer links and checkout policy links issue no version-body reads | **Pass** | "the footer (the REAL layout's chromeData) reads only the chrome set, and the REAL checkout's policyLinks reads no version at all …", at 0, 200 and 1,000 posts: the layout makes one version read and every id in it is a chrome version; the footer and checkout show the policy link; checkout reads no version; neither reads the journal index or any page body. Breaks B2, B4 |
 | 4 | unit: sitemap.xml and /journal read the journal index once at 200 and 1,000 posts, with no per-post reads | **Pass** | "the REAL sitemap.xml and /journal read the journal index once …": the only version read is the index (`[[index version]]`), 2 content statements, and N posts listed by each. Breaks B3, B7 |
 | 5a | local (perf-dbcount through real Next): per-route round trips and parsed bytes recorded before and after | **Pass (recorded)** | `docs/perf/2026-11-phase2-local.json` and `.md`: home, product, collection, policy, checkout, `/journal` and `/sitemap.xml` (and 8 more routes) on legacy with a live v3 release (before), legacy with no release, and v4 at 0, 200 and 1,000 posts, next to the PERF-04 baseline |
-| 5b | local: home parsed bytes drop from about 649 KB to under 50 KB | **NOT MET** | 648.2 KB before; after fix round 1, 59.9 KB on v4 at 0 posts and 60.0 KB at 200 and at 1,000. It no longer grows with posts, but it is above 50 KB. About 40 KB of it is catalog reads (rails, menus, counts), which a legacy store makes too (a legacy store with no release parses 66.0 KB on home); the content reads are about 20 KB (the 10.9 KB list plus the chrome and home versions). Meeting 50 KB needs the catalog share cut (a PERF-06 candidate), or the owner ruling that the target means the content reads only (owner check 3) |
+| 5b | local: home parsed bytes drop from about 649 KB to under 50 KB | **Pass** (fix round 2) | 648.7 KB before (PERF-04 baseline, 664,223 bytes). After fix round 2, through real Next on one build of `8868fbb`: 50,391 bytes (49.2 KB) on v4 at 0 posts, 50,502 (49.3 KB) at 200 and 50,519 (49.3 KB) at 1,000, stable over 5 counted runs and checked against sqld. 1 KB = 1,024 bytes, as in the baseline's 648.7 KB; the limit is 51,200 bytes, so the margin is about 680 bytes. Everything home parses is counted, catalog included. The catalog statements are pinned by the new unit tests (see "Fix round 2") |
 | 5c | local: the sitemap shows no per-post reads | **Pass** | `/sitemap.xml` on v4: 4 round trips at 0 posts, 5 at 200 and at 1,000 (the extra one is the journal index), stable over 5 counted runs. The legacy sitemap, for comparison, makes 65 |
 
 ### Requirements
 
 | Requirement | Proven here | Left, and for which item |
 |---|---|---|
-| PERF-01 | Read counts per request on the perf fixture at 0, 200 and 1,000 posts, unit and real Next: home 3 content statements, policy 3, checkout and footer no page body, sitemap and `/journal` one index read and no per-post read. Bytes independent of the post count (fix round 1): identical in the unit test at 200 and 1,000 posts; through real Next within 30 bytes of answer noise | The 50 KB home figure (5b, catalog share). Hosted numbers: owner check |
+| PERF-01 | Read counts per request on the perf fixture at 0, 200 and 1,000 posts, unit and real Next: home 3 content statements, policy 3, checkout and footer no page body, sitemap and `/journal` one index read and no per-post read. Bytes independent of the post count (fix round 1): identical in the unit test at 200 and 1,000 posts; through real Next within 30 bytes of answer noise. Home under 50 KB, catalog included (fix round 2) | Hosted numbers: owner check |
 
 ## Findings
 
@@ -122,8 +157,10 @@ The "legacy, v3 live" column is the "before" on this same build. It is one round
 4. **The cms_state read on legacy stores with no release** (plan sections 2 and 6, decision 15): one extra statement per page request (home 32 round trips, of which 1 is `SELECT mode FROM cms_state`; the unit test shows exactly 1 on home and on a policy page, and 0 on a store with a live release). Where `cache()` does nothing, it is paid per getter call: the sitemap makes 63 `cms_state` reads per request (plus 63 pointer reads, which were there before), and `/api/upsell`, `/offline` and the manifest one per call. The statement returns 12 bytes.
 5. **An unlisted slug on v4 reads the journal index** (plan section 6): a code default page, or any 404 under `/policies/`, reads the whole index once before giving up. Unit bytes: nothing at 0 posts, 72.3 KB at 200, 361.3 KB at 1,000. So every 404 on a store with 1,000 posts parses about 0.37 MB. Real Next was not measured for this (the report only measures 200 answers; the harness store has no code default pages, which are the brand tenant's only). The unit test "REPORTED: on v4, a slug that is not a listed page …" pins one index read per request.
 6. **Route handlers** (`/api/upsell`, `/offline`, `/manifest.webmanifest`) on v4: one pointer read per call, plus the chrome set for `/offline` and the manifest; nothing is shared between calls. The unit test calls each twice and sees two pointer reads. Each call parses the list (about 11 KB, at any post count after fix round 1).
-7. **The v4 product page** reads its layout version, and with no hand-picked pairs on v4 (plan decision 9) it runs the automatic "Pairs well with" query: 11 round trips and 3,757 rows read, against 9 and 1,407 on legacy. This is expected until OVL.
-8. **`/journal` lists every post**, so at 1,000 posts it parses 377 KB and sends 930 KB of HTML (72.5 ms p50). This is not new (the page has no paging), and it is bounded by the post count by design.
+7. **The v4 product page** reads its layout version, and with no hand-picked pairs on v4 (plan decision 9) it runs the automatic "Pairs well with" query: 10 round trips and 2,415 rows read, against 8 and 65 on legacy with a live release (after fix round 2, which dropped the nav collections read on both). This is expected until OVL.
+8. **`/journal` lists every post**, so at 1,000 posts it parses 370 KB and sends about 930 KB of HTML (72.2 ms p50). This is not new (the page has no paging), and it is bounded by the post count by design.
+9. **Fixed in round 2: home read catalog it never showed** (acceptance 5b). See "Fix round 2". Legacy stores gain too: legacy home with a live v3 release went from 23 round trips to 12, and every storefront page of a store with both menus skips the nav collections read (about 6 KB).
+10. **Home's 50 KB margin is small** (about 680 bytes on the perf fixture). The rest of home is the rails' product rows (18.2 KB for 40 cards), the release list (12.7 KB) and the home and chrome versions (9.6 KB), all of which a shopper sees. A store with more sections, longer menus or more pages will be above 50 KB: the target is met for the perf fixture, not for every store. Merging the five rails into one statement (about 2 KB of column headers and framing) is the next cut if one is wanted; it is not done here.
 
 ## Do the tests bite?
 
@@ -145,15 +182,18 @@ Each break was applied alone, the suite run, then the file restored (script in m
 
 ## Tests
 
-- `scripts/test-perf-docs.js`: 12 tests, 2.2 s in the gate. It prints its measured figures on one line at the end (`measured: {...}`), which is where the unit byte numbers above come from.
+- `scripts/test-perf-docs.js`: 14 tests (2 new in round 2), 2.4 s in the gate. It prints its measured figures on one line at the end (`measured: {...}`), which is where the unit byte numbers above come from.
 - `scripts/test-publish-service.js`: 26 tests (5 new in round 1), 1.4 s in the gate.
-- `scripts/test-perf-tools.js` is unchanged and passes (26) with the `perf-http.js` options added.
-- `pnpm test`: 66 of 66 suites passed in 118.3 s (round 1). `next build` passed (through `perf-report http --build`).
+- `scripts/test-surfaces.js`: 16 tests (1 new in round 2).
+- `scripts/test-perf-tools.js`: 26 tests; round 2 added the per-statement byte assertions to the proxy test.
+- `pnpm test`: 66 of 66 suites passed in 118.7 s (round 2). `next build` passed (through `perf-report http --build`).
 
 ## Known limits
 
-- **One acceptance item is not met** (5b): home parses about 60 KB, not under 50 KB.
-- **The 50 KB home target includes the catalog.** The catalog reads (rails, menus, counts) are about 40 KB of home's 60 KB at any post count. They are the same on legacy, so the target cannot be met by the content path alone.
+- **Home is under 50 KB with a small margin** (about 680 bytes, finding 10), on the perf fixture only. A store with more on its home page can be above it.
+- **A store without its own header or footer menu now reads the catalog's collections one database trip later** (fix round 2): the layout needs the chrome first to know whether the fallback list is shown. Its pages are the same; only the timing moves, by up to one database round trip (hosted, one Turso trip). Stores with both menus skip the read altogether. Not measured: the perf harness store has both menus in every column, so no run here shows a store without them (owner check 2).
+- **The home rails' pins are read in one statement**, but still from the draft table (`collection_overrides`), as before: the rails never used release-frozen pins, and this round does not change that.
+- **The legacy columns were taken again on the round 2 build**, because round 2 changed catalog reads legacy makes too. The "before" for 5b is the PERF-04 baseline.
 - **The real-Next byte figures at 200 and 1,000 posts differ by up to 30 bytes**, as routes that read no content do between runs. The unit test is the exact proof.
 - **Older-style v4 lists** (a post with its own `list.documents` entry) are read and cleaned per post on its next publish, not all at once. No real store has one.
 - **Fix round 1 touched P2-PUBLISH's files** (`lib/documents/publish.js`, `lib/documents/commit.js`, `scripts/test-publish-service.js`), as the review asked.
@@ -163,13 +203,14 @@ Each break was applied alone, the suite run, then the file restored (script in m
 - **`doc_cart` is not in the fixture**, so `/api/upsell` on v4 answers an empty slot; the PERF-04 store has a cart upsell placement. The read cost is the pointer either way (the cart version would add one small read).
 - **Route ids differ between runs** (the write service mints them). The builder's hash covers the bodies, types, slugs and singleton ids. Byte counts are unaffected (every random id has the same length).
 - **The harness takeover clears the seeded v3 pointer** on the harness store only; re-seed (`node scripts/dev-design.js seed --fixture perf`) to get the legacy store back.
-- `perf-http.js` is not in the plan's file list for this item. The change is additive (three options and five more fixture-size fields), needed to measure the sitemap and the route handlers through the same tool.
+- `perf-http.js` and `perf-dbcount.js` are not in the plan's file list for this item. The changes are additive (three options, five more fixture-size fields and, in round 2, per-statement bytes), needed to measure the sitemap, the route handlers and where home's bytes go through the same tool.
+- **Round 2 touched files other items own** (`app/(storefront)/layout.js`, `lib/repo.js`, `lib/cms/section-data.js`, `lib/experiments.js`), because the 5b target counts catalog reads.
 
 ## Owner checks
 
 1. **Finding 1 (fixed in round 1)**: review the change to `publish.js` and `commit.js` as P2-PUBLISH's owner would; the reconcile rule for post versions (`liveListHoldsMine`) is proven by a unit test only, not by a hosted thrown-batch run.
 2. **Hosted numbers (OQ-19)**: the same routes on a staging tenant in documents mode at 0, 200 and 1,000 posts. Hosted, each round trip is a network trip to Turso.
-3. **The 50 KB home target**: decide whether it is meant for the content reads only (about 19 KB at 0 posts here) or for everything the page parses (catalog included).
+3. **Fix round 2 (5b)**: review the catalog cuts in `layout.js`, `repo.js`, `section-data.js` and `experiments.js` as their owners would. Optional: open home, a collection page and a policy page of the perf harness in desktop Chrome, on a store with both menus and on one without, and check the header and footer look as before. The 50 KB target is met on everything home parses, so no ruling on its meaning is needed now; the margin is small (finding 10).
 4. **The legacy sitemap** (finding 3): 38.5 MB parsed per request on a store with a live release. Worth a PERF-03 or PERF-06 slot; real stores serve this to crawlers today.
 5. **CI sqld** stands (P2-ATOM): `.github/` was not touched. `test-perf-docs` needs no sqld; the real-Next runs need sqld on the machine.
 6. **DR-1, DR-2, DR-3** stand. No store must move to documents mode until the cutover gates in the plan are met.
@@ -179,7 +220,8 @@ Each break was applied alone, the suite run, then the file restored (script in m
 
 - `scripts/perf-docs-fixture.js` (new), `scripts/test-perf-docs.js` (replaces the placeholder)
 - Fix round 1: `lib/documents/publish.js`, `lib/documents/commit.js`, `scripts/test-publish-service.js`
-- `scripts/perf-http.js` (three options, more fixture sizes)
+- Fix round 2: `app/(storefront)/layout.js`, `lib/repo.js`, `lib/cms/section-data.js`, `lib/experiments.js`, `scripts/perf-dbcount.js` (per-statement bytes), `scripts/test-perf-docs.js`, `scripts/test-surfaces.js`, `scripts/test-perf-tools.js`, `scripts/perf-docs-fixture.js` (the report's wording about perf-dbcount)
+- `scripts/perf-http.js` (three options, more fixture sizes, per-statement bytes)
 - `docs/perf/2026-11-phase2-local.json`, `docs/perf/2026-11-phase2-local.md` (new)
 - `docs/cms-reviews/P2-PERF.md`
 
