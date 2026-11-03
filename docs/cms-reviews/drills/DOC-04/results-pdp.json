@@ -1,0 +1,37 @@
+{
+  "id": "DOC-04",
+  "part": "pdp",
+  "title": "P1-DRILLS DOC-04: plain, located messages, and failures after a write — pdp",
+  "ranAt": "2026-11-03T11:10:05.716Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 1,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "pdp: \"Product page accordions, accordion 2: needs a title\"",
+      "detail": [
+        "Platform notice: Payments provider latency",
+        "Card payments may take a little longer than usual today.",
+        "Fix these to save",
+        "Product page accordions, accordion 2: needs a title"
+      ]
+    }
+  ],
+  "notes": [
+    "pdp: PUT answered 422; banners: [{\"tone\":\"info\",\"text\":\"Platform notice: Payments provider latency\\nCard payments may take a little longer than usual today.\"},{\"tone\":\"danger\",\"text\":\"Fix these to save\\nProduct page accordions, accordion 2: needs a title\"}]"
+  ],
+  "screenshots": [
+    {
+      "name": "B-pdp-accordion-2",
+      "file": "docs/cms-reviews/drills/DOC-04/B-pdp-accordion-2.png",
+      "bytes": 35682,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/product-pages"
+    }
+  ]
+}

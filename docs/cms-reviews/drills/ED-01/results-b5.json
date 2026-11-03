@@ -1,0 +1,71 @@
+{
+  "id": "ED-01",
+  "part": "b5",
+  "title": "P1-DRILLS ED-01: the full-width editor on the edge runtime — b5",
+  "ranAt": "2026-11-03T11:39:48.744Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 2,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B5 at 1280 (pairs): clicking the region brings \"Also on this page\" into view and flashes it",
+      "detail": {
+        "before": "rounded-card transition-shadow > rounded-card border border-edge bg-surface shadow-card p-5",
+        "during": [
+          "rounded-card transition-shadow ring-2 ring-[var(--c-accent)] shadow-card > rounded-card border border-edge bg-surface shadow-card p-5"
+        ],
+        "after": {
+          "cls": "rounded-card transition-shadow > rounded-card border border-edge bg-surface shadow-card p-5",
+          "ring": false,
+          "inView": true,
+          "top": 678,
+          "inspectorWidth": 288
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "B5 at 1280 (pdp-modules): clicking the region brings \"Modules\" into view and flashes it",
+      "detail": {
+        "before": "rounded-card transition-shadow > rounded-card border border-edge bg-surface shadow-card p-5",
+        "during": [
+          "rounded-card transition-shadow ring-2 ring-[var(--c-accent)] shadow-card > rounded-card border border-edge bg-surface shadow-card p-5"
+        ],
+        "after": {
+          "cls": "rounded-card transition-shadow > rounded-card border border-edge bg-surface shadow-card p-5",
+          "ring": false,
+          "inView": true,
+          "top": 347,
+          "inspectorWidth": 288
+        }
+      }
+    }
+  ],
+  "notes": [
+    "B5: regions in the product preview: [\"announcement\",\"pdp-modules\",\"pdp-pairs\"]",
+    "B5: the Modules card sits in an inspector 288px wide"
+  ],
+  "screenshots": [
+    {
+      "name": "B5-1280-pairs",
+      "file": "docs/cms-reviews/drills/ED-01/B5-1280-pairs.png",
+      "bytes": 43047,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/designer/product"
+    },
+    {
+      "name": "B5-1280-modules",
+      "file": "docs/cms-reviews/drills/ED-01/B5-1280-modules.png",
+      "bytes": 42985,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/designer/product"
+    }
+  ]
+}

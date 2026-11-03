@@ -1,0 +1,59 @@
+{
+  "id": "COM-03",
+  "part": "later",
+  "title": "P1-DRILLS COM-03: offers in plain words, a check before going live, a way back — later",
+  "ranAt": "2026-11-03T11:46:38.039Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B7: the dialog's first line reads \"Shoppers get this from <date>:\"",
+      "detail": "Shoppers get this from 10 Nov, 10:00 am:"
+    },
+    {
+      "ok": true,
+      "label": "B7: the toast reads \"Back to the earlier settings. Shoppers get them from <date>.\"",
+      "detail": [
+        "Back to the earlier settings. Shoppers get them from 10 Nov, 10:00 am."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "B7: the dialog and the toast name the same date",
+      "detail": {
+        "dialog": "10 Nov, 10:00 am",
+        "toast": "10 Nov, 10:00 am"
+      }
+    }
+  ],
+  "notes": [
+    "B7: start toast [\"“DRILLLATER · 10% off” starts 10 Nov, 10:00 am.\"]",
+    "B7: the primary button reads \"Update live offer\"",
+    "B7: no-dates save toast [\"Updated. Shoppers get it on their next cart.\"]",
+    "B7: dialog text \"Go back to previous offer settings?\\nShoppers get this from 10 Nov, 10:00 am:\\nCode DRILLLATER takes 10% off the order\\nYour saved settings are kept, so you can switch back the same way.\\nCancel\\nGo back\""
+  ],
+  "screenshots": [
+    {
+      "name": "B7-go-back-dialog",
+      "file": "docs/cms-reviews/drills/COM-03/B7-go-back-dialog.png",
+      "bytes": 41925,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    },
+    {
+      "name": "B7-toast",
+      "file": "docs/cms-reviews/drills/COM-03/B7-toast.png",
+      "bytes": 42643,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    }
+  ]
+}

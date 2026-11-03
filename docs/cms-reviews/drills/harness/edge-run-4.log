@@ -1,0 +1,164 @@
+P1-HARNESS: the storefront on the edge runtime, on the design harness, with no code edit
+harness http://localhost:3081, Chrome 156.0.8078.80
+
+ok   app/(storefront)/layout.js still says export const runtime = "edge"
+ok   git diff HEAD -- app is empty (no runtime flip or other app edit in the working tree)
+ok   home at 1440 (/): answers 200
+ok   home at 1440: rendered on the edge runtime (x-edge-runtime: 1)
+ok   home at 1440: not an error page
+ok   home at 1440: shows real content ("Festive sale")
+ok   home at 1440: shows one of "Makeup second" / "Visibly brighter"
+ok   home at 1440: no sideways scroll
+ok   product at 1440 (/products/glow-serum): answers 200
+ok   product at 1440: rendered on the edge runtime (x-edge-runtime: 1)
+ok   product at 1440: not an error page
+ok   product at 1440: shows real content ("Radiance Glow Serum 30ml", "1,299")
+ok   product at 1440: no sideways scroll
+ok   collection at 1440 (/collections/serums): answers 200
+ok   collection at 1440: rendered on the edge runtime (x-edge-runtime: 1)
+ok   collection at 1440: not an error page
+ok   collection at 1440: shows real content ("Serums", "Radiance Glow Serum 30ml", "Vitamin C Booster 15ml")
+ok   collection at 1440: no sideways scroll
+ok   collections at 1440 (/collections): answers 200
+ok   collections at 1440: rendered on the edge runtime (x-edge-runtime: 1)
+ok   collections at 1440: not an error page
+ok   collections at 1440: shows real content ("Bestsellers", "Serums", "Night routine")
+ok   collections at 1440: no sideways scroll
+ok   search at 1440 (/search?q=serum): answers 200
+ok   search at 1440: rendered on the edge runtime (x-edge-runtime: 1)
+ok   search at 1440: not an error page
+ok   search at 1440: shows real content ("Radiance Glow Serum 30ml")
+ok   search at 1440: no sideways scroll
+ok   account-sign-in at 1440 (/account): answers 200
+ok   account-sign-in at 1440: rendered on the edge runtime (x-edge-runtime: 1)
+ok   account-sign-in at 1440: not an error page
+ok   account-sign-in at 1440: shows real content ("Sign in", "Email")
+ok   account-sign-in at 1440: no sideways scroll
+ok   cms-page at 1440 (/policies/shipping): answers 200
+ok   cms-page at 1440: rendered on the edge runtime (x-edge-runtime: 1)
+ok   cms-page at 1440: not an error page
+ok   cms-page at 1440: shows real content ("Shipping policy", "Orders dispatch within 24 hours")
+ok   cms-page at 1440: no sideways scroll
+ok   home at 768 (/): answers 200
+ok   home at 768: rendered on the edge runtime (x-edge-runtime: 1)
+ok   home at 768: not an error page
+ok   home at 768: shows real content ("Festive sale")
+ok   home at 768: shows one of "Makeup second" / "Visibly brighter"
+ok   home at 768: no sideways scroll
+ok   product at 768 (/products/glow-serum): answers 200
+ok   product at 768: rendered on the edge runtime (x-edge-runtime: 1)
+ok   product at 768: not an error page
+ok   product at 768: shows real content ("Radiance Glow Serum 30ml", "1,299")
+ok   product at 768: no sideways scroll
+ok   collection at 768 (/collections/serums): answers 200
+ok   collection at 768: rendered on the edge runtime (x-edge-runtime: 1)
+ok   collection at 768: not an error page
+ok   collection at 768: shows real content ("Serums", "Radiance Glow Serum 30ml", "Vitamin C Booster 15ml")
+ok   collection at 768: no sideways scroll
+ok   collections at 768 (/collections): answers 200
+ok   collections at 768: rendered on the edge runtime (x-edge-runtime: 1)
+ok   collections at 768: not an error page
+ok   collections at 768: shows real content ("Bestsellers", "Serums", "Night routine")
+ok   collections at 768: no sideways scroll
+ok   search at 768 (/search?q=serum): answers 200
+ok   search at 768: rendered on the edge runtime (x-edge-runtime: 1)
+ok   search at 768: not an error page
+ok   search at 768: shows real content ("Radiance Glow Serum 30ml")
+ok   search at 768: no sideways scroll
+ok   account-sign-in at 768 (/account): answers 200
+ok   account-sign-in at 768: rendered on the edge runtime (x-edge-runtime: 1)
+ok   account-sign-in at 768: not an error page
+ok   account-sign-in at 768: shows real content ("Sign in", "Email")
+ok   account-sign-in at 768: no sideways scroll
+ok   cms-page at 768 (/policies/shipping): answers 200
+ok   cms-page at 768: rendered on the edge runtime (x-edge-runtime: 1)
+ok   cms-page at 768: not an error page
+ok   cms-page at 768: shows real content ("Shipping policy", "Orders dispatch within 24 hours")
+ok   cms-page at 768: no sideways scroll
+ok   home at 375 (/): answers 200
+ok   home at 375: rendered on the edge runtime (x-edge-runtime: 1)
+ok   home at 375: not an error page
+ok   home at 375: shows real content ("Festive sale")
+ok   home at 375: shows one of "Makeup second" / "Visibly brighter"
+ok   home at 375: no sideways scroll
+ok   product at 375 (/products/glow-serum): answers 200
+ok   product at 375: rendered on the edge runtime (x-edge-runtime: 1)
+ok   product at 375: not an error page
+ok   product at 375: shows real content ("Radiance Glow Serum 30ml", "1,299")
+ok   product at 375: no sideways scroll
+ok   collection at 375 (/collections/serums): answers 200
+ok   collection at 375: rendered on the edge runtime (x-edge-runtime: 1)
+ok   collection at 375: not an error page
+ok   collection at 375: shows real content ("Serums", "Radiance Glow Serum 30ml", "Vitamin C Booster 15ml")
+ok   collection at 375: no sideways scroll
+ok   collections at 375 (/collections): answers 200
+ok   collections at 375: rendered on the edge runtime (x-edge-runtime: 1)
+ok   collections at 375: not an error page
+ok   collections at 375: shows real content ("Bestsellers", "Serums", "Night routine")
+ok   collections at 375: no sideways scroll
+ok   search at 375 (/search?q=serum): answers 200
+ok   search at 375: rendered on the edge runtime (x-edge-runtime: 1)
+ok   search at 375: not an error page
+ok   search at 375: shows real content ("Radiance Glow Serum 30ml")
+ok   search at 375: no sideways scroll
+ok   account-sign-in at 375 (/account): answers 200
+ok   account-sign-in at 375: rendered on the edge runtime (x-edge-runtime: 1)
+ok   account-sign-in at 375: not an error page
+ok   account-sign-in at 375: shows real content ("Sign in", "Email")
+ok   account-sign-in at 375: no sideways scroll
+ok   cms-page at 375 (/policies/shipping): answers 200
+ok   cms-page at 375: rendered on the edge runtime (x-edge-runtime: 1)
+ok   cms-page at 375: not an error page
+ok   cms-page at 375: shows real content ("Shipping policy", "Orders dispatch within 24 hours")
+ok   cms-page at 375: no sideways scroll
+ok   cart: adding the product, POST /api/cart answers 200
+ok   cart: the drawer opens with the item
+ok   cart: GET /api/cart answers 200 and holds the product
+ok   cart: Next compiled /api/cart as an edge function (.next/dev/server/app/api/cart/route/middleware-manifest.json)
+ok   checkout at 1440 (/checkout): answers 200
+ok   checkout at 1440: rendered on the edge runtime (x-edge-runtime: 1)
+ok   checkout at 1440: not an error page
+ok   checkout at 1440: shows real content ("Contact & shipping address", "Radiance Glow Serum 30ml")
+ok   checkout at 1440: no sideways scroll
+ok   checkout at 768 (/checkout): answers 200
+ok   checkout at 768: rendered on the edge runtime (x-edge-runtime: 1)
+ok   checkout at 768: not an error page
+ok   checkout at 768: shows real content ("Contact & shipping address", "Radiance Glow Serum 30ml")
+ok   checkout at 768: no sideways scroll
+ok   checkout at 375 (/checkout): answers 200
+ok   checkout at 375: rendered on the edge runtime (x-edge-runtime: 1)
+ok   checkout at 375: not an error page
+ok   checkout at 375: shows real content ("Contact & shipping address", "Radiance Glow Serum 30ml")
+KNOWN checkout at 375: no sideways scroll (page is 398px wide in a 375px window) [finding 6]
+ok   storefront: no console errors or page errors on any page above
+ok   storefront: no failed requests and no 4xx/5xx answers on any page above
+  · storefront: 0 requests were cut off by the drill's next navigation (net::ERR_ABORTED), not counted as failures
+ok   console: signed in with the .design-env setup password, landed on the dashboard
+ok   Designer: the preview connects ("Preview shows your last save")
+ok   Designer: the preview shows the saved draft hero, not the live one (button "Shop night routine")
+ok   Designer: the preview is marked "Draft preview"
+ok   Designer: the preview is not an error page
+  · Designer preview hero title: "Visibly brighter in 14 days" (draft title is "Winter repair, started."; the running hero-promise experiment's variant b is "Visibly brighter in 14 days")
+  · Experiment exposures sent from inside the Designer preview (POST /api/exp): 200 {"ok":true,"recorded":true}
+ok   Designer: the preview's page came from the edge runtime (200, x-edge-runtime: 1)
+ok   designer-product: the preview connects ("Preview shows your last save")
+ok   designer-product: the preview shows a real product page (/products/glow-serum)
+ok   designer-product: the preview's page came from the edge runtime (200, x-edge-runtime: 1)
+ok   designer-collection: the preview connects ("Preview shows your last save")
+ok   designer-collection: the preview shows a real collection page (/collections/serums)
+ok   designer-collection: the preview's page came from the edge runtime (200, x-edge-runtime: 1)
+ok   maintenance: the operator console switches it on (PATCH answers 200)
+ok   maintenance: a signed-out shopper gets the maintenance page with the founder's message
+ok   maintenance: the closed page is rendered on the edge runtime
+ok   maintenance: no store content visible (no announcement bar)
+  · maintenance: the founder's message is rgb(212, 212, 216) on rgb(255, 255, 255), contrast 1.48:1 (WCAG asks 4.5:1 for body text)
+ok   maintenance: a product page shows the maintenance page too, not the product
+ok   maintenance: a CMS page shows the maintenance page too, not the policy
+KNOWN maintenance: the home page's raw HTML carries no store content ("Shop bestsellers", "Radiance Glow Serum 30ml", "Festive sale") (status 200; found "Shop bestsellers" 2 times, "Radiance Glow Serum 30ml" 2 times) [finding 5]
+KNOWN maintenance: the product page's raw HTML carries no store content ("Radiance Glow Serum 30ml", "1299", "1,299") (status 200; found "Radiance Glow Serum 30ml" 24 times, "1299" 9 times) [finding 5]
+KNOWN maintenance: the CMS page's raw HTML carries no store content ("Orders dispatch within 24 hours") (status 200; found "Orders dispatch within 24 hours" 2 times) [finding 5]
+KNOWN maintenance: a client-side fetch of the product page (RSC: 1) carries no store content ("Radiance Glow Serum 30ml") (status 200; found "Radiance Glow Serum 30ml" 18 times) [finding 5]
+ok   maintenance: switched off again
+ok   maintenance: the store is open again afterwards
+
+150 passed, 0 failed, 5 known failures (expected until the issue named next to each is fixed). Screenshots and results.json in docs/cms-reviews/drills/P1-HARNESS/

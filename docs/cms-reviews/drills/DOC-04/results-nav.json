@@ -1,0 +1,40 @@
+{
+  "id": "DOC-04",
+  "part": "nav",
+  "title": "P1-DRILLS DOC-04: plain, located messages, and failures after a write — nav",
+  "ranAt": "2026-11-03T11:10:00.227Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 2,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "nav: the banner reads \"Header menu, item 2: needs a label and a path/URL\"",
+      "detail": [
+        "Header menu, item 2: needs a label and a path/URL"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "nav: N matches the empty row's position on screen (row 2 of 3)",
+      "detail": 2
+    }
+  ],
+  "notes": [
+    "nav: the custom header menu starts with 0 item(s)",
+    "nav: PUT /api/admin/storefront answered 422; banners: [{\"tone\":\"info\",\"text\":\"Platform notice: Payments provider latency\\nCard payments may take a little longer than usual today.\"},{\"tone\":\"danger\",\"text\":\"Fix these to save\\nHeader menu, item 2: needs a label and a path/URL\"}]"
+  ],
+  "screenshots": [
+    {
+      "name": "B-nav-empty-label",
+      "file": "docs/cms-reviews/drills/DOC-04/B-nav-empty-label.png",
+      "bytes": 38756,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/navigation"
+    }
+  ]
+}

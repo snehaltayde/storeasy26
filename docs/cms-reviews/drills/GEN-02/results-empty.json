@@ -1,0 +1,101 @@
+{
+  "id": "GEN-02",
+  "part": "empty",
+  "title": "P1-DRILLS GEN-02: first sync progress, failures and retry — empty",
+  "ranAt": "2026-11-03T12:06:33.750Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "D7: the setup step \"Bring in your products\"",
+      "detail": {
+        "text": "Bring in your products\nAuto\n\nBringing in your products from Shopify: 240 products so far\n\nOpen",
+        "link": "/admin/settings#catalog-sync",
+        "linkText": "Open",
+        "done": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "D7: it reads \"Bringing in your products from Shopify: 240 products so far\"",
+      "detail": "Bring in your products\nAuto\n\nBringing in your products from Shopify: 240 products so far\n\nOpen"
+    },
+    {
+      "ok": true,
+      "label": "D7: the step is not done",
+      "detail": {
+        "text": "Bring in your products\nAuto\n\nBringing in your products from Shopify: 240 products so far\n\nOpen",
+        "link": "/admin/settings#catalog-sync",
+        "linkText": "Open",
+        "done": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "D7: its link opens /admin/settings#catalog-sync",
+      "detail": {
+        "url": "/admin/settings#catalog-sync",
+        "top": 79.875,
+        "vh": 900
+      }
+    },
+    {
+      "ok": true,
+      "label": "D7: and lands on the card",
+      "detail": {
+        "url": "/admin/settings#catalog-sync",
+        "top": 79.875,
+        "vh": 900
+      }
+    },
+    {
+      "ok": true,
+      "label": "D10: \"Your products aren't in yet\"",
+      "detail": "Your products from Shopify\n\nYour products aren't in yet\n\nStoreasy isn't linked to your Shopify store yet. Contact support to link it."
+    },
+    {
+      "ok": true,
+      "label": "D10: \"Storeasy isn't linked to your Shopify store yet. Contact support to link it.\"",
+      "detail": "Your products from Shopify\n\nYour products aren't in yet\n\nStoreasy isn't linked to your Shopify store yet. Contact support to link it."
+    },
+    {
+      "ok": true,
+      "label": "D10: no button",
+      "detail": []
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "D7-setup",
+      "file": "docs/cms-reviews/drills/GEN-02/D7-setup.png",
+      "bytes": 29970,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/setup"
+    },
+    {
+      "name": "D7-link-lands-on-card",
+      "file": "docs/cms-reviews/drills/GEN-02/D7-link-lands-on-card.png",
+      "bytes": 30986,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/settings"
+    },
+    {
+      "name": "D10-no-link-no-products",
+      "file": "docs/cms-reviews/drills/GEN-02/D10-no-link-no-products.png",
+      "bytes": 35458,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    }
+  ]
+}

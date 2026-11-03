@@ -1,0 +1,76 @@
+{
+  "id": "ED-01",
+  "part": "b8",
+  "title": "P1-DRILLS ED-01: the full-width editor on the edge runtime — b8",
+  "ranAt": "2026-11-03T11:41:41.287Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 6,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B8 setup: the temporary throw is in the designer page"
+    },
+    {
+      "ok": true,
+      "label": "B8: the error page shows (\"This page hit an error\")"
+    },
+    {
+      "ok": true,
+      "label": "B8: Tab from the top: Open menu is the first stop",
+      "detail": {
+        "label": "Open menu",
+        "text": "",
+        "menu": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "B8: Enter opens the navigation with focus inside",
+      "detail": {
+        "open": true,
+        "focusInside": true,
+        "focus": "Close menu"
+      }
+    },
+    {
+      "ok": true,
+      "label": "B8: Escape closes it with focus back on the button",
+      "detail": {
+        "open": false,
+        "menu": true,
+        "label": "Open menu"
+      }
+    },
+    {
+      "ok": true,
+      "label": "B8: Try again is reachable by Tab",
+      "detail": "1 more Tab presses"
+    }
+  ],
+  "notes": [
+    "B8: focus style on Open menu: solid none"
+  ],
+  "screenshots": [
+    {
+      "name": "B8-error-page",
+      "file": "docs/cms-reviews/drills/ED-01/B8-error-page.png",
+      "bytes": 7985,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "B8-menu-open",
+      "file": "docs/cms-reviews/drills/ED-01/B8-menu-open.png",
+      "bytes": 12932,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

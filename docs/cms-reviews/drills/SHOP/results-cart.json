@@ -1,0 +1,120 @@
+{
+  "id": "SHOP",
+  "part": "cart",
+  "title": "P1-DRILLS SHOP: the cart after the CartContext change — cart",
+  "ranAt": "2026-11-03T11:57:51.337Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 9,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "add: POST /api/cart 200"
+    },
+    {
+      "ok": true,
+      "label": "add: the drawer opens"
+    },
+    {
+      "ok": true,
+      "label": "add: the cart holds 1 × Radiance Glow Serum 30ml (₹1,299)",
+      "detail": {
+        "items": [
+          [
+            "Radiance Glow Serum 30ml",
+            1
+          ]
+        ],
+        "subtotal": 1299
+      }
+    },
+    {
+      "ok": true,
+      "label": "quantity: + makes it 2 (₹2,598), in the drawer and the cart",
+      "detail": {
+        "q": 2,
+        "subtotal": 2598
+      }
+    },
+    {
+      "ok": true,
+      "label": "quantity: − takes it back to 1",
+      "detail": {
+        "q": 1,
+        "subtotal": 1299
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout: the drawer's Checkout opens checkout with the item",
+      "detail": "Festive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\n1\nBestsellers\nNight routine\nSerums\nDesign Demo Co\n1\nAddress\n→\n2\nReview\n→\n3\nPayment\nContact & sh"
+    },
+    {
+      "ok": true,
+      "label": "remove: the item goes, from the drawer and the cart",
+      "detail": "Your cart\n\nYour cart is empty\n\nAdd something you like and it’ll show up here."
+    },
+    {
+      "ok": true,
+      "label": "checkout with an empty cart: no error page"
+    },
+    {
+      "ok": true,
+      "label": "no console or page errors",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "remove: the header button now reads \"Open cart, 0 items\"",
+    "checkout with an empty cart reads: \"Festive sale — free shipping over ₹1,499\\nDesign Demo Co\\nShop all\\nBestsellers\\nNight routine\\nSerums\\nYour cart is empty\\n\\nAdd something before checking out.\\n\\nContinue shopping\\n\\nDesign Demo Co\\n\\nRealistic d\""
+  ],
+  "screenshots": [
+    {
+      "name": "1-added",
+      "file": "docs/cms-reviews/drills/SHOP/1-added.png",
+      "bytes": 18628,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "2-quantity-2",
+      "file": "docs/cms-reviews/drills/SHOP/2-quantity-2.png",
+      "bytes": 20066,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "3-checkout",
+      "file": "docs/cms-reviews/drills/SHOP/3-checkout.png",
+      "bytes": 16149,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "4-removed",
+      "file": "docs/cms-reviews/drills/SHOP/4-removed.png",
+      "bytes": 15695,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/glow-serum"
+    },
+    {
+      "name": "5-checkout-empty",
+      "file": "docs/cms-reviews/drills/SHOP/5-checkout-empty.png",
+      "bytes": 16497,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    }
+  ]
+}

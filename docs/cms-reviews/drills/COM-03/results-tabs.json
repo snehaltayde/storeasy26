@@ -1,0 +1,60 @@
+{
+  "id": "COM-03",
+  "part": "tabs",
+  "title": "P1-DRILLS COM-03: offers in plain words, a check before going live, a way back — tabs",
+  "ranAt": "2026-11-03T11:46:28.028Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "B6 setup: both tabs show the live offer's edit view with a way back",
+      "detail": 1
+    },
+    {
+      "ok": true,
+      "label": "B6: tab B's dialog shows \"This offer changed while you were looking at it…\"",
+      "detail": "Go back to previous offer settings?\nShoppers get this on their next cart:\nBuy 2 or more of Radiance Glow Serum 30ml, get 15% off\nYour saved settings are kept, so you can switch back the same way.\n\nThis offer changed while you were looking at it. Close it and open it again to see its settings now.\n\nCancel\nGo back"
+    },
+    {
+      "ok": true,
+      "label": "B6: the reloaded list still shows tab A's settings (step 1 at 18%)",
+      "detail": {
+        "row": [
+          "Serum duo — 15% off 2+",
+          "Buy 2 or more of Radiance Glow Serum 30ml, get 18% off · Runs whenever it's on"
+        ],
+        "cfg": {
+          "title": "Serum duo — 15% off 2+",
+          "config": "{\"id\":\"serum-duo\",\"type\":\"TIERED_QTY\",\"scope\":\"line\",\"priority\":30,\"target\":{\"kind\":\"handle\",\"value\":\"glow-serum\"},\"tiers\":[{\"minQty\":2,\"percent\":18}],\"title\":\"Serum duo — 15% off 2+\"}"
+        }
+      }
+    }
+  ],
+  "notes": [
+    "B6: tab A update toast [\"Updated. Shoppers get it on their next cart.\"]"
+  ],
+  "screenshots": [
+    {
+      "name": "B6-tab-b-refused",
+      "file": "docs/cms-reviews/drills/COM-03/B6-tab-b-refused.png",
+      "bytes": 41735,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    },
+    {
+      "name": "B6-list-after",
+      "file": "docs/cms-reviews/drills/COM-03/B6-list-after.png",
+      "bytes": 36402,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    }
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "id": "COM-03",
+  "part": "cart",
+  "title": "P1-DRILLS COM-03: offers in plain words, a check before going live, a way back — cart",
+  "ranAt": "2026-11-03T11:46:07.395Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: no other offer on Night Repair Cream 50g",
+      "detail": [
+        "Serum duo — 15% off 2+",
+        "FESTIVE10 — 10% off",
+        "Free lip mask over ₹2,999",
+        "Buy 2 of Detox Clay Mask 100g, get 1 free"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "B1 setup: Buy 2 get 1 started on the product, name left blank",
+      "detail": {
+        "id": "bxgy-night-repair-cream-50g-e1bc58",
+        "title": "Buy 2 of Night Repair Cream 50g, get 1 free",
+        "config": "{\"id\":\"bxgy-night-repair-cream-50g-e1bc58\",\"type\":\"BXGY\",\"scope\":\"line\",\"priority\":30,\"target\":{\"kind\":\"productId\",\"value\":\"gid://p/2\",\"label\":\"Night Repair Cream 50g\"},\"buy\":2,\"free\":1,\"title\":\"Buy 2 of Night Repair Cream 50g, get 1 free\",\"titleAuto\":true}",
+        "enabled": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "B5: with 3 in the cart the drawer's discount line reads \"Buy 2 of Night Repair Cream 50g, get 1 free\" (1 free, ₹1799 off)",
+      "detail": {
+        "cs": {
+          "items": [
+            {
+              "title": "Night Repair Cream 50g",
+              "qty": 3
+            }
+          ],
+          "offers": [
+            {
+              "title": "Buy 2 of Night Repair Cream 50g, get 1 free",
+              "amount": 1799
+            }
+          ],
+          "discountTotal": 1799,
+          "subtotal": 5397
+        },
+        "drawer": "Your cart (3)\n\nNight Repair Cream 50g\n\nDefault\n\n−\n3\n+\n₹5,397\nApply\nSubtotal\n₹5,397\nBuy 2 of Night Repair Cream 50g, get 1 free\n−₹1,799\nShipping\nFREE\nTotal\n₹3,598\n\nYou save ₹1,799\n\nCheckout →\n\nAny cash on delivery fee is added at checkout"
+      }
+    },
+    {
+      "ok": true,
+      "label": "B1: with 4 in the cart, 2 free (₹3598 off)",
+      "detail": {
+        "items": [
+          {
+            "title": "Night Repair Cream 50g",
+            "qty": 4
+          }
+        ],
+        "offers": [
+          {
+            "title": "Buy 2 of Night Repair Cream 50g, get 2 free",
+            "amount": 3598
+          }
+        ],
+        "discountTotal": 3598,
+        "subtotal": 7196
+      }
+    },
+    {
+      "ok": true,
+      "label": "B5: after the edit the drawer reads \"Buy 2 of Night Repair Cream 50g, get 2 free\"",
+      "detail": {
+        "cs": {
+          "items": [
+            {
+              "title": "Night Repair Cream 50g",
+              "qty": 4
+            }
+          ],
+          "offers": [
+            {
+              "title": "Buy 2 of Night Repair Cream 50g, get 2 free",
+              "amount": 3598
+            }
+          ],
+          "discountTotal": 3598,
+          "subtotal": 7196
+        },
+        "drawer": "Your cart (4)\n\nNight Repair Cream 50g\n\nDefault\n\n−\n4\n+\n₹7,196\nApply\nSubtotal\n₹7,196\nBuy 2 of Night Repair Cream 50g, get 2 free\n−₹3,598\nShipping\nFREE\nTotal\n₹3,598\n\nYou save ₹3,598\n\nCheckout →\n\nAny cash on delivery fee is added at checkout"
+      }
+    },
+    {
+      "ok": true,
+      "label": "B5: the checkout summary reads \"Buy 2 of Night Repair Cream 50g, get 2 free\"",
+      "detail": [
+        "Festive sale — free shipping over ₹1,499",
+        "Buy 2 of Night Repair Cream 50g, get 2 free",
+        "Buy 2 of Night Repair Cream 50g, get 2 free",
+        "FREE"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "B1: going back in the console says so",
+      "detail": [
+        "Back to the earlier settings. Shoppers get them on their next cart."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "B1: reloading the cart gives 1 free again (\"Buy 2 of Night Repair Cream 50g, get 1 free\"), with no restart and no publish",
+      "detail": {
+        "items": [
+          {
+            "title": "Night Repair Cream 50g",
+            "qty": 4
+          }
+        ],
+        "offers": [
+          {
+            "title": "Buy 2 of Night Repair Cream 50g, get 1 free",
+            "amount": 1799
+          }
+        ],
+        "discountTotal": 1799,
+        "subtotal": 7196
+      }
+    }
+  ],
+  "notes": [
+    "B1: start toast [\"“Buy 2 of Night Repair Cream 50g, get 1 free” has started.\"]",
+    "B1: update toast [\"Updated. Shoppers get it on their next cart.\"]",
+    "B1: go-back dialog: \"Go back to previous offer settings?\\nShoppers get this on their next cart:\\nBuy 2 of Night Repair Cream 50g, get 1 free\\nYour saved settings are kept, so you can switch back the same way.\\nCancel\\nGo back\"",
+    "B1: releases in the store: 7 (none made by this drill; offers are not published content)"
+  ],
+  "screenshots": [
+    {
+      "name": "B1-started",
+      "file": "docs/cms-reviews/drills/COM-03/B1-started.png",
+      "bytes": 36346,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    },
+    {
+      "name": "B5-drawer-get-1",
+      "file": "docs/cms-reviews/drills/COM-03/B5-drawer-get-1.png",
+      "bytes": 22856,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/products/night-repair-cream"
+    },
+    {
+      "name": "B5-drawer-get-2",
+      "file": "docs/cms-reviews/drills/COM-03/B5-drawer-get-2.png",
+      "bytes": 22896,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/products/night-repair-cream"
+    },
+    {
+      "name": "B5-checkout-get-2",
+      "file": "docs/cms-reviews/drills/COM-03/B5-checkout-get-2.png",
+      "bytes": 22586,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/checkout"
+    },
+    {
+      "name": "B1-went-back",
+      "file": "docs/cms-reviews/drills/COM-03/B1-went-back.png",
+      "bytes": 38980,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/offers"
+    },
+    {
+      "name": "B1-drawer-after-go-back",
+      "file": "docs/cms-reviews/drills/COM-03/B1-drawer-after-go-back.png",
+      "bytes": 22739,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/products/night-repair-cream"
+    }
+  ]
+}

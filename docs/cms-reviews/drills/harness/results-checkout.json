@@ -1,0 +1,80 @@
+{
+  "id": "harness",
+  "part": "checkout",
+  "title": "P1-DRILLS P1-HARNESS follow-ups — checkout",
+  "ranAt": "2026-11-03T11:19:12.782Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 1,
+  "failed": 0,
+  "knownFailures": 3,
+  "checks": [
+    {
+      "ok": false,
+      "label": "checkout at 360: no sideways scroll",
+      "detail": "page is 398px wide",
+      "known": "finding 6"
+    },
+    {
+      "ok": false,
+      "label": "checkout at 375: no sideways scroll",
+      "detail": "page is 398px wide",
+      "known": "finding 6"
+    },
+    {
+      "ok": false,
+      "label": "checkout at 390: no sideways scroll",
+      "detail": "page is 398px wide",
+      "known": "finding 6"
+    },
+    {
+      "ok": true,
+      "label": "checkout at 414: no sideways scroll",
+      "detail": "page is 414px wide"
+    }
+  ],
+  "notes": [
+    "checkout at 360: page 398px wide in a 360px window; the step row ends at 398px, \"Payment\" ends at 398px",
+    "checkout at 375: page 398px wide in a 375px window; the step row ends at 398px, \"Payment\" ends at 398px",
+    "checkout at 390: page 398px wide in a 390px window; the step row ends at 398px, \"Payment\" ends at 398px",
+    "checkout at 414: page 414px wide in a 414px window; the step row ends at 398px, \"Payment\" ends at 398px"
+  ],
+  "screenshots": [
+    {
+      "name": "checkout-360",
+      "file": "docs/cms-reviews/drills/harness/checkout-360.png",
+      "bytes": 16359,
+      "width": 360,
+      "height": 812,
+      "viewport": 360,
+      "path": "/checkout"
+    },
+    {
+      "name": "checkout-375",
+      "file": "docs/cms-reviews/drills/harness/checkout-375.png",
+      "bytes": 16543,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/checkout"
+    },
+    {
+      "name": "checkout-390",
+      "file": "docs/cms-reviews/drills/harness/checkout-390.png",
+      "bytes": 16659,
+      "width": 390,
+      "height": 812,
+      "viewport": 390,
+      "path": "/checkout"
+    },
+    {
+      "name": "checkout-414",
+      "file": "docs/cms-reviews/drills/harness/checkout-414.png",
+      "bytes": 16703,
+      "width": 414,
+      "height": 812,
+      "viewport": 414,
+      "path": "/checkout"
+    }
+  ]
+}

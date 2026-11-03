@@ -1,0 +1,39 @@
+{
+  "id": "MED-01",
+  "part": "heic",
+  "title": "P1-DRILLS MED-01: one upload path that makes photos fit (desktop Chrome) — heic",
+  "ranAt": "2026-11-03T12:14:17.073Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 1,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "5(c) Chrome on Mac: a .heic Chrome can't open gets the plain HEIC message and no POST",
+      "detail": {
+        "name": "phone-photo-undecodable.heic",
+        "sentBytes": 200024,
+        "posts": [],
+        "error": "This browser can't open \"phone-photo-undecodable.heic\" because it's a HEIC photo, a format many phones use. Save it as a JPEG first, or upload it from a phone browser that can open it.",
+        "toasts": [],
+        "stored": null
+      }
+    }
+  ],
+  "notes": [
+    "upload phone-photo-undecodable.heic: {\"name\":\"phone-photo-undecodable.heic\",\"sentBytes\":200024,\"posts\":[],\"error\":\"This browser can't open \\\"phone-photo-undecodable.heic\\\" because it's a HEIC photo, a format many phones use. Save it as a JPEG first, or upload it from a phone browser that can open it.\",\"toasts\":[],\"stored\":null}"
+  ],
+  "screenshots": [
+    {
+      "name": "5c-heic-message",
+      "file": "docs/cms-reviews/drills/MED-01/5c-heic-message.png",
+      "bytes": 45490,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/media"
+    }
+  ]
+}

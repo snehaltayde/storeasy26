@@ -1,0 +1,56 @@
+{
+  "id": "AU-05",
+  "part": "publish",
+  "title": "P1-DRILLS AU-05: the page editor keeps the founder's words — publish",
+  "ranAt": "2026-11-03T11:54:48.553Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "D1 live: the published page shows both paragraphs with no empty h2",
+      "detail": {
+        "status": 200,
+        "emptyH2": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "D7 live: the answer reads as typed",
+      "detail": [
+        "Free on orders under 500 rupees."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D8 live: the target=_blank link keeps nofollow (beside noopener noreferrer) in the page's HTML",
+      "detail": "<a href=\"https://example.com/guide\" target=\"_blank\" rel=\"nofollow noopener noreferrer\">"
+    }
+  ],
+  "notes": [
+    "publish: nothing new to publish (an earlier run of this part already published the drill pages)"
+  ],
+  "screenshots": [
+    {
+      "name": "D1-live",
+      "file": "docs/cms-reviews/drills/AU-05/D1-live.png",
+      "bytes": 18614,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/drill-au05-d1"
+    },
+    {
+      "name": "D7-live",
+      "file": "docs/cms-reviews/drills/AU-05/D7-live.png",
+      "bytes": 17750,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/drill-au05-d7"
+    }
+  ]
+}

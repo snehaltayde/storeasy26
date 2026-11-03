@@ -1,0 +1,651 @@
+{
+  "id": "MED-01",
+  "part": "library",
+  "title": "P1-DRILLS MED-01: one upload path that makes photos fit (desktop Chrome) — library",
+  "ranAt": "2026-11-03T12:13:42.239Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 27,
+  "failed": 2,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "1 (synthetic 5MB, 4000px JPEG): no error, image/jpeg, 1920 on the long edge, under 1.5MB, +thumb",
+      "detail": {
+        "name": "photo-4000x3000.jpg",
+        "sentBytes": 5273223,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "photo-4000x3000.jpg uploaded"
+        ],
+        "stored": {
+          "mime": "image/jpeg",
+          "size": 267629,
+          "width": 1920,
+          "height": 1440,
+          "filename": "photo-4000x3000.jpg",
+          "thumb": true,
+          "id": "med_131a5c6fd4fe1447ff"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "3 (Chrome): a transparent PNG over 1.5MB is stored as WebP under the limit",
+      "detail": {
+        "name": "transparent-1800.png",
+        "sentBytes": 10703216,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "transparent-1800.png uploaded"
+        ],
+        "stored": {
+          "mime": "image/webp",
+          "size": 1177574,
+          "width": 1800,
+          "height": 1800,
+          "filename": "transparent-1800.webp",
+          "thumb": true,
+          "id": "med_628dc15f2ba5e4c211"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "3: corners stay see-through (alpha 0), the middle solid",
+      "detail": {
+        "w": 1800,
+        "corner": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "middle": [
+          152,
+          172,
+          117,
+          255
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "3: the same file renamed .jpg: same result (WebP)",
+      "detail": {
+        "name": "transparent-1800-renamed.jpg",
+        "sentBytes": 10703321,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "transparent-1800-renamed.jpg uploaded"
+        ],
+        "stored": {
+          "mime": "image/webp",
+          "size": 1177406,
+          "width": 1800,
+          "height": 1800,
+          "filename": "transparent-1800-renamed.webp",
+          "thumb": true,
+          "id": "med_37bafa387c2ac61eac"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "3: a transparent PNG with a single see-through area is kept transparent (WebP)",
+      "detail": {
+        "name": "transparent-one-hole-1800.png",
+        "sentBytes": 10674422,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "transparent-one-hole-1800.png uploaded"
+        ],
+        "stored": {
+          "mime": "image/webp",
+          "size": 1311938,
+          "width": 1800,
+          "height": 1800,
+          "filename": "transparent-one-hole-1800.webp",
+          "thumb": true,
+          "id": "med_19c78c30c09a095a79"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "4 (Chrome): a sideways photo (EXIF orientation 6) is stored upright, 1440x1920",
+      "detail": {
+        "name": "sideways-exif6.jpg",
+        "sentBytes": 5357125,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "sideways-exif6.jpg uploaded"
+        ],
+        "stored": {
+          "mime": "image/jpeg",
+          "size": 254915,
+          "width": 1440,
+          "height": 1920,
+          "filename": "sideways-exif6.jpg",
+          "thumb": true,
+          "id": "med_47b10b0d55b6fea30f"
+        }
+      }
+    },
+    {
+      "ok": false,
+      "label": "5(c) Chrome on Mac: a .heic gets the plain HEIC message and no POST",
+      "detail": {
+        "name": "phone-photo.heic",
+        "sentBytes": 145388,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "phone-photo.heic uploaded"
+        ],
+        "stored": {
+          "mime": "image/jpeg",
+          "size": 213809,
+          "width": 800,
+          "height": 600,
+          "filename": "phone-photo.jpg",
+          "thumb": true,
+          "id": "med_f46358a95f5f72e445"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "6: an 800px JPEG under 1.5MB is stored at the same size in bytes",
+      "detail": {
+        "name": "small-800x600.jpg",
+        "sentBytes": 217472,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "small-800x600.jpg uploaded"
+        ],
+        "stored": {
+          "mime": "image/jpeg",
+          "size": 217472,
+          "width": 800,
+          "height": 600,
+          "filename": "small-800x600.jpg",
+          "thumb": true,
+          "id": "med_fedb9b44d8911f4240"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "6: a 300px PNG gets no +thumb",
+      "detail": {
+        "name": "small-300.png",
+        "sentBytes": 261661,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "small-300.png uploaded"
+        ],
+        "stored": {
+          "mime": "image/png",
+          "size": 261661,
+          "width": 300,
+          "height": 300,
+          "filename": "small-300.png",
+          "thumb": false,
+          "id": "med_10d732bb27b48af728"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: price-list.pdf: plain \"isn't an image\", no POST",
+      "detail": {
+        "name": "price-list.pdf",
+        "sentBytes": 193,
+        "posts": [],
+        "error": "\"price-list.pdf\" isn't an image. Please choose a photo or picture file.",
+        "toasts": [],
+        "stored": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: price-list-renamed.jpg: plain \"couldn't open\", no POST",
+      "detail": {
+        "name": "price-list-renamed.jpg",
+        "sentBytes": 193,
+        "posts": [],
+        "error": "We couldn't open \"price-list-renamed.jpg\". The file may be damaged. Try saving it again as a JPEG or PNG.",
+        "toasts": [],
+        "stored": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: damaged.jpg: plain \"couldn't open\", no POST",
+      "detail": {
+        "name": "damaged.jpg",
+        "sentBytes": 109284,
+        "posts": [],
+        "error": "We couldn't open \"damaged.jpg\". The file may be damaged. Try saving it again as a JPEG or PNG.",
+        "toasts": [],
+        "stored": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: small-png-renamed.jpg: plain \"isn't really the kind of image\"",
+      "detail": {
+        "name": "small-png-renamed.jpg",
+        "sentBytes": 348602,
+        "posts": [
+          422
+        ],
+        "error": "\"small-png-renamed.jpg\" isn't really the kind of image its name says. Try saving it again as a JPEG or PNG.",
+        "toasts": [],
+        "stored": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: empty.jpg: plain \"is empty\", no POST",
+      "detail": {
+        "name": "empty.jpg",
+        "sentBytes": 0,
+        "posts": [],
+        "error": "\"empty.jpg\" is empty. Please choose another file.",
+        "toasts": [],
+        "stored": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: photo-no-extension uploads",
+      "detail": {
+        "name": "photo-no-extension",
+        "sentBytes": 245854,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "photo-no-extension uploaded"
+        ],
+        "stored": {
+          "mime": "image/jpeg",
+          "size": 245854,
+          "width": 900,
+          "height": 600,
+          "filename": "photo-no-extension",
+          "thumb": true,
+          "id": "med_76cc57e4432c25b2b9"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: photo.jfif uploads",
+      "detail": {
+        "name": "photo.jfif",
+        "sentBytes": 245912,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "photo.jfif uploaded"
+        ],
+        "stored": {
+          "mime": "image/jpeg",
+          "size": 245912,
+          "width": 900,
+          "height": 600,
+          "filename": "photo.jfif",
+          "thumb": true,
+          "id": "med_e49e2335c574225584"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: big.gif over its limit: plain \"too big\"",
+      "detail": {
+        "name": "big.gif",
+        "sentBytes": 1868649,
+        "posts": [
+          422
+        ],
+        "error": "\"big.gif\" is too big. GIFs can be up to 1.5MB and SVGs up to 300KB, and these can't be made smaller here. Please choose a smaller file.",
+        "toasts": [],
+        "stored": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: big.svg over its limit: plain \"too big\"",
+      "detail": {
+        "name": "big.svg",
+        "sentBytes": 360115,
+        "posts": [
+          422
+        ],
+        "error": "\"big.svg\" is too big. GIFs can be up to 1.5MB and SVGs up to 300KB, and these can't be made smaller here. Please choose a smaller file.",
+        "toasts": [],
+        "stored": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "8: the stored SVG has no script or handler",
+      "detail": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"120\" height=\"60\"><rect width=\"120\" height=\"60\" fill=\"#e60\"/><text x=\"10\" y=\"35\">hi</text></svg>"
+    },
+    {
+      "ok": true,
+      "label": "8: an animated GIF is stored as sent (stays animated)",
+      "detail": {
+        "name": "anim-small.gif",
+        "sentBytes": 71409,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "anim-small.gif uploaded"
+        ],
+        "stored": {
+          "mime": "image/gif",
+          "size": 71409,
+          "width": 200,
+          "height": 150,
+          "filename": "anim-small.gif",
+          "thumb": false,
+          "id": "med_3174a5ad2abc34959b"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "8: an animated WebP over 1920px and under 1.5MB stays animated, name unchanged",
+      "detail": {
+        "name": "anim-2400x1000.webp",
+        "sentBytes": 1280564,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "anim-2400x1000.webp uploaded"
+        ],
+        "stored": {
+          "mime": "image/webp",
+          "size": 1280564,
+          "width": 2400,
+          "height": 1000,
+          "filename": "anim-2400x1000.webp",
+          "thumb": true,
+          "id": "med_6e3292276717bb680b"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "8: an animated WebP over 1.5MB: plain \"animated image and it's too big\"",
+      "detail": {
+        "name": "anim-webp-big.webp",
+        "sentBytes": 16593774,
+        "posts": [],
+        "error": "\"anim-webp-big.webp\" is an animated image and it's too big. Animated images can be up to 1.5MB, and making them smaller here would stop the animation. Please choose a smaller file.",
+        "toasts": [],
+        "stored": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "8: an animated WebP renamed .jpg (over 1.5MB): \"isn't really the kind of image\", no POST",
+      "detail": {
+        "name": "anim-webp-big-renamed.jpg",
+        "sentBytes": 16596342,
+        "posts": [],
+        "error": "\"anim-webp-big-renamed.jpg\" isn't really the kind of image its name says. Try saving it again as a JPEG or PNG.",
+        "toasts": [],
+        "stored": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "8: a small GIF renamed .jpg: \"isn't really the kind of image\" (after a POST the server refuses)",
+      "detail": {
+        "name": "anim-small-renamed.jpg",
+        "sentBytes": 71409,
+        "posts": [
+          422
+        ],
+        "error": "\"anim-small-renamed.jpg\" isn't really the kind of image its name says. Try saving it again as a JPEG or PNG.",
+        "toasts": [],
+        "stored": null
+      }
+    },
+    {
+      "ok": false,
+      "label": "11: a 1080x5000 size chart under 1.5MB is unchanged, no notice",
+      "detail": {
+        "name": "size-chart-1080x5000.png",
+        "sentBytes": 1454819,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "size-chart-1080x5000.png uploaded"
+        ],
+        "stored": {
+          "mime": "image/png",
+          "size": 1454819,
+          "width": 1080,
+          "height": 5000,
+          "filename": "size-chart-1080x5000.png",
+          "thumb": true,
+          "id": "med_6188faac1d09d30c0c"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "11: a 2000x6000 long image under 1.5MB keeps its bytes and size",
+      "detail": {
+        "name": "long-2000x6000.jpg",
+        "sentBytes": 351601,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "long-2000x6000.jpg uploaded"
+        ],
+        "stored": {
+          "mime": "image/jpeg",
+          "size": 351601,
+          "width": 2000,
+          "height": 6000,
+          "filename": "long-2000x6000.jpg",
+          "thumb": true,
+          "id": "med_730b3d844b25953876"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "11: a 4000x400 strip stays 4000x400",
+      "detail": {
+        "name": "strip-4000x400.jpg",
+        "sentBytes": 516566,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "strip-4000x400.jpg uploaded"
+        ],
+        "stored": {
+          "mime": "image/jpeg",
+          "size": 516566,
+          "width": 4000,
+          "height": 400,
+          "filename": "strip-4000x400.jpg",
+          "thumb": true,
+          "id": "med_1502df5178f97fb4c8"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "11: a long screenshot over 1.5MB lands about 1080 wide, under the limit",
+      "detail": {
+        "name": "long-screenshot-1290x7000.png",
+        "sentBytes": 25935813,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "long-screenshot-1290x7000.png uploaded"
+        ],
+        "stored": {
+          "mime": "image/jpeg",
+          "size": 1240487,
+          "width": 1080,
+          "height": 5860,
+          "filename": "long-screenshot-1290x7000.jpg",
+          "thumb": true,
+          "id": "med_f25abe957f1e54b352"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "11: a file over 1.5MB with its long side past 8192 lands at 8192 or less and the tab doesn't crash",
+      "detail": {
+        "name": "very-long-1200x12000.jpg",
+        "sentBytes": 9531400,
+        "posts": [
+          200
+        ],
+        "error": null,
+        "toasts": [
+          "\"very-long-1200x12000.jpg\" uploaded. It had to be made smaller to fit, so it's now 819×8192 pixels and could look soft on a big banner."
+        ],
+        "stored": {
+          "mime": "image/jpeg",
+          "size": 1249879,
+          "width": 819,
+          "height": 8192,
+          "filename": "very-long-1200x12000.jpg",
+          "thumb": true,
+          "id": "med_f7adb28aeb3bb6d042"
+        }
+      }
+    }
+  ],
+  "notes": [
+    "upload photo-4000x3000.jpg: {\"name\":\"photo-4000x3000.jpg\",\"sentBytes\":5273223,\"posts\":[200],\"error\":null,\"toasts\":[\"photo-4000x3000.jpg uploaded\"],\"stored\":{\"mime\":\"image/jpeg\",\"size\":267629,\"width\":1920,\"height\":1440,\"filename\":\"photo-4000x3000.jpg\",\"thumb\":true,\"id\":\"med_131a5c6fd4fe1447ff\"}}",
+    "upload transparent-1800.png: {\"name\":\"transparent-1800.png\",\"sentBytes\":10703216,\"posts\":[200],\"error\":null,\"toasts\":[\"transparent-1800.png uploaded\"],\"stored\":{\"mime\":\"image/webp\",\"size\":1177574,\"width\":1800,\"height\":1800,\"filename\":\"transparent-1800.webp\",\"thumb\":true,\"id\":\"med_628dc15f2ba5e4c211\"}}",
+    "upload transparent-1800-renamed.jpg: {\"name\":\"transparent-1800-renamed.jpg\",\"sentBytes\":10703321,\"posts\":[200],\"error\":null,\"toasts\":[\"transparent-1800-renamed.jpg uploaded\"],\"stored\":{\"mime\":\"image/webp\",\"size\":1177406,\"width\":1800,\"height\":1800,\"filename\":\"transparent-1800-renamed.webp\",\"thumb\":true,\"id\":\"med_37bafa387c2ac61eac\"}}",
+    "upload transparent-one-hole-1800.png: {\"name\":\"transparent-one-hole-1800.png\",\"sentBytes\":10674422,\"posts\":[200],\"error\":null,\"toasts\":[\"transparent-one-hole-1800.png uploaded\"],\"stored\":{\"mime\":\"image/webp\",\"size\":1311938,\"width\":1800,\"height\":1800,\"filename\":\"transparent-one-hole-1800.webp\",\"thumb\":true,\"id\":\"med_19c78c30c09a095a79\"}}",
+    "upload sideways-exif6.jpg: {\"name\":\"sideways-exif6.jpg\",\"sentBytes\":5357125,\"posts\":[200],\"error\":null,\"toasts\":[\"sideways-exif6.jpg uploaded\"],\"stored\":{\"mime\":\"image/jpeg\",\"size\":254915,\"width\":1440,\"height\":1920,\"filename\":\"sideways-exif6.jpg\",\"thumb\":true,\"id\":\"med_47b10b0d55b6fea30f\"}}",
+    "upload phone-photo.heic: {\"name\":\"phone-photo.heic\",\"sentBytes\":145388,\"posts\":[200],\"error\":null,\"toasts\":[\"phone-photo.heic uploaded\"],\"stored\":{\"mime\":\"image/jpeg\",\"size\":213809,\"width\":800,\"height\":600,\"filename\":\"phone-photo.jpg\",\"thumb\":true,\"id\":\"med_f46358a95f5f72e445\"}}",
+    "upload small-800x600.jpg: {\"name\":\"small-800x600.jpg\",\"sentBytes\":217472,\"posts\":[200],\"error\":null,\"toasts\":[\"small-800x600.jpg uploaded\"],\"stored\":{\"mime\":\"image/jpeg\",\"size\":217472,\"width\":800,\"height\":600,\"filename\":\"small-800x600.jpg\",\"thumb\":true,\"id\":\"med_fedb9b44d8911f4240\"}}",
+    "upload small-300.png: {\"name\":\"small-300.png\",\"sentBytes\":261661,\"posts\":[200],\"error\":null,\"toasts\":[\"small-300.png uploaded\"],\"stored\":{\"mime\":\"image/png\",\"size\":261661,\"width\":300,\"height\":300,\"filename\":\"small-300.png\",\"thumb\":false,\"id\":\"med_10d732bb27b48af728\"}}",
+    "upload price-list.pdf: {\"name\":\"price-list.pdf\",\"sentBytes\":193,\"posts\":[],\"error\":\"\\\"price-list.pdf\\\" isn't an image. Please choose a photo or picture file.\",\"toasts\":[],\"stored\":null}",
+    "upload price-list-renamed.jpg: {\"name\":\"price-list-renamed.jpg\",\"sentBytes\":193,\"posts\":[],\"error\":\"We couldn't open \\\"price-list-renamed.jpg\\\". The file may be damaged. Try saving it again as a JPEG or PNG.\",\"toasts\":[],\"stored\":null}",
+    "upload damaged.jpg: {\"name\":\"damaged.jpg\",\"sentBytes\":109284,\"posts\":[],\"error\":\"We couldn't open \\\"damaged.jpg\\\". The file may be damaged. Try saving it again as a JPEG or PNG.\",\"toasts\":[],\"stored\":null}",
+    "upload small-png-renamed.jpg: {\"name\":\"small-png-renamed.jpg\",\"sentBytes\":348602,\"posts\":[422],\"error\":\"\\\"small-png-renamed.jpg\\\" isn't really the kind of image its name says. Try saving it again as a JPEG or PNG.\",\"toasts\":[],\"stored\":null}",
+    "upload empty.jpg: {\"name\":\"empty.jpg\",\"sentBytes\":0,\"posts\":[],\"error\":\"\\\"empty.jpg\\\" is empty. Please choose another file.\",\"toasts\":[],\"stored\":null}",
+    "upload photo-no-extension: {\"name\":\"photo-no-extension\",\"sentBytes\":245854,\"posts\":[200],\"error\":null,\"toasts\":[\"photo-no-extension uploaded\"],\"stored\":{\"mime\":\"image/jpeg\",\"size\":245854,\"width\":900,\"height\":600,\"filename\":\"photo-no-extension\",\"thumb\":true,\"id\":\"med_76cc57e4432c25b2b9\"}}",
+    "upload photo.jfif: {\"name\":\"photo.jfif\",\"sentBytes\":245912,\"posts\":[200],\"error\":null,\"toasts\":[\"photo.jfif uploaded\"],\"stored\":{\"mime\":\"image/jpeg\",\"size\":245912,\"width\":900,\"height\":600,\"filename\":\"photo.jfif\",\"thumb\":true,\"id\":\"med_e49e2335c574225584\"}}",
+    "upload big.gif: {\"name\":\"big.gif\",\"sentBytes\":1868649,\"posts\":[422],\"error\":\"\\\"big.gif\\\" is too big. GIFs can be up to 1.5MB and SVGs up to 300KB, and these can't be made smaller here. Please choose a smaller file.\",\"toasts\":[],\"stored\":null}",
+    "upload big.svg: {\"name\":\"big.svg\",\"sentBytes\":360115,\"posts\":[422],\"error\":\"\\\"big.svg\\\" is too big. GIFs can be up to 1.5MB and SVGs up to 300KB, and these can't be made smaller here. Please choose a smaller file.\",\"toasts\":[],\"stored\":null}",
+    "upload script.svg: {\"name\":\"script.svg\",\"sentBytes\":185,\"posts\":[200],\"error\":null,\"toasts\":[\"script.svg uploaded\"],\"stored\":{\"mime\":\"image/svg+xml\",\"size\":142,\"width\":0,\"height\":0,\"filename\":\"script.svg\",\"thumb\":false,\"id\":\"med_076284f2c1e0d38b1a\"}}",
+    "upload anim-small.gif: {\"name\":\"anim-small.gif\",\"sentBytes\":71409,\"posts\":[200],\"error\":null,\"toasts\":[\"anim-small.gif uploaded\"],\"stored\":{\"mime\":\"image/gif\",\"size\":71409,\"width\":200,\"height\":150,\"filename\":\"anim-small.gif\",\"thumb\":false,\"id\":\"med_3174a5ad2abc34959b\"}}",
+    "upload anim-2400x1000.webp: {\"name\":\"anim-2400x1000.webp\",\"sentBytes\":1280564,\"posts\":[200],\"error\":null,\"toasts\":[\"anim-2400x1000.webp uploaded\"],\"stored\":{\"mime\":\"image/webp\",\"size\":1280564,\"width\":2400,\"height\":1000,\"filename\":\"anim-2400x1000.webp\",\"thumb\":true,\"id\":\"med_6e3292276717bb680b\"}}",
+    "upload anim-webp-big.webp: {\"name\":\"anim-webp-big.webp\",\"sentBytes\":16593774,\"posts\":[],\"error\":\"\\\"anim-webp-big.webp\\\" is an animated image and it's too big. Animated images can be up to 1.5MB, and making them smaller here would stop the animation. Please choose a smaller file.\",\"toasts\":[],\"stored\":null}",
+    "upload anim-webp-big-renamed.jpg: {\"name\":\"anim-webp-big-renamed.jpg\",\"sentBytes\":16596342,\"posts\":[],\"error\":\"\\\"anim-webp-big-renamed.jpg\\\" isn't really the kind of image its name says. Try saving it again as a JPEG or PNG.\",\"toasts\":[],\"stored\":null}",
+    "upload anim-small-renamed.jpg: {\"name\":\"anim-small-renamed.jpg\",\"sentBytes\":71409,\"posts\":[422],\"error\":\"\\\"anim-small-renamed.jpg\\\" isn't really the kind of image its name says. Try saving it again as a JPEG or PNG.\",\"toasts\":[],\"stored\":null}",
+    "upload size-chart-1080x5000.png: {\"name\":\"size-chart-1080x5000.png\",\"sentBytes\":1454819,\"posts\":[200],\"error\":null,\"toasts\":[\"size-chart-1080x5000.png uploaded\"],\"stored\":{\"mime\":\"image/png\",\"size\":1454819,\"width\":1080,\"height\":5000,\"filename\":\"size-chart-1080x5000.png\",\"thumb\":true,\"id\":\"med_6188faac1d09d30c0c\"}}",
+    "upload long-2000x6000.jpg: {\"name\":\"long-2000x6000.jpg\",\"sentBytes\":351601,\"posts\":[200],\"error\":null,\"toasts\":[\"long-2000x6000.jpg uploaded\"],\"stored\":{\"mime\":\"image/jpeg\",\"size\":351601,\"width\":2000,\"height\":6000,\"filename\":\"long-2000x6000.jpg\",\"thumb\":true,\"id\":\"med_730b3d844b25953876\"}}",
+    "upload strip-4000x400.jpg: {\"name\":\"strip-4000x400.jpg\",\"sentBytes\":516566,\"posts\":[200],\"error\":null,\"toasts\":[\"strip-4000x400.jpg uploaded\"],\"stored\":{\"mime\":\"image/jpeg\",\"size\":516566,\"width\":4000,\"height\":400,\"filename\":\"strip-4000x400.jpg\",\"thumb\":true,\"id\":\"med_1502df5178f97fb4c8\"}}",
+    "upload long-screenshot-1290x7000.png: {\"name\":\"long-screenshot-1290x7000.png\",\"sentBytes\":25935813,\"posts\":[200],\"error\":null,\"toasts\":[\"long-screenshot-1290x7000.png uploaded\"],\"stored\":{\"mime\":\"image/jpeg\",\"size\":1240487,\"width\":1080,\"height\":5860,\"filename\":\"long-screenshot-1290x7000.jpg\",\"thumb\":true,\"id\":\"med_f25abe957f1e54b352\"}}",
+    "upload very-long-1200x12000.jpg: {\"name\":\"very-long-1200x12000.jpg\",\"sentBytes\":9531400,\"posts\":[200],\"error\":null,\"toasts\":[\"\\\"very-long-1200x12000.jpg\\\" uploaded. It had to be made smaller to fit, so it's now 819×8192 pixels and could look soft on a big banner.\"],\"stored\":{\"mime\":\"image/jpeg\",\"size\":1249879,\"width\":819,\"height\":8192,\"filename\":\"very-long-1200x12000.jpg\",\"thumb\":true,\"id\":\"med_f7adb28aeb3bb6d042\"}}",
+    "11: its notice: [\"\\\"very-long-1200x12000.jpg\\\" uploaded. It had to be made smaller to fit, so it's now 819×8192 pixels and could look soft on a big banner.\"]"
+  ],
+  "screenshots": [
+    {
+      "name": "1-library-photo",
+      "file": "docs/cms-reviews/drills/MED-01/1-library-photo.png",
+      "bytes": 27833,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/media"
+    },
+    {
+      "name": "4-library-sideways",
+      "file": "docs/cms-reviews/drills/MED-01/4-library-sideways.png",
+      "bytes": 43648,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/media"
+    },
+    {
+      "name": "5c-heic-message",
+      "file": "docs/cms-reviews/drills/MED-01/5c-heic-message.png",
+      "bytes": 49296,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/media"
+    },
+    {
+      "name": "7-refusal-empty",
+      "file": "docs/cms-reviews/drills/MED-01/7-refusal-empty.png",
+      "bytes": 50280,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/media"
+    },
+    {
+      "name": "11-library-grid",
+      "file": "docs/cms-reviews/drills/MED-01/11-library-grid.png",
+      "bytes": 104786,
+      "width": 720,
+      "height": 1199,
+      "viewport": 1280,
+      "path": "/admin/media"
+    }
+  ]
+}

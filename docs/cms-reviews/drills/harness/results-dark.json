@@ -1,0 +1,104 @@
+{
+  "id": "harness",
+  "part": "dark",
+  "title": "P1-DRILLS P1-HARNESS follow-ups — dark",
+  "ranAt": "2026-11-03T11:32:57.705Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 6,
+  "failed": 2,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "dark: the console saves a dark brand (background #111827, text #f9fafb)",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "dark: the open store shows the dark brand",
+      "detail": {
+        "body": "rgb(17, 24, 39)",
+        "color": "rgb(249, 250, 251)"
+      }
+    },
+    {
+      "ok": true,
+      "label": "dark: maintenance switched on in the operator console",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "dark: a signed-out visitor gets the maintenance page",
+      "detail": {
+        "bg": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "ok": false,
+      "label": "dark: the maintenance page takes the dark brand's background",
+      "detail": {
+        "bg": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "ok": false,
+      "label": "dark: the message contrast is 4.5:1 or better",
+      "detail": {
+        "color": "rgb(212, 212, 216)",
+        "background": "rgb(255, 255, 255)",
+        "bgFrom": "BODY",
+        "ratio": 1.48
+      }
+    },
+    {
+      "ok": true,
+      "label": "dark: maintenance switched off again",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "dark: the brand put back (#fffdf8 / #1c1917)",
+      "detail": 200
+    }
+  ],
+  "notes": [
+    "dark: the brand before: {\"accent\":\"#0d9488\",\"background\":\"#fffdf8\",\"foreground\":\"#1c1917\",\"radius\":\"xl\",\"type_scale\":\"large\",\"button_shape\":\"pill\",\"section_spacing\":\"regular\",\"accent_label\":\"#0a0a0b\"}",
+    "dark: right after the brand save, Publishing showed nothing to publish (Publish now disabled)",
+    "dark: publish again after waiting 31 s: 200",
+    "dark: brand #111827/#f9fafb saved (200), published (200)",
+    "dark: the founder's message is rgb(212, 212, 216) on rgb(255, 255, 255) (from <BODY>), contrast 1.48:1",
+    "dark: the \"Store team sign-in\" link is rgb(212, 212, 216)",
+    "dark: the sign-in link contrast is 1.48:1",
+    "dark: brand #fffdf8/#1c1917 saved (200), published (200)"
+  ],
+  "screenshots": [
+    {
+      "name": "publishing-right-after-brand-save",
+      "file": "docs/cms-reviews/drills/harness/publishing-right-after-brand-save.png",
+      "bytes": 31202,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "open-store-dark-1440",
+      "file": "docs/cms-reviews/drills/harness/open-store-dark-1440.png",
+      "bytes": 26918,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "maintenance-dark-1440",
+      "file": "docs/cms-reviews/drills/harness/maintenance-dark-1440.png",
+      "bytes": 7442,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

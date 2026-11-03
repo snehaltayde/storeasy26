@@ -1,0 +1,51 @@
+{
+  "id": "MED-01",
+  "part": "offline",
+  "title": "P1-DRILLS MED-01: one upload path that makes photos fit (desktop Chrome) — offline",
+  "ranAt": "2026-11-03T12:18:46.536Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 2,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "7 (library, offline): \"didn't go through\", and re-picking the same file starts again and says the same",
+      "detail": {
+        "m1": true,
+        "m2": true,
+        "tries": 2
+      }
+    },
+    {
+      "ok": true,
+      "label": "7: back online, re-picking the same file uploads it",
+      "detail": {
+        "filename": "offline-1793708316688.png",
+        "size": 601545
+      }
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "7-offline-didnt-go-through",
+      "file": "docs/cms-reviews/drills/MED-01/7-offline-didnt-go-through.png",
+      "bytes": 49024,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/media"
+    },
+    {
+      "name": "7-back-online",
+      "file": "docs/cms-reviews/drills/MED-01/7-back-online.png",
+      "bytes": 56151,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/media"
+    }
+  ]
+}

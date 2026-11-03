@@ -1,0 +1,104 @@
+{
+  "id": "GEN-03",
+  "part": "home",
+  "title": "P1-DRILLS GEN-03: a good store before the founder edits anything — home",
+  "ranAt": "2026-11-03T12:03:42.021Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "12: the placeholders read as examples (\"A short headline\", \"<p>Tell your story…</p>\")",
+      "detail": [
+        {
+          "id": "sec-1-title",
+          "ph": null,
+          "value": "New arrivals"
+        },
+        {
+          "id": "sec-1-limit",
+          "ph": null,
+          "value": "8"
+        },
+        {
+          "id": "sec-c3-title",
+          "ph": "A short headline",
+          "value": ""
+        },
+        {
+          "id": "sec-c3-text",
+          "ph": null,
+          "value": ""
+        },
+        {
+          "id": "sec-c3-label",
+          "ph": "Shop now",
+          "value": ""
+        },
+        {
+          "id": "sec-c3-href",
+          "ph": "/collections/…",
+          "value": "/collections"
+        },
+        {
+          "id": "sec-c4-title",
+          "ph": null,
+          "value": ""
+        },
+        {
+          "id": "sec-c4-html",
+          "ph": "<p>Tell your story…</p>",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "12: saving them unedited shows the error for each",
+      "detail": {
+        "s1": 422,
+        "err": "Save failed\n\nSection 3 (Banner / CTA): needs a title or text\n\nSection 4 (Rich text): content is empty"
+      }
+    },
+    {
+      "ok": true,
+      "label": "12: typing a title (and the rich text) lets it save",
+      "detail": 200
+    }
+  ],
+  "notes": [
+    "12: the new sections' fields and placeholders: [{\"id\":\"sec-1-title\",\"ph\":null,\"value\":\"New arrivals\"},{\"id\":\"sec-1-limit\",\"ph\":null,\"value\":\"8\"},{\"id\":\"sec-c3-title\",\"ph\":\"A short headline\",\"value\":\"\"},{\"id\":\"sec-c3-text\",\"ph\":null,\"value\":\"\"},{\"id\":\"sec-c3-label\",\"ph\":\"Shop now\",\"value\":\"\"},{\"id\":\"sec-c3-href\",\"ph\":\"/collections/…\",\"value\":\"/collections\"},{\"id\":\"sec-c4-title\",\"ph\":null,\"value\":\"\"},{\"id\":\"sec-c4-html\",\"ph\":\"<p>Tell your story…</p>\",\"value\":\"\"}]"
+  ],
+  "screenshots": [
+    {
+      "name": "12-placeholders",
+      "file": "docs/cms-reviews/drills/GEN-03/12-placeholders.png",
+      "bytes": 27896,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/home"
+    },
+    {
+      "name": "12-unedited-error",
+      "file": "docs/cms-reviews/drills/GEN-03/12-unedited-error.png",
+      "bytes": 30080,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/home"
+    },
+    {
+      "name": "12-saved",
+      "file": "docs/cms-reviews/drills/GEN-03/12-saved.png",
+      "bytes": 32670,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/home"
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "id": "harness",
+  "part": "designer",
+  "title": "P1-DRILLS P1-HARNESS follow-ups — designer",
+  "ranAt": "2026-11-03T11:22:19.299Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 3,
+  "checks": [
+    {
+      "ok": true,
+      "label": "S57: the preview connects (\"Preview shows your last save\")"
+    },
+    {
+      "ok": true,
+      "label": "S57: the typed button label shows in the preview before saving",
+      "detail": "813 ms"
+    },
+    {
+      "ok": false,
+      "label": "S57: the typed title and subtitle show in the preview before saving",
+      "detail": {
+        "title": null,
+        "subtitle": null,
+        "hero": [
+          "Visibly brighter in 14 days"
+        ]
+      },
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "S57: Save answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "S57: after Save the preview shows the saved button label",
+      "detail": "Draft preview — this is NOT what shoppers see. Exit preview\nFestive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\n\n8"
+    },
+    {
+      "ok": false,
+      "label": "S57: after Save the preview shows the saved title and subtitle",
+      "detail": [
+        "Visibly brighter in 14 days",
+        "Or your money back."
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "S57: Publish now answers 200 ok",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "S57: a signed-out visitor sees the new button label on /",
+      "detail": "after 5 s"
+    },
+    {
+      "ok": true,
+      "label": "S57: the live page is 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": false,
+      "label": "S57: every signed-out visitor sees the new title and subtitle",
+      "detail": [
+        {
+          "h1": "Visibly brighter in 14 days",
+          "sub": false
+        },
+        {
+          "h1": "Visibly brighter in 14 days",
+          "sub": false
+        },
+        {
+          "h1": "Visibly brighter in 14 days",
+          "sub": false
+        },
+        {
+          "h1": "Drill hero 11.22.00",
+          "sub": true
+        }
+      ],
+      "known": "finding 1"
+    },
+    {
+      "ok": true,
+      "label": "S57: every preview document answered 200 with x-edge-runtime: 1",
+      "detail": "4 documents"
+    }
+  ],
+  "notes": [
+    "S57: signed-out visitors' hero titles (each a new visitor): [{\"h1\":\"Visibly brighter in 14 days\",\"sub\":false},{\"h1\":\"Visibly brighter in 14 days\",\"sub\":false},{\"h1\":\"Visibly brighter in 14 days\",\"sub\":false},{\"h1\":\"Drill hero 11.22.00\",\"sub\":true}]",
+    "S57: preview documents seen: [{\"url\":\"/\",\"status\":200,\"edge\":\"1\"},{\"url\":\"/\",\"status\":200,\"edge\":\"1\"},{\"url\":\"/\",\"status\":200,\"edge\":\"1\"},{\"url\":\"/\",\"status\":200,\"edge\":\"1\"}]"
+  ],
+  "screenshots": [
+    {
+      "name": "S57-designer-typed",
+      "file": "docs/cms-reviews/drills/harness/S57-designer-typed.png",
+      "bytes": 40862,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "S57-designer-saved",
+      "file": "docs/cms-reviews/drills/harness/S57-designer-saved.png",
+      "bytes": 41565,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "S57-published",
+      "file": "docs/cms-reviews/drills/harness/S57-published.png",
+      "bytes": 33730,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "S57-live-signed-out",
+      "file": "docs/cms-reviews/drills/harness/S57-live-signed-out.png",
+      "bytes": 27566,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

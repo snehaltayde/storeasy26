@@ -1,0 +1,88 @@
+{
+  "id": "GEN-02",
+  "part": "refresh",
+  "title": "P1-DRILLS GEN-02: first sync progress, failures and retry — refresh",
+  "ranAt": "2026-11-03T11:17:47.372Z",
+  "harness": "http://localhost:3081",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "D11 setup: freshly re-seeded harness (8 products)",
+      "detail": 8
+    },
+    {
+      "ok": true,
+      "label": "D11: \"The latest refresh from Shopify didn't finish\"",
+      "detail": "Your products from Shopify\n\nThe latest refresh from Shopify didn't finish\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\nAll 8 products are in. 0 collections so far. Your store keeps everything it had, plus what came in.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D11: an AMBER banner (warning), not red",
+      "detail": {
+        "tone": "warning",
+        "color": "rgb(255, 251, 235)",
+        "border": "rgb(253, 230, 138)"
+      }
+    },
+    {
+      "ok": true,
+      "label": "D11: \"Your store keeps everything it had, plus what came in.\"",
+      "detail": "Your products from Shopify\n\nThe latest refresh from Shopify didn't finish\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\nAll 8 products are in. 0 collections so far. Your store keeps everything it had, plus what came in.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D11: Try again",
+      "detail": [
+        "Try again"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "D11: nothing raw (no 503, GraphQL)",
+      "detail": "Your products from Shopify\n\nThe latest refresh from Shopify didn't finish\n\nShopify didn't answer. This usually clears up on its own. Try again in a few minutes.\n\nAll 8 products are in. 0 collections so far. Your store keeps everything it had, plus what came in.\n\nTry again"
+    },
+    {
+      "ok": true,
+      "label": "D12: /admin/dashboard shows no sync card while a refresh runs"
+    },
+    {
+      "ok": true,
+      "label": "D12: /admin/settings shows \"Refreshing your products from Shopify\"",
+      "detail": "Your products from Shopify\n\n8 products and 3 collections in your store now. Shopify changes also come in by themselves.\n\nRefreshing your products from Shopify\n\n8 of 8 products so far. Big stores can take a while. You can keep using the console."
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "D11-refresh-failed-amber",
+      "file": "docs/cms-reviews/drills/GEN-02/D11-refresh-failed-amber.png",
+      "bytes": 37875,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "D12-dashboard-no-card",
+      "file": "docs/cms-reviews/drills/GEN-02/D12-dashboard-no-card.png",
+      "bytes": 35752,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "D12-settings-refreshing",
+      "file": "docs/cms-reviews/drills/GEN-02/D12-settings-refreshing.png",
+      "bytes": 28500,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/settings"
+    }
+  ]
+}
