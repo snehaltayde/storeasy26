@@ -1,0 +1,488 @@
+{
+  "before": "baseline/default",
+  "after": "after2/default",
+  "compared": 30,
+  "identical": 30,
+  "results": [
+    {
+      "name": "account-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        900
+      ],
+      "sizeAfter": [
+        1440,
+        900
+      ],
+      "differing": 0,
+      "total": 1296000,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "account-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1223
+      ],
+      "sizeAfter": [
+        375,
+        1223
+      ],
+      "differing": 0,
+      "total": 458625,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "account-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1024
+      ],
+      "sizeAfter": [
+        768,
+        1024
+      ],
+      "differing": 0,
+      "total": 786432,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "cart-drawer-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1733
+      ],
+      "sizeAfter": [
+        1440,
+        1733
+      ],
+      "differing": 0,
+      "total": 2495520,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "cart-drawer-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        2219
+      ],
+      "sizeAfter": [
+        375,
+        2219
+      ],
+      "differing": 0,
+      "total": 832125,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "cart-drawer-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        2496
+      ],
+      "sizeAfter": [
+        768,
+        2496
+      ],
+      "differing": 0,
+      "total": 1916928,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "checkout-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1193
+      ],
+      "sizeAfter": [
+        1440,
+        1193
+      ],
+      "differing": 0,
+      "total": 1717920,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "checkout-375",
+      "sameSize": true,
+      "sizeBefore": [
+        398,
+        1802
+      ],
+      "sizeAfter": [
+        398,
+        1802
+      ],
+      "differing": 0,
+      "total": 717196,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "checkout-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1518
+      ],
+      "sizeAfter": [
+        768,
+        1518
+      ],
+      "differing": 0,
+      "total": 1165824,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "cms-page-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        900
+      ],
+      "sizeAfter": [
+        1440,
+        900
+      ],
+      "differing": 0,
+      "total": 1296000,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "cms-page-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1250
+      ],
+      "sizeAfter": [
+        375,
+        1250
+      ],
+      "differing": 0,
+      "total": 468750,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "cms-page-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1024
+      ],
+      "sizeAfter": [
+        768,
+        1024
+      ],
+      "differing": 0,
+      "total": 786432,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "collection-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1167
+      ],
+      "sizeAfter": [
+        1440,
+        1167
+      ],
+      "differing": 0,
+      "total": 1680480,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "collection-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1394
+      ],
+      "sizeAfter": [
+        375,
+        1394
+      ],
+      "differing": 0,
+      "total": 522750,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "collection-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1212
+      ],
+      "sizeAfter": [
+        768,
+        1212
+      ],
+      "differing": 0,
+      "total": 930816,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "collections-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1065
+      ],
+      "sizeAfter": [
+        1440,
+        1065
+      ],
+      "differing": 0,
+      "total": 1533600,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "collections-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1909
+      ],
+      "sizeAfter": [
+        375,
+        1909
+      ],
+      "differing": 0,
+      "total": 715875,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "collections-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1421
+      ],
+      "sizeAfter": [
+        768,
+        1421
+      ],
+      "differing": 0,
+      "total": 1091328,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "home-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        2393
+      ],
+      "sizeAfter": [
+        1440,
+        2393
+      ],
+      "differing": 0,
+      "total": 3445920,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "home-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        3501
+      ],
+      "sizeAfter": [
+        375,
+        3501
+      ],
+      "differing": 0,
+      "total": 1312875,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "home-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        3015
+      ],
+      "sizeAfter": [
+        768,
+        3015
+      ],
+      "differing": 0,
+      "total": 2315520,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "not-found-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        935
+      ],
+      "sizeAfter": [
+        1440,
+        935
+      ],
+      "differing": 0,
+      "total": 1346400,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "not-found-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1389
+      ],
+      "sizeAfter": [
+        375,
+        1389
+      ],
+      "differing": 0,
+      "total": 520875,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "not-found-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1047
+      ],
+      "sizeAfter": [
+        768,
+        1047
+      ],
+      "differing": 0,
+      "total": 804096,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "product-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1733
+      ],
+      "sizeAfter": [
+        1440,
+        1733
+      ],
+      "differing": 0,
+      "total": 2495520,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "product-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        2161
+      ],
+      "sizeAfter": [
+        375,
+        2161
+      ],
+      "differing": 0,
+      "total": 810375,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "product-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        2438
+      ],
+      "sizeAfter": [
+        768,
+        2438
+      ],
+      "differing": 0,
+      "total": 1872384,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "search-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1065
+      ],
+      "sizeAfter": [
+        1440,
+        1065
+      ],
+      "differing": 0,
+      "total": 1533600,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "search-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1292
+      ],
+      "sizeAfter": [
+        375,
+        1292
+      ],
+      "differing": 0,
+      "total": 484500,
+      "share": 0,
+      "box": null
+    },
+    {
+      "name": "search-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1110
+      ],
+      "sizeAfter": [
+        768,
+        1110
+      ],
+      "differing": 0,
+      "total": 852480,
+      "share": 0,
+      "box": null
+    }
+  ]
+}

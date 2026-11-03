@@ -1,0 +1,698 @@
+{
+  "before": "baseline/seeded",
+  "after": "after1/seeded",
+  "compared": 30,
+  "identical": 0,
+  "results": [
+    {
+      "name": "account-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        900
+      ],
+      "sizeAfter": [
+        1440,
+        900
+      ],
+      "differing": 507528,
+      "total": 1296000,
+      "share": 0.391611,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 1440,
+        "height": 860
+      },
+      "diffBytes": 2907,
+      "diffImage": "diff-tok01-seeded-first/account-1440-diff.png"
+    },
+    {
+      "name": "account-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1225
+      ],
+      "sizeAfter": [
+        375,
+        1225
+      ],
+      "differing": 258242,
+      "total": 459375,
+      "share": 0.562159,
+      "box": {
+        "x": 0,
+        "y": 92,
+        "width": 375,
+        "height": 1133
+      },
+      "diffBytes": 6420,
+      "diffImage": "diff-tok01-seeded-first/account-375-diff.png"
+    },
+    {
+      "name": "account-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1024
+      ],
+      "sizeAfter": [
+        768,
+        1024
+      ],
+      "differing": 361032,
+      "total": 786432,
+      "share": 0.459076,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 768,
+        "height": 984
+      },
+      "diffBytes": 6856,
+      "diffImage": "diff-tok01-seeded-first/account-768-diff.png"
+    },
+    {
+      "name": "cart-drawer-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1733
+      ],
+      "sizeAfter": [
+        1440,
+        1733
+      ],
+      "differing": 1420956,
+      "total": 2495520,
+      "share": 0.569403,
+      "box": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 1733
+      },
+      "diffBytes": 5308,
+      "diffImage": "diff-tok01-seeded-first/cart-drawer-1440-diff.png"
+    },
+    {
+      "name": "cart-drawer-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        2225
+      ],
+      "sizeAfter": [
+        375,
+        2225
+      ],
+      "differing": 646662,
+      "total": 834375,
+      "share": 0.775026,
+      "box": {
+        "x": 0,
+        "y": 219,
+        "width": 375,
+        "height": 2006
+      },
+      "diffBytes": 5072,
+      "diffImage": "diff-tok01-seeded-first/cart-drawer-375-diff.png"
+    },
+    {
+      "name": "cart-drawer-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        2500
+      ],
+      "sizeAfter": [
+        768,
+        2500
+      ],
+      "differing": 1361837,
+      "total": 1920000,
+      "share": 0.70929,
+      "box": {
+        "x": 0,
+        "y": 167,
+        "width": 768,
+        "height": 2333
+      },
+      "diffBytes": 11657,
+      "diffImage": "diff-tok01-seeded-first/cart-drawer-768-diff.png"
+    },
+    {
+      "name": "checkout-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1193
+      ],
+      "sizeAfter": [
+        1440,
+        1193
+      ],
+      "differing": 535512,
+      "total": 1717920,
+      "share": 0.311721,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 1440,
+        "height": 1153
+      },
+      "diffBytes": 4731,
+      "diffImage": "diff-tok01-seeded-first/checkout-1440-diff.png"
+    },
+    {
+      "name": "checkout-375",
+      "sameSize": true,
+      "sizeBefore": [
+        398,
+        1802
+      ],
+      "sizeAfter": [
+        398,
+        1802
+      ],
+      "differing": 288129,
+      "total": 717196,
+      "share": 0.401744,
+      "box": {
+        "x": 0,
+        "y": 0,
+        "width": 398,
+        "height": 1802
+      },
+      "diffBytes": 10936,
+      "diffImage": "diff-tok01-seeded-first/checkout-375-diff.png"
+    },
+    {
+      "name": "checkout-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1518
+      ],
+      "sizeAfter": [
+        768,
+        1518
+      ],
+      "differing": 392606,
+      "total": 1165824,
+      "share": 0.336763,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 768,
+        "height": 1478
+      },
+      "diffBytes": 11429,
+      "diffImage": "diff-tok01-seeded-first/checkout-768-diff.png"
+    },
+    {
+      "name": "cms-page-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        900
+      ],
+      "sizeAfter": [
+        1440,
+        900
+      ],
+      "differing": 492752,
+      "total": 1296000,
+      "share": 0.38021,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 1440,
+        "height": 860
+      },
+      "diffBytes": 3266,
+      "diffImage": "diff-tok01-seeded-first/cms-page-1440-diff.png"
+    },
+    {
+      "name": "cms-page-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1254
+      ],
+      "sizeAfter": [
+        375,
+        1254
+      ],
+      "differing": 244783,
+      "total": 470250,
+      "share": 0.520538,
+      "box": {
+        "x": 0,
+        "y": 92,
+        "width": 375,
+        "height": 1162
+      },
+      "diffBytes": 7263,
+      "diffImage": "diff-tok01-seeded-first/cms-page-375-diff.png"
+    },
+    {
+      "name": "cms-page-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1024
+      ],
+      "sizeAfter": [
+        768,
+        1024
+      ],
+      "differing": 346256,
+      "total": 786432,
+      "share": 0.440287,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 768,
+        "height": 984
+      },
+      "diffBytes": 7606,
+      "diffImage": "diff-tok01-seeded-first/cms-page-768-diff.png"
+    },
+    {
+      "name": "collection-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1167
+      ],
+      "sizeAfter": [
+        1440,
+        1167
+      ],
+      "differing": 673740,
+      "total": 1680480,
+      "share": 0.400921,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 1440,
+        "height": 1127
+      },
+      "diffBytes": 3160,
+      "diffImage": "diff-tok01-seeded-first/collection-1440-diff.png"
+    },
+    {
+      "name": "collection-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1394
+      ],
+      "sizeAfter": [
+        375,
+        1394
+      ],
+      "differing": 306020,
+      "total": 522750,
+      "share": 0.585404,
+      "box": {
+        "x": 0,
+        "y": 92,
+        "width": 375,
+        "height": 1302
+      },
+      "diffBytes": 6947,
+      "diffImage": "diff-tok01-seeded-first/collection-375-diff.png"
+    },
+    {
+      "name": "collection-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1212
+      ],
+      "sizeAfter": [
+        768,
+        1212
+      ],
+      "differing": 457129,
+      "total": 930816,
+      "share": 0.491106,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 768,
+        "height": 1172
+      },
+      "diffBytes": 7453,
+      "diffImage": "diff-tok01-seeded-first/collection-768-diff.png"
+    },
+    {
+      "name": "collections-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1067
+      ],
+      "sizeAfter": [
+        1440,
+        1067
+      ],
+      "differing": 489567,
+      "total": 1536480,
+      "share": 0.318629,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 1440,
+        "height": 1027
+      },
+      "diffBytes": 4701,
+      "diffImage": "diff-tok01-seeded-first/collections-1440-diff.png"
+    },
+    {
+      "name": "collections-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1911
+      ],
+      "sizeAfter": [
+        375,
+        1911
+      ],
+      "differing": 243896,
+      "total": 716625,
+      "share": 0.34034,
+      "box": {
+        "x": 0,
+        "y": 92,
+        "width": 375,
+        "height": 1819
+      },
+      "diffBytes": 18656,
+      "diffImage": "diff-tok01-seeded-first/collections-375-diff.png"
+    },
+    {
+      "name": "collections-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1423
+      ],
+      "sizeAfter": [
+        768,
+        1423
+      ],
+      "differing": 344007,
+      "total": 1092864,
+      "share": 0.314776,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 768,
+        "height": 1383
+      },
+      "diffBytes": 15812,
+      "diffImage": "diff-tok01-seeded-first/collections-768-diff.png"
+    },
+    {
+      "name": "home-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        2394
+      ],
+      "sizeAfter": [
+        1440,
+        2394
+      ],
+      "differing": 1202129,
+      "total": 3447360,
+      "share": 0.34871,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 1440,
+        "height": 2354
+      },
+      "diffBytes": 11275,
+      "diffImage": "diff-tok01-seeded-first/home-1440-diff.png"
+    },
+    {
+      "name": "home-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        3502
+      ],
+      "sizeAfter": [
+        375,
+        3502
+      ],
+      "differing": 467497,
+      "total": 1313250,
+      "share": 0.355985,
+      "box": {
+        "x": 0,
+        "y": 92,
+        "width": 375,
+        "height": 3410
+      },
+      "diffBytes": 27131,
+      "diffImage": "diff-tok01-seeded-first/home-375-diff.png"
+    },
+    {
+      "name": "home-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        3016
+      ],
+      "sizeAfter": [
+        768,
+        3016
+      ],
+      "differing": 774883,
+      "total": 2316288,
+      "share": 0.334537,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 768,
+        "height": 2976
+      },
+      "diffBytes": 78502,
+      "diffImage": "diff-tok01-seeded-first/home-768-diff.png"
+    },
+    {
+      "name": "not-found-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        937
+      ],
+      "sizeAfter": [
+        1440,
+        937
+      ],
+      "differing": 486655,
+      "total": 1349280,
+      "share": 0.360678,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 1440,
+        "height": 897
+      },
+      "diffBytes": 4515,
+      "diffImage": "diff-tok01-seeded-first/not-found-1440-diff.png"
+    },
+    {
+      "name": "not-found-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1393
+      ],
+      "sizeAfter": [
+        375,
+        1393
+      ],
+      "differing": 240444,
+      "total": 522375,
+      "share": 0.46029,
+      "box": {
+        "x": 0,
+        "y": 92,
+        "width": 375,
+        "height": 1301
+      },
+      "diffBytes": 11712,
+      "diffImage": "diff-tok01-seeded-first/not-found-375-diff.png"
+    },
+    {
+      "name": "not-found-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1049
+      ],
+      "sizeAfter": [
+        768,
+        1049
+      ],
+      "differing": 340159,
+      "total": 805632,
+      "share": 0.422226,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 768,
+        "height": 1009
+      },
+      "diffBytes": 10915,
+      "diffImage": "diff-tok01-seeded-first/not-found-768-diff.png"
+    },
+    {
+      "name": "product-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1733
+      ],
+      "sizeAfter": [
+        1440,
+        1733
+      ],
+      "differing": 1025597,
+      "total": 2495520,
+      "share": 0.410975,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 1440,
+        "height": 1693
+      },
+      "diffBytes": 5701,
+      "diffImage": "diff-tok01-seeded-first/product-1440-diff.png"
+    },
+    {
+      "name": "product-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        2167
+      ],
+      "sizeAfter": [
+        375,
+        2167
+      ],
+      "differing": 440504,
+      "total": 812625,
+      "share": 0.542075,
+      "box": {
+        "x": 0,
+        "y": 92,
+        "width": 375,
+        "height": 2075
+      },
+      "diffBytes": 12206,
+      "diffImage": "diff-tok01-seeded-first/product-375-diff.png"
+    },
+    {
+      "name": "product-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        2442
+      ],
+      "sizeAfter": [
+        768,
+        2442
+      ],
+      "differing": 1165123,
+      "total": 1875456,
+      "share": 0.621248,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 768,
+        "height": 2402
+      },
+      "diffBytes": 11955,
+      "diffImage": "diff-tok01-seeded-first/product-768-diff.png"
+    },
+    {
+      "name": "search-1440",
+      "sameSize": true,
+      "sizeBefore": [
+        1440,
+        1065
+      ],
+      "sizeAfter": [
+        1440,
+        1065
+      ],
+      "differing": 664856,
+      "total": 1533600,
+      "share": 0.433526,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 1440,
+        "height": 1025
+      },
+      "diffBytes": 3046,
+      "diffImage": "diff-tok01-seeded-first/search-1440-diff.png"
+    },
+    {
+      "name": "search-375",
+      "sameSize": true,
+      "sizeBefore": [
+        375,
+        1292
+      ],
+      "sizeAfter": [
+        375,
+        1292
+      ],
+      "differing": 295702,
+      "total": 484500,
+      "share": 0.610324,
+      "box": {
+        "x": 0,
+        "y": 92,
+        "width": 375,
+        "height": 1200
+      },
+      "diffBytes": 6649,
+      "diffImage": "diff-tok01-seeded-first/search-375-diff.png"
+    },
+    {
+      "name": "search-768",
+      "sameSize": true,
+      "sizeBefore": [
+        768,
+        1110
+      ],
+      "sizeAfter": [
+        768,
+        1110
+      ],
+      "differing": 448245,
+      "total": 852480,
+      "share": 0.525813,
+      "box": {
+        "x": 0,
+        "y": 40,
+        "width": 768,
+        "height": 1070
+      },
+      "diffBytes": 7087,
+      "diffImage": "diff-tok01-seeded-first/search-768-diff.png"
+    }
+  ]
+}

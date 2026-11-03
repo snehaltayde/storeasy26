@@ -1,11 +1,11 @@
 export function ProductCardSkeleton() {
   return (
     <div>
-      <div className="aspect-square animate-pulse rounded-2xl bg-zinc-100" />
+      <div className="aspect-square animate-pulse rounded-sf-card bg-sf-surface-sunken" />
       <div className="mt-3 space-y-2">
-        <div className="h-3 w-1/3 animate-pulse rounded bg-zinc-100" />
-        <div className="h-4 w-4/5 animate-pulse rounded bg-zinc-100" />
-        <div className="h-4 w-1/4 animate-pulse rounded bg-zinc-100" />
+        <div className="h-3 w-1/3 animate-pulse rounded-sf-2xs bg-sf-surface-sunken" />
+        <div className="h-4 w-4/5 animate-pulse rounded-sf-2xs bg-sf-surface-sunken" />
+        <div className="h-4 w-1/4 animate-pulse rounded-sf-2xs bg-sf-surface-sunken" />
       </div>
     </div>
   );

@@ -32,7 +32,7 @@ export default async function ContactPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6">
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Talk to us</h1>
-        <p className="mt-3 text-zinc-600">
+        <p className="mt-3 text-sf-text-muted">
           Tell us about your store — we onboard a small number of merchants at a time and reply personally.
         </p>
         <div className="mt-8">
@@ -56,7 +56,7 @@ export default async function ContactPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <h1 className="text-3xl font-extrabold tracking-tight">Contact {name}</h1>
-      <p className="mt-3 text-zinc-500">Questions about an order or a product? Drop us a line.</p>
+      <p className="mt-3 text-sf-text-subtle">Questions about an order or a product? Drop us a line.</p>
       <div className="mt-8">
         <ContactForm />
       </div>

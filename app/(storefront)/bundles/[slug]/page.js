@@ -26,18 +26,18 @@ export default async function BundlePage({ params }) {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <nav className="mb-4 text-sm text-zinc-400">
-        <Link href="/" className="hover:text-zinc-600">Home</Link> / <span className="text-zinc-600">{b.title}</span>
+      <nav className="mb-4 text-sm text-sf-text-faint">
+        <Link href="/" className="hover:text-sf-text-muted">Home</Link> / <span className="text-sf-text-muted">{b.title}</span>
       </nav>
-      <p className="text-xs font-bold uppercase tracking-wide text-accent-700">{b.components.length}-piece set</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-sf-accent-text">{b.components.length}-piece set</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight">{b.title}</h1>
-      {b.description && <p className="mt-3 max-w-2xl text-zinc-600">{b.description}</p>}
+      {b.description && <p className="mt-3 max-w-2xl text-sf-text-muted">{b.description}</p>}
 
       <div className="mt-8 grid gap-8 lg:grid-cols-2">
         <ul className="space-y-3">
           {b.components.map((c, i) => (
-            <li key={i} className={`flex items-center gap-4 rounded-2xl border p-4 ${c.available ? "border-zinc-200" : "border-zinc-100 opacity-60"}`}>
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-100">
+            <li key={i} className={`flex items-center gap-4 rounded-sf-card border p-4 ${c.available ? "border-sf-border" : "border-sf-border-soft opacity-60"}`}>
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-sf-control bg-sf-surface-sunken">
                 {c.image && <Image src={c.image} alt={c.title || ""} fill sizes="64px" className="object-cover" />}
               </div>
               <div className="min-w-0 flex-1">
@@ -46,33 +46,33 @@ export default async function BundlePage({ params }) {
                 ) : (
                   <p className="text-sm font-semibold">{c.title || "Unavailable item"}</p>
                 )}
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-sf-text-faint">
                   {c.variant_title && c.variant_title !== "Default Title" ? `${c.variant_title} · ` : ""}×{c.quantity}
-                  {!c.available && <span className="ml-2 font-bold text-zinc-500">{c.state === "missing" ? "NO LONGER AVAILABLE" : "SOLD OUT"}</span>}
+                  {!c.available && <span className="ml-2 font-bold text-sf-text-subtle">{c.state === "missing" ? "NO LONGER AVAILABLE" : "SOLD OUT"}</span>}
                 </p>
               </div>
-              {c.price != null && <span className="shrink-0 text-sm text-zinc-500 line-through">{formatMoney(c.price * c.quantity, cur)}</span>}
+              {c.price != null && <span className="shrink-0 text-sm text-sf-text-subtle line-through">{formatMoney(c.price * c.quantity, cur)}</span>}
             </li>
           ))}
         </ul>
 
-        <div className="h-fit rounded-2xl border border-zinc-200 p-6 lg:sticky lg:top-24">
+        <div className="h-fit rounded-sf-card border border-sf-border p-6 lg:sticky lg:top-24">
           <p className="flex items-baseline gap-3">
             <span className="text-3xl font-extrabold">{formatMoney(b.bundle_price, cur)}</span>
-            <span className="text-lg text-zinc-400 line-through">{formatMoney(b.componentsSum, cur)}</span>
+            <span className="text-lg text-sf-text-faint line-through">{formatMoney(b.componentsSum, cur)}</span>
             {b.saving > 0 && (
-              <span className="rounded-md bg-accent-100 px-2 py-0.5 text-sm font-bold text-accent-800">
+              <span className="rounded-sf-xs bg-sf-sale-soft px-2 py-0.5 text-sm font-bold text-sf-on-sale-soft">
                 Save {formatMoney(b.saving, cur)}
               </span>
             )}
           </p>
-          <p className="mt-2 text-xs text-zinc-400">
+          <p className="mt-2 text-xs text-sf-text-faint">
             Everything is added as normal items — the set price applies automatically in your cart.
           </p>
           <div className="mt-5">
             <BundleAddButton components={b.components} disabled={!b.available} />
           </div>
-          {!b.available && <p className="mt-2 text-xs text-zinc-400">A component is out of stock — the set comes back when it does.</p>}
+          {!b.available && <p className="mt-2 text-xs text-sf-text-faint">A component is out of stock — the set comes back when it does.</p>}
         </div>
       </div>
     </div>

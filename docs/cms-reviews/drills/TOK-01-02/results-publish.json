@@ -1,0 +1,140 @@
+{
+  "id": "TOK-01-02",
+  "part": "publish",
+  "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — publish",
+  "ranAt": "2026-11-03T14:06:09.697Z",
+  "harness": "http://localhost:3204",
+  "chrome": "156.0.8078.80",
+  "passed": 12,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "brand screen: typing a dark text colour on a dark background shows \"Hard to read\" before saving"
+    },
+    {
+      "ok": true,
+      "label": "brand screen: Save brand answers 200 (a save never fails on readability)",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "brand screen: the answer names the pair and the nearest colour that fixes it",
+      "detail": [
+        "Product titles, prices and body text: #18181b on #0a0a0b has a contrast of 1.12 to 1, and small text needs at least 4.5 to 1 (26 more colour pairs on your store have the same problem). Try text colour #80808e."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "publishing: the screen names the failing pair before publishing",
+      "detail": "32351 ms"
+    },
+    {
+      "ok": true,
+      "label": "publishing: Publish now is disabled while the pair fails"
+    },
+    {
+      "ok": true,
+      "label": "publishing: the publish call itself is refused (422) with the pair and its contrast",
+      "detail": {
+        "status": 422,
+        "errors": [
+          "Product titles, prices and body text: #18181b on #0a0a0b has a contrast of 1.12 to 1, and small text needs at least 4.5 to 1 (26 more colour pairs on your store have the same problem). Try text colour #80808e."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the suggested text colour #80808e saves with no warning about product titles",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "the suggested colour publishes (200)",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "brand screen: typing a black accent shows a note that the hero uses a lighter shade of it"
+    },
+    {
+      "ok": true,
+      "label": "a black accent saves with a note that the hero uses a lighter shade of it",
+      "detail": [
+        "The accent in your header wordmark would be #454545, too dark to read in the header, so your store uses #818181, a lighter shade of your accent.",
+        "The hero highlight and badge would be #454545, too dark to read on the hero, so your store uses #818181, a lighter shade of your accent."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the black accent publishes",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "shoppers: the hero highlight and badge pass 4.5:1 with a black accent (2.08:1 before)",
+      "detail": [
+        {
+          "text": "14 days",
+          "fg": "#818181",
+          "bg": "#09090b",
+          "ratio": 5.11
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "refused with: Product titles, prices and body text: #18181b on #0a0a0b has a contrast of 1.12 to 1, and small text needs at least 4.5 to 1 (26 more colour pairs on your store have the same problem). Try text colour #80808e.",
+    "brand put back to {\"accent\":\"#0d9488\",\"background\":\"#fffdf8\",\"foreground\":\"#1c1917\",\"radius\":\"xl\",\"type_scale\":\"large\",\"button_shape\":\"pill\",\"section_spacing\":\"regular\",\"accent_label\":\"#0a0a0b\"}, live release back to rel_603b89e777d1554f"
+  ],
+  "screenshots": [
+    {
+      "name": "publish-1-brand-preview-warning",
+      "file": "docs/cms-reviews/drills/TOK-01-02/publish-1-brand-preview-warning.png",
+      "bytes": 25697,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/brand"
+    },
+    {
+      "name": "publish-2-brand-saved-warning",
+      "file": "docs/cms-reviews/drills/TOK-01-02/publish-2-brand-saved-warning.png",
+      "bytes": 32661,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/brand"
+    },
+    {
+      "name": "publish-3-publishing-refused",
+      "file": "docs/cms-reviews/drills/TOK-01-02/publish-3-publishing-refused.png",
+      "bytes": 37993,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "publish-4-brand-black-accent",
+      "file": "docs/cms-reviews/drills/TOK-01-02/publish-4-brand-black-accent.png",
+      "bytes": 30388,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/brand"
+    },
+    {
+      "name": "publish-5-storefront-black-accent",
+      "file": "docs/cms-reviews/drills/TOK-01-02/publish-5-storefront-black-accent.png",
+      "bytes": 25906,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

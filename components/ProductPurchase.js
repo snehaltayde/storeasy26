@@ -87,20 +87,20 @@ export default function ProductPurchase({ product }) {
   return (
     <div className="mt-5">
       <div className="flex flex-wrap items-baseline gap-3">
-        <span className="text-3xl font-bold text-zinc-900">{formatMoney(price, currency)}</span>
+        <span className="text-3xl font-bold text-sf-text">{formatMoney(price, currency)}</span>
         {pct > 0 && (
           <>
-            <span className="text-lg text-zinc-400 line-through">
+            <span className="text-lg text-sf-text-faint line-through">
               {formatMoney(compareAt, currency)}
             </span>
-            <span className="rounded-md bg-accent-100 px-2 py-0.5 text-sm font-bold text-accent-800">
+            <span className="rounded-sf-xs bg-sf-sale-soft px-2 py-0.5 text-sm font-bold text-sf-on-sale-soft">
               Save {pct}%
             </span>
           </>
         )}
       </div>
 
-      <p className={`mt-2 text-sm font-medium ${available ? "text-accent-700" : "text-zinc-400"}`}>
+      <p className={`mt-2 text-sm font-medium ${available ? "text-sf-accent-text" : "text-sf-text-faint"}`}>
         {available ? "● In stock" : "● Sold out"}
       </p>
 
@@ -108,10 +108,10 @@ export default function ProductPurchase({ product }) {
         <div className="mt-6 space-y-5">
           {options.map((opt) => (
             <div key={opt.name}>
-              <p className="mb-2 text-sm font-semibold text-zinc-700">
+              <p className="mb-2 text-sm font-semibold text-sf-text-body">
                 {opt.name}
                 {selected[opt.name] ? (
-                  <span className="ml-2 font-normal text-zinc-400">{selected[opt.name]}</span>
+                  <span className="ml-2 font-normal text-sf-text-faint">{selected[opt.name]}</span>
                 ) : null}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -125,14 +125,14 @@ export default function ProductPurchase({ product }) {
                       onClick={() => choose(opt.name, val)}
                       aria-pressed={isSel}
                       title={state === "missing" ? "Not available with the current selection" : state === "soldout" ? "Sold out" : undefined}
-                      className={`rounded-lg border px-3.5 py-2 text-sm font-medium transition ${
+                      className={`rounded-sf-small border px-3.5 py-2 text-sm font-medium transition ${
                         isSel
-                          ? "border-zinc-900 bg-zinc-900 text-white"
+                          ? "border-sf-inverse bg-sf-inverse text-sf-on-inverse"
                           : state === "missing"
-                            ? "border-dashed border-zinc-200 bg-white text-zinc-300 line-through hover:border-zinc-300"
+                            ? "border-dashed border-sf-border bg-sf-surface text-sf-mark line-through hover:border-sf-border-strong"
                             : state === "soldout"
-                              ? "border-zinc-200 bg-white text-zinc-400 line-through hover:border-zinc-400"
-                              : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400"
+                              ? "border-sf-border bg-sf-surface text-sf-text-faint line-through hover:border-sf-border-hover"
+                              : "border-sf-border bg-sf-surface text-sf-text-body hover:border-sf-border-hover"
                       }`}
                     >
                       {val}
@@ -146,17 +146,17 @@ export default function ProductPurchase({ product }) {
       )}
 
       {showOptions && !currentVariant && (
-        <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p className="mt-4 rounded-sf-control bg-sf-warning-surface px-4 py-3 text-sm text-sf-warning-strong">
           This combination isn&rsquo;t available — struck-through values don&rsquo;t exist together. Pick a different option.
         </p>
       )}
 
       <div className="mt-6 flex items-center gap-3">
-        <div className="inline-flex items-center rounded-xl border border-zinc-200">
+        <div className="inline-flex items-center rounded-sf-control border border-sf-border">
           <button
             type="button"
             onClick={() => setQty((q) => Math.max(1, q - 1))}
-            className="px-3.5 py-3 text-zinc-600 hover:text-zinc-900"
+            className="px-3.5 py-3 text-sf-text-muted hover:text-sf-text"
             aria-label="Decrease quantity"
           >
             −
@@ -165,7 +165,7 @@ export default function ProductPurchase({ product }) {
           <button
             type="button"
             onClick={() => setQty((q) => q + 1)}
-            className="px-3.5 py-3 text-zinc-600 hover:text-zinc-900"
+            className="px-3.5 py-3 text-sf-text-muted hover:text-sf-text"
             aria-label="Increase quantity"
           >
             +
@@ -177,7 +177,7 @@ export default function ProductPurchase({ product }) {
           type="button"
           onClick={handleAdd}
           disabled={!available || !currentVariant}
-          className="flex-1 rounded-xl bg-accent-400 px-6 py-3.5 text-sm font-bold text-accent-label transition enabled:hover:bg-accent-300 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
+          className="flex-1 rounded-sf-control bg-sf-accent px-6 py-3.5 text-sm font-bold text-sf-on-accent transition enabled:hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:bg-sf-surface-strong disabled:text-sf-text-faint"
         >
           {available ? (currentVariant ? "Add to cart" : "Select options") : "Sold out"}
         </button>
@@ -187,7 +187,7 @@ export default function ProductPurchase({ product }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="mt-3 w-full rounded-xl border border-zinc-200 px-6 py-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-400"
+          className="mt-3 w-full rounded-sf-control border border-sf-border px-6 py-3 text-sm font-semibold text-sf-text-body transition hover:border-sf-border-hover"
         >
           Added ✓ — View cart
         </button>
@@ -195,17 +195,17 @@ export default function ProductPurchase({ product }) {
 
       {/* S38 (SF04): sticky mobile CTA — shows once the main button scrolls away */}
       {showSticky && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-sf-border bg-sf-surface/95 px-4 py-3 shadow-sf-bar backdrop-blur lg:hidden">
           <div className="mx-auto flex max-w-7xl items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-zinc-900">{title}</p>
-              <p className="text-sm font-bold text-zinc-900">{formatMoney(price, currency)}</p>
+              <p className="truncate text-sm font-semibold text-sf-text">{title}</p>
+              <p className="text-sm font-bold text-sf-text">{formatMoney(price, currency)}</p>
             </div>
             <button
               type="button"
               onClick={added ? () => setOpen(true) : handleAdd}
               disabled={!added && (!available || !currentVariant)}
-              className="rounded-xl bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition enabled:hover:bg-accent-300 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
+              className="rounded-sf-control bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition enabled:hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:bg-sf-surface-strong disabled:text-sf-text-faint"
             >
               {added ? "View cart" : available ? (currentVariant ? "Add to cart" : "Select options") : "Sold out"}
             </button>

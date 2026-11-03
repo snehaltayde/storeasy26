@@ -1,0 +1,120 @@
+{
+  "id": "TOK-01-02",
+  "part": "rte",
+  "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — rte",
+  "ranAt": "2026-11-03T14:15:11.113Z",
+  "harness": "http://localhost:3204",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "rich text link on the default look is unchanged (#4d7c0f, lime-700)",
+      "detail": {
+        "text": "serum routine",
+        "tag": "a",
+        "cls": "",
+        "fg": "#4d7c0f",
+        "bg": "#ffffff",
+        "ratio": 4.99,
+        "size": 16,
+        "weight": 400,
+        "large": false,
+        "icon": false,
+        "need": 4.5,
+        "disabled": false,
+        "overMedia": null,
+        "pass": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich text link on the seeded teal brand is no longer lime",
+      "detail": {
+        "text": "serum routine",
+        "tag": "a",
+        "cls": "",
+        "fg": "#06645c",
+        "bg": "#fffdf8",
+        "ratio": 6.92,
+        "size": 17.28,
+        "weight": 400,
+        "large": false,
+        "icon": false,
+        "need": 4.5,
+        "disabled": false,
+        "overMedia": null,
+        "pass": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich text link on seeded passes 4.5:1",
+      "detail": {
+        "text": "serum routine",
+        "tag": "a",
+        "cls": "",
+        "fg": "#06645c",
+        "bg": "#fffdf8",
+        "ratio": 6.92,
+        "size": 17.28,
+        "weight": 400,
+        "large": false,
+        "icon": false,
+        "need": 4.5,
+        "disabled": false,
+        "overMedia": null,
+        "pass": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich text link on light passes 4.5:1",
+      "detail": {
+        "text": "serum routine",
+        "tag": "a",
+        "cls": "",
+        "fg": "#832a05",
+        "bg": "#fffdf8",
+        "ratio": 8.99,
+        "size": 16,
+        "weight": 400,
+        "large": false,
+        "icon": false,
+        "need": 4.5,
+        "disabled": false,
+        "overMedia": null,
+        "pass": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich text link on dark passes 4.5:1",
+      "detail": {
+        "text": "serum routine",
+        "tag": "a",
+        "cls": "",
+        "fg": "#20b2a0",
+        "bg": "#0b0f17",
+        "ratio": 7.25,
+        "size": 16,
+        "weight": 400,
+        "large": false,
+        "icon": false,
+        "need": 4.5,
+        "disabled": false,
+        "overMedia": null,
+        "pass": true
+      }
+    }
+  ],
+  "notes": [
+    "rte link on default: {\"text\":\"serum routine\",\"tag\":\"a\",\"cls\":\"\",\"fg\":\"#4d7c0f\",\"bg\":\"#ffffff\",\"ratio\":4.99,\"size\":16,\"weight\":400,\"large\":false,\"icon\":false,\"need\":4.5,\"disabled\":false,\"overMedia\":null,\"pass\":true}",
+    "rte link on seeded: {\"text\":\"serum routine\",\"tag\":\"a\",\"cls\":\"\",\"fg\":\"#06645c\",\"bg\":\"#fffdf8\",\"ratio\":6.92,\"size\":17.28,\"weight\":400,\"large\":false,\"icon\":false,\"need\":4.5,\"disabled\":false,\"overMedia\":null,\"pass\":true}",
+    "rte link on light: {\"text\":\"serum routine\",\"tag\":\"a\",\"cls\":\"\",\"fg\":\"#832a05\",\"bg\":\"#fffdf8\",\"ratio\":8.99,\"size\":16,\"weight\":400,\"large\":false,\"icon\":false,\"need\":4.5,\"disabled\":false,\"overMedia\":null,\"pass\":true}",
+    "rte link on dark: {\"text\":\"serum routine\",\"tag\":\"a\",\"cls\":\"\",\"fg\":\"#20b2a0\",\"bg\":\"#0b0f17\",\"ratio\":7.25,\"size\":16,\"weight\":400,\"large\":false,\"icon\":false,\"need\":4.5,\"disabled\":false,\"overMedia\":null,\"pass\":true}"
+  ],
+  "screenshots": []
+}

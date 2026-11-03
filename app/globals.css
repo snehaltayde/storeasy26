@@ -30,6 +30,77 @@
   --hero-bg: #09090b;
   --hero-fg: #ffffff;
   --hero-muted: #d4d4d8;
+
+  /* TOK-01 semantic roles (lib/brand.js ROLES). Defaults = the exact value
+     the class each role replaced had (Tailwind v4's own oklch), so a store
+     with no brand config looks exactly as before. A brand with its own
+     colours overrides these from lib/brand.js brandCssVars. */
+  --sf-surface: var(--background); /* bg-white */
+  --sf-surface-muted: oklch(98.5% 0 0); /* zinc-50 */
+  --sf-surface-sunken: oklch(96.7% 0.001 286.375); /* zinc-100 */
+  --sf-surface-strong: oklch(92% 0.004 286.32); /* zinc-200 */
+  --sf-surface-disabled: oklch(87.1% 0.006 286.286); /* zinc-300 */
+  --sf-text: oklch(21% 0.006 285.885); /* zinc-900 */
+  --sf-text-soft: oklch(27.4% 0.006 286.033); /* zinc-800 */
+  --sf-text-body: oklch(37% 0.013 285.805); /* zinc-700 */
+  --sf-text-muted: oklch(44.2% 0.017 285.786); /* zinc-600 */
+  --sf-text-subtle: oklch(55.2% 0.016 285.938); /* zinc-500 */
+  --sf-text-faint: oklch(70.5% 0.015 286.067); /* zinc-400 */
+  --sf-mark: oklch(87.1% 0.006 286.286); /* zinc-300 */
+  --sf-border-soft: oklch(96.7% 0.001 286.375); /* zinc-100 */
+  --sf-border: oklch(92% 0.004 286.32); /* zinc-200 */
+  --sf-border-strong: oklch(87.1% 0.006 286.286); /* zinc-300 */
+  --sf-border-hover: oklch(70.5% 0.015 286.067); /* zinc-400 */
+  --sf-inverse: oklch(21% 0.006 285.885); /* zinc-900 */
+  --sf-inverse-hover: oklch(27.4% 0.006 286.033); /* zinc-800 */
+  --sf-on-inverse: #fff; /* white */
+  --sf-on-inverse-muted: oklch(87.1% 0.006 286.286); /* zinc-300 */
+  --sf-accent: var(--accent-400);
+  --sf-accent-hover: var(--accent-300);
+  --sf-on-accent: var(--accent-label);
+  --sf-accent-text: var(--accent-700);
+  --sf-accent-strong: var(--accent-600);
+  --sf-accent-mark: var(--accent-500);
+  --sf-accent-soft: var(--accent-100);
+  --sf-on-accent-soft: var(--accent-800);
+  --sf-on-accent-soft-strong: var(--accent-900);
+  --sf-accent-subtle: var(--accent-50);
+  --sf-accent-border: var(--accent-200);
+  --sf-sale: var(--sf-accent);
+  --sf-on-sale: var(--sf-on-accent);
+  --sf-sale-soft: var(--sf-accent-soft);
+  --sf-on-sale-soft: var(--sf-on-accent-soft);
+  --sf-success: oklch(53.2% 0.157 131.589); /* lime-700 */
+  --sf-success-strong: oklch(45.3% 0.124 130.933); /* lime-800 */
+  --sf-success-surface: oklch(98.6% 0.031 120.757); /* lime-50 */
+  --sf-success-soft: oklch(96.7% 0.067 122.328); /* lime-100 */
+  --sf-warning: oklch(55.5% 0.163 48.998); /* amber-700 */
+  --sf-warning-strong: oklch(47.3% 0.137 46.201); /* amber-800 */
+  --sf-warning-surface: oklch(98.7% 0.022 95.277); /* amber-50 */
+  --sf-warning-soft: oklch(96.2% 0.059 95.617); /* amber-100 */
+  --sf-warning-border: oklch(92.4% 0.12 95.746); /* amber-200 */
+  --sf-danger: oklch(57.7% 0.245 27.325); /* red-600 */
+  --sf-danger-surface: oklch(97.1% 0.013 17.38); /* red-50 */
+  --sf-danger-border: oklch(88.5% 0.062 18.334); /* red-200 */
+  /* header and hero surfaces are the kit's --header-* and --hero-* above
+     (classes bg-header, text-header-fg, bg-hero, text-hero-muted, …); these
+     are the accent shown on them */
+  --sf-header-accent: var(--accent-400);
+  --sf-hero-accent: var(--accent-400);
+  --sf-hero-glow: var(--accent-500);
+  --sf-overlay: #000; /* black: scrims over the page and photos */
+  --sf-on-overlay: #fff; /* white: text on photos */
+  --sf-media: oklch(21% 0.006 285.885); /* zinc-900: behind a collection photo */
+  --sf-media-from: oklch(27.4% 0.006 286.033); /* zinc-800 */
+  --sf-media-to: oklch(14.1% 0.005 285.823); /* zinc-950 */
+
+  /* TOK-01 radius roles: multiples of the brand radius; the default md
+     (0.75rem) gives exactly the Tailwind steps they replaced */
+  --sf-radius-card: calc(var(--brand-radius) * 4 / 3); /* rounded-2xl */
+  --sf-radius-control: var(--brand-radius); /* rounded-xl */
+  --sf-radius-small: calc(var(--brand-radius) * 2 / 3); /* rounded-lg */
+  --sf-radius-xs: calc(var(--brand-radius) / 2); /* rounded-md */
+  --sf-radius-2xs: calc(var(--brand-radius) / 3); /* rounded */
 }
 
 /* GLOW v1 (beauty / self-care): airy light surfaces, serif display type.
@@ -66,6 +137,76 @@
   --color-hero-fg: var(--hero-fg);
   --color-hero-muted: var(--hero-muted);
   --radius-brand: var(--brand-radius);
+
+  /* TOK-01 storefront roles → utilities: bg-sf-surface, text-sf-text-muted,
+     border-sf-border, … (the console has its own tokens in console.css) */
+  --color-sf-surface: var(--sf-surface);
+  --color-sf-surface-muted: var(--sf-surface-muted);
+  --color-sf-surface-sunken: var(--sf-surface-sunken);
+  --color-sf-surface-strong: var(--sf-surface-strong);
+  --color-sf-surface-disabled: var(--sf-surface-disabled);
+  --color-sf-text: var(--sf-text);
+  --color-sf-text-soft: var(--sf-text-soft);
+  --color-sf-text-body: var(--sf-text-body);
+  --color-sf-text-muted: var(--sf-text-muted);
+  --color-sf-text-subtle: var(--sf-text-subtle);
+  --color-sf-text-faint: var(--sf-text-faint);
+  --color-sf-mark: var(--sf-mark);
+  --color-sf-border-soft: var(--sf-border-soft);
+  --color-sf-border: var(--sf-border);
+  --color-sf-border-strong: var(--sf-border-strong);
+  --color-sf-border-hover: var(--sf-border-hover);
+  --color-sf-inverse: var(--sf-inverse);
+  --color-sf-inverse-hover: var(--sf-inverse-hover);
+  --color-sf-on-inverse: var(--sf-on-inverse);
+  --color-sf-on-inverse-muted: var(--sf-on-inverse-muted);
+  --color-sf-accent: var(--sf-accent);
+  --color-sf-accent-hover: var(--sf-accent-hover);
+  --color-sf-on-accent: var(--sf-on-accent);
+  --color-sf-accent-text: var(--sf-accent-text);
+  --color-sf-accent-strong: var(--sf-accent-strong);
+  --color-sf-accent-mark: var(--sf-accent-mark);
+  --color-sf-accent-soft: var(--sf-accent-soft);
+  --color-sf-on-accent-soft: var(--sf-on-accent-soft);
+  --color-sf-on-accent-soft-strong: var(--sf-on-accent-soft-strong);
+  --color-sf-accent-subtle: var(--sf-accent-subtle);
+  --color-sf-accent-border: var(--sf-accent-border);
+  --color-sf-sale: var(--sf-sale);
+  --color-sf-on-sale: var(--sf-on-sale);
+  --color-sf-sale-soft: var(--sf-sale-soft);
+  --color-sf-on-sale-soft: var(--sf-on-sale-soft);
+  --color-sf-success: var(--sf-success);
+  --color-sf-success-strong: var(--sf-success-strong);
+  --color-sf-success-surface: var(--sf-success-surface);
+  --color-sf-success-soft: var(--sf-success-soft);
+  --color-sf-warning: var(--sf-warning);
+  --color-sf-warning-strong: var(--sf-warning-strong);
+  --color-sf-warning-surface: var(--sf-warning-surface);
+  --color-sf-warning-soft: var(--sf-warning-soft);
+  --color-sf-warning-border: var(--sf-warning-border);
+  --color-sf-danger: var(--sf-danger);
+  --color-sf-danger-surface: var(--sf-danger-surface);
+  --color-sf-danger-border: var(--sf-danger-border);
+  --color-sf-header-accent: var(--sf-header-accent);
+  --color-sf-hero-accent: var(--sf-hero-accent);
+  --color-sf-hero-glow: var(--sf-hero-glow);
+  --color-sf-overlay: var(--sf-overlay);
+  --color-sf-on-overlay: var(--sf-on-overlay);
+  --color-sf-media: var(--sf-media);
+  --color-sf-media-from: var(--sf-media-from);
+  --color-sf-media-to: var(--sf-media-to);
+  --radius-sf-card: var(--sf-radius-card);
+  --radius-sf-control: var(--sf-radius-control);
+  --radius-sf-small: var(--sf-radius-small);
+  --radius-sf-xs: var(--sf-radius-xs);
+  --radius-sf-2xs: var(--sf-radius-2xs);
+  --radius-sf-button: var(--btn-radius, 9999px); /* was rounded-[var(--btn-radius,9999px)] */
+  --spacing-sf-section: var(--section-pad-y, 3.5rem); /* was py-[var(--section-pad-y,3.5rem)] */
+  --text-sf-2xs: 0.6875rem; /* was text-[11px] */
+  --text-sf-3xs: 0.625rem; /* was text-[10px] */
+  --shadow-sf-bar: 0 -4px 16px rgba(0, 0, 0, 0.08); /* was shadow-[0_-4px_16px_rgba(0,0,0,0.08)] */
+  --shadow-sf-sheet: 0 -4px 20px rgba(0, 0, 0, 0.08); /* was shadow-[0_-4px_20px_rgba(0,0,0,0.08)] */
+
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
   --font-display: var(--display-font);
@@ -87,10 +228,11 @@ body {
   background: var(--accent-200);
 }
 
-/* Rich-text product descriptions (Shopify descriptionHtml) */
+/* Rich-text product descriptions (Shopify descriptionHtml) and CMS text.
+   TOK-01: role variables, not fixed colours (links were lime on every store). */
 .rte {
   line-height: 1.7;
-  color: #3f3f46; /* zinc-700 */
+  color: var(--sf-text-body);
 }
 .rte > * + * {
   margin-top: 0.85rem;
@@ -100,7 +242,7 @@ body {
 .rte h3,
 .rte h4 {
   font-weight: 700;
-  color: #18181b; /* zinc-900 */
+  color: var(--sf-text);
   line-height: 1.3;
   margin-top: 1.4rem;
 }
@@ -124,16 +266,16 @@ body {
   margin-top: 0.3rem;
 }
 .rte a {
-  color: #4d7c0f; /* lime-700 */
+  color: var(--sf-accent-text);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 .rte strong {
-  color: #18181b;
+  color: var(--sf-text);
   font-weight: 650;
 }
 .rte img {
-  border-radius: 0.5rem;
+  border-radius: var(--sf-radius-small);
 }
 .rte table {
   width: 100%;
@@ -142,9 +284,21 @@ body {
 }
 .rte td,
 .rte th {
-  border: 1px solid #e4e4e7;
+  border: 1px solid var(--sf-border);
   padding: 0.5rem 0.75rem;
   text-align: left;
+}
+
+/* TOK-02: placeholder text follows the brand. With no brand config
+   --sf-placeholder is unset and this is exactly Tailwind's own default (half
+   the field's text colour), behind the same Safari guard; a brand with its
+   own colours sets a readable --sf-placeholder (lib/brand.js). */
+@layer base {
+  @supports (not (-webkit-appearance: -apple-pay-button)) or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: var(--sf-placeholder, color-mix(in oklab, currentcolor 50%, transparent));
+    }
+  }
 }
 
 /* Hide scrollbars on horizontal scrollers */

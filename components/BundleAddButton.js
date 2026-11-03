@@ -21,7 +21,7 @@ export default function BundleAddButton({ components, disabled }) {
 
   if (disabled) {
     return (
-      <button type="button" disabled className="w-full cursor-not-allowed rounded-xl bg-zinc-200 px-6 py-3.5 text-sm font-bold text-zinc-400">
+      <button type="button" disabled className="w-full cursor-not-allowed rounded-sf-control bg-sf-surface-strong px-6 py-3.5 text-sm font-bold text-sf-text-faint">
         Currently unavailable
       </button>
     );
@@ -31,7 +31,7 @@ export default function BundleAddButton({ components, disabled }) {
       type="button"
       disabled={state === "adding"}
       onClick={state === "done" ? () => setOpen(true) : addAll}
-      className="w-full rounded-xl bg-accent-400 px-6 py-3.5 text-sm font-bold text-accent-label transition hover:bg-accent-300 disabled:opacity-60"
+      className="w-full rounded-sf-control bg-sf-accent px-6 py-3.5 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover disabled:opacity-60"
     >
       {state === "adding" ? "Adding the set…" : state === "done" ? "Added ✓ — view cart" : "Add the set to cart"}
     </button>

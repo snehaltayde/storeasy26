@@ -9,7 +9,7 @@ export default function ProductGallery({ images = [], title }) {
 
   if (!images.length) {
     return (
-      <div className="flex aspect-square w-full items-center justify-center rounded-2xl bg-zinc-100 text-sm text-zinc-400">
+      <div className="flex aspect-square w-full items-center justify-center rounded-sf-card bg-sf-surface-sunken text-sm text-sf-text-faint">
         No image
       </div>
     );
@@ -19,7 +19,7 @@ export default function ProductGallery({ images = [], title }) {
 
   return (
     <div className="lg:sticky lg:top-28">
-      <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-zinc-100">
+      <div className="relative aspect-square w-full overflow-hidden rounded-sf-card bg-sf-surface-sunken">
         <FadeImage
           src={main.url}
           alt={main.alt || title}
@@ -38,8 +38,8 @@ export default function ProductGallery({ images = [], title }) {
               type="button"
               onClick={() => setActive(i)}
               aria-label={`View image ${i + 1}`}
-              className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition ${
-                i === active ? "border-accent-500" : "border-transparent hover:border-zinc-300"
+              className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-sf-small border-2 transition ${
+                i === active ? "border-sf-accent-mark" : "border-transparent hover:border-sf-border-strong"
               }`}
             >
               <Image src={img.url} alt="" fill sizes="64px" className="object-cover" />

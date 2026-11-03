@@ -1,0 +1,59 @@
+{
+  "320": {
+    "vw": 320,
+    "sw": 398,
+    "stepsRight": 398,
+    "paymentRight": 398,
+    "paymentVisible": false,
+    "wide": [
+      "ol.flex.items-center.gap-2",
+      "li.flex.items-center.gap-2",
+      "span.flex.h-6.w-6",
+      "span.text-sf-text-faint"
+    ]
+  },
+  "360": {
+    "vw": 360,
+    "sw": 398,
+    "stepsRight": 398,
+    "paymentRight": 398,
+    "paymentVisible": false,
+    "wide": [
+      "ol.flex.items-center.gap-2",
+      "li.flex.items-center.gap-2",
+      "span.text-sf-text-faint"
+    ]
+  },
+  "375": {
+    "vw": 375,
+    "sw": 398,
+    "stepsRight": 398,
+    "paymentRight": 398,
+    "paymentVisible": false,
+    "wide": [
+      "ol.flex.items-center.gap-2",
+      "li.flex.items-center.gap-2",
+      "span.text-sf-text-faint"
+    ]
+  },
+  "390": {
+    "vw": 390,
+    "sw": 398,
+    "stepsRight": 398,
+    "paymentRight": 398,
+    "paymentVisible": false,
+    "wide": [
+      "ol.flex.items-center.gap-2",
+      "li.flex.items-center.gap-2",
+      "span.text-sf-text-faint"
+    ]
+  },
+  "414": {
+    "vw": 414,
+    "sw": 414,
+    "stepsRight": 398,
+    "paymentRight": 398,
+    "paymentVisible": true,
+    "wide": []
+  }
+}

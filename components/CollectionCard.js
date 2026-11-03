@@ -6,7 +6,7 @@ export default function CollectionCard({ collection }) {
   return (
     <Link
       href={`/collections/${handle}`}
-      className="group relative block aspect-[4/3] overflow-hidden rounded-2xl bg-zinc-900"
+      className="group relative block aspect-[4/3] overflow-hidden rounded-sf-card bg-sf-media"
     >
       {image ? (
         <Image
@@ -17,13 +17,13 @@ export default function CollectionCard({ collection }) {
           className="object-cover opacity-85 transition duration-500 group-hover:scale-105 group-hover:opacity-100"
         />
       ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-950" />
+        <div className="absolute inset-0 bg-gradient-to-br from-sf-media-from to-sf-media-to" />
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-sf-overlay/75 via-sf-overlay/10 to-transparent" />
       <div className="absolute bottom-0 left-0 p-4">
-        <h3 className="text-lg font-bold text-white">{title}</h3>
+        <h3 className="text-lg font-bold text-sf-on-overlay">{title}</h3>
         {product_count != null && (
-          <p className="text-xs text-white/70">{product_count} products</p>
+          <p className="text-xs text-sf-on-overlay/70">{product_count} products</p>
         )}
       </div>
     </Link>

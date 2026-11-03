@@ -24,16 +24,16 @@ export default async function JournalIndex() {
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <h1 className="text-3xl font-extrabold tracking-tight">Journal</h1>
       {posts.length === 0 ? (
-        <p className="mt-6 text-zinc-500">Nothing published yet — check back soon.</p>
+        <p className="mt-6 text-sf-text-subtle">Nothing published yet — check back soon.</p>
       ) : (
         <ul className="mt-8 space-y-6">
           {posts.map((p) => (
             <li key={p.slug}>
               <Link href={`/journal/${p.slug}`} className="group block">
                 <h2 className="font-display text-xl font-bold group-hover:underline">{p.title}</h2>
-                {p.description && <p className="mt-1 text-sm text-zinc-500">{p.description}</p>}
+                {p.description && <p className="mt-1 text-sm text-sf-text-subtle">{p.description}</p>}
                 {p.published && (
-                  <p className="mt-1 text-xs text-zinc-400">
+                  <p className="mt-1 text-xs text-sf-text-faint">
                     {new Date(p.published).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
                   </p>
                 )}

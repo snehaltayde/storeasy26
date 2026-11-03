@@ -27,7 +27,7 @@ function HeroTitle({ title, highlight }) {
   return (
     <>
       {title.slice(0, i)}
-      <span className="text-accent-400">{title.slice(i, i + highlight.length)}</span>
+      <span className="text-sf-hero-accent">{title.slice(i, i + highlight.length)}</span>
       {title.slice(i + highlight.length)}
     </>
   );
@@ -70,11 +70,11 @@ export default async function Home() {
       {assignment && <ExperimentPing slug={assignment.slug} unit={unitId} />}
       {/* Hero */}
       <section data-sec="hero" className="relative overflow-hidden bg-hero text-hero-fg">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-accent-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-sf-hero-glow/20 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
           <ExperimentNote notice={testNotice} />
-          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-accent-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />
+          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-sf-hero-accent">
+            <span className="h-1.5 w-1.5 rounded-full bg-sf-hero-accent" />
             {empty ? "Coming soon" : hero.badge || `${stats.products} products · ${stats.collections} collections`}
           </p>
           <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
@@ -85,7 +85,7 @@ export default async function Home() {
             {hero.primary?.label ? (
               <Link
                 href={hero.primary.href || "/collections"}
-                className="rounded-[var(--btn-radius,9999px)] bg-accent-400 px-6 py-3 text-sm font-bold text-accent-label transition hover:bg-accent-300"
+                className="rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover"
               >
                 {hero.primary.label}
               </Link>
@@ -93,7 +93,7 @@ export default async function Home() {
             {showSecondary ? (
               <Link
                 href={hero.secondary.href || "#new"}
-                className="rounded-[var(--btn-radius,9999px)] border border-hero-fg/20 px-6 py-3 text-sm font-semibold text-hero-fg transition hover:bg-hero-fg/10"
+                className="rounded-sf-button border border-hero-fg/20 px-6 py-3 text-sm font-semibold text-hero-fg transition hover:bg-hero-fg/10"
               >
                 {hero.secondary.label}
               </Link>

@@ -125,12 +125,12 @@ export default function SearchBox() {
     }
   }
 
-  const activeCls = (i) => (i === active ? "bg-zinc-100" : "hover:bg-zinc-50");
+  const activeCls = (i) => (i === active ? "bg-sf-surface-sunken" : "hover:bg-sf-surface-muted");
 
   return (
     <div ref={boxRef} className="relative w-full">
       <form onSubmit={submit} className="relative">
-        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400">
+        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sf-text-faint">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.2-3.2" />
@@ -153,15 +153,15 @@ export default function SearchBox() {
           aria-expanded={showPanel}
           role="combobox"
           aria-autocomplete="list"
-          className="w-full rounded-full border border-zinc-200 bg-zinc-50 py-2.5 pl-11 pr-4 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:bg-white"
+          className="w-full rounded-full border border-sf-border bg-sf-surface-muted py-2.5 pl-11 pr-4 text-sm text-sf-text outline-none transition focus:border-sf-border-hover focus:bg-sf-surface"
         />
       </form>
 
       {showPanel && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-sf-card border border-sf-border-soft bg-sf-surface shadow-xl">
           {showRecent ? (
             <>
-              <p className="flex items-center justify-between px-4 pt-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+              <p className="flex items-center justify-between px-4 pt-3 text-sf-2xs font-semibold uppercase tracking-wide text-sf-text-faint">
                 Recent searches
                 <button
                   type="button"
@@ -171,7 +171,7 @@ export default function SearchBox() {
                     } catch { /* blocked storage */ }
                     setRecent([]);
                   }}
-                  className="font-medium normal-case tracking-normal text-zinc-400 hover:text-zinc-600"
+                  className="font-medium normal-case tracking-normal text-sf-text-faint hover:text-sf-text-muted"
                 >
                   Clear
                 </button>
@@ -185,7 +185,7 @@ export default function SearchBox() {
                         setQ(t);
                         go(t);
                       }}
-                      className={`block w-full px-4 py-2 text-left text-sm text-zinc-700 ${activeCls(i)}`}
+                      className={`block w-full px-4 py-2 text-left text-sm text-sf-text-body ${activeCls(i)}`}
                     >
                       {t}
                     </button>
@@ -194,14 +194,14 @@ export default function SearchBox() {
               </ul>
             </>
           ) : loading && results.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-zinc-400">Searching…</p>
+            <p className="px-4 py-6 text-center text-sm text-sf-text-faint">Searching…</p>
           ) : results.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-zinc-400">
+            <p className="px-4 py-6 text-center text-sm text-sf-text-faint">
               No products match “{term}”.
             </p>
           ) : (
             <>
-              <ul className="max-h-[60vh] divide-y divide-zinc-50 overflow-y-auto">
+              <ul className="max-h-[60vh] divide-y divide-sf-surface-muted overflow-y-auto">
                 {results.map((r, i) => (
                   <li key={r.handle}>
                     <Link
@@ -212,19 +212,19 @@ export default function SearchBox() {
                       }}
                       className={`flex items-center gap-3 px-3 py-2.5 ${activeCls(i)}`}
                     >
-                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
+                      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-sf-small bg-sf-surface-sunken">
                         {r.image ? (
                           <Image src={r.image} alt={r.title} fill sizes="48px" className="object-cover" />
                         ) : null}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-zinc-900">{r.title}</p>
+                        <p className="truncate text-sm font-medium text-sf-text">{r.title}</p>
                         {r.product_type ? (
-                          <p className="truncate text-xs text-zinc-400">{r.product_type}</p>
+                          <p className="truncate text-xs text-sf-text-faint">{r.product_type}</p>
                         ) : null}
                       </div>
                       {r.price != null && (
-                        <span className="shrink-0 text-sm font-semibold text-zinc-900">
+                        <span className="shrink-0 text-sm font-semibold text-sf-text">
                           {formatMoney(r.price, r.currency)}
                         </span>
                       )}
@@ -234,7 +234,7 @@ export default function SearchBox() {
               </ul>
               <button
                 onClick={submit}
-                className="block w-full border-t border-zinc-100 bg-zinc-50 px-4 py-2.5 text-center text-sm font-medium text-accent-700 hover:bg-zinc-100"
+                className="block w-full border-t border-sf-border-soft bg-sf-surface-muted px-4 py-2.5 text-center text-sm font-medium text-sf-accent-text hover:bg-sf-surface-sunken"
               >
                 View all results for “{term}”
               </button>

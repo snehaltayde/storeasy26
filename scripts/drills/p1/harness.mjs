@@ -2,7 +2,7 @@
 // (2, 5 and 6 are runs of pnpm drill:edge; see docs/cms-reviews/P1-DRILLS.md).
 //   designer   S57/S59 Designer flows on the edge runtime: edit, save, preview, publish, live
 //   dark       the maintenance message on a dark brand (finding 3)
-//   checkout   checkout at 360, 375, 390 and 414 (finding 6)
+//   checkout   checkout at 360, 375, 390 and 414 (finding 6, fixed in TOK-01-02)
 import { text, seen, settle, sleep } from "./util.mjs";
 import { addToCart, noThanks, clearCart } from "./sf.mjs";
 import { rows } from "./db.mjs";
@@ -297,7 +297,7 @@ export const parts = {
       });
       out[w] = m;
       drill.note(`checkout at ${w}: page ${m.sw}px wide in a ${m.vw}px window; the step row ends at ${m.stepsRight}px, "Payment" ends at ${m.paymentRight}px`);
-      drill.check(m.sw <= m.vw + 1, `checkout at ${w}: no sideways scroll`, `page is ${m.sw}px wide`, w < 414 ? { known: "finding 6" } : {});
+      drill.check(m.sw <= m.vw + 1, `checkout at ${w}: no sideways scroll`, `page is ${m.sw}px wide`);
       await drill.shoot(page, `checkout-${w}`);
     }
     await ctx.close();

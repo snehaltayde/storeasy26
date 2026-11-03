@@ -46,12 +46,12 @@ export default async function CheckoutPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-24 text-center">
         <h1 className="text-2xl font-bold">Checkout is temporarily unavailable</h1>
-        <p className="mt-2 text-zinc-500">
+        <p className="mt-2 text-sf-text-subtle">
           Your cart is saved — nothing was charged. Please try again a little later.
         </p>
         <Link
           href="/collections"
-          className="mt-6 inline-block rounded-full bg-zinc-900 px-6 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+          className="mt-6 inline-block rounded-full bg-sf-inverse px-6 py-3 text-sm font-semibold text-sf-on-inverse hover:bg-sf-inverse-hover"
         >
           Keep browsing
         </Link>
@@ -63,10 +63,10 @@ export default async function CheckoutPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-24 text-center">
         <h1 className="text-2xl font-bold">Your cart is empty</h1>
-        <p className="mt-2 text-zinc-500">Add something before checking out.</p>
+        <p className="mt-2 text-sf-text-subtle">Add something before checking out.</p>
         <Link
           href="/collections"
-          className="mt-6 inline-block rounded-full bg-zinc-900 px-6 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+          className="mt-6 inline-block rounded-full bg-sf-inverse px-6 py-3 text-sm font-semibold text-sf-on-inverse hover:bg-sf-inverse-hover"
         >
           Continue shopping
         </Link>

@@ -27,7 +27,7 @@ const AccountIcon = () => (
 
 const Announcement = ({ announcement }) =>
   announcement?.enabled && announcement.text ? (
-    <div data-sec="announcement" className="bg-accent-400 px-4 py-1.5 text-center text-xs font-semibold text-accent-label">
+    <div data-sec="announcement" className="bg-sf-accent px-4 py-1.5 text-center text-xs font-semibold text-sf-on-accent">
       {announcement.href ? (
         <Link href={announcement.href} className="hover:underline">
           {announcement.text}
@@ -41,7 +41,7 @@ const Announcement = ({ announcement }) =>
 const Wordmark = ({ logo, className = "" }) => (
   <Link href="/" className={`shrink-0 text-xl font-extrabold tracking-tight ${className}`}>
     {logo.text1}
-    {logo.text2 ? <span className="text-accent-400">{logo.text2}</span> : null}
+    {logo.text2 ? <span className="text-sf-header-accent">{logo.text2}</span> : null}
   </Link>
 );
 
@@ -74,12 +74,12 @@ const NavStrip = ({ items, centered = false }) =>
                   ▾
                 </span>
               </summary>
-              <div className="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-xl border border-zinc-200 bg-white py-1 shadow-xl">
-                <Link href={i.href} className="block px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50">
+              <div className="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-sf-control border border-sf-border bg-sf-surface py-1 shadow-xl">
+                <Link href={i.href} className="block px-4 py-2 text-sm font-semibold text-sf-text-soft hover:bg-sf-surface-muted">
                   {i.label}
                 </Link>
                 {i.children.map((c) => (
-                  <Link key={c.href + c.label} href={c.href} className="block px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900">
+                  <Link key={c.href + c.label} href={c.href} className="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text">
                     {c.label}
                   </Link>
                 ))}

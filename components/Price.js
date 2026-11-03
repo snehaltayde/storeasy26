@@ -12,14 +12,14 @@ export default function Price({
   const pct = onSale ? discountPercent(amount, compareAt) : 0;
   return (
     <span className={`inline-flex items-baseline gap-2 ${className}`}>
-      <span className="font-semibold text-zinc-900">{formatMoney(amount, currency)}</span>
+      <span className="font-semibold text-sf-text">{formatMoney(amount, currency)}</span>
       {onSale && (
-        <span className="text-sm text-zinc-400 line-through">
+        <span className="text-sm text-sf-text-faint line-through">
           {formatMoney(compareAt, currency)}
         </span>
       )}
       {onSale && showSaving && pct > 0 && (
-        <span className="rounded bg-accent-100 px-1.5 py-0.5 text-xs font-semibold text-accent-800">
+        <span className="rounded-sf-2xs bg-sf-sale-soft px-1.5 py-0.5 text-xs font-semibold text-sf-on-sale-soft">
           Save {pct}%
         </span>
       )}

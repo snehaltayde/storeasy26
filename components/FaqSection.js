@@ -46,13 +46,13 @@ export default function FaqSection({ heading, items }) {
 
   return (
     <section ref={rootRef}>
-      {heading ? <h2 className="text-lg font-bold text-zinc-900">{heading}</h2> : null}
-      <div className="mt-2 divide-y divide-zinc-100 rounded-2xl border border-zinc-200">
+      {heading ? <h2 className="text-lg font-bold text-sf-text">{heading}</h2> : null}
+      <div className="mt-2 divide-y divide-sf-border-soft rounded-sf-card border border-sf-border">
         {items.map((it) => {
           const anchor = faqAnchor(it.q);
           return (
             <details key={anchor} id={anchor} className="group scroll-mt-24 px-4 py-3">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-zinc-800 [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-sf-text-soft [&::-webkit-details-marker]:hidden">
                 <span>{it.q}</span>
                 <span className="flex shrink-0 items-center gap-2">
                   <button
@@ -62,17 +62,17 @@ export default function FaqSection({ heading, items }) {
                       e.preventDefault();
                       copyLink(anchor, e.currentTarget);
                     }}
-                    className="rounded px-1 text-zinc-300 hover:text-zinc-600"
+                    className="rounded-sf-2xs px-1 text-sf-mark hover:text-sf-text-muted"
                   >
                     ¶
                   </button>
-                  <span aria-hidden="true" className="text-zinc-400 transition group-open:rotate-45">
+                  <span aria-hidden="true" className="text-sf-text-faint transition group-open:rotate-45">
                     +
                   </span>
                 </span>
               </summary>
               {/* answers are allowlist-sanitized at save (lib/cms/store.js) */}
-              <div className="rte mt-2 text-sm text-zinc-600" dangerouslySetInnerHTML={{ __html: it.a }} />
+              <div className="rte mt-2 text-sm text-sf-text-muted" dangerouslySetInnerHTML={{ __html: it.a }} />
             </details>
           );
         })}

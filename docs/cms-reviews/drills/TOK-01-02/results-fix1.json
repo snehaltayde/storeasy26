@@ -1,0 +1,158 @@
+{
+  "id": "TOK-01-02",
+  "part": "fix1",
+  "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — fix1",
+  "ranAt": "2026-11-03T15:15:56.434Z",
+  "harness": "http://localhost:3204",
+  "chrome": "156.0.8078.80",
+  "passed": 17,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "A: the store's own colours save"
+    },
+    {
+      "ok": true,
+      "label": "A: the Pulse kit is pinned"
+    },
+    {
+      "ok": true,
+      "label": "A: the store's own colours on a pinned Pulse kit are live",
+      "detail": [
+        200
+      ]
+    },
+    {
+      "ok": true,
+      "label": "A: Reset answers 200 and shows nothing hard to read",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "A: after Reset, the platform's own look publishes (was 422 at a8dbaef)",
+      "detail": [
+        200
+      ]
+    },
+    {
+      "ok": true,
+      "label": "B: the store's own colours save"
+    },
+    {
+      "ok": true,
+      "label": "B: the Pulse kit is pinned"
+    },
+    {
+      "ok": true,
+      "label": "B: the store's own colours on a pinned Pulse kit are live",
+      "detail": [
+        200
+      ]
+    },
+    {
+      "ok": true,
+      "label": "B: the Pulse kit applied with its brand"
+    },
+    {
+      "ok": true,
+      "label": "B: the Pulse kit's own brand publishes (was 422 with 'Try text colour #080808' at a8dbaef)",
+      "detail": [
+        200
+      ]
+    },
+    {
+      "ok": true,
+      "label": "B: the Brand screen shows no 'Hard to read' banner for the Pulse kit's brand",
+      "detail": 0
+    },
+    {
+      "ok": true,
+      "label": "C: no brand and no theme are live",
+      "detail": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "ok": true,
+      "label": "C: the Glow kit applied with the brand box unticked"
+    },
+    {
+      "ok": true,
+      "label": "C: Glow with no brand publishes (was 422 'Header wordmark accent: #a3e635 on #fffbf7 … 1.46 to 1' at a8dbaef)",
+      "detail": [
+        200
+      ]
+    },
+    {
+      "ok": true,
+      "label": "C: the Brand screen explains the darker wordmark shade even with no brand saved"
+    },
+    {
+      "ok": true,
+      "label": "C: every header or hero accent text shoppers see on Glow is readable (1.46:1 before)",
+      "detail": {
+        "kit": "glow-1",
+        "accents": [
+          {
+            "text": "14 days",
+            "fg": "#3f6212",
+            "bg": "#fff1ee",
+            "ratio": 6.43,
+            "role": "hero"
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "C: the page carries the corrected header and hero accents (#4d7c0f, #3f6212) instead of the lime 400",
+      "detail": {
+        "header": "#4d7c0f",
+        "hero": "#3f6212",
+        "headerBg": "#fffbf7"
+      }
+    }
+  ],
+  "notes": [
+    "brand put back to {\"accent\":\"#0d9488\",\"background\":\"#fffdf8\",\"foreground\":\"#1c1917\",\"radius\":\"xl\",\"type_scale\":\"large\",\"button_shape\":\"pill\",\"section_spacing\":\"regular\",\"accent_label\":\"#0a0a0b\"}, theme to null, live release back to rel_e5ab554157242132"
+  ],
+  "screenshots": [
+    {
+      "name": "fix1-brand-pulse-kit-brand",
+      "file": "docs/cms-reviews/drills/TOK-01-02/fix1-brand-pulse-kit-brand.png",
+      "bytes": 25928,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/brand"
+    },
+    {
+      "name": "fix1-brand-no-brand-glow",
+      "file": "docs/cms-reviews/drills/TOK-01-02/fix1-brand-no-brand-glow.png",
+      "bytes": 29272,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/brand"
+    },
+    {
+      "name": "fix1-storefront-no-brand-glow",
+      "file": "docs/cms-reviews/drills/TOK-01-02/fix1-storefront-no-brand-glow.png",
+      "bytes": 28364,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

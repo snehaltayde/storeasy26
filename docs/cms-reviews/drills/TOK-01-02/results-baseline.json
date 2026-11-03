@@ -1,0 +1,619 @@
+{
+  "id": "TOK-01-02",
+  "part": "baseline",
+  "title": "TOK-01/02: storefront tokens, pairing matrix, checkout width — baseline",
+  "ranAt": "2026-11-03T12:51:50.675Z",
+  "harness": "http://localhost:3204",
+  "chrome": "156.0.8078.80",
+  "passed": 72,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "baseline/seeded: home at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: product at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: collection at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: collections at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: search at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: cart-drawer at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: cart at 375: Add to cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: checkout at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: account at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: cms-page at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: not-found at 375 answers 404",
+      "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: no page errors at 375",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: home at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: product at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: collection at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: collections at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: search at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: cart-drawer at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: cart at 768: Add to cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: checkout at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: account at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: cms-page at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: not-found at 768 answers 404",
+      "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: no page errors at 768",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: home at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: product at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: collection at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: collections at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: search at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: cart-drawer at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: cart at 1440: Add to cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: checkout at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: account at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: cms-page at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: not-found at 1440 answers 404",
+      "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "baseline/seeded: no page errors at 1440",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: home at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: product at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: collection at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: collections at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: search at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: cart-drawer at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: cart at 375: Add to cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: checkout at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: account at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: cms-page at 375 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: not-found at 375 answers 404",
+      "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: no page errors at 375",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: home at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: product at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: collection at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: collections at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: search at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: cart-drawer at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: cart at 768: Add to cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: checkout at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: account at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: cms-page at 768 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: not-found at 768 answers 404",
+      "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: no page errors at 768",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: home at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: product at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: collection at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: collections at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: search at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: cart-drawer at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: cart at 1440: Add to cart answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: checkout at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: account at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: cms-page at 1440 answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: not-found at 1440 answers 404",
+      "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "baseline/default: no page errors at 1440",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "live release before: rel_603b89e777d1554f",
+    "live release put back: rel_603b89e777d1554f"
+  ],
+  "screenshots": [
+    {
+      "name": "baseline/seeded-home-375",
+      "bytes": 40593
+    },
+    {
+      "name": "baseline/seeded-product-375",
+      "bytes": 37951
+    },
+    {
+      "name": "baseline/seeded-collection-375",
+      "bytes": 19503
+    },
+    {
+      "name": "baseline/seeded-collections-375",
+      "bytes": 40133
+    },
+    {
+      "name": "baseline/seeded-search-375",
+      "bytes": 19395
+    },
+    {
+      "name": "baseline/seeded-cart-drawer-375",
+      "bytes": 19708
+    },
+    {
+      "name": "baseline/seeded-checkout-375",
+      "bytes": 21985
+    },
+    {
+      "name": "baseline/seeded-account-375",
+      "bytes": 17087
+    },
+    {
+      "name": "baseline/seeded-cms-page-375",
+      "bytes": 21389
+    },
+    {
+      "name": "baseline/seeded-not-found-375",
+      "bytes": 24759
+    },
+    {
+      "name": "baseline/seeded-home-768",
+      "bytes": 26381
+    },
+    {
+      "name": "baseline/seeded-product-768",
+      "bytes": 10876
+    },
+    {
+      "name": "baseline/seeded-collection-768",
+      "bytes": 8890
+    },
+    {
+      "name": "baseline/seeded-collections-768",
+      "bytes": 14598
+    },
+    {
+      "name": "baseline/seeded-search-768",
+      "bytes": 9389
+    },
+    {
+      "name": "baseline/seeded-cart-drawer-768",
+      "bytes": 11422
+    },
+    {
+      "name": "baseline/seeded-checkout-768",
+      "bytes": 9462
+    },
+    {
+      "name": "baseline/seeded-account-768",
+      "bytes": 9150
+    },
+    {
+      "name": "baseline/seeded-cms-page-768",
+      "bytes": 8373
+    },
+    {
+      "name": "baseline/seeded-not-found-768",
+      "bytes": 9002
+    },
+    {
+      "name": "baseline/seeded-home-1440",
+      "bytes": 10200
+    },
+    {
+      "name": "baseline/seeded-product-1440",
+      "bytes": 3908
+    },
+    {
+      "name": "baseline/seeded-collection-1440",
+      "bytes": 3684
+    },
+    {
+      "name": "baseline/seeded-collections-1440",
+      "bytes": 4757
+    },
+    {
+      "name": "baseline/seeded-search-1440",
+      "bytes": 4140
+    },
+    {
+      "name": "baseline/seeded-cart-drawer-1440",
+      "bytes": 7930
+    },
+    {
+      "name": "baseline/seeded-checkout-1440",
+      "bytes": 4133
+    },
+    {
+      "name": "baseline/seeded-account-1440",
+      "bytes": 3368
+    },
+    {
+      "name": "baseline/seeded-cms-page-1440",
+      "bytes": 3254
+    },
+    {
+      "name": "baseline/seeded-not-found-1440",
+      "bytes": 5080
+    },
+    {
+      "name": "baseline/default-home-375",
+      "bytes": 33443
+    },
+    {
+      "name": "baseline/default-product-375",
+      "bytes": 38444
+    },
+    {
+      "name": "baseline/default-collection-375",
+      "bytes": 17548
+    },
+    {
+      "name": "baseline/default-collections-375",
+      "bytes": 36874
+    },
+    {
+      "name": "baseline/default-search-375",
+      "bytes": 16494
+    },
+    {
+      "name": "baseline/default-cart-drawer-375",
+      "bytes": 21298
+    },
+    {
+      "name": "baseline/default-checkout-375",
+      "bytes": 21347
+    },
+    {
+      "name": "baseline/default-account-375",
+      "bytes": 16060
+    },
+    {
+      "name": "baseline/default-cms-page-375",
+      "bytes": 17397
+    },
+    {
+      "name": "baseline/default-not-found-375",
+      "bytes": 19652
+    },
+    {
+      "name": "baseline/default-home-768",
+      "bytes": 23850
+    },
+    {
+      "name": "baseline/default-product-768",
+      "bytes": 9941
+    },
+    {
+      "name": "baseline/default-collection-768",
+      "bytes": 6688
+    },
+    {
+      "name": "baseline/default-collections-768",
+      "bytes": 13666
+    },
+    {
+      "name": "baseline/default-search-768",
+      "bytes": 6261
+    },
+    {
+      "name": "baseline/default-cart-drawer-768",
+      "bytes": 11283
+    },
+    {
+      "name": "baseline/default-checkout-768",
+      "bytes": 8098
+    },
+    {
+      "name": "baseline/default-account-768",
+      "bytes": 6334
+    },
+    {
+      "name": "baseline/default-cms-page-768",
+      "bytes": 6659
+    },
+    {
+      "name": "baseline/default-not-found-768",
+      "bytes": 8007
+    },
+    {
+      "name": "baseline/default-home-1440",
+      "bytes": 7973
+    },
+    {
+      "name": "baseline/default-product-1440",
+      "bytes": 5764
+    },
+    {
+      "name": "baseline/default-collection-1440",
+      "bytes": 2744
+    },
+    {
+      "name": "baseline/default-collections-1440",
+      "bytes": 4178
+    },
+    {
+      "name": "baseline/default-search-1440",
+      "bytes": 2503
+    },
+    {
+      "name": "baseline/default-cart-drawer-1440",
+      "bytes": 4600
+    },
+    {
+      "name": "baseline/default-checkout-1440",
+      "bytes": 3429
+    },
+    {
+      "name": "baseline/default-account-1440",
+      "bytes": 2348
+    },
+    {
+      "name": "baseline/default-cms-page-1440",
+      "bytes": 2661
+    },
+    {
+      "name": "baseline/default-not-found-1440",
+      "bytes": 3028
+    }
+  ]
+}

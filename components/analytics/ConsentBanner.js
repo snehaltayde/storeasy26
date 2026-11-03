@@ -48,7 +48,7 @@ export default function ConsentBanner({ storeName = "this store" }) {
           setVisible(true);
         }}
         aria-label="Privacy settings"
-        className="fixed bottom-3 left-3 z-40 rounded-full border border-zinc-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-zinc-500 shadow backdrop-blur hover:text-zinc-800"
+        className="fixed bottom-3 left-3 z-40 rounded-full border border-sf-border bg-sf-surface/90 px-3 py-1.5 text-xs font-semibold text-sf-text-subtle shadow backdrop-blur hover:text-sf-text-soft"
       >
         Privacy
       </button>
@@ -56,40 +56,40 @@ export default function ConsentBanner({ storeName = "this store" }) {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-200 bg-white/95 px-4 py-4 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur sm:px-6">
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-sf-border bg-sf-surface/95 px-4 py-4 shadow-sf-sheet backdrop-blur sm:px-6">
       <div className="mx-auto max-w-5xl">
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-zinc-600">
+          <p className="text-sm text-sf-text-muted">
             We use analytics and advertising cookies to understand shopping activity and improve{" "}
             {storeName}. Only with your consent — change your mind anytime via the Privacy button.
           </p>
           <div className="flex shrink-0 flex-wrap gap-2">
             <button
               onClick={() => setExpanded((e) => !e)}
-              className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
+              className="rounded-sf-control border border-sf-border-strong px-4 py-2 text-sm font-semibold text-sf-text-body hover:bg-sf-surface-muted"
             >
               Settings
             </button>
             <button
               onClick={() => persist({ analytics: false, marketing: false })}
-              className="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
+              className="rounded-sf-control border border-sf-border-strong px-4 py-2 text-sm font-semibold text-sf-text-body hover:bg-sf-surface-muted"
             >
               No thanks
             </button>
             <button
               onClick={() => persist({ analytics: true, marketing: true })}
-              className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+              className="rounded-sf-control bg-sf-inverse px-4 py-2 text-sm font-semibold text-sf-on-inverse hover:bg-sf-inverse-hover"
             >
               Allow all
             </button>
           </div>
         </div>
         {expanded && (
-          <div className="mt-3 flex flex-col gap-2 border-t border-zinc-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-3 flex flex-col gap-2 border-t border-sf-border-soft pt-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-2 text-sm sm:flex-row sm:gap-6">
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked disabled />
-                <span className="text-zinc-400">Essential (orders, cart) — always on</span>
+                <span className="text-sf-text-faint">Essential (orders, cart) — always on</span>
               </label>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={analytics} onChange={(e) => setAnalytics(e.target.checked)} />
@@ -102,7 +102,7 @@ export default function ConsentBanner({ storeName = "this store" }) {
             </div>
             <button
               onClick={() => persist({ analytics, marketing })}
-              className="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+              className="rounded-sf-control bg-sf-inverse px-4 py-2 text-sm font-semibold text-sf-on-inverse hover:bg-sf-inverse-hover"
             >
               Save choices
             </button>

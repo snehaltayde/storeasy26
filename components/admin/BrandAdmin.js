@@ -11,13 +11,17 @@ import { useToast } from "@/components/console/Toast";
 import { useDirtyGuard } from "@/components/admin/cms/useDirtyGuard";
 
 // Brand tokens editor (S35 / MC10, redesigned S50, live preview S52).
-// Colors + radius + type scale. The shade ladder, "Buy now" sample and
-// contrast warnings track the CURRENT values via a debounced read-only
+// Colors + radius + type scale. The shade ladder, "Buy now" sample and the
+// readability warnings track the CURRENT values via a debounced read-only
 // preview call (PUT {preview}) — on any preview failure they silently fall
-// back to the last-saved state. WCAG contrast errors BLOCK save (server
-// re-validates) and render as a persistent danger Banner. Save enables only
-// while dirty; useDirtyGuard covers tab close/reload. Reset goes to the
-// PLATFORM default look (that is what the API does — not the kit's colors).
+// back to the last-saved state. TOK-02: readability never blocks a save, so a
+// half-picked custom colour is never lost. Each colour pair the store draws
+// is checked; a hard-to-read one shows as a warning naming the pair and the
+// nearest colour that fixes it, and Publishing refuses it until it is fixed.
+// Only a malformed value (a bad hex) is a save error. Notes say where the
+// store uses a readable shade of the accent instead. Save enables only while
+// dirty; useDirtyGuard covers tab close/reload. Reset goes to the PLATFORM
+// default look (that is what the API does — not the kit's colors).
 const RADII = ["sm", "md", "lg", "xl"];
 const SCALES = ["compact", "regular", "large"];
 // S55: storefront CTA shape + homepage section rhythm (API validates; defaults
@@ -50,11 +54,12 @@ export default function BrandAdmin({ initial }) {
   const [brand, setBrand] = useState(initial.brand);
   const [customized, setCustomized] = useState(initial.customized);
   // last-saved snapshot: the dirty baseline and the silent preview fallback
-  const [saved, setSaved] = useState({ brand: initial.brand, shades: initial.shades, warnings: [] });
+  const [saved, setSaved] = useState({ brand: initial.brand, shades: initial.shades, warnings: initial.warnings || [], notes: initial.notes || [] });
   const [shades, setShades] = useState(initial.shades);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState([]);
-  const [warnings, setWarnings] = useState([]);
+  const [warnings, setWarnings] = useState(initial.warnings || []);
+  const [notes, setNotes] = useState(initial.notes || []);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const dirty = JSON.stringify(brand) !== JSON.stringify(saved.brand);
@@ -81,14 +86,17 @@ export default function BrandAdmin({ initial }) {
         if (res.ok && json.ok && json.shades) {
           setShades(json.shades);
           setWarnings(json.warnings || []);
+          setNotes(json.notes || []);
         } else {
           setShades(saved.shades);
           setWarnings(saved.warnings);
+          setNotes(saved.notes);
         }
       } catch {
         if (seq === previewSeq.current) {
           setShades(saved.shades);
           setWarnings(saved.warnings);
+          setNotes(saved.notes);
         }
       }
     }, PREVIEW_DEBOUNCE_MS);
@@ -111,8 +119,17 @@ export default function BrandAdmin({ initial }) {
         setCustomized(json.customized);
         setShades(json.shades);
         setWarnings(json.warnings || []);
-        setSaved({ brand: json.brand, shades: json.shades, warnings: json.warnings || [] });
-        toast.success(body.reset ? "Reset to the platform default look." : "Saved as a draft — publish from Publishing to take it live.");
+        setNotes(json.notes || []);
+        setSaved({ brand: json.brand, shades: json.shades, warnings: json.warnings || [], notes: json.notes || [] });
+        toast.success(
+          body.reset
+            ? "Reset to the platform default look."
+            : json.blocking
+              ? "Saved as a draft. Some colours are hard to read; fix them before you publish."
+              : json.warnings?.length
+                ? "Saved as a draft. Some colours are hard to read, but your live store already shows them, so you can still publish."
+                :"Saved as a draft — publish from Publishing to take it live.",
+        );
       } else {
         setErrors(json.errors || [json.error || `Save failed (${res.status})`]);
       }
@@ -131,8 +148,15 @@ export default function BrandAdmin({ initial }) {
         </Banner>
       )}
       {warnings.length > 0 && (
-        <Banner tone="warning">
+        <Banner tone="warning" title="Hard to read">
           {warnings.map((t, i) => (
+            <p key={i}>{t}</p>
+          ))}
+        </Banner>
+      )}
+      {notes.length > 0 && (
+        <Banner tone="info">
+          {notes.map((t, i) => (
             <p key={i}>{t}</p>
           ))}
         </Banner>
@@ -143,7 +167,7 @@ export default function BrandAdmin({ initial }) {
         <div className="grid gap-4 sm:grid-cols-3">
           <ColorField id="brand-accent" label="Accent" value={brand.accent} onChange={set("accent")} hint="One color — the 50–900 ladder derives from it." />
           <ColorField id="brand-background" label="Background" value={brand.background} onChange={set("background")} />
-          <ColorField id="brand-foreground" label="Text" value={brand.foreground} onChange={set("foreground")} hint="Must pass WCAG AA (4.5:1) on the background." />
+          <ColorField id="brand-foreground" label="Text" value={brand.foreground} onChange={set("foreground")} hint="Text must stay easy to read on your background. Publishing checks it." />
         </div>
         <div className="mt-4">
           <p className="text-xs font-medium text-fg-muted">Derived accent ladder</p>
