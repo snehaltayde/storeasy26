@@ -39,6 +39,7 @@
 // the unchanged perf-dbcount.js), with --extra-routes. See
 // docs/cms-reviews/P2-PERF.md for the exact commands.
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { buildPerfFixture, PERF_FIXTURE } from "./perf-fixture.js";
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -373,7 +374,10 @@ async function main(argv) {
   return 2;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// fileURLToPath, not a "file://" string: the URL percent-encodes a space
+// (the owner's checkout is ".../Projects 2026/..."), so a string compare would
+// skip the CLI there and exit 0 with no output (scripts/drill.js does the same).
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   try {
     process.exit(await main(process.argv.slice(2)));
   } catch (e) {

@@ -59,7 +59,7 @@ const Pub = await import("../lib/documents/publish.js");
 const J = await import("../lib/documents/journal-index.js");
 const L = await import("../lib/documents/release-list.js");
 const ids = await import("../lib/documents/ids.js");
-const { commitPublishBatch } = await import("../lib/documents/commit.js");
+const { commitPublishBatch, __commitInternals } = await import("../lib/documents/commit.js");
 const { versionRow } = await import("../lib/documents/versions.js");
 const { handleDocumentsPut } = await import("../lib/admin/documents-api.js");
 const R = await import("../lib/registry/index.js");
@@ -611,6 +611,163 @@ await t("publishing a journal post writes a new indexes.journal version in the s
   const pg = await create("docs", "page", { body: page("plain-page", "Plain", "x") });
   published(await publishApi("docs", pg.id), "plain page");
   eq((await pointerOf()).list.indexes.journal, live2.list.indexes.journal, "the index is untouched by a page publish:");
+});
+
+// P2-PERF finding 1 (PERF-01): a journal post is listed through the journal
+// index only, never in list.documents, so the list (which every storefront
+// request reads) stays the same size however many posts there are. Each place
+// publish.js used a post's list entry now reads its index row; each has a test.
+
+// A post made live straight through the commit, the way publish.js lists it:
+// through a new journal index version, with no list.documents entry. With
+// oldStyle it also gets its own list.documents entry, as a list written before
+// the fix holds.
+async function livePostFixture(docId, b, { oldStyle = false, store = "docs" } = {}) {
+  return inT(async () => {
+    const live = await pointerOf(store);
+    const list0 = live.list || L.emptyList(1, R.singletonTypes());
+    const at = new Date().toISOString();
+    const v = await versionRow({ documentId: docId, kind: "migrated", body: b, schemaVersion: 1, createdAt: at });
+    const prevIndex = list0.indexes.journal ? await versionBody(list0.indexes.journal.version, store) : null;
+    const iv = await versionRow({ documentId: J.JOURNAL_INDEX_ID, kind: "published", body: J.nextJournalIndexBody(prevIndex, [{ documentId: docId, versionId: v.id, body: b }]), schemaVersion: R.SCHEMA_VERSION, createdAt: at });
+    const changes = [{ index: "journal", entry: { version: iv.id, hash: iv.body_hash } }];
+    if (oldStyle) changes.push({ document: docId, entry: { version: v.id, hash: v.body_hash } });
+    const list = L.setEntries(list0, changes);
+    const cur = await current(store, docId);
+    const r = await commitPublishBatch({ releaseId: ids.relId(), setId: ids.setId(), pointer: live.pointer, list, versions: [v, iv], documents: [{ id: docId, revision: cur.revision, published_version_id: v.id, published_hash: await R.documentHash(b) }], log: [{ id: ids.logId(), document_id: docId, action: "migrated", to_version_id: v.id }] });
+    eq(r.outcome, "ok", "post fixture:");
+    return v.id;
+  }, store);
+}
+const indexRowOf = async (docId, store = "docs") => {
+  const e = (await pointerOf(store)).list.indexes.journal;
+  return e ? J.journalEntriesOf(await versionBody(e.version, store)).find((x) => x.document === docId) ?? null : null;
+};
+
+await t("PERF-01: a journal post gets no list.documents entry, so the list stays the same size however many posts go live; its redirects stay listed", async () => {
+  const before = await pointerOf();
+  const posts = [];
+  for (const n of [1, 2, 3]) posts.push(await create("docs", "journal", { body: body("journal", { meta: { slug: `size-post-${n}`, title: `Size ${n}`, ...(n === 1 ? { redirect_from: ["old-size-post"] } : {}) }, sections: [textSec("sec_t1", `Size ${n}`, "Words.")] }) }));
+  const r = published(await publishSetApi("docs", posts.map((p) => p.id)), "three posts");
+  const live = await pointerOf();
+  for (const p of posts) ok(!Object.hasOwn(live.list.documents, p.id), `${p.id} has no list.documents entry`);
+  eq(Object.keys(live.list.documents).sort(), Object.keys(before.list.documents).sort(), "list.documents holds the same documents as before:");
+  eq(live.list.pages, before.list.pages, "list.pages unchanged:");
+  ok(live.list.redirects.some((x) => x.document === posts[0].id && x.from_slug === "old-size-post" && x.to_slug === "size-post-1"), "the post's redirect is listed");
+  for (const p of r.published) eq((await indexRowOf(p.id))?.version, p.versionId, `${p.id} is live through the index:`);
+  eq((await inT(() => Res.resolvedContentPage("size-post-2")))?.title, "Size 2", "shoppers read the post through the index:");
+  eq((await inT(() => Res.resolvedSlugRedirect("old-size-post"))), "size-post-1", "and its redirect:");
+  // only the index entry and the redirect differ from the list before
+  const strip = (l) => canon({ ...l, indexes: null, redirects: l.redirects.filter((x) => !posts.some((p) => p.id === x.document)) });
+  eq(strip(live.list), strip(before.list), "the rest of the list:");
+});
+
+await t("PERF-01 (the skip check): a post already live through the index is skipped; one live through an older list's own entry is skipped too, and republishing it after an edit drops that entry and logs its previous version", async () => {
+  const p = await create("docs", "journal", { body: page("skip-post", "Skip post", "Words.", "journal") });
+  const r1 = published(await publishApi("docs", p.id), "first");
+  const before = await dump();
+  const again = published(await publishApi("docs", p.id), "again");
+  eq([again.release, again.published, again.skipped], [null, [], [p.id]], "skipped through the index row:");
+  await unchanged(before, "skip");
+
+  const b = page("old-style-post", "Old style", "Words.", "journal");
+  const q = await create("docs", "journal", { body: b });
+  const vOld = await livePostFixture(q.id, b, { oldStyle: true });
+  ok(Object.hasOwn((await pointerOf()).list.documents, q.id), "the older list holds the post's own entry");
+  const before2 = await dump();
+  const skip2 = published(await publishApi("docs", q.id), "old style, again");
+  eq([skip2.release, skip2.skipped], [null, [q.id]], "skipped:");
+  await unchanged(before2, "old-style skip");
+
+  const cur = await current("docs", q.id);
+  await save("docs", cur, { ...cur.body, meta: { ...cur.body.meta, title: "Old style (edited)" } });
+  const r2 = published(await publishApi("docs", q.id), "old style, edited");
+  ok(!Object.hasOwn((await pointerOf()).list.documents, q.id), "the post's own entry is dropped");
+  eq((await indexRowOf(q.id))?.version, r2.published[0].versionId, "live through the index:");
+  eq((await sql("SELECT from_version_id AS f FROM publish_log WHERE to_version_id = ?", [r2.published[0].versionId]))[0].f, vOld, "the log names the previous version:");
+
+  const cur2 = await current("docs", p.id);
+  await save("docs", cur2, { ...cur2.body, meta: { ...cur2.body.meta, title: "Skip post (edited)" } });
+  const r3 = published(await publishApi("docs", p.id), "edited");
+  eq((await sql("SELECT from_version_id AS f FROM publish_log WHERE to_version_id = ?", [r3.published[0].versionId]))[0].f, r1.published[0].versionId, "the log names the previous version (from the index):");
+});
+
+await t("PERF-01 (the inherited rule): a post live through the index with an incomplete section publishes a typo fix with a warning; a new incomplete section still blocks", async () => {
+  const old = body("journal", { meta: { slug: "inherited-post", title: "Inherited post" }, sections: [textSec("sec_t1", "Inherited post", "Words."), sec("banner", "sec_old1", { title: "", text: "" })] });
+  const d = await create("docs", "journal", { body: page("inherited-post", "Inherited post", "Words.", "journal") });
+  await livePostFixture(d.id, old);
+  ok(!Object.hasOwn((await pointerOf()).list.documents, d.id), "no list.documents entry");
+  const cur = await current("docs", d.id);
+  await save("docs", cur, { ...old, meta: { ...old.meta, title: "Inherited post (fixed)" } });
+  const r = published(await publishApi("docs", d.id), "typo with an inherited problem");
+  const w = r.issues.filter((i) => i.sectionId === "sec_old1");
+  ok(w.length > 0 && w.every((i) => i.severity === "warning") && w.some((i) => /already live like this/.test(i.message)), `inherited problems warn: ${JSON.stringify(r.issues).slice(0, 300)}`);
+  const cur2 = await current("docs", d.id);
+  await save("docs", cur2, { ...cur2.body, sections: [...cur2.body.sections, sec("banner", "sec_new9", { title: "", text: "" })] });
+  const blocked = await publishApi("docs", d.id);
+  eq(blocked.status, 422, "a new incomplete section:");
+});
+
+await t("PERF-01 (the lost check): two concurrent publishes of the same post give one success and one 409; of different posts, both go live", async () => {
+  const d = await create("docs", "journal", { body: page("race-post", "Race post", "First.", "journal") });
+  let inner = null;
+  let loserBuild = null;
+  Pub.setPublishHooks({
+    beforeCommit: async ({ attempt, build }) => {
+      if (attempt !== 1 || loserBuild) return;
+      loserBuild = build;
+      Pub.setPublishHooks({}); // the winner runs without the hook
+      inner = await publishApi("docs", d.id);
+    },
+  });
+  const loser = await publishApi("docs", d.id);
+  Pub.setPublishHooks({});
+  published(inner, "winner");
+  eq([loser.status, loser.body.code], [409, "PUBLISHED_ELSEWHERE"], `loser: ${JSON.stringify(loser.body).slice(0, 300)}`);
+  eq((await indexRowOf(d.id))?.version, inner.body.published[0].versionId, "the winner's version is live:");
+  eq(await sql("SELECT id FROM releases WHERE id = ?", [loserBuild.releaseId]), [], "the loser's release was never written:");
+
+  const a = await create("docs", "journal", { body: page("race-post-a", "Race A", "A.", "journal") });
+  const b = await create("docs", "journal", { body: page("race-post-b", "Race B", "B.", "journal") });
+  let innerB = null;
+  let attempts = 0;
+  Pub.setPublishHooks({
+    beforeCommit: async ({ attempt, build }) => {
+      if (build.documents[0].id !== a.id) return;
+      attempts = attempt;
+      if (attempt === 1) innerB = await publishApi("docs", b.id);
+    },
+  });
+  const ra = await publishApi("docs", a.id);
+  Pub.setPublishHooks({});
+  published(innerB, "B");
+  published(ra, "A");
+  eq(attempts, 2, "A lost once and rebuilt:");
+  eq((await indexRowOf(a.id))?.version, ra.body.published[0].versionId, "A live:");
+  eq((await indexRowOf(b.id))?.version, innerB.body.published[0].versionId, "B live:");
+});
+
+await t("PERF-01 (commit.js liveListHoldsMine): a post's version, which has no list slot, counts as live through this build's own index version, and only then", async () => {
+  const at = new Date().toISOString();
+  const pb = page("held-post", "Held", "Words.", "journal");
+  const pv = await versionRow({ documentId: "doc_heldpost", kind: "published", body: pb, schemaVersion: 1, createdAt: at });
+  const iv = await versionRow({ documentId: J.JOURNAL_INDEX_ID, kind: "published", body: J.nextJournalIndexBody(null, [{ documentId: "doc_heldpost", versionId: pv.id, body: pb }]), schemaVersion: 1, createdAt: at });
+  const ov = await versionRow({ documentId: J.JOURNAL_INDEX_ID, kind: "published", body: J.nextJournalIndexBody(null, []), schemaVersion: 1, createdAt: at });
+  const base = L.emptyList(1, R.singletonTypes());
+  const ours = L.setEntries(base, [{ index: "journal", entry: { version: iv.id, hash: iv.body_hash } }]);
+  const other = L.setEntries(base, [{ index: "journal", entry: { version: ov.id, hash: ov.body_hash } }]);
+  const holds = __commitInternals.liveListHoldsMine;
+  eq(holds(ours, ours, [pv, iv]), true, "our index is live, and it names the post:");
+  eq(holds(ours, other, [pv, iv]), false, "another index is live:");
+  eq(holds(ours, base, [pv, iv]), false, "no index is live:");
+  // an index of ours that does not name the version proves nothing about it
+  const lone = await versionRow({ documentId: "doc_lonepost", kind: "published", body: pb, schemaVersion: 1, createdAt: at });
+  eq(holds(ours, ours, [pv, iv, lone]), false, "a version no slot and no index of ours names:");
+  // a page's version still needs its own slot
+  const pg = await versionRow({ documentId: "doc_heldpage", kind: "published", body: page("held-page", "Held page"), schemaVersion: 1, createdAt: at });
+  const withPage = L.setEntries(ours, [{ document: "doc_heldpage", entry: { version: pg.id, hash: pg.body_hash } }]);
+  eq(holds(withPage, withPage, [pv, iv, pg]), true, "page slot and post index both live:");
+  eq(holds(withPage, ours, [pv, iv, pg]), false, "the page's slot is not live:");
 });
 
 await t("publishing what is already live is skipped (no new release); the set is capped at 200", async () => {

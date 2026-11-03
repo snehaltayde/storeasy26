@@ -6,7 +6,8 @@
 // home, policy, checkout and journal page modules and the real sitemap.
 //   1. The builder is deterministic (same hash in two processes and in-process).
 //   2. Home and a policy page: at most 3 content statements, at every post
-//      count; which bytes change with the post count, and why.
+//      count, and the same bytes at 200 and 1,000 posts (posts are listed
+//      through the journal index only, never in list.documents).
 //   3. The footer (layout) and the checkout policy links read no page bodies.
 //   4. The sitemap and /journal read the journal index once, no per-post read.
 //   5. Reported costs (plan sections 2 and 6): the cms_state read a legacy
@@ -16,7 +17,8 @@
 //   pnpm test:perf-docs
 // request-cache must load before any app module that imports react.
 import "./support/request-cache.js";
-import { readFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { createRequire, registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
@@ -375,6 +377,36 @@ await t("the fixture was published through publish.js: every document live, 25 l
   }
 });
 
+// The owner's checkout lives at ".../Projects 2026/storeasy26". import.meta.url
+// percent-encodes that space, so a CLI guard written as a "file://" string
+// compare never matches there and every command exits 0 with no output. This
+// runs the CLI from a copy of the script in a folder whose path has a space;
+// everything it imports is linked back to this checkout.
+await t("the CLI runs from a checkout whose path has a space: hash prints the same hash, and an unknown command still answers", async () => {
+  // realpath: on macOS the temp folder is behind a symlink (/var -> /private/var),
+  // and Node names the running script by its real path
+  const top = await mkdtemp(join(await realpath(tmpdir()), "perf docs space-"));
+  try {
+    const repo = join(top, "Projects 2026", "storeasy26");
+    await mkdir(join(repo, "scripts"), { recursive: true });
+    for (const name of ["lib", "node_modules", "package.json"]) await symlink(join(ROOT, name), join(repo, name));
+    for (const name of await readdir(join(ROOT, "scripts"))) {
+      if (name === "perf-docs-fixture.js") await copyFile(join(ROOT, "scripts", name), join(repo, "scripts", name));
+      else await symlink(join(ROOT, "scripts", name), join(repo, "scripts", name));
+    }
+    const script = join(repo, "scripts/perf-docs-fixture.js");
+    ok(script.includes(" "), "the path has a space");
+    const r = spawnSync(process.execPath, [script, "hash", "--posts", "0"], { cwd: repo, encoding: "utf8" });
+    eq(r.status, 0, `hash exit (${r.stderr})`);
+    ok(r.stdout.trim() !== "", `the hash command printed nothing from ${script}`);
+    eq(JSON.parse(r.stdout.trim().split("\n").at(-1)).hash, FX[0].hash, "the hash from the spaced path:");
+    const u = spawnSync(process.execPath, [script, "no-such-command"], { cwd: repo, encoding: "utf8" });
+    eq(u.status, 2, `an unknown command is refused, not a silent success (stdout ${JSON.stringify(u.stdout)}, stderr ${JSON.stringify(u.stderr)}):`);
+  } finally {
+    await rm(top, { recursive: true, force: true });
+  }
+});
+
 // =====================================================================================
 console.log("— 2. home and a policy page, per request, at 0, 200 and 1,000 posts");
 // =====================================================================================
@@ -432,27 +464,32 @@ await t("home and policy: every version body read is byte-identical at 0, 200 an
   }
 });
 
-// KNOWN DEFECT, measured (P2-PERF.md, finding 1): the pointer read returns the
-// whole release list, and publish.js puts every published journal post into
-// list.documents (makeBuild: a documents entry for every document in the set,
-// posts included). So the pointer read, and with it every storefront request,
-// grows by one list entry per post. This test pins the cause and the size, so
-// a fix (posts only in indexes.journal) shows up here as a failure to update.
-await t("MEASURED, not a pass of the PERF-01 byte claim: the pointer read grows with the post count only by the journal posts' list.documents entries", async () => {
+// PERF-01: the pointer read returns the whole release list, so the list must
+// not grow with the post count. Journal posts are listed through the journal
+// index only (indexes.journal), never in list.documents (P2-PERF finding 1,
+// fixed in publish.js). So the pointer read, and with it every content read
+// of home and a policy page, is byte-identical at 200 and 1,000 posts. At 0
+// posts the list holds `indexes.journal: null` instead of one {version, hash}
+// entry: a fixed difference that does not depend on how many posts exist.
+await t("home and policy: the pointer read, and every content statement, returns identical bytes at 200 and 1,000 posts; at 0 posts the only difference is the journal index entry itself", async () => {
   for (const n of [200, 1000]) {
     const list = await liveList(DOC[n]);
-    const postIds = LIVE[n].filter((d) => d.type === "journal").map((d) => d.id);
-    const inDocuments = postIds.filter((id) => Object.hasOwn(list.documents, id));
-    eq(inDocuments.length, n, `posts listed in list.documents at ${n}:`);
-    // the list without those entries is the 0-post list's size, give or take the ids
-    const trimmed = { ...list, documents: Object.fromEntries(Object.entries(list.documents).filter(([id]) => !postIds.includes(id))) };
+    const postIds = new Set(LIVE[n].filter((d) => d.type === "journal").map((d) => d.id));
+    eq(Object.keys(list.documents).filter((id) => postIds.has(id)).length, 0, `posts listed in list.documents at ${n}:`);
     const base = await liveList(DOC[0]);
-    eq(Object.keys(trimmed.documents).length, Object.keys(base.documents).length, `documents outside the posts at ${n}:`);
-    const growth = bytes(pointerReads(homeAt[n].statements)) - bytes(pointerReads(homeAt[0].statements));
-    ok(growth > 0, `the pointer read grows at ${n}`);
-    facts[`pointerGrowth${n}`] = { bytes: growth, perPost: Math.round(growth / n) };
-    eq(bytes(pointerReads(policyAt[n].statements)) - bytes(pointerReads(policyAt[0].statements)), growth, `policy pays the same growth at ${n}:`);
+    eq(Object.keys(list.documents).length, Object.keys(base.documents).length, `list.documents entries at ${n} vs 0:`);
+    // the 0-post list with this list's journal index entry is this list's size
+    eq(JSON.stringify({ ...base, indexes: list.indexes }).length, JSON.stringify(list).length, `the list at ${n} is the 0-post list plus its index entry:`);
   }
+  for (const [name, at] of [["home", homeAt], ["policy", policyAt]]) {
+    eq(bytes(pointerReads(at[1000].statements)), bytes(pointerReads(at[200].statements)), `${name}: pointer read bytes at 1,000 vs 200 posts:`);
+    eq(bytes(contentOnly(at[1000].statements)), bytes(contentOnly(at[200].statements)), `${name}: content bytes at 1,000 vs 200 posts:`);
+    // the list is returned as one JSON string inside the row, so its quotes come back escaped
+    const inRow = (v) => JSON.stringify(JSON.stringify(v)).length - 2;
+    const indexEntry = inRow((await liveList(DOC[200])).indexes.journal) - inRow(null);
+    eq(bytes(pointerReads(at[200].statements)) - bytes(pointerReads(at[0].statements)), indexEntry, `${name}: pointer read at 200 vs 0 differs by the index entry only:`);
+  }
+  facts.pointerBytes = Object.fromEntries(COUNTS.map((n) => [n, bytes(pointerReads(homeAt[n].statements))]));
 });
 
 // =====================================================================================
