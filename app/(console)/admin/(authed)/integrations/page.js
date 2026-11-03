@@ -5,7 +5,7 @@ import { integrationStatus } from "@/lib/integrations";
 import { listNotifications, listContactMessages } from "@/lib/notifications";
 import IntegrationsAdmin from "@/components/admin/IntegrationsAdmin";
 import MessagesPanel from "@/components/admin/MessagesPanel";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
 import { PermissionNote } from "@/components/console/bits";
 

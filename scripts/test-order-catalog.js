@@ -146,6 +146,18 @@ await t("cart lines carry Shopify's title and the SKU next to the title the shop
   eq(cart.items.find((i) => i.variantId === V3).sku, null, "a variant with no SKU:");
 });
 
+// P1-FIX-C (MIG-05/OVL-06 review): taking catalog_title from the line's own
+// title passed every test, because the two are equal until OVL-03 gives the
+// line an overlay title. No behaviour can tell them apart yet, so this reads
+// the code: catalog_title in lib/cart.js comes from the raw product title
+// column and nowhere else.
+await t("the cart's catalog_title is the raw catalog column, never the line's title (a source check until OVL-03)", async () => {
+  const src = (await readFile(join(ROOT, "lib/cart.js"), "utf8")).replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
+  const assigned = [...src.matchAll(/\bcatalog_title:\s*([^,\n}]+)/g)].map((m) => m[1].trim());
+  same(assigned, ["r.product_title", "i.catalog_title"], "every catalog_title in lib/cart.js");
+  ok(/"p\.title as product_title"/.test(src), "product_title is no longer the products table's own title column");
+});
+
 let firstOrder;
 await t("an order freezes catalog_title and sku on its lines and in its snapshot", async () => {
   firstOrder = await placeOrder([[V1, 1], [V2, 1]], { retitle: { [P1]: "Morning Whey" } });
@@ -225,7 +237,8 @@ async function renderOrderPage(orderId, { role = "owner", src = pageSrc } = {}) 
     "@/lib/platform/authz": authz,
     "@/lib/order-projection": projection,
     "@/lib/admin/order-view": view,
-    "@/lib/tenant-request": { tfetch: inT },
+    // console pages read the store through lib/console-request.js (P1-FIX-C)
+    "@/lib/console-request": { tfetch: inT },
     "@/components/console/Badge": { StatusBadge: ({ status }) => h("span", null, status), Badge: ({ children }) => h("span", null, children) },
     "@/components/console/PageHeader": { PageHeader: ({ title, description }) => h("header", null, title, description) },
     "@/components/console/Card": { Card: ({ children }) => h("section", null, children), CardHeader: ({ title }) => h("h2", null, title) },
@@ -287,6 +300,32 @@ await t("an order placed before its tenant was migrated still shows the line, fr
   });
   const r = rows(await renderOrderPage(id));
   ok(r[0].includes("Shopify title: Steel Shaker, SKU: SH-750"), r[0]);
+});
+
+// P1-FIX-C (MIG-05/OVL-06 review): every gap-window order above has one line,
+// so taking the snapshot's FIRST item for every line passed. Two lines, each
+// retitled, and the snapshot listing them in the other order: each line must
+// find its own item by variant.
+await t("an order placed before migrating, with two lines: each line shows its own Shopify title and SKU", async () => {
+  const id = "OC-GAP-2";
+  await inT(async () => {
+    const ts = "2026-02-03T00:00:00.000Z";
+    const snap = {
+      v: 1,
+      items: [
+        { variantId: V2, productId: P2, title: "Shaker Pro", catalog_title: "Steel Shaker", sku: "SH-750", quantity: 1, lineTotal: 200 },
+        { variantId: V1, productId: P1, title: "Morning Whey", catalog_title: "Whey Gold Isolate", sku: "WGI-1KG", quantity: 1, lineTotal: 1000 },
+      ],
+    };
+    await db.insertInto("orders").values({ id, idempotency_key: "ocat-gap-2", status: "cod_pending", payment_method: "cod", payment_status: "cod", total: 1200, subtotal: 1200, discount_total: 0, currency: "INR", snapshot: JSON.stringify(snap), sync_attempts: 0, created_at: ts, updated_at: ts }).execute();
+    await db.insertInto("order_items").values({ order_id: id, variant_id: V1, product_id: P1, title: "Morning Whey", unit_price: 1000, quantity: 1, line_total: 1000, line_discount: 0, is_gift: 0, position: 0 }).execute();
+    await db.insertInto("order_items").values({ order_id: id, variant_id: V2, product_id: P2, title: "Shaker Pro", unit_price: 200, quantity: 1, line_total: 200, line_discount: 0, is_gift: 0, position: 1 }).execute();
+  });
+  const r = rows(await renderOrderPage(id));
+  eq(r.length, 2, "lines:");
+  ok(r[0].startsWith("Morning Whey") && r[0].includes("Shopify title: Whey Gold Isolate, SKU: WGI-1KG"), `first line (whey): ${r[0]}`);
+  ok(r[1].startsWith("Shaker Pro") && r[1].includes("Shopify title: Steel Shaker, SKU: SH-750"), `second line (shaker): ${r[1]}`);
+  ok(!r[0].includes("Steel Shaker") && !r[1].includes("Whey Gold"), "a line shows another line's Shopify title");
 });
 
 await t("the support role sees the Shopify line, and still no customer details", async () => {

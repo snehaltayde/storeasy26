@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { listAutomations, automationRuns, automationsDisabled, AUTOMATION_TRIGGERS, AUTOMATION_ACTIONS } from "@/lib/automations";
 import AutomationsAdmin from "@/components/admin/AutomationsAdmin";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Automations · Admin", robots: { index: false } };

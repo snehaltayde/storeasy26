@@ -1,5 +1,5 @@
 import { siteName } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 // Auth shell (S50): login / reset / accept-invite render as a centered
 // card — store context above, no sidebar, no storefront chrome.

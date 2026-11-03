@@ -5,7 +5,7 @@ import { roleAllows } from "@/lib/platform/authz";
 import { listReleases, getLiveRelease, snapshotContent, validateRelease, releaseDiff } from "@/lib/releases";
 import ReleasesAdmin from "@/components/admin/ReleasesAdmin";
 import { PageHeader } from "@/components/console/PageHeader";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Publishing · Admin", robots: { index: false } };

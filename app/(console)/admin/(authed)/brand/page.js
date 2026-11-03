@@ -5,7 +5,7 @@ import { currentTenant } from "@/lib/tenant-context";
 import { resolveBrand, accentShades, DEFAULT_BRAND } from "@/lib/brand";
 import BrandAdmin from "@/components/admin/BrandAdmin";
 import { PageHeader } from "@/components/console/PageHeader";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Brand · Admin", robots: { index: false } };

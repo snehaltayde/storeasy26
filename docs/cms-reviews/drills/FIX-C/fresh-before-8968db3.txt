@@ -1,0 +1,44 @@
+— Settings: saved on one instance, read on another at once
+✓ before any save, both instances show the starter rates and the notice (and have cached the store's row)
+✗ THE BUG: rates saved through instance B; a reload served by instance A shows them at once, with no starter notice
+   GET /api/admin/settings on A: expected {"flatRate":79,"freeThreshold":1999,"codFee":49}, got {"flatRate":79,"freeThreshold":999,"codFee":49}
+✗ the store's name (identity) saved on B shows on A's Settings page and API at once
+   A's API: expected "Fresh Co Renamed", got "Fresh Co"
+✗ the same instance: a save then a reload on A shows the save (the page and the API agree)
+   and B: expected 39, got 49
+— Brand and theme: Publishing sees the change at once
+✓ set-up: publish once, so Publishing has a live version to compare with
+✗ THE BUG: brand saved on B; Publishing on A (page and API) lists the brand change at once
+   A's Publishing API still says nothing to publish: expected true, got false
+✗ THE BUG: Publishing opened on B, Publish now answered by A: 200, not 409, and the live brand is the saved one
+   Publish now: DRAFTS_CHANGED Drafts changed since you reviewed them — review the updated change list, then publish again expected 200, got 409
+✗ a theme kit applied on B shows on A's Theme API and in A's Publishing at once
+   A's Theme API: expected "glow", got undefined
+— what still uses the cache, and what a fresh read costs
+✗ every console request reads the store's row once; a shopper's page reads it not at all (cached)
+   GET /api/admin/settings: expected 1, got 0
+✗ a shopper's page on A keeps the cached row until it expires (rates saved on B aren't fetched per request)
+   while A's console reads the save: expected 59, got 79
+✗ a founder's preview session on A reads the row fresh (drafts come from it); a forged preview cookie does not
+   a shopper on A, inside the 30 seconds (cached): expected "#2563eb", got undefined
+✗ NEGATIVE: when the control plane can't be read, the console says so (503); it never falls back to the cached row
+   console API: {"ok":true,"settings":{"tenantId":"fresh","readOnly":false,"identity":{"name":"Fresh Co Renamed","support_email":"","support_phone":"","site_url":"","title":"","tagline":"","footer_tagline":"","logo_text1":"","logo_text2":"","legal_name":""},"domains":["fresh.test","alias.fresh.test"],"shopify":{"store_domain":"","connected":false,"connected_at":null,"uninstalled_at":null},"payments":{"razorpay_key_id":"","has_key_secret":false,"has_webhook_secret":false},"commerce":{"checkout_mode":"direct","timezone":"Asia/Kolkata","shopper_emails":"Shopify sends order confirmation/fulfillment emails (native, S18); Storeasy sends none — no duplicates."},"tracking":{"ga4_measurement_id":"","has_ga4_api_secret":false,"meta_pixel_id":"","has_meta_capi_token":false,"meta_test_event_code":""},"shipping":{"currency":"INR","basis":"net","freeThreshold":1999,"flatRate":79,"codFee":39,"codFeeWaivedAt":null,"zones":[]},"shipping_is_default":false,"sync":{"products":0,"collections":0,"lastSyncedAt":null}}} expected 503, got 200
+— the operator console: no write puts back an old copy
+✗ an operator's cost budget set on A doesn't undo the brand the founder just saved on B
+   stored brand and budget: expected ["#16a34a",5000], got ["#dc2626",5000]
+✗ an operator's edit of the store's details on A doesn't undo the tagline the founder just saved on B
+   stored tagline and email: expected ["Fresh every day","help@fresh.test"], got [null,"help@fresh.test"]
+✗ a domain claimed on A doesn't drop one B added a moment ago
+   second.fresh.test missing: ["fresh.test","alias.fresh.test","first.fresh.test","third.fresh.test"] expected truthy
+— the store's status and domains, as the console sees them
+✗ a store suspended through instance B is closed to its console on A at once; reopened, it opens at once
+   A's console while suspended: expected [503,"TENANT_SUSPENDED"], got [200,null]
+✗ a domain removed through B no longer opens the console on A
+   the removed domain on A: expected 404, got 200
+— every console path is covered
+✗ every console page takes tfetch from lib/console-request.js, never the cached one
+   app/(console)/admin/(auth)/accept-invite/page.js reads the store through the cached path expected truthy
+✗ every /api/admin route resolves the store through tenantHandler (which reads fresh there), or reads no store
+   the console API prefix: expected "/api/admin/", got undefined
+
+2 passed, 17 failed

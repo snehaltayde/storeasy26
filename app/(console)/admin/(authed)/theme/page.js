@@ -7,7 +7,7 @@ import ThemeAdmin from "@/components/admin/ThemeAdmin";
 import SurfaceTemplatesCard from "@/components/admin/cms/SurfaceTemplatesCard";
 import { getBlockRow } from "@/lib/cms/store";
 import { PageHeader } from "@/components/console/PageHeader";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Theme · Admin", robots: { index: false } };

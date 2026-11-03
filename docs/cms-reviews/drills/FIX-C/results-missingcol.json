@@ -1,0 +1,78 @@
+{
+  "id": "FIX-C",
+  "part": "missingcol",
+  "title": "P1-FIX-C: the console shows a founder's save at once; a broken schema isn't an old store — missingcol",
+  "ranAt": "2026-11-03T13:24:22.691Z",
+  "harness": "http://localhost:3201",
+  "chrome": "156.0.8078.80",
+  "passed": 7,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "missingcol: the Designer save answers 503 (saved, refresh failed), not 200",
+      "detail": {
+        "at": 1793712255814,
+        "method": "PUT",
+        "path": "/api/admin/storefront",
+        "status": 503
+      }
+    },
+    {
+      "ok": true,
+      "label": "missingcol: the banner says the save went through and to reload",
+      "detail": [
+        "Platform notice: Payments provider latency\nCard payments may take a little longer than usual today.",
+        "Couldn't save the hero\nYour changes were saved, but this page couldn't refresh. Reload it before you make more changes."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "missingcol: the hero really was saved"
+    },
+    {
+      "ok": true,
+      "label": "missingcol: the page editor shows \"This page hit an error\"",
+      "detail": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDesign Demo Co\n\nlocalhost\n\nOVERVIEW\n\nDashboard\nAnalytics\nSetup\n2/9\n\nORDERS\n\nOrders\n1\n\nCATALOG\n\nCat"
+    },
+    {
+      "ok": true,
+      "label": "missingcol: with Try again"
+    },
+    {
+      "ok": true,
+      "label": "missingcol: not a 404",
+      "detail": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDesign Demo Co\n\nlocalhost\n\nOVERVIEW\n\nDashboard\nAnalytics\nSetup\n2/9\n\nORDERS\n\nOrders\n1\n\nCATALOG\n\nCat"
+    },
+    {
+      "ok": true,
+      "label": "missingcol: with the table back, the page editor opens the page",
+      "detail": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDesign Demo Co\n\nlocalhost\n\nOVERVIEW\n\nDashboard\nAnalytics\nSetup\n2/9\n\nORDERS\n\nOrders\n1\n\nCATALOG\n\nCat"
+    }
+  ],
+  "notes": [
+    "missingcol: requests [{\"at\":1793712255814,\"method\":\"PUT\",\"path\":\"/api/admin/storefront\",\"status\":503},{\"at\":1793712255961,\"method\":\"GET\",\"path\":\"/api/admin/storefront\",\"status\":503},{\"at\":1793712256473,\"method\":\"PUT\",\"path\":\"/api/admin/storefront\",\"status\":200}]; banners [\"Platform notice: Payments provider latency\\nCard payments may take a little longer than usual today.\",\"Couldn't save the hero\\nYour changes were saved, but this page couldn't refresh. Reload it before you make more changes.\"]",
+    "missingcol: /admin/storefront/pages/shipping answered 200; \"Platform notice: Payments provider latency\\n\\nCard payments may take a little longer than usual today.\\n\\nDesign Demo Co\\n\\nlocalhost\\n\\nOVERVIEW\\n\\nDashboard\\nAnalytics\\nSetup\\n2/9\\n\\nORDERS\\n\\nOrders\\n1\\n\\nCATALOG\\n\\nCat\""
+  ],
+  "screenshots": [
+    {
+      "name": "missingcol-designer-saved-refresh-failed",
+      "file": "docs/cms-reviews/drills/FIX-C/missingcol-designer-saved-refresh-failed.png",
+      "bytes": 41834,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "missingcol-page-editor-error",
+      "file": "docs/cms-reviews/drills/FIX-C/missingcol-page-editor-error.png",
+      "bytes": 17148,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/shipping"
+    }
+  ]
+}

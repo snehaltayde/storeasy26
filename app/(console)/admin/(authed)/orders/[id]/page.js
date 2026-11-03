@@ -13,7 +13,7 @@ import { Banner } from "@/components/console/Banner";
 import RetryPushButton from "@/components/admin/RetryPushButton";
 import ReconcileButton from "@/components/admin/ReconcileButton";
 import CancelOrderButton from "@/components/admin/CancelOrderButton";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Order · Admin", robots: { index: false } };

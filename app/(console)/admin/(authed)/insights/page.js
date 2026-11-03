@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { listInsights, aiBudget, aiConfigured, AI_MODEL } from "@/lib/ai/insights";
 import InsightsAdmin from "@/components/admin/InsightsAdmin";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Insights · Admin", robots: { index: false } };

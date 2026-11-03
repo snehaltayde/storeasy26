@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { listExperiments } from "@/lib/experiments";
 import ExperimentsAdmin from "@/components/admin/ExperimentsAdmin";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Experiments · Admin", robots: { index: false } };

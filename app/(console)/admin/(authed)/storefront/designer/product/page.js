@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { getBlockRow } from "@/lib/cms/store";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import SurfaceDesigner from "@/components/admin/cms/SurfaceDesigner";
 
 // S59 (audit slice 3): the PRODUCT-PAGE designer — real-product context,

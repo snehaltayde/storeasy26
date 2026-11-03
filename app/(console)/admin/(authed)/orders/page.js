@@ -5,7 +5,7 @@ import { listOrders, orderStatusCounts } from "@/lib/admin/orders";
 import { listReturns } from "@/lib/returns";
 import OrdersAdmin from "@/components/admin/OrdersAdmin";
 import { PageHeader } from "@/components/console/PageHeader";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Orders · Admin", robots: { index: false } };

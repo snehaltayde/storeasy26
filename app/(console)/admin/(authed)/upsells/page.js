@@ -4,7 +4,7 @@ import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { listPlacements } from "@/lib/cms/placements";
 import { db } from "@/lib/db";
 import UpsellsAdmin from "@/components/admin/UpsellsAdmin";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Upsells · Admin", robots: { index: false } };

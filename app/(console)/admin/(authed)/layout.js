@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { currentTenant } from "@/lib/tenant-context";
 import { siteName } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { ConsoleShell } from "@/components/console/nav/ConsoleShell";
 
 // Authed admin shell (S50): ONE auth gate + ONE sidebar mount for all 18

@@ -5,9 +5,10 @@ import { Plus } from "lucide-react";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { storefrontView } from "@/lib/cms/view";
 import { db } from "@/lib/db";
+import { notMigratedYet } from "@/lib/schema-shape";
 import { PageHeader } from "@/components/console/PageHeader";
 import { PagesList } from "@/components/admin/cms/PagesList";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 // S52: the Pages area of the storefront CMS — every content page (policies,
 // campaigns, journal posts) in one filterable list, with the editor one click
@@ -30,8 +31,10 @@ export default async function StorefrontPagesPage() {
     try {
       const rows = await db.selectFrom("cms_pages").select(["slug", "window_start", "window_end"]).execute();
       windows = Object.fromEntries(rows.map((r) => [r.slug, r]));
-    } catch {
-      /* pre-migration tenant → no windows, statuses fall back to Visible/Hidden */
+    } catch (e) {
+      // pre-migration tenant → no windows, statuses fall back to Visible/Hidden.
+      // P1-FIX-C: only that shape; any other failure is a failed load.
+      if (!notMigratedYet(e, { table: "cms_pages", columns: ["window_start", "window_end"] })) throw e;
     }
     return {
       pages: view.pages.map((p) => ({

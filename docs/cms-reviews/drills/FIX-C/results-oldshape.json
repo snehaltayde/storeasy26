@@ -1,0 +1,44 @@
+{
+  "id": "FIX-C",
+  "part": "oldshape",
+  "title": "P1-FIX-C: the console shows a founder's save at once; a broken schema isn't an old store — oldshape",
+  "ranAt": "2026-11-03T13:24:26.620Z",
+  "harness": "http://localhost:3201",
+  "chrome": "156.0.8078.80",
+  "passed": 2,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "oldshape: the Pages list opens and lists the pages",
+      "detail": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDesign Demo Co\n\nlocalhost\n\nOVERVIEW\n\nDashboard\nAnalytics\nSetup\n2/9\n\nORDERS\n\nOrders\n1\n\nCATALOG\n\nCatalog\n\nSTOREFRONT\n\nOverview\nHome page\nDesigner\nPages\nNavigation\nProduct pages\nTheme\nBrand\nMedia\nPubli"
+    },
+    {
+      "ok": true,
+      "label": "oldshape: the page editor opens the page",
+      "detail": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDesign Demo Co\n\nlocalhost\n\nOVERVIEW\n\nDashboard\nAnalytics\nSetup\n2/9\n\nORDERS\n\nOrders\n1\n\nCATALOG\n\nCat"
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "oldshape-pages-list",
+      "file": "docs/cms-reviews/drills/FIX-C/oldshape-pages-list.png",
+      "bytes": 24092,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages"
+    },
+    {
+      "name": "oldshape-page-editor",
+      "file": "docs/cms-reviews/drills/FIX-C/oldshape-page-editor.png",
+      "bytes": 37580,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/storefront/pages/shipping"
+    }
+  ]
+}

@@ -10,7 +10,7 @@ import { catalogSyncStatus } from "@/lib/sync";
 import { roleAllows } from "@/lib/platform/authz";
 import SyncProgress from "@/components/admin/SyncProgress";
 import { formatMoney } from "@/lib/format";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
 import { Card, CardHeader } from "@/components/console/Card";
 import { Stat, EmptyState } from "@/components/console/bits";

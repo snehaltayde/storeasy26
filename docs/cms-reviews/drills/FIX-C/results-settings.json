@@ -1,0 +1,106 @@
+{
+  "id": "FIX-C",
+  "part": "settings",
+  "title": "P1-FIX-C: the console shows a founder's save at once; a broken schema isn't an old store — settings",
+  "ranAt": "2026-11-03T13:23:51.438Z",
+  "harness": "http://localhost:3201",
+  "chrome": "156.0.8078.80",
+  "passed": 6,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "settings: starter rates, with the notice"
+    },
+    {
+      "ok": true,
+      "label": "settings: Save settings answers 200",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "settings: a reload right after Save shows the saved rates and no notice",
+      "detail": {
+        "flat": "79",
+        "free": "1999",
+        "cod": "49",
+        "notice": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "settings: four more reloads in a row all show the saved rates",
+      "detail": [
+        {
+          "flat": "79",
+          "free": "1999",
+          "cod": "49",
+          "notice": false
+        },
+        {
+          "flat": "79",
+          "free": "1999",
+          "cod": "49",
+          "notice": false
+        },
+        {
+          "flat": "79",
+          "free": "1999",
+          "cod": "49",
+          "notice": false
+        },
+        {
+          "flat": "79",
+          "free": "1999",
+          "cod": "49",
+          "notice": false
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "settings: a new tab shows the saved rates",
+      "detail": {
+        "flat": "79",
+        "free": "1999",
+        "cod": "49",
+        "notice": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "settings: rates removed in the control plane show as starter rates on the next reload",
+      "detail": {
+        "flat": "79",
+        "free": "999",
+        "cod": "49",
+        "notice": true
+      }
+    }
+  ],
+  "notes": [
+    "settings: starter values shown: {\"flat\":\"79\",\"free\":\"999\",\"cod\":\"49\",\"notice\":true}",
+    "settings: the control plane right after Save: {\"currency\":\"INR\",\"basis\":\"net\",\"freeThreshold\":1999,\"flatRate\":79,\"codFee\":49,\"codFeeWaivedAt\":null,\"zones\":[]}"
+  ],
+  "screenshots": [
+    {
+      "name": "settings-reload-at-once",
+      "file": "docs/cms-reviews/drills/FIX-C/settings-reload-at-once.png",
+      "bytes": 30116,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/settings"
+    },
+    {
+      "name": "settings-after-control-plane-change",
+      "file": "docs/cms-reviews/drills/FIX-C/settings-after-control-plane-change.png",
+      "bytes": 33124,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/settings"
+    }
+  ]
+}

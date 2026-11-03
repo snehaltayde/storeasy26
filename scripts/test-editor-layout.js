@@ -425,7 +425,7 @@ function* walk(node, parent) {
 }
 let H = null; // the shallow render in progress
 const hookReact = new Proxy(React, {
-  get: (target, key) => (H && (key === "useState" || key === "useRef" || key === "useEffect") ? H[key] : target[key]),
+  get: (target, key) => (H && (key === "useState" || key === "useRef" || key === "useEffect" || key === "useContext") ? H[key] : target[key]),
 });
 function shallow(Component, props, { nav = null } = {}) {
   const states = [];
@@ -448,6 +448,8 @@ function shallow(Component, props, { nav = null } = {}) {
     useEffect(fn) {
       effects.push(fn);
     },
+    // the one context these components read is the console shell's nav
+    useContext: () => nav,
   };
   const s = {
     refs,
@@ -575,6 +577,116 @@ await t("on the designer, the console's menu really opens the store navigation d
   drawer().props.onClose();
   eq(drawerOf(s.render()).props.open, false, "after Close:");
 });
+
+// P1-FIX-C (ED-01 review of fix round 1): the error page's menu button was
+// only checked to exist. Wired to do nothing, or given `hidden`, it passed.
+await t("on the designer, the error page's menu button is visible and its click opens the store navigation", () => {
+  for (const p of ["/admin/storefront/designer", "/admin/storefront/designer/product", "/admin/storefront/designer/collection"]) {
+    const menu = classesOf(tagWith(shellHtml(p, errorEl()), 'aria-label="Open menu"'));
+    ok(menu.length > 0, `${p}: no menu button`);
+    const hiding = menu.filter((c) => /^(?:[a-z0-9]+:)?(?:hidden|invisible|sr-only|opacity-0)$/.test(c));
+    eq(hiding, [], `${p}: classes that hide the menu button:`);
+  }
+  let opened = 0;
+  const openNav = () => opened++;
+  const s = shallow(IsoShell.ConsolePageFrame, { children: marker("error") }, { nav: { editor: true, openNav, storeName: "Design Demo Co" } });
+  const menu = s.find((el) => el.props?.["data-console-menu"])?.el;
+  ok(menu && menu.props.label === "Open menu", "the frame has no menu button");
+  ok(menu.props.onClick === openNav, "the menu button's click is not the shell's openNav");
+  menu.props.onClick();
+  eq(opened, 1, "a click opened the navigation this many times:");
+  ok(!/(^|\s)(hidden|invisible|sr-only)(\s|$)/.test(String(menu.props.className || "")), `hidden by a class: ${menu.props.className}`);
+  ok(s.has(isMarker("error")), "the error page is not inside the frame");
+  // outside an editor route the frame adds nothing
+  const plain = shallow(IsoShell.ConsolePageFrame, { children: marker("error") }, { nav: null });
+  ok(!plain.find((el) => el.props?.["data-console-menu"]), "a menu button outside the designer");
+});
+
+// P1-FIX-C (DOC-04 review, R4 and R5): the Designer and the Home editor give a
+// section its durable id the moment it is added or duplicated, so a refusal
+// can name it before its first save. Nothing tested that. Each editor runs on
+// stand-in hooks; its Save goes to a stand-in for the API that keeps what it
+// was sent.
+{
+  const sent = [];
+  const apiStub = {
+    saveBlock: async (block, value, revision) => {
+      sent.push({ block, value, revision });
+      return { ok: false, error: "stand-in" };
+    },
+    getStorefrontView: async () => ({ ok: false }),
+    resetBlock: async () => ({ ok: false }),
+    startPreview: async () => ({ ok: false }),
+    getHistory: async () => ({ ok: false }),
+    saveCandidate: async () => ({ ok: true }),
+  };
+  const { SECTION_ID_RE, COMPONENTS } = await import("../lib/cms/registry.js");
+  const COMPONENTS_LABEL = { banner: COMPONENTS.banner.label };
+  // every element in the tree, including those handed to a component as a prop
+  // (EditorShell's tree and inspector, a card's actions)
+  function* deep(node, seen = new Set()) {
+    if (node == null || typeof node !== "object" || seen.has(node)) return;
+    seen.add(node);
+    if (Array.isArray(node)) {
+      for (const n of node) yield* deep(n, seen);
+      return;
+    }
+    if (!node.props || typeof node.props !== "object") return;
+    yield node;
+    for (const v of Object.values(node.props)) yield* deep(v, seen);
+  }
+  const textOf = (el) => (typeof el === "string" ? el : Array.isArray(el) ? el.map(textOf).join("") : el?.props ? textOf(el.props.children) : "");
+  const click = (s, pred, label) => {
+    const el = [...deep(s.tree)].find(pred);
+    ok(el && typeof el.props.onClick === "function", `no ${label}`);
+    el.props.onClick();
+    return s.render();
+  };
+  const homeSections = (initialSections) => ({
+    customized: { hero: false, announcement: false, home_sections: true },
+    revisions: { hero: null, announcement: null, home_sections: 3 },
+    blocks: { hero: { title: "Skin first" }, announcement: { enabled: false, text: "", href: "" }, home_sections: initialSections, nav_header: [], nav_footer: [], collections_index: null, pdp_extras: [] },
+  });
+  const checkSent = (label, originalId) => {
+    const last = sent.filter((x) => x.block === "home_sections").at(-1);
+    ok(last, `${label}: Save sent no homepage sections`);
+    const ids = last.value.map((sec) => sec.id);
+    eq(ids.length, 3, `${label}: sections sent:`);
+    ok(ids.every((id) => typeof id === "string" && SECTION_ID_RE.test(id)), `${label}: a section went without a durable id: ${JSON.stringify(ids)}`);
+    eq(new Set(ids).size, 3, `${label}: two sections share an id: ${JSON.stringify(ids)}`);
+    eq(ids[0], originalId, `${label}: the original keeps its id:`);
+  };
+
+  const IsoDesigner = (await loadIsolated(join(ROOT, "components/admin/cms/Designer.js"), { react: hookReact, "./api": apiStub })).default;
+  const IsoHome = (await loadIsolated(join(ROOT, "components/admin/cms/HomeEditor.js"), { react: hookReact, "./api": apiStub })).default;
+
+  await t("Designer: a section added or duplicated has its own durable id before its first save", async () => {
+    sent.length = 0;
+    pathname = "/admin/storefront/designer";
+    const s = shallow(IsoDesigner, { initial: homeSections([{ id: "sec_orig1", kind: "collections", title: "Shop by collection", enabled: true }]) });
+    click(s, (el) => el.props["aria-label"] == null && textOf(el.props.children) === "Add section" && "aria-expanded" in el.props, "Add section button");
+    click(s, (el) => el.type === "button" && textOf(el.props.children).includes(COMPONENTS_LABEL.banner), "Banner / CTA in the add menu");
+    click(s, (el) => el.props.label === "Duplicate section", "Duplicate on the first section");
+    await click(s, (el) => textOf(el.props.children) === "Save" && el.props.variant === "primary", "Save").tree;
+    await new Promise((r) => setTimeout(r, 0));
+    checkSent("Designer", "sec_orig1");
+  });
+
+  await t("Home editor: a section added or duplicated has its own durable id before its first save", async () => {
+    sent.length = 0;
+    pathname = "/admin/storefront/home";
+    const s = shallow(IsoHome, { initial: homeSections([{ id: "sec_orig2", kind: "collections", title: "Shop by collection", enabled: true }]) });
+    click(s, (el) => textOf(el.props.children) === "Duplicate", "Duplicate on the first section");
+    click(s, (el) => el.props.title === "Accent panel with a headline and button", "Banner / CTA add button");
+    const sectionsCard = [...deep(s.tree)].find((el) => el.props.title === "Homepage sections" && el.props.actions);
+    ok(sectionsCard, "no Homepage sections card");
+    const save = [...deep(sectionsCard.props.actions)].find((el) => textOf(el.props.children) === "Save");
+    ok(save && typeof save.props.onClick === "function", "no Save on the sections card");
+    await save.props.onClick();
+    // the order here: original, its duplicate, then the added banner
+    checkSent("Home editor", "sec_orig2");
+  });
+}
 
 await t("the preview's box positions and clips the page inside it, at the measured size", () => {
   const frame = (style) => React.createElement("iframe", { "data-marker": "frame", style });

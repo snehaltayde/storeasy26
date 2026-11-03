@@ -595,6 +595,63 @@ await t("NEGATIVE: a pid file with no start times (an older harness) still never
   }
 });
 
+// P1-FIX-C (review of round 1): `ps -o lstart=` prints local time. A seed run
+// with another TZ read another start time for the running launcher, decided it
+// was gone, and stopLeftovers deleted its pid file although it signalled
+// nothing. With the pid file gone, a seed on other ports wiped .design-data
+// under the running harness.
+await t("NEGATIVE: a seed or a second dev run in another time zone is refused, and the running harness keeps its pid file, servers and data", async () => {
+  const s = await setup();
+  const first = await startDev(s, { TZ: "Asia/Kolkata" });
+  const servers = sqldPids(s);
+  const pidfile = readFileSync(join(s.dataDir, "harness.pid.json"), "utf8");
+  const seeded = readFileSync(join(s.dataDir, "seeded.json"), "utf8");
+  try {
+    for (const [mode, tz] of [["seed", "UTC"], ["seed", "America/Los_Angeles"], ["dev", "UTC"]]) {
+      const second = start(mode, s, { TZ: tz });
+      eq((await second.done).code, 1, `${mode} with TZ=${tz}: exit code\n${second.output()}`);
+      ok(second.output().includes("already running"), `${mode} with TZ=${tz}: ${second.output()}`);
+      ok(existsSync(join(s.dataDir, "harness.pid.json")) && readFileSync(join(s.dataDir, "harness.pid.json"), "utf8") === pidfile, `${mode} with TZ=${tz}: the running harness's pid file was changed or deleted`);
+    }
+    // the step that wiped the data in the review: a seed on other ports
+    const other = await freePorts();
+    const away = start("seed", s, { TZ: "UTC", DESIGN_PORT: String(other.next), DESIGN_SQLD_PORT: String(other.sqld) });
+    eq((await away.done).code, 1, `a seed on other ports: exit code\n${away.output()}`);
+    ok(away.output().includes("already running"), away.output());
+    eq(readFileSync(join(s.dataDir, "seeded.json"), "utf8"), seeded, "the running harness's data was re-seeded:");
+    for (const x of servers) ok(alive(x.pid), `the running harness's database server ${x.pid} was stopped`);
+    ok(first.child.exitCode === null, `the first harness stopped:\n${first.output()}`);
+  } finally {
+    first.child.kill("SIGTERM");
+    await first.done;
+  }
+});
+
+await t("NEGATIVE: a live launcher whose recorded start time doesn't match still counts as running; stopLeftovers keeps its pid file and signals nothing", async () => {
+  const s = await setup();
+  mkdirSync(s.dataDir, { recursive: true });
+  const launcher = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)", "scripts/dev-design.js"], { stdio: "ignore" });
+  const db = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)", join(s.dataDir, "platform.sqld")], { stdio: "ignore" });
+  wrappers.push(launcher, db);
+  await sleep(200);
+  const wrong = "Thu Jan  1 00:00:00 1970";
+  writeFileSync(join(s.dataDir, "harness.pid.json"), JSON.stringify({ launcher: { pid: launcher.pid, started: wrong, script: "/elsewhere/scripts/dev-design.js" }, sqld: [{ key: "platform", pid: db.pid, started: wrong, port: s.ports.sqld }] }));
+  try {
+    eq(H.sameProcess({ pid: launcher.pid, started: wrong }), false, "the start time doesn't match:");
+    ok(H.runningHarness(s.dataDir), "runningHarness should still see the live launcher");
+    eq(await H.stopLeftovers(s.dataDir), [], "stopLeftovers stopped something:");
+    ok(existsSync(join(s.dataDir, "harness.pid.json")), "stopLeftovers deleted the pid file of a live launcher");
+    ok(alive(db.pid), "stopLeftovers signalled a live harness's server");
+    // once that launcher is gone, the same pid file is a leftover again
+    launcher.kill("SIGKILL");
+    await until(() => !alive(launcher.pid), "the stand-in launcher to stop", 5_000);
+    eq(H.runningHarness(s.dataDir), null, "a dead launcher:");
+  } finally {
+    launcher.kill("SIGKILL");
+    db.kill("SIGKILL");
+  }
+});
+
 await t("the pid file records each process with its start time, the ports and Next", async () => {
   const s = await setup();
   const run = await startDev(s);
@@ -645,6 +702,28 @@ await t("Next and the servers left behind by a harness that was killed outright 
   ok(now.pid !== next.pid && alive(now.pid), "the new harness runs its own Next on the same port");
   again.child.kill("SIGTERM");
   await again.done;
+});
+
+// P1-FIX-C: the start times are read in one time zone (UTC) whoever reads them,
+// so what a killed harness left behind is still recognised from another TZ.
+await t("the servers a killed harness left behind are recognised and stopped by a start in another time zone", async () => {
+  const s = await setup();
+  const first = await startDev(s, { TZ: "Asia/Kolkata" });
+  const servers = sqldPids(s);
+  const next = JSON.parse(readFileSync(join(s.logs, "next.json"), "utf8"));
+  first.child.kill("SIGKILL");
+  await first.done;
+  await sleep(300);
+  rmSync(join(s.logs, "next.json"));
+  const again = await startDev(s, { TZ: "America/Los_Angeles" });
+  try {
+    ok(again.output().includes(`stopped the web server left over from an earlier run (pid ${next.pid})`), again.output());
+    for (const x of servers) ok(!alive(x.pid), `leftover server ${x.pid} still running`);
+    ok(!alive(next.pid), `leftover Next ${next.pid} still running`);
+  } finally {
+    again.child.kill("SIGTERM");
+    await again.done;
+  }
 });
 
 await t("NEGATIVE: a recorded PID that now belongs to some other program is never signalled", async () => {

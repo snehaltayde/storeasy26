@@ -4,7 +4,7 @@ import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { roleAllows } from "@/lib/platform/authz";
 import { buildBillingView } from "@/lib/admin/billing-view";
 import BillingAdmin from "@/components/admin/BillingAdmin";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
 import { Card } from "@/components/console/Card";
 import { PermissionNote } from "@/components/console/bits";

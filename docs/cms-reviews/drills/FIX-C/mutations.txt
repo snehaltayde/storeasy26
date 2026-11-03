@@ -1,0 +1,90 @@
+CAUGHT    F1 — console pages read the cached row (console-request without fresh)
+          test-console-fresh: 16 passed, 3 failed; ✗ every console request reads the store's row once; a shopper's page reads it not at all (cached)
+CAUGHT    F2 — /api/admin routes read the cached row
+          test-console-fresh: 7 passed, 12 failed; ✗ THE BUG: rates saved through instance B; a reload served by instance A shows them at once, with no starter notice
+CAUGHT    F3 — getTenant ignores fresh
+          test-console-fresh: 5 passed, 14 failed; ✗ THE BUG: rates saved through instance B; a reload served by instance A shows them at once, with no starter notice
+CAUGHT    F4 — a fresh read that fails falls back to the cached row
+          test-console-fresh: 18 passed, 1 failed; ✗ NEGATIVE: when the control plane can't be read, the console says so (503); it never falls back to the cached row
+SURVIVED  F5 — fresh resolution trusts the cached index's status
+          test-console-fresh: 19 passed, 0 failed; 
+CAUGHT    F6 — fresh resolution ignores a removed domain
+          test-console-fresh: 18 passed, 1 failed; ✗ a domain removed through B no longer opens the console on A
+CAUGHT    F7 — a preview session keeps the cached row
+          test-console-fresh: 18 passed, 1 failed; ✗ a founder's preview session on A reads the row fresh (drafts come from it); a forged preview cookie does not
+CAUGHT    F8 — any preview cookie, even a forged one, reads the row fresh
+          test-console-fresh: 18 passed, 1 failed; ✗ a founder's preview session on A reads the row fresh (drafts come from it); a forged preview cookie does not
+CAUGHT    F9 — operator cost budget writes back the cached config
+          test-console-fresh: 18 passed, 1 failed; ✗ an operator's cost budget set on A doesn't undo the brand the founder just saved on B
+CAUGHT    F10 — operator edit merges into a cached copy
+          test-console-fresh: 18 passed, 1 failed; ✗ an operator's edit of the store's details on A doesn't undo the tagline the founder just saved on B
+CAUGHT    F11 — domain claim builds the list from a cached copy
+          test-console-fresh: 18 passed, 1 failed; ✗ a domain claimed on A doesn't drop one B added a moment ago
+CAUGHT    F12 — one console page imports the cached tfetch
+          test-console-fresh: 18 passed, 1 failed; ✗ every console page takes tfetch from lib/console-request.js, never the cached one
+SURVIVED  S1 — the editors' page list counts any schema error as an old store
+          test-failure-matrix: 96 passed, 0 failed; 
+SURVIVED  S1b — page versions count any schema error as an old store
+          test-failure-matrix: 96 passed, 0 failed; 
+SURVIVED  S2 — the page editor load counts any schema error as an old store
+          test-failure-matrix: 96 passed, 0 failed; 
+CAUGHT    S3 — the live pointer: any missing table means no release yet
+          test-failure-matrix: 95 passed, 1 failed; ✗ the live pointer read failing on some other table is an error, never "no release yet" (which serves drafts to shoppers)
+CAUGHT    S4 — the snapshot's other tables: any missing table reads as empty
+          test-failure-matrix: 95 passed, 1 failed; ✗ publish: the slug redirects read names a table that's gone (not an old store): nothing ships, no redirect is dropped → 503 DATABASE_NOT_READY
+CAUGHT    S5 — schema-compat remembers any missing column as absent
+          test-schema-compat: 27 passed, 1 failed; ✗ a probe that fails with some OTHER missing column (a broken view) is not remembered as absent
+CAUGHT    S6 — notMigratedYet: any table name counts
+          test-schema-compat: 27 passed, 1 failed; ✗ the expected shapes, from a local file and from sqld over HTTP, and nothing else | test-failure-matrix: 93 passed, 3 failed; ✗ publish: the slug redirects read names a table that's gone (not an old store): nothing ships, no redirect is dropped → 503 DATABASE_NOT_READY
+CAUGHT    S7 — notMigratedYet reads our own errors' words too
+          test-schema-compat: 27 passed, 1 failed; ✗ the expected shapes, from a local file and from sqld over HTTP, and nothing else
+CAUGHT    S8 — the page save's redirect clean-up swallows every error again
+          test-failure-matrix: 95 passed, 1 failed; ✗ a page save whose redirect clean-up fails is never answered as a success
+SURVIVED  S9 — approvals: any missing table means no approval
+          test-failure-matrix: 96 passed, 0 failed; test-releases: 25 passed, 0 failed; 
+CAUGHT    R1 — go back: unknown errors re-thrown (before c513d27)
+          test-failure-matrix: 95 passed, 1 failed; ✗ go back: an error that is neither the store's nor the database's → JSON 500 INTERNAL_ERROR, the raw text kept out
+CAUGHT    R2 — go back: no database check
+          test-failure-matrix: 93 passed, 3 failed; ✗ go back: a database that doesn't answer → 503 with the plain message, never a 4xx
+CAUGHT    R3 — go back: NO_PREVIOUS answered 422
+          test-failure-matrix: 95 passed, 1 failed; ✗ go back: each of the store's refusals keeps its status and its exact body, and changes nothing
+CAUGHT    R4 — sync: no database check (before c513d27)
+          test-first-sync: 73 passed, 2 failed; ✗ Sync now when reading the store's sync record fails: 503 DATABASE_ERROR about the store's data, not about Shopify
+CAUGHT    R5 — sync: a missing link answers 500
+          test-first-sync: 74 passed, 1 failed; ✗ starting with no Shopify link answers with a plain message, not an internal one
+CAUGHT    E1 — ED-01 F2: the error page's menu button does nothing
+          test-editor-layout: 33 passed, 1 failed; ✗ on the designer, the error page's menu button is visible and its click opens the store navigation
+CAUGHT    E2 — ED-01 F9: the error page's menu button is hidden
+          test-editor-layout: 33 passed, 1 failed; ✗ on the designer, the error page's menu button is visible and its click opens the store navigation
+CAUGHT    G1 — GEN-02: a long collection's old members cleaned up on every member page
+          test-first-sync: 74 passed, 1 failed; ✗ a 600-member collection: Shopify fails on its second member page; all 600 stay live while it retries and after the run fails
+CAUGHT    M1 — OVL-06: the snapshot fallback takes the first snapshot line
+          test-order-catalog: 16 passed, 1 failed; ✗ an order placed before migrating, with two lines: each line shows its own Shopify title and SKU
+CAUGHT    M2 — OVL-06: the cart's catalog_title taken from the line's title
+          test-order-catalog: 16 passed, 1 failed; ✗ the cart's catalog_title is the raw catalog column, never the line's title (a source check until OVL-03)
+CAUGHT    M3 — MIG-05: a ledger ahead of the code fails the check
+          test-schema-compat: 27 passed, 1 failed; ✗ a tenant whose ledger holds a migration this code doesn't ship (a rollback deploy): --check exits 0, with a note
+CAUGHT    D1 — DOC-04: a known answer moved after the database check, another added before it (count stays 11)
+          test-failure-matrix: 95 passed, 1 failed; ✗ every catch-all in an /api/admin route answers its own refusals, then checks for a database failure, then falls back
+CAUGHT    D2 — DOC-04 R5: the Designer adds a section with no id
+          test-editor-layout: 33 passed, 1 failed; ✗ Designer: a section added or duplicated has its own durable id before its first save
+CAUGHT    D3 — DOC-04 R5: the Designer's duplicate keeps the original's id
+          test-editor-layout: 33 passed, 1 failed; ✗ Designer: a section added or duplicated has its own durable id before its first save
+CAUGHT    D4 — DOC-04 R4: the Home editor adds a section with no id
+          test-editor-layout: 33 passed, 1 failed; ✗ Home editor: a section added or duplicated has its own durable id before its first save
+CAUGHT    D5 — DOC-04 R4: the Home editor's duplicate keeps the original's id
+          test-editor-layout: 33 passed, 1 failed; ✗ Home editor: a section added or duplicated has its own durable id before its first save
+CAUGHT    H1 — HARNESS: ps reads start times in the caller's time zone again
+          test-design-harness: 48 passed, 1 failed; ✗ the servers a killed harness left behind are recognised and stopped by a start in another time zone
+CAUGHT    H2 — HARNESS: a live launcher with a mismatched start time counts as gone (pid file then cleared)
+          test-design-harness: 48 passed, 1 failed; ✗ NEGATIVE: a live launcher whose recorded start time doesn't match still counts as running; stopLeftovers keeps its pid file and signals nothing
+CAUGHT    F5 — fresh resolution trusts the cached index's status
+          test-console-fresh: 18 passed, 1 failed; ✗ a store suspended through instance B is closed to its console on A at once; reopened, it opens at once
+CAUGHT    S1 — the editors' page list counts any schema error as an old store
+          test-failure-matrix: 100 passed, 1 failed; ✗ load: only the page list's read fails "no such column" on a column it never expected missing → 503 DATABASE_NOT_READY
+CAUGHT    S1b — page versions count any schema error as an old store
+          test-failure-matrix: 100 passed, 1 failed; ✗ load: only the page versions' read fails "no such column" on a column it never expected missing → 503 DATABASE_NOT_READY
+CAUGHT    S2 — the page editor load counts any schema error as an old store
+          test-failure-matrix: 100 passed, 1 failed; ✗ page editor load: only the page's own read fails "no such column" (its versions read fine): the error screen, not a 404
+CAUGHT    S9 — approvals: any missing table means no approval
+          test-failure-matrix: 100 passed, 1 failed; ✗ load: Publishing's load when the approvals table is a view over a table that's gone: 503, not "no approval" → 503 DATABASE_NOT_READY

@@ -10,7 +10,7 @@ import { roleAllows } from "@/lib/platform/authz";
 import SettingsAdmin from "@/components/admin/SettingsAdmin";
 import OpsPanels from "@/components/admin/OpsPanels";
 import { PageHeader } from "@/components/console/PageHeader";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/console-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings · Admin", robots: { index: false } };
