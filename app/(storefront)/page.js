@@ -4,7 +4,7 @@ import EmptyCatalog from "@/components/EmptyCatalog";
 import ExperimentPing from "@/components/ExperimentPing";
 import MarketingHome from "@/components/site/MarketingHome";
 import HomeSections from "@/components/sections/HomeSections";
-import { runningExperimentFor, heroVariantFor, UNIT_COOKIE } from "@/lib/experiments";
+import { runningExperimentFor, heroVariantFor, signedInToConsole, UNIT_COOKIE } from "@/lib/experiments";
 // PV-08 (its own lines, away from the resolve/tfetch imports another branch edits)
 import ExperimentNote from "@/components/preview/ExperimentNote";
 import { contentSource } from "@/lib/content/resolve";
@@ -41,14 +41,19 @@ export default async function Home() {
   // The unit cookie is functional (like the cart cookie); a first-time
   // visitor gets an id the ping component persists — the pure-hash
   // assignment makes this render and every later one agree on the variant.
-  const unitId = (await cookies()).get(UNIT_COOKIE)?.value || crypto.randomUUID();
+  const jar = await cookies();
+  const unitId = jar.get(UNIT_COOKIE)?.value || crypto.randomUUID();
+  // PV-08: a browser signed in to the console is the founder's, preview or not
+  // (the preview cookie lapses with its token while the Designer stays open).
+  const founder = signedInToConsole(jar);
 
   const { hero, sections, stats, dataById, assignment, testNotice } = await tfetch(async () => {
     const [liveHero, sections, stats, index, src] = await Promise.all([resolvedHero(), resolvedHomeSections(), getCatalogStats(), resolvedCollectionsIndex(), contentSource()]);
     const heroExp = await runningExperimentFor("hero");
     // PV-08: a preview shows the founder's own hero. No variant, no exposure
     // ping (no assignment), and a note that a test runs on this section.
-    const { hero, assignment, notice: testNotice = null } = heroVariantFor(heroExp, liveHero, unitId, { preview: src.preview });
+    // Signed in but out of preview: the live hero, no variant, no ping, no note.
+    const { hero, assignment, notice: testNotice = null } = heroVariantFor(heroExp, liveHero, unitId, { preview: src.preview, founder });
     // S54: data resolves PER SECTION INSTANCE (registry bindings, batched) —
     // duplicate sections no longer overwrite each other's data or limits.
     const dataById = await resolveHomeSectionData(sections, { index });

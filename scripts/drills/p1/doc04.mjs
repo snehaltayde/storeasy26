@@ -152,7 +152,9 @@ export const parts = {
     const tree = await page.evaluate(() => {
       const h = [...document.querySelectorAll("h2")].find((x) => x.textContent.trim() === "Sections");
       const root = h?.closest("aside, section, div")?.parentElement || document;
-      return [...root.querySelectorAll("li button, ul button")].map((b) => b.innerText.trim()).filter((t) => t && !/^(Add section|Undo|Redo)$/.test(t));
+      // each row's first line is its name: a mark after it ("Hidden", or PV-08's
+      // "Test running" on the Hero row) sits on a line of its own
+      return [...root.querySelectorAll("li button, ul button")].map((b) => b.innerText.split("\n")[0].trim()).filter((t) => t && !/^(Add section|Undo|Redo)$/.test(t));
     });
     const bannerAt = tree.filter((t) => !["Hero", "Announcement bar"].includes(t)).findIndex((t) => /Monsoon sale|Banner/.test(t)) + 1;
     drill.note(`overview: the Designer's tree reads ${JSON.stringify(tree)}`);

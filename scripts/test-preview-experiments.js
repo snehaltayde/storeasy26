@@ -9,10 +9,14 @@
 //      names the test inside the hero. Without a preview, shoppers are bucketed
 //      and served exactly as at 8968db3 (a frozen copy of that code is the
 //      oracle), and never see the note.
+//      Fix round 1: once the preview cookie lapses (the browser deletes it at
+//      the token's expiry) a browser still signed in to the console is the
+//      founder: no variant, no ping, no note.
 //   2. route: the real POST /api/exp handler refuses to count an exposure from
-//      a preview session, and still counts a shopper's, once.
-//   3. conversions: a preview session's order converts nothing; the checkout
-//      route reads its unit through that one gate.
+//      a preview session or a browser signed in to the console, and still
+//      counts a shopper's, once.
+//   3. conversions: an order from a preview session or a signed-in browser
+//      converts nothing; the checkout route reads its unit through that one gate.
 //   4. rendered console: the Designer's hero settings and tree say a test is
 //      running, name it and link to its row on the Experiments screen; the
 //      Designer page loads the running tests.
@@ -353,6 +357,9 @@ await t("the note: in a preview the hero says a test is running, names it, and l
   ok(text(hero).includes(`“${TEST_NAME}”`), `the note doesn't name the test: ${text(hero).slice(0, 240)}`);
   ok(text(hero).includes("Some visitors see a different version; the preview shows yours."), "the note doesn't say what the founder sees");
   ok(hero.includes('href="/admin/experiments#exp-row-hero-promise"'), `no link to the test's row: ${hero.slice(0, 600)}`);
+  // a preview tab is the top window already; in a frame without the Designer's
+  // bridge the console opens in place of the whole page, never inside the frame
+  ok(/<a [^>]*href="\/admin\/experiments#exp-row-hero-promise"[^>]*target="_top"/.test(hero), "the note's link doesn't open in the top window");
   ok(!/\b(variant|exposure|bucket)\b/i.test(text(hero.match(/<[a-z]+[^>]*data-preview-note[\s\S]*?<\/(p|div)>/)?.[0] || "")), "the note uses jargon");
 });
 
@@ -412,12 +419,54 @@ await t("REGRESSION: a first-time shopper (no unit cookie) is still bucketed and
   eq([...titles].sort(), [LIVE_HERO.title, VARIANT_B.title].sort(), "titles first-time shoppers got (30 visits):");
 });
 
-await t("a forged or expired preview cookie is not a preview: the live page serves as for any shopper", async () => {
+// A browser drops a real preview cookie at the token's own expiry (its Max-Age
+// is the token's remaining life), so it never sends an expired one. These are
+// forged values: a token-shaped one with a past expiry, junk, and another
+// store's real token.
+await t("a forged preview cookie, or another store's, is not a preview: the live page serves as for any shopper", async () => {
   for (const bad of ["p.1.00000000000000000000", "nonsense", await token(inPw)]) {
     const html = await renderHome({ cookies: { _unit: B_UNITS[1], [PREVIEW_COOKIE]: bad } });
     eq(h1(html), VARIANT_B.title, `cookie ${bad.slice(0, 12)}…:`);
     ok(!NOTE_RE.test(text(html)), "a bad cookie shows the preview note");
   }
+});
+
+// Fix round 1. The Designer's preview cookie lives as long as its token (1
+// hour), and the browser then deletes it. The Designer stays open, still signed
+// in (the console cookie lives 7 days), and its next refresh loads "/" with no
+// preview cookie. That browser is still the founder's.
+const CONSOLE = { _admin: "merchant-session-pv08" };
+const SUPPORT = { _platform: "operator-session-pv08" };
+await t("THE BUG, lapsed preview: the preview cookie goes mid-session and the founder, still signed in, sees no variant, sends no ping and gets no note", async () => {
+  const tok = await token();
+  for (const unit of B_UNITS.slice(0, 5)) {
+    const during = await renderHome({ cookies: { _unit: unit, ...CONSOLE, [PREVIEW_COOKIE]: tok } });
+    eq(h1(during), DRAFT_HERO.title, `unit ${unit}, while the preview lasts:`);
+    // the browser deletes _preview at the token's expiry; _admin stays
+    const lapsed = await renderHome({ cookies: { _unit: unit, ...CONSOLE } });
+    eq(h1(lapsed), LIVE_HERO.title, `unit ${unit}, after the preview lapsed (the live hero, not variant b):`);
+    ok(!lapsed.includes(VARIANT_B.title) && !lapsed.includes(VARIANT_B.subtitle), `unit ${unit}: variant b's words reach the founder after the preview lapsed`);
+    ok(!pinged(lapsed), `unit ${unit}: the page would ping /api/exp for the founder after the preview lapsed`);
+    ok(!NOTE_RE.test(text(lapsed)), `unit ${unit}: the preview note shows outside a preview`);
+  }
+  // an operator in support, and a founder with no unit yet, the same
+  for (const cookies of [{ _unit: B_UNITS[2], ...SUPPORT }, { ...CONSOLE }]) {
+    const html = await renderHome({ cookies });
+    eq(h1(html), LIVE_HERO.title, `${Object.keys(cookies).join("+")}:`);
+    ok(!pinged(html), `${Object.keys(cookies).join("+")}: pings`);
+  }
+});
+
+await t("NEGATIVE: a signed-out shopper in variant b still gets variant b and its ping, beside a signed-in founder in the same bucket", async () => {
+  const unit = B_UNITS[3];
+  const shopper = await renderHome({ cookies: { _unit: unit } });
+  eq(h1(shopper), VARIANT_B.title, "the shopper:");
+  ok(pinged(shopper), "the shopper's page doesn't ping");
+  const founder = await renderHome({ cookies: { _unit: unit, ...CONSOLE } });
+  eq(h1(founder), LIVE_HERO.title, "the founder:");
+  // an empty console cookie (what a sign-out leaves for an instant) is no sign-in
+  const empty = await renderHome({ cookies: { _unit: unit, _admin: "" } });
+  eq(h1(empty), VARIANT_B.title, "an empty console cookie:");
 });
 
 await t("unit: heroVariantFor in a preview applies nothing and returns the note; outside it matches 8968db3 for 2,000 units", () => {
@@ -427,10 +476,18 @@ await t("unit: heroVariantFor in a preview applies nothing and returns the note;
   eq(p.assignment, null, "preview assignment:");
   eq(p.notice, { slug: "hero-promise", name: TEST_NAME, section: "hero" }, "preview notice:");
   eq(X.heroVariantFor(null, live, B_UNITS[0], { preview: true }), { hero: live, assignment: null }, "no test, preview:");
+  // fix round 1: signed in to the console, outside a preview: nothing applied,
+  // nothing to ping, and no note (the note needs a valid preview)
+  const f = X.heroVariantFor(EXP, live, B_UNITS[0], { founder: true });
+  ok(f.hero === live, "founder: the hero is not the one given");
+  eq(f.assignment, null, "founder assignment:");
+  eq(f.notice ?? null, null, "founder notice outside a preview:");
+  eq(X.heroVariantFor(EXP, live, B_UNITS[0], { preview: true, founder: true }).notice, { slug: "hero-promise", name: TEST_NAME, section: "hero" }, "founder in a preview, notice:");
   for (let i = 0; i < 2000; i++) {
     const unit = `u-${i}-${(i * 7919).toString(36)}`;
     eq(X.heroVariantFor(EXP, live, unit), baseHeroVariantFor(EXP, live, unit), `unit ${unit}, no options:`);
     eq(X.heroVariantFor(EXP, live, unit, { preview: false }), baseHeroVariantFor(EXP, live, unit), `unit ${unit}, preview false:`);
+    eq(X.heroVariantFor(EXP, live, unit, { preview: false, founder: false }), baseHeroVariantFor(EXP, live, unit), `unit ${unit}, signed out:`);
   }
   eq(X.heroVariantFor(EXP, live, ""), { hero: live, assignment: null }, "no unit:");
   // Random units almost never land on a split's edge, so find ones that do:
@@ -466,12 +523,23 @@ await t("THE BUG: an exposure ping from a preview session is refused by the serv
   eq(await allExposures(), before, "exposures in all:");
 });
 
-await t("NEGATIVE: any preview cookie is refused, even an expired, forged or other store's one", async () => {
+await t("NEGATIVE: any preview cookie is refused, even a forged one or another store's", async () => {
   const before = await allExposures();
   for (const [i, bad] of ["p.1.00000000000000000000", "nonsense", await token(inPw)].entries()) {
     const unit = C_UNITS[10 + i];
     const res = await ping({ _unit: unit, [PREVIEW_COOKIE]: bad });
     eq(await res.json(), { ok: true, recorded: false }, `cookie ${i}:`);
+    eq((await exposuresFor(unit)).length, 0, `rows for ${unit}:`);
+  }
+  eq(await allExposures(), before, "exposures in all:");
+});
+
+await t("THE BUG, lapsed preview: a ping from a browser signed in to the console, its preview cookie gone, is refused and writes no row", async () => {
+  const before = await allExposures();
+  for (const [i, cookies] of [CONSOLE, SUPPORT].entries()) {
+    const unit = B_UNITS[12 + i];
+    const res = await ping({ _unit: unit, ...cookies });
+    eq(await res.json(), { ok: true, recorded: false }, `${Object.keys(cookies)[0]}:`);
     eq((await exposuresFor(unit)).length, 0, `rows for ${unit}:`);
   }
   eq(await allExposures(), before, "exposures in all:");
@@ -514,6 +582,15 @@ await t("a preview session's order converts nothing; a shopper's still converts"
   eq(await inPv(() => X.recordConversions(X.conversionUnit(req({ _unit: exposed })), "PV08-O2", 999)), 1, "shopper order converts:");
 });
 
+await t("THE BUG, lapsed preview: an order from a browser signed in to the console converts nothing, preview cookie or not", async () => {
+  const exposed = C_UNITS[20]; // exposed above, as a shopper
+  eq(X.conversionUnit(req({ _unit: exposed, ...CONSOLE })), null, "signed in, preview lapsed:");
+  eq(X.conversionUnit(req({ _unit: exposed, ...SUPPORT })), null, "an operator in support:");
+  eq(X.conversionUnit(req({ _unit: exposed, _admin: "" })), exposed, "an empty console cookie is no sign-in:");
+  eq(await inPv(() => X.recordConversions(X.conversionUnit(req({ _unit: exposed, ...CONSOLE })), "PV08-O3", 999)), 0, "the founder's order converts:");
+  eq(await inPv(() => X.recordConversions(X.conversionUnit(req({ _unit: exposed })), "PV08-O4", 999)), 1, "the same unit signed out converts:");
+});
+
 // Written to hold after claude/gallant-keller-7d3213 merges too: that branch
 // moves recordConversions into lib/payment-settle.js and hands it an `expUnit`
 // read in the checkout route, in two new places.
@@ -533,6 +610,22 @@ await t("runningTestsBySection names the running hero test, and nothing on a sto
   ok(typeof X.runningTestsBySection === "function", "lib/experiments.js has no runningTestsBySection");
   eq(await inPv(() => X.runningTestsBySection()), { hero: { slug: "hero-promise", name: TEST_NAME } }, "pv:");
   eq(await inPw(() => X.runningTestsBySection()), {}, "pw:");
+});
+
+await t("a paused test serves nobody and is named nowhere: no Designer note or mark, no preview note, shoppers get the live hero", async () => {
+  await inPv(() => X.setExperimentStatus("hero-promise", "paused"));
+  try {
+    eq(await inPv(() => X.runningTestsBySection()), {}, "paused, by section:");
+    const preview = await renderHome({ cookies: { _unit: B_UNITS[0], [PREVIEW_COOKIE]: await token() } });
+    eq(h1(preview), DRAFT_HERO.title, "paused, the founder's preview:");
+    ok(!NOTE_RE.test(text(preview)) && !pinged(preview), "paused: the preview has a note or pings");
+    const shopper = await renderHome({ cookies: { _unit: B_UNITS[0] } });
+    eq(h1(shopper), LIVE_HERO.title, "paused, a variant-b shopper:");
+    ok(!pinged(shopper), "paused: a shopper's page pings");
+  } finally {
+    await inPv(() => X.setExperimentStatus("hero-promise", "running"));
+  }
+  eq(await inPv(() => X.runningTestsBySection()), { hero: { slug: "hero-promise", name: TEST_NAME } }, "resumed:");
 });
 
 // The Designer with stand-in hooks (the shallow driver from test-editor-layout):
@@ -625,6 +718,11 @@ await t("Designer: the hero's settings say a test is running, name it, and link 
   ok(text(inspector).includes(`“${TEST_NAME}”`), "the note doesn't name the test");
   ok(text(inspector).includes("Some visitors see a different version; the preview shows yours."), "the note doesn't say what the preview shows");
   ok(inspector.includes('href="/admin/experiments#exp-row-hero-promise"'), "no link to the test's row");
+  // fix round 1: the link sits above the fields being edited, so it opens a new
+  // tab and the Designer, with any unsaved edits, stays as it was
+  const a = inspector.match(/<a [^>]*href="\/admin\/experiments#exp-row-hero-promise"[^>]*>[\s\S]*?<\/a>/)?.[0] || "";
+  ok(/target="_blank"/.test(a) && /rel="noopener noreferrer"/.test(a), `the link would leave the Designer (and its unsaved edits): ${a}`);
+  ok(text(a).includes("See the test") && text(a).includes("opens in a new tab"), `the link doesn't say it opens a new tab: ${text(a)}`);
   ok(inspector.indexOf("A test is running") < inspector.indexOf('id="ins-hero-title"'), "the note should come before the fields");
 });
 
@@ -712,11 +810,18 @@ await t("guard: only the known, gated places pick, apply or count a variant (a n
   eq(X.TARGET_KINDS, ["hero"], "experiment targets (a new one needs its own preview gate and note):");
 });
 
-await t("guard: the home page passes the preview state to the hero test, and pings only with an assignment", () => {
+await t("guard: the home page passes the preview state and the console sign-in to the hero test, and pings only with an assignment", () => {
   const src = SRC.get("app/(storefront)/page.js");
-  ok(/heroVariantFor\([^)]*\{\s*preview:\s*src\.preview\s*\}\s*\)/.test(src), "heroVariantFor is called without { preview: src.preview }");
+  ok(/heroVariantFor\([^)]*\{\s*preview:\s*src\.preview,\s*founder\s*\}\s*\)/.test(src), "heroVariantFor is called without { preview: src.preview, founder }");
+  ok(/const founder = signedInToConsole\(jar\);/.test(src) && /const jar = await cookies\(\);/.test(src), "the page doesn't read the console sign-in from the request's cookies");
   ok(/\{assignment && <ExperimentPing\b/.test(src), "the ping no longer depends on an assignment");
-  ok(/recordExposure\(/.test(SRC.get("app/api/exp/route.js")) && SRC.get("app/api/exp/route.js").indexOf("isPreviewRequest(request)") < SRC.get("app/api/exp/route.js").indexOf("recordExposure("), "the route records before it checks for a preview");
+  const route = SRC.get("app/api/exp/route.js");
+  ok(/recordExposure\(/.test(route) && route.includes("isFounderRequest(request)") && route.indexOf("isFounderRequest(request)") < route.indexOf("recordExposure("), "the route records before it checks for the founder (a preview or a console sign-in)");
+});
+
+await t("guard: the console cookies the gate knows are the ones sign-in really sets", async () => {
+  const { ADMIN_COOKIE, PLATFORM_COOKIE } = await import("../lib/admin-auth.js");
+  eq(X.CONSOLE_COOKIES, [ADMIN_COOKIE, PLATFORM_COOKIE], "console cookies:");
 });
 
 await t("edge: the storefront files this item touches import nothing from node:", () => {

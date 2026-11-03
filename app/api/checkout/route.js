@@ -177,7 +177,7 @@ export const POST = tenantHandler(async (request) => {
         // server-side purchase event (durable, browser-independent).
         // S47 (BE22): experiment conversion join — best-effort, AFTER the
         // money committed, idempotent per (experiment, order). PV-08: none
-        // from a preview session.
+        // from the founder's browser (a preview, or signed in to the console).
         const expUnit = conversionUnit(request);
         after(async () => {
           await enqueueShopifyPush(order.id);
@@ -274,7 +274,7 @@ export const POST = tenantHandler(async (request) => {
       });
       if (cartId) await clearCart(cartId);
       if (!paid.already) {
-        const expUnit = conversionUnit(request); // PV-08: none from a preview session
+        const expUnit = conversionUnit(request); // PV-08: none from the founder's browser
         after(async () => {
           await enqueueShopifyPush(orderId);
           await enqueuePurchaseAndForward(orderId);

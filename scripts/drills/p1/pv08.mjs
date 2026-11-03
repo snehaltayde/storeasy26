@@ -2,15 +2,23 @@
 //   DESIGN_PORT=3202 node scripts/drills/p1/run.mjs pv08 [part]
 //   PV08_PHASE=before … runs the same journey on code without PV-08: every PV-08
 //   check is marked known, screenshots and results are named before-*.
+//   PV08_PHASE=before-fix1 … the same on the first PV-08 build (da7617f): only
+//   fix round 1's checks are marked known; files are named before-fix1-*.
 // Parts:
 //   designer    the founder's Designer with the seeded hero test running, as a
 //               visitor bucketed into variant b: saved and typed titles show, the
 //               note shows in the frame and beside the hero settings, its link
-//               opens the test's row, and nothing pings /api/exp
+//               opens the test's row in a new tab (unsaved edits stay), and
+//               nothing pings /api/exp
 //   preview-tab the same preview opened as a page of its own, at 1440 and 375
 //   shopper     signed-out shoppers in each bucket: served and counted as before
 //   conversion  a founder exposed as a shopper, then previewing, places a COD
 //               order: no conversion; the same as a plain shopper: a conversion
+//   lapsed      fix round 1: the Designer open, the preview cookie dropped (what
+//               the browser does at the token's expiry), the frame refreshed:
+//               no variant, no ping, a hand-sent ping refused, nothing recorded
+//   lapsed-order  a founder exposed as a shopper, then signed in with the
+//               preview lapsed, places a COD order: no conversion
 import { text, seen, sleep } from "./util.mjs";
 import { addToCart, checkoutCod, clearCart, noThanks } from "./sf.mjs";
 import { rows } from "./db.mjs";
@@ -18,9 +26,11 @@ import { rows } from "./db.mjs";
 export const id = "PV-08";
 export const title = "PV-08 experiments are inert in preview";
 
-const PHASE = process.env.PV08_PHASE === "before" ? "before" : "after";
+const PHASE = ["before", "before-fix1"].includes(process.env.PV08_PHASE) ? process.env.PV08_PHASE : "after";
 const K = PHASE === "before" ? { known: "PV-08 not built (8968db3)" } : {};
-const shot = (name) => (PHASE === "before" ? `before-${name}` : name);
+// fix round 1's checks: known on 8968db3 and on the first build
+const K1 = PHASE === "before" ? K : PHASE === "before-fix1" ? { known: "fix round 1 not built (da7617f)" } : {};
+const shot = (name) => (PHASE === "after" ? name : `${PHASE}-${name}`);
 const NOTE = "A test is running on this section";
 const SEES = "Some visitors see a different version; the preview shows yours.";
 
@@ -197,18 +207,35 @@ async function designer(drill) {
   drill.check((await allExposures()) === before, "exposures in all unchanged by the Designer session", { before, after: await allExposures() }, K);
   drill.check(docs.length > 0 && docs.every((d) => d.status === 200 && d.edge === "1"), "every preview document answered 200 on the edge runtime", docs);
 
-  // The link opens the test's row in the console.
+  // The link opens the test's row in the console, in a new tab (fix round 1):
+  // an unsaved title typed first is still in the Designer afterwards.
+  const UNSAVED = `PV-08 unsaved ${stamp}`;
+  await page.locator("#ins-hero-title").fill(UNSAVED);
+  const dirty = await seen(page, "Unsaved changes", 5_000);
+  const popup = ctx.waitForEvent("page", { timeout: 10_000 }).catch(() => null);
   await page.locator("a[href='/admin/experiments#exp-row-hero-promise']").first().click().catch(() => {});
-  await page.waitForURL(/\/admin\/experiments/, { timeout: 15_000 }).catch(() => {});
-  await sleep(800);
-  const row = await page.evaluate(() => {
+  const tab = await popup;
+  const target = tab || page;
+  await target.waitForURL(/\/admin\/experiments/, { timeout: 15_000 }).catch(() => {});
+  await target.waitForLoadState("load").catch(() => {});
+  await sleep(1200);
+  const row = await target.evaluate(() => {
     const el = document.getElementById("exp-row-hero-promise");
     if (!el) return null;
     const r = el.getBoundingClientRect();
     return { text: el.innerText.replace(/\s+/g, " ").slice(0, 120), top: Math.round(r.top), inView: r.top >= 0 && r.top < window.innerHeight };
   });
-  drill.check(new URL(page.url()).pathname === "/admin/experiments" && row?.text?.includes(exp.name) && row.inView, "the note's link opens Experiments at the test's row", { url: page.url(), row }, K);
-  await drill.shoot(page, shot("experiments-row"));
+  drill.check(new URL(target.url()).pathname === "/admin/experiments" && row?.text?.includes(exp.name) && row.inView, "the note's link opens Experiments at the test's row", { url: target.url(), row }, K);
+  await drill.shoot(target, shot("experiments-row"));
+  const kept = {
+    newTab: Boolean(tab),
+    designerUrl: new URL(page.url()).pathname,
+    title: await page.locator("#ins-hero-title").inputValue().catch(() => null),
+    unsavedShownBefore: dirty,
+    unsavedShownAfter: await seen(page, "Unsaved changes", 2_000),
+  };
+  drill.check(kept.newTab && kept.designerUrl === "/admin/storefront/designer" && kept.title === UNSAVED && kept.unsavedShownAfter, "the link opens a new tab, and the Designer keeps the unsaved title", kept, K1);
+  if (tab) await tab.close();
 
   // Put the hero back as seeded, so later parts and drills see the seed.
   await drill.open(page, "/admin/storefront/designer", { width: 1440 });
@@ -330,5 +357,110 @@ async function conversion(drill) {
   drill.note(`conversions: ${JSON.stringify(results)} (harness orders; re-seed afterwards)`);
 }
 
-const PARTS = { designer, "preview-tab": previewTab, shopper, conversion };
-export const parts = Object.fromEntries(Object.entries(PARTS).map(([k, fn]) => [PHASE === "before" ? `before-${k}` : k, fn]));
+// What a signed-out visitor's control hero says: the live release's title, or
+// the saved draft's on a store that has never published.
+async function liveTitle() {
+  const [live] = await rows("tenant", "SELECT json_extract(content, '$.blocks.hero.title') title FROM releases WHERE id = (SELECT live_release_id FROM release_state WHERE id = 1)").catch(() => [null]);
+  if (live?.title) return live.title;
+  const [saved] = await rows("tenant", "SELECT value FROM cms_blocks WHERE key='hero'");
+  return JSON.parse(saved.value).title;
+}
+
+// Fix round 1. The preview cookie's Max-Age is its token's remaining life (1
+// hour), so the browser deletes it then, while the Designer stays open and the
+// console cookie (7 days) stays. The drill drops it by hand, which is what the
+// browser does at that moment, then refreshes the preview as the founder would.
+async function lapsed(drill) {
+  const exp = await heroTest();
+  const variantTitle = exp.variants.find((v) => v.key === "b").payload.title;
+  const live = await liveTitle();
+  const unit = unitIn(exp, "b", "lapsed");
+  const ctx = await drill.context({ width: 1440 });
+  const pings = expPings(ctx);
+  const before = await allExposures();
+  const page = await drill.signIn(ctx);
+  await setUnit(ctx, drill.baseUrl, unit);
+  const [saved] = await rows("tenant", "SELECT value FROM cms_blocks WHERE key='hero'");
+  const draft = JSON.parse(saved.value);
+  drill.note(`setup: founder's browser unit ${unit} is in variant ${assign(exp, unit)}; saved title "${draft.title}"; live title "${live}"; variant b's title "${variantTitle}"`);
+
+  await drill.open(page, "/admin/storefront/designer", { width: 1440 });
+  drill.check(await seen(page, "Preview shows your last save", 60_000), 'the preview connects ("Preview shows your last save")');
+  const first = await waitHero(page, (h) => h.h1 === draft.title, 8_000);
+  drill.check(first.hero?.h1 === draft.title, "while the preview lasts: the founder's saved title", first.hero?.h1);
+
+  const jar = await ctx.cookies();
+  const pc = jar.find((c) => c.name === "_preview");
+  const tokenExp = Number(pc?.value?.split(".")[1]);
+  drill.check(pc && Math.abs(pc.expires - tokenExp) <= 2, "the preview cookie expires with its token, so the browser drops it then", { cookieExpires: pc?.expires, tokenExp, difference: pc ? Math.round((pc.expires - tokenExp) * 10) / 10 : null });
+  await ctx.clearCookies({ name: "_preview" });
+  const after = await ctx.cookies();
+  drill.check(!after.some((c) => c.name === "_preview") && after.some((c) => c.name === "_admin" && c.value), "setup: the preview cookie is gone, the console cookie stays", after.map((c) => c.name));
+
+  // Refresh twice: first through the preview bridge, then (with no bridge left
+  // to answer) by remounting the frame, as the Designer does.
+  const views = [];
+  for (let i = 0; i < 2; i++) {
+    await page.getByRole("button", { name: "Refresh preview" }).click();
+    await sleep(1000);
+    views.push((await waitHero(page, (h) => !!h.h1 && h.h1 !== draft.title, 15_000)).hero);
+  }
+  const fr = previewFrame(page);
+  const frameFacts = fr ? await fr.evaluate(() => ({ draftBar: document.body.innerText.includes("Draft preview"), sw: document.documentElement.scrollWidth, vw: window.innerWidth })).catch(() => null) : null;
+  const status = (await page.locator('[data-editor-pane="preview"] [role="status"]').first().innerText().catch(() => "")).trim();
+  drill.note(`after the lapse: frame ${JSON.stringify(frameFacts)}; the Designer's status reads "${status}" (renewing the session is PV-04's)`);
+  drill.check(views.length === 2 && views.every((v) => v?.h1 && v.h1 !== variantTitle), "after the lapse: the Designer frame never shows variant b", views.map((v) => v?.h1), K1);
+  drill.check(views.every((v) => v?.h1 === live), `after the lapse: the frame shows the live hero ("${live}"), as a signed-in founder sees the store`, views.map((v) => v?.h1), K1);
+  drill.check(views.every((v) => v && v.note === null), "after the lapse: no preview note (it needs a valid preview)", views.map((v) => v?.note ?? null));
+  await drill.shoot(page, shot("lapsed-designer"));
+
+  await sleep(1000);
+  const fromPage = pings.length;
+  drill.note(`/api/exp requests the pages sent: ${JSON.stringify(pings)}`);
+  drill.check(fromPage === 0, "after the lapse: the frame sends no POST /api/exp", pings.slice(), K1);
+  // A ping sent by hand from the frame, as the page used to send one.
+  const manual = fr ? await fr.evaluate(() => fetch("/api/exp", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: "hero-promise" }) }).then((r) => r.json())).catch((e) => String(e)) : "no frame";
+  drill.check(manual?.ok === true && manual.recorded === false, "after the lapse: a ping sent from the frame by hand is refused (recorded:false)", manual, K1);
+  await sleep(500);
+  drill.check((await exposures(unit)).length === 0, "no exposure row for the founder's unit", await exposures(unit), K1);
+  drill.check((await allExposures()) === before, "exposures in all unchanged", { before, after: await allExposures() }, K1);
+  await ctx.close();
+}
+
+async function lapsedOrder(drill) {
+  const exp = await heroTest();
+  const unit = unitIn(exp, "b", "lapsed-order");
+  const ctx = await drill.context({ width: 1440 });
+  await setUnit(ctx, drill.baseUrl, unit);
+  // First as a shopper: exposed, counted.
+  const shopperPage = await ctx.newPage();
+  await drill.open(shopperPage, "/", { width: 1440 });
+  await noThanks(shopperPage);
+  await sleep(1200);
+  const exposed = await exposures(unit);
+  drill.check(exposed.length === 1, "exposed once as a shopper first", exposed);
+  // Then the same browser signs in and opens the Designer, and the preview lapses.
+  const page = await drill.signIn(ctx);
+  await setUnit(ctx, drill.baseUrl, unit);
+  await drill.open(page, "/admin/storefront/designer", { width: 1440 });
+  await seen(page, "Preview shows your last save", 60_000);
+  await ctx.clearCookies({ name: "_preview" });
+  const jar = await ctx.cookies();
+  drill.check(!jar.some((c) => c.name === "_preview") && jar.some((c) => c.name === "_admin" && c.value), "setup: signed in, the preview cookie gone", jar.map((c) => c.name));
+  await clearCart(page);
+  await addToCart(drill, page, "glow-serum", 1);
+  const order = await checkoutCod(drill, page);
+  let conv = [];
+  for (let i = 0; i < 10; i++) {
+    conv = await conversions(unit);
+    if (conv.length) break;
+    await sleep(500);
+  }
+  drill.check(conv.length === 0, "the COD order from the signed-in browser, preview lapsed, counts as no conversion", { unit, order: order.orderId, conversions: conv }, K1);
+  await drill.shoot(page, shot("lapsed-order"));
+  drill.note(`lapsed order: ${JSON.stringify({ unit, order: order.orderId, conversions: conv })} (a harness order; re-seed afterwards)`);
+  await ctx.close();
+}
+
+const PARTS = { designer, "preview-tab": previewTab, shopper, conversion, lapsed, "lapsed-order": lapsedOrder };
+export const parts = Object.fromEntries(Object.entries(PARTS).map(([k, fn]) => [PHASE === "after" ? k : `${PHASE}-${k}`, fn]));
