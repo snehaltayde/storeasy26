@@ -93,6 +93,18 @@ The full list goes to the owner when all six phases are done. Each entry names t
 ### The founder test (spec section 12)
 - [ ] **The riskiest-assumption test.** Recruit 5 Shopify founders who pay for at least two apps. Time the five founder tasks on the harness shell and on today's console. Show them the app matrix in section 9 and ask which apps they would cancel. Decision rule: if fewer than 3 of 5 would cancel at least one app, or if missing reviews stop most of them, reopen OQ-07 before investing further. This needs your time with founders, not engineering.
 
+## Phase 1, batch C
+
+### Colours follow the brand, and unreadable colours can't be published (TOK-01, TOK-02, checkout width)
+- [ ] **Checkout on your phone.** On your iPhone in Safari, open a store's checkout with one item in the cart. Pass: nothing moves sideways and "Payment" in the step row is fully visible. Chrome on the harness passed at 320, 360, 375, 390 and 414.
+- [ ] **A real branded store on staging.** Open a tenant that has its own brand (pavos.in, for example) before and after this merges. Pass: the greys, buttons and links now follow its own background and text colours, and you are happy with how it looks. A store with no brand looks exactly as before.
+- [ ] **The full flow on staging.** In Brand, type a dark text colour on a dark background and save. Pass: it saves, the "Hard to read" note names the problem and a colour to try, Publishing refuses with the same words, and the suggested colour publishes.
+- [ ] **Decisions:**
+  - The platform default look (no brand) keeps today's colours, so it keeps today's hard-to-read ones: small grey text (product types, old prices, captions) at 2.6:1, placeholders about 3.3:1, the wordmark accent in the footer and checkout, red error text on its pink panel at 4.36:1. Darken them (this changes the default look), or keep them?
+  - Stores using the Pulse kit's own colours: their link and wordmark accent now use a darker lime (links #588a0c become #456c09) because the old shade read at 4.15:1. Keep?
+  - Field outlines are about 1.3:1 on every store. Accessibility guidance asks 3:1 for a field's outline. Change them?
+  - The suggested fix is the nearest colour that passes (for dark text on black it suggests a mid grey, #80808e). Would you rather it suggest near-white or near-black?
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.

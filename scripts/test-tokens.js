@@ -483,6 +483,10 @@ await t("comparePixels counts every changed pixel and its box; identical images 
   const a = img(4, 3, () => 200);
   const b = img(4, 3, (i) => (i === (1 * 4 + 2) * 4 + 1 ? 201 : 200)); // pixel (2,1), green +1
   eq(comparePixels(a, a).differing, 0);
+  for (let ch = 0; ch < 4; ch++) {
+    const c = img(4, 3, (i) => (i === 5 * 4 + ch ? 199 : 200)); // pixel (1,1), one channel −1
+    eq(comparePixels(a, c).differing, 1, `a change in channel ${"rgba"[ch]} only:`);
+  }
   const r = comparePixels(a, b);
   eq(r.differing, 1);
   eq(JSON.stringify(r.box), JSON.stringify({ x: 2, y: 1, width: 1, height: 1 }));
