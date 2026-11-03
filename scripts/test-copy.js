@@ -73,6 +73,8 @@ const BANNED = [
   { label: "developer: npm command", re: /\bnpm (run|install)\b/i },
   { label: "developer: yarn command", re: /\byarn (run|install|add|sync|migrate|build|dev)\b/i },
   { label: "developer: npx command", re: /\bnpx \S/i },
+  { label: "developer: bun command", re: /\bbun (run|install|add|sync|migrate|build|dev)\b/i },
+  { label: "developer: localhost", re: /\blocalhost\b/i, only: SHOPPER_UI, literalsOnly: true },
   { label: "developer: node script", re: /\bnode scripts\//i },
   { label: "developer: sync script", re: /\bsync script\b/i },
   { label: "developer: connect Shopify", re: /\bconnect shopify\b/i },
@@ -87,6 +89,7 @@ const BANNED = [
   { label: "platform: by the platform", re: /by the platform/i },
   { label: "platform: Razorpay in copy", re: /(via Razorpay|load Razorpay|Razorpay is not configured|"Razorpay"\})/ },
   { label: "platform: vendor name in visible text", re: /\b(Razorpay|Shopify|Storeasy)\b/, only: SHOPPER_UI, literalsOnly: true },
+  { label: "platform: hosting vendor in visible text", re: /\b(Vercel|Turso)\b/i, only: SHOPPER_UI, literalsOnly: true },
   { label: "wrong brand: BeastLife", re: /beastlife/i },
   { label: "wrong brand: Beast", re: /\bbeast\b/i },
   { label: "wrong brand: coupon code", re: /\b(BEAST10|FLAT200|SOLO25)\b/ },
@@ -114,7 +117,7 @@ const ALLOWED = [
   { file: "lib/integrations.js", re: /pnpm webhooks:register/, why: "connect hint for the operator console" },
   { file: "lib/shopify-push.js", re: /paid via Razorpay/, why: "order note in Shopify admin, read by store staff; never content for shoppers" },
   { file: "lib/shopify.js", re: /\.env\.local/, why: "sync-only errors (lib/sync.js is its only importer), for operators" },
-  { file: "lib/automations.js", re: /automated rule "/, why: "notify_merchant only; the email_customer branch omits it (test-w6)" },
+  { file: "lib/automations.js", re: /automated rule "/, why: "notify_merchant only; the email_customer branch omits it (tested below, and in test-w6)" },
 ];
 
 // Marketing routes only render on the platform's own host; a tenant host gets a
@@ -260,6 +263,8 @@ await t("the scan fails: each banned rule catches planted text", async () => {
     "developer: npm command": "npm run build",
     "developer: yarn command": "Then run: yarn sync",
     "developer: npx command": "npx prisma migrate",
+    "developer: bun command": "Run bun sync first.",
+    "developer: localhost": "See localhost:3000 for setup",
     "developer: node script": "node scripts/sync.js",
     "developer: sync script": "run the sync script",
     "developer: connect Shopify": "connect Shopify first",
@@ -274,6 +279,7 @@ await t("the scan fails: each banned rule catches planted text", async () => {
     "platform: by the platform": "paused by the platform",
     "platform: Razorpay in copy": "Secure payment via Razorpay.",
     "platform: vendor name in visible text": "Powered by Shopify",
+    "platform: hosting vendor in visible text": "Hosted on Vercel, data in Turso",
     "wrong brand: BeastLife": "About BeastLife",
     "wrong brand: Beast": "Go Beast mode",
     "wrong brand: coupon code": "try BEAST10",
@@ -355,7 +361,7 @@ await t("every neutralized row's old wording fails the scan (inventory section 1
     ["components/account/ReorderPanel.js", "`Couldn't check this order (${res.status}).`"],
     ["app/api/checkout/route.js", '"Razorpay is not configured"'],
     ["app/api/checkout/route.js", '"Checkout is briefly paused by the platform — nothing was charged."'],
-    // Allowed in lib/automations.js for store emails; test-w6 guards the shopper branch there.
+    // Allowed in lib/automations.js for store emails; "automation emails" below guards the shopper branch.
     ["lib/notifications.js", '`— automated rule "${rule.name}"`'],
     ["components/cart/CartDrawer.js", "<p>COD fee (if any) added at checkout · prices incl. GST</p>"],
     ["app/(storefront)/orders/[orderId]/page.js", "<p>Refunds reach the original payment method in 5–7 business days.</p>"],
@@ -607,6 +613,39 @@ await t("code defaults: a store with nothing set reads neutral", async () => {
   assertClean(JSON.stringify(COMPONENTS), "section registry");
 });
 
+// The Home editor isn't scanned (it is a console file), but what its "add section"
+// buttons start with can reach shoppers. Read from the real source; a move fails loudly.
+await t("home editor: a new section starts with nothing a shopper could be shown unedited", async () => {
+  const block = (await readFile(join(ROOT, "components/admin/cms/HomeEditor.js"), "utf8")).match(/const NEW_SECTION = (\{[\s\S]*?\n\});/);
+  ok(block, "NEW_SECTION has moved in the Home editor");
+  const NEW_SECTION = new Function(`return ${block[1]}`)();
+  eq(NEW_SECTION.new.title, "New arrivals", "newest products:");
+  eq(NEW_SECTION.collections.title, "Shop by collection", "collections:");
+  assertClean(JSON.stringify(NEW_SECTION), "new sections");
+  eq(`${NEW_SECTION.banner.title}${NEW_SECTION.banner.text}${NEW_SECTION.banner.label}`, "", "a new banner has no words of its own:");
+  eq(`${NEW_SECTION.rich_text.title}${NEW_SECTION.rich_text.html}`, "", "a new rich text section has no words of its own:");
+  const { validateBlock } = await import("../lib/cms/validate.js");
+  eq(validateBlock("home_sections", [NEW_SECTION.banner]).ok, false, "an unedited banner can't be saved:");
+  eq(validateBlock("home_sections", [NEW_SECTION.rich_text]).ok, false, "an unedited rich text section can't be saved:");
+  ok(validateBlock("home_sections", [{ ...NEW_SECTION.banner, title: "Hello" }]).ok, "a banner the founder typed saves");
+});
+
+await t("automation emails: the rule's name stays out of a shopper's email", async () => {
+  const M = await import("../lib/automations.js");
+  await inStocked(async () => {
+    await M.setAutomationsDisabled(false);
+    await libsql.execute({
+      sql: "INSERT INTO orders (id, email, total, currency, status, payment_method, snapshot, created_at, updated_at, sync_attempts, refunded_total) VALUES (?,?,?,?,'paid',?,?,datetime('now'),datetime('now'),0,0)",
+      args: ["GEN03-1", "shopper@x.test", 1000, "INR", "cod", JSON.stringify({ consent: JSON.stringify({ v: 2, a: 1, m: 1, at: "2026-10-28T00:00:00Z" }), items: [] })],
+    });
+    const order = await db.selectFrom("orders").selectAll().where("id", "=", "GEN03-1").executeTakeFirst();
+    const rule = await M.upsertAutomation({ name: "Secret rule", trigger: "order_placed", action: { kind: "email_customer", subject: "Thanks", text: "Thanks for ordering!" }, cap_per_day: 10 }, { enabled: true });
+    eq((await M.runOne(rule, { key: "order_placed:GEN03-1", order })).status, "done", "sent:");
+    const email = await db.selectFrom("notifications").selectAll().where("type", "=", "automation_email_customer").executeTakeFirst();
+    eq(email.body, "Thanks for ordering!\n\nOrder GEN03-1", "the whole email:");
+  });
+});
+
 await t("BeastLife keeps its stored voice: only code defaults changed", async () => {
   const stored = "Science-backed protein, creatine and pre-workout — browse the full catalog at ludicrous speed.";
   await inBl(() => S.setBlock("hero", { title: "Go Beast Mode.", highlight: "Beast", subtitle: stored, primary: { label: "Shop", href: "/collections" }, secondary: { label: "New", href: "#new" } }));
@@ -693,6 +732,19 @@ await t("checkout page (rendered): a store with no rates sees the starter charge
   const html = await renderCheckoutPage(inStocked, await cartWithCandle(inStocked), await realFlow());
   eq(shippingLib.computeShipping({ subtotal: 500, paymentMethod: "cod" }).total, 128, "what the server charges for COD:");
   ok(html.includes("₹128") && html.includes("₹628"), "the real charge must stay visible");
+});
+
+await t("checkout page (rendered): a closed checkout shows fixed text, never the capability's reason", async () => {
+  const shop = await C.getTenant("shop");
+  for (const config of [{ checkout_mode: "shopify" }, { checkout_mode: "disabled" }, { maintenance: { enabled: true } }]) {
+    const inClosed = (fn) => withTenant({ ...shop, config: { ...shop.config, ...config } }, fn);
+    const { available, reason } = await inClosed(async () => commerceAdapter.checkoutCapability());
+    eq(available, false, "the fixture really closes checkout:");
+    ok(reason, "the capability carries a reason this page must not show");
+    if (config.checkout_mode === "shopify") ok(reason.includes("not implemented"), `the reason this guards against: ${reason}`);
+    const html = await renderCheckoutPage(inClosed, "no-cart", { __esModule: true, default: () => "the checkout form" });
+    eq(shopperText(html), "Checkout is temporarily unavailable Your cart is saved — nothing was charged. Please try again a little later. Keep browsing", "the whole page:");
+  }
 });
 
 await t("checkout preview can fail: dropping the store's rates is caught", async () => {
@@ -845,6 +897,7 @@ const PLAIN_CHECKOUT = "Could not continue — your cart is untouched, please re
 const RAW_CHECKOUT_ERRORS = [
   { error: "Razorpay order create failed (500): {\"error\":{\"code\":\"BAD_REQUEST_ERROR\"}}" },
   { error: "Razorpay order create failed (500)" },
+  { error: "Razorpay order create failed (429): Too many requests" },
   { error: "SQLITE_ERROR: no such table: orders" },
   { error: "fetch failed" },
   { error: "Cannot read properties of undefined (reading 'id')", code: "X" },
@@ -871,9 +924,12 @@ await t("checkout (clicked): a failed order shows the shopper's line, never the 
       eq(shownError(app), PLAIN_CHECKOUT, `${reply.error}:`);
     }
   }
-  const app = await checkoutAtPayment();
-  await withBrowser([{ error: "Please fill all required fields", status: 400 }], {}, () => app.click("Place order"));
-  eq(shownError(app), "Please fill all required fields", "our own line:");
+  for (const online of [false, true]) {
+    const app = await checkoutAtPayment();
+    if (online) payOnline(app);
+    await withBrowser([{ error: "Please fill all required fields", status: 400 }], {}, () => app.click(online ? "Pay " : "Place order"));
+    eq(shownError(app), "Please fill all required fields", `our own line (${online ? "online" : "cash"}):`);
+  }
 });
 
 await t("checkout (clicked): browser failures read as the connection, not as browser wording", async () => {
