@@ -280,6 +280,32 @@ Unless noted the command is `node scripts/test-first-sync.js`. A fake Shopify an
 - **Equivalent mutant left:** with one clock, a membership's `synced_at` alone separates a run's rows from older ones, so dropping the run stamp changes no test. The stamp stays because it guards the run's own rows if two invocations' clocks disagree, the same reason products carry both.
 - **`next build` passes, with one warning that is not from this branch:** it traces `lib/platform/migrate.js` through `app/api/platform/overview/route.js` ("the whole project was traced"), a file GEN-02 doesn't touch. The build doesn't run the edge storefront against anything. GEN-02 changes no edge code; `lib/sync.js` stays free of `node:` APIs and uses only `AbortSignal.timeout`, a web standard.
 
+### From review
+
+Non-blocking findings from the independent reviews, added at merge. The first eleven came from the first review and are answered in "Fix round 1" above (the table "The smaller items"); they are kept here so the list is complete. The rest came from the review of fix round 1 and are still open.
+
+**First review (answered in "Fix round 1").**
+- **Run-on sentence in every products-phase card**: "240 of 600 products so far Big stores can take a while." (`soFar()` had no full stop; the test checked only part of the sentence). Fix round 1 says it is fixed and the whole sentence is tested.
+- **Drill D7 was wrong on the seeded harness**, which has 8 products, so the step is already done and has no Open link. With the products removed it reads as described and Open lands on the card. Fix round 1 corrected the drill.
+- **Mutants with no test**, in code that works: Try again now during a backoff, the collection handle clash cleanup, a shrinking image list, a pre-0020 run stuck "running", `failSyncRun` and a live lease, an "at least" count used as the total, the 404 message, the setup step's done flag, `commit()`'s lost-answer branch, the retry source check, and the busy requeue wait. Fix round 1 says each now has a test.
+- **A cursor Shopify rejects is not treated as final**, and a failed run's card offers no "start fresh". Not fixed; already in Known limits. Theoretical, since Shopify's ID cursors don't expire.
+- **Permanent-error matching read 401/403/404/423 anywhere in the text**, even in a 5xx body. Fix round 1 says the HTTP status now decides.
+- **A store with no products and no Shopify link was shown a "Bring in products" button** that could only answer "Couldn't start". Fix round 1 says the button is hidden without a link.
+- **A failed scheduled refresh of an existing store showed a red "didn't finish coming in" card.** Fix round 1 says it now reads as a refresh, in amber.
+- **`abortUnlessGuarded` could insert a stand-in run row** if the run's row was gone (needs 50 newer runs during one run). Fix round 1 says the insert is now always refused.
+- **`docs/platform-guide.md` described the old inline sync.** Fix round 1 says it is updated.
+- **The scheduled sync queues every active tenant by default (was 3)**, and the endpoint is open when `CRON_SECRET` is unset, as before this branch. Unchanged; already in Known limits.
+- **D9 (support login) was not checked in a browser.** The unit and rendered tests cover it. Still a browser drill.
+
+**Review of fix round 1 (still open).**
+- **An important line has no test.** If a collection's old members are cleaned up on every member page instead of only the last (`lib/sync.js:666`, `page.hasNextPage ? [] :` changed to always clean up), no test fails. The suite's only long collection has 300 members, so it has one member page. With that change and a 600-member collection, a refresh that failed on the second member page left only 500 of the 600 members live, which is the original blocking problem coming back. The real code keeps all 600 live throughout. Suggested test: a collection of 600 or more members, Shopify answering 503 at the second member page, and the live count still 600 after the run fails.
+- **Another surviving mutant:** the cleanup on a collections page uses the run's start time (`lib/sync.js:269`, passed at `:638`). Using the page's own time instead fails no test. It only matters in a narrow race, where a webhook writes a one-page collection after the run started but before its collections page.
+- **Equivalent survivors.** Treating every leased job as lapsed is still safe, because the SQL that takes a job refuses a live lease. Ignoring `sync_generation` in the cleanup, or not stamping run rows with it, makes no difference while one clock writes everything, as the packet says.
+- **Removing the sync read time limit is caught only by a timeout.** `test-first-sync` then hangs until the test runner's per-suite timeout stops it; no named test fails.
+- **A long collection's order can be mixed during and after a failed refresh.** It holds its old members plus the new ones, with positions from two orderings, and members Shopify removed stay listed until a later complete sync or a collection webhook. Shoppers never see fewer products. This matches the new copy "Your store keeps everything it had, plus what came in." Already in Known limits.
+- **Tenant migration 0020 must run before this code is deployed**, because collection webhooks now write `collection_products.sync_generation` and `synced_at`. Already in Merge notes.
+- **Not run in that review:** `next build` and browser drills. No storefront edge module imports anything new: `lib/sync.js` and `lib/admin/sync-view.js` are imported only by Node routes.
+
 ## Browser drills still needed
 
 Desktop Chrome on the design harness. The harness tenant (`design`, `.design-tenant.db`) has no Shopify link and no sync runs, and it has 8 products. Each state is set by writing a `sync_runs` row directly (local file database only), for example with `sqlite3 .design-tenant.db`. Re-seed the harness first (`node scripts/dev-design.js seed`), so migration 0020 as it now stands is applied. A harness seeded from the first GEN-02 commit refuses to start with a checksum error until it is re-seeded.
