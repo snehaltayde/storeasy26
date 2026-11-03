@@ -1,0 +1,38 @@
+# scripts/test-rates.js on d890d80 (the suite copied onto the base tree)
+— Cash on Delivery
+✗ THE BUG: the page showed ₹1,348 on the old rates, the server prices ₹1,507: refused, nothing stored, the new amount said
+    an order was stored at 1507 while the button said ₹1348
+✗ the refusal carries the server's cart and rates, so the page redraws to the amount it will charge
+    rates flat: expected 149, got undefined
+✓ REGRESSION: the shown total is the server's: the order is stored at exactly that amount, cart cleared
+✗ a request that names no total is refused, never charged unseen
+    expectedTotal undefined: expected [409,"PRICE_CHANGED"], got [200,null]
+✗ amounts compare in paise: ₹1,507.00 and "1507" are the shown ₹1,507; ₹1,506.99 is not
+    ₹1,506.99: expected 409, got 200
+✓ REGRESSION: a retry with the same key after the order went through returns that order, not a refusal
+— online payment
+✗ THE BUG, online: Pay ₹1,299 on the old rates is refused before any Razorpay order exists
+    a Razorpay order was created for 144800 paise while the button said ₹1299
+✓ online: the Razorpay order, the stored order and the modal all carry the amount on the Pay button
+✗ online: a request that names no total creates no Razorpay order
+    refused: expected [409,"PRICE_CHANGED"], got [200,null]
+— fresh pricing
+✗ a save made on another instance applies to the next order, though this instance cached the old row
+    old total, priced on the saved row: expected [409,"Shipping changed — your new total is ₹1,507. Review and place order."], got [200,null]
+✗ when the fresh read fails, checkout keeps working on the cached row, and still charges only the shown amount
+    a total the cached rates don't make: expected [409,"PRICE_CHANGED",1348], got [200,null,null]
+— the words
+✗ the shopper reads the server's sentence; anything else under that code reads the safe fallback
+    shipping: expected "Shipping changed — your new total is ₹1,507. Review and place order.", got "Could not continue — your cart is untouched, please retry."
+— the checkout UI
+✗ guard: both payment methods send the total the button shows, and a refusal redraws from the server's cart and rates
+    the UI does not send grandTotal as expectedTotal
+
+3 passed, 10 failed
+
+# scripts/test-copy.js P1-RATES test on d890d80 (base CheckoutFlow; only lib/checkout-price.js added so the suite can load)
+✗ checkout (clicked, P1-RATES): a refused total redraws the page, and the next press sends the redrawn amount
+    requests on one press (cash), no silent retry: expected 1, got 2
+✓ settings (rendered): the notice shows only when the rates aren't chosen
+--
+52 passed, 1 failed

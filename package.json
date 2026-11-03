@@ -91,6 +91,7 @@
     "test:console-fresh": "node scripts/test-console-fresh.js",
     "test:preview-experiments": "node scripts/test-preview-experiments.js",
     "test:tokens": "node scripts/test-tokens.js",
+    "test:rates": "node scripts/test-rates.js",
     "test:perf": "node scripts/perf-report.js",
     "test:perf-tools": "node scripts/test-perf-tools.js",
     "seed:design": "node scripts/dev-design.js seed",

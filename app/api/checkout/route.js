@@ -17,6 +17,7 @@ import {
 } from "@/lib/orders";
 import { razorpayConfigured, razorpayKeyId, createRazorpayOrder, verifyRazorpaySignature } from "@/lib/razorpay";
 import { toMinor, sameAmount } from "@/lib/money";
+import { priceMismatch, PRICE_CHANGED } from "@/lib/checkout-price";
 import { checkoutCapability } from "@/lib/commerce/adapter";
 import { tenantHandler } from "@/lib/tenant-request";
 import { conversionUnit } from "@/lib/experiments";
@@ -60,6 +61,27 @@ async function dedupByKey(key, cart, expectedTotal) {
   return existing;
 }
 
+// P1-RATES: never charge an amount the shopper wasn't shown (lib/checkout-price.js).
+// The refusal also carries the server's cart and rates, which the checkout page
+// already hands this shopper, so the UI redraws the summary and the button from
+// the numbers the server will charge. undefined rates (the code default) drop
+// out of the JSON and the UI's computeShipping falls back to the same default.
+function priceCheck(body, cart, shipping, shippingConfig) {
+  const currency = cart.currency || "INR";
+  const m = priceMismatch({
+    expectedTotal: body?.expectedTotal,
+    expectedShipping: body?.expectedShipping,
+    goodsTotal: cart.total || 0,
+    shippingTotal: shipping.total,
+    currency,
+  });
+  if (!m) return null;
+  return NextResponse.json(
+    { ok: false, code: PRICE_CHANGED, error: m.message, total: m.total, shippingTotal: m.shippingTotal, currency, cart, shippingConfig },
+    { status: 409 },
+  );
+}
+
 // S25 (SF08): every response the client navigates to confirmation from carries
 // a server-computed tokenized path — the confirmation page requires it. Minted
 // inside the tenantHandler context, so the right tenant's secret signs it.
@@ -96,6 +118,11 @@ async function razorpayResponse(order, razorpayOrderId, deduped = false) {
   });
 }
 
+// P1-RATES: priced with the store's row as saved now, not this instance's
+// 30 s copy (tenantHandler's "prefer"), so a founder's new rates apply from
+// the next order and a refusal hands the shopper the rates that will be
+// charged. A failed fresh read falls back to the cached row: a control-plane
+// blip never closes checkout, and the amount check holds either way.
 export const POST = tenantHandler(async (request) => {
   // S32 (BE06): the per-tenant capability gate — checkout modes are explicit
   // configuration, never silently switched. Browsing and the cart stay up.
@@ -133,13 +160,15 @@ export const POST = tenantHandler(async (request) => {
       const cart = cartId ? await getCart(cartId) : { items: [] };
 
       // Authoritative shipping: same pure engine the drawer/checkout UI use,
-      // now with the real payment method + destination pincode.
+      // now with the real payment method + destination pincode. One read of the
+      // rates for the whole request (the row was read fresh, see POST below).
+      const shippingConfig = tenantShippingConfig();
       const shipping = computeShipping({
         subtotal: cart.subtotal || 0,
         discountTotal: cart.discountTotal || 0,
         paymentMethod: "cod",
         pincode: address?.pincode,
-        config: tenantShippingConfig(),
+        config: shippingConfig,
       });
 
       const dup = await dedupByKey(idempotencyKey, cart, (cart.total || 0) + shipping.total);
@@ -154,6 +183,9 @@ export const POST = tenantHandler(async (request) => {
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+      // P1-RATES: never store an amount the shopper wasn't shown.
+      const changed = priceCheck(body, cart, shipping, shippingConfig);
+      if (changed) return changed;
 
       const order = await createOrder({
         cartId,
@@ -201,12 +233,13 @@ export const POST = tenantHandler(async (request) => {
         return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
       const cart = cartId ? await getCart(cartId) : { items: [] };
 
+      const shippingConfig = tenantShippingConfig();
       const shipping = computeShipping({
         subtotal: cart.subtotal || 0,
         discountTotal: cart.discountTotal || 0,
         paymentMethod: "prepaid",
         pincode: address?.pincode,
-        config: tenantShippingConfig(),
+        config: shippingConfig,
       });
 
       // Dedup BEFORE creating a Razorpay order, so a retry reopens the SAME
@@ -219,6 +252,10 @@ export const POST = tenantHandler(async (request) => {
       if (!validate(contact, address))
         return NextResponse.json({ error: "Please fill all required fields" }, { status: 400 });
       if (!cart.items.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+      // P1-RATES: the Razorpay order is minted for the amount on the Pay button,
+      // or not at all.
+      const changed = priceCheck(body, cart, shipping, shippingConfig);
+      if (changed) return changed;
 
       // One getCart + one shipping compute → the SAME amount for the Razorpay
       // order, our order row, and (later) the Shopify shipping line.
@@ -302,4 +339,4 @@ export const POST = tenantHandler(async (request) => {
       { status },
     );
   }
-});
+}, { fresh: "prefer" });

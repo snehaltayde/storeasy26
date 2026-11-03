@@ -9,7 +9,11 @@
 //                    the Designer: the new name in the field and the console sidebar
 //   c-rates          save new shipping rates, then within 30 s add to cart and go
 //                    through COD checkout to the review step: the drawer's shipping
-//                    and the review's shipping and total agree (numbers recorded)
+//                    and the review's shipping and total agree (numbers recorded).
+//                    P1-RATES: then Place order. The order is stored at the amount
+//                    on the button pressed; a press the server prices differently
+//                    is refused with the new total, the page redraws, and the
+//                    second press goes through at the redrawn amount
 //   c-oldversions    cms_pages as a view without `revision` (a store from before
 //                    page versions, tenant migration 0006): the Pages list and the
 //                    page editor open with no error screen
@@ -242,6 +246,25 @@ export const parts = {
     await drill.open(page, "/admin/settings", { width: W });
     const before = { flat: await page.locator("#sa-flat-rate").inputValue(), free: await page.locator("#sa-free-over").inputValue(), cod: await page.locator("#sa-cod-fee").inputValue() };
     const NEW = { flat: before.flat === "149" ? "129" : "149", free: "4999", cod: "59" };
+    // P1-RATES: the shopper's caches must hold the rates being changed from, or
+    // the drill tests nothing. A run started within 30 s of an earlier run's
+    // put-back still has that run's rates cached: wait it out and warm again.
+    {
+      const SUB0 = 1299;
+      const cod0 = (SUB0 >= Number(before.free) ? 0 : Number(before.flat)) + Number(before.cod);
+      const shipOf = (s) => (s === "FREE" ? 0 : Number(String(s ?? "").replace(/[^\d.]/g, "")));
+      let warm = warmReview;
+      if (shipOf(warm.shipping) !== cod0) {
+        drill.note(`the warm review shows ${warm.shipping}, not the current rates' ₹${cod0}: waiting 32 s for the caches to expire`);
+        await sleep(32_000);
+        await clearAndAdd();
+        await drawerNums();
+        warm = await review();
+        drill.note(`warmed again: review ${JSON.stringify({ shipping: warm.shipping, total: warm.total })}`);
+      }
+      drill.check(shipOf(warm.shipping) === cod0, "setup: the shopper's checkout holds the rates being changed from", { review: warm.shipping, expected: cod0 });
+      await drill.open(page, "/admin/settings", { width: W });
+    }
     await page.locator("#sa-flat-rate").fill(NEW.flat);
     await page.locator("#sa-free-over").fill(NEW.free);
     await page.locator("#sa-cod-fee").fill(NEW.cod);
@@ -288,17 +311,54 @@ export const parts = {
     drill.check(s1.payment.at < 30_000, "the drawer, review and payment steps were read within 30 s of the save", { drawer: s1.drawer.at, review: s1.review.at, payment: s1.payment.at });
     drill.check(s1.drawer.rates === s1.review.rates, "the drawer's shipping and the review step's shipping come from the same rates", { drawer: s1.drawer, review: s1.review });
     drill.check(s1.review.rates === s1.payment.rates, "the review step's shipping and total and the payment step's total come from the same rates", { review: s1.review, payment: s1.payment });
-    const placed = sp.waitForResponse((r) => new URL(r.url()).pathname === "/api/checkout" && r.request().method() === "POST", { timeout: 60_000 });
-    await sp.getByRole("button", { name: /^Place order/ }).click();
-    const pres = await placed;
-    const tOrder = Date.now() - savedAt;
-    const pbody = await pres.json().catch(() => ({}));
-    await sp.waitForURL(/\/checkout\/confirmation\//, { timeout: 60_000 }).catch(() => {});
+    // P1-RATES: whatever the page shows, the server charges that amount or
+    // refuses, says the new total and redraws the page; then the shopper presses
+    // the redrawn button. Every stored order must equal the button pressed.
+    const orderCount = async () => Number((await rows("tenant", "SELECT COUNT(*) AS n FROM orders"))[0]?.n ?? 0);
+    const press = async () => {
+      const shown = await sp.evaluate(() => (document.querySelector("main")?.innerText || "").match(/Place order · (₹[\d,]+)/)?.[1] ?? null);
+      const before = await orderCount();
+      const placed = sp.waitForResponse((r) => new URL(r.url()).pathname === "/api/checkout" && r.request().method() === "POST", { timeout: 60_000 });
+      await sp.getByRole("button", { name: /^Place order/ }).click();
+      const res = await placed;
+      const body = await res.json().catch(() => ({}));
+      return { shown, status: res.status(), body, at: Date.now() - savedAt, newOrders: (await orderCount()) - before };
+    };
+    const p1 = await press();
+    drill.note(`first press at ${p1.at} ms on "Place order · ${p1.shown}": ${p1.status} ${JSON.stringify({ code: p1.body.code, error: p1.body.error, total: p1.body.total, orderId: p1.body.orderId })}`);
+    let final = p1;
+    if (p1.status === 409 && p1.body.code === "PRICE_CHANGED") {
+      drill.check(p1.newOrders === 0, "a refused press stores no order", { newOrders: p1.newOrders });
+      await sp.locator("main").getByRole("alert").filter({ hasText: "your new total is" }).waitFor({ timeout: 10_000 });
+      await sp.waitForTimeout(400);
+      const after = await sp.evaluate(() => {
+        const t = document.querySelector("main")?.innerText || "";
+        // the order summary only: the alert also says "Shipping changed … ₹1,507"
+        const summary = document.querySelector("main aside")?.innerText || "";
+        return {
+          alert: document.querySelector('main [role="alert"]')?.innerText.trim() ?? null,
+          button: t.match(/Place order · (₹[\d,]+)/)?.[1] ?? null,
+          shipping: summary.match(/Shipping[^\n₹]*\n?\s*(FREE|₹[\d,]+)/)?.[1] ?? null,
+          total: summary.match(/\bTotal\s*\n?\s*(₹[\d,]+)/)?.[1] ?? null,
+        };
+      });
+      drill.note(`after the refusal: ${JSON.stringify(after)}`);
+      await drill.shoot(sp, "c-rates-refused-within-30s");
+      const newAmount = `₹${Number(p1.body.total).toLocaleString("en-IN")}`;
+      drill.check(after.alert === `Shipping changed — your new total is ${newAmount}. Review and place order.`, "the shopper is told shipping changed and the new total", after.alert);
+      drill.check(after.button === newAmount && money(after.total) === Number(p1.body.total) && which(num(after.shipping), true) === which(Number(p1.body.shippingTotal), true), "the button, the summary's shipping and its total are redrawn to the new amount", { after, server: { total: p1.body.total, shipping: p1.body.shippingTotal } });
+      final = await press();
+      drill.note(`second press at ${final.at} ms on "Place order · ${final.shown}": ${final.status} ${JSON.stringify({ orderId: final.body.orderId, code: final.body.code })}`);
+    }
+    // The page navigates away on success, which can take the response body
+    // with it, so the confirmation page is the proof the order went through.
+    const confirmed = await sp.waitForURL(/\/checkout\/confirmation\//, { timeout: 60_000 }).then(() => true, () => false);
     await settle(sp);
-    const orderId = pbody.orderId || decodeURIComponent(new URL(sp.url()).pathname.split("/").pop());
+    drill.check(final.status === 200 && confirmed, "the order goes through on the press after any refusal", { status: final.status, confirmed, error: final.body.error ?? null });
+    const orderId = final.body.orderId || decodeURIComponent(new URL(sp.url()).pathname.split("/").pop());
     const [ord] = await rows("tenant", "SELECT id, subtotal, shipping_total, total, payment_method FROM orders WHERE id = ?", [orderId]);
-    drill.note(`order placed at ${tOrder} ms: ${pres.status()} ${JSON.stringify(ord || pbody)}; the payment step showed "Place order · ${s1.payment.placeOrder}"`);
-    drill.check(ord && Number(ord.total) === money(s1.payment.placeOrder), "the order's stored total is the amount the payment step showed", { stored: ord?.total, shown: s1.payment.placeOrder, storedRates: ord ? which(Number(ord.shipping_total), true) : null });
+    drill.note(`order stored: ${JSON.stringify(ord || final.body)}; the button pressed said "Place order · ${final.shown}"`);
+    drill.check(ord && Number(ord.total) === money(final.shown), "the order's stored total is the amount on the button that was pressed", { stored: ord?.total, pressed: final.shown, storedRates: ord ? which(Number(ord.shipping_total), true) : null });
     await drill.shoot(sp, "c-rates-confirmation-within-30s");
     // after the 30 s window, everything shows the new rates
     await clearAndAdd();

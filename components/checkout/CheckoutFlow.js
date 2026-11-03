@@ -6,6 +6,7 @@ import Link from "next/link";
 import { formatMoney } from "@/lib/format";
 import { computeShipping } from "@/lib/shipping";
 import { friendlyCheckoutError } from "@/lib/shopper-errors";
+import { PRICE_CHANGED } from "@/lib/checkout-price";
 import { track } from "@/lib/track/client";
 
 const STEPS = ["Address", "Review", "Payment"];
@@ -43,8 +44,13 @@ const FIELDS = [
   { key: "pincode", label: "PIN code", required: true, half: true },
 ];
 
-export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store", logo = null, policies = [], shippingConfig }) {
+export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeName = "Store", logo = null, policies = [], shippingConfig: pageShippingConfig }) {
   const [step, setStep] = useState(0);
+  // P1-RATES: the cart and rates this page prices with. They start as the
+  // page's and are replaced by the server's when it refuses a total that has
+  // changed, so the summary and the button show what the server will charge.
+  const [cart, setCart] = useState(pageCart);
+  const [shippingConfig, setShippingConfig] = useState(pageShippingConfig);
   const [form, setForm] = useState({
     email: "",
     phone: "",
@@ -129,9 +135,22 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
     return intentKey.current;
   }
 
+  // P1-RATES: the server refused because the total changed. Redraw every
+  // amount from its cart and rates, say the new total, and wait for the
+  // shopper to press the button again. Nothing was created or charged.
+  function priceChanged(data) {
+    if (data.cart?.items) setCart(data.cart);
+    setShippingConfig(data.shippingConfig ?? undefined);
+    paymentKey(true);
+    setError(friendlyCheckoutError(data));
+    setPlacing(false);
+  }
+
   async function placeOrder(isRetry = false) {
     setPlacing(true);
     setError("");
+    // What the button says: the server charges this or nothing.
+    const shown = { expectedTotal: grandTotal, expectedShipping: shipping.total };
     // add_payment_info — the user committed a payment method (fired once per
     // attempt; the stable id makes an auto-retry after 409 a dedup no-op).
     if (!isRetry) {
@@ -148,13 +167,14 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
         const res = await fetch("/api/checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "cod", contact, address, idempotencyKey: paymentKey() }),
+          body: JSON.stringify({ action: "cod", contact, address, idempotencyKey: paymentKey(), ...shown }),
         });
+        const data = await res.json();
+        if (data.code === PRICE_CHANGED) return priceChanged(data);
         if (res.status === 409 && !isRetry) {
           paymentKey(true); // stale intent (cart changed) — new key, one retry
           return placeOrder(true);
         }
-        const data = await res.json();
         if (!data.ok) throw new Error(friendlyCheckoutError(data));
         goConfirmation(data);
         return;
@@ -164,13 +184,14 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "razorpay_create", contact, address, idempotencyKey: paymentKey() }),
+        body: JSON.stringify({ action: "razorpay_create", contact, address, idempotencyKey: paymentKey(), ...shown }),
       });
+      const data = await res.json();
+      if (data.code === PRICE_CHANGED) return priceChanged(data);
       if (res.status === 409 && !isRetry) {
         paymentKey(true);
         return placeOrder(true);
       }
-      const data = await res.json();
       if (!data.ok) throw new Error(friendlyCheckoutError(data));
       if (data.alreadyPaid) {
         // This intent's payment already landed (duplicate submit after verify).
@@ -374,7 +395,7 @@ export default function CheckoutFlow({ cart, razorpayEnabled, storeName = "Store
                 </label>
               </div>
 
-              {error && <p className="mt-4 rounded-sf-control bg-sf-danger-surface px-4 py-3 text-sm text-sf-danger">{error}</p>}
+              {error && <p role="alert" className="mt-4 rounded-sf-control bg-sf-danger-surface px-4 py-3 text-sm text-sf-danger">{error}</p>}
 
               <div className="mt-6 flex gap-3">
                 <button onClick={() => setStep(1)} disabled={placing} className="rounded-sf-control border border-sf-border-strong px-5 py-3 text-sm font-semibold hover:bg-sf-surface-muted disabled:opacity-50">
