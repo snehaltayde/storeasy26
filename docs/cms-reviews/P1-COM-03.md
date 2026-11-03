@@ -357,6 +357,33 @@ Deliberately left, or outside what COM-03 may change. Each was read from the cod
 - **The storefront cart wasn't opened in a browser after going back.** The suite reads the real `getCart`. The storefront runs on the edge runtime, which this harness doesn't serve against file databases (spec 8.15, the harness fix).
 - **No Safari, no real phone, no staging, and no real Shopify gift variant.** See the owner's checks.
 
+### From review
+
+Non-blocking findings from the independent reviews, added at merge. The first group came from the first review and is answered in "Fix round 1" above (the table "The non-blocking items"); it is kept here so the list is complete. The second group came from the review of fix round 1 and is still open or for the owner to decide.
+
+**First review (answered in "Fix round 1").**
+- **Going back from a stale page did not do what the dialog promised.** The route took nothing from the page, so another tab's save in between could leave different settings live while the toast reported success. Fix round 1 item 1 says the page now sends the earlier settings' time and a mismatch is refused.
+- **Going back to settings whose dates had ended promised "Shoppers get this on their next cart".** Fix round 1 item 2 says the dialog now says the dates ended.
+- **The free-item warning on Buy some, get some free was untested** (the reviewer's M15 and M16 survived). The behaviour worked. Fix round 1 item 3 says both are now caught.
+- **An edit save that always sent "on" was untested** (M26). The code was right. Fix round 1 item 4 says it is now tested.
+- **Further survivors M27, M28, M31, M3 and M22.** Fix round 1 item 5 says M27, M28 and M31 now have tests; M3 and M22 remain, as already disclosed.
+- **"Engine unchanged" rested on `match.js` being identical to the old code, not on `test:offers`**; a case-insensitive tag match (M24) passed both suites. Fix round 1 item 6 says a test now pins the rule.
+- **Default names showed the store's internal tags to shoppers**, for example 'Buy 2 products tagged "glow", get 1 free'. Fix round 1 item 7 says default names no longer name the tag.
+- **The Offers list switch still toggled a bundle's offer row**, which could leave the offer out of step with its bundle. Fix round 1 item 8 says the switch is disabled and the route refuses.
+- **Going back silently dropped unsaved edits in the open form.** Fix round 1 item 9 says the dialog now warns.
+- **A future start toasted "has started".** Fix round 1 item 10 says the toast now matches when shoppers get it.
+- **The test table said `test:offer-form 40/0` while the totals said 44/0.** Fix round 1 item 11 says the table is corrected.
+- **Accepted as listed:** collections can't be picked, discounts round to whole units outside India (12.5% of $20 shows "$3 saved"), dollar amounts use Indian digit grouping, `validate.js` keeps the rupee sign in developer messages, and B1 to B4 remain undone. The fixes for the dollar minimum-spend message and the example lines check out.
+- **Edge runtime and build:** the offers modules use no `node:` APIs, `require`, `process` or `Buffer`, and `next build` passes with only the older trace warnings from `lib/platform/migrate.js`.
+
+**Review of fix round 1 (still open, or for the owner).**
+- **The storefront cart drill (B5) could not run.** The design harness's edge cart answered `GET /api/cart` with 503 on its local file databases. What shoppers see was checked through the real `getCart` in Node instead, and the drawer still shows the offer label unchanged. The cart and the engine are not touched by this round, and the new modules are imported only by console code and the Node simulate route. It stays in the open list with B1.
+- **One harmless surviving mutant:** removing `changed &&` from the stale-name check in `components/admin/OfferForm.js:114` fails no test. It makes no difference, because when the settings haven't changed, no rule part differs and the check returns nothing anyway.
+- **From reading the code, not run: an automatic name whose product was renamed in the catalog.** Opening Edit rebuilds the name from the new product name, so the form thinks something changed. "Update live offer" is enabled straight away, and the go-back dialog adds "The changes you haven't saved here will be lost." although the founder changed nothing. Saving would take the new product name, which is arguably right. Wording only.
+- **From reading the code: turning an offer on or off from another tab doesn't change the earlier settings' time.** So the go-back dialog in a stale tab can still say "Shoppers get this on their next cart" for an offer that is now off. Going back itself is still correct, because it leaves on/off as it is.
+- **For the owner, already listed as deviations:** a typed name that exactly equals the default (an older save, with no mark) counts as automatic and will follow later rule edits. The mark (`titleAuto`) now sits inside the engine config JSON.
+- **Bundle rows now change only in Catalog.** The Offers list switch is disabled and the route refuses changes with 409 `NOT_HERE`. At `bdbe1a7` the Offers list could toggle a bundle row. That ability moved to Catalog (`components/admin/CommercePanels.js:56` calls `setBundleEnabled` through `/api/admin/bundles`), so the founder still has a way to turn a bundle off. The reviewer asked for this, so it is not a regression.
+
 ## Browser drills still needed
 
 These are for an agent with desktop Chrome on the design harness.
