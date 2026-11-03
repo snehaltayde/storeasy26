@@ -1,0 +1,96 @@
+— save
+   → 422 {"error":"Validation failed","errors":["Hero title is required"]}
+   hero with no title code: expected "VALIDATION_FAILED", got undefined
+   → 422 {"error":"Validation failed","errors":["Section 1 (banner): link must be a path or URL","Section 1 (banner): needs a title or text","Section 2 (product rail): pick a collection"]}
+   two homepage sections wrong at once code: expected "VALIDATION_FAILED", got undefined
+   → 422 {"error":"title required"}
+   page with an empty section and no title code: expected "VALIDATION_FAILED", got undefined
+   → 422 {"error":"A template needs a name"}
+   template with no name code: expected "VALIDATION_FAILED", got undefined
+   → 422 {"error":"redirect-from must be a slug"}
+   a bad redirect is refused before anything is written code: expected "VALIDATION_FAILED", got undefined
+   → 409 {"error":"edited by someone else since you loaded it","code":"CMS_CONFLICT","current":{"value":{"enabled":true,"text":"Theirs","href":"/"},"revision":1,"schema_version":1,"updated_at":"2026-11-03T08:34:24.186Z"}}
+✓ save: someone else saved first (stale revision) → 409 CMS_CONFLICT
+   → 422 {"error":"SQLITE_CONSTRAINT: UNIQUE constraint failed: cms_blocks.key"}
+   two first saves race (block) status: expected 409, got 422
+   → 422 {"error":"SQLITE_CONSTRAINT: UNIQUE constraint failed: cms_pages.slug"}
+   two first saves race (page) status: expected 409, got 422
+   → 428 {"error":"Send the revision you loaded (or force:true to overwrite deliberately)","code":"REVISION_REQUIRED"}
+✓ save: no revision sent → 428 REVISION_REQUIRED
+   → 400 {"error":"Ambiguous payload — send exactly one operation","code":"AMBIGUOUS_OPERATION"}
+✓ save: two operations in one request → 400 AMBIGUOUS_OPERATION
+   → 422 {"error":"Cannot destructure property 'slug' of 'object null' as it is null."}
+   a page that isn't an object status: expected 400, got 422
+   → 401 {"error":"Unauthorized"}
+✓ save: signed out → 401
+   → 403 {"error":"Your role (support) can't do that"}
+✓ save: read-only role (support) → 403
+   → 404 {"error":"Template not found"}
+   template that no longer exists code: expected "NOT_FOUND", got undefined
+   → 409 {"error":"edited by someone else since you loaded it","code":"CMS_CONFLICT","current":null}
+   database doesn't answer (block) status: expected 503, got 409
+   → 422 {"error":"fetch failed"}
+   database doesn't answer (page) status: expected 503, got 422
+   → 422 {"error":"SQLITE_READONLY: attempt to write a readonly database"}
+   database went read-only (block) status: expected 503, got 422
+   → 422 {"error":"SQLITE_READONLY: attempt to write a readonly database"}
+   database went read-only (reset to default) status: expected 503, got 422
+   → 422 {"error":"SQLITE_READONLY: attempt to write a readonly database"}
+   database went read-only (page) status: expected 503, got 422
+   → 422 {"error":"SQLITE_ERROR: no such table: cms_blocks"}
+   database never migrated (block) status: expected 503, got 422
+   → 422 {"error":"SQLITE_ERROR: no such table: cms_pages"}
+   database never migrated (page) status: expected 503, got 422
+   → 422 {"error":"SQLITE_ERROR: no such table: cms_templates"}
+   templates table missing (save as template) status: expected 503, got 422
+   → 422 {"error":"SQLITE_ERROR: no such table: cms_templates"}
+   templates table missing (start from a template) status: expected 503, got 422
+   → 409 {"error":"edited by someone else since you loaded it","code":"CMS_CONFLICT","current":null}
+   reading the current version fails (block) status: expected 503, got 409
+   → 422 {"error":"SQLITE_ERROR: no such function: nosuch_fn"}
+   reading the current version fails (page) status: expected 503, got 422
+   → 422 {"error":"boom: a bug of ours"}
+— load
+   → 200 {"ok":true,"blocks":{"announcement":{"enabled":false,"text":"","href":""},"hero":{"title":"Shop Failure down.","highlight":"Failure down","subtitle":"Browse the full catalog and check out in a few easy steps.","primary":{"label":"Shop all collections","href":"
+   editor load when the database doesn't answer status: expected 503, got 200
+   → 200 {"ok":true,"blocks":{"announcement":{"enabled":false,"text":"","href":""},"hero":{"title":"Shop Failure broken.","highlight":"Failure broken","subtitle":"Browse the full catalog and check out in a few easy steps.","primary":{"label":"Shop all collections","hre
+— preview
+   → 422 {"error":"Validation failed","errors":["Hero title is required"]}
+   unsaved hero and sections both wrong code: expected "VALIDATION_FAILED", got undefined
+   → 409 {"error":"Start a preview first","code":"NO_PREVIEW"}
+✓ preview: no preview open → 409 NO_PREVIEW
+   → 400 {"error":"previewCandidate can carry hero/announcement/home_sections — not pdp_extras"}
+   a block the preview can't show code: expected "UNKNOWN_BLOCK", got undefined
+   → 422 {"error":"SQLITE_ERROR: no such table: cms_preview_candidates"}
+   preview table missing (tenant before migration 0016) status: expected 503, got 422
+   → 422 {"error":"SQLITE_READONLY: attempt to write a readonly database"}
+   database went read-only status: expected 503, got 422
+   → 422 {"error":"fetch failed"}
+   database doesn't answer status: expected 503, got 422
+   → 200 {"ok":true,"url":"/api/preview?token=p.<redacted>&to=%2F"}
+— publish
+   → 422 {"error":"Publish blocked by validation","errors":["Hero: a published hero needs a title"],"warnings":["No enabled privacy policy page — add one before launch (checkout links to it)","No enabled terms/refund page — add one before launch"]}
+   hero has no title code: expected "VALIDATION_FAILED", got undefined
+   → 422 {"error":"Publish blocked by validation","errors":["Home section 1 (banner): \"/collections/not-here\" points at a collection that doesn't exist in the catalog"],"warnings":["No enabled privacy policy page — add one before launch (checkout links to it)","No en
+   banner links to a collection that isn't in the catalog code: expected "VALIDATION_FAILED", got undefined
+   → 409 {"error":"Drafts changed since you reviewed them — review the updated change list, then publish again","code":"DRAFTS_CHANGED","releases":[],"live":null,"liveSince":null,"liveHash":null,"draftHash":"5dd6b08ff3477828bae3cb5cf950127d9bee6f592aa1b3dd91d84170822d0
+✓ publish: drafts changed since review → 409 DRAFTS_CHANGED
+   → 422 {"error":"Scheduled time must be in the future"}
+   schedule time in the past code: expected "VALIDATION_FAILED", got undefined
+   → 403 {"error":"Your role (staff) can't do that"}
+✓ publish: staff can't publish → 403
+   → 422 {"error":"release rel_gone not found"}
+   undo to a version that doesn't exist status: expected 404, got 422
+   → 404 {"error":"release rel_gone not found"}
+✓ publish: cancel a release that isn't scheduled → 404
+   → 422 {"error":"fetch failed"}
+   database doesn't answer status: expected 503, got 422
+   → 422 {"error":"SQLITE_READONLY: attempt to write a readonly database"}
+   database went read-only status: expected 503, got 422
+   → 422 {"error":"SQLITE_ERROR: no such function: nosuch_fn"}
+   reading the drafts fails status: expected 503, got 422
+   → 422 {"error":"SQLITE_ERROR: no such function: nosuch_fn"}
+   the catalog lookup behind link checks fails status: expected 503, got 422
+   → 422 {"error":"SQLITE_ERROR: no such table: releases"}
+   release table missing status: expected 503, got 422
+   → 500 "<!DOCTYPE html><html>Internal Server Error</html>"

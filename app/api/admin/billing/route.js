@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { currentTenant } from "@/lib/tenant-context";
 import { platformConfigured } from "@/lib/platform/control";
@@ -38,6 +39,8 @@ export const POST = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "settings.write", resource: `billing:subscribe:${body.plan}`, diff: { status: r.status } });
     return NextResponse.json({ ok: true, result: r, ...(await buildBillingView()) });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/billing" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     const status = e.code === "BILLING_UNCONFIGURED" ? 503 : 422;
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status });
   }

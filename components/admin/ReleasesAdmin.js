@@ -5,7 +5,13 @@ import Link from "next/link";
 import { CircleCheck, ExternalLink } from "lucide-react";
 import { localInputToIso } from "@/lib/admin/schedule";
 import { diffItemInfo } from "@/components/admin/cms/labels";
-import { startPreview } from "@/components/admin/cms/api";
+import { startPreview, NETWORK_ERROR } from "@/components/admin/cms/api";
+import { issueText } from "@/lib/cms/issues";
+
+// DOC-04: publish issues are the same structured shape as save issues. The
+// server sends no positions; "Section 2 (Banner / CTA)" is worked out here
+// from each issue's section id against the sections being published.
+const issueLines = (issues, sections, severity) => (issues || []).filter((i) => i.severity === severity).map((i) => issueText(i, { sections }));
 import { Card, CardHeader } from "@/components/console/Card";
 import { Badge, StatusBadge } from "@/components/console/Badge";
 import { Banner } from "@/components/console/Banner";
@@ -68,11 +74,15 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
         setApiErrors([json.error || "Drafts changed since you reviewed them — review the updated list, then publish again."]);
         return { ok: false, error: json.error };
       }
-      const msgs = json.errors ? [json.error, ...json.errors].filter(Boolean) : [json.error || `Request failed (${res.status})`];
+      const msgs = Array.isArray(json.issues)
+        ? [json.error, ...issueLines(json.issues, json.sections, "error")].filter(Boolean)
+        : json.errors
+          ? [json.error, ...json.errors].filter(Boolean)
+          : [json.error || `Something went wrong on our side (error ${res.status}), so nothing was published. Your live store hasn't changed. Try again in a minute.`];
       setApiErrors(msgs);
       return { ok: false, error: msgs.join(" — ") };
-    } catch (e) {
-      const msg = `Network error: ${String(e?.message || e)}`;
+    } catch {
+      const msg = NETWORK_ERROR.replace("nothing was saved", "nothing was published");
       setApiErrors([msg]);
       return { ok: false, error: msg };
     } finally {
@@ -96,7 +106,10 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
     }
   }
 
-  const v = data.validation || { ok: true, errors: [], warnings: [] };
+  const rawV = data.validation || { ok: true, errors: [], warnings: [] };
+  const v = Array.isArray(rawV.issues)
+    ? { ...rawV, errors: issueLines(rawV.issues, rawV.sections, "error"), warnings: issueLines(rawV.issues, rawV.sections, "warning") }
+    : rawV;
   const diff = data.diff || { firstPublish: !data.live, dirty: !!data.dirty, items: [] };
   const diffItems = diff.items || [];
   const readyToPublish = v.ok && !!data.dirty; // content gate; canPublish is the ROLE gate

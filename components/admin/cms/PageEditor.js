@@ -21,7 +21,13 @@ import { useDirtyGuard } from "./useDirtyGuard";
 import { MediaPicker } from "./MediaPicker";
 import { pageUrl, FAMILY_LABELS } from "./labels";
 import { pageStatus } from "./PagesList";
-import { toEdit, formSections, editEmpty, sectionsPayload, blankSection } from "./pageSections";
+import { toEdit, formSections, editEmpty, sectionsPayload, blankSection, newSectionId, pageIssueText } from "./pageSections";
+
+// DOC-04: a problem is either our own words (a string) or a server issue,
+// put into words against the form as it is NOW, so the section number follows
+// the founder's edits. Clicking one scrolls to its section.
+const problemText = (p, sections) => (typeof p === "string" ? p : pageIssueText(p, sections));
+const sectionAnchor = (pid) => `pe-sec-${pid}`;
 
 // The page editor (S52): one screen for creating and editing content pages.
 // Sections keep the S38 data shapes exactly (text body = paragraphs split on
@@ -79,7 +85,7 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
   const [pendingTemplate, setPendingTemplate] = useState(null); // template pick awaiting the "replace content?" confirm
   const [saving, setSaving] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
-  const [problems, setProblems] = useState(null); // string[] — persistent 422 / validation Banner
+  const [problems, setProblems] = useState(null); // (string | issue)[] — persistent 422 / validation Banner
   const [conflict, setConflict] = useState(null); // {current} from a 409
   const [conflictBusy, setConflictBusy] = useState(false);
   const [removeId, setRemoveId] = useState(null); // section id pending the remove confirm
@@ -180,7 +186,7 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
       if (i < 0) return f;
       const copy = JSON.parse(JSON.stringify(f.sections[i]));
       copy.id = nextId();
-      delete copy.pid; // a duplicate is a NEW instance — the server mints its id
+      copy.pid = newSectionId(); // a duplicate is a NEW instance with its own durable id
       const sections = [...f.sections];
       sections.splice(i + 1, 0, copy);
       return { ...f, sections };
@@ -239,7 +245,7 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
       setConflict(res.conflict);
       return;
     }
-    setProblems(res.errors?.length ? res.errors : [res.error || "Save failed — try again."]);
+    setProblems(res.issues?.length ? res.issues.filter((i) => i.severity === "error") : res.errors?.length ? res.errors : [res.error || "Save failed — try again."]);
   }
 
   async function takeTheirs() {
@@ -366,9 +372,25 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
         {problems && (
           <Banner tone="danger" title="Couldn't save">
             <ul className="list-inside list-disc space-y-0.5">
-              {problems.map((e, i) => (
-                <li key={i}>{e}</li>
-              ))}
+              {problems.map((p, i) => {
+                const text = problemText(p, form.sections);
+                const target = typeof p === "object" && p.sectionId && form.sections.some((s) => s.pid === p.sectionId) ? sectionAnchor(p.sectionId) : null;
+                return (
+                  <li key={i}>
+                    {target ? (
+                      <button
+                        type="button"
+                        className="text-left underline-offset-2 hover:underline focus-ring"
+                        onClick={() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                      >
+                        {text}
+                      </button>
+                    ) : (
+                      text
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </Banner>
         )}
@@ -389,7 +411,7 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
               ) : (
                 <div className="space-y-3">
                   {form.sections.map((s, i) => (
-                    <Card as="div" key={s.id} padded={false} className="p-3">
+                    <Card as="div" key={s.id} id={s.pid ? sectionAnchor(s.pid) : undefined} padded={false} className="p-3">
                       <div className="flex items-center gap-2">
                         <Badge tone="neutral">
                           {i + 1}. {SECTION_LABELS[s.kind] || s.kind}
@@ -650,7 +672,7 @@ export function PageEditor({ mode, page, revision: initialRevision, fromMissing 
         onConfirm={async () => {
           const sections = sectionsPayload(form.sections);
           const r = await saveTemplateApi({ name: templateName, family: form.family, sections });
-          if (!r.ok) throw new Error(r.error || (r.errors || []).join("; ") || "Couldn’t save the template");
+          if (!r.ok) throw new Error((r.issues || []).filter((i) => i.severity === "error").map((i) => pageIssueText(i, form.sections)).join("; ") || r.error || "Couldn’t save the template");
           toast.success(`Template “${r.template.name}” saved — it’s in “Start from a template” on new pages`);
         }}
       />

@@ -138,7 +138,12 @@ await t("missing hero title blocks; dead catalog link blocks; unknown path warns
 await t("brand contrast failure blocks a publish even if it slipped into drafts", async () => {
   const r = await inTenant(() => R.validateRelease({ v: 1, blocks: {}, pages: [], brand: { foreground: "#cccccc", background: "#ffffff" } }));
   eq(r.ok, false);
-  if (!/Brand:/.test(r.errors[0])) throw new Error(`wrong error: ${r.errors}`);
+  // DOC-04: the issue names its document; "Brand:" is the reader's wording, not the server's
+  const brand = r.issues.find((i) => i.severity === "error");
+  if (brand?.documentId !== "doc_design" || brand.code !== "BRAND_INVALID") throw new Error(`wrong issue: ${JSON.stringify(r.issues)}`);
+  if (!/contrast/i.test(r.errors[0])) throw new Error(`wrong error: ${r.errors}`);
+  const { issueText } = await import("../lib/cms/issues.js");
+  if (!/^Brand: /.test(issueText(brand))) throw new Error(`worded: ${issueText(brand)}`);
 });
 
 await t("createRelease refuses an invalid draft set with RELEASE_INVALID", async () => {

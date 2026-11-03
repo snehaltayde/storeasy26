@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { listPlacements, upsertPlacement, deletePlacement } from "@/lib/cms/placements";
@@ -33,6 +34,8 @@ export const PUT = tenantHandler(async (request, { params }) => {
     await audit({ actor: auth.actor, action: "upsells.write", resource: `placement:${id}`, diff: { enabled: body.enabled !== false } });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/upsells/[id]" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 422 });
   }
 });

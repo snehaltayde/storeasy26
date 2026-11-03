@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { saveMedia, listMedia, setMediaAlt, deleteMedia, mediaUsage, mediaUrl, MEDIA_MIME } from "@/lib/media";
 import { audit } from "@/lib/platform/audit";
@@ -66,6 +67,8 @@ export const POST = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "storefront.write", resource: `media:${original.id}`, diff: { filename: original.filename, size: original.size, thumb: !!thumbRow } });
     return NextResponse.json({ ok: true, media: shape(original), thumb: thumbRow ? shape(thumbRow) : null });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/media" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     if (e.code === "MEDIA_INVALID") return NextResponse.json({ error: e.message, errors: e.errors }, { status: 422 });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }
@@ -80,6 +83,8 @@ export const PATCH = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "storefront.write", resource: `media:${body.id}`, diff: { alt: true } });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/media" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 422 });
   }
 });
@@ -95,6 +100,8 @@ export const DELETE = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "storefront.write", resource: `media:${id}`, diff: { deleted: true, forced: body.force === true } });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/media" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     if (e.code === "MEDIA_IN_USE") return NextResponse.json({ error: e.message, code: e.code, usage: e.usage }, { status: 409 });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 422 });
   }

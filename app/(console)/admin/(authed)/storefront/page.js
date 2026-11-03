@@ -12,6 +12,7 @@ import { Banner } from "@/components/console/Banner";
 import { EmptyState } from "@/components/console/bits";
 import { diffItemInfo, BLOCK_INFO, pageUrl, FAMILY_LABELS } from "@/components/admin/cms/labels";
 import { tfetch } from "@/lib/tenant-request";
+import { issueText } from "@/lib/cms/issues";
 
 // S52: the Storefront OVERVIEW — published state, what's changed since live,
 // recent edits, and the doors into each management area. The old everything-
@@ -96,9 +97,12 @@ export default async function StorefrontOverviewPage() {
           {validation.errors.length > 0 && (
             <Banner tone="danger" title="Fix before publishing" className="mb-3">
               <ul className="list-inside list-disc space-y-0.5">
-                {validation.errors.map((e, i) => (
-                  <li key={i}>{e}</li>
-                ))}
+                {/* DOC-04: worded from each issue's ids against the sections being published */}
+                {validation.issues
+                  .filter((it) => it.severity === "error")
+                  .map((it, i) => (
+                    <li key={i}>{issueText(it, { sections: validation.sections })}</li>
+                  ))}
               </ul>
             </Banner>
           )}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { listReturns, decideReturn } from "@/lib/returns";
@@ -29,6 +30,8 @@ export const POST = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "returns.decide", resource: `return:${r.id}`, diff: { status: r.status } });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
+    const infra = infraResponse(e, { route: "admin/returns" }); // DOC-04: a database failure is never a 4xx
+    if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e).slice(0, 300) }, { status: 422 });
   }
 });
