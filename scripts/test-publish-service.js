@@ -864,6 +864,33 @@ await t("FIX4 late commit: a {lost} whose batch actually committed after the rea
   eq((await C.platformDb().execute({ sql: "SELECT count(*) AS n FROM audit_log WHERE tenant_id = 'psdocs' AND action = 'storefront.publish' AND resource = ?", args: [`release:${first.releaseId}`] })).rows[0].n, 1, "audited:");
 });
 
+await t("FIX4 late commit, journal post (batch 5 merge with PERF-01): a post has no list entry, so its own late batch is found through the journal index and reported as success", async () => {
+  const d = await create("docs", "journal", { body: page("late-post", "Late post", "Words.", "journal") });
+  const before = await pointerOf();
+  let calls = 0;
+  let first = null;
+  Pub.setPublishHooks({
+    commit: async (b) => {
+      calls++;
+      if (calls > 1) return commitPublishBatch(b);
+      first = b;
+      const real = await commitPublishBatch(b);
+      eq(real.outcome, "ok", "the first batch commits:");
+      return { lost: true, outcome: "lost", releaseId: b.releaseId, pointer: before.pointer, list: before.list, cause: new Error("fetch failed") };
+    },
+  });
+  const r = await publishApi("docs", d.id);
+  Pub.setPublishHooks({});
+  eq(r.status, 200, `status: ${JSON.stringify(r.body).slice(0, 400)}`);
+  ok(!/someone else/i.test(JSON.stringify(r.body)), "never 'someone else published'");
+  eq(r.body.release.id, first.releaseId, "the release that went live:");
+  const live = await pointerOf();
+  eq(live.pointer, first.releaseId, "live pointer:");
+  ok(!Object.hasOwn(live.list.documents, d.id), "the post has no list entry (PERF-01)");
+  eq(calls, 2, "the rebuilt batch was refused by the guard, then the first recognised:");
+  eq((await sql("SELECT count(*) AS n FROM publish_log WHERE document_id = ?", [d.id]))[0].n, 1, "one log row:");
+});
+
 await t("FIX4 R1: the journal index is re-read on every attempt: a post published while another post's publish rebuilds stays in /journal", async () => {
   const a = await create("docs", "journal", { body: page("r1-post-a", "R1 A", "A.", "journal") });
   const b = await create("docs", "journal", { body: page("r1-post-b", "R1 B", "B.", "journal") });
