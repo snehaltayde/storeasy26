@@ -705,9 +705,83 @@ try {
       eq(c.status, 1, `${tenantArg}: --confirm alone is not enough:`);
       ok(/refusing: the control plane/.test(c.stderr), c.stderr);
     }
-    // a control plane on this machine (the harness's sqld) is accepted like a file one
-    const onMachine = cli(["--tenant", "_default", "--dry-run", "--json"], { PLATFORM_DB_URL: "http://127.0.0.1:7169" });
-    ok(!/control plane/.test(onMachine.stderr), `a local sqld address is not refused: ${onMachine.stderr.slice(0, 200)}`);
+  });
+
+  // P4-FIX2: the review found the old "local sqld control plane is accepted"
+  // case weak (it ran _default, which never reads the control plane, on a port
+  // nothing listened on). These run a real store against a real control plane.
+  await t("P4-FIX2: a store (not _default) runs against a local sqld control plane: the command reads the store's row from that sqld, and a store the sqld doesn't hold is 'no store'", async () => {
+    const H = await import("./design-harness.js");
+    const { mkdtemp, rm: rmDir } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const net = await import("node:net");
+    const { createClient } = await import("@libsql/client");
+    const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+    const freePort = () =>
+      new Promise((resolve, reject) => {
+        const srv = net.createServer();
+        srv.once("error", reject);
+        srv.listen(0, "127.0.0.1", () => {
+          const { port } = srv.address();
+          srv.close(() => resolve(port));
+        });
+      });
+    const found = H.findSqld(); // throws (the case fails) when sqld is missing, as test:publish does
+    const dataDir = await mkdtemp(join(tmpdir(), "storeasy-test-migrate-map-"));
+    const port = Number(process.env.TEST_MIGRATE_MAP_SQLD_PORT) || (await freePort());
+    const sqld = H.startSqld({ bin: found.bin, key: "platform", port, dataDir });
+    let client = null;
+    try {
+      await H.waitForHealth(sqld.url, sqld.child, { logFile: sqld.logFile, label: "test:migrate-map" });
+      ok(/^http:\/\/127\.0\.0\.1:\d+$/.test(sqld.url), `a local address: ${sqld.url}`);
+      client = createClient({ url: sqld.url });
+      await client.executeMultiple(await readFile(join(ROOT, "lib/platform/schema.sql"), "utf8"));
+      await runMigrations(client, await loadMigrations("platform"), {});
+      // the store's control-plane row, copied as it is (its database is the local file)
+      const row = (await world.control.platformDb().execute({ sql: "SELECT * FROM tenants WHERE id = ?", args: ["mmapcli"] })).rows[0];
+      ok(row && /^file:/.test(String(row.db_url)), "mmapcli is a local file store");
+      const cols = Object.keys(row);
+      await client.execute({ sql: `INSERT INTO tenants (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`, args: cols.map((c) => row[c]) });
+      const viaSqld = cli(["--tenant", "mmapcli", "--dry-run", "--json"], { PLATFORM_DB_URL: sqld.url, PLATFORM_DB_TOKEN: "" });
+      eq(viaSqld.status, 0, `exit (stderr ${viaSqld.stderr.slice(0, 300)}):`);
+      ok(!/refusing|control plane/.test(viaSqld.stderr), viaSqld.stderr);
+      const j = JSON.parse(viaSqld.stdout);
+      eq(j.details.tenant, "mmapcli", "the store:");
+      // the same store through the file control plane gives the same report
+      const viaFile = JSON.parse(cli(["--tenant", "mmapcli", "--dry-run", "--json"]).stdout);
+      eq(j.digest, viaFile.digest, "the same digest as through the file control plane:");
+      // the sqld really is the one read: a store only the file control plane holds
+      ok(await world.control.getTenant("mmapsched", { fresh: true }), "mmapsched is in the file control plane");
+      const missing = cli(["--tenant", "mmapsched", "--dry-run", "--json"], { PLATFORM_DB_URL: sqld.url, PLATFORM_DB_TOKEN: "" });
+      eq(missing.status, 1, "a store the sqld doesn't hold:");
+      ok(/no store "mmapsched" in the control plane/.test(missing.stderr), missing.stderr);
+    } finally {
+      try {
+        client?.close();
+      } catch {}
+      await H.stopChild(sqld.child);
+      await rmDir(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  await t("P4-FIX2: a hosted control plane with a local store needs --hosted --confirm: the same local store that runs against a local control plane is refused, --confirm alone or for another store is not enough, and nothing is read", async () => {
+    const { db } = await tenant({ id: "mmapcpl", state: "live_v3" });
+    const before = await fileHash(db);
+    // control: the store and the control plane both local, no flags: it runs
+    const local = cli(["--tenant", "mmapcpl", "--dry-run", "--json"]);
+    eq(local.status, 0, `local control plane (stderr ${local.stderr.slice(0, 300)}):`);
+    eq(JSON.parse(local.stdout).details.tenant, "mmapcpl", "the store:");
+    // the same store, the control plane hosted (a .invalid host never resolves)
+    const hostedPlatform = { PLATFORM_DB_URL: "libsql://mmap-platform.invalid", PLATFORM_DB_TOKEN: "dummy-not-a-token" };
+    for (const [label, extra] of [["no flags", []], ["--confirm alone", ["--confirm", "mmapcpl"]], ["--confirm for another store", ["--confirm", "mmapcli"]]]) {
+      const r = cli(["--tenant", "mmapcpl", "--dry-run", "--json", ...extra], hostedPlatform);
+      eq(r.status, 1, `${label}: exit:`);
+      ok(/refusing: the control plane \(PLATFORM_DB_URL\) is not a local database/.test(r.stderr), `${label}: refused for the control plane, not the store: ${r.stderr}`);
+      ok(/--hosted --confirm mmapcpl/.test(r.stderr), `${label}: says what it needs: ${r.stderr}`);
+      eq(r.stdout, "", `${label}: nothing printed, nothing read`);
+      ok(!/mmap-platform|dummy/.test(r.stderr), `${label}: the URL and token are not printed`);
+    }
+    eq(await fileHash(db), before, "the store's file is unchanged:");
   });
 
   await t("P4-FIX1: the dry run says, below Details, which routes the in-process data check covered", async () => {
@@ -1110,6 +1184,28 @@ try {
     ok(doc(b, "doc_cart").published.versionId !== doc(a, "doc_cart").published.versionId, "the cart version id moves");
     const check = await checkOf(db, b);
     ok(!check.differences.some((d) => d.fn === "resolvedCartUpsell"), "shoppers see the same offer");
+  });
+
+  await t("P4-FIX2: mapPages reads 'stored' from the same list it renames: with empty rows (null, 0, false) between the sections, each stored id stays on its own section and each generated one moves", async () => {
+    const { db } = await tenant({ set: "journal", state: "no_release_open", id: "mmapnulls" });
+    const SECTIONS = [
+      null,
+      { kind: "text", heading: "Alpha", body: ["a"] }, // no id: generated sec_l0
+      0,
+      { id: "sec_l0", kind: "text", heading: "Stored zero", body: ["s"] }, // stored, the same id
+      false,
+      { kind: "text", heading: "Gamma", body: ["g"] }, // no id: generated sec_l2
+      { id: "sec_keep", heading: "No kind", body: ["k"] }, // stored, kind-less (a text section)
+    ];
+    await exec(db, "INSERT INTO cms_pages (slug, title, description, sections, enabled, family) VALUES ('with-nulls', 'With nulls', '', ?, 1, 'page')", [JSON.stringify(SECTIONS)]);
+    const out = await mapIt(db, { storeOpen: true });
+    const page = out.documents.find((d) => d.slug === "with-nulls");
+    for (const body of [page.draft, page.published.body]) {
+      const got = body.sections.map((s) => [s.id, JSON.stringify(s.settings).match(/Alpha|Stored zero|Gamma|No kind/)?.[0] ?? null]);
+      same(got, [["sec_l0x2", "Alpha"], ["sec_l0", "Stored zero"], ["sec_l2", "Gamma"], ["sec_keep", "No kind"]], "each id on its own section:");
+    }
+    const check = await checkOf(db, out);
+    ok(!check.differences.some((d) => d.fn === "resolvedContentPage" && JSON.stringify(d.args).includes("with-nulls")), `shoppers see the same page: ${JSON.stringify(check.differences).slice(0, 300)}`);
   });
 } finally {
   await world.cleanup();

@@ -21,6 +21,9 @@
 //      finds a planted mismatch; shoppers of the legacy store still see none
 //      of those rows.
 //   5. The dry run's verdict no longer refuses a store for its entity content.
+//   6. P4-FIX2: home rail pins are capped at 24; a closed store reads no live
+//      row; a failing live-row read degrades the pairs strip and the
+//      template (logged) while the product's own content still fails closed.
 //   pnpm test:entity-content
 import { COL, P, ENTITY_FIXTURES, ROOT, buildPhase3Leftovers, installHooks, makeLegacyTenant, openWorld } from "./support/legacy-tenants.js";
 
@@ -336,6 +339,131 @@ await t("a store whose only extras are product and collection content is no long
   const report = Rep.buildReport({ ...mapped }, check);
   ok(!report.verdict.fixes.some((f) => f.code === "ENTITY_CONTENT_NOT_MOVABLE"), `fixes: ${JSON.stringify(report.verdict.fixes)}`);
   same(report.shopperChanges, [], "nothing shoppers would see change:");
+});
+
+// =====================================================================================
+console.log("— 6. P4-FIX2: the pin cap, the closed store, and a failing live-row read");
+// =====================================================================================
+const Eff = await import("../lib/catalog/effective.js");
+const DocsReader = await import("../lib/content/documents-reader.js");
+// A legacy v3 store with its mapped live rows written as a backfill would.
+async function backfilled() {
+  const { db } = await tenant({ state: "live_v3", entities: CLEAN });
+  const mapped = await mapIt(db, "live_v3");
+  await db.run(async () => {
+    const stmts = [
+      ...mapped.liveRows.product.map((row) => LiveRows.liveRowStatement({ type: "product_content", entityId: row.product_id, row })),
+      ...mapped.liveRows.collection.map((row) => LiveRows.liveRowStatement({ type: "collection_content", entityId: row.collection_id, row })),
+    ];
+    await libsql.batch(stmts, "write");
+  });
+  // the candidate that reads those tables (no rows of its own), and the one with no rows at all
+  const tables = Res.candidateSource({ list: mapped.list, bodies: mapped.bodies, releaseId: mapped.releaseId });
+  const none = Res.candidateSource({ list: mapped.list, bodies: mapped.bodies, releaseId: mapped.releaseId, entityRows: { product: new Map(), collection: new Map() } });
+  return { db, mapped, tables, none };
+}
+// slog lines written while fn runs
+async function logged(fn) {
+  const lines = [];
+  const real = console.log;
+  console.log = (...a) => {
+    if (a.length === 1 && typeof a[0] === "string" && a[0].startsWith("{")) {
+      try {
+        lines.push(JSON.parse(a[0]));
+        return;
+      } catch {
+        /* not a log line */
+      }
+    }
+    real(...a);
+  };
+  try {
+    return { result: await fn(), lines };
+  } finally {
+    console.log = real;
+  }
+}
+// Make a live table unreadable (an error that is not "no such table"): the
+// real table moves aside and a view of the same columns fails on every row.
+async function breakTable(db, table, key, columns) {
+  await exec(db, `ALTER TABLE ${table} RENAME TO ${table}_fix2`);
+  await exec(db, `CREATE VIEW ${table} AS SELECT json_extract('{not json', '$') AS ${key}, ${columns.filter((c) => c !== key).join(", ")} FROM ${table}_fix2`);
+  return async () => {
+    await exec(db, `DROP VIEW ${table}`);
+    await exec(db, `ALTER TABLE ${table}_fix2 RENAME TO ${table}`);
+  };
+}
+
+await t("home rail pins on a documents store: livePinsByHandles gives at most 24 pins, the first 24 in order", async () => {
+  const { db } = await backfilled();
+  const thirty = Array.from({ length: 30 }, (_, i) => P(500 + i));
+  await exec(db, "UPDATE collection_content_live SET pinned = ? WHERE collection_id = ?", [JSON.stringify(thirty), COL(230)]);
+  const pins = await db.run(() => Eff.livePinsByHandles(["pinned-col", "sidebar-col", "no-such-col"]));
+  same(pins.get("pinned-col"), thirty.slice(0, 24), "capped at 24:");
+  same(pins.get("no-such-col"), [], "a collection with no row:");
+});
+
+await t("a closed store (PUB-06) reads no live row: modules, badge, pairs, pins and templates are the neutral empties even though the tables hold rows", async () => {
+  const { db, tables, none } = await backfilled();
+  const closed = { mode: "closed", v: tables.v, list: DocsReader.emptyList(), releaseId: null, content: null, preview: false };
+  const closedEmpty = { ...none, list: DocsReader.emptyList(), releaseId: null };
+  await db.run(async () => {
+    const C1 = Res.contentGettersFor(closed);
+    const open = Res.contentGettersFor(tables);
+    // control: the same reads on an open candidate see the rows
+    eq((await open.resolvedProductOverride(P(201))).badge, "Lab tested", "control, open:");
+    eq((await open.resolvedSurfaceTemplateFor("pdp", P(240))).template, "editorial", "control, open template:");
+    same(await C1.resolvedProductOverride(P(201)), { modules: [], badge: "" }, "closed: no modules or badge:");
+    const pairs = await C1.resolvedPdpPairs(P(210));
+    ok(pairs.source !== "manual", `closed: no hand-picked pairs: ${JSON.stringify(pairs)}`);
+    same(pairs, await Res.contentGettersFor(closedEmpty).resolvedPdpPairs(P(210)), "closed pairs are a store with no row's:");
+    same(await C1.resolvedCollectionPins("pinned-col"), [], "closed: no pins:");
+    const tpl = await C1.resolvedSurfaceTemplateFor("pdp", P(240));
+    ok(tpl.template !== "editorial" && tpl.source !== "entity", `closed: not the product's own template: ${JSON.stringify(tpl)}`);
+    ok((await C1.resolvedSurfaceTemplateFor("collection", COL(241))).source !== "entity", "closed: not the collection's own template");
+  });
+});
+
+await t("a failing live-row read: the pairs strip falls back to the automatic strip and the template to the family default, each logged; the product's own content row still fails closed", async () => {
+  const { db, tables, none } = await backfilled();
+  // what a product with no row shows: the target answers
+  const want = await db.run(async () => {
+    const G = Res.contentGettersFor(none);
+    return { pairs: await G.resolvedPdpPairs(P(210)), tpl: await G.resolvedSurfaceTemplateFor("pdp", P(240)), ctpl: await G.resolvedSurfaceTemplateFor("collection", COL(241)) };
+  });
+  ok(want.pairs.source !== "manual" && want.tpl.template !== "editorial" && want.ctpl.template !== "sidebar", "the no-row answers differ from the rows'");
+  const fixP = await breakTable(db, "product_content_live", "product_id", Eff.PRODUCT_ENTITY_COLUMNS);
+  const fixC = await breakTable(db, "collection_content_live", "collection_id", Eff.COLLECTION_ENTITY_COLUMNS);
+  try {
+    // the break really is a read error, not a missing table
+    const direct = await db.run(() => Eff.contentRowFor(P(210)).then(() => null, (e) => e));
+    ok(direct && /malformed JSON/i.test(String(direct.message || direct.cause?.message)), `a read error: ${direct}`);
+    const { result, lines } = await logged(() =>
+      db.run(async () => {
+        const G = Res.contentGettersFor(tables);
+        return {
+          pairs: await G.resolvedPdpPairs(P(210)),
+          tpl: await G.resolvedSurfaceTemplateFor("pdp", P(240)),
+          ctpl: await G.resolvedSurfaceTemplateFor("collection", COL(241)),
+          override: await G.resolvedProductOverride(P(201)).then(() => "no error", (e) => e),
+        };
+      }),
+    );
+    // no hand-picked pairs; the automatic strip reads the effective titles
+    // through the same broken table, so getPdpPairs gives its own read-error
+    // answer, exactly the legacy reader's: an empty strip, never an error page
+    same(result.pairs, { title: "Pairs well with", products: [], source: "none" }, "pairs: the legacy read-error answer:");
+    ok(want.pairs.source === "auto", "control: with a readable table and no row it is the automatic strip");
+    same(result.tpl, want.tpl, "product template: the family default:");
+    same(result.ctpl, want.ctpl, "collection template: the family default:");
+    ok(result.override instanceof Error, `the product's own content fails closed: ${result.override}`);
+    const failed = lines.filter((l) => l.evt === "entity_row_read_failed");
+    same(failed.map((l) => [l.kind, l.part]).sort(), [["collection", "template"], ["product", "pairs"], ["product", "template"]].sort(), "each degraded read is logged:");
+    ok(failed.every((l) => /malformed JSON/i.test(l.error)), "with the error");
+  } finally {
+    await fixP();
+    await fixC();
+  }
 });
 
 for (const name of CLEAN) ok(ENTITY_FIXTURES[name], `unknown fixture ${name}`);

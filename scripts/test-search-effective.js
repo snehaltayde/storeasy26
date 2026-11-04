@@ -319,6 +319,71 @@ await t("only rows written before the import read the catalog are marked done: a
   eq(await pending(docs), [], "nothing pending:");
 });
 
+await t("P4-FIX2: when the full sync's drain fails after the reopen, it enqueues a search_reindex job of its own (the publish's job for the same rows is already done), and that job drains the reopened rows", async () => {
+  // a publish whose own job ran and finished: its key is taken for good
+  const index = new Map();
+  await rename(docs, 6, "Six Before Sync");
+  const top = (await pending(docs)).at(-1).rid;
+  const k = await docs.run(() => SR.kickSearchReindex({ client: indexedSpy(index).s }));
+  ok(k.job?.id, "the publish's job");
+  TS.setSearchAdminClientForTest(indexedSpy(index).s);
+  await W.runDueJobs({ limit: 50 });
+  const key = docs.run(() => SR.searchReindexKey(top));
+  eq((await J.getJobByKey(key)).status, "done", "the publish's job is done:");
+  eq(await pending(docs), [], "nothing pending before the sync:");
+  // the full sync: its page import holds Six's old name while a fast drain
+  // writes a newer one and marks its row done; the reopen makes that row
+  // pending again; then search goes down for the drain
+  await rename(docs, 6, "Six V1");
+  await docs.run(() => SR.drainSearchOutbox({ client: indexedSpy(index).s }));
+  // the rebuild's page imports go through; every import after them (the
+  // drain) fails: search went down
+  const catalogSize = Number((await sql(docs, "SELECT count(*) AS n FROM products WHERE handle IS NOT NULL AND handle != ''"))[0].n);
+  let rebuilt = 0;
+  const FS = indexedSpy(index, { holdWhen: (ds) => ds.some((d) => d.id === H(6) && d.title === "Six V1") });
+  const failing = spy({
+    onImport: async (call) => {
+      if (rebuilt >= catalogSize) throw new Error("search went down");
+      rebuilt += call.docs.length;
+      await FS.s.collections(call.name).documents().import(call.docs, { action: call.action });
+    },
+  });
+  TS.setSearchAdminClientForTest(failing);
+  const jobsBefore = (await J.listJobs({ limit: 500 })).filter((j) => j.type === "search_reindex").length;
+  const sync = docs.run(() => Sync.indexTypesense());
+  await FS.heldNow;
+  await rename(docs, 6, "Six V2");
+  await docs.run(() => SR.drainSearchOutbox({ client: indexedSpy(index).s }));
+  eq(await pending(docs), [], "the fast drain marked its row done:");
+  FS.release();
+  const r = await sync;
+  const left = await pending(docs);
+  ok(left.some((x) => x.product_id === P(6)), `the reopened row is pending: ${JSON.stringify(left)}`);
+  ok(r.requeued?.key, `the sync says it requeued: ${JSON.stringify(r)}`);
+  const top2 = left.at(-1).rid;
+  ok(r.requeued.key.startsWith(`search_reindex:sedocs:${top2}:sync:`), `a key of its own: ${r.requeued.key}`);
+  const jobs = (await J.listJobs({ limit: 500 })).filter((j) => j.type === "search_reindex");
+  eq(jobs.length, jobsBefore + 1, "one new job:");
+  eq((await J.getJobByKey(r.requeued.key)).status, "pending", "pending:");
+  eq(index.get(H(6)).title, "Six V1", "search holds the old name until the job runs:");
+  // the job drains it
+  TS.setSearchAdminClientForTest(indexedSpy(index).s);
+  await W.runDueJobs({ limit: 50 });
+  eq((await J.getJobByKey(r.requeued.key)).status, "done", "the job ran:");
+  eq(index.get(H(6)).title, "Six V2", "search holds the live name:");
+  eq(await pending(docs), [], "nothing pending:");
+});
+
+await t("P4-FIX2: a full sync whose drain succeeds enqueues no extra job", async () => {
+  await rename(docs, 7, "Seven Synced");
+  const before = (await J.listJobs({ limit: 500 })).length;
+  TS.setSearchAdminClientForTest(spy());
+  const r = await docs.run(() => Sync.indexTypesense());
+  eq(r.requeued, undefined, "no requeue:");
+  eq((await J.listJobs({ limit: 500 })).length, before, "no job:");
+  eq(await pending(docs), [], "nothing pending:");
+});
+
 await t("on a store without Typesense, or without its own namespace, a full sync marks pending rows done and prunes, with no client call", async () => {
   typesenseOff();
   await rename(docs, 6, "Six Without Search");
