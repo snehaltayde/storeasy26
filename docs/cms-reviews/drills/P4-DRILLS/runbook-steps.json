@@ -1,0 +1,124 @@
+{
+  "ranAt": "2026-11-04T21:16:24.448Z",
+  "runbook": "docs/cms-reviews/P4-CUTOVER-RUNBOOK.md",
+  "steps": [
+    {
+      "section": "0.1",
+      "what": "the env store's updates: pnpm migrate",
+      "as": "in the sentence only ('the env store with pnpm migrate'); the code block lists --all and --check",
+      "ran": "node scripts/migrate.js (harness env)",
+      "dev": "the code block alone leaves the env store behind and the check then fails; pnpm migrate was only in the sentence",
+      "fix": "section 0.1's code block now lists pnpm migrate between --all and the check"
+    },
+    {
+      "section": "0.1",
+      "what": "pnpm tenant:migrate -- --all, then --check --include-env",
+      "as": "pnpm tenant:migrate -- --all; pnpm tenant:migrate -- --check --include-env",
+      "ran": "node scripts/tenant-migrate.js --all; … --check --include-env (harness env)",
+      "dev": "the package scripts load .env.local (the hosted control plane); on the harness the same files run with the harness's own env",
+      "fix": "a 'Practising on the local harness' section says how each command runs locally"
+    },
+    {
+      "section": "0.2-0.4, 1, 2",
+      "what": "deploy order, staging atomicity, PITR, the quiet window, the founder warning, the backup time: owner steps with no harness equivalent (the backup time is only passed with --hosted)",
+      "dev": null
+    },
+    {
+      "section": "4",
+      "what": "the dry run said Not ready (an agency has access); the agency's access removed on the Settings page (Agency access, Revoke), in Chrome",
+      "as": "Settings > Team: remove the agency's access",
+      "dev": "the report says 'Settings > Team', but the agency's access is its own panel, 'Agency access', further down the Settings page",
+      "fix": "section 4 says where: Settings, the 'Agency access' panel, Revoke (the report's own words are finding F3 for its owner)"
+    },
+    {
+      "section": "3.1",
+      "what": "the restore-drill copy (restore-drill.js --tenant X --keep)",
+      "as": "node --env-file=.env.local scripts/restore-drill.js --tenant X --keep",
+      "ran": "node scripts/restore-drill.js --tenant design --keep (harness env)",
+      "dev": null
+    },
+    {
+      "section": "3.2",
+      "what": "serve the copy with the local harness",
+      "as": "start the harness, load the copy into a local sqld database, and point a local control-plane row for store X at that sqld",
+      "ran": "node scripts/drills/p4/runbook.mjs serve-copy --copy restore-drill-design.db --tenant design (then Ctrl-C)",
+      "dev": "the runbook named no command for loading the file into sqld or for pointing the row; a developer had to write both",
+      "fix": "section 3.2 now gives the command (runbook.mjs serve-copy) and what to do when it is done (Ctrl-C: the row points back, the copy's server stops)"
+    },
+    {
+      "section": "3.3",
+      "what": "the route list (migrate-render --make-routes)",
+      "as": "node scripts/migrate-render.mjs --make-routes routes.json --tenant X",
+      "ran": "the same, harness env",
+      "dev": null
+    },
+    {
+      "section": "4",
+      "what": "the dry run (Ready to move, the digest kept)",
+      "as": "node --env-file=.env.local scripts/migrate-documents.js --tenant X --dry-run --hosted --confirm X",
+      "ran": "node scripts/migrate-documents.js --tenant design --dry-run (harness env, no --hosted --confirm)",
+      "dev": "--hosted --confirm X is refused on a local store ('Run it without --hosted'); the owner's real run needs it",
+      "fix": "the new 'Practising on the local harness' section lists what to leave out locally"
+    },
+    {
+      "section": "5",
+      "what": "the rehearsal on the copy (Result: passed)",
+      "as": "node --env-file=.env.local scripts/migrate-documents.js --tenant X --rehearsal-run --db <the copy's local address> --base http://localhost:<harness port> --routes routes.json --out rehearsal-X",
+      "ran": "the same with the harness env; --db is the address serve-copy printed",
+      "dev": null
+    },
+    {
+      "section": "8",
+      "what": "--status during the stop",
+      "as": "node --env-file=.env.local scripts/migrate-documents.js --tenant X --status --hosted --confirm X",
+      "ran": "node scripts/migrate-documents.js --tenant design --status (harness env)",
+      "dev": "--status prints its next commands with --env-file=.env.local even on a local store: on the harness they must run with the harness env",
+      "fix": "the harness section says the printed commands are for the real store; on the harness run them without --env-file"
+    },
+    {
+      "section": "0.3",
+      "what": "the staging check of hosted batch atomicity: an old editor's save while the store is being updated",
+      "as": "it must answer \"Your store is being updated. Try again in a few minutes.\" (the batch guard's words)",
+      "ran": "the same save on the harness",
+      "dev": "an ordinary save reads the mode first and is refused before any batch is sent (409, \"This store is moving to the new editor right now, so nothing was saved. Make this change in the new editor once the move is done.\"), so it never reaches the batch guard 0.3 is meant to test on Turso; no runbook step reaches it",
+      "fix": "0.3 keeps the batch guard's words as its only proof, says an ordinary save is refused before any batch and that those words prove nothing, and is marked open (an owner and orchestrator decision: a staging-only script, or accept the local proof) with no real move before it; checked by runbook.mjs --check",
+      "correctedBy": "P4-DRILLS fix round 1, by hand: the run on dbc27f2 recorded this as '0.3 and 8' with the fix 'section 0.3 quotes the words the store says now', which was wrong; the measured save (409, the words above, nothing saved) is unchanged"
+    },
+    {
+      "section": "8",
+      "what": "an old editor's save while the store is being updated",
+      "as": "every old editor refuses (\"This store is moving to the new editor right now, so nothing was saved…\")",
+      "ran": "the same save on the harness",
+      "dev": null
+    },
+    {
+      "section": "8",
+      "what": "--abort before the switch, back on the old editor",
+      "as": "--abort",
+      "ran": "node scripts/migrate-documents.js --tenant design --abort (harness env)",
+      "dev": null
+    },
+    {
+      "section": "8 → 6",
+      "what": "after --abort, the earlier rehearsal is refused ('The store changed since that rehearsal…')",
+      "as": "section 8 said only that the next move takes the old editor's content again",
+      "ran": "a fresh copy, rehearsal and dry run (sections 3 to 5 again), then the move",
+      "dev": "the runbook didn't say that after --abort the move needs a fresh copy, rehearsal and dry run",
+      "fix": "section 8 now says: after --abort, start again from section 3 (a fresh copy, the dry run, the rehearsal), then the move"
+    },
+    {
+      "section": "6",
+      "what": "the move with the digest and the rehearsal report",
+      "as": "… --dry-run-digest <digest> --rehearsal rehearsal-X/rehearsal.json --hosted --confirm X --backup-ref <time>",
+      "ran": "node scripts/migrate-documents.js --tenant design --dry-run-digest <digest> --rehearsal <report> (harness env)",
+      "dev": null
+    },
+    {
+      "section": "9",
+      "what": "the reversal's dry run, the reversal with its digest, its --status",
+      "as": "node --env-file=.env.local scripts/reverse-documents.js --tenant X --dry-run --hosted --confirm X; … --dry-run-digest <digest> --hosted --confirm X --backup-ref <time>",
+      "ran": "node scripts/reverse-documents.js --tenant design --dry-run, then --dry-run-digest <digest> (harness env)",
+      "dev": null
+    }
+  ]
+}

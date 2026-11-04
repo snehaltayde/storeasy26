@@ -1,0 +1,66 @@
+{
+  "ranAt": "2026-11-04T20:27:57.191Z",
+  "finishedAt": "2026-11-04T20:33:45.676Z",
+  "stages": [
+    "items"
+  ],
+  "rows": [
+    {
+      "stage": "items",
+      "name": "smoke",
+      "id": "P3-HARNESS",
+      "exit": 1,
+      "seconds": 34,
+      "passed": 25,
+      "failed": 1,
+      "known": 0,
+      "results": "items/P3-HARNESS-results-smoke.json"
+    },
+    {
+      "stage": "items",
+      "name": "routes",
+      "id": "P3-ROUTES",
+      "exit": 1,
+      "seconds": 230,
+      "passed": 18,
+      "failed": 1,
+      "known": 0,
+      "aborted": "DrillError: The harness didn't come up at http://localhost:6100 within 3 minutes.\n    at connectHarness (file:///private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/wt/scripts/drill.js:121:9)\n    at process.processTi",
+      "results": "items/P3-ROUTES-results-routes.json"
+    },
+    {
+      "stage": "items",
+      "name": "editor",
+      "id": "P3-EDITOR",
+      "exit": 0,
+      "seconds": 46,
+      "passed": 22,
+      "failed": 0,
+      "known": 0,
+      "results": "items/P3-EDITOR-results-editor.json"
+    },
+    {
+      "stage": "items",
+      "name": "design",
+      "id": "P3-DESIGN",
+      "exit": 0,
+      "seconds": 24,
+      "passed": 26,
+      "failed": 0,
+      "known": 0,
+      "results": "items/P3-DESIGN-results-design.json"
+    },
+    {
+      "stage": "items",
+      "name": "rte",
+      "id": "P3-RTE",
+      "exit": 0,
+      "seconds": 14,
+      "passed": 46,
+      "failed": 0,
+      "known": 0,
+      "results": "items/P3-RTE-results-rte.json"
+    }
+  ],
+  "failed": 2
+}

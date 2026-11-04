@@ -1,0 +1,411 @@
+{
+  "id": "P3-RTE",
+  "part": "rte",
+  "title": "P3-RTE — the rich text field",
+  "ranAt": "2026-11-04T20:33:45.569Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 46,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the console page has style sheets to give the host",
+      "detail": "1 links, 1 style tags"
+    },
+    {
+      "ok": true,
+      "label": "the field opens editable, in its sandboxed surface",
+      "detail": {
+        "mode": "edit",
+        "editable": true,
+        "html": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p>",
+        "cls": "rte",
+        "srcdoc": "about:srcdoc"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the surface holds the stored value exactly",
+      "detail": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p>"
+    },
+    {
+      "ok": true,
+      "label": "clicks and arrow keys send nothing (an untouched value is never rewritten)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "saving the untouched value stores the same bytes and the same hash",
+      "detail": {
+        "before": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p>",
+        "after": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p>"
+      }
+    },
+    {
+      "ok": true,
+      "label": "focusRequest offset 2 puts the caret at the start of the third block",
+      "detail": {
+        "focused": true,
+        "block": 2,
+        "offset": 0,
+        "text": "Third paragraph.",
+        "atStart": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "the editor's surface is styled by the .rte rules (line height 1.7, 0.85rem between blocks)",
+      "detail": {
+        "lineHeight": 1.7,
+        "gap": 0.85,
+        "linkUnderline": null,
+        "rte": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "typing makes a paragraph, and Bold makes <b>",
+      "detail": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p><p>Fourth paragraph with <b>bold words</b></p>"
+    },
+    {
+      "ok": true,
+      "label": "the Bold button shows it is on"
+    },
+    {
+      "ok": true,
+      "label": "Link makes the selected word a link",
+      "detail": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p><p><a href=\"/collections/new\">Fourth</a> paragraph with <b>bold words</b></p>"
+    },
+    {
+      "ok": true,
+      "label": "each change sent the surface's HTML",
+      "detail": 35
+    },
+    {
+      "ok": true,
+      "label": "the field takes the paste itself (the browser doesn't insert it)",
+      "detail": {
+        "prevented": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "the field sends the copied part as it was copied (the client cleans nothing)",
+      "detail": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p><p><a href=\"/collections/new\">Fourth</a> paragraph with <b>bold words</b></p><p class=MsoNormal style='margin-bottom:8.0pt;line-height:107%'><b><span style='font-size:14.0pt;mso-bidi-font-size:11.0pt;color:#C00000'>Spring sizes</s"
+    },
+    {
+      "ok": true,
+      "label": "nothing in the paste ran (no script, no ontoggle or onclick, no dialog)",
+      "detail": {
+        "pwned": null,
+        "dialogs": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "clicking the pasted onclick text runs nothing"
+    },
+    {
+      "ok": true,
+      "label": "the save is accepted"
+    },
+    {
+      "ok": true,
+      "label": "the stored value is cleaned: no script, handler, style, class or Word markup",
+      "detail": {
+        "bad": [],
+        "stored": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p><p><a href=\"/collections/new\">Fourth</a> paragraph with <b>bold words</b></p><p><b><span>Spring sizes</span></b><span> </span>run small.</p>\n<p><span>·<span>&nbsp;&nbsp; </span></span>Order one size up</p>\n\n<p><span>Free returns</span> within 30 days.Ask us anything.</p>"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the stored value keeps every word",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "the stored value keeps the bold and the link",
+      "detail": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p><p><a href=\"/collections/new\">Fourth</a> paragraph with <b>bold words</b></p><p><b><span>Spring sizes</span></b><span> </span>run small.</p>\n<p><span>·<span>&nbsp;&nbsp; </span></span>Order one size up</p>\n\n<p><span>Free returns</span> within 30 days.Ask us anything.</p>"
+    },
+    {
+      "ok": true,
+      "label": "the pasted paragraphs are not inside another paragraph",
+      "detail": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p><p><a href=\"/collections/new\">Fourth</a> paragraph with <b>bold words</b></p><p><b><span>Spring sizes</span></b><span> </span>run small.</p>\n<p><span>·<span>&nbsp;&nbsp; </span></span>Order one size up</p>\n\n<p><span>Free returns</span> within 30 days.Ask us anything.</p>"
+    },
+    {
+      "ok": true,
+      "label": "after the save the field shows the stored value",
+      "detail": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p><p><a href=\"/collections/new\">Fourth</a> paragraph with <b>bold words</b></p><p><b><span>Spring sizes</span></b><span> </span>run small.</p>\n<p><span>·<span>&nbsp;&nbsp; </span></span>Order one size up</p>\n\n<p><span>Free returns</"
+    },
+    {
+      "ok": true,
+      "label": "a preview session starts"
+    },
+    {
+      "ok": true,
+      "label": "the page opens in the preview",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "the preview shows the saved text in a .rte block"
+    },
+    {
+      "ok": true,
+      "label": "the preview has the bold, the link and no script",
+      "detail": "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p><p><a href=\"/collections/new\">Fourth</a> paragraph with <b>bold words</b></p><p><b><span>Spring sizes</span></b><span> </span>run small.</p>\n<p><span>·<span>&nbsp;&nbsp; </span></span>Order one size up</p>\n\n<p><span>Free returns</"
+    },
+    {
+      "ok": true,
+      "label": "the storefront's rich text has the same .rte rules as the editor's surface",
+      "detail": {
+        "editor": {
+          "lineHeight": 1.7,
+          "gap": 0.85,
+          "linkUnderline": null,
+          "rte": true
+        },
+        "storefront": {
+          "lineHeight": 1.7,
+          "gap": 0.85,
+          "linkUnderline": "underline",
+          "rte": true
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "nothing ran on the storefront"
+    },
+    {
+      "ok": true,
+      "label": "a value with a table opens read-only with Edit as HTML",
+      "detail": {
+        "mode": "view",
+        "editable": false,
+        "html": "<p>Sizes:</p><table><tbody><tr><th>Size</th><td>Chest</td></tr><tr><th>M</th><td>96 cm</td></tr></tbody></table>",
+        "cls": "rte",
+        "srcdoc": "about:srcdoc"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the read-only surface is as tall as its content (the whole table shows)",
+      "detail": {
+        "frame": 143,
+        "content": 143
+      }
+    },
+    {
+      "ok": true,
+      "label": "it says why, in plain words"
+    },
+    {
+      "ok": true,
+      "label": "Edit as HTML shows the stored HTML in a plain text box"
+    },
+    {
+      "ok": true,
+      "label": "the text box sends exactly what was typed"
+    },
+    {
+      "ok": true,
+      "label": "editing as HTML stores the cleaned result",
+      "detail": "<p>Sizes:</p><table><tbody><tr><th>Size</th><td>Chest</td></tr><tr><th>M</th><td>98 cm</td></tr><tr><th>L</th><td>104 cm</td></tr></tbody></table>"
+    },
+    {
+      "ok": true,
+      "label": "the text box then shows the stored value",
+      "detail": "<p>Sizes:</p><table><tbody><tr><th>Size</th><td>Chest</td></tr><tr><th>M</th><td>98 cm</td></tr><tr><th>L</th><td>104 cm</td></tr></tbody></table>"
+    },
+    {
+      "ok": true,
+      "label": "Show formatted shows the stored table read-only again",
+      "detail": "<p>Sizes:</p><table><tbody><tr><th>Size</th><td>Chest</td></tr><tr><th>M</th><td>98 cm</td></tr><tr><th>L</th><td>104 cm</td></tr></tbody></table>"
+    },
+    {
+      "ok": true,
+      "label": "the web page's paste is sent as copied",
+      "detail": "<p>Our story.</p><div class=\"product__description rte\"><p>Made from <strong>organic cotton</strong>.</p></div><product-info id=\"ProductInfo-1\" data-section=\"main\"><p>Ships in 2 days.</p></product-info>"
+    },
+    {
+      "ok": true,
+      "label": "the web page's paste saves cleaned: the visible text kept, its own tags gone (P3-FIX4)",
+      "detail": {
+        "answer": true,
+        "wstored": "<p>Our story.</p><div><p>Made from <strong>organic cotton</strong>.</p></div><p>Ships in 2 days.</p>"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the field then shows the stored text, with no refusal and no Edit as HTML offer",
+      "detail": {
+        "mode": "edit",
+        "same": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "a paste with a tag that isn't a web page's own element is sent as copied",
+      "detail": "<p>Our story.</p><p>Our deal.</p><shop class=\"x\"><p>Ten percent off.</p></shop>"
+    },
+    {
+      "ok": true,
+      "label": "a real loss is still refused (WORDS_LOST), and the words name the <shop> tag and Edit as HTML",
+      "detail": [
+        {
+          "documentId": "doc_jzexxsunphlmqu2s",
+          "sectionId": "sec_rte1",
+          "blockId": null,
+          "field": "html",
+          "code": "WORDS_LOST",
+          "severity": "error",
+          "message": "Saving would lose these words: \"<shop class=\"x\">Ten percent off.</shop>\". They come from a <shop> tag this page can't show, often hidden in pasted text. Open Edit as HTML to see it and remove that tag, or reword it if you typed it, then save again.",
+          "autoFix": null
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "nothing was stored"
+    },
+    {
+      "ok": true,
+      "label": "the field stays editable and offers Edit as HTML",
+      "detail": {
+        "mode": "edit",
+        "buttons": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "it says why, in plain words"
+    },
+    {
+      "ok": true,
+      "label": "the text box shows the hidden markup",
+      "detail": "<p>Our story.</p><p>Our deal.</p><shop class=\"x\"><p>Ten percent off.</p></shop>"
+    },
+    {
+      "ok": true,
+      "label": "after removing it, the save goes through and is stored cleaned",
+      "detail": {
+        "lstored": "<p>Our story.</p><p>Our deal.</p><p>Ten percent off.</p>"
+      }
+    },
+    {
+      "ok": true,
+      "label": "Show formatted goes back to the editor with the stored text, and Edit as HTML goes away",
+      "detail": {
+        "mode": "edit",
+        "editable": true,
+        "html": "<p>Our story.</p><p>Our deal.</p><p>Ten percent off.</p>",
+        "cls": "rte",
+        "srcdoc": "about:srcdoc"
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_4fcb40ab41c382c0, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s",
+    "host bundle: 2106 KB",
+    "made page rte-drill (doc_u6ty3t7cgctesf3n)",
+    "stored after the paste: <p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p><p><a href=\"/collections/new\">Fourth</a> paragraph with <b>bold words</b></p><p><b><span>Spring sizes</span></b><span> </span>run small.</p>\n<p><span>·<span>&nbsp;&nbsp; </span></span>Order one size up</p>\n\n<p><span>Free returns</span> within 30 days.Ask us anything.</p>",
+    "made page rte-table (doc_u7wxbhozixocfhnu)",
+    "made page rte-web (doc_4lapyzbcpcndpcoz)",
+    "made page rte-loss (doc_jzexxsunphlmqu2s)"
+  ],
+  "screenshots": [
+    {
+      "name": "editor-start-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/editor-start-1440.png",
+      "bytes": 7602,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    },
+    {
+      "name": "editor-link-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/editor-link-1440.png",
+      "bytes": 10030,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    },
+    {
+      "name": "editor-pasted-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/editor-pasted-1440.png",
+      "bytes": 11160,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    },
+    {
+      "name": "editor-saved-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/editor-saved-1440.png",
+      "bytes": 10820,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    },
+    {
+      "name": "preview-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/preview-1440.png",
+      "bytes": 21575,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/rte-drill"
+    },
+    {
+      "name": "table-readonly-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/table-readonly-1440.png",
+      "bytes": 6553,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    },
+    {
+      "name": "table-saved-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/table-saved-1440.png",
+      "bytes": 7351,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    },
+    {
+      "name": "web-paste-saved-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/web-paste-saved-1440.png",
+      "bytes": 7625,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    },
+    {
+      "name": "loss-paste-refused-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/loss-paste-refused-1440.png",
+      "bytes": 14272,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    },
+    {
+      "name": "loss-paste-saved-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/loss-paste-saved-1440.png",
+      "bytes": 7152,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    }
+  ]
+}

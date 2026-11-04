@@ -2,7 +2,7 @@
   "id": "P4-EDITOR",
   "part": "editor",
   "title": "P4-EDITOR — rename, publish, shopper, pickers, reset",
-  "ranAt": "2026-11-04T16:38:38.411Z",
+  "ranAt": "2026-11-04T20:26:18.823Z",
   "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 14,
@@ -130,13 +130,13 @@
     }
   ],
   "notes": [
-    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_6331ce8abc11b59b, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.1s"
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_29be3d1baa084ed0, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.6s"
   ],
   "screenshots": [
     {
       "name": "editor-renamed-1440",
       "file": "docs/cms-reviews/drills/P4-EDITOR/editor-renamed-1440.png",
-      "bytes": 39274,
+      "bytes": 54045,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -145,7 +145,7 @@
     {
       "name": "editor-renamed-published-1440",
       "file": "docs/cms-reviews/drills/P4-EDITOR/editor-renamed-published-1440.png",
-      "bytes": 35788,
+      "bytes": 35739,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -181,7 +181,7 @@
     {
       "name": "editor-pairs-renamed-1440",
       "file": "docs/cms-reviews/drills/P4-EDITOR/editor-pairs-renamed-1440.png",
-      "bytes": 39285,
+      "bytes": 39138,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -190,7 +190,7 @@
     {
       "name": "editor-pins-renamed-1440",
       "file": "docs/cms-reviews/drills/P4-EDITOR/editor-pins-renamed-1440.png",
-      "bytes": 33130,
+      "bytes": 33119,
       "width": 720,
       "height": 450,
       "viewport": 1440,

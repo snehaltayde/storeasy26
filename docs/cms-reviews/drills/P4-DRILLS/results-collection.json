@@ -1,0 +1,129 @@
+{
+  "id": "P4-DRILLS",
+  "part": "collection",
+  "title": "P4-DRILLS — collection",
+  "ranAt": "2026-11-04T21:08:03.586Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 9,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the route list for the page comparison (migrate-render --make-routes)",
+      "detail": "Wrote 75 routes to /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/collection-mw2ly29g/routes.json: 12 canaries, 59 more products and 4 more collections with old content. A hero test is running (hero-promise): its hero is set aside when both captures show it."
+    },
+    {
+      "ok": true,
+      "label": "the move: the rehearsal on a copy passes (the move on the copy, then the page comparison)",
+      "detail": {
+        "exit": 0,
+        "compared": 75,
+        "same": true,
+        "canariesOk": true,
+        "list": [],
+        "dataCheck": {
+          "ran": true,
+          "compared": 357,
+          "differences": 0
+        },
+        "tail": [
+          "",
+          "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/collection-mw2ly29g/rehearsal-the-move/rehearsal.json",
+          "Result: passed. Give this file to the real move with --rehearsal."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the move: the store's own database is untouched by its rehearsal",
+      "detail": {
+        "before": {
+          "mode": "legacy",
+          "live": "rel_39a5c6730f5c061a",
+          "documents": 0
+        },
+        "after": {
+          "mode": "legacy",
+          "live": "rel_39a5c6730f5c061a",
+          "documents": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the move: the dry run says Ready to move and prints its digest",
+      "detail": "Ready to move |  | What shoppers will see change"
+    },
+    {
+      "ok": true,
+      "label": "the move: the move (digest and rehearsal report as proofs) finishes",
+      "detail": "{\"ts\":\"2026-11-04T21:07:45.093Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_51724dc66968c0f5\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 21:07 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
+    },
+    {
+      "ok": true,
+      "label": "before: the product to pin is not first on the collection page",
+      "detail": {
+        "first": "/products/shaker-bottle-10",
+        "template": "standard"
+      }
+    },
+    {
+      "ok": true,
+      "label": "collection: the pin and the template are published (its live row)",
+      "detail": {
+        "phase": "done",
+        "live": {
+          "pinned": "[\"gid://shopify/Product/8000389\"]",
+          "layout_template": "sidebar"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the pinned product (Max Lifting Straps) is first on the collection page",
+      "detail": {
+        "first": [
+          "/products/max-lifting-straps-390",
+          "/products/shaker-bottle-10",
+          "/products/gym-bag-20"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the collection page uses the sidebar template",
+      "detail": {
+        "template": "sidebar",
+        "before": "standard"
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_39a5c6730f5c061a): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.5s",
+    "the demo agency's access to the store removed first (1 grant), as the dry run asks (Settings > Team)",
+    "the move: the store copied into http://127.0.0.1:7103 (58 tables, 4922 rows)",
+    "the collection: Accessories (accessories); pinned first: Max Lifting Straps"
+  ],
+  "screenshots": [
+    {
+      "name": "collection-editor-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/collection-editor-1440.png",
+      "bytes": 36004,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "shopper-collection-pinned-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/shopper-collection-pinned-1440.png",
+      "bytes": 49429,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/accessories"
+    }
+  ]
+}

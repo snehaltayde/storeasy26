@@ -1,26 +1,52 @@
-// P4-HARNESS: `pnpm drill:p4`, the phase 4 drills, in desktop Chrome on the
-// design harness. HARNESS ships the stages 'seed' and 'smoke'; P4-DRILLS adds
-// the rest (add a function to STAGE_FNS and its name to STAGES).
+// P4-HARNESS and P4-DRILLS: `pnpm drill:p4`, the phase 4 drills, in desktop
+// Chrome on the design harness. HARNESS shipped 'seed' and 'smoke'; P4-DRILLS
+// adds the founder tasks, the runbook drill and the item drills.
 //
-//   DESIGN_PORT=6160 DESIGN_SQLD_PORT=7160 node scripts/drills/p4/run.mjs [seed,smoke] [--headed]
+//   DESIGN_PORT=6100 DESIGN_SQLD_PORT=7100 [COPY_SQLD_PORT=7103] [P4_DRILL_SCRATCH=<dir>] \
+//     node scripts/drills/p4/run.mjs [stage,stage…] [--headed]
 //
-// Stages (all of them when none is named):
-//   seed   seeds the phase 4 store twice (seed-design-documents.js --p4) and
-//          checks it by SQL (check --p4): a LEGACY store live on a version 3
-//          release made by createRelease, every line of the seed list counted
-//          (P4_SEED_LIST), what the live release froze, the same counts on
-//          the second run, no password printed, the seed files mode 600.
-//          Also runs lib.mjs's selfCheck (assertLocal, p3Ports and 3017).
-//   smoke  seeds again, starts the harness and, in desktop Chrome at 1440 px:
-//          the chosen product shows its badge, its own pairs title, its six
-//          modules and the editorial template; the first pinned collection
-//          lists its pinned products first, in the sidebar template; the
-//          renamed journal post's old address redirects. Shopper captures
-//          (fixed unit cookie only) of the same pages; the owner and staff sign in.
+// Ports: the harness takes DESIGN_PORT and three database ports from
+// DESIGN_SQLD_PORT; the restore-drill copy takes COPY_SQLD_PORT (default
+// DESIGN_SQLD_PORT + 3). 3017 (the owner's harness) is refused.
 //
-// Results: docs/cms-reviews/drills/P4-HARNESS/results-<stage>.json and the
-// screenshots there; captures go to .design-data/p4-captures/ (not committed).
-import { statSync } from "node:fs";
+// Stages (all of them when none is named), each on a fresh seed:
+//   seed           (P4-HARNESS) the --p4 store, checked by SQL
+//   smoke          (P4-HARNESS) its badge, pairs title, modules, templates,
+//                  pins and redirect in Chrome; the owner and staff sign in
+//   cutover        cutover.mjs: the rehearsal on a copy, then the move of the
+//                  --p4 store; the canaries in Chrome before and after
+//   product        product.mjs: on the moved store, the founder renames a
+//                  product, gives it a description, a library photo, a badge,
+//                  a module, pairs and a template, publishes, and a shopper
+//                  sees them on the card, product page, cart, checkout,
+//                  confirmation and order page (a COD test order, cancelled);
+//                  the order page's "Shopify title" line; Reset puts
+//                  Shopify's back
+//   collection     product.mjs: a collection's pinned products and template
+//   routes         routes.mjs: every old console address leads to the editor;
+//                  the setup links open working screens
+//   media          media.mjs: archive, a refused delete of a used file, and a
+//                  file used only by a version 3 release kept for rollback
+//                  reported as used after the move
+//   reverse        reverse.mjs: the move back, the old editors work again,
+//                  the move again
+//   search-rename  product.mjs: a rename found by storefront search, its
+//                  search row done; a second rename drained to a spy search
+//                  client in this process; Undo
+//   runbook        runbook.mjs: P4-CUTOVER-RUNBOOK.md followed literally, a
+//                  stop in 'migrating' recovered with --status and --abort
+//   picker, editor, fix3, reverse-drill
+//                  the item drills (P4-PICKER, P4-EDITOR, P4-FIX3,
+//                  P4-REVERSE), each its own process, results in its own folder
+//   p3             the phase 3 item drills (scripts/drills/p3/run.mjs items),
+//                  each reseeding --p3
+//
+// Results: docs/cms-reviews/drills/P4-HARNESS/results-{seed,smoke}.json,
+// docs/cms-reviews/drills/P4-DRILLS/results-<stage>.json with the screenshots,
+// and the summary docs/cms-reviews/drills/P4-DRILLS/results-run[-<stages>].json.
+// Captures go to .design-data/p4-captures/ (not committed).
+import { spawn } from "node:child_process";
+import { copyFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DATA_DIR_NAME, ROOT, runningHarness } from "../../design-harness.js";
@@ -28,7 +54,27 @@ import { P4_SEED_LIST } from "../../seed-design-documents.js";
 import { CAPTURE_DIR, P4_SEED_PATH, captureShopperRoutes, login, noThanks, p3Ports, p4SeedState, readP4Seed, reseedP4, runDrill, selfCheck, settle, storeSql } from "./lib.mjs";
 
 export const DRILL_ID = "P4-HARNESS";
-export const STAGES = ["seed", "smoke"];
+export const DRILLS_ID = "P4-DRILLS";
+// in-process stages: [file, export] (run.mjs's own for seed and smoke)
+const OWN = {
+  cutover: ["./cutover.mjs", "cutoverStage"],
+  product: ["./product.mjs", "productStage"],
+  collection: ["./product.mjs", "collectionStage"],
+  routes: ["./routes.mjs", "routesStage"],
+  media: ["./media.mjs", "mediaStage"],
+  reverse: ["./reverse.mjs", "reverseStage"],
+  "search-rename": ["./product.mjs", "searchRenameStage"],
+  runbook: ["./runbook.mjs", "runbookStage"],
+};
+// the item drills, each its own process (runDrill refuses a second harness)
+export const CHILDREN = {
+  picker: { file: "scripts/drills/p4/picker.mjs", id: "P4-PICKER", part: "picker" },
+  editor: { file: "scripts/drills/p4/editor.mjs", id: "P4-EDITOR", part: "editor" },
+  fix3: { file: "docs/cms-reviews/drills/P4-FIX3/fix3.mjs", id: "P4-FIX3", part: "fix3" },
+  "reverse-drill": { file: "docs/cms-reviews/drills/P4-REVERSE/drill.mjs", id: "P4-REVERSE", part: "reverse" },
+  p3: { file: "scripts/drills/p3/run.mjs", args: ["items"], id: "P3-DRILLS", part: "run-items", summary: "docs/cms-reviews/drills/P3-DRILLS/results-run-items.json" },
+};
+export const STAGES = ["seed", "smoke", ...Object.keys(OWN), ...Object.keys(CHILDREN)];
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -169,20 +215,68 @@ export async function smokeStage(drill) {
 }
 
 const STAGE_FNS = { seed: seedStage, smoke: smokeStage };
+const OUT = join(ROOT, "docs", "cms-reviews", "drills", DRILLS_ID);
+
+function runChild(args, env) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const child = spawn(process.execPath, args, { cwd: ROOT, env, stdio: ["ignore", "pipe", "pipe"] });
+    const take = (c) => process.stdout.write(c);
+    child.stdout.on("data", take);
+    child.stderr.on("data", take);
+    child.on("exit", (code) => resolve({ code, seconds: Math.round((Date.now() - started) / 1000) }));
+  });
+}
+const readJson = (file) => {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+};
 
 async function main() {
   p3Ports();
+  // the move's rehearsal points the store's row at a copy and back: the
+  // harness must see the row change within a second or two
+  if (!process.env.PLATFORM_CACHE_MS) process.env.PLATFORM_CACHE_MS = "1000";
   const ours = runningHarness(join(ROOT, DATA_DIR_NAME));
   if (ours) throw new Error(`A design harness is already running in this checkout (pid ${ours.launcher.pid}). The phase 4 drills seed the store fresh and start their own: stop it first.`);
   const [only] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
   const wanted = only ? only.split(",") : STAGES;
   for (const w of wanted) if (!STAGES.includes(w)) throw new Error(`There is no stage "${w}". Stages: ${STAGES.join(", ")}.`);
-  let failed = 0;
+  const rows = [];
+  const started = new Date().toISOString();
+  mkdirSync(join(OUT, "items"), { recursive: true });
   for (const stage of wanted) {
     console.log(`\n=== ${stage}`);
-    failed += await runDrill({ id: DRILL_ID, part: stage, title: `${DRILL_ID} — ${stage}` }, STAGE_FNS[stage]);
+    const t0 = Date.now();
+    if (STAGE_FNS[stage]) {
+      const code = await runDrill({ id: DRILL_ID, part: stage, title: `${DRILL_ID} — ${stage}` }, STAGE_FNS[stage]);
+      const res = readJson(join(ROOT, "docs", "cms-reviews", "drills", DRILL_ID, `results-${stage}.json`));
+      rows.push({ stage, exit: code, seconds: Math.round((Date.now() - t0) / 1000), passed: res?.passed, failed: res?.failed, results: `../${DRILL_ID}/results-${stage}.json` });
+    } else if (OWN[stage]) {
+      const [file, name] = OWN[stage];
+      const mod = await import(file);
+      const code = await runDrill({ id: DRILLS_ID, part: stage, title: `${DRILLS_ID} — ${stage}` }, mod[name]);
+      const res = readJson(join(OUT, `results-${stage}.json`));
+      rows.push({ stage, exit: code, seconds: Math.round((Date.now() - t0) / 1000), passed: res?.passed, failed: res?.failed, results: `results-${stage}.json` });
+    } else {
+      const c = CHILDREN[stage];
+      const r = await runChild([join(ROOT, c.file), ...(c.args || []), ...process.argv.filter((a) => a === "--headed")], process.env);
+      const file = c.summary ? join(ROOT, c.summary) : join(ROOT, "docs", "cms-reviews", "drills", c.id, `results-${c.part}.json`);
+      const res = readJson(file);
+      if (res) copyFileSync(file, join(OUT, "items", `${c.id}-results-${c.part}.json`));
+      const counts = res && !c.summary ? { passed: res.passed, failed: res.failed } : res ? { passed: res.rows?.reduce((n, x) => n + (x.passed || 0), 0), failed: res.rows?.reduce((n, x) => n + (x.failed || 0), 0) } : {};
+      rows.push({ stage, exit: r.code, seconds: r.seconds, ...counts, results: res ? `items/${c.id}-results-${c.part}.json` : null });
+    }
   }
-  return failed ? 1 : 0;
+  const summary = { ranAt: started, finishedAt: new Date().toISOString(), stages: wanted, rows, failed: rows.filter((r) => r.exit !== 0 || r.failed).length };
+  const file = join(OUT, only ? `results-run-${wanted.join("-").slice(0, 60)}.json` : "results-run.json");
+  writeFileSync(file, `${JSON.stringify(summary, null, 2)}\n`);
+  console.log("\n=== summary");
+  for (const r of rows) console.log(`${r.exit === 0 && !r.failed ? "ok  " : "FAIL"} ${r.stage}: ${r.passed ?? "?"} passed, ${r.failed ?? "?"} failed (${r.seconds} s)`);
+  return summary.failed ? 1 : 0;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

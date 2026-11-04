@@ -12,14 +12,19 @@ Nothing here ever writes to Shopify.
 
 ## 0. Once, before the first store: the database updates and their order
 
-1. Apply the database updates to every store (the env store with `pnpm migrate`), then check them all, the env store included (these package scripts load `.env.local` themselves):
+1. Apply the database updates to every store, then to the env store, then check them all, the env store included (these package scripts load `.env.local` themselves):
    ```
    pnpm tenant:migrate -- --all
+   pnpm migrate
    pnpm tenant:migrate -- --check --include-env
    ```
-   The check must say every store is current.
+   The check must say every store is current. Without `pnpm migrate` the check stops on "the env store (_default): behind".
 2. Deploy order: **0023 before any code that writes refs**; **0024 and 0025 before the batch 2 code deploys**. Do not deploy code that needs a database update before that update has run everywhere.
-3. **Staging check of hosted batch atomicity (Turso), before the first real move.** On a staging store, set the store to "being updated" and try an old-editor save: it must answer "Your store is being updated. Try again in a few minutes." and save nothing. This proves a refused statement rolls back its whole batch on Turso over HTTP, as it does on the file database and on sqld. Put the store back afterwards.
+3. **Staging check of hosted batch atomicity (Turso), before the first real move. Open: it needs an owner and orchestrator decision before anyone can run it.** The check exists to show that a refused statement rolls back its whole batch on Turso over HTTP, as it does on the file database and on sqld. The only proof is the refusal from inside the batch: with the staging store set to "being updated", an old-editor write must answer "Your store is being updated. Try again in a few minutes." and save nothing.
+
+   An ordinary old-editor save cannot show this. It first reads whether the store is being updated and, if it is, refuses before any batch is sent, with "This store is moving to the new editor right now, so nothing was saved…". Those words never reach Turso's batch, so they prove nothing here: do not tick this check on them. To reach the refusal inside the batch, the store must turn "being updated" between that first read and the batch, which no one can time by hand, and there is no staging tool for it yet.
+
+   Decide one of these and write the answer here: (a) a staging-only script that, while the staging store is "being updated", sends one old-editor batch (the guard first, then a harmless write) straight to that store, skipping the first read, and checks for the words above and that nothing was written; or (b) accept the proof on the file database and on sqld and record that hosted Turso's batch rollback is untested. Until it is decided and done, this check is open and no real store moves. Put the staging store back afterwards.
 4. Confirm your Turso plan has **point-in-time restore (PITR)**. Without it there is no disaster path; do not move a store.
 
 ## 1. Pick a quiet window and warn the founder first
@@ -51,7 +56,13 @@ The rehearsal runs on a copy of the store on this machine, never on the store it
    node --env-file=.env.local scripts/restore-drill.js --tenant X --keep
    ```
    It writes `restore-drill-X.db` at the checkout root. **It holds customer data**: keep it on this machine, never commit, upload or share it, and delete it (and its `-wal` and `-shm` files) when the rehearsal is done.
-2. Serve the copy with the local harness so a browser can see it: start the harness (`pnpm dev:design`, on its own ports), load the copy into a local sqld database, and point a local control-plane row for store `X` (same id, same config) at that sqld. The page comparison captures from that harness address (`http://localhost:<port>`), and the copy is the `--db` of step 5. The drill for this item (`docs/cms-reviews/P4-CUTOVER.md`, "Drill") does exactly this on the harness and lists the commands.
+2. Serve the copy with the local harness so a browser can see it. Start the harness (`pnpm dev:design`, on its own ports, `PLATFORM_CACHE_MS=1000` so it notices the next command quickly). Then, in a second terminal, with the same `DESIGN_PORT` and `DESIGN_SQLD_PORT` (and `COPY_SQLD_PORT`, a free port for the copy):
+   ```
+   node scripts/drills/p4/runbook.mjs serve-copy --copy restore-drill-X.db --tenant X
+   ```
+   It loads the copy into its own local database server and points the harness's row for store `X` at it, then prints the copy's address (`http://127.0.0.1:<port>`): that is the `--db` of step 5, and the harness address (`http://localhost:<port>`) is the `--base`. Leave it running until the rehearsal (step 5) is done, then press **Ctrl-C**: the row points back and the copy's server stops. It only ever uses addresses on this machine.
+
+   **Needs a developer for now:** the harness must already hold a row for store `X` with the store's id and config (brand, theme). The harness only has its own `design` store; serve-copy refuses any other id and says so. Copying a real store's row into the harness is not a tool yet (`P4-CUTOVER.md`, Known limits).
 3. Make the route list for the comparison (it reads the local copy only):
    ```
    node scripts/migrate-render.mjs --make-routes routes.json --tenant X
@@ -65,7 +76,7 @@ node --env-file=.env.local scripts/migrate-documents.js --tenant X --dry-run --h
 
 Add `--store-open` for a store that never published but whose shoppers see it today, or `--not-launched` for one that never published and isn't open. The command never guesses: without the flag such a store is "Not ready".
 
-Read the plain report with the founder. It must say **Ready to move**. Keep the last line, `Dry-run digest: <digest>`: the real command needs it, and refuses if the store changed since (run the dry run again then).
+Read the plain report with the founder. It must say **Ready to move**. If it says **Not ready**, each line says what to fix and where; fix it and run the dry run again. For "An agency has access to your store": sign in as the owner, open **Settings**, scroll to the **Agency access** panel (below Team), press **Revoke** next to the agency and confirm. Keep the last line, `Dry-run digest: <digest>`: the real command needs it, and refuses if the store changed since (run the dry run again then).
 
 ## 5. The rehearsal, on the copy
 
@@ -111,10 +122,10 @@ node --env-file=.env.local scripts/migrate-documents.js --tenant X --status --ho
 It says, in plain words, whether the store is being updated, which step finished, when it started and how long it has taken, and what to run next:
 
 - `--resume` carries on from the recorded step (give the same proofs as the real move). A run that stopped after the switch only finishes its last steps (theme pin, search).
-- `--abort` (before the switch only) puts the store back on the old editor in one step: the old editors save again and the catalog copy carries on. What was already copied stays in the new editor's tables, unseen by shoppers; the next move takes the old editor's content again.
+- `--abort` (before the switch only) puts the store back on the old editor in one step: the old editors save again and the catalog copy carries on. What was already copied stays in the new editor's tables, unseen by shoppers; the next move takes the old editor's content again. **After `--abort`, start again from section 3**: a fresh restore-drill copy, the dry run and the rehearsal. The rehearsal made before the stop no longer matches (the move refuses it: "The store changed since that rehearsal… Make a fresh copy, rehearse again, and pass the new report.").
 - After the switch `--abort` refuses and names the reversal tool.
 
-While a store is being updated, every old editor refuses and the full catalog copy waits with no end time, so never leave a store in that state: resume or abort.
+While a store is being updated, every old editor refuses ("This store is moving to the new editor right now, so nothing was saved…"), the full catalog copy waits with no end time, and shoppers still see the store and can buy. Never leave a store in that state: resume or abort.
 
 ## 9. Reversal: going back to the old editor
 
@@ -157,3 +168,15 @@ It says, in plain words, whether a reversal is under way, which step finished, w
 - After step 2 `--abort` refuses: the store is already back on the old editor. To use the new editor again, move it with `migrate:documents`.
 
 While a reversal is paused, nothing can be published or saved in either editor: resume or abort, never leave it there.
+
+## Practising on the local harness (builders and rehearsals of this runbook)
+
+P4-DRILLS follows this runbook literally on the design harness (`node scripts/drills/p4/run.mjs runbook`; what each step needed is in `docs/cms-reviews/P4-DRILLS.md`). On the harness, and only there, the commands change like this:
+
+- **No `.env.local`.** Run each file with the harness's environment (its local databases, Turso, Typesense and Shopify blank), never with `--env-file=.env.local` and never through a package script that loads it (`pnpm tenant:migrate`, `pnpm migrate`, `pnpm restore:drill`): run `node scripts/<the same file> …` instead. The commands the tools print next (for example after `--status`) carry `--env-file=.env.local`, because they are written for the real store; drop it on the harness.
+- **No `--hosted --confirm X` and no `--backup-ref`.** They are refused on local databases ("Run it without --hosted"). There is nothing to back up on the harness.
+- **The store's id is `design`**, the harness's own store; serve-copy (section 3.2) works for it as written.
+- **One row for the store and its copy.** On the harness the store and its restore-drill copy share one control-plane row. serve-copy points it at the copy and Ctrl-C points it back, so the real move (section 6) only runs after Ctrl-C. On a real move the harness row is a local copy and the hosted row is never touched.
+- **Sections 0.2 to 0.4, 1 and 2** (deploy order, staging atomicity, PITR, the quiet window, the backup time) have no harness equivalent.
+- **A rehearsal that fails only on the home page's hero** while a hero test runs can be a false alarm (P4-DRILLS finding F2): rehearse again on a fresh copy. A second failure is real.
+

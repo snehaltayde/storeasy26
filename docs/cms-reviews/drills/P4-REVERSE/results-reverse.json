@@ -2,7 +2,7 @@
   "id": "P4-REVERSE",
   "part": "reverse",
   "title": "P4-REVERSE — move, rename, move back, move again, in desktop Chrome",
-  "ranAt": "2026-11-04T19:05:04.644Z",
+  "ranAt": "2026-11-04T20:27:56.922Z",
   "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 21,
@@ -12,7 +12,7 @@
     {
       "ok": true,
       "label": "the route list for the comparison (migrate-render --make-routes)",
-      "detail": "Wrote 75 routes to /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b6/P4-REVERSE/drill-scratch2/routes.json: 12 canaries, 59 more products and 4 more collections with old content. A hero test is running (hero-promise): its hero is set aside when both captures show it."
+      "detail": "Wrote 75 routes to /var/folders/qv/kw93gh7s6n11gs_hs2cgvd8c0000gn/T/p4-reverse-drill-vsc33Q/routes.json: 12 canaries, 59 more products and 4 more collections with old content. A hero test is running (hero-promise): its hero is set aside when both captures show it."
     },
     {
       "ok": true,
@@ -39,7 +39,7 @@
         },
         "tail": [
           "",
-          "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b6/P4-REVERSE/drill-scratch2/rehearsal-first-move/rehearsal.json",
+          "Rehearsal report: /var/folders/qv/kw93gh7s6n11gs_hs2cgvd8c0000gn/T/p4-reverse-drill-vsc33Q/rehearsal-first-move/rehearsal.json",
           "Result: passed. Give this file to the real move with --rehearsal."
         ]
       }
@@ -52,14 +52,14 @@
     {
       "ok": true,
       "label": "first-move: the move finishes",
-      "detail": "{\"ts\":\"2026-11-04T19:04:18.466Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_001f4794d495e0a7\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 19:04 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
+      "detail": "{\"ts\":\"2026-11-04T20:27:10.281Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_d63ec4d231d5ccb7\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 20:27 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
     },
     {
       "ok": true,
       "label": "the store is on the new editor, the old live release recorded",
       "detail": {
         "mode": "documents",
-        "cutover_release_id": "rel_52004462e9679a6f"
+        "cutover_release_id": "rel_08f6b8f35fb3503e"
       }
     },
     {
@@ -104,7 +104,7 @@
     {
       "ok": true,
       "label": "the reversal finishes, with the message for the founder",
-      "detail": "Your store is back on the old editor.\n  Moved back at 2026-11-04 19:04 UTC.\n\nEdits from the new editor that won't show any more\n  - “Micronised Creatine”: new name (“Drill Renamed Bestseller”).\n  - 1 part of your store was published in the new editor since the move (1 publish).\n  - 1 product edit (names, descriptions, photos, brand or type shown) on 1 product follow Shopify again.\n  - 0 unpublished drafts stay in the new editor.\n\nUnpublished drafts in the new editor\n  None.\n\nSearch\n  Search is being updated to Shopify's names.\n\nThe store's look (for Storeasy's own screens)\n  Set back to the old editor's look.\n\nA message you can pass on\n  Your store is back on the old editor. Shoppers see it as it was before the move to the new editor.\n  These edits from the new editor don't show any more:\n    - “Micronised Creatine”: new name (“Drill Renamed Bestseller”).\n  The old editors work again right away.\n  When your store moves to the new editor again, the product edits above (names, descriptions, photos, brand and type shown) come back. Other things you published in the new editor stay saved there as older versions.\n"
+      "detail": "Your store is back on the old editor.\n  Moved back at 2026-11-04 20:27 UTC.\n\nEdits from the new editor that won't show any more\n  - “Micronised Creatine”: new name (“Drill Renamed Bestseller”).\n  - 1 part of your store was published in the new editor since the move (1 publish).\n  - 1 product edit (names, descriptions, photos, brand or type shown) on 1 product follow Shopify again.\n  - 0 unpublished drafts stay in the new editor.\n\nUnpublished drafts in the new editor\n  None.\n\nSearch\n  Search is being updated to Shopify's names.\n\nThe store's look (for Storeasy's own screens)\n  Set back to the old editor's look.\n\nA message you can pass on\n  Your store is back on the old editor. Shoppers see it as it was before the move to the new editor.\n  These edits from the new editor don't show any more:\n    - “Micronised Creatine”: new name (“Drill Renamed Bestseller”).\n  The old editors work again right away.\n  When your store moves to the new editor again, the product edits above (names, descriptions, photos, brand and type shown) come back. Other things you published in the new editor stay saved there as older versions.\n"
     },
     {
       "ok": true,
@@ -114,7 +114,7 @@
           "mode": "legacy"
         },
         {
-          "id": "rel_52004462e9679a6f"
+          "id": "rel_08f6b8f35fb3503e"
         },
         {
           "n": 0
@@ -135,7 +135,7 @@
     {
       "ok": true,
       "label": "--status says the store is back on the old editor",
-      "detail": "Your store uses the old editor. No reversal is under way.\n  The last reversal moved the store back to the old editor at 2026-11-04 19:04 UTC."
+      "detail": "Your store uses the old editor. No reversal is under way.\n  The last reversal moved the store back to the old editor at 2026-11-04 20:27 UTC."
     },
     {
       "ok": true,
@@ -154,7 +154,7 @@
         },
         "tail": [
           "",
-          "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b6/P4-REVERSE/drill-scratch2/rehearsal-second-move/rehearsal.json",
+          "Rehearsal report: /var/folders/qv/kw93gh7s6n11gs_hs2cgvd8c0000gn/T/p4-reverse-drill-vsc33Q/rehearsal-second-move/rehearsal.json",
           "Result: passed. Give this file to the real move with --rehearsal."
         ]
       }
@@ -167,7 +167,7 @@
     {
       "ok": true,
       "label": "second-move: the move finishes",
-      "detail": "{\"ts\":\"2026-11-04T19:05:00.713Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_001f4794d495e0a7\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 19:05 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nEdits that came back\n  - “Micronised Creatine”: new name (“Drill Renamed Bestseller”).\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
+      "detail": "{\"ts\":\"2026-11-04T20:27:52.554Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_d63ec4d231d5ccb7\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 20:27 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nEdits that came back\n  - “Micronised Creatine”: new name (“Drill Renamed Bestseller”).\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
     },
     {
       "ok": true,
@@ -184,8 +184,8 @@
     }
   ],
   "notes": [
-    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_52004462e9679a6f): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.6s",
-    "store design; the product /products/micronised-creatine-12 (gid://shopify/Product/8000011), Shopify's name \"Micronised Creatine\"; scratch /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b6/P4-REVERSE/drill-scratch2",
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_08f6b8f35fb3503e): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.5s",
+    "store design; the product /products/micronised-creatine-12 (gid://shopify/Product/8000011), Shopify's name \"Micronised Creatine\"; scratch /var/folders/qv/kw93gh7s6n11gs_hs2cgvd8c0000gn/T/p4-reverse-drill-vsc33Q",
     "the agency's access to the store removed first (1 grant), as the dry run asks",
     "first-move: copied the store into http://127.0.0.1:7103: 58 tables, 4922 rows",
     "second-move: copied the store into http://127.0.0.1:7103: 58 tables, 5737 rows"
@@ -194,7 +194,7 @@
     {
       "name": "product-legacy-before-1440",
       "file": "docs/cms-reviews/drills/P4-REVERSE/product-legacy-before-1440.png",
-      "bytes": 135980,
+      "bytes": 137580,
       "width": 720,
       "height": 450,
       "viewport": 1440,

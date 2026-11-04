@@ -1,0 +1,208 @@
+{
+  "id": "P4-DRILLS",
+  "part": "media",
+  "title": "P4-DRILLS — media",
+  "ranAt": "2026-11-04T21:11:03.099Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 16,
+  "failed": 0,
+  "knownFailures": 1,
+  "checks": [
+    {
+      "ok": true,
+      "label": "on the old editor: a product's module shows a fresh photo, published; then the module is taken out, published again",
+      "detail": {
+        "product": "Advanced Anti-dandruff Shampoo",
+        "photo": "med_9e03dcdb451dc6db8f",
+        "put": 200,
+        "r1": 200,
+        "off": 200,
+        "r2": 200,
+        "rel1": "rel_d0d80c656a98601a",
+        "rel2": "rel_28b211068e9b87c9"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the photo is in the older release only, not in the live one",
+      "detail": [
+        {
+          "id": "rel_28b211068e9b87c9",
+          "uses": 0
+        },
+        {
+          "id": "rel_d0d80c656a98601a",
+          "uses": 1
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the route list for the page comparison (migrate-render --make-routes)",
+      "detail": "Wrote 75 routes to /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/media-mw2m1s7i/routes.json: 12 canaries, 59 more products and 4 more collections with old content. A hero test is running (hero-promise): its hero is set aside when both captures show it."
+    },
+    {
+      "ok": true,
+      "label": "the move: the rehearsal on a copy passes (the move on the copy, then the page comparison)",
+      "detail": {
+        "exit": 0,
+        "compared": 75,
+        "same": true,
+        "canariesOk": true,
+        "list": [],
+        "dataCheck": {
+          "ran": true,
+          "compared": 357,
+          "differences": 0
+        },
+        "tail": [
+          "",
+          "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/media-mw2m1s7i/rehearsal-the-move/rehearsal.json",
+          "Result: passed. Give this file to the real move with --rehearsal."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the move: the store's own database is untouched by its rehearsal",
+      "detail": {
+        "before": {
+          "mode": "legacy",
+          "live": "rel_28b211068e9b87c9",
+          "documents": 0
+        },
+        "after": {
+          "mode": "legacy",
+          "live": "rel_28b211068e9b87c9",
+          "documents": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the move: the dry run says Ready to move and prints its digest",
+      "detail": "Ready to move |  | What shoppers will see change"
+    },
+    {
+      "ok": true,
+      "label": "the move: the move (digest and rehearsal report as proofs) finishes",
+      "detail": "{\"ts\":\"2026-11-04T21:10:42.542Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_ec21f49ea2e26de3\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 21:10 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
+    },
+    {
+      "ok": true,
+      "label": "after the move: the store's reference index holds the photo for the release the move kept, and nothing else",
+      "detail": [
+        {
+          "version_id": "release:rel_d0d80c656a98601a",
+          "ref_id": "med_9e03dcdb451dc6db8f"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "'Where it's used' lists the release kept for rollback, in plain words ('An earlier published version of your store')",
+      "detail": {
+        "said": "Used by:\n\nAn earlier published version of your store"
+      }
+    },
+    {
+      "ok": true,
+      "label": "Delete of that photo is refused in plain words (no 'Delete anyway'); a forced delete is refused too; the file stays",
+      "detail": {
+        "words": "This file is still used, so it wasn't deleted. Remove it from the places below first.\n\nUsed by:\n\nAn earlier published version of your store\n\nArchive it instead to hide it from the image picker. Pages that use it keep showing it.",
+        "forced": 409,
+        "code": "MEDIA_IN_USE"
+      }
+    },
+    {
+      "ok": true,
+      "label": "Delete of the photo Micronised Creatine's module uses (live in the new editor) is refused in plain words, with 'Archive it instead' and no 'Delete anyway'; the file stays",
+      "detail": {
+        "words": "This file is still used, so it wasn't deleted. Remove it from the places below first.\n\nUsed by:\n\nProduct content (draft)\nProduct content (live)\nAn earlier published version of your store\n\nArchive it instead to hide it from the image picker. Pages that use it keep showing it."
+      }
+    },
+    {
+      "ok": false,
+      "label": "the refusal names the product (Micronised Creatine)",
+      "detail": {
+        "words": "This file is still used, so it wasn't deleted. Remove it from the places below first.\n\nUsed by:\n\nProduct content (draft)\nProduct content (live)\nAn earlier published version of your store\n\nArchive it instead to hide it from the image picker. Pages that use it keep showing it."
+      },
+      "known": "P4-DRILLS finding F1: documents made by the move are labelled 'Product content'"
+    },
+    {
+      "ok": true,
+      "label": "archive: 'Where it's used' says the fresh file is not used anywhere",
+      "detail": {
+        "said": "Not used anywhere."
+      }
+    },
+    {
+      "ok": true,
+      "label": "archive: Archive hides the file from the library, and the store holds it as archived",
+      "detail": {
+        "archived_at": "2026-11-04T21:11:02.572Z"
+      }
+    },
+    {
+      "ok": true,
+      "label": "archive: 'Show archived files' shows it, marked",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "archive: Unarchive brings it back to the library",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "no page errors in the console",
+      "detail": {
+        "errors": []
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_f5a4e5d6c3502351): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.5s",
+    "the demo agency's access to the store removed first (1 grant), as the dry run asks (Settings > Team)",
+    "the move: the store copied into http://127.0.0.1:7103 (58 tables, 4925 rows)"
+  ],
+  "screenshots": [
+    {
+      "name": "media-rollback-used-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/media-rollback-used-1440.png",
+      "bytes": 37634,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/media"
+    },
+    {
+      "name": "media-rollback-delete-refused-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/media-rollback-delete-refused-1440.png",
+      "bytes": 45611,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/media"
+    },
+    {
+      "name": "media-used-delete-refused-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/media-used-delete-refused-1440.png",
+      "bytes": 45337,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/media"
+    },
+    {
+      "name": "media-archived-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/media-archived-1440.png",
+      "bytes": 37590,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/media"
+    }
+  ]
+}

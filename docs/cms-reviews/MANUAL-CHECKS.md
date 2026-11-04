@@ -496,6 +496,7 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 ## Phase 4, batch 0
 
 ### Phase 4 ground: migration 0024, ids, editability, fixture (P4-SCAFFOLD)
+Packet: [P4-SCAFFOLD.md](P4-SCAFFOLD.md), section "Owner checks".
 - [ ] Owner step: apply 0023, 0024 and 0025 on every tenant and on the env store before code that reads or writes them deploys. Run `pnpm tenant:migrate -- --all`, then `pnpm migrate` (the env store), then `pnpm tenant:migrate -- --check --include-env`, which must exit 0 (`migrations/README.md`, "Phase 4").
 - [ ] CI: approve the source and checksum of the sqld download under `.github/` before CI runs the phase 4 sqld suites. Nothing under `.github/` was changed.
 - [ ] OQ-6, the `doc_cart` ruling: `CART_EDITABLE = true` is the default in `lib/registry/editability.js`. Confirm it before batch 2 (LIVEROW and MAPPER).
@@ -505,46 +506,60 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 ## Phase 4, batch 1
 
 ### The mode check moves into every old write's own batch (P4-GUARD)
+Packet: [P4-GUARD.md](P4-GUARD.md), section "Owner checks".
 - [ ] Hosted Turso batch atomicity on staging, before the first real cutover: with `cms_state` set to 'migrating', a legacy save must give the plain refusal and write nothing.
+  - P4-DRILLS (fix round 1): the only pass is the batch guard's words, "Your store is being updated. Try again in a few minutes." An ordinary legacy save is refused before any batch is sent ("This store is moving to the new editor right now, so nothing was saved…"), which proves nothing about Turso. No step reaches the guard on staging yet: OPEN decision, see runbook 0.3.
 - [ ] OQ-5: confirm that product webhooks may keep writing while a store is migrating (an allowed difference in the data check), or ask for them to be queued instead.
 - [ ] CI: approve the source and checksum of the sqld download in `.github/`. This item changed nothing there.
 - [ ] Desktop Chrome drill was NOT DONE for this item. P4-DRILLS could rehearse it on the harness: a store set to 'migrating', every old editor refusing in plain words, and the sync showing as paused.
+  - P4-DRILLS (runbook stage, desktop Chrome on the harness): DONE for a store stopped in 'migrating': an old editor's save is refused in plain words and nothing is saved, shoppers still get the store, `--status` and `--abort` recover it. The sync pause was not drilled (a sync would need Shopify): it stays an owner check on staging.
 - [ ] Orchestrator: add `scripts/test-release-readers.js` to P4-GUARD's files. Only its fixture changed: an `asLegacy` helper.
 - [ ] Orchestrator, ED05 or a route owner: the catalog POST and upsells POST/PUT routes answer an in-batch refusal as 422, and upsells DELETE answers 500. The words are plain and nothing is written. These routes should map `e.expose` 4xx errors before their catch-all.
 - [ ] CUTOVER: cancel pending `publish_release` jobs at the lock. The scheduled job's pre-check still throws on a store that is already off legacy, and the queue then dead-letters it.
 
 ### The reference index and the media archive (P4-MEDIA)
+Packet: [P4-MEDIA.md](P4-MEDIA.md), section "Owner checks".
 - [ ] Still recommended after deploy: run `pnpm media:reindex -- --tenant <id> --releases` on each documents-mode store (staging, harness, test stores). It is now cleanup, not a safety step. It is still needed to index old checkpoints and Undo-saved versions, which had no refs before this branch.
 - [ ] CI sqld download under `.github/` still needs owner approval of source and checksum (unchanged).
+- [ ] Apply 0025 with 0023 and 0024 on every tenant and on the env store before this code deploys (`pnpm tenant:migrate -- --all`, `pnpm migrate`, then `pnpm tenant:migrate -- --check --include-env` must exit 0). A store without 0025 lists media as before and refuses archive in plain words.
+- [ ] Staging, after the reindex: in a documents-mode store, try to delete an image that only an older version uses. Pass: the dialog lists the page with "(older version)" and the forced delete is refused too.
+- [ ] Decision (MANUAL-CHECKS.md line 44 and P4-MEDIA Design (6)): keep the default, or ask for the legacy catch blocks to fail closed as well (that would change legacy usage output and `test-releases`).
 
 ### Legacy tenants for phase 4 tests (P4-FIXTURES)
+Packet: [P4-FIXTURES.md](P4-FIXTURES.md), section "Owner checks".
 - [ ] Orchestrator: add `scripts/test-documents.js` (one allowlist line naming `scripts/support/legacy-tenants.js` in the documents-writer scan) to P4-FIXTURES' file list.
 - [ ] Carried from P4-SCAFFOLD: the CI sqld download in `.github/` needs the owner's approval of its source and checksum. This item changed nothing under `.github/`.
 - [ ] LIVEROW and CUTOVER: check that the stale-backfill fixture writes the same live-row columns you define as legacy-derived (badge, modules, pairs, pinned), and adjust the fixture if they differ.
 
 ### The content getters against a given source (P4-SEAM)
+Packet: [P4-SEAM.md](P4-SEAM.md), section "Owner checks".
 - [ ] None new from this item. Nothing calls the seam on a real tenant until P4-CUTOVER, whose runbook and rehearsal cover the MIG-02 data check.
 - [ ] Staging NOT DONE: nothing ran against hosted Turso; this item is local and unit-tested only.
 
 ## Phase 4, batch 2
 
 ### One effective read of product content (P4-EFFECTIVE)
+Packet: [P4-EFFECTIVE.md](P4-EFFECTIVE.md), section "Owner checks".
 - [ ] OQ-7: confirm nothing in the browser needs `catalog_title` or `sku` in the cart. They are now removed from every cart a browser receives.
 - [ ] Gift line titles: confirm "the founder's published title, else the title the offer stored". The alternative is Shopify's title, which would visibly change gift names on stores that have no published content today.
+- [ ] Gift lines on a store where nothing is published for the product keep the title and the image the offer stored (not Shopify's). Confirm this on staging with a real gift offer.
 - [ ] Hosted speed (after OQ-19): measure the cart API and a product page on a staging tenant and confirm the database reads stay at 3 and 10 as in PERF-04.
 - [ ] CI: the sqld download under `.github/` still needs the owner's approval of its source and checksum. This item changed nothing under `.github/`.
 - [ ] Phone and Safari check of a renamed product's page, card and cart once P4-LIVEROW can publish. The drill here only used the app's narrow built-in browser pane.
 
 ### Product and collection content publish as live rows (P4-LIVEROW)
+Packet: [P4-LIVEROW.md](P4-LIVEROW.md), section "Owner checks".
 - [ ] OQ-6 cart ruling (default applied): staff can now edit `doc_cart` but need an owner or admin to publish it. Confirm.
 - [ ] OVL-13 gallery allowlist pulled forward: only `cdn.shopify.com` and `/api/media/<id>` images go live. Confirm no store uses images from other hosts in product galleries.
 - [ ] OQ-14 on a dev store: do Shopify image addresses differ only by their query string? The "same as Shopify" rule strips the query before comparing.
+- [ ] The editor's caps are below Shopify's own limits: at most 30 gallery images and 20,000 characters of description. Confirm these caps are acceptable (a Shopify product with more images or a longer description is shown as it is until the founder edits it).
 - [ ] Check that hosted Turso batches are atomic for the new live-row batch (no release row; guarded UPDATE plus abort) on staging, before the first real cutover.
 - [ ] CI: the sqld download in `.github/` still needs the owner's approval of its source and checksum. `test-product-content` needs sqld and fails, never skips, without it.
 - [ ] Orchestrator: add `scripts/test-documents.js` and `scripts/test-doc-changes.js` to this item's file list (changed for the cart ruling and the fixed ids).
 - [ ] Desktop Chrome drill: NOT DONE (nothing visible yet); left for P4-DRILLS after P4-EDITOR.
 
 ### The legacy store as documents, and a read-only dry run (P4-MAPPER)
+Packet: [P4-MAPPER.md](P4-MAPPER.md), section "Owner checks".
 - [ ] Owner: run a real dry run per store before its rehearsal: `pnpm migrate:documents -- --tenant <id> --dry-run --hosted --confirm <id>`, adding `--store-open` or `--not-launched` for a store that never published. Read the plain report with the founder and keep the digest for CUTOVER. Builders never ran this.
 - [ ] Owner (OQ-6): confirm with the team the staff line under "Team access that changes": staff can change the cart offer but an owner or admin must publish it.
 - [ ] Owner (OQ-8): confirm that saved templates being counted, and kept readable on ED05's saved templates page, is enough.
@@ -555,29 +570,42 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] Owner: the CI sqld download in `.github/` still needs approval of its source and checksum (carried from P4-SCAFFOLD; nothing under `.github/` changed).
 
 ### The phase 4 drill harness and local tenants (P4-HARNESS)
+Packet: [P4-HARNESS.md](P4-HARNESS.md), section "Owner checks".
 - [ ] If you already have a local-tenants build from before this fix (for example in `.design-data/p4-local`), delete that folder by hand once. Its manifest has no tool field, so a rebuild into it is now refused.
 - [ ] CI sqld download (carried over): its source and checksum still need your approval; nothing under `.github/` was touched.
+- [ ] The P3 smoke's document refs check (22 "orphan" refs): decide whether the P3 drill is updated to count checkpoint refs, or the check is accepted as known after P4-MEDIA. P4-DRILLS confirmed the cause: the check counts only published versions, and P4-MEDIA now writes refs for checkpoints and Undo-saved versions too (P4-DRILLS.md, Known limits).
+- [ ] Before each rehearsal: make the restore-drill copy on your own Mac only, and delete it (and its `-wal` and `-shm` files) afterwards. It holds customer data.
+- [ ] Optional: run `DESIGN_PORT=<port> DESIGN_SQLD_PORT=<port> node scripts/drills/p4/run.mjs seed,smoke` once on your Mac and open the chosen product (`/products/micronised-creatine-12`) and `/collections/protein` in your own Chrome.
 
 ## Phase 4, batch 3
 
 ### Search and the console read the names shoppers see (P4-SEARCH)
+Packet: [P4-SEARCH.md](P4-SEARCH.md), section "Owner checks".
 - [ ] On staging with a real Typesense: publish two renames of the same product within about a second, then confirm search shows the second name once the job tick has run.
 - [ ] The job tick: confirm the hosted scheduler runs `runDueJobs` often enough for `search_reindex` retries, including the new 'kept changing' give-up.
+- [ ] Typesense stores, `_default` included: after the first rename on each, search shows the new name within a few minutes (the reindex job and the tick are running), and a full sync keeps it.
+- [ ] Hosted publish latency: a publish on a Typesense store waits for the inline reindex (capped at 2.5 s). Check it feels instant on staging.
+- [ ] Phone and Safari: the order page's "Shopify title" line was measured in desktop Chrome only.
+- [ ] CI: the sqld download in `.github/` still needs the owner's approval of its source and checksum.
 
 ### Product and collection content on the shopper side (P4-OVL07)
+Packet: [P4-OVL07.md](P4-OVL07.md), section "Owner checks".
 - [ ] Old module HTML: on stores whose product modules were saved before sanitizing, the dry run reports a shopper change on those products (the cleaned HTML). Decide per store whether that is acceptable, or have CUTOVER list it in `allowed-differences.js`.
 - [ ] Spec 8.9 deviation (plan section 2): a product's or collection's draft shows to any valid documents preview session, on that page only, not only when it is open in the editor. Confirm this is acceptable.
+- [ ] Documents stores fail closed: when a product's own content row can't be read, its page shows the error page instead of the product (on the old editor only the extras were hidden). Confirm, and watch the error rate on product pages for the first day after each move.
 - [ ] Hosted speed (OQ-19): on a staging documents store, measure the product page (one more statement: the content row) and the collection page (two more: the handle's id and the row) against the local counts.
 - [ ] Phone and Safari: the drill ran in desktop Chrome only.
 - [ ] Staging (hosted Turso): nothing ran against a hosted store; product and collection content on a real cut-over store waits for CUTOVER's runbook.
 - [ ] CI: the sqld download in `.github/` still needs the owner's approval of its source and checksum (nothing under `.github/` was changed).
 
 ### The library picker, gallery, pairs and pins, and media archive (P4-PICKER)
+Packet: [P4-PICKER.md](P4-PICKER.md), section "Owner checks".
 - [ ] On a phone and in Safari: open a product's content in the editor, add a library image to its images, and archive an unused file on the Media screen.
 - [ ] After P4-SEARCH merges: in the pairs and pinned-products lists, check that a renamed product shows its new name with 'Shopify title: …' under it.
 - [ ] CI sqld download: nothing under `.github/` was changed. Its source and checksum still need the owner's approval (carried over from P4-SCAFFOLD).
 
 ### The MAPPER review's findings (P4-FIX1)
+Packet: [P4-FIX1.md](P4-FIX1.md), section "Owner checks".
 - [ ] `{store_name}` binding: decide between keeping 'no title of its own' and a real store-name token. Keeping it: the first edit to any hero field blocks publishing until the founder types a title, which then stops following the store name, and experiments' `unpublishableDrafts` reports a migrated half-customized home as blocked. A token needs a named owner for `resolve.js`, `documents-reader.js` and the home page. After a real cutover, open the home page in the editor and try a subtitle-only experiment adopt.
 - [ ] A real hosted dry run per store (owner only): `pnpm migrate:documents -- --tenant <id> --dry-run --hosted --confirm <id>`, with `PLATFORM_DB_URL` and its token in the environment; check that the Details 'routes given to the data check' list covers the store's pages and old addresses.
 - [ ] P4-CUTOVER note: rehearsal and cutover version and release ids may differ while source hashes match (a Shopify handle change of a cart product); compare source hashes only.
@@ -586,6 +614,7 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 ## Phase 4, batch 4
 
 ### The new product and collection editor (P4-EDITOR)
+Packet: [P4-EDITOR.md](P4-EDITOR.md), section "Owner checks".
 - [ ] Desktop Chrome on a staging test tenant: open a product from the editor's product list, rename it, publish, then check the product page, a card, search and the cart. Then Reset and publish.
 - [ ] Typesense stores: after a rename, search shows the new name within a few seconds (P4-SEARCH reindex). The local drill had no Typesense.
 - [ ] Design editor: with the design open, the frame's bar no longer offers 'Hide them'; on the home page it still does.
@@ -593,9 +622,14 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] CI: the sqld download in .github/ still needs your approval of its source and checksum. Nothing under .github/ was changed.
 - [ ] Orchestrator: add these files outside the plan's list to P4-EDITOR's files: lib/admin/entity-entry.js, components/admin/editor/PreviewPane.js, scripts/drills/p4/editor.mjs, docs/cms-reviews/drills/P4-EDITOR/.
 - [ ] Per-tab overlay: the rule that the Home tab must not show another tab's unpublished colours waits until the per-tab overlay lands.
+- [ ] Only the first 50 collections show in the editor's switcher. Confirm that is enough for every store, or ask for a search there.
+- [ ] A collection page fails closed when its live row can't be read (the error page instead of the collection). Confirm, with the pins decision under P4-FIX2.
+  - P4-DRILLS ran the rename, publish, product page, card, search, cart and Reset on the harness in desktop Chrome (product stage, and the P4-EDITOR drill again): DONE on the harness; the staging run stays yours.
 
 ### Old admin addresses lead to the editor (P4-ED05)
+Packet: [P4-ED05.md](P4-ED05.md), section "Owner checks".
 - [ ] Desktop Chrome drill on the design harness (P4-DRILLS routes stage), on a documents store. Old addresses land in the editor: catalog ?product=, upsells, both designers, an existing page slug and a missing one. The bare /admin/catalog shows the Products link plus Bundles and Quiz. The setup links open the editor. /admin/editor/templates lists templates and 'Make a page from this' opens a new draft. A page with an old banner shows the note and publishes. Legacy stores are unchanged.
+  - P4-DRILLS routes stage: DONE on the harness in desktop Chrome, except the old-banner page (not drilled: NOT DONE). The rest stays for a staging look.
 - [ ] Owner decision: keep the bare /admin/catalog for Bundles and Quiz until ED-06 (current build), or move them first and then redirect.
 - [ ] OQ-8 saved templates default: not converted, read-only with 'Make a page from this'. Confirm.
 - [ ] Orchestrator or P4-EDITOR: make the editor read ?list=products and ?list=pages, and link /admin/editor/templates from its pages section.
@@ -604,14 +638,18 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] CI: the sqld download in .github still needs the owner's approval of its source and checksum (nothing under .github was changed).
 
 ### The before-and-after page comparison (P4-EQUIV)
+Packet: [P4-EQUIV.md](P4-EQUIV.md), section "Owner checks".
 - [ ] CI sqld download: no .github/ change was made. Its source and checksum still need the owner's approval (carried over from P4-SCAFFOLD).
 - [ ] Before the first real cutover, the owner reads the rendered comparison in CUTOVER's rehearsal report and approves the two allowed differences in lib/migrate/allowed-differences.js (section-ids, hero-test-variant), or says which to drop.
 - [ ] The owner decides whether to pause a running hero test during the rehearsal so the hero is also compared as a page, or to accept the data-only comparison of the hero (hero-test-variant).
+- [ ] The rendered comparison masks `/_next/static` asset addresses, full date-times and `id` attributes, so a change only there is never reported. Confirm.
+- [ ] P4-DRILLS finding F2: while a hero test runs, a rehearsal can fail on the home page's hero alone, because Next sometimes splits the hero test's ping inside its streamed data and the comparison then can't see the test. Rehearse again when only the hero differs, until the comparison is fixed (P4-DRILLS.md, Findings).
 - [ ] Old module HTML that today's sanitizer rewrites (MANUAL-CHECKS.md line 568): the owner decides per store whether CUTOVER adds it to ALLOWED_DIFFERENCES or it is fixed before the move.
 - [ ] Orchestrator: P4-CUTOVER's scripts/test-migrate-documents.js must import ALLOWED_DIFFERENCES from lib/migrate/allowed-differences.js and assert the same list. Add a pnpm migrate:render script only if the runbook needs one (package.json is SCAFFOLD-only). Add docs/cms-reviews/drills/P4-EQUIV/results-harness.json to the plan's file list.
 - [ ] Optional: the owner reruns the harness check on their own Mac: capture twice with node scripts/migrate-render.mjs --base http://localhost:<port> --routes <file> --out <dir>, then --compare (expect exit 0).
 
 ### Batch 3 review fixes (P4-FIX2)
+Packet: [P4-FIX2.md](P4-FIX2.md), section "Owner checks".
 - [ ] Browser NOT DONE: on a legacy store's media screen, delete a file used by an old home section and by a page draft. Expect no 'Delete anyway', the fixed words, and the places in plain words.
 - [ ] Browser NOT DONE: upload a file whose bytes match an archived file. Expect '<file> was archived. It's back in your library now.' and the file back in the picker.
 - [ ] Browser NOT DONE: open a product with an unpublished draft in the editor and save. The frame should report up to date once the product page shows the draft. This depends on P4-EDITOR's wiring.
@@ -622,13 +660,28 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 ## Phase 4, batch 5
 
 ### Moving a store to the new editor (P4-CUTOVER)
-- [ ] No new owner checks. The existing ones in docs/cms-reviews/P4-CUTOVER.md still stand: hosted batch atomicity on staging, PITR, the per-store runbook, OQ-5, sanitized module HTML, the hosted theme pin, CI sqld approval, phone and Safari.
+Packet: [P4-CUTOVER.md](P4-CUTOVER.md), section "Owner checks".
+- [ ] Staging, before the first real move: hosted Turso batch atomicity (runbook step 0.3).
+- [ ] PITR: confirm the Turso plan has point-in-time restore; record the time just before each real move (`--backup-ref`).
+- [ ] Per store: the dry run read with the founder, a rehearsal on a restore-drill copy served by the local harness, the real move and the post-checks (runbook steps 1 to 7). Serving the copy needs the store's control-plane row copied into the harness by a developer for now (runbook 3.2).
+- [ ] OQ-5: product webhooks keep writing while a store is migrating (an allowed difference). OK, or should they be queued?
+- [ ] Sanitized module HTML: accept it as an allowed difference, or have the founder save those modules again before the move.
+- [ ] Hosted theme pin: the move writes the control plane; check the platform console shows the store's kit after each move.
+- [ ] Brand or theme edits made on the control plane (the platform console) during a move are not caught by the recheck after the pause. Don't change them while a move runs.
+- [ ] CI: the sqld download in `.github/` still needs the owner's approval of its source and checksum.
+- [ ] Phone and Safari: not run (desktop Chrome only).
 
 ### New stores start on the new editor (P4-PROVISION)
+Packet: [P4-PROVISION.md](P4-PROVISION.md), section "Owner checks".
 - [ ] Staging: run a /platform 'New tenant' with the slug of an existing throwaway legacy tenant. It should be refused, and that tenant should stay on the old editor (cms_state 'legacy', storefront still open).
+- [ ] Before deploy: 0024 and 0025 applied everywhere. Check that no provisioning run is half-done on the hosted control plane (`/platform`, provisioning runs). A resumed earlier run keeps the old editor, as designed.
+- [ ] OQ-4, staging, after P4-PROVISION deploys: provision one throwaway tenant (no `--legacy-content`). It starts on the new editor ("the new editor … private" in the summary), shows "Opening soon" to shoppers until its first publish (the sitemap only `/`), and every link of its onboarding checklist opens a working screen (Design, Pages, the editor, Publish). A COD test order from the editor's preview goes to `snehal@mediastic.in` and is cancelled after. The first publish opens the store and Setup shows Launch done. Then offboard it.
+- [ ] Desktop Chrome on the design harness: the Setup page of a new documents store before and after its first publish, and the preview test order. NOT DONE (no P4-DRILLS stage provisions a store).
+- [ ] Decide whether `/platform` "New tenant" needs a "start on the old editor" choice (today only the CLI has it).
 - [ ] CI: the sqld download in .github/ still needs the owner to approve its source and checksum. Nothing under .github/ was changed.
 
 ### The P4-EDITOR review findings (P4-FIX3)
+Packet: [P4-FIX3.md](P4-FIX3.md), section "Owner checks".
 - [ ] Desktop Chrome on a staging test tenant: give a product your own description and check Shopify's shows beside it as plain text. Change the description in Shopify, wait for the catalog update and reopen: the notice should read in plain words. Then switch to another product from the product list: the first product's name should never show with the second's Shopify title.
 - [ ] Catalog page on a documents store: the header should say the brand and product type shoppers see are set in the editor.
 - [ ] Phone and Safari: check the product form at phone width.
@@ -636,7 +689,10 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] Orchestrator: add docs/cms-reviews/drills/P4-FIX3/ (the drill and its results) to P4-FIX3's file list.
 
 ### Review findings of P4-EQUIV, P4-ED05 and P4-FIX2 (P4-FIX4)
+Packet: [P4-FIX4.md](P4-FIX4.md), section "Owner checks".
 - [ ] Desktop Chrome on the design harness (P4-DRILLS): on a documents store the editor's product and collection pickers list as before; with the live release made unreadable on a local copy they still list products; /admin/upsells still redirects to the editor. Browser verification for this item is NOT DONE.
+  - P4-DRILLS: the pickers listing on a documents store (product, collection, picker and editor stages) and the /admin/upsells redirect (routes stage) are DONE on the harness. The unreadable live release case was not drilled: NOT DONE.
+- [ ] On a legacy store, a failing mode read now answers 503 on the upsells GET and on the cms-api page reads (instead of showing old data). Confirm on staging.
 - [ ] P4-CUTOVER rehearsal: run --make-routes on the restore-drill copy. If a hero test is running, the command says so and routes.json carries its slug. An exit 2 from --compare means the harness was broken before the move: fix it and capture again.
 - [ ] P4-CUTOVER's test-migrate-documents must pass fixture.heroExperiments to compare() when it replays the ALLOWED_DIFFERENCES fixtures.
 - [ ] Staging and production are NOT DONE: nothing ran against hosted Turso or a real Typesense, and nothing was pushed or deployed.
@@ -645,20 +701,25 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 ## Phase 4, batch 6
 
 ### Moving a store back to the old editor (P4-REVERSE)
+Packet: [P4-REVERSE.md](P4-REVERSE.md), section "Owner checks".
 - [ ] Staging, before the first real reversal: move a staging store, rename a product, then run runbook section 9. The product should show Shopify's name on its page, in collections and in search; the old editors should save; the platform console should show the old kit.
 - [ ] Typesense stores (_default included): after a reversal, search shows Shopify's names within a few minutes, with the reindex job and the tick running. After the next move it shows the restored names.
 - [ ] Read the reversal report's 'A message you can pass on' with the founder and confirm the wording.
 - [ ] OQ-9 default: product names, descriptions, photos and the brand and type shown come back at the next move; everything else published in the new editor stays as older versions. Confirm this is OK.
 - [ ] The reversal uses a dry-run digest but no rehearsal (plan section 0 asks for both). Accept this, or ask for a rehearsal step.
 - [ ] After a move that follows a reversal, check the restored products by hand: the rehearsal leaves those edits out of its page comparison.
+- [ ] A product deleted from Shopify while the store was back on the old editor gets its live row back at the next move. Shoppers never see it (the product is gone), but its edits sit unseen. Confirm this is acceptable.
+- [ ] Orchestrator ruling to confirm: the reversal needs a dry-run digest but no rehearsal (it returns to the exact release from before the move). Give your OK before the first real reversal.
 - [ ] PITR: record --backup-ref just before each real reversal.
 - [ ] Hosted Turso batch atomicity check on staging (runbook step 0.3).
 - [ ] Approve the source and checksum of the CI sqld download under .github/ (not touched here).
 - [ ] Phone and Safari: not run (desktop Chrome only).
 
 ### Review fixes from batch 5 (P4-FIX5)
+Packet: [P4-FIX5.md](P4-FIX5.md), section "Owner checks".
 - [ ] Desktop Chrome on the design harness, with DevTools throttling: open product A, then click B and quickly C. The editor should end on C's form and never stay on 'Opening C…'. While 'Opening…' shows, there should be no Publish, Discard or Earlier versions controls. (This browser drill was not run: browser verification is NOT DONE.)
 - [ ] Staging: provision a throwaway tenant whose database name is a prefix of an existing one (for example shop beside shop2), check the summary says its database was created, then offboard the tenant.
+- [ ] An adopted `--db-url`: on staging, provision a throwaway tenant with `--db-url` pointing at another registered store's database (written differently, for example its `https://` form). It must be refused and the other store must stay open and on its editor. Until P4-FIX6's `sameDbAddress` change merges, two spellings of one database are not seen as the same (P4-FIX5 Known limits).
 - [ ] CI: the sqld download in .github/ still needs the owner's approval of its source and checksum. Nothing under .github/ was changed.
 
 ## Bug-fix branches (not yet merged to main)
@@ -677,3 +738,32 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
   - The re-review checked the closed-store title ("<Store> will be right back") and curtain contrast on light and dark brands, and both passed.
   - On a real https staging host, click "Store team sign-in" on the closed page with a verified staff session. Pass: the `_mx` pass cookie is stored (it is Secure, so local http can't show this) and the real site shows.
   - Check the curtain in Safari and on a phone. Only headless desktop Chrome was used.
+
+## Phase 4, batch 7
+
+### Every owner step for phase 4, in one list (P4-DRILLS)
+Packet: [P4-DRILLS.md](P4-DRILLS.md), section "Owner checks". Collected from every phase 4 packet; each line names the packet it comes from. The runbook is [P4-CUTOVER-RUNBOOK.md](P4-CUTOVER-RUNBOOK.md).
+- [ ] Migrations 0023 to 0025 on every tenant, then the env store, then the check: `pnpm tenant:migrate -- --all`, `pnpm migrate`, `pnpm tenant:migrate -- --check --include-env` (must exit 0). Before any code that needs them deploys ([P4-SCAFFOLD](P4-SCAFFOLD.md), [P4-MEDIA](P4-MEDIA.md), [P4-PROVISION](P4-PROVISION.md)).
+- [ ] Per tenant, in this order: a real dry run read with the founder, a rehearsal on a restore-drill copy, the real move, the post-checks (runbook sections 3 to 7) ([P4-MAPPER](P4-MAPPER.md), [P4-FIX1](P4-FIX1.md), [P4-CUTOVER](P4-CUTOVER.md)).
+- [ ] Hosted batch atomicity on staging before the first real move (runbook 0.3) ([P4-GUARD](P4-GUARD.md), [P4-LIVEROW](P4-LIVEROW.md), [P4-CUTOVER](P4-CUTOVER.md), [P4-REVERSE](P4-REVERSE.md)). **Open decision first (owner and orchestrator):** an ordinary old-editor save is refused before any batch is sent, so it can't reach the batch guard; the only pass is "Your store is being updated. Try again in a few minutes.", never "This store is moving to the new editor right now…". Choose (a) a staging-only script that sends one guarded old-editor batch straight to the staging store, or (b) accept the file-database and sqld proof and record hosted Turso as untested. No real store moves before this is settled.
+- [ ] OQ-14 on a dev store: do Shopify image addresses differ only by their query string? ([P4-LIVEROW](P4-LIVEROW.md)).
+- [ ] Typesense tenants, `_default` included: after the first rename on each, search shows the new name within a few minutes (the reindex job and the tick are running), and a full sync keeps it ([P4-SEARCH](P4-SEARCH.md), [P4-EDITOR](P4-EDITOR.md), [P4-REVERSE](P4-REVERSE.md)).
+- [ ] Phone and Safari: every phase 4 drill ran in desktop Chrome only (the product form and switcher at phone width, a renamed product's page, card and cart, the media picker and archive, the order page line) ([P4-EFFECTIVE](P4-EFFECTIVE.md), [P4-OVL07](P4-OVL07.md), [P4-PICKER](P4-PICKER.md), [P4-EDITOR](P4-EDITOR.md), [P4-FIX3](P4-FIX3.md), [P4-SEARCH](P4-SEARCH.md), [P4-CUTOVER](P4-CUTOVER.md), [P4-REVERSE](P4-REVERSE.md), [P4-DRILLS](P4-DRILLS.md)).
+- [ ] The theme pin on hosted: after each real move and reversal, the platform console shows the right kit ([P4-CUTOVER](P4-CUTOVER.md), [P4-REVERSE](P4-REVERSE.md)).
+- [ ] Webhook allowed differences: product webhooks keep writing while a store moves (OQ-5). OK, or queue them? ([P4-GUARD](P4-GUARD.md), [P4-CUTOVER](P4-CUTOVER.md)).
+- [ ] PITR: confirm the Turso plan has point-in-time restore, and record the PITR time just before each real move and reversal (`--backup-ref`) ([P4-CUTOVER](P4-CUTOVER.md), [P4-REVERSE](P4-REVERSE.md)).
+- [ ] Warn the founder and pick a quiet window before each move and reversal (runbook sections 1 and 9.1) ([P4-CUTOVER](P4-CUTOVER.md)).
+- [ ] Staff lose cart-offer publishing at the move (OQ-6): they can still edit the cart offer but an owner or admin must publish it. Tell the team before each move ([P4-SCAFFOLD](P4-SCAFFOLD.md), [P4-LIVEROW](P4-LIVEROW.md), [P4-MAPPER](P4-MAPPER.md)).
+- [ ] OQ-4: after P4-PROVISION deploys, provision one throwaway tenant on staging: it starts on the new editor, shows "Opening soon" to shoppers until its first publish, and its onboarding checklist links all work ([P4-PROVISION](P4-PROVISION.md)).
+- [ ] CI: approve the source and checksum of the sqld download in `.github/` (every phase 4 packet; nothing under `.github/` was changed).
+
+### Phase 4 drills on the harness (P4-DRILLS)
+Packet: [P4-DRILLS.md](P4-DRILLS.md), section "Owner checks".
+- [ ] Finding F1 (decide or assign): after a move, every product and collection the move brought over is named "Product content" or "Collection content" in the media screen's "Where it's used" and delete refusal (and "Moved to the new editor Collection content" in Publishing), because the move labels those documents by type and a label is never renamed. The founder can't tell which product uses a photo. Needs an owner for `lib/migrate/map-entities.js` (and a one-off relabel of moved stores).
+- [ ] Finding F2 (decide or assign): a rehearsal can fail on the home page's hero alone while a hero test runs (the comparison misses the test's ping when Next splits its streamed data). Until `lib/migrate/render-compare.js` joins the streamed chunks, rehearse again when only the hero differs.
+- [ ] Finding F3 (wording): the dry run's "Not ready" line for an agency says "Settings > Team"; the panel is "Agency access" on the Settings page. The runbook now says where; the report's words are `lib/migrate/report.js`'s owner's.
+- [ ] Runbook 3.2 on a real store: serving the restore-drill copy needs the store's control-plane row (id and config) in your local harness. Until there is a tool for it, a developer copies it.
+- [ ] Not drilled, staging only: the catalog sync pausing while a store is being updated (a sync needs Shopify), and Typesense (the drills use the SQL search and a spy client).
+- [ ] P4-FIX6 ran beside this item; its owner checks are added when it merges.
+- [ ] Optional: run `DESIGN_PORT=<port> DESIGN_SQLD_PORT=<port> COPY_SQLD_PORT=<port> node scripts/drills/p4/run.mjs` on your Mac (about 25 minutes) and look at the screenshots in `docs/cms-reviews/drills/P4-DRILLS/`.
+

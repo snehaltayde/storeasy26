@@ -1,0 +1,265 @@
+{
+  "id": "P4-DRILLS",
+  "part": "routes",
+  "title": "P4-DRILLS — routes",
+  "ranAt": "2026-11-04T21:10:05.451Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 17,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the route list for the page comparison (migrate-render --make-routes)",
+      "detail": "Wrote 75 routes to /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/routes-mw2lz5jy/routes.json: 12 canaries, 59 more products and 4 more collections with old content. A hero test is running (hero-promise): its hero is set aside when both captures show it."
+    },
+    {
+      "ok": true,
+      "label": "the move: the rehearsal on a copy passes (the move on the copy, then the page comparison)",
+      "detail": {
+        "exit": 0,
+        "compared": 75,
+        "same": true,
+        "canariesOk": true,
+        "list": [],
+        "dataCheck": {
+          "ran": true,
+          "compared": 357,
+          "differences": 0
+        },
+        "tail": [
+          "",
+          "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/routes-mw2lz5jy/rehearsal-the-move/rehearsal.json",
+          "Result: passed. Give this file to the real move with --rehearsal."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the move: the store's own database is untouched by its rehearsal",
+      "detail": {
+        "before": {
+          "mode": "legacy",
+          "live": "rel_5f69914e794c33b8",
+          "documents": 0
+        },
+        "after": {
+          "mode": "legacy",
+          "live": "rel_5f69914e794c33b8",
+          "documents": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the move: the dry run says Ready to move and prints its digest",
+      "detail": "Ready to move |  | What shoppers will see change"
+    },
+    {
+      "ok": true,
+      "label": "the move: the move (digest and rehearsal report as proofs) finishes",
+      "detail": "{\"ts\":\"2026-11-04T21:09:12.137Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_91fe7af071d4d868\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 21:09 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
+    },
+    {
+      "ok": true,
+      "label": "before the move (old editor): all 13 old addresses still open their old screens, with no redirect",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "after the move: the 11 old Storefront, Brand, Theme, designer and Upsells addresses open the new editor on their own document",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "after the move: Catalog for a product and for a collection, Upsells for a product, an old page, a missing page and 'new' each open the editor where that thing is edited",
+      "detail": [
+        {
+          "from": "catalog ?product=",
+          "ok": true,
+          "at": "/admin/editor?product=gid%3A%2F%2Fshopify%2FProduct%2F8000196"
+        },
+        {
+          "from": "catalog ?collection=",
+          "ok": true,
+          "at": "/admin/editor?collection=gid%3A%2F%2Fshopify%2FCollection%2F7000010"
+        },
+        {
+          "from": "upsells ?product=",
+          "ok": true,
+          "at": "/admin/editor?product=gid%3A%2F%2Fshopify%2FProduct%2F8000196"
+        },
+        {
+          "from": "pages/affiliate-program",
+          "ok": true,
+          "at": "/admin/editor?doc=doc_p_d48261da08e93efd"
+        },
+        {
+          "from": "pages/<missing>",
+          "ok": true,
+          "at": "/admin/editor?doc=doc_p_7564c287a4d30ced"
+        },
+        {
+          "from": "pages/new",
+          "ok": true,
+          "at": "/admin/editor"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the bare Catalog page stays (Bundles and Quiz live there) and links to the editor's product list",
+      "detail": {
+        "at": "/admin/catalog",
+        "links": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "its product-list link opens the editor",
+      "detail": "http://localhost:6100/admin/editor?list=products"
+    },
+    {
+      "ok": true,
+      "label": "Publishing is the Recently published page",
+      "detail": {
+        "status": 200,
+        "path": "/admin/releases",
+        "search": "",
+        "doc": null,
+        "product": null,
+        "collection": null,
+        "list": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "the Setup checklist's links point at the editor, never at an old editor",
+      "detail": {
+        "links": [
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings",
+          "/admin/editor",
+          "/checkout"
+        ],
+        "old": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "every Setup link (5) opens a working screen",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "the Saved templates page lists both old saved templates",
+      "detail": {
+        "listed": [
+          "tpl_c42ff55ca043",
+          "tpl_d6a0d93e3e2c"
+        ],
+        "seeded": [
+          "tpl_c42ff55ca043",
+          "tpl_d6a0d93e3e2c"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "'Make a page from this' opens a new, unpublished draft in the editor",
+      "detail": {
+        "made": {
+          "id": "doc_3mvxjcaugpz3aerz",
+          "type": "page",
+          "published_version_id": null
+        },
+        "docsBefore": 157,
+        "docsAfter": 158
+      }
+    },
+    {
+      "ok": true,
+      "label": "the old saved templates are unchanged",
+      "detail": {
+        "before": {
+          "n": 2,
+          "sig": "tpl_c42ff55ca043:1:2026-11-04T21:08:07.388Z:58:5B7B226B696E64223A2274657874222C2268656164696E67223A22496E74726F222C22626F6479223A5B22537461727420686572652E225D7D5D,tpl_d6a0d93e3e2c:1:2026-11-04T21:08:07.389Z:70:5B7B226B696E64223A2274657874222C2268656164696E67223A225468652073686F72742076657273696F6E222C22626F6479223A5B22577269746520686572"
+        },
+        "after": {
+          "n": 2,
+          "sig": "tpl_c42ff55ca043:1:2026-11-04T21:08:07.388Z:58:5B7B226B696E64223A2274657874222C2268656164696E67223A22496E74726F222C22626F6479223A5B22537461727420686572652E225D7D5D,tpl_d6a0d93e3e2c:1:2026-11-04T21:08:07.389Z:70:5B7B226B696E64223A2274657874222C2268656164696E67223A225468652073686F72742076657273696F6E222C22626F6479223A5B22577269746520686572"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "no page errors in the console",
+      "detail": {
+        "errors": []
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_5f69914e794c33b8): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.5s",
+    "the demo agency's access to the store removed first (1 grant), as the dry run asks (Settings > Team)",
+    "the move: the store copied into http://127.0.0.1:7103 (58 tables, 4922 rows)"
+  ],
+  "screenshots": [
+    {
+      "name": "upsells-to-cart-offer-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/upsells-to-cart-offer-1440.png",
+      "bytes": 39560,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "old-page-address-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/old-page-address-1440.png",
+      "bytes": 40555,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "catalog-bare-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/catalog-bare-1440.png",
+      "bytes": 33285,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/catalog"
+    },
+    {
+      "name": "setup-checklist-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/setup-checklist-1440.png",
+      "bytes": 30694,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/setup"
+    },
+    {
+      "name": "saved-templates-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/saved-templates-1440.png",
+      "bytes": 19666,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor/templates"
+    },
+    {
+      "name": "page-from-template-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/page-from-template-1440.png",
+      "bytes": 22017,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    }
+  ]
+}

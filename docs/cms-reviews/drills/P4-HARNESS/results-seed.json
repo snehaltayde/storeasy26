@@ -2,8 +2,8 @@
   "id": "P4-HARNESS",
   "part": "seed",
   "title": "P4-HARNESS — seed",
-  "ranAt": "2026-11-04T14:15:05.246Z",
-  "harness": "http://localhost:6160",
+  "ranAt": "2026-11-04T21:03:59.625Z",
+  "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 35,
   "failed": 0,
@@ -55,8 +55,8 @@
       "label": "the live release is version 3, and it is the one --p4 published",
       "detail": {
         "v": 3,
-        "live": "rel_917ae8a1d50baa5b",
-        "seeded": "rel_917ae8a1d50baa5b"
+        "live": "rel_7fac69a2a5ef9f42",
+        "seeded": "rel_7fac69a2a5ef9f42"
       }
     },
     {
@@ -64,7 +64,7 @@
       "label": "the live release was made by createRelease and published (its note and time)",
       "detail": {
         "note": "P4-HARNESS drill store",
-        "publishedAt": "2026-11-04T14:15:00.346Z"
+        "publishedAt": "2026-11-04T21:03:54.906Z"
       }
     },
     {
@@ -312,8 +312,8 @@
       "ok": true,
       "label": "the second run started again from scratch (a new live release)",
       "detail": {
-        "first": "rel_917ae8a1d50baa5b",
-        "second": "rel_4bbba61c27a35236"
+        "first": "rel_7fac69a2a5ef9f42",
+        "second": "rel_d10630e68957e416"
       }
     },
     {
@@ -333,8 +333,8 @@
     }
   ],
   "notes": [
-    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_917ae8a1d50baa5b): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.6s",
-    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_4bbba61c27a35236): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.7s"
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_7fac69a2a5ef9f42): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.5s",
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_d10630e68957e416): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.5s"
   ],
   "screenshots": []
 }

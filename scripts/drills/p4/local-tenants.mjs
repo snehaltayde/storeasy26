@@ -26,14 +26,17 @@
 // Verified by SQL after the build (and by --check): each copy is legacy, has
 // the right live release and version (or none), the right release count, and
 // its rows; the control plane names each copy. Results:
-// docs/cms-reviews/drills/P4-HARNESS/results-local-tenants.json.
+// docs/cms-reviews/drills/P4-HARNESS/results-local-tenants.json, written only
+// when the build is in the default folder (a scratch --out leaves the
+// committed file alone).
 // File databases only: anything else is refused before it is opened.
 //
 // The output folder is never wiped. A rebuild deletes only the files this tool
 // writes (OWN_FILES), and only in a folder that is new, empty, or an earlier
 // build of this tool (its manifest.json says so) holding nothing else. Any
 // other folder (one with a file this tool did not write, or a manifest.json of
-// some other kind) is refused before anything is deleted or built.
+// some other kind) is refused before anything is deleted or built. A
+// .DS_Store (Finder's) is tolerated and left where it is (P4-DRILLS).
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync, lstatSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -75,6 +78,8 @@ const ENTITIES = [
 export const MANIFEST_TOOL = "p4-local-tenants";
 const DB_NAMES = [...LOCAL_STATES.map((s) => s.name), "platform"];
 export const OWN_FILES = Object.freeze([...DB_NAMES.flatMap((n) => [`${n}.db`, `${n}.db-wal`, `${n}.db-shm`]), "manifest.json"]);
+// files the operating system leaves in a folder: neither foreign nor deleted
+export const IGNORED_FILES = Object.freeze([".DS_Store"]);
 
 // Make outDir ready for a build: create it, or clear an earlier build of this
 // tool file by file. Refuses (throws, deleting nothing) when the folder holds
@@ -94,7 +99,9 @@ export function prepareOutDir(outDir) {
     return { created: true, removed: [] };
   }
   if (!st.isDirectory() || st.isSymbolicLink()) refuse("it is not a folder.");
-  const entries = readdirSync(outDir);
+  // Finder drops a .DS_Store into any folder it opens: it is tolerated (and
+  // left in place), never counted as a foreign file
+  const entries = readdirSync(outDir).filter((n) => !IGNORED_FILES.includes(n));
   if (!entries.length) return { created: false, removed: [] };
   const foreign = entries.filter((n) => !OWN_FILES.includes(n));
   if (foreign.length) refuse(`it holds files this tool did not write (${foreign.slice(0, 5).join(", ")}${foreign.length > 5 ? ", …" : ""}).`);
@@ -241,6 +248,12 @@ async function main(argv) {
     console.log(`✓ built ${m.tenants.length} local stores in ${opts.out} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
   }
   const r = await verifyLocalTenants(opts.out);
+  // the committed results file describes the default build only: a run into
+  // a scratch folder (--out elsewhere) leaves it alone
+  if (resolve(opts.out) !== resolve(DEFAULT_OUT)) {
+    console.log(`-- local-tenants: ${r.passed} passed, ${r.failed} failed (built in ${opts.out}; the committed results file is written only for the default folder)`);
+    return r.failed ? 1 : 0;
+  }
   mkdirSync(join(RESULTS, ".."), { recursive: true });
   writeFileSync(RESULTS, `${JSON.stringify({ id: "P4-HARNESS", part: "local-tenants", ranAt: new Date().toISOString(), outDir: opts.out, passed: r.passed, failed: r.failed, checks: r.checks, tenants: r.manifest.tenants.map(({ name, id, state, flag, liveRelease, v }) => ({ name, id, state, flag, liveRelease, v })) }, null, 2)}\n`);
   console.log(`-- local-tenants: ${r.passed} passed, ${r.failed} failed. Results in docs/cms-reviews/drills/P4-HARNESS/results-local-tenants.json`);

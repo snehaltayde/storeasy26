@@ -1,0 +1,393 @@
+{
+  "id": "P4-DRILLS",
+  "part": "product",
+  "title": "P4-DRILLS — product",
+  "ranAt": "2026-11-04T21:07:12.631Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 29,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the route list for the page comparison (migrate-render --make-routes)",
+      "detail": "Wrote 75 routes to /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/product-mw2lwi3v/routes.json: 12 canaries, 59 more products and 4 more collections with old content. A hero test is running (hero-promise): its hero is set aside when both captures show it."
+    },
+    {
+      "ok": true,
+      "label": "the move: the rehearsal on a copy passes (the move on the copy, then the page comparison)",
+      "detail": {
+        "exit": 0,
+        "compared": 75,
+        "same": true,
+        "canariesOk": true,
+        "list": [],
+        "dataCheck": {
+          "ran": true,
+          "compared": 357,
+          "differences": 0
+        },
+        "tail": [
+          "",
+          "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/product-mw2lwi3v/rehearsal-the-move/rehearsal.json",
+          "Result: passed. Give this file to the real move with --rehearsal."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the move: the store's own database is untouched by its rehearsal",
+      "detail": {
+        "before": {
+          "mode": "legacy",
+          "live": "rel_ba41b0f8a39622c9",
+          "documents": 0
+        },
+        "after": {
+          "mode": "legacy",
+          "live": "rel_ba41b0f8a39622c9",
+          "documents": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the move: the dry run says Ready to move and prints its digest",
+      "detail": "Ready to move |  | What shoppers will see change"
+    },
+    {
+      "ok": true,
+      "label": "the move: the move (digest and rehearsal report as proofs) finishes",
+      "detail": "{\"ts\":\"2026-11-04T21:06:32.426Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_d9a4973b5586cc6a\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 21:06 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
+    },
+    {
+      "ok": true,
+      "label": "product: it opens from the editor's product list, with 'Shopify title: …'",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "product: the name, description, library photo, badge, template, 'goes well with' and one module are saved in the draft",
+      "detail": {
+        "title": "Aurora Drill Tonic",
+        "description": "<p>Our own words for this tonic: brewed in small batches.</p>",
+        "gallery": [
+          {
+            "media": "/api/media/med_c12b0a48887ebb6162",
+            "alt": "Product photo 1"
+          }
+        ],
+        "badge": "Drill pick",
+        "template": "editorial",
+        "pairs": {
+          "title": null,
+          "products": [
+            "gid://shopify/Product/8000222"
+          ]
+        },
+        "modules": [
+          "rich_text"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "product: Publish goes live (its live row holds the new name, badge and template)",
+      "detail": {
+        "phase": "done",
+        "live": {
+          "title": "Aurora Drill Tonic",
+          "badge": "Drill pick",
+          "template": "editorial"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the product page's heading and tab title show the new name",
+      "detail": {
+        "h1": "Aurora Drill Tonic",
+        "title": "Aurora Drill Tonic · Design Demo Co"
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the product page shows the founder's description",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "shopper: the product page shows the photo chosen from the library",
+      "detail": {
+        "media": "med_c12b0a48887ebb6162",
+        "imgs": [
+          "/api/media/med_c12b0a48887ebb6162",
+          "/api/media/med_75768f3b65781d963d"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the product page shows the badge \"Drill pick\"",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "shopper: the product page shows the founder's module (its title, and its words when opened)",
+      "detail": {
+        "modules": "From the founder+A module the founder wrote in the new editor."
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: \"goes well with\" shows Advanced BCAA Recovery",
+      "detail": {
+        "pairs": [
+          "/products/advanced-bcaa-recovery-223"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the product page uses the editorial template",
+      "detail": {
+        "template": "editorial"
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: storefront search finds it by the new name, and its card shows the new name",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "shopper: its card on its collection page shows the new name",
+      "detail": {
+        "collection": "sugar-free",
+        "card": "HAIRCARE\n\nAurora Drill Tonic\n\nfrom ₹639"
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the cart (the drawer and the cart the browser gets) shows the new name, never Shopify's",
+      "detail": {
+        "line": {
+          "variantId": "gid://shopify/ProductVariant/90001960",
+          "productId": "gid://shopify/Product/8000196",
+          "variantNumericId": "90001960",
+          "handle": "advanced-anti-dandruff-shampoo-197",
+          "title": "Aurora Drill Tonic",
+          "variantTitle": "100ml",
+          "image": "/api/media/med_c12b0a48887ebb6162",
+          "price": 639,
+          "currency": "INR",
+          "quantity": 1,
+          "lineTotal": 639,
+          "available": true,
+          "discount": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "before the test order: the store's row and the harness env hold no Shopify domain, token or secret and no Razorpay secret (nothing can reach Shopify or a payment)",
+      "detail": {
+        "found": [],
+        "env": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the checkout's review step lists the item under the new name",
+      "detail": {
+        "has": true,
+        "sample": "Design Demo Co\n1\nAddress\n→\n2\nReview\n→\n3\nPayment\nReview your order\n\nSHIP TO\n\nP4 Drill Test Order\n\n1 Test Street, Mumbai, Maharashtra 400001\n\nsnehal@mediastic.in · 9999999999\n\nEdit\n\nAurora Drill Tonic\n\nQty 1\n\n₹639\nBack\nContinue to payment\nOrder summary\nSubtotal\n₹639\nShipping (incl. COD fee)\n₹128\nTotal"
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout: cash on delivery is chosen (no card details are ever entered)",
+      "detail": {
+        "codValue": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: a cash on delivery test order (snehal@mediastic.in) goes through, and the confirmation shows the new name",
+      "detail": {
+        "orderRow": {
+          "id": "DES-5BEB9E0B",
+          "status": "sync_failed",
+          "email": "snehal@mediastic.in",
+          "payment_method": "cod"
+        },
+        "at": "http://localhost:6100/checkout/confirmation/DES-5BEB9E0B?t=2.1796418421.14a8b8e3f37c7b332169"
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the order page shows the new name (and no Shopify title)",
+      "detail": {
+        "at": "/orders/DES-5BEB9E0B"
+      }
+    },
+    {
+      "ok": true,
+      "label": "console: the order page shows the new name with 'Shopify title: …' (and the SKU) under it",
+      "detail": {
+        "lineText": "Shopify title: Advanced Anti-dandruff Shampoo, SKU: PF-HAI-197-1",
+        "sku": "PF-HAI-197-1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the test order is cancelled at once",
+      "detail": {
+        "cancel": 200,
+        "status": "cancelled"
+      }
+    },
+    {
+      "ok": true,
+      "label": "reset: 'Reset to Shopify' puts Shopify's name, description and photos back ('Same as Shopify')",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "reset: published, the shopper sees Shopify's name and description again, and search no longer finds the new name",
+      "detail": {
+        "phase2": "done",
+        "live": {
+          "title": null,
+          "description_html": null,
+          "gallery": null
+        },
+        "h1b": "Advanced Anti-dandruff Shampoo"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the order keeps the name it was bought under, with Shopify's beside it",
+      "detail": {
+        "title": "Aurora Drill Tonic",
+        "catalog_title": "Advanced Anti-dandruff Shampoo"
+      }
+    },
+    {
+      "ok": true,
+      "label": "no page errors in the editor",
+      "detail": {
+        "errors": []
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_ba41b0f8a39622c9): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.5s",
+    "the demo agency's access to the store removed first (1 grant), as the dry run asks (Settings > Team)",
+    "the move: the store copied into http://127.0.0.1:7103 (58 tables, 4922 rows)",
+    "the product: Advanced Anti-dandruff Shampoo (advanced-anti-dandruff-shampoo-197); its \"goes well with\" pick: Advanced BCAA Recovery; its collection: sugar-free",
+    "test order DES-5BEB9E0B (snehal@mediastic.in) placed and cancelled: {\"status\":\"cancelled\"}"
+  ],
+  "screenshots": [
+    {
+      "name": "product-editor-edited-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/product-editor-edited-1440.png",
+      "bytes": 93280,
+      "width": 720,
+      "height": 1608,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "product-editor-published-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/product-editor-published-1440.png",
+      "bytes": 35518,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "shopper-product-page-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/shopper-product-page-1440.png",
+      "bytes": 149056,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/advanced-anti-dandruff-shampoo-197"
+    },
+    {
+      "name": "shopper-search-card-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/shopper-search-card-1440.png",
+      "bytes": 31956,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/search"
+    },
+    {
+      "name": "shopper-cart-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/shopper-cart-1440.png",
+      "bytes": 27530,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/advanced-anti-dandruff-shampoo-197"
+    },
+    {
+      "name": "shopper-checkout-review-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/shopper-checkout-review-1440.png",
+      "bytes": 25437,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "shopper-checkout-payment-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/shopper-checkout-payment-1440.png",
+      "bytes": 27613,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "shopper-confirmation-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/shopper-confirmation-1440.png",
+      "bytes": 20838,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/DES-5BEB9E0B"
+    },
+    {
+      "name": "shopper-order-page-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/shopper-order-page-1440.png",
+      "bytes": 17926,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/orders/DES-5BEB9E0B"
+    },
+    {
+      "name": "console-order-page-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/console-order-page-1440.png",
+      "bytes": 30577,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/orders/DES-5BEB9E0B"
+    },
+    {
+      "name": "shopper-after-reset-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/shopper-after-reset-1440.png",
+      "bytes": 20119,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/search"
+    }
+  ]
+}

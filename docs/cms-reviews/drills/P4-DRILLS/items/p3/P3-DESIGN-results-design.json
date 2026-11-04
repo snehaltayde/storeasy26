@@ -1,0 +1,313 @@
+{
+  "id": "P3-DESIGN",
+  "part": "design",
+  "title": "P3-DESIGN — change a colour, preview, publish, Undo",
+  "ranAt": "2026-11-04T20:33:31.755Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 26,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the phase 3 seed's store is in documents mode",
+      "detail": "documents"
+    },
+    {
+      "ok": true,
+      "label": "shoppers: the store's live look before the drill",
+      "detail": {
+        "kit": "pulse-1",
+        "accent": "#0d9488"
+      }
+    },
+    {
+      "ok": true,
+      "label": "/admin/brand opens the editor at the design document",
+      "detail": "/admin/editor?doc=doc_design"
+    },
+    {
+      "ok": true,
+      "label": "/admin/theme opens the editor at the design document",
+      "detail": "/admin/editor?doc=doc_design"
+    },
+    {
+      "ok": true,
+      "label": "the brand API refuses a save and names the editor",
+      "detail": {
+        "status": 409,
+        "body": {
+          "error": "This store publishes with the new editor, so nothing was saved here. Change your brand in the editor: open Brand there, then publish.",
+          "code": "STORE_USES_DOCUMENTS",
+          "editor": "/admin/editor?doc=doc_design"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the theme API reads the design document on a documents store",
+      "detail": {
+        "status": 200,
+        "design": {
+          "id": "doc_design",
+          "revision": 1,
+          "draftHash": "c483da3eebffb97b4e3904dcb8c90f9efad0c4fc48e771cfeb90e8409337e7a8",
+          "editor": "/admin/editor?doc=doc_design"
+        },
+        "theme": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "apply the glow look: saved as a doc_design draft",
+      "detail": {
+        "status": 200,
+        "applied": {
+          "theme": {
+            "kit": "glow",
+            "version": 1,
+            "applied_at": "2026-11-04T20:33:22.961Z"
+          },
+          "brand": {
+            "accent": "#0d9488"
+          },
+          "presets": [],
+          "document": {
+            "id": "doc_design",
+            "revision": 2,
+            "draftHash": "7bc02cf73e86a4334ed903f3c08e2976dc3711bd5b77bc7cd9a9a3d446dd7c5b"
+          }
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "applying a look writes nothing to the store's control-plane config",
+      "detail": {
+        "has": true,
+        "pin": null,
+        "theme": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "change the accent to #dc2626: saved as a draft",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "shoppers still see the old accent and look (nothing is published)",
+      "detail": {
+        "kit": "pulse-1",
+        "accent": "#0d9488"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the change list names the colour and the look",
+      "detail": [
+        "Colours: accent changed",
+        "Look: chosen"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the colour row lists the live parts that use it (every page's header and footer, the home page's sections)",
+      "detail": [
+        {
+          "words": "Every page: header, footer and announcement bar"
+        },
+        {
+          "words": "Home page: Hero, Banner, Collections grid, Product rail, Image with text, Newest products and Rich text"
+        },
+        {
+          "words": "Product page layout: Product details and buy button"
+        },
+        {
+          "words": "Affiliate Program: Text, FAQ, Rich text and Image with text"
+        },
+        {
+          "words": "Bulk Orders: Text, FAQ and Rich text"
+        },
+        {
+          "words": "Cancellation Policy: Text, FAQ, Rich text and Image with text"
+        },
+        {
+          "words": "Careers: Text, FAQ and Rich text"
+        },
+        {
+          "words": "and 26 more pages"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the look row lists only what the look styles: the header and the home page's hero",
+      "detail": [
+        {
+          "words": "Every page: header"
+        },
+        {
+          "words": "Home page: Hero"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the rows are plain words (no ids)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "preview: the new colours are not shown until asked (show design is off)",
+      "detail": {
+        "kit": "pulse-1",
+        "accent": "#0d9488"
+      }
+    },
+    {
+      "ok": true,
+      "label": "preview: show my new colours",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "preview: the new accent and the glow look",
+      "detail": {
+        "kit": "glow-1",
+        "accent": "#dc2626"
+      }
+    },
+    {
+      "ok": true,
+      "label": "shoppers, during the preview: the old look",
+      "detail": {
+        "kit": "pulse-1",
+        "accent": "#0d9488"
+      }
+    },
+    {
+      "ok": true,
+      "label": "publish the design",
+      "detail": {
+        "status": 200,
+        "item": {
+          "id": "doc_design",
+          "versionId": "ver_61a303a2e4c9753d",
+          "hash": "e698dc0f837d3acdc3a344b7471b9916f049d75ac1c79a5ce23b674c404e60a9",
+          "liveUrl": "/api/preview?exit=1&to=%2F",
+          "undo": {
+            "id": "doc_design",
+            "revision": 3,
+            "logId": "log_62b7c6a8b333de5a"
+          }
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "shoppers: the new accent and the glow look are live",
+      "detail": {
+        "kit": "glow-1",
+        "accent": "#dc2626"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the store's theme_pin is the live look (glow)",
+      "detail": {
+        "has": true,
+        "pin": {
+          "kit": "glow",
+          "version": 1,
+          "applied_at": "2026-11-04T20:33:22.961Z",
+          "published_at": "2026-11-04T20:33:29.282Z",
+          "release": "rel_363789f865157a77"
+        },
+        "theme": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "the legacy config.theme is not written",
+      "detail": {
+        "before": null,
+        "after": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "after publish: nothing left to publish in the design",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "Undo the design publish",
+      "detail": {
+        "status": 200,
+        "message": "“Brand” is back to the version that went live on 5 Nov, 02:03."
+      }
+    },
+    {
+      "ok": true,
+      "label": "shoppers: the old accent and look are back",
+      "detail": {
+        "kit": "pulse-1",
+        "accent": "#0d9488"
+      }
+    },
+    {
+      "ok": true,
+      "label": "after Undo the theme_pin is the live look again",
+      "detail": {
+        "pin": null,
+        "liveKit": "pulse-1"
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_4bce48ef41fe6c9b, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s",
+    "theme_pin before the drill: {\"has\":true,\"pin\":null,\"theme\":null}"
+  ],
+  "screenshots": [
+    {
+      "name": "1-live-before-1440",
+      "file": "docs/cms-reviews/drills/P3-DESIGN/1-live-before-1440.png",
+      "bytes": 22133,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "2-preview-new-colours-1440",
+      "file": "docs/cms-reviews/drills/P3-DESIGN/2-preview-new-colours-1440.png",
+      "bytes": 29846,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "3-live-after-publish-1440",
+      "file": "docs/cms-reviews/drills/P3-DESIGN/3-live-after-publish-1440.png",
+      "bytes": 24040,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "4-live-after-undo-1440",
+      "file": "docs/cms-reviews/drills/P3-DESIGN/4-live-after-undo-1440.png",
+      "bytes": 22133,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

@@ -1,0 +1,224 @@
+{
+  "id": "P4-DRILLS",
+  "part": "search-rename",
+  "title": "P4-DRILLS — search-rename",
+  "ranAt": "2026-11-04T21:13:33.162Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 16,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the route list for the page comparison (migrate-render --make-routes)",
+      "detail": "Wrote 75 routes to /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/search-rename-mw2m56bb/routes.json: 12 canaries, 59 more products and 4 more collections with old content. A hero test is running (hero-promise): its hero is set aside when both captures show it."
+    },
+    {
+      "ok": true,
+      "label": "the move: the rehearsal on a copy passes (the move on the copy, then the page comparison)",
+      "detail": {
+        "exit": 0,
+        "compared": 75,
+        "same": true,
+        "canariesOk": true,
+        "list": [],
+        "dataCheck": {
+          "ran": true,
+          "compared": 357,
+          "differences": 0
+        },
+        "tail": [
+          "",
+          "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/search-rename-mw2m56bb/rehearsal-the-move/rehearsal.json",
+          "Result: passed. Give this file to the real move with --rehearsal."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the move: the store's own database is untouched by its rehearsal",
+      "detail": {
+        "before": {
+          "mode": "legacy",
+          "live": "rel_fbda6417a61fb848",
+          "documents": 0
+        },
+        "after": {
+          "mode": "legacy",
+          "live": "rel_fbda6417a61fb848",
+          "documents": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the move: the dry run says Ready to move and prints its digest",
+      "detail": "Ready to move |  | What shoppers will see change"
+    },
+    {
+      "ok": true,
+      "label": "the move: the move (digest and rehearsal report as proofs) finishes",
+      "detail": "{\"ts\":\"2026-11-04T21:13:17.274Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_812624c2f620b0d0\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 21:13 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
+    },
+    {
+      "ok": true,
+      "label": "before: search for \"Advanced Anti-dandruff Shampoo\" finds the product",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the rename is published in the editor",
+      "detail": {
+        "phase": "done"
+      }
+    },
+    {
+      "ok": true,
+      "label": "storefront search (the SQL path) finds it by the new name, and not by the old one",
+      "detail": {
+        "byNew": true,
+        "byOld": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "its search row is marked done (the harness server has no Typesense: its fast path marks rows done without a client call)",
+      "detail": {
+        "outbox": [
+          {
+            "rid": 60,
+            "handle": "advanced-anti-dandruff-shampoo-197",
+            "reason": "publish",
+            "done_at": "2026-11-04T21:13:25.480Z"
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the spy step's Typesense values are dummies set in this process only: nothing listens on the dummy port, and the harness server's Typesense values are blank",
+      "detail": {
+        "port": "7109",
+        "listening": false,
+        "serverHost": ""
+      }
+    },
+    {
+      "ok": true,
+      "label": "in this process: the second rename, published against the harness database, wrote its own pending search row",
+      "detail": {
+        "pending": [
+          {
+            "rid": 61,
+            "product_id": "gid://shopify/Product/8000196",
+            "done_at": null
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "drainSearchOutbox({ client: spy }) upserts the product with the second name, in the drill's collection only",
+      "detail": {
+        "calls": [
+          {
+            "op": "import",
+            "collection": "p4_drill_products",
+            "titles": [
+              "Quasar Drill Blend"
+            ]
+          }
+        ],
+        "drained": {
+          "read": 1,
+          "upserted": 1,
+          "deleted": 0,
+          "done": 1
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "after the spy drain every search row of the product is done",
+      "detail": {
+        "rows": [
+          {
+            "rid": 60,
+            "done_at": "2026-11-04T21:13:25.480Z"
+          },
+          {
+            "rid": 61,
+            "done_at": "2026-11-04T21:13:26.349Z"
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "storefront search finds the second name too",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "after Undo of both renames in the browser, search finds the old name again and neither new one",
+      "detail": {
+        "liveTitle": null,
+        "backOld": true,
+        "gone1": true,
+        "gone2": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "the Undo's search rows are marked done too",
+      "detail": {
+        "n": 0
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_fbda6417a61fb848): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.6s",
+    "the demo agency's access to the store removed first (1 grant), as the dry run asks (Settings > Team)",
+    "the move: the store copied into http://127.0.0.1:7103 (58 tables, 4922 rows)",
+    "the product: Advanced Anti-dandruff Shampoo (advanced-anti-dandruff-shampoo-197); search words: new \"Zephyr\", second \"Quasar\", old \"Advanced Anti-dandruff Shampoo\" (the whole old name)"
+  ],
+  "screenshots": [
+    {
+      "name": "search-new-name-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/search-new-name-1440.png",
+      "bytes": 32848,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/search"
+    },
+    {
+      "name": "recently-published-undo-1-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/recently-published-undo-1-1440.png",
+      "bytes": 25481,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "recently-published-undo-2-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/recently-published-undo-2-1440.png",
+      "bytes": 26858,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "search-old-name-back-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/search-old-name-back-1440.png",
+      "bytes": 24926,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/search"
+    }
+  ]
+}
