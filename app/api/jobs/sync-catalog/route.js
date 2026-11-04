@@ -3,6 +3,7 @@ import { getTenant, listTenants } from "@/lib/platform/control.js";
 import { withTenant } from "@/lib/tenant-context.js";
 import { startCatalogSync } from "@/lib/platform/sync-jobs";
 import { runJobById } from "@/lib/platform/worker";
+import { SYNC_PAUSED_MESSAGE } from "@/lib/sync.js";
 
 // Full-reconcile catalog sync per tenant (Session 21) — the backstop behind
 // webhook-driven freshness. No vercel.json cron entry (Hobby's 2 slots are
@@ -32,6 +33,9 @@ async function queueOne(slug) {
   if (tenant.status !== "active") return { tenant: slug, ok: false, error: `status ${tenant.status}` };
   try {
     const { run, action, job } = await withTenant(tenant, () => startCatalogSync({ startedBy: "scheduled" }));
+    // P4-CUTOVER (from the P4-GUARD review): a store being moved to the new
+    // editor starts nothing, and may have no earlier run (run null)
+    if (action === "skipped") return { tenant: slug, ok: true, skipped: true, action, message: SYNC_PAUSED_MESSAGE, runId: run?.id ?? null, jobId: null };
     return { tenant: slug, ok: true, runId: run.id, action, jobId: job?.id ?? null };
   } catch (e) {
     return { tenant: slug, ok: false, error: String(e?.message || e).slice(0, 300) };

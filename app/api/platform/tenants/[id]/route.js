@@ -4,6 +4,7 @@ import { sameOrigin } from "@/lib/origin-check";
 import { patchTenant, getTenant, listTenants, platformDb } from "@/lib/platform/control.js";
 import { audit } from "@/lib/platform/audit";
 import { startCatalogSync, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
+import { SYNC_PAUSED_MESSAGE } from "@/lib/sync.js";
 import { withTenant } from "@/lib/tenant-context.js";
 import { slog } from "@/lib/log";
 import { themePinOf } from "@/lib/themes/kits";
@@ -197,6 +198,13 @@ export async function POST(request, { params }) {
     const { run, action } = await withTenant(tenant, () =>
       startCatalogSync({ startedBy: "operator", defer: after, budgetMs: Math.max(0, KICK_BUDGET_MS - (Date.now() - started)) }),
     );
+    // P4-CUTOVER (from the P4-GUARD review): a store being moved to the new
+    // editor starts nothing, and may have no earlier run (run null)
+    if (action === "skipped") {
+      slog("tenant_sync_queued", { tenant: id, run: run?.id ?? null, action, via: "platform-console" });
+      await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.sync", tenantId: id, diff: { run: run?.id ?? null, action: "skipped" } });
+      return NextResponse.json({ ok: false, action: "skipped", paused: true, error: SYNC_PAUSED_MESSAGE }, { status: 409 });
+    }
     slog("tenant_sync_queued", { tenant: id, run: run.id, action, via: "platform-console" });
     await audit({ actor: { kind: "operator", id: "operator" }, action: "tenant.sync", tenantId: id, diff: { run: run.id, action } });
     return NextResponse.json(

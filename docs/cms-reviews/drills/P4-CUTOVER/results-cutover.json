@@ -1,0 +1,303 @@
+{
+  "id": "P4-CUTOVER",
+  "part": "cutover",
+  "title": "P4-CUTOVER — rehearsal on a copy, then the move, in desktop Chrome",
+  "ranAt": "2026-11-04T17:49:17.915Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 19,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the route list for the comparison (migrate-render --make-routes)",
+      "detail": "Wrote 75 routes to /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b5/P4-CUTOVER/drill-scratch/routes.json: 12 canaries, 59 more products and 4 more collections with old content."
+    },
+    {
+      "ok": true,
+      "label": "the rehearsal on the copy passes (the move on the copy, then the page comparison)",
+      "detail": {
+        "exit": 0,
+        "tail": [
+          "",
+          "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b5/P4-CUTOVER/drill-scratch/rehearsal/rehearsal.json",
+          "Result: passed. Give this file to the real move with --rehearsal."
+        ],
+        "render": {
+          "same": true,
+          "compared": 75,
+          "canariesOk": true,
+          "allowed": [
+            "hero-test-variant"
+          ],
+          "list": []
+        },
+        "dataCheck": {
+          "ran": true,
+          "compared": 357,
+          "differences": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the rehearsal compared every route, and every canary loaded before the move",
+      "detail": {
+        "compared": 75,
+        "canaries": 12
+      }
+    },
+    {
+      "ok": true,
+      "label": "the copy moved to the new editor",
+      "detail": {
+        "mode": "documents"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the store's own database is untouched by its rehearsal",
+      "detail": {
+        "before": [
+          {
+            "mode": "legacy"
+          },
+          {
+            "id": "rel_56bb7e5b6229486f"
+          },
+          {
+            "n": 0
+          }
+        ],
+        "after": [
+          {
+            "mode": "legacy"
+          },
+          {
+            "id": "rel_56bb7e5b6229486f"
+          },
+          {
+            "n": 0
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the store's row points at its own database again",
+      "detail": {
+        "db_url": "http://127.0.0.1:7101"
+      }
+    },
+    {
+      "ok": true,
+      "label": "before: the chosen product's editorial template and the collection's sidebar template show",
+      "detail": {
+        "product": [
+          "announcement||",
+          "|editorial|",
+          "pdp-modules||",
+          "pdp-pairs||"
+        ],
+        "collection": [
+          "announcement||",
+          "||sidebar",
+          "collection-products||"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "a shopper capture of every route before the move",
+      "detail": "Captured 75 pages into /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b5/P4-CUTOVER/drill-scratch/real-before."
+    },
+    {
+      "ok": true,
+      "label": "the dry run says Ready to move and prints its digest",
+      "detail": "Ready to move"
+    },
+    {
+      "ok": true,
+      "label": "the real-shaped move (digest and rehearsal report as proofs) finishes",
+      "detail": "{\"ts\":\"2026-11-04T17:48:47.830Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_8bca76120caf7a27\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 17:48 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
+    },
+    {
+      "ok": true,
+      "label": "the store is on the new editor: v4 release live, the old live release recorded, one finished run",
+      "detail": [
+        [
+          {
+            "mode": "documents",
+            "cutover_release_id": "rel_56bb7e5b6229486f"
+          }
+        ],
+        [
+          {
+            "id": "rel_mig_8bca76120caf7a27"
+          }
+        ],
+        [
+          {
+            "step": "searched",
+            "outcome": "done"
+          }
+        ]
+      ]
+    },
+    {
+      "ok": true,
+      "label": "in Chrome, / shows the same text, sections and templates before and after the move",
+      "detail": {
+        "path": "/",
+        "chars": 3633
+      }
+    },
+    {
+      "ok": true,
+      "label": "in Chrome, /products/micronised-creatine-12 shows the same text, sections and templates before and after the move",
+      "detail": {
+        "path": "/products/micronised-creatine-12",
+        "chars": 1224
+      }
+    },
+    {
+      "ok": true,
+      "label": "in Chrome, /collections/protein shows the same text, sections and templates before and after the move",
+      "detail": {
+        "path": "/collections/protein",
+        "chars": 1855
+      }
+    },
+    {
+      "ok": true,
+      "label": "in Chrome, /journal shows the same text, sections and templates before and after the move",
+      "detail": {
+        "path": "/journal",
+        "chars": 6358
+      }
+    },
+    {
+      "ok": true,
+      "label": "in Chrome, /journal/protein-myths-1 shows the same text, sections and templates before and after the move",
+      "detail": {
+        "path": "/journal/protein-myths-1-updated",
+        "chars": 6564
+      }
+    },
+    {
+      "ok": true,
+      "label": "the shopper captures of every route before and after the real move compare the same",
+      "detail": "Compared 75 pages: every one looks the same to a shopper. |  | Result: the same. Nothing a shopper sees changed."
+    },
+    {
+      "ok": true,
+      "label": "--status says the store uses the new editor",
+      "detail": "Your store uses the new editor. No update is under way."
+    },
+    {
+      "ok": true,
+      "label": "--abort with nothing under way says so",
+      "detail": "✗ There is no move under way, so there is nothing to stop."
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_56bb7e5b6229486f): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.7s",
+    "store design: its database http://127.0.0.1:7101, the control plane http://127.0.0.1:7100; scratch /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b5/P4-CUTOVER/drill-scratch",
+    "the agency's access to the store removed first (1 grant), as the dry run asks",
+    "copied the store into http://127.0.0.1:7103: 58 tables, 4922 rows",
+    "rehearsal output (plain part):\nCapturing 75 pages before the move…\nCapturing 75 pages after the move…\nRehearsal passed: the copy moved to the new editor and looks the same to shoppers.\n  This ran on a copy of your store on this machine. Nothing on your real store changed.\n  Switched at 2026-11-04 17:48 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Not recorded: this was a rehearsal on a copy.\n\nSearch\n  Not updated: this was a rehearsal on a copy.\n\nThe comparison with your live store\n  As data: the same.\n  As pages: the same (75 pages compared).\n"
+  ],
+  "screenshots": [
+    {
+      "name": "home-before-1440",
+      "file": "docs/cms-reviews/drills/P4-CUTOVER/home-before-1440.png",
+      "bytes": 45346,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "product-before-1440",
+      "file": "docs/cms-reviews/drills/P4-CUTOVER/product-before-1440.png",
+      "bytes": 135980,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "collection-before-1440",
+      "file": "docs/cms-reviews/drills/P4-CUTOVER/collection-before-1440.png",
+      "bytes": 70651,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/protein"
+    },
+    {
+      "name": "journal-before-1440",
+      "file": "docs/cms-reviews/drills/P4-CUTOVER/journal-before-1440.png",
+      "bytes": 29431,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/journal"
+    },
+    {
+      "name": "redirected-post-before-1440",
+      "file": "docs/cms-reviews/drills/P4-CUTOVER/redirected-post-before-1440.png",
+      "bytes": 53364,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/journal/protein-myths-1-updated"
+    },
+    {
+      "name": "home-after-1440",
+      "file": "docs/cms-reviews/drills/P4-CUTOVER/home-after-1440.png",
+      "bytes": 45836,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "product-after-1440",
+      "file": "docs/cms-reviews/drills/P4-CUTOVER/product-after-1440.png",
+      "bytes": 135980,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "collection-after-1440",
+      "file": "docs/cms-reviews/drills/P4-CUTOVER/collection-after-1440.png",
+      "bytes": 70651,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/protein"
+    },
+    {
+      "name": "journal-after-1440",
+      "file": "docs/cms-reviews/drills/P4-CUTOVER/journal-after-1440.png",
+      "bytes": 29431,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/journal"
+    },
+    {
+      "name": "redirected-post-after-1440",
+      "file": "docs/cms-reviews/drills/P4-CUTOVER/redirected-post-after-1440.png",
+      "bytes": 53364,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/journal/protein-myths-1-updated"
+    }
+  ]
+}
