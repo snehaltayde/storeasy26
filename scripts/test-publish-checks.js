@@ -980,6 +980,67 @@ await t("P3-FIX2: an unchanged header menu item to a page taken offline is inher
   eq([Checks.linkLead("header", null, "x"), Checks.linkLead("announcement", null, "x"), Checks.linkLead("header", "sec_1", "x"), Checks.linkLead("page", null, "x")], ["Your header menu links to", "Your announcement bar links to", "x", "x"], "linkLead:");
 });
 
+await t("P3-FIX2 fix 1: an unchanged menu item is not inherited when this same set is what breaks it (the set hides its page, or renames it by id or by address); an announcement bar too", async () => {
+  const header = await current("ck", "doc_header");
+  const menu = (items) => body("header", { settings: { mode: "custom", items } });
+  // hidden inside the set
+  const x = await create("ck", "page", { body: page("rv-x", "Rv x") });
+  published(await publishApi("ck", x.id), "x live");
+  await save("ck", header.id, menu([{ label: "X", link: urlLink("/policies/rv-x") }]));
+  published(await publishApi("ck", header.id), "header live with the x item");
+  await save("ck", header.id, menu([{ label: "X", link: urlLink("/policies/rv-x") }, { label: "Shop", link: urlLink("/collections") }]));
+  await save("ck", x.id, page("rv-x", "Rv x", undefined, "page", { enabled: false }));
+  let before = await dump();
+  const r = await publishSetApi("ck", [header.id, x.id]);
+  eq([r.status, r.body.code], [422, "VALIDATION_FAILED"], `the set hides x: ${JSON.stringify((r.body.issues || []).map((i) => [i.code, i.level]))}`);
+  const h = issuesOf(r, "LINK_TARGET_HIDDEN");
+  eq(h.map((i) => [i.documentId, i.field, i.level]), [[header.id, "items.0.link", "blocks"]], "blocks:");
+  ok(!/already live/.test(h[0].message), `no 'already live' words: ${h[0].message}`);
+  checkIssues(r.body.issues, "hide in set");
+  await unchanged(before, "the refusal");
+  // x hidden on its own first: then the header's unchanged item is inherited, as before
+  published(await publishApi("ck", x.id), "x hidden alone");
+  const ri = published(await publishApi("ck", header.id), "header after x was hidden");
+  eq(issuesOf({ body: ri }, "LINK_TARGET_HIDDEN").map((i) => i.level), ["inherited"], "inherited once x was already hidden:");
+
+  // renamed inside the set, a link by id
+  const y = await create("ck", "page", { body: page("rv-y", "Rv y") });
+  published(await publishApi("ck", y.id), "y live");
+  await save("ck", header.id, menu([{ label: "Y", link: pageLink("page", "rv-y", y.id) }]));
+  published(await publishApi("ck", header.id), "header live with the y item");
+  await save("ck", header.id, menu([{ label: "Y", link: pageLink("page", "rv-y", y.id) }, { label: "Shop", link: urlLink("/collections") }]));
+  await save("ck", y.id, page("rv-y2", "Rv y"));
+  before = await dump();
+  const r2 = await publishSetApi("ck", [header.id, y.id]);
+  eq([r2.status, r2.body.code], [422, "VALIDATION_FAILED"], `the set renames y: ${JSON.stringify((r2.body.issues || []).map((i) => [i.code, i.level]))}`);
+  const m = issuesOf(r2, "LINK_TARGET_MISSING");
+  eq(m.map((i) => [i.documentId, i.field, i.level]), [[header.id, "items.0.link", "blocks"]], "blocks:");
+  ok(/\/policies\/rv-y2/.test(m[0].message) && !/already live/.test(m[0].message), `the words: ${m[0].message}`);
+  await unchanged(before, "the refusal");
+
+  // renamed inside the set, a link by address
+  const z = await create("ck", "page", { body: page("rv-z", "Rv z") });
+  published(await publishApi("ck", z.id), "z live");
+  await save("ck", header.id, menu([{ label: "Z", link: urlLink("/policies/rv-z") }]));
+  published(await publishApi("ck", header.id), "header live with the z item");
+  await save("ck", header.id, menu([{ label: "Z", link: urlLink("/policies/rv-z") }, { label: "Shop", link: urlLink("/collections") }]));
+  await save("ck", z.id, page("rv-z2", "Rv z"));
+  const r3 = await publishSetApi("ck", [header.id, z.id]);
+  eq([r3.status, issuesOf(r3, "LINK_TARGET_MISSING").map((i) => [i.documentId, i.level])], [422, [[header.id, "blocks"]]], `the set renames z: ${JSON.stringify((r3.body.issues || []).map((i) => [i.code, i.level]))}`);
+
+  // the announcement bar: hidden inside the set
+  const w = await create("ck", "page", { body: page("rv-w", "Rv w") });
+  published(await publishApi("ck", w.id), "w live");
+  const ann = (await current("ck", "doc_announcement").catch(() => null)) || (await create("ck", "announcement"));
+  const bar = (text) => ({ ...R.emptyBody("announcement"), settings: { ...(R.emptyBody("announcement").settings || {}), enabled: true, text, link: urlLink("/policies/rv-w") } });
+  await save("ck", ann.id, bar("Sale on"));
+  published(await publishApi("ck", ann.id), "bar live");
+  await save("ck", ann.id, bar("Sale on now"));
+  await save("ck", w.id, page("rv-w", "Rv w", undefined, "page", { enabled: false }));
+  const r4 = await publishSetApi("ck", [ann.id, w.id]);
+  eq([r4.status, issuesOf(r4, "LINK_TARGET_HIDDEN").map((i) => [i.documentId, i.level])], [422, [[ann.id, "blocks"]]], `the set hides w: ${JSON.stringify((r4.body.issues || []).map((i) => [i.code, i.level, i.field]))}`);
+});
+
 // =========================================================================================
 console.log("— the checks module on its own");
 
