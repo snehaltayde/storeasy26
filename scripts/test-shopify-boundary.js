@@ -574,14 +574,23 @@ const ORDER_STRINGS = {
   sku: "ORDER-SKU-SENTINEL",
 };
 
-// OVL-03 HOOK. No overlay layer exists yet, so today the only other title in play
-// is the catalog's. SHOP-02 extends here once OVL-03 lands: write OVERLAY_TITLE
-// through the real overlay writer in seedOverlay(), and build the order's cart
-// through the effective read instead of the hand-made CART. OVERLAY_TITLE is
-// already in the list below, so the assertion needs no change.
+// OVL-03 (P4-EFFECTIVE): the overlay is a published row in product_content_live
+// (migration 0024), read through lib/catalog/effective.js. seedOverlay() writes
+// one for the catalog product below, as a publish would (the publish writer is
+// P4-LIVEROW's). The hand-made CART stays here because it also carries order
+// content (ORDER_STRINGS) the effective read never makes; the test after it
+// builds the order's cart through the real effective read, with a gift and a
+// bundle.
 const OVERLAY_TITLE = "OVERLAY-TITLE-SENTINEL";
+async function liveTable() {
+  await libsql.executeMultiple(await readFile(join(ROOT, "migrations/tenant/0024_content_live.sql"), "utf8"));
+}
 async function seedOverlay() {
-  // OVL-03: nothing to write until the overlay table exists.
+  await liveTable();
+  await db
+    .insertInto("product_content_live")
+    .values({ product_id: PRODUCT_ID, document_id: "doc_prod_boundary", version_id: "ver_boundary", title: OVERLAY_TITLE, display_type: "OVERLAY-TYPE-SENTINEL", display_vendor: "OVERLAY-VENDOR-SENTINEL", description: "OVERLAY-DESCRIPTION-SENTINEL", published_at: "2026-11-04T00:00:00.000Z" })
+    .execute();
 }
 
 // The sentinel inside each value, so a URL or JSON wrapper cannot hide it.
@@ -748,6 +757,50 @@ await t("SHOP-02: through the real push, no catalog text and no order content ap
 
   const { lineItems } = gql.calls[1].variables.input;
   eq(lineItems.map((l) => Object.keys(l).sort()), [LINE_KEYS, GIFT_LINE_KEYS], "line item keys on the wire:");
+});
+
+await t("SHOP-02 (OVL-03): a cart built through the effective read, with published titles on a paid line, a gift and both bundle components, sends no overlay text to Shopify, not even in a discount description", async () => {
+  await liveTable();
+  // the cart and bundle tables as a real tenant has them (this suite's store is the bare baseline)
+  for (const m of ["0004_cart_price_at_add", "0011_commerce_expansion"]) await libsql.executeMultiple(await readFile(join(ROOT, `migrations/tenant/${m}.sql`), "utf8"));
+  const Cart = await import("../lib/cart.js");
+  const { upsertOffer, deleteOffer } = await import("../lib/offers/store.js");
+  const Bun = await import("../lib/bundles.js");
+  const pid = (n) => `gid://shopify/Product/95${n}`;
+  const vid = (n) => `gid://shopify/ProductVariant/95${n}1`;
+  const OVERLAY = { 1: "OVERLAY-PAID-TITLE-SENTINEL", 2: "OVERLAY-GIFT-TITLE-SENTINEL", 3: "OVERLAY-BUNDLE-A-SENTINEL", 4: "OVERLAY-BUNDLE-B-SENTINEL" };
+  for (const n of [1, 2, 3, 4]) {
+    await db.insertInto("products").values({ id: pid(n), handle: `ov-${n}`, title: `RAW-TITLE-${n}-SENTINEL`, price_min: 500, price_max: 500, currency: "INR", available: 1, tags: "[]" }).execute();
+    await db.insertInto("variants").values({ id: vid(n), product_id: pid(n), title: "Default Title", sku: `OV-SKU-${n}-SENTINEL`, price: 500, currency: "INR", available: 1 }).execute();
+    await db.insertInto("product_content_live").values({ product_id: pid(n), document_id: `doc_prod_ov${n}`, version_id: `ver_ov${n}`, title: OVERLAY[n], display_type: `OVERLAY-TYPE-${n}-SENTINEL`, display_vendor: `OVERLAY-VENDOR-${n}-SENTINEL`, description_html: `<p>OVERLAY-HTML-${n}-SENTINEL</p>`, published_at: "2026-11-04T00:00:00.000Z" }).execute();
+  }
+  await upsertOffer({ offer: { id: "ov-gift", type: "FREE_GIFT", scope: "gift", priority: 40, title: "Gift deal", threshold: 100, gift: { variantId: vid(2), productId: pid(2), handle: "ov-2", title: "STORED-GIFT-TITLE", image: null, value: 500 } } });
+  const bundle = await Bun.upsertBundle({ slug: "ov-duo", title: "Duo deal", items: [{ variantId: vid(3) }, { variantId: vid(4) }], bundle_price: 800, enable: true });
+  try {
+    await Cart.createCart("ov-cart");
+    for (const n of [1, 3, 4]) await Cart.addItem("ov-cart", vid(n), 1);
+    const cart = await Cart.getCart("ov-cart");
+    // the overlay really is in the cart and on the order: the shopper saw it
+    eq(cart.items.map((i) => i.title), [OVERLAY[1], OVERLAY[3], OVERLAY[4]], "cart titles:");
+    eq(cart.gifts.map((g) => g.title), [OVERLAY[2]], "gift title:");
+    eq(cart.appliedOffers.map((o) => o.label).sort(), ["Duo deal", "Gift deal"], "offers applied:");
+    const id = await seedOrder({ cart });
+    const snapshot = (await libsql.execute({ sql: "SELECT snapshot FROM orders WHERE id = ?", args: [id] })).rows[0].snapshot;
+    for (const s of Object.values(OVERLAY)) ok(snapshot.includes(s), `${s} is not on the order (the test would prove nothing)`);
+    const gql = fakeShopify(cart.total);
+    const r = await P.pushOrderToShopify(id, { gql });
+    ok(r.ok, `push failed: ${JSON.stringify(r)}`);
+    const wire = JSON.stringify(gql.calls);
+    const leaked = [...new Set(wire.match(/OVERLAY-[A-Z0-9-]*SENTINEL|RAW-TITLE-\d-SENTINEL|OV-SKU-\d-SENTINEL|STORED-GIFT-TITLE/g) || [])];
+    eq(leaked, [], "content reached Shopify:");
+    const input = gql.calls[1].variables.input;
+    eq(input.lineItems.map((l) => Object.keys(l).sort()), [LINE_KEYS, LINE_KEYS, LINE_KEYS, GIFT_LINE_KEYS], "line item keys:");
+    eq(input.lineItems[3].appliedDiscount, GIFT_DISCOUNT, "the gift line's discount (fixed words):");
+    eq(input.appliedDiscount.description.split(" + ").sort(), ["Duo deal", "Gift deal"], "the order discount's description is offer and bundle titles only:");
+  } finally {
+    await deleteOffer("ov-gift");
+    await Bun.deleteBundle(bundle.id);
+  }
 });
 
 // ===========================================================================

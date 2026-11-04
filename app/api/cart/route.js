@@ -4,7 +4,8 @@ import { tenantHandler } from "@/lib/tenant-request";
 import {
   CART_COOKIE,
   emptyCart,
-  getCart,
+  getCart as fullCart,
+  shopperCart,
   createCart,
   addItem,
   setItemQty,
@@ -14,6 +15,10 @@ import {
 } from "@/lib/cart";
 
 export const runtime = "edge";
+
+// P4-EFFECTIVE (OVL-06, plan decision 13): every cart this route answers with
+// is the shopper's projection: Shopify's title and the SKU stay on the server.
+const getCart = async (id) => shopperCart(await fullCart(id));
 export const dynamic = "force-dynamic";
 
 const COOKIE_OPTS = {

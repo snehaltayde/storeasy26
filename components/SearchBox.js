@@ -219,8 +219,8 @@ export default function SearchBox() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-sf-text">{r.title}</p>
-                        {r.product_type ? (
-                          <p className="truncate text-xs text-sf-text-faint">{r.product_type}</p>
+                        {r.display_type ? (
+                          <p className="truncate text-xs text-sf-text-faint">{r.display_type}</p>
                         ) : null}
                       </div>
                       {r.price != null && (

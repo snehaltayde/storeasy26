@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { CART_COOKIE, getCart, clearCart } from "@/lib/cart";
+import { CART_COOKIE, getCart, clearCart, shopperCart } from "@/lib/cart";
 import { computeShipping } from "@/lib/shipping";
 import { tenantShippingConfig } from "@/lib/tenant-context";
 import { enqueueShopifyPush } from "@/lib/shopify-push";
@@ -78,7 +78,9 @@ function priceCheck(body, cart, shipping, shippingConfig) {
   });
   if (!m) return null;
   return NextResponse.json(
-    { ok: false, code: PRICE_CHANGED, error: m.message, total: m.total, shippingTotal: m.shippingTotal, currency, cart, shippingConfig },
+    // P4-EFFECTIVE (OVL-06): the browser gets the shopper's projection of the
+    // cart (no Shopify title or SKU); createOrder below keeps the full cart.
+    { ok: false, code: PRICE_CHANGED, error: m.message, total: m.total, shippingTotal: m.shippingTotal, currency, cart: shopperCart(cart), shippingConfig },
     { status: 409 },
   );
 }
