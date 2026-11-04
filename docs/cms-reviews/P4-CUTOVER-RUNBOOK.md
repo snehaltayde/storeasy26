@@ -87,7 +87,11 @@ node --env-file=.env.local scripts/migrate-documents.js --tenant X --dry-run-dig
 
 (plus `--store-open` or `--not-launched` if the dry run needed it). The command itself checks, before it changes anything: the store is on the old editor; its database holds the 0021 to 0025 updates; no catalog copy is running; no release is scheduled; the live store reads; no approvals or agency access; no address clash; every kind of content has an editor; the digest is the current dry run's; the rehearsal passed for this very content. Each failed check is a plain "Not moved: …" and nothing changes.
 
-Then it pauses the store, checks again, copies the content into the new editor, compares the copy with the live store for every part a shopper sees, and only if nothing differs switches the store in one step. Last, it records the store's look in the control plane (the theme pin: a control-plane write, so it needs the control plane's token in your environment) and asks search to update.
+Then it pauses the store, checks again, copies the content into the new editor, compares the copy with the live store for every part a shopper sees, and only if nothing differs switches the store in one step.
+
+**What the check after the pause does not see.** After the pause the command reads the store's content again and stops ("The store changed since the dry run…") if it is not exactly what the dry run and the rehearsal saw. That recheck does not cover brand or theme edits made on the control plane (the platform console's brand and theme settings) during the move: they are read from the control plane, which the pause doesn't hold. Don't change the store's brand or theme in the platform console while a move runs. If the agency-access read fails after the pause, the move stops with "We couldn't read who else has access to this store just now … Try again in a few minutes" (a read error, not a change). A store whose record of which editor it uses is missing is refused before anything is written ("This store's record of which editor it uses is missing…"); ask a developer to put the row back as the old editor, then start again from the dry run.
+
+**On a store that was moved back before (section 9).** The dry run then has two more sections: "Edits that come back at the move" lists, by product name, the names, descriptions, photos, brand and type shown that were published in the new editor before the reversal; they come back at the switch, never earlier. "Published in the new editor before, kept as older versions" lists what else was published there; it is not put live again (the old editor's content wins) and stays in each page's earlier versions. The rehearsal leaves the returning product edits out, so its page comparison stays exact; check those products by hand after the move. Last, it records the store's look in the control plane (the theme pin: a control-plane write, so it needs the control plane's token in your environment) and asks search to update.
 
 ## 7. Post-checks
 
@@ -112,6 +116,44 @@ It says, in plain words, whether the store is being updated, which step finished
 
 While a store is being updated, every old editor refuses and the full catalog copy waits with no end time, so never leave a store in that state: resume or abort.
 
-## 9. Going back: the reversal tool
+## 9. Reversal: going back to the old editor
 
-The supported way back is `pnpm reverse:documents` (P4-REVERSE adds its own section here: what the founder loses, the words to pass on, and its own status and abort). A PITR restore (step 2) is the disaster path only.
+The supported way back after a move is the reversal tool. A PITR restore (step 2) is the disaster path only. The reversal puts the store back on the release it had just before the move (or, for a store that had no release, on the old editor's drafts), removes every live product and collection row the new editor wrote (copied aside first, never lost), and gives search Shopify's names back. Nothing is written to Shopify.
+
+```
+node --env-file=.env.local scripts/reverse-documents.js --tenant X …
+```
+
+1. **Warn the founder first**, as in step 1: for a few seconds nothing can be published in the new editor. Shoppers can keep buying.
+2. **The reversal's dry run** (read only):
+   ```
+   node --env-file=.env.local scripts/reverse-documents.js --tenant X --dry-run --hosted --confirm X
+   ```
+   It must say **Ready to move back to the old editor**. It lists, by product name, the edits made in the new editor that won't show any more (for example `“Protein Bar”: new name (“Protein Bar Max”), description.`), the pages published there since the move, the counts (publishes, product edits, unpublished drafts), and the drafts that stay in the new editor. Keep the last line, `Reversal dry-run digest: <digest>`. A store that started on the new editor (made after P4-PROVISION) is refused: it has no old editor content to go back to.
+3. **The backup time**: record the time just before the real command, as in step 2, and pass it as `--backup-ref`.
+4. **The reversal**:
+   ```
+   node --env-file=.env.local scripts/reverse-documents.js --tenant X --dry-run-digest <digest> \
+     --hosted --confirm X --backup-ref <the time you recorded>
+   ```
+   It refuses, with nothing changed, when anything was published in the new editor since the dry run (run the dry run again). Step 1 pauses the store (new-editor publishing, Undo and discard refuse in their own step from here); step 2, in one go, copies the live product and collection rows aside, removes them, queues search for every one of those products, moves the live store back and puts the store on the old editor. Then it asks search to update (a failure is reported; the next catalog copy from Shopify catches up) and sets the store's look for Storeasy's own screens back to the old editor's value (the `theme_pin` key is removed from the store's control-plane config, so the operator screens read its old `theme` again; a control-plane write, so it needs the control plane's token in your environment). The report says "Set back to the old editor's look." under "The store's look".
+5. **Post-checks**: as a shopper, a product renamed in the new editor shows Shopify's name again, on its page, in collections and in search; the home page and pages look as before the move. Sign in as the founder: the old editors work again at once (Storefront, Catalog, Upsells, Releases).
+6. **The message to pass on.** The report ends with "A message you can pass on". It says which products lost which edits, that the old editors work again, and that moving to the new editor again brings those edits back. In your own words, for example:
+
+   > "Your store is back on the old editor. Shoppers see it as it was before the move. These edits from the new editor don't show any more: “Protein Bar”: new name (“Protein Bar Max”), description. The old editors work again right away. When your store moves to the new editor again, the product edits above (names, descriptions, photos, brand and type shown) come back. Other things you published in the new editor stay saved there as older versions."
+
+   Moving to the new editor again later (the move, steps 1 to 7, with `migrate:documents`) brings those edits back at the switch (OQ-9's default): legacy wins for everything the old editor can edit; the product names, descriptions, photos, brand and type shown come back from what was last published for each product in the new editor; other content published in the new editor is not put live again and stays as older versions. The move's dry run lists both by name before anything happens.
+
+**If a reversal stops midway:**
+
+```
+node --env-file=.env.local scripts/reverse-documents.js --tenant X --status --hosted --confirm X
+```
+
+It says, in plain words, whether a reversal is under way, which step finished, when it started and what to run next:
+
+- `--resume` finishes a reversal paused after step 1 (the store is still on the new editor until step 2 lands). On a store already back on the old editor whose last steps failed (search, the look), `--resume` does those again.
+- `--abort`, between step 1 and step 2 only, keeps the store on the new editor in one step: publishing works again and nothing shoppers see changed.
+- After step 2 `--abort` refuses: the store is already back on the old editor. To use the new editor again, move it with `migrate:documents`.
+
+While a reversal is paused, nothing can be published or saved in either editor: resume or abort, never leave it there.

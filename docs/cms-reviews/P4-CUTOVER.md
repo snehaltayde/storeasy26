@@ -156,6 +156,8 @@ Mutations (`…/scratchpad/p4-b5/P4-CUTOVER/mut/run.py`: one change, the suite, 
 - **`--resume` and `--status` on a hosted store** need `--hosted --confirm` (the command's own check) but not a new backup time; the run keeps the one it started with.
 - **The control plane writes (theme pin, the job cancel, the search job) are not in the store's batch**, as spec 8.11 accepts for brand and theme: a failure is reported and redone on `--resume` (the pin) or by the next full sync (search).
 - **Hosted batch atomicity** (the guards, `changes()` gating) is proven on file databases and sqld only; the staging check is an owner step.
+- **The source-hash recheck after the lock does not cover brand or theme edits made on the control plane during the move** (added in batch 6 by P4-REVERSE, from this item's review). The design is read from `currentTenant().config`, cached once per process, so the read before the lock and the read after it share the same config: a brand or theme change made in the platform console while the store is paused is not seen by the recheck. The runbook (step 6) says not to change the store's brand or theme in the platform console while a move runs.
+- **Batch 6 (P4-REVERSE) changes to this item's stops:** a failed agency-access read after the lock now stops with its own words ("We couldn't read who else has access to this store just now … Try again in a few minutes", `RECHECK_AGENCY_UNREAD`), and a store whose `cms_state` row is missing is refused before anything is written with "This store's record of which editor it uses is missing…" (`NO_MODE_ROW`). Both are tested in `scripts/test-migrate-reverse.js` part 7.
 
 From review:
 
