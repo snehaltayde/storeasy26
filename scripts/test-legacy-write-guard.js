@@ -18,6 +18,9 @@
 //      carries on after; legacy and documents stores sync as before; webhook
 //      writes carry on.
 //   5. The refusal words: plain, no codes or table names (snapshot).
+//  1b. P4-CUTOVER (from the P4-GUARD review): a page save and its old-address
+//      statements are one guarded batch (never a page without its redirect);
+//      cancelScheduledRelease is guarded in its batch.
 //   pnpm test:legacy-write-guard
 import { rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -427,6 +430,85 @@ const fetchersFor = (n = 4, { onProductsPage } = {}) => ({
   collectionsPage: async () => page([{ id: COLLECTION, handle: "guard-collection", title: "Guard collection", products: { nodes: [{ id: productId(1) }], pageInfo: { hasNextPage: false } } }], false, "c1"),
 });
 const indexer = async () => ({ indexed: 0, skipped: "test" });
+// ---- P4-CUTOVER (from the P4-GUARD review) ---------------------------------------------
+console.log("— 1b. a page and its old address in ONE guarded batch; a guarded schedule cancel");
+
+await t("upsertContentPage sends the page and its redirect statements as ONE guarded batch (the hook fires once)", async () => {
+  let calls = 0;
+  M.__legacyWriteTestHooks.beforeBatch = async () => {
+    calls++;
+  };
+  try {
+    await L.run(() => Store.upsertContentPage({ slug: "one-batch", title: "One batch", sections: [], redirect_from: "one-batch-old" }));
+    eq(calls, 1, "batches for an insert with an old address:");
+    calls = 0;
+    await L.run(async () => Store.upsertContentPage({ slug: "one-batch", title: "One batch, edited", sections: [], redirect_from: "one-batch-older" }, { expectedRevision: await pageRev("one-batch") }));
+    eq(calls, 1, "batches for an edit with an old address:");
+  } finally {
+    M.__legacyWriteTestHooks.beforeBatch = null;
+  }
+  const r = await L.run(async () => (await libsql.execute("SELECT from_slug, to_slug FROM page_redirects WHERE to_slug = 'one-batch' ORDER BY from_slug")).rows.map((x) => [x.from_slug, x.to_slug]));
+  eq(r, [["one-batch-old", "one-batch"], ["one-batch-older", "one-batch"]], "both old addresses lead here:");
+});
+
+for (const mode of ["migrating", "documents"]) {
+  await t(`'${mode}' right before a page save with an old address: nothing is written, neither the page nor its redirects (never a page without its redirect)`, async () => {
+    await L.run(() => Store.upsertContentPage({ slug: "moving-page", title: "Moving page", sections: [] }));
+    const before = await dump(L);
+    const out = await armed(LEGACY.hooks, LEGACY.key, mode, L, () =>
+      L.run(async () => {
+        await M.assertLegacyContentWrites();
+        return Store.upsertContentPage({ slug: "moving-page", title: "Moving page, renamed", sections: [], redirect_from: "moving-page-old" }, { expectedRevision: await pageRev("moving-page") });
+      }),
+    );
+    ok(out.error, "the save went through");
+    eq([out.error.status, out.error.code], [409, "STORE_USES_DOCUMENTS"], "refusal:");
+    eq(out.calls(), 1, "one batch:");
+    eq(await dump(L), before, "tables:");
+  });
+}
+
+await t("a lost compare-and-set on a page save changes no old address either (the redirect statements act only on this save's own row)", async () => {
+  await L.run(() => Store.upsertContentPage({ slug: "cas-page", title: "CAS page", sections: [] }));
+  let before = null;
+  // another save lands between this save's read and its batch
+  M.__legacyWriteTestHooks.beforeBatch = async () => {
+    await L.run(() => libsql.execute("UPDATE cms_pages SET revision = revision + 1, title = 'CAS page, theirs' WHERE slug = 'cas-page'"));
+    before = await dump(L);
+  };
+  let e = null;
+  try {
+    e = await L.run(async () => Store.upsertContentPage({ slug: "cas-page", title: "CAS page, mine", sections: [], redirect_from: "cas-page-old" }, { expectedRevision: await pageRev("cas-page") }).then(() => null, (x) => x));
+  } finally {
+    M.__legacyWriteTestHooks.beforeBatch = null;
+  }
+  ok(e && /edited by someone else/.test(e.message), `a conflict: ${e?.message}`);
+  eq(await dump(L), before, "nothing written (no old address for a save that lost):");
+});
+
+for (const mode of ["migrating", "documents"]) {
+  await t(`'${mode}' after the pre-check: cancelScheduledRelease is refused in its batch (409, plain words) and the scheduled release stays`, async () => {
+    const sched = await L.run(async () => {
+      await Store.setBlock("hero", { title: `Cancel ${mode}` });
+      return R.createRelease({ note: "to cancel", scheduledFor: new Date(Date.now() + 3_600_000).toISOString() });
+    });
+    const before = await dump(L);
+    const out = await armed(LEGACY.hooks, LEGACY.key, mode, L, () =>
+      L.run(async () => {
+        await M.assertLegacyContentWrites({ doing: "publish" });
+        return R.cancelScheduledRelease(sched.id);
+      }),
+    );
+    ok(out.error, "cancelled anyway");
+    eq([out.error.status, out.error.code], [409, "STORE_USES_DOCUMENTS"], "refusal:");
+    eq(out.error.message, words(mode, "publish"), "words:");
+    eq(await dump(L), before, "tables:");
+    // on legacy it cancels
+    const ok2 = await L.run(() => R.cancelScheduledRelease(sched.id));
+    eq(ok2.cancelled, true, "cancelled on legacy:");
+  });
+}
+
 const catalog = (T) =>
   T.run(async () => ({
     products: (await libsql.execute("SELECT id, title, synced_at FROM products ORDER BY id")).rows.map((r) => ({ ...r })),

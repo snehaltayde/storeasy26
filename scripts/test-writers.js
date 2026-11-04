@@ -701,7 +701,9 @@ export function directWriters(files) {
     if (isTest(path)) continue;
     const code = stripComments(text);
     if (!BLOCK_WRITER_ALLOW.has(path) && (BLOCK_WRITE_RE.test(code) || BLOCK_IMPORT_RE.test(code))) out.push(`${path}: block/page writer`);
-    if (!path.startsWith("lib/documents/") && DOC_WRITE_RE.test(code)) out.push(`${path}: document-table writer`);
+    // P4-CUTOVER: the cutover (lib/migrate/) writes the backfill and the flip
+    // itself, every statement under the migrating guard (plan decision 5)
+    if (!path.startsWith("lib/documents/") && !path.startsWith("lib/migrate/") && DOC_WRITE_RE.test(code)) out.push(`${path}: document-table writer`);
     if (legacyAllowed(path)) continue;
     if (GUARDED_HELPERS.has(path)) {
       if (executedWrites(code).length || (!GUARDED_SQL.has(path) && LEGACY_SQL_WRITE_RE.test(code))) out.push(`${path}: unguarded legacy write`);

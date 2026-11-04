@@ -974,7 +974,9 @@ await t("a scan finds no INSERT, UPDATE or DELETE on documents, document_version
   // P4-FIXTURES: the legacy tenant builders write leftover document rows on
   // purpose (re-run fixtures for CUTOVER and REVERSE), on local file databases
   // only; that one support file is test code like the suites
-  const allowed = (p) => /^scripts\/test-[\w.-]+\.js$/.test(p) || p === "scripts/support/legacy-tenants.js";
+  // P4-CUTOVER: the cutover writes the backfill and the flip itself, under
+  // the migrating guard (lib/migrate/backfill.js and flip.js only)
+  const allowed = (p) => /^scripts\/test-[\w.-]+\.js$/.test(p) || p === "scripts/support/legacy-tenants.js" || p === "lib/migrate/backfill.js" || p === "lib/migrate/flip.js";
   const found = writesOutsideService(files).filter((p) => !allowed(p));
   eq(found, [], "writers outside lib/documents/:");
   // the scan itself bites: each of these shapes is caught
