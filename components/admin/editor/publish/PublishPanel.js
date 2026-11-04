@@ -237,7 +237,7 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
     case "done": {
       const undoable = (o.published || []).filter((p) => p.undo);
       const undoTarget = o.undoSet
-        ? { kind: "set", setId: o.undoSet.setId, members: o.undoSet.members, labels: o.undoSet.labels }
+        ? { kind: "set", setId: o.undoSet.setId, members: o.undoSet.members, labels: o.undoSet.labels, revisions: o.undoSet.revisions }
         : undoable.length === 1
           ? { kind: "one", label: undoable[0].label, undo: undoable[0].undo }
           : null;

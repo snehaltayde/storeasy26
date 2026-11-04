@@ -341,7 +341,7 @@ export function outcomeOf(result, ctx = {}) {
     const skipped = (Array.isArray(d.skipped) ? d.skipped : []).map((id) => labelFrom(ctx, typeof id === "string" ? id : id?.id));
     const warnings = Array.isArray(d.issues) ? d.issues : [];
     const undoable = published.filter((p) => p.undo);
-    const undoSet = published.length > 1 && undoable.length > 1 && d.setId ? { setId: d.setId, members: undoable.map((p) => ({ id: p.id, logId: p.undo.logId })), labels: undoable.map((p) => p.label) } : null;
+    const undoSet = published.length > 1 && undoable.length > 1 && d.setId ? { setId: d.setId, members: undoable.map((p) => ({ id: p.id, logId: p.undo.logId })), labels: undoable.map((p) => p.label), revisions: undoable.map((p) => p.undo.revision) } : null;
     const title = published.length > 1 ? `Published ${published.length} pages.` : published.length === 1 ? `Published ${q(published[0].label)}.` : "Nothing new to publish: it was all live already.";
     return { phase: "done", title, published, skipped, warnings, undoSet };
   }
@@ -669,7 +669,10 @@ export function createPublishFlow(deps = {}) {
 
 // A target:
 //   { kind: "one", label, undo: {id, revision, logId} }
-//   { kind: "set", setId, members: [{id, logId}], labels }
+//   { kind: "set", setId, members: [{id, logId}], labels, revisions }
+//     revisions[i] is members[i]'s revision, from its own undo args: the
+//     server refuses an undo without one (428 REVISION_REQUIRED), even a dry
+//     run, so each member's own dry run sends it (undoSet takes none)
 //   { kind: "offline", label, id, revision }
 const requestOf = (t, dryRun) => {
   if (t.kind === "set") return { op: "undoSet", args: { setId: t.setId, members: t.members, ...(dryRun ? { dryRun: true } : {}) } };
@@ -774,7 +777,8 @@ export function createUndoFlow(deps = {}) {
     // own dry run, so the confirm can name that page
     let members = null;
     if (target.kind === "set" && r.data?.willTakeOffline === true) {
-      const each = await Promise.all(target.members.map((m) => safeCall(call, { op: "undo", args: { id: m.id, logId: m.logId, dryRun: true } })));
+      // P3-FIX3 round 1: with its revision; a member without one is not asked
+      const each = await Promise.all(target.members.map((m, i) => (Number.isInteger(target.revisions?.[i]) ? safeCall(call, requestOf({ kind: "one", undo: { id: m.id, logId: m.logId, revision: target.revisions[i] } }, true)) : null)));
       if (state.target !== target) return null;
       members = target.members.map((m, i) => ({ label: target.labels?.[i] || "That page", dry: each[i]?.ok ? each[i].data : null }));
     }
@@ -868,7 +872,7 @@ export function recentGroupsOf(rows, { timeZone } = {}) {
   }
   for (const g of groups) {
     const undoable = g.rows.filter((x) => x.canUndo);
-    g.undoSet = g.rows.length > 1 && undoable.length > 1 ? { kind: "set", setId: g.setId, members: undoable.map((x) => ({ id: x.undo.id, logId: x.undo.logId })), labels: undoable.map((x) => x.label) } : null;
+    g.undoSet = g.rows.length > 1 && undoable.length > 1 ? { kind: "set", setId: g.setId, members: undoable.map((x) => ({ id: x.undo.id, logId: x.undo.logId })), labels: undoable.map((x) => x.label), revisions: undoable.map((x) => x.undo.revision) } : null;
   }
   return groups;
 }

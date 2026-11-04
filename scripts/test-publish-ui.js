@@ -798,7 +798,7 @@ await t("a set publish offers Undo of the whole set with the publish's own undo 
   const body = clone(P.ok.body);
   body.published.push({ id: SALE.id, versionId: "ver_3", hash: "h_draft2", liveUrl: "/api/preview?exit=1&to=%2Fcampaigns%2Fdiwali", undo: { id: SALE.id, revision: 3, logId: "log_2" } });
   const out = M.outcomeOf({ ok: true, data: body }, { items: [HOME, SALE] });
-  eq(out.undoSet, { setId: "set_1", members: [{ id: "doc_home", logId: "log_1" }, { id: SALE.id, logId: "log_2" }], labels: ["Home page", "Diwali sale"] }, "set target:");
+  eq(out.undoSet, { setId: "set_1", members: [{ id: "doc_home", logId: "log_1" }, { id: SALE.id, logId: "log_2" }], labels: ["Home page", "Diwali sale"], revisions: [4, 3] }, "set target:");
   const text = plain(html(h(Panel.PublishPanelView, { state: { phase: "done", outcome: out, items: [HOME, SALE], order: [], lists: {} }, call: async () => ({}) })), "set done");
   ok(text.includes("Published 2 pages.") && text.includes("Undo all 2"), text);
 });
@@ -806,7 +806,7 @@ await t("a set publish offers Undo of the whole set with the publish's own undo 
 // =========================================================================================
 console.log("— P3-FIX3: the batch 3 review findings");
 
-const SET_T = () => ({ kind: "set", setId: "set_1", members: [{ id: "doc_home", logId: "log_1" }, { id: SALE.id, logId: "log_2" }], labels: ["Home page", "Diwali sale"] });
+const SET_T = () => ({ kind: "set", setId: "set_1", members: [{ id: "doc_home", logId: "log_1" }, { id: SALE.id, logId: "log_2" }], labels: ["Home page", "Diwali sale"], revisions: [4, 2] });
 
 await t("P3-FIX3 unit: whole-set Undo with nothing undone shows the server's words, not 'Undone.'; in a mixed set a page that stayed is listed as stayed, not 'Live now'", async () => {
   const nothing = { ok: true, data: { ok: true, message: "There's nothing earlier to undo.", documents: [DOC({ live: true }), DOC({ id: SALE.id, label: "Diwali sale", live: true })] } };
@@ -892,7 +892,7 @@ await t("P3-FIX3 unit+rendered: the whole-set Undo confirm names the page that g
   await flow.start(tg);
   const v = flow.getState().view;
   eq([v.title, v.changes, v.offline], ["Undo all 2 pages of this publish? “Diwali sale” goes offline.", ["Diwali sale: Taken offline"], ["Diwali sale"]], "named:");
-  eq(call.calls.filter((c) => c.op === "undo").map((c) => [c.args.id, c.args.logId, c.args.dryRun]), [["doc_home", "log_1", true], [SALE.id, "log_2", true]], "each member's dry run:");
+  eq(call.calls.filter((c) => c.op === "undo").map((c) => [c.args.id, c.args.logId, c.args.dryRun, c.extra?.revision]), [["doc_home", "log_1", true, 4], [SALE.id, "log_2", true, 2]], "each member's dry run, with its revision:");
   const text = plain(html(h(Offline.default, { open: true, view: v, onConfirm() {}, onCancel() {} })), "set offline confirm");
   ok(text.includes("“Diwali sale” goes offline"), text);
   // no one goes offline: no member dry runs
@@ -905,6 +905,71 @@ await t("P3-FIX3 unit+rendered: the whole-set Undo confirm names the page that g
   const out = M.outcomeOf({ ok: true, data: body }, { items: [SALE], offerItems: [HOME, SALE], firstPublish: { doc_home: true, [SALE.id]: true }, types: {} });
   eq([out.published.find((p) => p.id === "doc_home").undo, out.undoSet], [null, null], "no set Undo:");
   eq([M.typeOfId("doc_home", {}), M.typeOfId("doc_header", null), M.typeOfId(SALE.id, {}), M.typeOfId("doc_x", { doc_x: "page" })], ["home", "header", null, "page"], "typeOfId:");
+});
+
+await t("P3-FIX3 round 1: the whole-set Undo confirm names the page that goes offline through the real client and the server's parser, which refuse an undo without a revision (428 REVISION_REQUIRED), dry run or not", async () => {
+  // the server side: the real parser (lib/admin/documents-api.js) and the
+  // rule documents-api applies after it (PUBLISH_NEEDS_REVISION: undo and
+  // unpublish need a revision, a dry run too; pinned against the real
+  // handler in scripts/test-publish-service.js "428 without a revision")
+  const Api = await import("../lib/admin/documents-api.js");
+  const { createDocumentsApi } = await import("../components/admin/editor/documentsApi.js");
+  const offline = { ok: true, willTakeOffline: true, linkers: [], changes: [{ words: "Taken offline" }], target: null };
+  const stays = { ok: true, willTakeOffline: false, linkers: [], changes: [{ words: "Hero: title changed" }], target: { versionId: "ver_prev", name: "Published 2 Nov, 10:00 by Asha" } };
+  const sent = [];
+  const fetch = async (_url, init) => {
+    const parsed = Api.parseDocumentsOperation(JSON.parse(init.body));
+    const op = parsed.op;
+    sent.push(op ? { kind: op.kind, id: op.id, dryRun: op.dryRun, hasRevision: op.hasRevision, revision: op.revision } : parsed);
+    const reply = (status, body) => ({ status, json: async () => clone(body) });
+    if (parsed.error) return reply(400, { error: parsed.error, code: parsed.code });
+    if ((op.kind === "undo" || op.kind === "unpublish") && !op.hasRevision) return reply(428, SHAPES.undo.outcomes.revisionRequired.body);
+    if (op.kind === "undoSet") return reply(200, { ...offline, changes: [{ words: "Diwali sale: Taken offline" }, { words: "Home page: Hero: title changed" }] });
+    if (op.kind === "undo") return reply(200, op.id === SALE.id ? offline : stays);
+    throw new Error(`unexpected ${op.kind}`);
+  };
+  const { call } = createDocumentsApi({ fetch });
+  // the two ways a set target is made: the publish answer and Recently published
+  const body = clone(P.ok.body);
+  body.published.push({ id: SALE.id, versionId: "ver_3", hash: "h_draft2", liveUrl: null, undo: { id: SALE.id, revision: 3, logId: "log_2" } });
+  const fromPublish = M.outcomeOf({ ok: true, data: body }, { items: [HOME, SALE] }).undoSet;
+  const row = clone(SHAPES.listRecentlyPublished.outcomes.ok.body.rows[0]);
+  const fromRecent = M.recentGroupsOf([row, { ...row, logId: "log_2", documentId: SALE.id, label: "Diwali sale", undo: { id: SALE.id, revision: 2, logId: "log_2" } }], { timeZone: "UTC" })[0].undoSet;
+  for (const [name, set, revs] of [
+    ["the publish answer", { kind: "set", ...fromPublish }, [4, 3]],
+    ["Recently published", fromRecent, [row.undo.revision, 2]],
+  ]) {
+    sent.length = 0;
+    const flow = M.createUndoFlow({ call });
+    await flow.start(set);
+    const v = flow.getState().view;
+    eq(v?.title, "Undo all 2 pages of this publish? “Diwali sale” goes offline.", `${name}: the confirm names the page:`);
+    eq(v.offline, ["Diwali sale"], `${name}: offline:`);
+    eq(sent.filter((x) => x.kind === "undo").map((x) => [x.id, x.dryRun, x.hasRevision, x.revision]), [["doc_home", true, true, revs[0]], [SALE.id, true, true, revs[1]]], `${name}: each member's dry run carries its revision:`);
+    const text = plain(html(h(Offline.default, { open: true, view: v, onConfirm() {}, onCancel() {} })), `${name} confirm`);
+    ok(text.includes("“Diwali sale” goes offline"), text);
+  }
+  // the PublishPanel's done state builds its target with the revisions too
+  const flow = M.createUndoFlow({ call });
+  const tree = Panel.PublishPanelView({ state: { phase: "done", outcome: M.outcomeOf({ ok: true, data: body }, { items: [HOME, SALE] }), items: [HOME, SALE], order: [], lists: {} }, call });
+  const find = (el) => {
+    if (!el || typeof el !== "object") return null;
+    if (Array.isArray(el)) return el.map(find).find(Boolean) || null;
+    if (el.props && el.props.target && el.props.target.kind === "set") return el.props.target;
+    return find(el.props?.children);
+  };
+  const panelTarget = find(tree);
+  eq(panelTarget?.revisions, [4, 3], "the panel's set target carries the revisions:");
+  sent.length = 0;
+  await flow.start(panelTarget);
+  eq(flow.getState().view.offline, ["Diwali sale"], "the panel's Undo all names the page:");
+  // a set target with no revisions (an older host) sends no member dry run that would only be refused
+  sent.length = 0;
+  const { revisions: _r, ...noRevs } = SET_T();
+  const f3 = M.createUndoFlow({ call });
+  await f3.start(noRevs);
+  eq(sent.map((x) => x.kind), ["undoSet"], "no doomed member requests:");
+  eq(f3.getState().view.title, M.WORDS.undoSetTitle(2), "the generic title then:");
 });
 
 await t("P3-FIX3 rendered: without undo rights, Undo is disabled with the reason as text (RecentlyPublished, UndoNotice, the publish answer); start() sends nothing", async () => {
