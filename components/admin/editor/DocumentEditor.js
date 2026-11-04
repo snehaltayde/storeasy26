@@ -10,6 +10,9 @@ import { createDocumentStore } from "./store";
 import SectionTree from "./tree/SectionTree";
 import { groupIssues } from "./tree/treeModel";
 import SettingsForm from "./fields/SettingsForm";
+import { EntityFields, createLibraryPicker, entityFieldsOf } from "./fields/index.js";
+import { MediaPicker } from "../cms/MediaPicker";
+import { fetchRefs } from "../cms/RefPicker";
 import { PublishPanelView } from "./publish/PublishPanel";
 import UndoNotice from "./publish/UndoNotice";
 import EarlierVersions from "./publish/EarlierVersions";
@@ -50,6 +53,23 @@ import { documentType, sectionType } from "@/lib/registry/index.js";
 //   the switcher                  every document, products listed
 // The interaction rules are in editorModel.js (pure, unit-tested). This file
 // only holds React state and browser events.
+//
+// P4-PICKER (MED-03, OVL-04, ED-12): the inspector's context carries
+//   pickImage({ path })    opens the media library (MediaPicker); resolves
+//                          with { media: "/api/media/<id>", alt } or null
+//                          (fields/index.js createLibraryPicker, mediaPick).
+//                          ImageControl and GalleryControl use it. Archived
+//                          files are not listed: the library read leaves them
+//                          out (GET /api/admin/media, P4-MEDIA)
+//   lookupProducts(ids)    the catalog picker's names for product ids
+//                          (/api/admin/refs ids=), for the pairs and pinned
+//                          product lists
+//   shopify                what Shopify sends now for an open product or
+//                          collection (openEntityContent), for the gallery's
+//                          read-only Shopify side
+// and a product's or collection's document shows the gallery, pairs and
+// pinned controls (fields/index.js EntityFields) under its settings form.
+// P4-EDITOR replaces this with the product and collection forms (batch 4).
 //
 // Props (from app/(console)/admin/(authed)/editor/page.js):
 //   document { id, type, label, slug }  the document to open (editor-entry)
@@ -92,6 +112,9 @@ export function EditorView({
   versions = null,
   busyOpen = null,
   call = null,
+  pickImage = null,
+  lookupProducts = null,
+  entity = null,
   on = {},
 }) {
   const label = state?.document?.label || entry?.label || "Home page";
@@ -112,6 +135,10 @@ export function EditorView({
     collections: catalog.collections || [],
     products: catalog.products || [],
     pages: (Array.isArray(docs) ? docs : []).filter((d) => ROUTE_FAMILY[d.type] && d.slug).map((d) => ({ slug: d.slug, family: ROUTE_FAMILY[d.type], document: d.id, title: d.label })),
+    ...(typeof pickImage === "function" ? { pickImage } : {}),
+    ...(typeof lookupProducts === "function" ? { lookupProducts } : {}),
+    shopify: isObj(entity) && isObj(entity.shopify) ? entity.shopify : null,
+    shopifyMissing: isObj(entity) && entity.inShopify === false,
   };
 
   const inspector = () => {
@@ -130,7 +157,14 @@ export function EditorView({
         />
       );
     }
-    return <SettingsForm key={`doc-${state.id}`} type={type} value={body} issues={issues} focusRequest={focusRequest} context={context} onChange={(_next, m) => on.edit?.({ sectionId: null, path: m.path, value: m.value })} />;
+    const docForm = <SettingsForm key={`doc-${state.id}`} type={type} value={body} issues={issues} focusRequest={focusRequest} context={context} onChange={(_next, m) => on.edit?.({ sectionId: null, path: m.path, value: m.value })} />;
+    if (!entityFieldsOf(type).length) return docForm;
+    return (
+      <div className="space-y-4">
+        {docForm}
+        <EntityFields key={`entity-${state.id}`} type={type} value={body} issues={issues} context={context} onEdit={(m) => on.edit?.({ sectionId: null, path: m.path, value: m.value })} />
+      </div>
+    );
   };
 
   const actions = state && (
@@ -291,6 +325,10 @@ export default function DocumentEditor({ document: entry, note = null, api = doc
   const [busyOpen, setBusyOpen] = useState(null);
   const [mounted, setMounted] = useState(false);
   const [previewRetries, setPreviewRetries] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [entity, setEntity] = useState(null); // { id, answer }: openEntityContent for the open product or collection
+  const picker = useMemo(() => createLibraryPicker(setPickerOpen), []);
+  const lookupProducts = useCallback(async (ids) => (await fetchRefs({ type: "product", ids: ids.join(","), limit: ids.length })).items || [], []);
   const storeRef = useRef(null);
   const flowRef = useRef(null);
   const pickRef = useRef(null); // a pick that opened another document: select there
@@ -372,6 +410,21 @@ export default function DocumentEditor({ document: entry, note = null, api = doc
   }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => storeRef.current?.dispose(), []);
+
+  // P4-PICKER: what Shopify sends now for an open product or collection (the
+  // gallery's Shopify side). The document already exists, so this finds it.
+  const entityKey = state && entityFieldsOf(state.type).length && state.document?.entityId ? `${state.type}|${state.document.entityId}|${state.id}` : null;
+  useEffect(() => {
+    if (!entityKey) return undefined;
+    let stale = false;
+    const [type, entityId, id] = entityKey.split("|");
+    api.call("openEntityContent", { type, entityId }).then((r) => {
+      if (!stale) setEntity(r?.ok ? { id, answer: r.data } : { id, answer: null });
+    });
+    return () => {
+      stale = true;
+    };
+  }, [entityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- leaving (ED-03) ----
   const guard = useMemo(
@@ -579,6 +632,7 @@ export default function DocumentEditor({ document: entry, note = null, api = doc
     );
 
   return (
+    <>
     <EditorView
       entry={entry}
       note={note}
@@ -599,6 +653,9 @@ export default function DocumentEditor({ document: entry, note = null, api = doc
       versions={versions}
       busyOpen={busyOpen}
       call={call}
+      pickImage={picker.pick}
+      lookupProducts={lookupProducts}
+      entity={entity && entity.id === state?.id ? entity.answer : null}
       on={{
         edit,
         treeChange,
@@ -641,6 +698,8 @@ export default function DocumentEditor({ document: entry, note = null, api = doc
         },
       }}
     />
+    {pickerOpen && <MediaPicker open={pickerOpen} onClose={picker.close} onSelect={picker.select} />}
+    </>
   );
 }
 
