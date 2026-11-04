@@ -1,0 +1,111 @@
+{
+  "ranAt": "2026-11-04T09:31:46.256Z",
+  "finishedAt": "2026-11-04T09:46:49.191Z",
+  "stages": [
+    "legacy",
+    "p2"
+  ],
+  "rows": [
+    {
+      "stage": "legacy",
+      "name": "legacy",
+      "exit": 1,
+      "passed": 0,
+      "failed": 1,
+      "known": 0,
+      "aborted": "DrillError: The harness didn't come up at http://localhost:6100 within 3 minutes.\n    at connectHarness (file:///private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p3-b6/P3-FIX5/wt/scripts/drill.js:121:9)\n    at process.processTick",
+      "results": "scripts/drills/p2/results-legacy.json"
+    },
+    {
+      "stage": "p2",
+      "name": "sections",
+      "exit": 0,
+      "passed": 453,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-sections.json"
+    },
+    {
+      "stage": "p2",
+      "name": "hero-image",
+      "exit": 0,
+      "passed": 32,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-hero-image.json"
+    },
+    {
+      "stage": "p2",
+      "name": "policy-typo",
+      "exit": 0,
+      "passed": 8,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-policy-typo.json"
+    },
+    {
+      "stage": "p2",
+      "name": "error-chrome",
+      "exit": 0,
+      "passed": 15,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-error-chrome.json"
+    },
+    {
+      "stage": "p2",
+      "name": "edge",
+      "exit": 0,
+      "passed": 25,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-edge.json"
+    },
+    {
+      "stage": "p2",
+      "name": "preview",
+      "exit": 0,
+      "passed": 22,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-preview.json"
+    },
+    {
+      "stage": "p2",
+      "name": "unfinished",
+      "exit": 0,
+      "passed": 9,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-unfinished.json"
+    },
+    {
+      "stage": "p2",
+      "name": "redirect",
+      "exit": 0,
+      "passed": 115,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-redirect.json"
+    },
+    {
+      "stage": "p2",
+      "name": "space",
+      "exit": 0,
+      "passed": 3,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-space.json"
+    },
+    {
+      "stage": "p2",
+      "name": "legacy",
+      "exit": 0,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-legacy.json"
+    }
+  ],
+  "failed": 1
+}

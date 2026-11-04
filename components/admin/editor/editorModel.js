@@ -19,7 +19,7 @@
 //   switcherRows(…), isStoreClosed(…), isWritingDocument(…), framePathFor(…)
 import { documentType } from "../../../lib/registry/index.js";
 import { livePath } from "../../../lib/documents/paths.js";
-import { createPreviewMachine, READY_TIMEOUT_MS, PREVIEW_WORDS } from "./previewMachine.js";
+import { createPreviewMachine, designHiddenIn, READY_TIMEOUT_MS, PREVIEW_WORDS } from "./previewMachine.js";
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const q = (s) => `“${s}”`;
@@ -462,11 +462,29 @@ export const showDesignFor = (documentId) => documentId === "doc_design";
 // frame shows the live store) or when no ready arrives within 3 seconds of a
 // frame load; "Reconnecting…" shows meanwhile. Nothing re-mints before the
 // session's expiry (PV-04 is P1).
+//
+// P3-FIX5 (finding D1):
+//   · The session that counts is the one the frame renders. The browser has
+//     one _preview cookie, so a second editor tab (or a second mint) can
+//     leave the frame on another session than the one this controller made.
+//     Every ready ok names that session (state.sid); the controller adopts
+//     it, so showDesign goes where the frame is.
+//   · While the design is open, a ready whose state says the design draft is
+//     not shown (doc_design in skipped) is never "Up to date": the machine
+//     answers fixDesign, the controller turns showDesign on in the frame's
+//     session and reloads the frame (a failed turn-on mints a new session).
+//   · start() is idempotent per controller: start, dispose, start (React
+//     strict mode's double effect in next dev, with PreviewPane keeping one
+//     controller per mount) mints one session. A dispose parks whatever
+//     answer arrives meanwhile; the next start() applies it; a controller
+//     never started again (a real unmount) drops it.
 export function createPreviewController({ api, frame, pathFor = () => "/", documentId = null, timers = defaultTimers(), onChange = () => {}, onPick = () => {} }) {
   let docId = documentId;
-  let machine = createPreviewMachine({ documentId: docId });
+  let machine = createPreviewMachine({ documentId: docId, showDesign: showDesignFor(docId) });
   let last = machine.current;
   let sid = null;
+  let started = false;
+  let parked = null; // an answer that arrived while disposed
   let shown = null; // the showDesign the session has
   let bridge = false; // a v2 ready since the last load
   let timer = null;
@@ -509,6 +527,11 @@ export function createPreviewController({ api, frame, pathFor = () => "/", docum
       }, READY_TIMEOUT_MS);
     }
   }
+  // run fn now, or (while disposed) keep it for the next start()
+  const whenLive = (fn) => {
+    if (disposed) parked = fn;
+    else fn();
+  };
   async function mint() {
     const mine = ++token;
     const want = showDesignFor(docId);
@@ -519,13 +542,36 @@ export function createPreviewController({ api, frame, pathFor = () => "/", docum
     } catch {
       r = { error: true, message: PREVIEW_WORDS.mintFailed };
     }
-    if (disposed || mine !== token) return;
+    if (mine !== token) return;
+    whenLive(() => minted(r, want));
+  }
+  function minted(r, want) {
     if (r && r.ok) {
       log.push("minted");
       sid = r.sid;
       shown = want;
       act(machine.send({ type: "mintOk" }));
     } else act(machine.send({ type: "mintFailed", message: r?.message }));
+  }
+  // P3-FIX5: turn the colours on in the session the frame renders (sid: the
+  // ready that asked for this already adopted the frame's session)
+  async function fixDesign() {
+    const mine = ++token;
+    const target = sid;
+    log.push("fixDesign");
+    let r;
+    try {
+      r = target ? await api.setShowDesign(target, true) : null;
+    } catch {
+      r = { error: true };
+    }
+    if (mine !== token) return;
+    whenLive(() => {
+      if (!r || !r.ok) return mint(); // a new session of our own, with the colours on
+      sid = target;
+      shown = true;
+      act(machine.send({ type: "mintOk" }));
+    });
   }
   function reload() {
     const path = pathFor(docId);
@@ -549,7 +595,7 @@ export function createPreviewController({ api, frame, pathFor = () => "/", docum
   async function openDocument(next) {
     if (next === docId && sid) return;
     docId = next;
-    machine = createPreviewMachine({ documentId: docId });
+    machine = createPreviewMachine({ documentId: docId, showDesign: showDesignFor(docId) });
     last = machine.current;
     clearTimer();
     onChange(view());
@@ -564,15 +610,31 @@ export function createPreviewController({ api, frame, pathFor = () => "/", docum
       } catch {
         r = { error: true };
       }
-      if (disposed || mine !== token) return;
-      if (!r || !r.ok) return mint(); // a new session with the right setting
-      shown = want;
+      if (mine !== token) return;
+      return whenLive(() => {
+        if (!r || !r.ok) return mint(); // a new session with the right setting
+        shown = want;
+        act(machine.send({ type: "mintOk" }));
+      });
     }
     act(machine.send({ type: "mintOk" }));
   }
 
   return {
-    start: () => mint(),
+    // idempotent: mints once per controller; after a dispose it comes back
+    // to life and applies what arrived meanwhile
+    start() {
+      disposed = false;
+      if (started) {
+        const fn = parked;
+        parked = null;
+        if (fn) fn();
+        else onChange(view());
+        return Promise.resolve();
+      }
+      started = true;
+      return mint();
+    },
     openDocument,
     // the same document at a new address (its slug changed, or the product
     // the frame shows was only known later): load it there
@@ -595,7 +657,18 @@ export function createPreviewController({ api, frame, pathFor = () => "/", docum
         bridge = true;
         clearTimer();
         log.push(`ready:${data.ok === true ? "ok" : data.reason || "live"}`);
-        act(machine.send({ type: "ready", ok: data.ok === true, state: data.state, reason: data.reason }));
+        // P3-FIX5: the frame's own session (the cookie's) is the one to steer
+        const frameSid = data.ok === true && isObj(data.state) && typeof data.state.sid === "string" && /^ps_[0-9a-f]{16}$/.test(data.state.sid) ? data.state.sid : null;
+        if (frameSid && frameSid !== sid) {
+          log.push("adopt");
+          sid = frameSid;
+          shown = null; // not known until the frame says so, or it is set
+        }
+        const a = machine.send({ type: "ready", ok: data.ok === true, state: data.state, reason: data.reason });
+        act(a);
+        if (a.fixDesign) fixDesign();
+        // an adopted session showing the design (nothing hidden) counts as on
+        else if (a.state.phase === "shown" && shown == null && showDesignFor(docId) && !designHiddenIn(data.state)) shown = true;
         return;
       }
       if (data.type === "storeasy:pick") onPick(data);

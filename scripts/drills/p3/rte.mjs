@@ -27,9 +27,11 @@
 //   6. a table opens read-only with Edit as HTML; editing it as HTML stores
 //      the cleaned result;
 //   7. a paste from a web page with its own elements (<product-info â€¦>, as
-//      every Shopify theme has): the server refuses the save in plain words,
-//      the field offers Edit as HTML, the founder removes the hidden markup
-//      there, and the save goes through.
+//      every Shopify theme has): since P3-FIX4 the save goes through cleaned
+//      (the visible text kept, the page's own tags gone). A paste that would
+//      really lose words (<shop class="x">, a name with no hyphen) is still
+//      refused in plain words naming the tag; the field offers Edit as HTML,
+//      the founder removes the tag there, and the save goes through.
 // Results: docs/cms-reviews/drills/P3-RTE/results-rte.json, with screenshots.
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
@@ -408,52 +410,75 @@ process.exitCode = await runDrill({ id: "P3-RTE", part: "rte", title: "P3-RTE â€
   drill.check(s.html === tstored && (await state(page)).pwned === null, "Show formatted shows the stored table read-only again", s.html);
   await drill.screenshot(page, "table-saved-1440");
 
-  // ---- 7. a paste from a web page: refused, then Edit as HTML is the way out ----
+  // ---- 7. a paste from a web page: saved cleaned (P3-FIX4) ----
+  const paste = (html, plain) =>
+    page.evaluate(
+      ({ id, html, plain }) => {
+        const d = document.querySelector(`[id="${id}"] iframe`).contentDocument;
+        const dt = new DataTransfer();
+        dt.setData("text/html", html);
+        dt.setData("text/plain", plain);
+        d.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+      },
+      { id: FIELD_ID, html, plain },
+    );
   const wdoc = await makePage(drill, page, "rte-web", "<p>Our story.</p>");
   await openHost(page, wdoc.id);
   await waitEditable(page);
   await frameOf(page).locator("body").click();
   await frameOf(page).locator("body").press("ControlOrMeta+End");
-  await page.evaluate(
-    ({ id, html }) => {
-      const d = document.querySelector(`[id="${id}"] iframe`).contentDocument;
-      const dt = new DataTransfer();
-      dt.setData("text/html", html);
-      dt.setData("text/plain", "Made from organic cotton.\nShips in 2 days.");
-      d.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
-    },
-    { id: FIELD_ID, html: WEB_CLIPBOARD },
-  );
+  await paste(WEB_CLIPBOARD, "Made from organic cotton.\nShips in 2 days.");
   await page.waitForTimeout(300);
   st = await state(page);
   drill.check(st.changes[st.changes.length - 1]?.includes("<product-info"), "the web page's paste is sent as copied", st.changes[st.changes.length - 1]);
   await page.locator("#host-save").click();
   await page.waitForFunction(() => window.__rte.saves.length === 1);
-  const wrefused = await page.evaluate(() => window.__rte.saves[0].answer);
-  const wissue = (wrefused.issues || []).find((i) => i.code === "WORDS_LOST");
-  drill.check(wrefused.ok !== true && wrefused.code === "VALIDATION_FAILED" && Boolean(wissue), "the server refuses it (WORDS_LOST: lib/sanitize.js counts a web page's own element as words)", wrefused.issues);
-  drill.check(storedHtmlOf(await docRow(wdoc.id)) === "<p>Our story.</p>", "nothing was stored");
+  const wsaved = await page.evaluate(() => window.__rte.saves[0].answer);
+  const wstored = storedHtmlOf(await docRow(wdoc.id));
+  drill.check(wsaved.ok === true && wstored.includes("<p>Our story.</p>") && wstored.includes("<strong>organic cotton</strong>") && wstored.includes("Ships in 2 days.") && !/product-info|class=|data-section/.test(wstored), "the web page's paste saves cleaned: the visible text kept, its own tags gone (P3-FIX4)", { answer: wsaved.message || wsaved.code || wsaved.ok, wstored });
+  await page.waitForTimeout(300);
+  s = await surface(page);
+  drill.check(s.mode === "edit" && s.html === wstored && (await page.getByRole("button", { name: "Edit as HTML", exact: true }).count()) === 0, "the field then shows the stored text, with no refusal and no Edit as HTML offer", { mode: s.mode, same: s.html === wstored });
+  await drill.screenshot(page, "web-paste-saved-1440");
+
+  // ---- 7b. a paste that would really lose words: refused, then Edit as HTML ----
+  const LOSS_PART = `<p>Our deal.</p><shop class="x"><p>Ten percent off.</p></shop>`;
+  const ldoc = await makePage(drill, page, "rte-loss", "<p>Our story.</p>");
+  await openHost(page, ldoc.id);
+  await waitEditable(page);
+  await frameOf(page).locator("body").click();
+  await frameOf(page).locator("body").press("ControlOrMeta+End");
+  await paste(`<html><body>\n<!--StartFragment-->${LOSS_PART}<!--EndFragment-->\n</body></html>`, "Our deal.\nTen percent off.");
+  await page.waitForTimeout(300);
+  st = await state(page);
+  drill.check(st.changes[st.changes.length - 1]?.includes("<shop"), "a paste with a tag that isn't a web page's own element is sent as copied", st.changes[st.changes.length - 1]);
+  await page.locator("#host-save").click();
+  await page.waitForFunction(() => window.__rte.saves.length === 1);
+  const lrefused = await page.evaluate(() => window.__rte.saves[0].answer);
+  const lissue = (lrefused.issues || []).find((i) => i.code === "WORDS_LOST");
+  drill.check(lrefused.ok !== true && lrefused.code === "VALIDATION_FAILED" && Boolean(lissue) && /<shop> tag/.test(lissue?.message || "") && /Edit as HTML/.test(lissue?.message || ""), "a real loss is still refused (WORDS_LOST), and the words name the <shop> tag and Edit as HTML", lrefused.issues);
+  drill.check(storedHtmlOf(await docRow(ldoc.id)) === "<p>Our story.</p>", "nothing was stored");
   await page.waitForTimeout(300);
   s = await surface(page);
   const wbtn = page.getByRole("button", { name: "Edit as HTML", exact: true });
   drill.check(s.mode === "edit" && s.editable && (await wbtn.count()) === 1, "the field stays editable and offers Edit as HTML", { mode: s.mode, buttons: await wbtn.count() });
   drill.check((await page.getByText("Pasted text can hold hidden code that doesn't show here. Use Edit as HTML to see it, and remove the part named below.").count()) === 1, "it says why, in plain words");
-  await drill.screenshot(page, "web-paste-refused-1440");
+  await drill.screenshot(page, "loss-paste-refused-1440");
   await wbtn.click();
   const wbox = page.locator(`textarea[id="${FIELD_ID}"]`);
   const wshown = await wbox.inputValue();
-  drill.check(wshown.includes('<product-info id="ProductInfo-1" data-section="main">'), "the text box shows the hidden markup", wshown);
-  const wfixed = wshown.replace(/<\/?product-info[^>]*>/g, "");
+  drill.check(wshown.includes('<shop class="x">'), "the text box shows the hidden markup", wshown);
+  const wfixed = wshown.replace(/<\/?shop[^>]*>/g, "");
   await wbox.fill(wfixed);
   await page.locator("#host-save").click();
   await page.waitForFunction(() => window.__rte.saves.length === 2);
-  const wsaved = await page.evaluate(() => window.__rte.saves[1].answer);
-  const wstored = storedHtmlOf(await docRow(wdoc.id));
-  drill.check(wsaved.ok === true && wstored.includes("<p>Our story.</p>") && wstored.includes("<strong>organic cotton</strong>") && wstored.includes("Ships in 2 days.") && !/product-info|class=|data-section/.test(wstored), "after removing it, the save goes through and is stored cleaned", { answer: wsaved.message || wsaved.code, wstored });
+  const lsaved = await page.evaluate(() => window.__rte.saves[1].answer);
+  const lstored = storedHtmlOf(await docRow(ldoc.id));
+  drill.check(lsaved.ok === true && lstored.includes("<p>Our story.</p>") && lstored.includes("Our deal.") && lstored.includes("Ten percent off.") && !/shop|class=/.test(lstored), "after removing it, the save goes through and is stored cleaned", { answer: lsaved.message || lsaved.code, lstored });
   await page.getByRole("button", { name: "Show formatted", exact: true }).click();
   await waitEditable(page);
   await page.waitForTimeout(300);
   s = await surface(page);
-  drill.check(s.mode === "edit" && s.html === wstored && (await wbtn.count()) === 0, "Show formatted goes back to the editor with the stored text, and Edit as HTML goes away", s);
-  await drill.screenshot(page, "web-paste-saved-1440");
+  drill.check(s.mode === "edit" && s.html === lstored && (await wbtn.count()) === 0, "Show formatted goes back to the editor with the stored text, and Edit as HTML goes away", s);
+  await drill.screenshot(page, "loss-paste-saved-1440");
 });

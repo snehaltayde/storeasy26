@@ -1,0 +1,115 @@
+{
+  "id": "P3-DRILLS",
+  "part": "pv01",
+  "title": "P3-DRILLS — pv01",
+  "ranAt": "2026-11-04T09:31:45.978Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 6,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "PV-01 revoked: the session ends, the preview says Reconnecting, opens a new session, and is Up to date with the edit",
+      "detail": {
+        "ok": true,
+        "labels": [
+          "Up to date",
+          "Updating",
+          "Updating (Reconnecting)",
+          "Up to date"
+        ],
+        "reminted": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "PV-01 expired: an expired session is noticed, Reconnecting, then Up to date",
+      "detail": {
+        "ok": true,
+        "labels": [
+          "Up to date",
+          "Updating",
+          "Updating (Reconnecting)",
+          "Up to date"
+        ],
+        "reminted": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "PV-01 exit: the frame left the preview for the live store, then Reconnecting, then Up to date",
+      "detail": {
+        "ok": true,
+        "labels": [
+          "Up to date",
+          "Updating (Reconnecting)",
+          "Up to date",
+          "Updating",
+          "Up to date"
+        ],
+        "reminted": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "See the live store, then back: Reconnecting, then Up to date",
+      "detail": {
+        "labels": [
+          "Up to date",
+          "Updating (Reconnecting)",
+          "Up to date"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "PV-01 network: the preview says Could not update, why in plain words, with 'Try the preview again'",
+      "detail": {
+        "words": "Changes: Saved\n\nPreview: Could not update · We couldn't reach Storeasy, so nothing was saved. Check your internet connection, then try again. Your changes are still here.\n\nTry the preview again",
+        "labels": [
+          "Up to date",
+          "Updating",
+          "Could not update"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "PV-01 network: Try the preview again, back online: Up to date",
+      "detail": {
+        "labels": [
+          "Up to date",
+          "Updating",
+          "Could not update",
+          "Updating",
+          "Up to date"
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_d96e30797cca04f9, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 5.1s"
+  ],
+  "screenshots": [
+    {
+      "name": "pv01-reconnected-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/pv01-reconnected-1440.png",
+      "bytes": 44384,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "pv01-network-failed-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/pv01-network-failed-1440.png",
+      "bytes": 46459,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    }
+  ]
+}

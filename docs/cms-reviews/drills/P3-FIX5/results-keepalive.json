@@ -1,0 +1,87 @@
+{
+  "id": "P3-DRILLS",
+  "part": "keepalive",
+  "title": "P3-DRILLS — keepalive",
+  "ranAt": "2026-11-04T09:09:44.953Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "keepalive: text typed and the tab closed within the pause is saved (the keepalive save on close)",
+      "detail": {
+        "statusAtClose": "pending",
+        "requests": [
+          true
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "backup: with the network down the save fails in plain words, and nothing reaches the server",
+      "detail": {
+        "words": "Changes: Could not save: We couldn't reach Storeasy, so nothing was saved. Check your internet connection, then try again. Your changes are still here.\n\nPreview: Could not update · We couldn't reach S",
+        "server": "Closed in the pause 7427"
+      }
+    },
+    {
+      "ok": true,
+      "label": "backup: the next open offers the edits that weren't saved",
+      "detail": {
+        "words": "Changes: Saved\n\nPreview: Up to date\n\nWe found edits that weren't saved. Keep them as an earlier draft?\n\nKeep them as an earlier draft\nNo, throw them away"
+      }
+    },
+    {
+      "ok": true,
+      "label": "backup: 'Keep them as an earlier draft' keeps them in Earlier versions",
+      "detail": {
+        "panel": "Restoring puts this version in your draft. It doesn't go live until you publish.\n\nEdits this browser kept\n\n4 Nov, 14:39 · Asha Founder\n\nRestore to draft\n\nPublished\nLive now\n\n4 Nov, 14:39 · Asha Founder\n\nRestore to draft\n\nPublished\n\n4 Nov, 14:39 · Someone on your team\n\nRestore to draft\n\nSaved while y"
+      }
+    },
+    {
+      "ok": true,
+      "label": "backup: the stored version holds the text that never reached the server, and Earlier versions says 'Edits this browser kept', not 'Kept from another tab'",
+      "detail": {
+        "note": "Edits this browser kept",
+        "listed": "Edits this browser kept",
+        "hasText": true,
+        "panel": "Restoring puts this version in your draft. It doesn't go live until you publish.\n\nEdits this browser kept\n\n4 Nov, 14:39 · Asha Founder\n\nRestore to draft\n\nPublished\nLive now\n\n4 Nov, 14:39 · Asha Founder\n\nRestore to draft\n\nPublished\n\n4 Nov, 14:39 · Someone on your team\n\nRestore to draft\n\nSaved while y"
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_769cf4ebbc2f39e9, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 5.6s"
+  ],
+  "screenshots": [
+    {
+      "name": "keepalive-save-failed-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/keepalive-save-failed-1440.png",
+      "bytes": 42743,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "keepalive-backup-offer-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/keepalive-backup-offer-1440.png",
+      "bytes": 39763,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "keepalive-backup-kept-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/keepalive-backup-kept-1440.png",
+      "bytes": 30347,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    }
+  ]
+}

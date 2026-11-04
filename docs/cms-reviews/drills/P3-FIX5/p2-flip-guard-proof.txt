@@ -1,0 +1,4 @@
+FAIL flip guard: "/policies/shipping with only doc_header's version missing gives the error page (finding 3, P3-CLOSED)" ran in error-chrome ({"why":"a flipped P2 check is missing from the results: its part's label, note or screenshot name probably changed; update FLIPPED, NOTE_CHECKS, REWORDED or EXPECTED_FLIPS in scripts/drills/p2/run.mjs"})
+FAIL flip guard: "/ with only doc_header's version missing gives the error page (finding 3, P3-CLOSED)" ran in error-chrome ({"why":"a flipped P2 check is missing from the results: its part's label, note or screenshot name probably changed; update FLIPPED, NOTE_CHECKS, REWORDED or EXPECTED_FLIPS in scripts/drills/p2/run.mjs"})
+-- error-chrome: 13 passed, 2 failed
+exit 1

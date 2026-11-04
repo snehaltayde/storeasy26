@@ -500,6 +500,28 @@ await t("keepAsEarlierDraft stores an undo_saved version listed in listHistory w
   eq((await sql("SELECT count(*) AS n FROM document_versions WHERE id = ?", [r.body.savedVersion.id]))[0].n, 1, "kept after 25 saves:");
 });
 
+await t("P3-FIX5: a version kept from the local backup (from: 'backup') reads 'Edits this browser kept', never 'Kept from another tab', and counts toward the cap of 10", async () => {
+  const d = await publishedPage("kept-backup", [text("sec_kb", "Live")]);
+  const body = (n) => ({ ...route("kept-backup", "Page kept-backup"), sections: [text("sec_kb", `Never reached the server ${n}`)] });
+  const r = await api({ keepAsEarlierDraft: { id: d.id, body: body(0), from: "backup" } });
+  likeShape(r, "keepAsEarlierDraft", "ok");
+  eq(r.body.savedVersion.note, "Edits this browser kept", "note:");
+  const v = (await sql("SELECT kind, note, body FROM document_versions WHERE id = ?", [r.body.savedVersion.id]))[0];
+  eq([v.kind, v.note], ["undo_saved", "Edits this browser kept"], "stored:");
+  ok(/Never reached the server 0/.test(String(v.body)), "the unsent text is in the stored version");
+  const it = (await api({ listHistory: d.id })).body.versions.find((x) => x.id === r.body.savedVersion.id);
+  ok(it && it.note === "Edits this browser kept" && !/another tab/.test(it.note), `in Earlier versions: ${JSON.stringify(it)}`);
+  // without from, the other-tab note as before
+  eq((await keep(d.id, body(1))).body.savedVersion.note, "Kept from another tab", "another tab's keep:");
+  // the two kinds share the cap
+  for (let n = 2; n < 10; n++) eq((await api({ keepAsEarlierDraft: { id: d.id, body: body(n), from: n % 2 ? "backup" : undefined } })).status, 200, `kept ${n + 1}:`);
+  const full = await api({ keepAsEarlierDraft: { id: d.id, body: body(10), from: "backup" } });
+  likeShape(full, "keepAsEarlierDraft", "tooManyKept");
+  // anything else in from is refused before it is read
+  const bad = await api({ keepAsEarlierDraft: { id: d.id, body: body(11), from: "tab" } });
+  eq([bad.status, bad.body.code], [400, "MALFORMED"], "from must be 'backup':");
+});
+
 await t("keepAsEarlierDraft dedupes an identical body (and one that differs only by stamped ids), answers 409 TOO_MANY_KEPT at 10 with nothing stored, refuses a structurally invalid body with 422, is 403 for read-only callers, 404 for an unknown page and 409 on a legacy store", async () => {
   const d = await publishedPage("kept-many", [text("sec_km", "Live")]);
   const body = (n) => ({ ...route("kept-many", "Page kept-many"), sections: [text("sec_km", `Tab copy ${n}`)] });

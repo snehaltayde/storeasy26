@@ -31,6 +31,13 @@
 //   remint         start a new preview session (startDocumentsPreview)
 //   reload         reload the frame (post storeasy:refresh, or set its src)
 //   armReadyTimer  start the READY_TIMEOUT_MS timer (after a frame load)
+//   fixDesign      P3-FIX5 (finding D1): the design is open, but the frame's
+//                  ready says its new colours are hidden (doc_design is in
+//                  state.skipped): the session the frame renders (the one
+//                  the browser's _preview cookie names, state.sid) must get
+//                  showDesign on, then the frame reloads. Never "Up to date"
+//                  meanwhile; after MAX_DESIGN_FIXES tries in a row it says
+//                  Could not update with PREVIEW_WORDS.designHidden.
 
 export const PREVIEW_LABELS = Object.freeze({
   upToDate: "Up to date",
@@ -42,6 +49,8 @@ export const READY_TIMEOUT_MS = 3000;
 export const MAX_REMINTS = 2;
 // Reloads in a row whose ready still names an older draft.
 export const MAX_STALE_RELOADS = 2;
+// P3-FIX5: tries in a row to turn the colours on in the frame's session.
+export const MAX_DESIGN_FIXES = 2;
 
 export const PREVIEW_WORDS = Object.freeze({
   reconnecting: "Reconnecting…",
@@ -54,15 +63,18 @@ export const PREVIEW_WORDS = Object.freeze({
   stale: "The preview is still showing an older version of your changes. Try again.",
   saveFailed: "Your latest changes aren't saved yet, so the preview doesn't show them.",
   incomplete: "A section isn't finished yet, so the preview shows a placeholder for it.",
+  designHidden: "The preview isn't showing your new colours. Try again.",
 });
 
 const ENDED = new Set(["revoked", "expired", "not_found"]);
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
-export function initialPreviewState({ documentId = null } = {}) {
+export function initialPreviewState({ documentId = null, showDesign = false } = {}) {
   return Object.freeze({
     phase: "minting", // minting | loading | shown | failed
     documentId,
+    wantDesign: Boolean(showDesign), // the design is open: its colours must show
+    designFixes: 0,
     expectHash: null, // the draftHash the frame should show
     ackDuringLoad: false,
     readySinceLoad: false,
@@ -105,7 +117,14 @@ function answer(state, actions = {}) {
     remint: Boolean(actions.remint),
     reload: Boolean(actions.reload),
     armReadyTimer: Boolean(actions.armReadyTimer),
+    fixDesign: Boolean(actions.fixDesign),
   };
+}
+
+// P3-FIX5: the frame's ready says the design draft is not shown (the layout
+// lists doc_design in skipped when that session's showDesign is off).
+export function designHiddenIn(frameState) {
+  return isObj(frameState) && Array.isArray(frameState.skipped) && frameState.skipped.includes("doc_design");
 }
 
 // The session or the frame let us down: re-mint, unless that has already
@@ -159,11 +178,16 @@ export function previewStep(state, input) {
         if (s.ackDuringLoad) return answer({ ...base, phase: "loading", ackDuringLoad: false, readySinceLoad: false }, { reload: true });
         const docs = isObj(input.state) && isObj(input.state.docs) ? input.state.docs : null;
         const shows = docs && s.documentId && Object.hasOwn(docs, s.documentId) ? docs[s.documentId] : undefined;
+        if (s.wantDesign && designHiddenIn(input.state)) {
+          // finding D1: never Up to date while the frame shows the old colours
+          if (s.designFixes >= MAX_DESIGN_FIXES) return answer({ ...base, phase: "failed", designFixes: 0, failure: { kind: "frame", words: PREVIEW_WORDS.designHidden, field: null } });
+          return answer({ ...base, phase: "loading", designFixes: s.designFixes + 1, readySinceLoad: false }, { fixDesign: true });
+        }
         if (s.expectHash && shows !== undefined && shows !== s.expectHash) {
           if (s.stale + 1 >= MAX_STALE_RELOADS) return answer({ ...base, phase: "failed", stale: 0, failure: { kind: "frame", words: PREVIEW_WORDS.stale, field: null } });
           return answer({ ...base, phase: "loading", stale: s.stale + 1, readySinceLoad: false }, { reload: true });
         }
-        return answer({ ...base, phase: "shown", stale: 0, failure: null });
+        return answer({ ...base, phase: "shown", stale: 0, designFixes: 0, failure: null });
       }
       const reason = typeof input.reason === "string" ? input.reason : "live";
       if (reason === "legacy") return answer({ ...s, phase: "failed", readySinceLoad: true, failure: { kind: "legacy", words: PREVIEW_WORDS.legacy, field: null } });
@@ -173,15 +197,15 @@ export function previewStep(state, input) {
       if (s.phase !== "loading" || s.readySinceLoad) return answer(s);
       return remintOr(s, PREVIEW_WORDS.timeout);
     case "retry":
-      return answer({ ...s, phase: "minting", remints: 0, stale: 0, failure: null, readySinceLoad: false, ackDuringLoad: false }, { remint: true });
+      return answer({ ...s, phase: "minting", remints: 0, stale: 0, designFixes: 0, failure: null, readySinceLoad: false, ackDuringLoad: false }, { remint: true });
     default:
       return answer(s);
   }
 }
 
 // A small holder for the editor: send(input) keeps the state.
-export function createPreviewMachine({ documentId = null } = {}) {
-  let state = initialPreviewState({ documentId });
+export function createPreviewMachine({ documentId = null, showDesign = false } = {}) {
+  let state = initialPreviewState({ documentId, showDesign });
   let last = answer(state);
   return {
     send(input) {
