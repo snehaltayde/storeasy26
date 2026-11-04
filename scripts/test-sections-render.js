@@ -18,8 +18,17 @@
 //      hero holding a broken draft value previews as its note; every kind's
 //      starter section saves, previews and renders.
 //   5. Edge safety of the files this item touches.
+//   6. P5-HIDDEN (COM-01): a section that hides itself gives the founder a
+//      reason in a documents preview (a component's hiddenReason), never
+//      live; the binding-failed note names its cause. Live renders of every
+//      kind's worst-case fixtures are byte-equal to the base (b09f342).
 // Everything is rendered with Next's own SWC and react-dom/server; no browser.
 //   pnpm test:sections-render
+//   SR_RECORD=1 node scripts/test-sections-render.js   prints the live digests (section 6)
+// request-cache must load before any app module that imports react (P5-HIDDEN:
+// a real documents preview notes its request scope through React's cache()).
+import "./support/request-cache.js";
+import { createHash } from "node:crypto";
 import { readFile, readdir, rm } from "node:fs/promises";
 import { createRequire, registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -268,6 +277,37 @@ async function publishHome(sections) {
 const heroOf = (h) => h.match(/<section[^>]*data-sec="hero"[\s\S]*?<\/section>/)?.[0] || "";
 const imgs = (h) => [...h.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
 const attr = (tag, name) => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1] ?? null;
+
+// ---- P5-HIDDEN: live renders of every kind's worst-case fixtures ------------------
+//
+// For each registered kind, every worst-case fixture (lib/registry/fixtures.js)
+// rendered live four ways: SectionView on the home page and on a content page
+// with the fixture's data, and HomeSections with that data and with none (the
+// hidden state, where P5-HIDDEN's note goes in a preview). No request, so no
+// preview scope: what a shopper gets. One sha256 per kind.
+const sha = (v) => createHash("sha256").update(v).digest("hex");
+const { worstCase } = await import("../lib/registry/fixtures.js");
+function liveWorstCaseDigests() {
+  const out = {};
+  for (const kind of Reg.sectionKinds()) {
+    const parts = [];
+    for (const c of worstCase(kind).cases) {
+      const extra = kind === "product_main" ? { productMain: React.createElement("p", null, "buy") } : {};
+      parts.push(`${c.name}/home-view`, view(c.section, c.data, { surface: "home", secKey: c.section.id, ...extra }));
+      parts.push(`${c.name}/page-view`, view(c.section, c.data, { surface: "page", ...extra }));
+      parts.push(`${c.name}/home`, home([c.section], new Map([[c.section.id, c.data]])));
+      parts.push(`${c.name}/home-nodata`, home([c.section], new Map()));
+      parts.push(`${c.name}/home-nodata-empty-note`, home([c.section], new Map(), true));
+    }
+    out[kind] = sha(parts.join("\n\u0000"));
+  }
+  return out;
+}
+if (process.env.SR_RECORD === "1") {
+  console.log(JSON.stringify(liveWorstCaseDigests(), null, 2));
+  for (const f of dbs) await rm(join(ROOT, f), { force: true });
+  process.exit(0);
+}
 
 // =====================================================================================
 console.log("— 1. the renderer map and the registry");
@@ -862,6 +902,226 @@ await t("no node: import in the files this item touches (the storefront is edge 
   ];
   const nodeImport = /(?:from\s+|import\s*\(\s*|require\s*\(\s*)["'](node:[^"']+|fs|path|crypto|child_process|os|module|url)["']/;
   for (const f of files) ok(!nodeImport.test(await readFile(join(ROOT, f), "utf8")), `${f} imports a Node module`);
+});
+
+// =====================================================================================
+console.log("— 6. P5-HIDDEN (COM-01): why a section is hidden, for the founder only");
+// =====================================================================================
+const { runRequest } = await import("./support/request-cache.js");
+const { tfetch } = await import("../lib/tenant-request.js");
+const { contentSource } = await import("../lib/content/resolve.js");
+const { previewToken: legacyPreviewToken } = await import("../lib/releases.js");
+const { hiddenNote, isFounderPreview, FounderNote } = Map_;
+
+// The base's live digests (SR_RECORD=1 on b09f342, before this item): see
+// liveWorstCaseDigests above. A kind registered after b09f342 has no base
+// here; the item that adds it records its own.
+const BASE_LIVE = {
+  hero: "460ff6d7dac4ce7ef450fecd88eafc1476c05a6739f6322fda7a634cce5f799f",
+  collections: "c5651e5cf8141d25351e0b48a836f83c2ea863472d4360ba6f1b6298ec77d1bb",
+  new: "ad91ac1d8ff1c7af35b673ee2cb222b3f80ab67dafee8f47bf2a60bbd0b2d0a8",
+  banner: "c960f87e7903e54441f03a7b73d779089fbc3f5e7022bc40069eefc055f8b4b7",
+  rich_text: "2339e77e7fa507c716375e3f14cd97dc610b6ee0965a4595e67ce2ee8a036f17",
+  image_with_text: "41233de7e28e9539bec3eb4bc974e8ab93516bba0036580579ef87b57a570b13",
+  product_rail: "e8a26a88771d1ff0b2c87331aa699ff16744b068599d8f59e8c6e190be922948",
+  text: "0bf6413f32708ee1915a055545b673849f63d92fb17cad5b46cdccc23800533d",
+  faq: "03721e0455a5805f63e8343142ce364e01285fda10ba5b2b93b14ec7726c956a",
+  product_main: "f42c0b20c417a38f4fb1865c663e22957a89f485cdef19a9b7b3adbee399c81a",
+};
+
+// One request through the real preview path: contentSource (lib/content/resolve.js)
+// reads the cookie and notes the request scope, exactly as the home page's own
+// call does; fn then renders inside the same request (one React cache memo).
+const inRequest = (host, cookies, fn) =>
+  asRequest(host, cookies, () =>
+    runRequest(async () => {
+      const src = await tfetch(() => contentSource());
+      return fn(src);
+    }),
+  );
+const renderHomeIn = (host, cookies) => asRequest(host, cookies, () => runRequest(async () => htmlAsync(await Home())));
+const HIDDEN_WHY = "This bundle is turned off, so shoppers don't see it. Turn it on in Catalog > Bundles, or remove it.";
+// the note's words go through escapeHtml into rich text (an apostrophe stays as typed)
+const HIDDEN_WHY_HTML = HIDDEN_WHY.replace(/>/g, "&gt;");
+// a throwaway kind that never shows; with or without the hook
+function hiddenKinds() {
+  Reg.defineSection({ kind: "fake_hidden", version: 1, label: "Offer box", documentTypes: ["home"], settings: [{ key: "title", kind: "text", label: "Title", max: 80, default: "Deal" }] });
+  Reg.defineSection({ kind: "fake_hidden_plain", version: 1, label: "Plain box", documentTypes: ["home"], settings: [{ key: "title", kind: "text", label: "Title", max: 80, default: "Plain" }] });
+  const Hidden = ({ section, attrs }) => (Hidden.shows(section) ? React.createElement("div", attrs, "shown") : null);
+  Hidden.shows = () => false;
+  Hidden.hiddenReason = (section, data) => (data?.why === "" ? "" : data?.why === "throw" ? (() => { throw new Error("boom"); })() : HIDDEN_WHY);
+  const Plain = ({ section, attrs }) => (Plain.shows(section) ? React.createElement("div", attrs, "shown") : null);
+  Plain.shows = () => false;
+  const drops = [registerSectionComponent("fake_hidden", Hidden), registerSectionComponent("fake_hidden_plain", Plain)];
+  return () => {
+    for (const d of drops) d();
+    Reg.removeSection("fake_hidden");
+    Reg.removeSection("fake_hidden_plain");
+  };
+}
+const tagOf = (h, id) => h.match(new RegExp(`<section[^>]*data-section-id="${id}"[^>]*>`))?.[0] || "";
+
+await t("a throwaway kind whose shows() is false and whose hiddenReason returns a sentence: in a documents preview (the real preview path) the home page shows that sentence with data-sec, data-section-id and data-hidden-reason; live it renders nothing", async () => {
+  const drop = hiddenKinds();
+  try {
+    await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("fake_hidden", "sec_hid1"), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+    const token = await previewToken();
+    const pv = await renderHomeIn("srv.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: token });
+    const root = tagOf(pv, "sec_hid1");
+    ok(root, `no note in the preview: ${pv.slice(0, 600)}`);
+    eq(attr(root, "data-sec"), "sec_hid1", "data-sec (the click target):");
+    eq(attr(root, "data-section-kind"), "fake_hidden", "data-section-kind:");
+    eq(attr(root, "data-hidden-reason"), "", "data-hidden-reason:");
+    ok(!/data-unfinished/.test(root), "a hidden section is not marked unfinished");
+    const note = sectionHtml(pv, "sec_hid1");
+    ok(note.includes("Offer box: hidden from shoppers"), `the note's title: ${note}`);
+    ok(note.includes(`${HIDDEN_WHY_HTML} Only you can see this note in your preview.`), `the note's words: ${note}`);
+    // the #new anchor still lands on the newest products, after the note
+    ok(/data-section-id="sec_new1"[^>]*id="new"/.test(pv), "the #new anchor moved");
+    // live: no trace, and the page equals the page without the hidden section
+    const live = await renderHomeIn("srv.test", { _unit: "unit-sections-plain" });
+    ok(!/sec_hid1|hidden from shoppers|data-hidden-reason|turned off/.test(live), "a shopper sees the note");
+    await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+    eq(live, await renderHomeIn("srv.test", { _unit: "unit-sections-plain" }), "live with the hidden section = live without it:");
+    // the renderer alone: live (no request) is an empty string
+    const hid = sec("fake_hidden", "sec_hid1");
+    eq(home([hid]), "", "HomeSections live:");
+    eq(view(hid), "", "SectionView live:");
+    eq(html(hiddenNote(hid, {}, { surface: "home", secKey: "sec_hid1" })) , "", "hiddenNote live:");
+    eq(html(hiddenNote(hid, {}, { surface: "home", secKey: "sec_hid1", preview: false })), "", "hiddenNote, ctx.preview false:");
+    ok(html(hiddenNote(hid, {}, { surface: "home", secKey: "sec_hid1", preview: true })).includes(HIDDEN_WHY_HTML), "hiddenNote, ctx.preview true:");
+    // no sentence, or a hook that throws: nothing, even in a preview
+    eq(html(hiddenNote(hid, { why: "" }, { surface: "home", preview: true })), "", "an empty reason:");
+    eq(html(hiddenNote(hid, { why: "throw" }, { surface: "home", preview: true })), "", "a throwing hook:");
+  } finally {
+    drop();
+  }
+  await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+});
+
+await t("a kind without hiddenReason renders nothing in a documents preview and live; in a preview a hidden note counts as shown for the empty-page message, live it never does", async () => {
+  const drop = hiddenKinds();
+  try {
+    const token = await previewToken();
+    const plain = sec("fake_hidden_plain", "sec_pl1");
+    const hid = sec("fake_hidden", "sec_hid1");
+    const pv = await inRequest("srv.test", { [PREVIEW_COOKIE]: token }, async (src) => {
+      ok(src.preview === true && src.v === 4, `not a documents preview: ${JSON.stringify({ preview: src.preview, v: src.v })}`);
+      ok(isFounderPreview({}), "the request scope says documents preview");
+      return { plain: home([plain]), plainEmpty: home([plain], new Map(), true), hidEmpty: home([hid], new Map(), true) };
+    });
+    eq(pv.plain, "", "no hook, preview:");
+    ok(/data-empty-page/.test(pv.plainEmpty), "no hook: the empty-page message as before");
+    ok(pv.hidEmpty.includes(HIDDEN_WHY_HTML) && !/data-empty-page/.test(pv.hidEmpty), `with the hook, preview: the note and no empty-page message: ${pv.hidEmpty}`);
+    eq(home([plain]), "", "no hook, live:");
+    ok(/data-empty-page/.test(home([hid], new Map(), true)) && !home([hid], new Map(), true).includes("turned off"), "live: the empty-page message, no note");
+    // through the page: publish the plain kind and preview it
+    await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), plain, sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+    const page = await renderHomeIn("srv.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: token });
+    ok(page.includes("New in") && !/sec_pl1|data-hidden-reason/.test(page), "the plain kind left a trace in the preview");
+  } finally {
+    drop();
+  }
+  await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+});
+
+await t("product_rail bound to an empty collection still renders nothing, in a documents preview and live (PV-09 unchanged)", async () => {
+  const r = { ...rail({ collection: { handle: "empty-shelf" } }), id: "sec_e0" };
+  const data = await inV4(() => resolveHomeSectionData([r], { documents: true }));
+  same(data.get("sec_e0").products, [], "empty collection data:");
+  const token = await previewToken();
+  const pv = await inRequest("srv.test", { [PREVIEW_COOKIE]: token }, async () => ({ home: home([r], data), view: view(r, data.get("sec_e0"), { surface: "home", secKey: "sec_e0", preview: true }) }));
+  eq(pv.home, "", "preview, HomeSections:");
+  eq(pv.view, "", "preview, SectionView:");
+  eq(home([r], data), "", "live:");
+  await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), r, sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+  const page = await renderHomeIn("srv.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: token });
+  ok(page.includes("New in") && !/sec_e0|data-hidden-reason/.test(page), "the empty rail left a trace in the preview page");
+  await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+});
+
+await t("a binding that failed: cause source_unknown says 'Remove it and add it again' in the preview, cause fault and no cause say reload; live renders nothing for both", async () => {
+  const s = sec("new", "sec_new1", { title: "New in", limit: 3 });
+  const unknown = { bindingFailed: ["products"], bindingFailedCause: { products: "source_unknown" } };
+  const fault = { bindingFailed: ["products"], bindingFailedCause: { products: "fault" } };
+  const bare = { bindingFailed: ["products"] };
+  const REMOVE = "This newest products section is set up in a way the editor can't fix. Remove it and add it again.";
+  const RELOAD = "Reload the preview to try again.";
+  // ctx.preview given
+  const u = view(s, unknown, { surface: "home", secKey: "sec_new1", preview: true });
+  ok(u.includes(REMOVE) && !u.includes(RELOAD), `source_unknown: ${u}`);
+  ok(/data-section-failed=""/.test(u) && attr(tagOf(u, "sec_new1"), "data-sec") === "sec_new1", "the failed note's marks");
+  for (const [name, d] of [["fault", fault], ["no cause", bare]]) {
+    const h = view(s, d, { surface: "home", secKey: "sec_new1", preview: true });
+    ok(h.includes(RELOAD) && !h.includes("Remove it and add it again"), `${name}: ${h}`);
+    ok(h.includes("Something went wrong while showing this newest products section."), `${name}: today's words`);
+  }
+  // a cause on a field that did not fail does not count
+  ok(view(s, { bindingFailed: ["products"], bindingFailedCause: { other: "source_unknown", products: "fault" } }, { surface: "home", preview: true }).includes(RELOAD), "another field's cause");
+  for (const d of [unknown, fault, bare]) eq(view(s, d, { surface: "home", preview: false }), "", "ctx.preview false:");
+  // through HomeSections, in the real request: preview and live
+  const token = await previewToken();
+  const pv = await inRequest("srv.test", { [PREVIEW_COOKIE]: token }, async () => ({
+    unknown: await htmlAsync(React.createElement(HomeSections, { sections: [s], dataById: new Map([["sec_new1", unknown]]) })),
+    fault: await htmlAsync(React.createElement(HomeSections, { sections: [s], dataById: new Map([["sec_new1", fault]]) })),
+  }));
+  ok(pv.unknown.includes(REMOVE), `preview, source_unknown: ${pv.unknown}`);
+  ok(pv.fault.includes(RELOAD) && !pv.fault.includes("Remove it"), `preview, fault: ${pv.fault}`);
+  for (const d of [unknown, fault]) {
+    const live = await inRequest("srv.test", {}, async () => htmlAsync(React.createElement(HomeSections, { sections: [s], dataById: new Map([["sec_new1", d]]) })));
+    eq(live, "", "live:");
+  }
+});
+
+await t("a legacy preview shows no hidden note (the scope only a documents preview sets); the same section in a documents preview does", async () => {
+  const drop = hiddenKinds();
+  try {
+    const hid = sec("fake_hidden", "sec_hid1");
+    const legacyToken = await inLeg(() => legacyPreviewToken());
+    const leg = await inRequest("srl.test", { [PREVIEW_COOKIE]: legacyToken }, async (src) => {
+      ok(src.preview === true && src.mode === "draft", `not a legacy preview: ${JSON.stringify({ preview: src.preview, mode: src.mode })}`);
+      return { home: home([hid]), view: view(hid, {}, { surface: "home", secKey: "sec_hid1" }), founder: isFounderPreview({}), cell: html(React.createElement(FounderNote, { ctx: {}, text: "A cell was dropped." })) };
+    });
+    eq(leg.home, "", "legacy preview, HomeSections:");
+    eq(leg.view, "", "legacy preview, SectionView:");
+    eq(leg.founder, false, "legacy preview, isFounderPreview:");
+    eq(leg.cell, "", "legacy preview, FounderNote:");
+    const legPage = await renderHomeIn("srl.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: legacyToken });
+    ok(!/data-hidden-reason|hidden from shoppers/.test(legPage), "the legacy preview page holds a hidden note");
+    const docs = await inRequest("srv.test", { [PREVIEW_COOKIE]: await previewToken() }, async () => home([hid]));
+    ok(docs.includes(HIDDEN_WHY_HTML), `documents preview: ${docs}`);
+  } finally {
+    drop();
+  }
+});
+
+await t("FounderNote (a per-cell note): only in a documents preview, with its attributes and the founder-only words; nothing live, nothing for ctx.preview false", async () => {
+  const el = (ctx) => html(React.createElement(FounderNote, { ctx, title: "Gym kit", text: "This bundle was deleted, so shoppers don't see it.", attrs: { "data-cell": "2" } }));
+  const on = el({ preview: true });
+  ok(/^<div data-founder-note="" data-cell="2" class="[^"]*border-dashed/.test(on), `the note: ${on}`);
+  ok(on.includes("Gym kit") && on.includes("shoppers don&#x27;t see it. Only you can see this note in your preview."), `the words: ${on}`);
+  eq(el({ preview: false }), "", "ctx.preview false:");
+  eq(el({}), "", "no request (live):");
+  eq(html(React.createElement(FounderNote, { ctx: { preview: true }, text: " " })), "", "no words:");
+  const token = await previewToken();
+  ok((await inRequest("srv.test", { [PREVIEW_COOKIE]: token }, async () => el({}))).includes("data-founder-note"), "a documents preview request (no ctx.preview)");
+  eq(await inRequest("srv.test", {}, async () => el({})), "", "a live request:");
+});
+
+await t("live renders of every registered kind's worst-case fixtures (SectionView on home and page, HomeSections with and without data, with the empty-page message) are byte-equal to the base (b09f342)", () => {
+  const now = liveWorstCaseDigests();
+  const missing = Object.keys(BASE_LIVE).filter((k) => !Object.hasOwn(now, k));
+  same(missing, [], "base kinds no longer registered:");
+  const differ = Object.keys(BASE_LIVE).filter((k) => now[k] !== BASE_LIVE[k]);
+  same(differ, [], "kinds whose live markup differs from the base:");
+});
+
+await t("live renders inside a real live request (documents store, no preview cookie) equal the renders with no request", async () => {
+  const inside = await inRequest("srv.test", { _unit: "unit-sections-plain" }, async (src) => {
+    ok(src.preview === false, "a live request");
+    return liveWorstCaseDigests();
+  });
+  same(inside, liveWorstCaseDigests(), "digests inside a live request:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -53,3 +53,48 @@ export function buttonOf(button) {
 }
 
 export const settingsOf = (section) => (section?.settings && typeof section.settings === "object" && !Array.isArray(section.settings) ? section.settings : {});
+
+// ---- P3-FRAME: what this request renders (lib/content/resolve.js) -----------------
+//
+// contentSource notes, per request, the store's id and whether this is a
+// founder's documents preview, under a global symbol (no section module can
+// import resolve.js: next/headers would reach every suite that renders the
+// map). Outside a request the answer is "unknown" and "not a preview".
+// P5-HIDDEN: moved here from index.js (which re-exports both) so a section
+// component can ask without importing the renderer map that imports it.
+const REQUEST_SCOPE_KEY = Symbol.for("storeasy.requestScope");
+export function requestScope() {
+  try {
+    const read = globalThis[REQUEST_SCOPE_KEY];
+    const scope = typeof read === "function" ? read() : null;
+    return scope && typeof scope === "object" ? scope : null;
+  } catch {
+    return null;
+  }
+}
+export const inDocumentsPreview = () => requestScope()?.documentsPreview === true;
+
+// P5-HIDDEN (COM-01): whether this render is a founder's documents preview.
+// ctx.preview when the caller says so (true or false); otherwise the request
+// scope above, which only a documents preview sets (resolve.js: a valid
+// preview session on a documents store). A legacy preview, a live page and a
+// render outside a request all answer false.
+export const isFounderPreview = (ctx) => (typeof ctx?.preview === "boolean" ? ctx.preview : inDocumentsPreview());
+
+// P5-HIDDEN (COM-01): a small founder note, for a part of a section that
+// shoppers don't see (a grid cell the section drops). The caller renders it
+// only when isFounderPreview(ctx) is true; the note checks again and renders
+// nothing otherwise, so a shopper never gets it. `attrs` go on its root (a
+// data-* marker, an id the editor can select by). Plain text, escaped by React.
+export const FOUNDER_ONLY = "Only you can see this note in your preview.";
+export function FounderNote({ ctx, title = "", text = "", attrs = {}, className = "" }) {
+  if (!isFounderPreview(ctx) || typeof text !== "string" || !text.trim()) return null;
+  return (
+    <div data-founder-note="" {...attrs} className={`rounded-sf-card border border-dashed border-sf-border-strong bg-sf-surface-muted p-4 text-sm text-sf-text-muted ${className}`.trim()}>
+      {title ? <p className="font-semibold text-sf-text">{title}</p> : null}
+      <p className={title ? "mt-1" : undefined}>
+        {text} {FOUNDER_ONLY}
+      </p>
+    </div>
+  );
+}
