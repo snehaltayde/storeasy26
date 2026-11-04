@@ -666,7 +666,7 @@ await t("P5: bundle words: no rupee sign, 'INR' or 'component ' in the source; U
   ok(usd.every((x) => x && !/₹|INR|component \d/.test(x)), usd.join(" | "));
   const money = [BW.stateLine("no_saving", REASONS, { currency: "USD" }), BW.reasonSentence(REASONS[2], { currency: "USD" })];
   ok(money.every((x) => x.includes("$1,500")), money.join(" | "));
-  eq(BW.stateLine("no_saving", REASONS, { currency: "USD" }), "The price no longer saves anything (the products add up to $1,500): shoppers can't add it. Lower the price in Catalog > Bundles.", "final text:");
+  eq(BW.stateLine("no_saving", REASONS, { currency: "USD" }), "The price no longer saves anything (the products add up to $1,500), so shoppers don't see it. Lower the price in Catalog > Bundles.", "final text:");
   for (const cur of [null, undefined]) ok(all(cur).every((x) => !/null|undefined/.test(x)), `${cur}: ${all(cur).join(" | ")}`);
   eq(BW.stateLine("available", []), "Showing to shoppers.", "available:");
   eq(BW.reasonSentence({ kind: "duplicate" }), "This product is already in the bundle", "duplicate:");

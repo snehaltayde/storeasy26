@@ -304,6 +304,18 @@ await t("release validation checks child links too", async () => {
 
 console.log("— upsells (MC15)");
 
+// P5-BLOCKS (plan 0.4): the bundle blocks are documents-mode kinds only; a
+// legacy store's home sections validator still knows none of them
+await t("P5-BLOCKS: a legacy home refuses bundle_card and bundle_grid as unknown kinds, and keeps its own kinds", async () => {
+  for (const kind of ["bundle_card", "bundle_grid"]) {
+    const r = validateBlock("home_sections", [{ id: "sec_b1", kind, bundle: { id: "bun-1" }, bundles: [{ id: "bun-1" }] }]);
+    eq(r.ok, false, `${kind} ok:`);
+    eq(r.issues[0]?.code, "UNKNOWN_KIND", `${kind} code:`);
+    eq(r.value.length, 0, `${kind} kept:`);
+  }
+  eq(validateBlock("home_sections", [{ id: "sec_b1", kind: "banner", title: "x" }]).ok, true, "a legacy banner:");
+});
+
 await t("a disabled placement stays disabled through an edit round-trip", async () => {
   const id = await inT(() => P.upsertPlacement({ kind: "cart_upsell", targetProductIds: ["gid://p/1"], title: "Try", enabled: false }));
   let row = (await inT(P.listPlacements)).find((p) => p.id === id);

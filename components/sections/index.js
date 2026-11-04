@@ -8,6 +8,8 @@ import ProductRailSection from "./ProductRailSection";
 import TextSection from "./TextSection";
 import FaqListSection from "./FaqListSection";
 import ProductMainSection from "./ProductMainSection";
+import BundleCardSection from "./BundleCardSection";
+import BundleGridSection from "./BundleGridSection";
 import FaqSection from "@/components/FaqSection";
 import { cloneElement, isValidElement } from "react";
 import { unfinishedMark, unfinishedTitle, unfinishedHtml } from "@/lib/content/unfinished";
@@ -64,6 +66,9 @@ const COMPONENTS = {
   text: TextSection,
   faq: FaqListSection,
   product_main: ProductMainSection,
+  // P5-BLOCKS (COM-02): bundles on the home page
+  bundle_card: BundleCardSection,
+  bundle_grid: BundleGridSection,
 };
 
 // Tests only: a throwaway kind's component, and taking it out again.
@@ -217,6 +222,8 @@ const textFields = {
   new: (s) => [["title", s.title]],
   product_rail: (s) => [["title", s.title]],
   faq: (s) => [["title", s.title]],
+  bundle_card: (s) => [["title", s.title]],
+  bundle_grid: (s) => [["title", s.title]],
 };
 const htmlFields = { rich_text: (s) => [["html", s.html]] };
 

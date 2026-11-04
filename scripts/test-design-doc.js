@@ -347,6 +347,9 @@ console.log("— 4. the design change list");
 await t("unit: every registered section kind has a token-usage entry; groupsOfRow and affectsWords say it in plain words", async () => {
   const missing = R.sectionKinds().filter((k) => !TU.SECTION_TOKENS[k]);
   eq(missing, [], "section kinds without an entry:");
+  // P5-BLOCKS: the bundle blocks are cards with photos, a button and a sale chip
+  eq([TU.SECTION_TOKENS.bundle_card, TU.SECTION_TOKENS.bundle_grid], [["colours", "fonts", "shapes", "spacing"], ["colours", "fonts", "shapes", "spacing"]], "bundle kinds:");
+  eq(Object.keys(TU.SECTION_TOKENS).sort(), [...R.sectionKinds()].sort(), "one entry per registered kind, no more:");
   for (const [k, groups] of Object.entries(TU.SECTION_TOKENS)) ok(R.sectionType(k) && groups.every((g) => TU.TOKEN_GROUPS.includes(g)), `${k}: ${groups}`);
   eq(TU.groupsOfRow("Colours: accent changed"), ["colours"], "colours:");
   eq(TU.groupsOfRow("Look: a different look chosen"), ["look"], "look:");

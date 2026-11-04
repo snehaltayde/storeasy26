@@ -349,6 +349,24 @@ await t("the picker lists every registered kind for the document type, with its 
   ok(T.addOptions("header", [], 0).length === 0 && !T.add([], "text", 0, { type: "header" }).ok, "a type without sections lists nothing and refuses");
 });
 
+// P5-BLOCKS (COM-02, OQ-E): the bundle blocks are home kinds only for now
+await t("P5-BLOCKS: bundle_card and bundle_grid are offered on the home page only (not page, campaign or journal), and their add makes a known-incomplete draft", () => {
+  for (const kind of ["bundle_card", "bundle_grid"]) {
+    ok(offeredKinds("home").includes(kind), `${kind} not offered on home`);
+    ok(T.addOptions("home", sample("home"), 1).some((o) => o.kind === kind && o.ok), `${kind}: the home picker can't add it`);
+    for (const type of ["page", "campaign", "journal"]) {
+      ok(!allowedKinds(type).includes(kind), `${kind} allowed on ${type}`);
+      ok(!T.addOptions(type, sample(type), 1).some((o) => o.kind === kind), `${kind} listed on ${type}`);
+      ok(!T.add(sample(type), kind, 1, { type }).ok, `${kind} added on ${type}`);
+    }
+    const r = T.add(sample("home"), kind, 1, { type: "home" });
+    ok(r.ok, `${kind}: ${r.message}`);
+    const issues = validateDocument(bodyOf("home", r.sections), { mode: "draft" }).issues.filter((i) => i.sectionId === r.id);
+    ok(issues.length > 0 && issues.every((i) => i.severity === "incomplete"), `${kind}: a new one waits for its bundle: ${JSON.stringify(issues.map((i) => [i.code, i.severity]))}`);
+  }
+  eq(JSON.stringify(SECTION_TYPES.filter((type) => allowedKinds(type).includes("bundle_card") || allowedKinds(type).includes("bundle_grid"))), JSON.stringify(["home"]), "types offering a bundle kind:");
+});
+
 await t("product_rail add picks a collection with products when given collections, and asks for one without", () => {
   const collections = [
     { handle: "empty", id: "gid://shopify/Collection/1", available_count: 0, product_count: 0 },

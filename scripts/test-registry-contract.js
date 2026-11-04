@@ -192,6 +192,28 @@ await t("a fake type whose default breaks its own rules fails the contract check
   deq(R.checkRegistry(), []);
 });
 
+// P5-BLOCKS (TREE-01, plan deviation 3.9): a source taken out of the table
+// after a kind was registered on it fails the registry check, by name.
+await t("P5-BLOCKS: checkRegistry names a kind whose source was removed after it registered; the real registry checks clean", async () => {
+  deq(R.checkRegistry(), [], "before:");
+  R.defineSource({ name: "zz_throwaway_src", args: ["limit"], resolve: () => Promise.resolve([]) });
+  let removedSrc = false;
+  R.defineSection({ kind: "zz_throwaway_kind", label: "Throwaway", documentTypes: ["home"], settings: [{ key: "limit", kind: "number", label: "N", min: 1, max: 4, default: 2 }], bindings: { things: { sources: ["zz_throwaway_src"], args: ["limit"] } } });
+  try {
+    deq(R.checkRegistry(), [], "with its source in the table:");
+    ok(R.removeSource("zz_throwaway_src"), "removeSource");
+    removedSrc = true;
+    const problems = R.checkRegistry();
+    deq(problems, ['zz_throwaway_kind: binding "things" names the source "zz_throwaway_src", which is not in the source table'], "after removeSource:");
+    ok(R.checkSectionContract("zz_throwaway_kind").length === 1, "the kind's own contract check says so too");
+  } finally {
+    if (!removedSrc) R.removeSource("zz_throwaway_src");
+    R.removeSection("zz_throwaway_kind");
+  }
+  deq(R.checkRegistry(), [], "after:");
+  ok(R.sectionKinds().includes("bundle_card") && R.sectionKinds().includes("bundle_grid"), "the bundle kinds are in the real registry checked here");
+});
+
 // ---- DOC-03 / DOC-04: never strip, never cut ---------------------------------------
 
 await t("an undeclared field gives UNKNOWN_FIELD naming the section id and field, and the value stays", async () => {
@@ -1069,17 +1091,10 @@ await t("crafted bad values for every setting kind of every section and document
       for (const bad of badValues(s)) for (const mode of ["draft", "publish"]) validate({ ...R.emptyBody(type), settings: { ...R.emptyBody(type).settings, [s.key]: bad } }, { mode });
     }
   }
-  // bundle and bundle_list: declared by bundle_card/bundle_grid in P5-BLOCKS
-  // (P5-SETTING adds the kinds in batch 1; P5-BLOCKS takes this exemption out)
-  const NOT_DECLARED_YET = ["bundle", "bundle_list"];
-  for (const k of Object.keys(R.SETTING_KINDS)) ok(kinds.has(k) || k === "number" || k === "product" || NOT_DECLARED_YET.includes(k), `setting kind ${k} is declared somewhere`);
-  // the bad values of the waiting kinds still speak, through a throwaway kind
-  R.defineSection({ kind: "zz_badbundle", label: "Bundle probe", documentTypes: ["home"], settings: [{ key: "pick", kind: "bundle", label: "Bundle", required: true, default: null }, { key: "grid", kind: "bundle_list", label: "Bundles to show", default: [] }] });
-  try {
-    for (const s of R.sectionType("zz_badbundle").settings) for (const bad of badValues(s)) for (const mode of ["draft", "publish"]) validate(home([sec("zz_badbundle", "sec_bad1", { [s.key]: bad })]), { mode });
-  } finally {
-    R.removeSection("zz_badbundle");
-  }
+  // P5-BLOCKS: bundle and bundle_list are declared by bundle_card and
+  // bundle_grid (their bad values ran in the loop above), so no kind waits
+  for (const k of Object.keys(R.SETTING_KINDS)) ok(kinds.has(k) || k === "number" || k === "product", `setting kind ${k} is declared somewhere`);
+  ok(kinds.has("bundle") && kinds.has("bundle_list"), "the bundle setting kinds are declared by a registered kind");
   // each section rules() and document rules() function, made to speak
   validate(home([sec("hero", "sec_h1", { title: "T", highlight: "X" })]), { mode: "draft" });
   validate(home([sec("banner", "sec_b1", { title: "", text: "" })]), { mode: "publish" });
@@ -1199,10 +1214,12 @@ await t("P5-SETTING: a bundle list refuses the same bundle twice and more than i
     const dup = validate(bundleDoc({ bundles: [{ id: "bun-a" }, { id: "bun-b" }, { id: "bun-a" }] }), { mode: "publish" });
     const d = one(dup, "INVALID_VALUE", { sectionId: "sec_bp1", field: "bundles.2" });
     eq(d.message, "This bundle is already in the grid.", "duplicate words:");
+    eq(VAL.issueClass(d), "invalid", "duplicate class (a draft keeps it, publish refuses it):");
     eq(d.severity, "error", "duplicate at publish:");
     eq(R.where(d, bundleDoc({})), "Bundle probe · Bundles to show · bundle 3", "where:");
     const over = one(validate(bundleDoc({ bundles: ids(13) }), { mode: "publish" }), "INVALID_VALUE", { field: "bundles" });
     eq(over.message, "A grid shows at most 12 bundles.", "over the default max:");
+    eq(VAL.issueClass(over), "invalid", "over-max class:");
     eq(one(validate(bundleDoc({ few: ids(4) }), { mode: "publish" }), "INVALID_VALUE", { field: "few" }).message, "A grid shows at most 3 bundles.", "over a declared max:");
     for (const key of ["title", "price", "available"]) {
       const i = one(validate(bundleDoc({ bundles: [{ id: "bun-a", [key]: 1 }] }), { mode: "publish" }), "UNKNOWN_FIELD", { field: `bundles.0.${key}` });
@@ -1243,10 +1260,25 @@ const OBJECT_KINDS = {
   gallery: [[{ media: "https://cdn.shopify.com/a.jpg", alt: "A" }], "0"],
 };
 // values with no object to put a key in
-const PLAIN_KINDS = ["text", "number", "boolean", "choice", "rich_text", "paragraphs", "entries", "product_ids"];
+const PLAIN_KINDS = ["text", "number", "boolean", "choice", "rich_text", "paragraphs", "product_ids"];
+// P5-BLOCKS (after the P5-SETTING review): kinds that DO hold objects but are
+// left out of the key check, each with its reason
+const EXEMPT_KINDS = {
+  // a list of objects, but only the system document journal_index holds it:
+  // lib/documents/release-list.js generates it from the posts, and
+  // service.js, publish.js and undo.js refuse to write it, so no editor or
+  // founder path can put a price or stock key into it
+  entries: "system type journal_index: generated, never written by an editor",
+};
 
 await t("TREE-01: for every object-valued setting kind (and every list kind's items), a price or stock key is UNKNOWN_FIELD of class structure in publish mode", async () => {
-  deq(Object.keys(R.SETTING_KINDS).filter((k) => !Object.hasOwn(OBJECT_KINDS, k) && !PLAIN_KINDS.includes(k)), [], "setting kinds placed in neither table:");
+  deq(Object.keys(R.SETTING_KINDS).filter((k) => !Object.hasOwn(OBJECT_KINDS, k) && !PLAIN_KINDS.includes(k) && !Object.hasOwn(EXEMPT_KINDS, k)), [], "setting kinds placed in no table:");
+  deq(Object.keys(EXEMPT_KINDS).filter((k) => Object.hasOwn(OBJECT_KINDS, k) || PLAIN_KINDS.includes(k)), [], "an exempt kind placed in another table too:");
+  // the exemption is real and narrow: entries is only declared by the system journal index
+  const holders = R.documentTypeNames().filter((t) => R.documentType(t).settings.some((x) => x.kind === "entries"));
+  deq(holders, ["journal_index"], "document types holding entries:");
+  ok(R.documentType("journal_index").system, "journal_index is a system type");
+  for (const k of R.sectionKinds()) ok(!R.sectionType(k).settings.some((x) => x.kind === "entries"), `section kind ${k} holds entries`);
   const settings = Object.entries(OBJECT_KINDS).map(([kind, [, , extra]]) => ({ key: `v_${kind}`, kind, label: `Probe ${kind.replace(/_/g, " ")}`, default: null, ...(extra || {}) }));
   R.defineSection({ kind: "zz_tree", label: "Tree probe", documentTypes: ["home"], settings });
   try {

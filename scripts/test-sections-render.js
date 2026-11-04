@@ -172,7 +172,11 @@ const HomeSections = (await loadJsx(join(ROOT, "components/sections/HomeSections
 const ContentPageMod = await loadJsx(join(ROOT, "components/ContentPage.js"));
 const ContentPage = ContentPageMod.default;
 const Home = (await loadJsx(join(ROOT, "app/(storefront)/page.js"))).default;
-const html = (el) => renderToStaticMarkup(React.createElement(ImageConfigContext.Provider, { value: imageConfig }, el));
+// P5-BLOCKS: the storefront layout wraps every page in CartProvider; the bundle
+// blocks' add button (components/BundleAddButton.js, useCart) needs it. It
+// renders no markup of its own, and server rendering runs no effects.
+const { CartProvider } = await loadJsx(join(ROOT, "components/cart/CartContext.js"));
+const html = (el) => renderToStaticMarkup(React.createElement(ImageConfigContext.Provider, { value: imageConfig }, React.createElement(CartProvider, null, el)));
 const view = (section, data = {}, ctx = { surface: "home", secKey: section.id }) => html(React.createElement(SectionView, { section, data, ctx }));
 const home = (sections, dataById = new Map(), emptyNote = false) => html(React.createElement(HomeSections, { sections, dataById, emptyNote }));
 
@@ -286,7 +290,7 @@ const attr = (tag, name) => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1] ?
 // hidden state, where P5-HIDDEN's note goes in a preview). No request, so no
 // preview scope: what a shopper gets. One sha256 per kind.
 const sha = (v) => createHash("sha256").update(v).digest("hex");
-const { worstCase } = await import("../lib/registry/fixtures.js");
+const { worstCase, worstBundle } = await import("../lib/registry/fixtures.js");
 function liveWorstCaseDigests() {
   const out = {};
   for (const kind of Reg.sectionKinds()) {
@@ -359,6 +363,9 @@ await t("every registered kind's root element carries data-section-id and data-s
     collections: { collections: [{ handle: "serums", title: "Serums", product_count: 3 }] },
     new: { products: [1, 2, 3].map((n) => ({ handle: `p${n}`, title: `P${n}`, price_min: 1, price_max: 1, currency: "INR", available: true })) },
     product_rail: { products: [1, 2, 3].map((n) => ({ handle: `p${n}`, title: `P${n}`, price_min: 1, price_max: 1, currency: "INR", available: true })) },
+    // P5-BLOCKS: a bundle that shows
+    bundle_card: { bundle: worstBundle("bun-root", "available") },
+    bundle_grid: { bundles: [worstBundle("bun-root", "available")] },
   };
   const ctxFor = (kind) => ({ surface: "home", secKey: `sec_${kind}`, ...(kind === "product_main" ? { productMain: React.createElement("p", null, "buy") } : {}) });
   for (const kind of Reg.sectionKinds()) {
@@ -622,7 +629,7 @@ console.log("— 3b. P3-VALIDATE: one broken section never blocks the rest (PV-0
 // can't. Both are compared only with themselves.
 const { prerenderToNodeStream } = require("react-dom/static");
 const htmlAsync = async (el) => {
-  const { prelude } = await prerenderToNodeStream(React.createElement(ImageConfigContext.Provider, { value: imageConfig }, el));
+  const { prelude } = await prerenderToNodeStream(React.createElement(ImageConfigContext.Provider, { value: imageConfig }, React.createElement(CartProvider, null, el)));
   let out = "";
   for await (const chunk of prelude) out += chunk;
   return out;
@@ -899,6 +906,14 @@ await t("no node: import in the files this item touches (the storefront is edge 
     "lib/content/unfinished.js",
     "lib/content/documents-reader.js",
     "lib/image-src.js",
+    // P5-BLOCKS: what the bundle blocks bring into the storefront
+    "components/BundleAddButton.js",
+    "components/cart/CartContext.js",
+    "lib/registry/sources.js",
+    "lib/commerce/bundle-read.js",
+    "lib/commerce/bundle-compat.js",
+    "lib/commerce/bundle-words.js",
+    "lib/format.js",
   ];
   const nodeImport = /(?:from\s+|import\s*\(\s*|require\s*\(\s*)["'](node:[^"']+|fs|path|crypto|child_process|os|module|url)["']/;
   for (const f of files) ok(!nodeImport.test(await readFile(join(ROOT, f), "utf8")), `${f} imports a Node module`);
@@ -927,6 +942,12 @@ const BASE_LIVE = {
   text: "0bf6413f32708ee1915a055545b673849f63d92fb17cad5b46cdccc23800533d",
   faq: "03721e0455a5805f63e8343142ce364e01285fda10ba5b2b93b14ec7726c956a",
   product_main: "f42c0b20c417a38f4fb1865c663e22957a89f485cdef19a9b7b3adbee399c81a",
+  // P5-BLOCKS: recorded with SR_RECORD=1 when the two kinds were added (their
+  // worst cases: lib/registry/fixtures.js worstBundle; the grid's max_items
+  // holds 12 cells in every state, so the live markup drops its no_saving,
+  // disabled and missing cells and holds no founder note)
+  bundle_card: "ba00c0b13358ea0c69564a12ab42354bc21a11ee3cfae90fc621ba7b86875171",
+  bundle_grid: "ab49b941dd7ab1c985825912d3fb6a9f345f2f9343d529fefe905ee576e640fb",
 };
 
 // One request through the real preview path: contentSource (lib/content/resolve.js)
@@ -1114,6 +1135,39 @@ await t("live renders of every registered kind's worst-case fixtures (SectionVie
   same(missing, [], "base kinds no longer registered:");
   const differ = Object.keys(BASE_LIVE).filter((k) => now[k] !== BASE_LIVE[k]);
   same(differ, [], "kinds whose live markup differs from the base:");
+});
+
+// P5-BLOCKS (after the P5-SOURCES and P5-HIDDEN reviews): the real path, end to
+// end. data.bindingFailedCause is not enumerable, so only the data object
+// section-data made carries it; this proves the home page hands that very
+// object to HomeSections and SectionView (no spread, no JSON copy on the way).
+await t("P5-BLOCKS: a source removed after publish fails its section end to end (section-data source_unknown, the home page, HomeSections): the documents preview shows 'Remove it and add it again', live shows nothing", async () => {
+  const Src = await import("../lib/registry/sources.js");
+  Src.defineSource({ name: "p5_e2e_src", args: ["limit"], resolve: () => Promise.resolve(["one", "two"]) });
+  Reg.defineSection({ kind: "p5_e2e_kind", label: "Echo block", documentTypes: ["home"], settings: [{ key: "limit", kind: "number", label: "N", min: 1, max: 4, default: 2 }], bindings: { items: { sources: ["p5_e2e_src"], args: ["limit"] } } });
+  const Echo = ({ data, attrs }) => React.createElement("div", { ...attrs, "data-echo": "" }, (data.items || []).join(","));
+  const drop = registerSectionComponent("p5_e2e_kind", Echo);
+  let removed = false;
+  try {
+    await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("p5_e2e_kind", "sec_e2e1"), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+    const token = await previewToken();
+    const before = await renderHomeIn("srv.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: token });
+    ok(before.includes(">one,two</div>"), "with its source, the section renders its data");
+    Src.removeSource("p5_e2e_src");
+    removed = true;
+    const { result: pv, lines } = await logsOf(() => renderHomeIn("srv.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: token }));
+    ok(pv.includes("This echo block section is set up in a way the editor can&#x27;t fix. Remove it and add it again.") || pv.includes("This echo block section is set up in a way the editor can't fix. Remove it and add it again."), `preview: the remove-and-add-again words: ${pv.match(/data-section-kind="p5_e2e_kind"[\s\S]{0,600}/)?.[0] || pv.slice(0, 400)}`);
+    ok(!pv.includes("Reload the preview to try again"), "preview: not the reload words");
+    ok(pv.includes("New in"), "the other sections still render");
+    ok(lines.some((l) => l.evt === "section_binding_failed" && l.sectionId === "sec_e2e1" && l.cause === "source_unknown"), `logged with cause source_unknown: ${JSON.stringify(lines)}`);
+    const live = await renderHomeIn("srv.test", { _unit: "unit-sections-plain" });
+    ok(!/sec_e2e1|p5_e2e_kind|Remove it and add it again/.test(live) && live.includes("New in"), "live: no trace of the section");
+  } finally {
+    if (!removed) Src.removeSource("p5_e2e_src");
+    drop();
+    Reg.removeSection("p5_e2e_kind");
+  }
+  await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
 });
 
 await t("live renders inside a real live request (documents store, no preview cookie) equal the renders with no request", async () => {
