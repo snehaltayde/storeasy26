@@ -187,6 +187,8 @@ check("every operation of today and of phase 3 has its entry", () => {
     "unpublish", "undo", "undoSet", "listRecentlyPublished", "listChanges", "keepLiveSection", "keepAsEarlierDraft",
     // P4-LIVEROW
     "openEntityContent", "resolveShopifyChange", "discardOrphanEdits",
+    // P4-SEARCH
+    "listProductContent",
   ];
   sameList(Object.keys(SHAPES), want, "operations");
 });
@@ -631,6 +633,57 @@ check("P4-LIVEROW: the new operations parse with their access, and bad ones are 
   if (!/const PUBLISHES = new Set\(\[[^\]]*"discardOrphanEdits"/.test(apiSource)) fail("discardOrphanEdits is not a publish operation in documents-api.js");
   if (!/const NEEDS_REVISION = new Set\(\[[^\]]*"resolveShopifyChange"/.test(apiSource)) fail("resolveShopifyChange needs no revision in documents-api.js");
   if (!/const PUBLISH_NEEDS_REVISION = new Set\(\[[^\]]*"discardOrphanEdits"/.test(apiSource)) fail("discardOrphanEdits needs no revision in documents-api.js");
+});
+
+// ---- P4-SEARCH ---------------------------------------------------------------------------
+
+check("P4-SEARCH: listProductContent parses (storefront.read, a mode read) and bad ones are refused; its 200 keys are the dispatcher's and its items' the list module's", () => {
+  const p = (b) => parseDocumentsOperation(b);
+  const o = p(SHAPES.listProductContent.request).op;
+  if (o.kind !== "listProductContent" || o.q !== "whey" || o.filter !== "all" || o.cursor !== null || o.limit !== 30) fail(`listProductContent: ${JSON.stringify(o)}`);
+  const dflt = p({ listProductContent: true }).op;
+  if (dflt.filter !== "all" || dflt.limit !== 30 || dflt.q !== "") fail(`defaults: ${JSON.stringify(dflt)}`);
+  for (const bad of [
+    { listProductContent: { filter: "nope" } },
+    { listProductContent: { limit: 0 } },
+    { listProductContent: { limit: 101 } },
+    { listProductContent: { cursor: "%%%" } },
+    { listProductContent: { q: 3 } },
+    { listProductContent: true, revision: 2 },
+  ]) {
+    if (p(bad).code !== "MALFORMED") fail(`not refused: ${JSON.stringify(bad)}`);
+  }
+  if (SHAPES.listProductContent.access !== "storefront.read") fail("access");
+  if (!/const MODE_READS = new Set\(\[[^\]]*"listProductContent"/.test(apiSource)) fail("listProductContent is not a mode read in documents-api.js");
+  const at = apiSource.indexOf('case "listProductContent": {', apiSource.indexOf("async function handleOperation("));
+  const ret = apiSource.indexOf("body: {", at);
+  const lit = literalParts(balanced(apiSource, ret + "body: ".length));
+  sameList(lit.keys, Object.keys(SHAPES.listProductContent.outcomes.ok.body), "listProductContent 200");
+});
+
+const listSource = await read("lib/admin/product-content-list.js");
+check("P4-SEARCH: the product list's item keys and counts are lib/admin/product-content-list.js's; the gate's and the new refusals' words are the code's", () => {
+  const src = listSource;
+  const item = SHAPES.listProductContent.outcomes.ok.body.items[0];
+  for (const fn of ["const itemOf = (r, changed) => {", "  return rows.map((r) => ({"]) {
+    const at = src.indexOf(fn);
+    if (at < 0) fail(`can't find ${fn.trim()} in product-content-list.js`);
+    const ret = src.indexOf(fn.startsWith("const") ? "return {" : "({", at);
+    const lit = literalParts(balanced(src, ret + (fn.startsWith("const") ? "return ".length : 1)));
+    sameList(lit.keys, Object.keys(item), `items (${fn.trim()})`);
+  }
+  if (!/const counts = \{ all: [^,]+, edited: [^,]+, changedInShopify: [^,]+, orphaned: [^}]+ \};/.test(src)) fail("the counts changed");
+  sameList(Object.keys(SHAPES.listProductContent.outcomes.ok.body.counts), ["all", "edited", "changedInShopify", "orphaned"], "counts");
+  const gate = readFileSyncText("lib/catalog/title-gate.js");
+  for (const words of [SHAPES.publish.outcomes.titleNotPublishable.body.error, SHAPES.undo.outcomes.titleNotPublishable.body.error]) {
+    const tail = words.slice(words.indexOf("”") + 1);
+    if (!gate.includes(tail.replace(/^ can't/, " can't"))) fail(`the gate's words are not title-gate.js's: ${tail}`);
+  }
+  if (/search on your store/i.test(gate.replace(/\/\/.*$/gm, ""))) fail("title-gate.js still speaks of search");
+  sameList(Object.keys(SHAPES.publish.outcomes.productNotInShopify.body), ["error", "code", "documents"], "PRODUCT_NOT_IN_SHOPIFY (publish)");
+  if (!/"PRODUCT_NOT_IN_SHOPIFY", productGoneMessage\(list, names\.length > 1\), \{ documents: gone\.map/.test(publishSource)) fail("PRODUCT_NOT_IN_SHOPIFY extra changed");
+  if (!publishSource.includes("is no longer in Shopify, so its edits can't go live. Open it and choose Discard edits, or leave it out of this publish.")) fail("the gone-product words are not publish.js's");
+  if (!/"TITLE_NOT_PUBLISHABLE", titleUndoMessage\(list, gate\.cause\), \{ documents: blocked\.map/.test(docSources["undo.js"])) fail("Undo's TITLE_NOT_PUBLISHABLE extra changed");
 });
 
 check("P4-LIVEROW: openEntityContent's 200 is the service's answer; the words of the new refusals are the code's", () => {

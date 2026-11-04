@@ -1,0 +1,70 @@
+{
+  "id": "P4-SEARCH",
+  "part": "list-perf",
+  "title": "P4-SEARCH — the editor's product list on the perf seed",
+  "ranAt": "2026-11-04T15:28:53.615Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 2,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the first page answers 30 of 400 with a cursor and the counts",
+      "detail": {
+        "p50": 13.399999976158142,
+        "p95": 20.900000035762787,
+        "status": 200,
+        "items": 30,
+        "counts": {
+          "all": 400,
+          "edited": 0,
+          "changedInShopify": 0,
+          "orphaned": 0
+        },
+        "next": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "under a second (first page p50 13.4 ms, p95 20.9 ms; changed p95 18.2 ms)",
+      "detail": {
+        "first": {
+          "p50": 13.399999976158142,
+          "p95": 20.900000035762787,
+          "status": 200,
+          "items": 30,
+          "counts": {
+            "all": 400,
+            "edited": 0,
+            "changedInShopify": 0,
+            "orphaned": 0
+          },
+          "next": true
+        },
+        "changed": {
+          "p50": 10.300000011920929,
+          "p95": 18.19999998807907,
+          "status": 200,
+          "items": 0,
+          "counts": {
+            "all": 400,
+            "edited": 0,
+            "changedInShopify": 0,
+            "orphaned": 0
+          },
+          "next": false
+        }
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_7eb1966c7c70ecbd, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.9s",
+    "products in the seed: 400",
+    "first page: {\"p50\":13.399999976158142,\"p95\":20.900000035762787,\"status\":200,\"items\":30,\"counts\":{\"all\":400,\"edited\":0,\"changedInShopify\":0,\"orphaned\":0},\"next\":true}",
+    "q=serum: {\"p50\":13.100000023841858,\"p95\":19,\"status\":200,\"items\":21,\"counts\":{\"all\":400,\"edited\":0,\"changedInShopify\":0,\"orphaned\":0},\"next\":false}",
+    "changed_in_shopify: {\"p50\":10.300000011920929,\"p95\":18.19999998807907,\"status\":200,\"items\":0,\"counts\":{\"all\":400,\"edited\":0,\"changedInShopify\":0,\"orphaned\":0},\"next\":false}"
+  ],
+  "screenshots": []
+}

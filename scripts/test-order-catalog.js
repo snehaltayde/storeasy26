@@ -273,8 +273,10 @@ const text = (html) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").rep
 // Each line's row, as plain text.
 const rows = (html) => [...html.matchAll(/<li class="flex items-center[^"]*">([\s\S]*?)<\/li>/g)].map((m) => text(m[1]));
 
-// The page as it was before OVL-06: the new line taken out.
-const NEW_LINE = /\n\s*\{shopifyLines\[i\] && <p className="text-xs text-fg-subtle">\{shopifyLines\[i\]\}<\/p>\}/g;
+// The page as it was before OVL-06: the new line taken out. P4-SEARCH: the
+// line's class is lib/admin/order-view.js SHOPIFY_LINE_CLASS (the muted text
+// colour, 4.5:1 or better), no longer the subtle one.
+const NEW_LINE = /\n\s*\{shopifyLines\[i\] && <p className=\{SHOPIFY_LINE_CLASS\}>\{shopifyLines\[i\]\}<\/p>\}/g;
 const pageWithoutNewLine = () => {
   const n = (pageSrc.match(NEW_LINE) || []).length;
   eq(n, 1, "the new line, found in the page source:");
