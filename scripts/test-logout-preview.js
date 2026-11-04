@@ -617,7 +617,12 @@ await t(`call() maps every example outcome of every operation (${ALL_OPS.length}
       mapped++;
     }
   }
-  eq(mapped, 360, "outcomes mapped:");
+  // Every example outcome in the contract, counted from the contract itself, so a later
+  // item that adds examples (P3-COMMIT added 17) is still checked in full. The floor is
+  // the count when this suite was written: the contract never drops an example.
+  const total = ALL_OPS.reduce((n, op) => n + Object.keys({ ...Shapes.COMMON.outcomes, ...outcomesOf(op) }).length, 0);
+  eq(mapped, total, "outcomes mapped:");
+  ok(total >= 360, `the contract lost examples: ${total} < 360`);
 });
 await t("the conflict carries updatedByName for every 409 DOCUMENT_CHANGED or PUBLISHED_ELSEWHERE example that has current", async () => {
   let n = 0;
