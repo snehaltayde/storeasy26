@@ -502,6 +502,30 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] Orchestrator: add `scripts/test-publish.js` (one assertion relaxed to "0023 and later") to P4-SCAFFOLD's file list, and name an owner to add the new 0024 tables to `lib/platform/export.js`.
 - [ ] Orchestrator: the operator commands carry no `--env-file=.env.local`. If CUTOVER's hosted owner run needs it, `package.json` must change, and only SCAFFOLD may edit it.
 
+## Phase 4, batch 1
+
+### The mode check moves into every old write's own batch (P4-GUARD)
+- [ ] Hosted Turso batch atomicity on staging, before the first real cutover: with `cms_state` set to 'migrating', a legacy save must give the plain refusal and write nothing.
+- [ ] OQ-5: confirm that product webhooks may keep writing while a store is migrating (an allowed difference in the data check), or ask for them to be queued instead.
+- [ ] CI: approve the source and checksum of the sqld download in `.github/`. This item changed nothing there.
+- [ ] Desktop Chrome drill was NOT DONE for this item. P4-DRILLS could rehearse it on the harness: a store set to 'migrating', every old editor refusing in plain words, and the sync showing as paused.
+- [ ] Orchestrator: add `scripts/test-release-readers.js` to P4-GUARD's files. Only its fixture changed: an `asLegacy` helper.
+- [ ] Orchestrator, ED05 or a route owner: the catalog POST and upsells POST/PUT routes answer an in-batch refusal as 422, and upsells DELETE answers 500. The words are plain and nothing is written. These routes should map `e.expose` 4xx errors before their catch-all.
+- [ ] CUTOVER: cancel pending `publish_release` jobs at the lock. The scheduled job's pre-check still throws on a store that is already off legacy, and the queue then dead-letters it.
+
+### The reference index and the media archive (P4-MEDIA)
+- [ ] Still recommended after deploy: run `pnpm media:reindex -- --tenant <id> --releases` on each documents-mode store (staging, harness, test stores). It is now cleanup, not a safety step. It is still needed to index old checkpoints and Undo-saved versions, which had no refs before this branch.
+- [ ] CI sqld download under `.github/` still needs owner approval of source and checksum (unchanged).
+
+### Legacy tenants for phase 4 tests (P4-FIXTURES)
+- [ ] Orchestrator: add `scripts/test-documents.js` (one allowlist line naming `scripts/support/legacy-tenants.js` in the documents-writer scan) to P4-FIXTURES' file list.
+- [ ] Carried from P4-SCAFFOLD: the CI sqld download in `.github/` needs the owner's approval of its source and checksum. This item changed nothing under `.github/`.
+- [ ] LIVEROW and CUTOVER: check that the stale-backfill fixture writes the same live-row columns you define as legacy-derived (badge, modules, pairs, pinned), and adjust the fixture if they differ.
+
+### The content getters against a given source (P4-SEAM)
+- [ ] None new from this item. Nothing calls the seam on a real tenant until P4-CUTOVER, whose runbook and rehearsal cover the MIG-02 data check.
+- [ ] Staging NOT DONE: nothing ran against hosted Turso; this item is local and unit-tested only.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
