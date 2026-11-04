@@ -9,7 +9,7 @@ No store changes mode. No real or hosted store was used: every case runs on file
 | Stage | Status |
 |---|---|
 | Implemented | Yes, on this branch |
-| Locally tested | Yes. `pnpm test`: 96 of 96 suites passed in 205.8 s. `test:commerce-exp` 33 passed (15 new), `test:refs` 15 passed (4 new), `test:effective-read` 41 passed, unchanged. `pnpm build` passes (its two Turbopack warnings were there before) |
+| Locally tested | Yes. After fix round 1: `pnpm test` 96 of 96 suites passed in 179.1 s; `test:commerce-exp` 35 passed (17 new, 2 from fix round 1). First round: `pnpm test` 96 of 96 in 205.8 s, `test:commerce-exp` 33 passed (15 new), `test:refs` 15 passed (4 new), `test:effective-read` 41 passed, unchanged. `pnpm build` passes (its two Turbopack warnings were there before) |
 | Browser verified | **NOT DONE, nothing to see yet.** This item has no UI: the read, the words and the writes are used by P5-BLOCKS, P5-CHECKS, P5-PANEL and P5-EDITOR. The bundle route's answers are proved by calling the real route handler. Port 6140 was not used; 7140 was given to test:migrate-map's sqld during `pnpm test` and stopped with it |
 | Staging | **NOT DONE** (owner checks below) |
 
@@ -67,6 +67,7 @@ The only source of bundle-state wording. `stateLine(state, reasons, { currency, 
 - `createBundle({ title, items, bundle_price, description?, enable = false, mustPass = false })` derives the slug: `slugBase(title)` (NFKD, accents dropped, lower-case, anything not `a-z0-9` becomes `-`, trimmed, `bundle` when empty) and `slugWithSuffix(base, n)` (the base cut so base plus `-N` is at most 61 characters). One statement reads the slugs already used under that base, the first free one is tried, and a UNIQUE race moves on to the next suffix (up to 25 tries). `mustPass: true` with a failing check throws `BUNDLE_INCOMPATIBLE` and saves nothing; without it the bundle is saved turned off and `compat.reasons` come back. `enable: true` turns it on only when it passes. An empty title throws `BUNDLE_INVALID` "Give the bundle a name."
 - A turned-off draft the offer validator refuses (one product, no price) is now saved with its older offer turned off. Before, the row was written and then the save failed with OFFER_INVALID, leaving any older offer as it was.
 - `setBundleEnabled` uses the same refusal (legacy message, plus code and reasons).
+- Fix round 1: the offer engine's own rules (`validateOffer` in `lib/offers/validate.js`, run on the exact offer `syncOffer` would write) are checked before any row is written whenever the bundle will be on: in `writeRow` (so `upsertBundle` creates and edits), in `createBundle` when `mustPass` is set or `enable: true` passes the check, and in `setBundleEnabled` when turning on. A refusal is `BUNDLE_INVALID` (the route answers 422) in plain words, for example "Give the bundle a name of at least 3 characters. Nothing was saved." or "Each product's quantity must be a whole number, 1 or more. Nothing was saved." Turning a draft on now writes its offer in full rather than only flagging an offer row that may not exist (a draft the engine refused has none).
 - `listBundles` adds `state` and `reasons` to each row's `compat`.
 - `getBundle` and the bundle page are unchanged.
 
@@ -124,7 +125,10 @@ It looks each fixture bundle's id up by slug before `upsertBundle`, so a reseed 
 
 ## From review
 
-- Nothing yet (written before review).
+- Fix round 1 (blocker): `createBundle` could report a failure while leaving a live bundle behind. `writeRow` inserted the row, then `syncOffer` was refused by the offer validator and the error was thrown again because the row was on. Two inputs did it: a 2-character name ("Gy": `OFFER_INVALID` "title: required", 422, yet slug `gy` stayed enabled with no offer, and `getBundle('gy')` showed a saving of 50 the cart would never give) and a quantity of 1.5 (slug `frac-kit` left on, no offer). A retry then got `gy-2`. Fixed as described in Design (4): the engine's rules run before any write. Tests in `scripts/test-commerce-exp.js`, both failing on `4788534` and passing now:
+  - "P5 fix 1: createBundle mustPass with a 2-character name, or a quantity of 1.5, is refused with nothing saved, and a retry gets the plain slug" (also `enable: true` without `mustPass`, and the route answering 422 `BUNDLE_INVALID` with no row);
+  - "P5 fix 1: upsertBundle and setBundleEnabled never leave a turned-on bundle without its offer" (a create asked to go on, an edit of a live bundle to quantity 1.5 leaving row and offer unchanged, and turning on a draft that has no offer).
+- Left as is: `compatFrom` and `mergeItems` still accept a quantity of 1.5 for a turned-off draft (the draft saves, with no offer, as any engine-refused draft does), and `listBundles` reports it as passing the check. Turning it on is refused in plain words.
 
 ## Owner checks
 

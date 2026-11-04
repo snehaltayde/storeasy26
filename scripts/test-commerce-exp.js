@@ -558,6 +558,60 @@ await t("P5: createBundle derives slugs: 'Gym Kit' twice, a 61-character name, a
   });
 });
 
+// P5-BUNDLEREAD fix 1: a bundle that passes the check but that the offer
+// engine refuses (a 2-character name, a quantity of 1.5) used to be left
+// behind turned on with no offer, while the call reported a failure.
+await t("P5 fix 1: createBundle mustPass with a 2-character name, or a quantity of 1.5, is refused with nothing saved, and a retry gets the plain slug", async () => {
+  await inB(async () => {
+    const counts = async () => [await bundleCount(), Number((await raw("SELECT count(*) AS n FROM offers")).rows[0].n)];
+    const before = await counts();
+    const gy = await B.createBundle({ title: "Gy", items: it2(1, 2), bundle_price: 250, enable: true, mustPass: true }).then(() => null, (e) => e);
+    same([gy?.code, gy?.message], ["BUNDLE_INVALID", "Give the bundle a name of at least 3 characters. Nothing was saved."], "refused in plain words");
+    same(await counts(), before, "(a) no row, no offer");
+    eq((await raw("SELECT count(*) AS n FROM bundles WHERE slug LIKE 'gy%'")).rows[0].n, 0, "no 'gy' slug:");
+    eq(await B.getBundle("gy"), null, "the storefront shows nothing:");
+    const frac = await B.createBundle({ title: "Frac kit", items: [{ variantId: V(1), quantity: 1.5 }, { variantId: V(2), quantity: 1 }], bundle_price: 250, enable: true, mustPass: true }).then(() => null, (e) => e);
+    same([frac?.code, frac?.message], ["BUNDLE_INVALID", "Each product's quantity must be a whole number, 1 or more. Nothing was saved."], "refused in plain words");
+    same(await counts(), before, "(b) no row, no offer");
+    eq((await raw("SELECT count(*) AS n FROM bundles WHERE slug LIKE 'frac-kit%'")).rows[0].n, 0, "no 'frac-kit' slug:");
+    // without mustPass, asked to go on: refused the same way, nothing saved
+    eq(await codeOf(B.createBundle({ title: "Gy", items: it2(1, 2), bundle_price: 250, enable: true })), "BUNDLE_INVALID", "enable without mustPass:");
+    same(await counts(), before, "still nothing saved");
+    // the founder fixes the name and retries: the plain slug, on, with its offer
+    const fixed = await B.createBundle({ title: "Gym", items: it2(1, 2), bundle_price: 250, enable: true, mustPass: true });
+    same([fixed.slug, Number(fixed.enabled), Number((await offerOf(fixed.id))?.enabled)], ["gym", 1, 1], "retry");
+    await B.deleteBundle(fixed.id);
+  });
+  const r = await callRoute("POST", { create: { title: "Gy", items: it2(1, 2), bundle_price: 250, enable: true, mustPass: true } });
+  same([r.status, r.body.code], [422, "BUNDLE_INVALID"], "route:");
+  eq((await raw("SELECT count(*) AS n FROM bundles WHERE slug LIKE 'gy%'")).rows[0].n, 0, "route wrote nothing:");
+});
+
+await t("P5 fix 1: upsertBundle and setBundleEnabled never leave a turned-on bundle without its offer", async () => {
+  await inB(async () => {
+    const n = await bundleCount();
+    // a new bundle asked to go on with a 2-character name: refused before the row
+    eq(await codeOf(B.upsertBundle({ slug: "two-ch", title: "Tw", items: it2(1, 2), bundle_price: 250, enable: true })), "BUNDLE_INVALID", "create on:");
+    eq(await bundleCount(), n, "no row:");
+    // an edit of a turned-on bundle to a quantity of 1.5: row and offer unchanged
+    const live = await B.upsertBundle({ slug: "live-q", title: "Live q", items: it2(1, 2), bundle_price: 250, enable: true });
+    const before = [await rowOf(live.id), await offerOf(live.id)];
+    eq(await codeOf(B.upsertBundle({ id: live.id, title: "Live q", items: [{ variantId: V(1), quantity: 1.5 }, { variantId: V(2), quantity: 1 }], bundle_price: 250 })), "BUNDLE_INVALID", "edit:");
+    same([await rowOf(live.id), await offerOf(live.id)], before, "nothing changed");
+    // a turned-off draft the engine refused has no offer; turning it on with
+    // that name is refused, and with a fixed name writes its offer in full
+    const draft = await B.upsertBundle({ slug: "draft-tw", title: "Tw", items: it2(1, 2), bundle_price: 250, enable: false });
+    eq(await offerOf(draft.id), null, "no offer for the draft:");
+    eq(await codeOf(B.setBundleEnabled(draft.id, true)), "BUNDLE_INVALID", "enable refused:");
+    eq(Number((await rowOf(draft.id)).enabled), 0, "still off:");
+    await B.upsertBundle({ id: draft.id, title: "Two", items: it2(1, 2), bundle_price: 250 });
+    await B.setBundleEnabled(draft.id, true);
+    same([Number((await rowOf(draft.id)).enabled), Number((await offerOf(draft.id))?.enabled)], [1, 1], "on, with its offer");
+    eq((await BR.bundlesByIds([draft.id])).get(draft.id).state, "available", "read as available:");
+    for (const x of [live, draft]) await B.deleteBundle(x.id);
+  });
+});
+
 await t("P5: editing a turned-on bundle's price (no enable, no description sent) keeps it on, its offer on with the new price, and its description", async () => {
   const b = await inB(() => B.upsertBundle({ slug: "edit-me", title: "Edit me", description: "Keep this text", items: it2(9, 10), bundle_price: 1800, enable: true }));
   const r = await callRoute("POST", { bundle: { id: b.id, title: "Edit me", items: it2(9, 10), bundle_price: 1700 } });
