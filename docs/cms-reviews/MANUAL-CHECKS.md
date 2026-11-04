@@ -472,6 +472,16 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] **Rich text paste:** P3-FIX4 (clean a web page's paste on save) was not merged when this ran, so the drill proved the "Edit as HTML" way out instead. After P3-FIX4 merges, run `node scripts/drills/p3/rte.mjs` and change its step 7 to expect the cleaned save.
 - [ ] **CI sqld download:** still not touched (no `.github/` change). Approve its source and checksum.
 
+### Rich text cleans a web page's paste on save (P3-FIX4)
+- [ ] Desktop Chrome in the editor (P3-DRILLS or the owner): paste a product description copied from a live Shopify page into a rich text field and save. The words, bold and links come through, and the store shows them. NOT DONE here.
+- [ ] P3-DRILLS must update `scripts/drills/p3/rte.mjs` step 7. It still expects the `<product-info>` paste to be refused with WORDS_LOST, but that paste now saves cleaned. A paste that is still refused, such as `<shop class="x">`, can drill the Edit as HTML way out.
+- [ ] Ruling on option (b) as built: tags with a hyphen and whole `<noscript>`s are cleaned in the documents editor only, and the legacy editors stay strict.
+- [ ] Ruling on wording: the refusal words that name the tag (both copies), the theme route's "hero look wasn't added" note, and the "can't be published yet" notes on insight apply and experiment adopt.
+- [ ] Hosted staging (Turso): a design publish writes `config.theme_pin` with the targeted update; a slow platform database leaves the publish a success, with `documents_after_commit_timeout` logged.
+- [ ] Known limit: a whole-row `patchTenant` running at the same time elsewhere can still put an old `theme_pin` back. `lib/platform/control.js` is outside this item.
+- [ ] Still open from P3-DESIGN: should a never-published design that matches the platform default list nothing to publish?
+- [ ] CI: the owner still needs to approve the source and checksum of the sqld download. Nothing under `.github` was touched.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
