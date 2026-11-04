@@ -723,6 +723,43 @@ await t("a live read in error refuses before the lock; caused after the lock it 
   eq((await modeOf(S2)).mode, "legacy", "back on legacy:");
 });
 
+await t("an edit or a publish on the old editor between the proofs' read and the lock puts the store back on the old editor and refuses (the moved source is the one the digest and rehearsal describe)", async () => {
+  for (const kind of ["edit", "publish"]) {
+    const S = await store("live_v3");
+    const pr = await proofs(S);
+    const before = await dump(S);
+    const pointer = await pointerOf(S);
+    const r = await move(S, {
+      proofs: pr,
+      beforeLock: async () => {
+        await Store.setBlock("announcement", { enabled: true, text: `Saved in the gap (${kind})`, href: "/" });
+        if (kind === "publish") await R.createRelease({ note: "published in the gap" });
+      },
+    });
+    eq(r.ok, false, `${kind}: not moved:`);
+    eq(r.stopped?.code, "RECHECK_SOURCE_MOVED", `${kind}: ${JSON.stringify(r.stopped || r.refused)}`);
+    eq(r.stopped.unlocked, true, `${kind}: unlocked:`);
+    plainWords(r.stopped.words, "the source-moved words");
+    ok(/changed since the dry run/.test(r.stopped.words) && /again/.test(r.stopped.words), `${kind}: says run it again: ${r.stopped.words}`);
+    eq((await modeOf(S)).mode, "legacy", `${kind}: back on legacy:`);
+    const runs = await q(S, "SELECT outcome, source_hash FROM cms_migration_runs");
+    eq(runs.length, 1, `${kind}: one run row:`);
+    eq(runs[0].outcome, "stopped", `${kind}: the run:`);
+    eq(runs[0].source_hash, pr.dry.mapped.sourceHash, `${kind}: the run row keeps the hash it was approved for:`);
+    eq(await count(S, "documents"), 0, `${kind}: nothing backfilled:`);
+    eq((await q(S, "SELECT count(*) AS n FROM release_state WHERE id = 2"))[0].n, 0, `${kind}: no stray pointer row:`);
+    if (kind === "edit") {
+      eq(await pointerOf(S), pointer, "edit: the live pointer unchanged:");
+      same((await dump(S)).documents, before.documents, "edit: no document written:");
+    } else ok((await pointerOf(S)) !== pointer, "publish: the gap publish went live on the old editor");
+    // the old editor still saves after the stop
+    await inS(S, () => Store.setBlock("announcement", { enabled: true, text: "Saved after the source-moved stop", href: "/" }));
+    // a fresh dry run and rehearsal of the changed store then moves it
+    const r2 = await move(S);
+    ok(r2.ok, `${kind}: the fresh move: ${JSON.stringify(r2.refused || r2.stopped)}`);
+  }
+});
+
 await t("an approvals store and an agency store refuse (DOC-13 isn't built)", async () => {
   const A = await store("live_v3", { entities: [...CLEAN, "cms_approvals"] });
   await refusedBeforeLock(A, await move(A, { proofs: { digest: "x", rehearsal: null } }), "APPROVALS_IN_USE");
