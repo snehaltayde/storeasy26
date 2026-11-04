@@ -355,6 +355,119 @@ await t("unit: a save acknowledged while the frame is shown refreshes it in plac
   eq(picks.length, 1, "pick handed on:");
 });
 
+// P3-FIX5 (finding D1) ------------------------------------------------------------------
+const OWN = "ps_00000000000000a1";
+const OTHER = "ps_00000000000000b2";
+const readyWith = (state) => ({ type: "storeasy:ready", v: 2, ok: true, state: { kind: "documents", docs: {}, offline: [], ...state }, unfinished: [] });
+
+await t("P3-FIX5 unit: one editor mount mints one preview session (start, dispose, start: React strict mode's double effect)", async () => {
+  // the mint answers after the strict-mode cleanup and re-run
+  const r = previewRig();
+  let release;
+  r.setMint(() => new Promise((res) => (release = () => res({ ok: true, sid: OWN }))));
+  r.ctl.start();
+  r.ctl.dispose();
+  r.ctl.start();
+  release();
+  await tick();
+  eq(r.minted.length, 1, "one session for the mount:");
+  eq(r.srcs, ["/"], "the frame loads once, with that session:");
+  await connect(r);
+  eq(r.last().label, "Up to date", "and it is Up to date:");
+  // the mint answers while the controller is disposed (between cleanup and re-run): parked, then applied
+  const p = previewRig();
+  let release2;
+  p.setMint(() => new Promise((res) => (release2 = () => res({ ok: true, sid: OWN }))));
+  p.ctl.start();
+  p.ctl.dispose();
+  release2();
+  await tick();
+  eq(p.srcs, [], "nothing is applied while disposed:");
+  p.ctl.start();
+  eq([p.minted.length, p.srcs], [1, ["/"]], "the re-run applies the parked answer, still one session:");
+  // a real unmount: never started again, so nothing is applied and nothing more is minted
+  const u = previewRig();
+  let release3;
+  u.setMint(() => new Promise((res) => (release3 = () => res({ ok: true, sid: OWN }))));
+  u.ctl.start();
+  u.ctl.dispose();
+  const seen = u.views.length;
+  release3();
+  await tick();
+  eq([u.minted.length, u.srcs.length, u.views.length], [1, 0, seen], "after a real unmount nothing changes:");
+  // PreviewPane keeps one controller per mount (the ref), and starts it in the effect
+  const pane = await readFile(join(ROOT, "components/admin/editor/PreviewPane.js"), "utf8");
+  ok(/let ctl = ctlRef\.current;\s*if \(!ctl\) \{/.test(pane), "PreviewPane makes the controller only when the ref has none");
+  ok(!/ctlRef\.current = null/.test(pane), "PreviewPane's cleanup keeps the controller for the strict-mode re-run");
+});
+
+await t("P3-FIX5 unit: showDesign reaches the session the frame renders; the preview never says Up to date while the frame says the new colours are hidden", async () => {
+  // the design is open; the frame renders another session (the cookie is a second tab's) with the colours off
+  const r = previewRig({ documentId: "doc_design" });
+  r.setMint(() => ({ ok: true, sid: OWN }));
+  await r.ctl.start();
+  eq(r.minted, [true], "minted with the colours on:");
+  r.ctl.frameLoad();
+  r.ctl.message(readyWith({ sid: OTHER, skipped: ["doc_design"], designShown: false }));
+  ok(r.views.every((v) => v.label !== "Up to date"), "never Up to date while the frame says the colours are hidden");
+  await tick();
+  eq(r.shows, [[OTHER, true]], "showDesign goes to the frame's session (state.sid), not only our own:");
+  eq(r.ctl.view().sid, OTHER, "the controller now steers the frame's session:");
+  eq(r.srcs.length + r.posted.filter((m) => m.type === "storeasy:refresh").length, 2, "the frame is reloaded after the turn-on:");
+  r.ctl.frameLoad();
+  r.ctl.message(readyWith({ sid: OTHER, skipped: [], designShown: true }));
+  eq([r.last().label, r.ctl.view().showDesign], ["Up to date", true], "the colours are shown: Up to date:");
+  eq(r.minted.length, 1, "no new session was needed:");
+  // the next document turns it off in the session the frame renders
+  await r.ctl.openDocument("doc_home");
+  eq(r.shows.at(-1), [OTHER, false], "another document: off in the frame's session:");
+  // adopted with nothing hidden (the home page in a second tab's session):
+  // opening the design later turns it on where the frame is
+  const q = previewRig({ documentId: "doc_home" });
+  q.setMint(() => ({ ok: true, sid: OWN }));
+  await q.ctl.start();
+  q.ctl.frameLoad();
+  q.ctl.message(readyWith({ sid: OTHER, skipped: [] }));
+  eq([q.last().label, q.ctl.view().sid], ["Up to date", OTHER], "the frame's session is adopted:");
+  await q.ctl.openDocument("doc_design");
+  eq(q.shows.at(-1), [OTHER, true], "opening the design turns it on in the frame's session:");
+  // the turn-on keeps failing to show: Could not update, with words, never Up to date
+  const s = previewRig({ documentId: "doc_design" });
+  s.setMint(() => ({ ok: true, sid: OWN }));
+  await s.ctl.start();
+  for (let i = 0; i < 3; i++) {
+    s.ctl.frameLoad();
+    s.ctl.message(readyWith({ sid: OWN, skipped: ["doc_design"], designShown: false }));
+    await tick();
+  }
+  eq([s.last().label, s.last().words], ["Could not update", PREVIEW_WORDS.designHidden], "after the tries: Could not update, in words:");
+  ok(s.views.every((v) => v.label !== "Up to date"), "never Up to date on the way");
+  s.ctl.retry();
+  await tick();
+  eq(s.minted.length, 2, "Try again opens a new session:");
+  // the turn-on is refused (the frame's session is someone else's or gone): a new session of our own
+  const shows = [];
+  const refusing = M.createPreviewController({
+    api: { startDocumentsPreview: async (o) => (shows.push(["mint", o.showDesign]), { ok: true, sid: OWN }), setShowDesign: async (sid, on) => (shows.push([sid, on]), { error: true }) },
+    timers: fakeTimers(),
+    documentId: "doc_design",
+    frame: { setSrc() {}, post() {}, currentPath: () => null },
+  });
+  await refusing.start();
+  refusing.frameLoad();
+  refusing.message(readyWith({ sid: OTHER, skipped: ["doc_design"] }));
+  await tick();
+  await tick();
+  eq(shows, [["mint", true], [OTHER, true], ["mint", true]], "refused turn-on: a new session with the colours on:");
+  // another document with the design hidden is Up to date (its colours are the live ones by rule)
+  const h = previewRig({ documentId: "doc_home" });
+  h.setMint(() => ({ ok: true, sid: OWN }));
+  await h.ctl.start();
+  h.ctl.frameLoad();
+  h.ctl.message(readyWith({ sid: OWN, skipped: ["doc_design"] }));
+  eq([h.last().label, h.shows], ["Up to date", []], "the home page: Up to date, nothing turned on:");
+});
+
 // =====================================================================================
 console.log("— 3. leaving (ED-03)");
 
@@ -581,6 +694,23 @@ await t("unit: two tabs on one document at one revision write two keys; tab B di
   ok(c.getState().backupOffer, "an older visit's backup is offered");
   c.dismissBackup();
   eq(raw2.length, 0, "and dismissing it removes it:");
+});
+
+await t("P3-FIX5 unit: 'Keep them as an earlier draft' from the local backup asks for the backup's note (from: 'backup'); another tab's keep does not", async () => {
+  const srv = server();
+  srv.answer("keepAsEarlierDraft", (args) => ({ ok: true, data: { ok: true, savedVersion: { id: "ver_k", note: args?.from === "backup" ? "Edits this browser kept" : "Kept from another tab" } } }));
+  const raw = memoryStorage();
+  raw.setItem("storeasy:unsaved:t1:doc_home:3", JSON.stringify({ v: 1, baseRevision: 3, savedAt: 1, body: { type: "home", sections: [{ id: "sec_aa", kind: "hero", settings: { title: "Never reached the server" } }] } }));
+  const s = makeStore(srv, { storage: M.createTabStorage(raw, "dddd") });
+  await s.open();
+  ok(s.getState().backupOffer, "the backup is offered");
+  const r = await s.acceptBackup();
+  ok(r.ok, `kept: ${JSON.stringify(r)}`);
+  const call = srv.calls.find((c) => c.op === "keepAsEarlierDraft");
+  eq([call?.args?.from, call?.args?.body?.sections?.[0]?.settings?.title], ["backup", "Never reached the server"], "the keep says it is the backup, with its text:");
+  // the store's other keep (another tab's draft, undoSet) sends no from
+  await s.keepAsEarlierDraft({ type: "home", sections: [] });
+  eq(Object.hasOwn(srv.calls.filter((c) => c.op === "keepAsEarlierDraft").at(-1).args, "from"), false, "another tab's keep: no from:");
 });
 
 // =====================================================================================

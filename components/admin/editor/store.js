@@ -599,7 +599,9 @@ export function createDocumentStore({
     });
 
   // ---- kept drafts and the conflict choice ----
-  const keepBody = (b) => api.call("keepAsEarlierDraft", { id, body: outgoing(b).body });
+  // P3-FIX5: from "backup" for the local backup offer, so its version reads
+  // "Edits this browser kept", not "Kept from another tab"
+  const keepBody = (b, { from = null } = {}) => api.call("keepAsEarlierDraft", { id, body: outgoing(b).body, ...(from ? { from } : {}) });
 
   async function useNewer() {
     if (!conflict) return { ok: true, nothing: true };
@@ -792,7 +794,7 @@ export function createDocumentStore({
   async function acceptBackup() {
     if (!backupOffer) return { ok: true, nothing: true };
     const offer = backupOffer;
-    const r = await keepBody(offer.body);
+    const r = await keepBody(offer.body, { from: "backup" });
     if (r.ok) {
       try {
         storage.removeItem(offer.key);

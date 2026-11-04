@@ -595,6 +595,106 @@ await t("P3-FIX4 unit: a hanging after-commit handler times out; the publish ans
   eq((await cfgOf("dd")).theme_pin.kit, "pulse", "pinned by the next publish:");
 });
 
+// P3-FIX5 (FIX4 review survivors): writeThemePin's guards, each pinned.
+await t("P3-FIX5 unit: writeThemePin refuses a corrupt config (writes nothing), a missing row is logged as a failure, the cache is refreshed, and a late write never replaces a newer pin", async () => {
+  const pdb = C.platformDb();
+  const cfgRaw = async (id) => String((await pdb.execute({ sql: "SELECT config FROM tenants WHERE id = ?", args: [id] })).rows[0].config);
+  const pin = (kit, at) => ({ kit, version: 1, applied_at: null, published_at: at, release: `rel_${kit}` });
+  // 1. a config that isn't valid JSON: thrown, and the row is left exactly as it was
+  await C.upsertTenant({ id: "dbad", name: "Broken config", domains: ["dbad.test"], dbUrl: "file:.test-design-doc-default.db", config: {}, secrets: {} });
+  await pdb.execute({ sql: "UPDATE tenants SET config = ? WHERE id = 'dbad'", args: ['{"site": {"name": "Broken"'] });
+  let err = null;
+  try {
+    await After.writeThemePin("dbad", pin("pulse", "2026-11-04T10:00:00.000Z"));
+  } catch (e) {
+    err = e;
+  }
+  ok(err && /not valid JSON/.test(err.message), `throws on a corrupt config: ${err?.message}`);
+  eq(await cfgRaw("dbad"), '{"site": {"name": "Broken"', "the corrupt config is not replaced:");
+  await pdb.execute("DELETE FROM tenants WHERE id = 'dbad'");
+  // 2. no row changed (a missing tenant): a failure, never theme_pin_written
+  let missing = null;
+  try {
+    await After.writeThemePin("no_such_store", pin("pulse", "2026-11-04T10:00:00.000Z"));
+  } catch (e) {
+    missing = e;
+  }
+  ok(missing && /not found/.test(missing.message), `a missing row throws: ${missing?.message}`);
+  const { lines } = await logsOf(() =>
+    withTenant({ id: "no_such_store", config: {}, secrets: {} }, () => After.runAfterCommit({ build: { versions: [{ document_id: "doc_design", body: JSON.stringify({ settings: { theme: { kit: "pulse", version: 1 } } }) }], now: "2026-11-04T10:00:00.000Z", releaseId: "rel_x" }, items: [] })),
+  );
+  ok(lines.some((l) => l.evt === "documents_after_commit_failed" && l.handler === "themePin" && /not found/.test(l.error)), `rowsAffected 0 is logged as a failure: ${JSON.stringify(lines.map((l) => l.evt))}`);
+  ok(!lines.some((l) => l.evt === "theme_pin_written"), "and never as written");
+  // 3. the cache: with a 60 s tenant cache warmed, the next cached read shows the new pin
+  const was = process.env.PLATFORM_CACHE_MS;
+  process.env.PLATFORM_CACHE_MS = "60000";
+  try {
+    const cur = await cfgOf("dd");
+    const stamp = new Date(Date.parse(cur.theme_pin_at || cur.theme_pin?.published_at || "2026-01-01T00:00:00.000Z") + 1000).toISOString();
+    await C.getTenant("dd", { fresh: true }); // warm
+    eq(await After.writeThemePin("dd", pin("glow", stamp), { at: stamp }), "written", "written:");
+    eq((await C.getTenant("dd")).config.theme_pin?.kit, "glow", "this instance's cached tenant shows the new pin (getTenant fresh after the write):");
+    // 4. a late write (an older build's) never replaces the newer pin
+    const older = new Date(Date.parse(stamp) - 5000).toISOString();
+    const { result: late, lines: lateLines } = await logsOf(() => After.writeThemePin("dd", pin("pulse", older), { at: older }));
+    eq(late, "newer", "the late write answers newer:");
+    eq([(await cfgOf("dd")).theme_pin.kit, (await cfgOf("dd")).theme_pin_at], ["glow", stamp], "the newer pin stays:");
+    ok(lateLines.some((l) => l.evt === "theme_pin_skipped_newer"), "logged as skipped");
+    // a late null pin (a design with no look) never replaces it either
+    eq(await After.writeThemePin("dd", null, { at: older }), "newer", "a late null:");
+    eq((await cfgOf("dd")).theme_pin.kit, "glow", "still the newer pin:");
+    // the same build again (a retry) or a newer one writes
+    const newer = new Date(Date.parse(stamp) + 5000).toISOString();
+    eq(await After.writeThemePin("dd", pin("pulse", newer), { at: newer }), "written", "a newer write:");
+    eq((await cfgOf("dd")).theme_pin.kit, "pulse", "pulse again:");
+    // through the handler: a late build is not logged as written
+    const lateBuild = { versions: [{ document_id: "doc_design", body: JSON.stringify({ settings: { theme: { kit: "glow", version: 1 } } }) }], now: older, releaseId: "rel_late" };
+    const { lines: hl } = await logsOf(() => inD(() => After.runAfterCommit({ build: lateBuild, items: [] })));
+    ok(!hl.some((l) => l.evt === "theme_pin_written") && hl.some((l) => l.evt === "theme_pin_skipped_newer"), `the handler skips a late build: ${JSON.stringify(hl.map((l) => l.evt))}`);
+    eq((await cfgOf("dd")).theme_pin.kit, "pulse", "the newer pin stays after the late handler:");
+  } finally {
+    process.env.PLATFORM_CACHE_MS = was;
+  }
+  // a pin written before this item (no theme_pin_at) is ordered by its published_at
+  const cfg = await cfgOf("dd");
+  await C.patchTenant("dd", { config: { theme_pin_at: null, theme_pin: { ...cfg.theme_pin, published_at: "2099-01-01T00:00:00.000Z" } } });
+  eq(await After.writeThemePin("dd", pin("glow", "2098-01-01T00:00:00.000Z"), { at: "2098-01-01T00:00:00.000Z" }), "newer", "an old-style pin's published_at orders it:");
+  // put a current pin back for the tests below
+  await C.patchTenant("dd", { config: { theme_pin_at: null, theme_pin: { ...cfg.theme_pin } } });
+  await pdb.execute({ sql: "UPDATE tenants SET config = json_remove(config, '$.theme_pin_at') WHERE id = 'dd'" });
+});
+
+// P3-FIX5: the theme route records only the design's save as "the design saved".
+// A failure after the hero's doc_home save must still answer with the design.
+await t("P3-FIX5 unit: the theme route's partial answer names the design's save, never another document's (watchDesignSave's DESIGN_ID check)", async () => {
+  const design = await designRow();
+  const orig = console.log;
+  let armed = 0;
+  console.log = (...a) => {
+    const s = a.map(String).join(" ");
+    // the content_write line after doc_home's save, and slog's fallback line: fail both
+    if (armed === 0 && /"evt":"content_write"/.test(s) && /"document":"doc_home"/.test(s)) {
+      armed = 1;
+      throw new Error("simulated failure after the hero write");
+    }
+    if (armed === 1) {
+      armed = 2;
+      throw new Error("simulated failure after the hero write (fallback)");
+    }
+    orig(...a);
+  };
+  let r;
+  try {
+    r = await route("docs", "admin/theme", "POST", { action: "apply", kit: "pulse", withBrand: false });
+  } finally {
+    console.log = orig;
+  }
+  eq(armed, 2, "setup: the failure happened after the doc_home save:");
+  const after = await designRow();
+  eq(Number(after.revision), Number(design.revision) + 1, "setup: the design saved:");
+  eq([r.status, r.body.ok, r.body.heroApplied, r.body.applied?.document?.id, r.body.applied?.document?.revision], [200, true, false, "doc_design", Number(after.revision)], `the answer names the design's save: ${JSON.stringify(r.body).slice(0, 300)}`);
+});
+
 await t("unit: themePinOf reads a build's design version; a design with no look of its own pins null; kits.themePinOf falls back to the legacy pin only when no theme_pin was ever written", async () => {
   const v = (theme) => ({ versions: [{ document_id: "doc_design", body: JSON.stringify({ type: "design", settings: { brand: null, theme } }) }], now: "t", releaseId: "rel_x" });
   eq(After.themePinOf({ versions: [{ document_id: "doc_home", body: "{}" }] }), undefined, "no design in the build:");

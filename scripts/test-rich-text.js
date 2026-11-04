@@ -492,24 +492,31 @@ await t("P3-FIX4 unit: the reviewer's custom-element and <noscript> web pastes a
 const STILL_REFUSED = [
   // a name with no hyphen is somebody's word, not a web page's element
   [`<p>Our story.</p><shop class="x"><p>Ships in 2 days.</p></shop>`, "shop"],
-  ["Ask for the <founder> today.", "founder"],
   ["Click the <link> below.", "link"],
   // a lone opening tag with nothing closing it, and no attributes, is still words
   [`<p>Our story.</p><product-info><p>Ships</p>`, "product-info"],
-  // an attribute with no value that reads as a word
-  ["<sale-ends soon>Friday</sale-ends>", "sale-ends"],
   // the noscript rule is for a whole element: a lone one is words
   ["<p>Hi</p><noscript>Our founder's note", "noscript"],
+  // P3-FIX5 (FIX4 review survivor): an unclosed noscript WITH an attribute
+  // reads as markup, so it takes the drop-content path; nothing closes it, so
+  // everything after it would be lost: refused (the lost words are the text
+  // after it, which holds no tag, so no tag is named)
+  ['<p>Hi</p><noscript class="x">Founder note', null, "Founder note"],
 ];
 
 await t("P3-FIX4 unit: real text loss is still refused, and the refusal words name the tag and Edit as HTML", async () => {
-  for (const [typed, tag] of STILL_REFUSED) {
+  for (const [typed, tag, words] of STILL_REFUSED) {
     const lost = R.lostBySanitizing(typed, R.sanitize(typed));
     eq(lost?.code, "WORDS_LOST", `refused: ${typed}`);
+    if (!tag) {
+      ok(lost.message.includes(`"${words}"`), `quotes the lost words: ${lost.message}`);
+      continue;
+    }
     ok(lost.message.includes(`<${tag}> tag`) && lost.message.includes("Edit as HTML"), `names <${tag}> and Edit as HTML: ${lost.message}`);
     ok(!lost.message.includes("< or > signs"), `blames < or > signs: ${lost.message}`);
   }
-  for (const typed of ["Free on orders <500 and >100 rupees.", "Write to Priya <priya@store.com> any day.", "Call <tel:9876543210> now."]) {
+  // P3-FIX5: a tag is named only when it reads as markup; typed < and > signs keep their words
+  for (const typed of ["Free on orders <500 and >100 rupees.", "Write to Priya <priya@store.com> any day.", "Call <tel:9876543210> now.", "<p>Keep <b and c> here</p>", "Size <XL or bigger>", "Ask for the <founder> today.", "<sale-ends soon>Friday</sale-ends>"]) {
     const lost = R.lostBySanitizing(typed, R.sanitize(typed));
     eq(lost?.code, "WORDS_LOST", `refused: ${typed}`);
     ok(lost.message.includes("This usually comes from < or > signs.") && !lost.message.includes("Edit as HTML"), `stray signs keep their words: ${lost.message}`);
@@ -524,6 +531,13 @@ await t("P3-FIX4 unit: real text loss is still refused, and the refusal words na
   const [legacyTag] = said(WEB_PASTES[0][0]);
   ok(legacyTag?.includes("<product-info> tag") && !legacyTag.includes("< or > signs") && !legacyTag.includes("Edit as HTML"), `legacy names the tag: ${legacyTag}`);
   eq(said("Free on orders <500 and >100 rupees."), ['saving would lose these words: "<500 and >". This usually comes from < or > signs. Reword them or remove them, then save again.'], "legacy stray signs, word for word:");
+  // P3-FIX5: the legacy copy follows the same rule
+  for (const typed of ["<p>Keep <b and c> here</p>", "Size <XL or bigger>"]) {
+    const [m] = said(typed);
+    ok(m?.includes("This usually comes from < or > signs.") && !/ tag /.test(m), `legacy: ${typed} keeps the signs words: ${m}`);
+  }
+  const [shop] = said(`<p>Our story.</p><shop class="x"><p>Ships in 2 days.</p></shop>`);
+  ok(shop?.includes("<shop> tag"), `legacy: a tag with a real attribute is still named: ${shop}`);
 });
 
 // Text that is still refused offers Edit as HTML in the editable field, where

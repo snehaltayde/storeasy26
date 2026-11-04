@@ -741,6 +741,12 @@ parts.keepalive = async (drill) => {
     const panel = await t3.locator("[data-earlier-versions-panel]").innerText();
     const hist = await docsApi(t3, { listHistory: "doc_home" });
     drill.check(/Your edits were kept as an earlier draft/.test(await t3.locator("[data-status-line]").innerText()) && (hist.body?.versions || []).length > 0, "backup: 'Keep them as an earlier draft' keeps them in Earlier versions", { panel: panel.slice(0, 300) });
+    // P3-FIX5: the text that never reached the server is in the stored version,
+    // and that version says it came from this browser, not from another tab
+    const [kept] = await storeSql("tenant", ["SELECT id, kind, note, body FROM document_versions WHERE document_id = 'doc_home' AND kind = 'undo_saved' ORDER BY created_at DESC, rowid DESC LIMIT 1"]);
+    const row = kept.rows[0] || {};
+    const listed = (hist.body?.versions || []).find((v) => v.id === String(row.id));
+    drill.check(String(row.body || "").includes(BACK) && row.note === "Edits this browser kept" && listed?.note === "Edits this browser kept" && /Edits this browser kept/.test(panel) && !/Kept from another tab/.test(panel), "backup: the stored version holds the text that never reached the server, and Earlier versions says 'Edits this browser kept', not 'Kept from another tab'", { note: row.note, listed: listed?.note, hasText: String(row.body || "").includes(BACK), panel: panel.slice(0, 300) });
     await drill.screenshot(t3, "keepalive-backup-kept-1440");
   }
   await ctx.close();
@@ -917,34 +923,44 @@ parts.design = async (drill) => {
     }));
   const shown = await waitFor(async () => (await page.locator("[data-preview-pane]").getAttribute("data-preview-design")) === "true" && (await previewLabel(page)) === "Up to date" && (await frameFacts(page)).accent === NEW, 30_000);
   const [sess] = await storeSql("tenant", ["SELECT id, show_design FROM preview_sessions WHERE revoked_at IS NULL ORDER BY created_at"]);
-  const pv = { ...(await frameFacts(page).catch(() => ({}))), design: await page.locator("[data-preview-pane]").getAttribute("data-preview-design"), label: await previewLabel(page), sessions: sess.rows };
-  // finding D1 (see P3-DRILLS.md): next dev mounts the editor's effects twice,
-  // so one editor can hold two preview sessions; when the browser's cookie is
-  // the other one, switching to the design turns its colours on in a session
-  // the frame isn't using, and the label still says Up to date
-  const raced = !shown && sess.rows.length > 1 && /Your new colours are not shown here/.test(pv.bar || "");
-  drill.check(Boolean(shown), "design: the editor's preview shows the new accent (the design's draft is shown while it is open)", pv, raced ? { known: "finding D1" } : {});
+  const pv = { ...(await frameFacts(page).catch(() => ({}))), design: await page.locator("[data-preview-pane]").getAttribute("data-preview-design"), label: await previewLabel(page), sessions: sess.rows, log: await page.locator("[data-preview-pane]").getAttribute("data-preview-log") };
+  // P3-FIX5 (finding D1 fixed): a plain check, no escape
+  drill.check(Boolean(shown), "design: the editor's preview shows the new accent (the design's draft is shown while it is open)", pv);
+  // one editor mount mints one session, even with next dev's double effect
+  // (a re-mint the preview asked for itself, after a timeout, is allowed)
+  const remints = (String(pv.log || "").match(/readyTimeout|ready:(revoked|expired|not_found|live)|fixDesign/g) || []).length;
+  drill.check(sess.rows.length >= 1 && sess.rows.length <= 1 + remints, "design: one editor tab holds one preview session (React strict mode's double effect mints once)", { sessions: sess.rows.length, remints, log: pv.log });
   await drill.screenshot(page, "design-editor-preview-1440");
-  if (raced) {
-    // what the founder can do: reload the editor, which opens one preview with the colours on
-    await page.reload({ waitUntil: "load" });
-    await page.waitForSelector("#f-doc-brand-accent", { timeout: 60_000 });
-    const again = await waitFor(async () => (await previewLabel(page)) === "Up to date" && (await frameFacts(page)).accent === NEW, 60_000);
-    drill.note(`finding D1 hit in this run; after a reload the preview shows the new accent: ${Boolean(again)}`);
-  }
 
-  // finding D1, the same thing on purpose with two editor tabs: tab B opens a
-  // newer preview (the cookie is now B's); tab A's design change then goes to
-  // A's session, and A's frame keeps the old colours while saying Up to date
+  // finding D1 with two editor tabs: tab B opens a newer preview (the
+  // browser's cookie is now B's); tab A's design change must still show in
+  // A's frame, and A's label never says Up to date while its frame shows the
+  // old colours
   const b = await ctx.newPage();
   await openEditor(b);
   await waitLabel(b, "Up to date", 90_000);
-  await page.locator("#f-doc-brand-accent").fill("#2563eb");
+  const SECOND = "#2563eb";
+  await page.locator("#f-doc-brand-accent").fill(SECOND);
   await waitSaved(page);
-  await sleep(3000);
-  const twoTab = { ...(await frameFacts(page).catch(() => ({}))), label: await previewLabel(page) };
-  drill.check(!(twoTab.label === "Up to date" && twoTab.accent !== "#2563eb"), "design, two editor tabs: the design tab's preview never says Up to date while it shows the old colours", twoTab, { known: "finding D1" });
-  await drill.screenshot(page, "design-two-tabs-stale-1440");
+  const samples = [];
+  const twoTabShown = await waitFor(async () => {
+    const f = await frameFacts(page).catch(() => ({}));
+    const label = await previewLabel(page);
+    samples.push(`${label}|${f.accent}`);
+    return label === "Up to date" && f.accent === SECOND;
+  }, 30_000);
+  // once Up to date, it stays right (no late flip back to the old colours)
+  let stale = null;
+  for (let i = 0; i < 15 && !stale; i++) {
+    await sleep(200);
+    const f = await frameFacts(page).catch(() => ({}));
+    const label = await previewLabel(page);
+    if (label === "Up to date" && f.accent !== SECOND) stale = { label, accent: f.accent };
+  }
+  const [sess2] = await storeSql("tenant", ["SELECT id, show_design FROM preview_sessions WHERE revoked_at IS NULL ORDER BY created_at"]);
+  const twoTab = { ...(await frameFacts(page).catch(() => ({}))), label: await previewLabel(page), stale, sessions: sess2.rows, samples: [...new Set(samples)].slice(-8), log: await page.locator("[data-preview-pane]").getAttribute("data-preview-log") };
+  drill.check(Boolean(twoTabShown) && !stale, "design, two editor tabs: the design tab's preview shows the new colours and never says Up to date while it shows the old ones", twoTab);
+  await drill.screenshot(page, "design-two-tabs-1440");
   await b.close();
   await page.locator("#f-doc-brand-accent").fill(NEW);
   await waitSaved(page);

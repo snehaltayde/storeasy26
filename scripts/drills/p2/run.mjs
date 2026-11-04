@@ -232,15 +232,23 @@ class PartDrill extends Drill {
     if (!flip) return super.check(ok, label, detail, opts);
     if (flip.retired) {
       super.note(`retired: "${label}" (${opts.known}): ${flip.retired}`);
+      this.ran.add(`retired: ${opts.known}`);
       return true;
     }
     return super.check(ok, label, detail);
+  }
+
+  // P3-FIX5: what ran, for the flip guard (check labels are read from checks)
+  get ran() {
+    this._ran ??= new Set();
+    return this._ran;
   }
 
   async shoot(page, name, opts) {
     const r = this.reworded;
     if (r && r.shot === name) {
       this.reworded = null;
+      this.ran.add(`reworded: ${r.label}`);
       const facts = await page.evaluate(r.facts).catch((e) => ({ error: String(e) }));
       super.check(r.ok(facts), r.newLabel, { ...facts, oldCheck: r.label, oldResult: r.was });
     }
@@ -256,6 +264,13 @@ class PartDrill extends Drill {
   }
 
   finishPart(part, { error } = {}) {
+    // P3-FIX5: a flipped check whose label (or note, or shot) changed in its
+    // part file would silently vanish; every expected one must have run
+    if (!error) {
+      for (const missing of missingFlips(part, { labels: this.checks.map((c) => c.label), ran: this.ran, pendingReworded: this.reworded })) {
+        super.check(false, `flip guard: "${missing}" ran in ${part}`, { why: "a flipped P2 check is missing from the results: its part's label, note or screenshot name probably changed; update FLIPPED, NOTE_CHECKS, REWORDED or EXPECTED_FLIPS in scripts/drills/p2/run.mjs" });
+      }
+    }
     const results = {
       id: this.id,
       part,
@@ -316,6 +331,34 @@ export const NOTE_CHECKS = [
     label: (m) => `${m[1]} with only doc_header's version missing gives the error page (finding 3, P3-CLOSED)`,
   },
 ];
+
+// P3-FIX5: the flipped checks each part must produce. A check label, or a
+// marker: "retired: <known>" (a retired known check was met) and
+// "reworded: <old label>" (a reworded check was met and its screenshot taken).
+// If one is missing after a part that ran to the end, the part fails.
+export const EXPECTED_FLIPS = {
+  preview: [
+    "after signing out of the console, the same browser no longer sees the draft overlay", // finding 1, FLIPPED
+    NOTE_CHECKS[0].label(),
+    "reworded: before the first publish: the preview bar shows",
+    REWORDED["before the first publish: the preview bar shows"].newLabel,
+  ],
+  unfinished: [
+    "retired: finding 2",
+    "the editor previews a documents store (the Designer's address leads to it), and a click on the unfinished note selects that section there (replaces finding 2)",
+  ],
+  "error-chrome": [NOTE_CHECKS[1].label(["", "/policies/shipping"]), NOTE_CHECKS[1].label(["", "/"])],
+};
+
+// The expected flips missing from one part's results. Pure, so it is tested
+// on its own (P3-FIX5): labels are the part's check labels, ran the markers.
+export function missingFlips(part, { labels = [], ran = new Set(), pendingReworded = null } = {}) {
+  const have = new Set([...labels, ...ran]);
+  const missing = (EXPECTED_FLIPS[part] || []).filter((x) => !have.has(x));
+  // a reworded check met, whose screenshot never came: its new check never ran
+  if (pendingReworded) missing.push(`reworded: ${pendingReworded.label} (shot ${pendingReworded.shot})`);
+  return missing;
+}
 
 // Steps that run after a part, while its harness and state are still there.
 export const AFTER = {

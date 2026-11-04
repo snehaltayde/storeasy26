@@ -939,6 +939,42 @@ await t("P3-FIX1: /api/preview without the confirm header answers as before (302
   ok(setCookies(confirmed)._preview?.value, "and the same cookie");
 });
 
+await t("P3-FIX5 (finding D1): showDesign on reaches the session the request's _preview cookie names (the frame's), for the same person only; off changes only its own", async () => {
+  const A = await sessionToken(asha);
+  const R2 = await sessionToken(ravi);
+  const withCookie = (admin, cookie, body) => inT(LD, () => handlePreviewSessionPost(req(LD, { cookies: { _admin: admin, _preview: cookie }, body, path: "/api/admin/preview-session" })));
+  const design = async (sid) => (await inT(LD, () => PS.readPreviewSession(sid))).session.showDesign;
+  // tab A's session, then tab B's (the cookie is B's now)
+  const a = await mint(LD, A);
+  const b = await mint(LD, A);
+  const on = await withCookie(A, b.token, { showDesign: { sid: a.sid, on: true } });
+  eq(on.status, 200, "on:");
+  same(on.body, { ok: true, sid: a.sid, showDesign: true, frameSid: b.sid }, "the answer names the frame's session:");
+  eq(await design(a.sid), true, "A's own session:");
+  eq(await design(b.sid), true, "and the session the frame renders (the cookie's):");
+  // off changes only the named session: another tab's design preview stays on
+  const off = await withCookie(A, a.token, { showDesign: { sid: b.sid, on: false } });
+  same(off.body, { ok: true, sid: b.sid, showDesign: false }, "off answer:");
+  same([await design(a.sid), await design(b.sid)], [true, false], "off: only the named session:");
+  // the cookie is the same session: one write, no frameSid
+  const self = await withCookie(A, a.token, { showDesign: { sid: a.sid, on: true } });
+  same(self.body, { ok: true, sid: a.sid, showDesign: true }, "cookie = sid:");
+  // the cookie names another person's session: never changed
+  const rv = await mint(LD, R2);
+  const other = await withCookie(A, rv.token, { showDesign: { sid: a.sid, on: true } });
+  same(other.body, { ok: true, sid: a.sid, showDesign: true }, "another person's cookie session is not named:");
+  eq(await design(rv.sid), false, "another person's session is untouched:");
+  // a forged or ended cookie session is ignored
+  const forged = b.token.replace(/\.[0-9a-f]{20}$/, ".00000000000000000000");
+  same((await withCookie(A, forged, { showDesign: { sid: a.sid, on: true } })).body, { ok: true, sid: a.sid, showDesign: true }, "forged cookie:");
+  await inT(LD, () => PS.revokePreviewSession({ sid: b.sid }));
+  same((await withCookie(A, b.token, { showDesign: { sid: a.sid, on: true } })).body, { ok: true, sid: a.sid, showDesign: true }, "revoked cookie session:");
+  // the storefront now renders the cookie's session with the design on (what the frame shows)
+  const c = await mint(LD, A);
+  await withCookie(A, c.token, { showDesign: { sid: a.sid, on: true } });
+  eq((await asRequest(LD, () => Res.contentSource(), { _preview: c.token })).overlay.showDesign, true, "the frame's request sees showDesign on:");
+});
+
 // ---- done ------------------------------------------------------------------------------
 await cleanup();
 const secs = ((Date.now() - started) / 1000).toFixed(1);

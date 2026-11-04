@@ -34,31 +34,38 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
 
   useEffect(() => {
     const origin = window.location.origin;
-    const frame = {
-      setSrc: (p) => {
-        if (frameRef.current) frameRef.current.src = p;
-      },
-      post: (msg) => {
-        try {
-          frameRef.current?.contentWindow?.postMessage(msg, origin);
-        } catch {
-          /* the frame is navigating */
-        }
-      },
-      currentPath: () => frameRef.current?.contentWindow?.location?.pathname ?? null,
-    };
-    const ctl = createPreviewController({
-      api,
-      frame,
-      documentId: openedRef.current,
-      pathFor: () => pathRef.current || "/",
-      onChange: (v) => {
-        setView(v);
-        viewRef.current?.(v);
-      },
-      onPick: (p) => pickRef.current?.(p),
-    });
-    ctlRef.current = ctl;
+    // P3-FIX5 (finding D1): one controller per mount. React strict mode (next
+    // dev) runs this effect, its cleanup, then the effect again on the same
+    // mount: the controller is kept in the ref and start() is idempotent, so
+    // the mount mints one preview session, not two.
+    let ctl = ctlRef.current;
+    if (!ctl) {
+      const frame = {
+        setSrc: (p) => {
+          if (frameRef.current) frameRef.current.src = p;
+        },
+        post: (msg) => {
+          try {
+            frameRef.current?.contentWindow?.postMessage(msg, origin);
+          } catch {
+            /* the frame is navigating */
+          }
+        },
+        currentPath: () => frameRef.current?.contentWindow?.location?.pathname ?? null,
+      };
+      ctl = createPreviewController({
+        api,
+        frame,
+        documentId: openedRef.current,
+        pathFor: () => pathRef.current || "/",
+        onChange: (v) => {
+          setView(v);
+          viewRef.current?.(v);
+        },
+        onPick: (p) => pickRef.current?.(p),
+      });
+      ctlRef.current = ctl;
+    }
     const onMessage = (e) => {
       if (e.origin !== origin || e.source !== frameRef.current?.contentWindow) return;
       ctl.message(e.data);
@@ -67,8 +74,7 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
     ctl.start();
     return () => {
       window.removeEventListener("message", onMessage);
-      ctl.dispose();
-      ctlRef.current = null;
+      ctl.dispose(); // parks what arrives meanwhile; a strict-mode re-run starts it again
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
