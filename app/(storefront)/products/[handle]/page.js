@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import { PdpClassic, PdpEditorial } from "@/components/pdp/PdpLayouts";
 import { getProductByHandle } from "@/lib/repo";
-import { resolvedPdpExtras, resolvedPdpPairs, resolvedProductOverride, resolvedSurfaceTemplateFor } from "@/lib/content/resolve";
+import { resolvedPdpExtras, resolvedPdpPairs, resolvedProductOverride, resolvedSurfaceTemplateFor, previewEntityRow, productPreviewView } from "@/lib/content/resolve";
+import { productPage } from "@/lib/catalog/effective";
 import { numericId } from "@/lib/ids";
 import { abs, siteName } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
@@ -16,9 +17,23 @@ export const dynamic = "force-dynamic";
 // trimmed description, which was the only behaviour before.
 const metaDescription = (p) => p.seo_description || (p.description ? p.description.slice(0, 160) : undefined);
 
+// P4-OVL07 (PV-03, plan decision 14): in a founder's documents preview, this
+// product's saved draft is laid over its live content here, on this page only
+// (previewEntityRow is null for everyone else, shoppers included). The
+// product is then read as if that draft were live. The cart, search and the
+// sitemap never read a draft. Returns { product, draft } (draft: the row, or
+// null).
+async function productFor(handle) {
+  const product = await getProductByHandle(handle);
+  if (!product) return { product: null, draft: null };
+  const draft = await previewEntityRow("product_content", product.id);
+  if (!draft) return { product, draft: null };
+  return { product: (await productPage(handle, { overlay: draft })) || product, draft };
+}
+
 export async function generateMetadata({ params }) {
   const { handle } = await params;
-  const p = await tfetch(() => getProductByHandle(handle));
+  const { product: p } = await tfetch(() => productFor(handle));
   // Thrown HERE (before streaming starts) so the response is a REAL 404 —
   // inside the page body the loading.js boundary has already committed a 200.
   if (!p) notFound();
@@ -88,17 +103,23 @@ function productJsonLd(product, brandName) {
 export default async function ProductPage({ params }) {
   const { handle } = await params;
   const { product, pairs, brandName, extras, override, template } = await tfetch(async () => {
-    const product = await getProductByHandle(handle);
+    const { product, draft } = await productFor(handle);
     if (!product) return { product: null };
     // "Pairs well with" (S23): manual placement, else same-collection auto.
     // S39 (MC05): per-product presentation override — modules + badge.
     // S53 (0B-2): both are release-gated now (drafts stay draft until publish).
+    // P4-OVL07: on a documents store they come from the product's live row.
     const [pairs, extras, override, surface] = await Promise.all([
       resolvedPdpPairs(product.id, { limit: 4 }),
       resolvedPdpExtras(),
       resolvedProductOverride(product.id),
       resolvedSurfaceTemplateFor("pdp", product.id), // S56/S57: family default or this product's explicit assignment
     ]);
+    // P4-OVL07: a founder's preview shows this product's draft instead
+    if (draft) {
+      const view = await productPreviewView(product.id, draft, { limit: 4 });
+      return { product, pairs: view.pairs, brandName: siteName(), extras, override: view.override, template: view.surface.template };
+    }
     return { product, pairs, brandName: siteName(), extras, override, template: surface.template };
   });
   if (!product) notFound();

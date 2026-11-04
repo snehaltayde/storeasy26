@@ -12,9 +12,13 @@
 //   6. Failure rows: a preview_sessions read error (live, logged, no 5xx), a
 //      missing table (no overlay), a drafts read error, a session write error
 //      (5xx with a code).
-//   7. product_content is never overlaid (known limit until OVL-02).
+//   7. product_content is never overlaid by the list overlay.
 //   8. The other-tab note, and the real layout's preview bar.
 //   9. The admin route's answers; migration 0022; edge safety.
+//  10. P4-OVL07 (PV-03, plan decision 14): the real product and collection
+//      pages lay their own draft over the live row, only for a valid
+//      documents preview session; shoppers and the cart and search never see
+//      a draft; a layout that is no longer offered renders the default.
 //   pnpm test:preview-overlay
 // request-cache must load before any app module that imports react.
 import "./support/request-cache.js";
@@ -912,7 +916,7 @@ await t("a session-create write failure returns 5xx with a code and writes nothi
 });
 
 // =====================================================================================
-console.log("— 7. product_content (known limit until OVL-02)");
+console.log("— 7. product_content is never overlaid by the list overlay (the pages do it: section 10)");
 // =====================================================================================
 await publish(PX, [{ id: "doc_home", body: LIVE.doc_home }]);
 await t("a product_content draft is not overlaid", async () => {
@@ -923,7 +927,8 @@ await t("a product_content draft is not overlaid", async () => {
   eq(src.preview, true, "a preview:");
   ok(!src.overlay.documents.includes(pc.id), "not overlaid:");
   ok(!(src.list.drafts instanceof Map && src.list.drafts.has(pc.id)), "no draft body:");
-  same(await asRequest(PX, () => Res.resolvedProductOverride(P(1)), withToken(s.token)), { modules: [], badge: "" }, "the product page keeps the neutral v4 answer:");
+  // the getter reads the live row (none here), never the draft: the page lays the draft over (section 10)
+  same(await asRequest(PX, () => Res.resolvedProductOverride(P(1)), withToken(s.token)), { modules: [], badge: "" }, "the getter keeps the live answer:");
   same(await asRequest(PX, () => Res.resolvedPdpExtras(), withToken(s.token)), [], "no product words reach the accordions:");
   // the overlay itself refuses the type, even when handed the row
   const row = await inT(PX, async () => (await libsql.execute({ sql: "SELECT id, type, draft, draft_hash FROM documents WHERE id = ?", args: [pc.id] })).rows[0]);
@@ -1157,6 +1162,140 @@ await t("edge safety: no node:* import in lib/preview-sessions.js or anything it
   await walk(join(ROOT, "lib/content/documents-reader.js"));
   await walk(join(ROOT, "lib/content/resolve.js"));
   ok(seen.size > 10, "the walk found nothing");
+});
+
+// =====================================================================================
+console.log("— 10. P4-OVL07: the product and collection pages preview their own draft");
+// =====================================================================================
+const LiveRows = await import("../lib/documents/live-rows.js");
+const Cart = await import("../lib/cart.js");
+const Repo = await import("../lib/repo.js");
+const PAGE_STUBS = {
+  ...STUBS,
+  "next/navigation": { notFound: () => { throw new Error("notFound"); }, redirect: () => { throw new Error("redirect"); } },
+  "@/components/ProductGallery": nothing,
+  "@/components/ProductPurchase": nothing,
+  "@/components/WishlistButton": nothing,
+  "@/components/CollectionControls": nothing,
+  "@/components/analytics/TrackEvent": nothing,
+  "./FadeImage": { __esModule: true, default: ({ src, alt }) => React.createElement("img", { src, alt }) },
+  // already inside the store's context (asRequest)
+  "@/lib/tenant-request": { tfetch: (fn) => fn() },
+};
+const ProductPageMod = await loadJsx(join(ROOT, "app/(storefront)/products/[handle]/page.js"), PAGE_STUBS);
+const CollectionPageMod = await loadJsx(join(ROOT, "app/(storefront)/collections/[handle]/page.js"), PAGE_STUBS);
+const renderProductPage = async (handle) => {
+  const html = renderToStaticMarkup(await ProductPageMod.default({ params: Promise.resolve({ handle }) }));
+  const meta = await ProductPageMod.generateMetadata({ params: Promise.resolve({ handle }) });
+  return { html, meta, h1: (/<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html) || [])[1] ?? null };
+};
+const renderCollectionPage = async (handle) => renderToStaticMarkup(await CollectionPageMod.default({ params: Promise.resolve({ handle }), searchParams: Promise.resolve({}) }));
+const productOrder = (html) => [...html.matchAll(/href="\/products\/([^"]+)"/g)].map((m) => m[1]);
+
+// What a publish of product 1 put live (a row as liveRowFor writes it) and a
+// newer draft. The draft's name is written to the row directly: the title gate
+// keeps names from being saved until P4-SEARCH, and this is the preview's test.
+const liveRow = (type, entityId, b, documentId) => LiveRows.liveRowFor(type, b, { documentId, versionId: "ver_ovl07live0000", publishedAt: NOW, entityId });
+async function putLiveRow(T, type, entityId, b, documentId) {
+  await inT(T, () => libsql.execute(LiveRows.liveRowStatement({ type, entityId, row: liveRow(type, entityId, b, documentId) })));
+}
+const PROD_LIVE = body("product_content", { settings: { badge: "Live badge", pairs: { title: "Live pairs", products: [P(2)] } }, sections: [sec("rich_text", "sec_lm", { title: "Live module", html: "<p>Live words</p>" })] });
+const PROD_DRAFT = body("product_content", {
+  settings: { title: { value: "Draft name", base_hash: "h", base_value: "Glow Serum" }, badge: "Draft badge", template: "editorial", pairs: { title: "Draft pairs", products: [P(3)] } },
+  sections: [sec("rich_text", "sec_dm", { title: "Draft module", html: "<p>Draft words</p>" })],
+});
+const pcId = await inT(PX, async () => String((await libsql.execute({ sql: "SELECT id FROM documents WHERE type = 'product_content' AND entity_id = ?", args: [P(1)] })).rows[0].id));
+await putLiveRow(PX, "product_content", P(1), PROD_LIVE, pcId);
+await inT(PX, () => libsql.execute({ sql: "UPDATE documents SET draft = ?, draft_hash = 'dh_ovl07' WHERE id = ?", args: [JSON.stringify(PROD_DRAFT), pcId] }));
+const pxSession = await newSession(PX);
+
+await t("a product draft shows on its product page only with a valid documents preview session: name, badge, modules, pairs and layout", async () => {
+  const pv = await asRequest(PX, () => renderProductPage("glow-serum"), withToken(pxSession.token));
+  eq(pv.h1, "Draft name", "preview h1:");
+  eq(pv.meta.title, "Draft name", "preview meta title:");
+  const t1 = text(pv.html);
+  ok(t1.includes("Draft badge") && t1.includes("Draft module") && t1.includes("Draft pairs"), `the draft shows: ${t1.slice(0, 500)}`);
+  ok(!t1.includes("Live badge") && !t1.includes("Live module") && !t1.includes("Live pairs"), "the published content still shows in the preview");
+  ok(pv.html.includes('data-pdp-template="editorial"'), "the draft's layout:");
+  same(productOrder(pv.html).filter((h) => h !== "glow-serum"), ["whey-gold"], "the draft's pairs:");
+});
+
+await t("a cookie-less request, a tampered token and a revoked session all see the live row", async () => {
+  const [p, exp, sid, sig] = pxSession.token.split(".");
+  const tampered = `${p}.${exp}.${sid}.${sig[0] === "0" ? "1" : "0"}${sig.slice(1)}`;
+  const gone = await newSession(PX);
+  await admin(PX, { revoke: gone.sid });
+  for (const [label, cookies] of [["no cookie", {}], ["tampered", withToken(tampered)], ["revoked", withToken(gone.token)]]) {
+    const live = await asRequest(PX, () => renderProductPage("glow-serum"), cookies);
+    eq(live.h1, "Glow Serum", `${label} h1:`);
+    eq(live.meta.title, "Glow Serum", `${label} meta title:`);
+    const t1 = text(live.html);
+    ok(t1.includes("Live badge") && t1.includes("Live module") && t1.includes("Live pairs"), `${label}: the live row: ${t1.slice(0, 400)}`);
+    ok(!t1.includes("Draft"), `${label}: a draft leaked`);
+    ok(live.html.includes('data-pdp-template="classic"'), `${label}: the live layout`);
+  }
+});
+
+await t("in the same preview, the cart and search ignore the draft (the live tables only)", async () => {
+  const r = await asRequest(
+    PX,
+    async () => {
+      const page = await renderProductPage("glow-serum");
+      await Cart.createCart("cart_ovl07_pv");
+      await Cart.addItem("cart_ovl07_pv", "gid://shopify/ProductVariant/1", 1);
+      const cart = await Cart.getCart("cart_ovl07_pv");
+      return { page, cart, byDraft: await Repo.searchProductsInDb("Draft", 8), byName: await Repo.searchProductsInDb("Glow", 8), src: await Res.contentSource() };
+    },
+    withToken(pxSession.token),
+  );
+  eq(r.src.preview, true, "a preview request:");
+  eq(r.page.h1, "Draft name", "the page shows the draft (control):");
+  eq(r.cart.items[0].title, "Glow Serum", "cart line:");
+  eq(r.byDraft.found, 0, "search finds the draft name:");
+  same(r.byName.hits.map((h) => h.title), ["Glow Serum"], "search:");
+  ok(!r.src.overlay.documents.includes(pcId), "the list overlay still leaves product content out");
+});
+
+await t("a collection draft shows on its collection page only with a valid documents preview session: pins and layout; never on a shopper's page", async () => {
+  const cc = await createDraft(PX, "collection_content", body("collection_content", { settings: { pinned: null, template: "sidebar" } }), { entityId: COL(2) });
+  await putLiveRow(PX, "collection_content", COL(2), body("collection_content", { settings: { pinned: [P(2)], template: null } }), cc.id);
+  const live = await asRequest(PX, () => renderCollectionPage("serums"));
+  same(productOrder(live), ["night-cream", "glow-serum"], "live: the published pin first:");
+  ok(live.includes('data-collection-template="standard"'), "live layout:");
+  const pv = await asRequest(PX, () => renderCollectionPage("serums"), withToken(pxSession.token));
+  same(productOrder(pv), ["glow-serum", "night-cream"], "preview: the draft has no pins:");
+  ok(pv.includes('data-collection-template="sidebar"'), "preview: the draft's layout:");
+  const src = await asRequest(PX, () => Res.contentSource(), withToken(pxSession.token));
+  ok(!src.overlay.documents.includes(cc.id), "the list overlay leaves collection content out");
+});
+
+await t("a legacy store's preview never lays a product or collection content draft over its pages", async () => {
+  await createDraft(PL, "product_content", body("product_content", { settings: { badge: "Legacy draft badge" } }), { entityId: P(1) }).catch(() => null);
+  await inT(PL, async () => {
+    const id = await ids.productDocumentId(P(1));
+    await libsql.execute({
+      sql: "INSERT INTO documents (id, type, entity_id, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES (?, 'product_content', ?, 'x', ?, 'dh_l', 1, 1, ?, ?) ON CONFLICT(id) DO UPDATE SET draft = excluded.draft",
+      args: [id, P(1), JSON.stringify(body("product_content", { settings: { badge: "Legacy draft badge" } })), NOW, NOW],
+    });
+  });
+  const ltok = await inT(PL, () => R.previewToken());
+  const pv = await asRequest(PL, () => renderProductPage("glow-serum"), withToken(ltok));
+  ok(!text(pv.html).includes("Legacy draft badge"), "a legacy preview showed a product content draft");
+  eq(await asRequest(PL, () => Res.previewEntityRow("product_content", P(1)), withToken(ltok)), null, "previewEntityRow on a legacy preview:");
+});
+
+await t("a layout_template that is no longer offered renders the default layout with no shopper-visible error, and is logged", async () => {
+  await inT(PX, () => libsql.execute({ sql: "UPDATE product_content_live SET layout_template = 'magazine' WHERE product_id = ?", args: [P(1)] }));
+  const { result, lines } = await logsDuring(() => asRequest(PX, () => renderProductPage("glow-serum")));
+  eq(result.h1, "Glow Serum", "the page renders:");
+  ok(result.html.includes('data-pdp-template="classic"'), "the default layout:");
+  ok(!/magazine|couldn.t|error/i.test(text(result.html)), "nothing about it shows to the shopper");
+  const line = lines.map((l) => JSON.parse(l)).find((l) => l.evt === "entity_template_unavailable");
+  ok(line && line.template === "magazine" && line.surface === "pdp", `logged: ${lines.join(" | ")}`);
+  // the family default still applies (a published product layout of editorial)
+  await publish(PX, [{ id: "doc_product_layout", body: body("product_layout", { settings: { template: "editorial" }, sections: [sec("product_main", "sec_pm")] }) }]);
+  ok((await asRequest(PX, () => renderProductPage("glow-serum"))).html.includes('data-pdp-template="editorial"'), "the family default:");
+  await inT(PX, () => libsql.execute({ sql: "UPDATE product_content_live SET layout_template = NULL WHERE product_id = ?", args: [P(1)] }));
 });
 
 console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);

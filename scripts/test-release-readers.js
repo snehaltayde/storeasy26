@@ -65,7 +65,7 @@ process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 process.env.PLATFORM_SITE_HOSTS = "";
 
-const TENANTS = ["dv", "dz", "lg", "pre", "brk", "dm", "p0", "p1k", "sm", "lag", "bg", "beastlife", "lgx", "mgx", "prex", "prey", "mt", "ml", "bg2", "fc", "dpo"];
+const TENANTS = ["dv", "dz", "lg", "pre", "brk", "dm", "p0", "p1k", "sm", "lag", "bg", "beastlife", "lgx", "mgx", "prex", "prey", "mt", "ml", "bg2", "fc", "dpo", "ov1", "ov3", "ovd"];
 const dbs = [".test-rr-default.db", ".test-rr-platform.db", ".test-rr-legacy-outputs.json", ".test-rr-journal-outputs.json", ...TENANTS.map((t) => `.test-rr-${t}.db`)];
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
@@ -604,6 +604,59 @@ await t("product overrides, collection pins and PDP pairs on v4 are neutral empt
   same(hits.map((s) => s.sql), [], "statements on the legacy presentation tables:");
 });
 
+// P4-OVL07 (OVL-02, ED-12): a v4 store reads each product's and collection's
+// live row: modules and badge, pairs (title and products), the template, and
+// the pins (the getters and the home rails). The entity reads are the row
+// reads by id and the pins; the effective join for titles and images (P4-
+// EFFECTIVE, every store) also names product_content_live and is not one.
+const ENTITY_LIVE_SQL = /\bFROM (product_content_live|collection_content_live) WHERE\b|\bcollection_content_live\b/i;
+async function putEntityRows(T) {
+  await withTenant(T, async () => {
+    await libsql.execute({
+      sql: "INSERT INTO product_content_live (product_id, document_id, version_id, badge, modules, pairs, pairs_title, layout_template, published_at) VALUES (?, 'doc_prod_rr', 'ver_rr', 'LIVE ROW', ?, ?, 'Row pairs', 'editorial', ?)",
+      args: [P(1), JSON.stringify([{ title: "Row module", html: "<p>row</p>" }]), JSON.stringify([P(3), P(2)]), NOW],
+    });
+    await libsql.execute({ sql: "INSERT INTO collection_content_live (collection_id, document_id, version_id, pinned, layout_template, published_at) VALUES (?, 'doc_coll_rr', 'ver_rr', ?, 'sidebar', ?)", args: [COL(2), JSON.stringify([P(2)]), NOW] });
+  });
+}
+const clearEntityRows = (T) => withTenant(T, () => libsql.batch(["DELETE FROM product_content_live", "DELETE FROM collection_content_live"], "write"));
+const entityGetters = () =>
+  Promise.all([
+    Res.resolvedProductOverride(P(1)),
+    Res.resolvedPdpPairs(P(1)),
+    Res.resolvedPdpPairs(P(1), { limit: 1 }),
+    Res.resolvedSurfaceTemplateFor("pdp", P(1)),
+    Res.resolvedCollectionPins("serums"),
+    Res.resolvedSurfaceTemplateFor("collection", COL(2)),
+  ]);
+
+await t("P4-OVL07: on v4 the entity getters read the live rows (modules, badge, pairs, template, pins), one statement per entity per request, never the legacy tables", async () => {
+  await putEntityRows(DV);
+  try {
+    const { result, statements } = await asRequest("dv.test", () => inDv(() => watch(entityGetters)));
+    const [override, pairs, one, pdp, pins, coll] = result;
+    same(override, { modules: [{ title: "Row module", html: "<p>row</p>" }], badge: "LIVE ROW" }, "override:");
+    same([pairs.source, pairs.title, pairs.products.map((p) => p.handle)], ["manual", "Row pairs", ["whey-gold", "night-cream"]], "pairs:");
+    same(one.products.map((p) => p.handle), ["whey-gold"], "a limit below the pair count:");
+    same(pdp, { template: "editorial", source: "entity" }, "product template:");
+    same(pins, [P(2)], "pins:");
+    same(coll, { template: "sidebar", source: "entity" }, "collection template:");
+    const live = statements.filter((st) => ENTITY_LIVE_SQL.test(st.sql));
+    eq(live.filter((st) => /FROM product_content_live WHERE/.test(st.sql)).length, 1, "product row reads in one request:");
+    eq(live.filter((st) => /collection_content_live/.test(st.sql)).length, 1, "collection row reads in one request:");
+    same(statements.filter((st) => /\b(product_overrides|collection_overrides|placements)\b/i.test(st.sql)).map((st) => st.sql), [], "legacy table reads:");
+    // the home rails use the published pins too (one read for every rail)
+    const { resolveHomeSectionData } = await import("../lib/cms/section-data.js");
+    const rail = { id: "sec_r9", kind: "product_rail", v: 1, enabled: true, settings: { title: "Serums", collection: { handle: "serums", id: COL(2) }, limit: 4 }, blocks: [] };
+    const home = await inDv(() => watch(() => resolveHomeSectionData([rail], { documents: true })));
+    same([home.result.get("sec_r9").products.map((p) => p.handle), home.result.get("sec_r9").handPicked], [["night-cream", "glow-serum"], true], "the rail:");
+    eq(home.statements.filter((st) => /collection_content_live/.test(st.sql)).length, 1, "rail pin reads:");
+    eq(home.statements.filter((st) => /collection_overrides/.test(st.sql)).length, 0, "collection_overrides reads:");
+  } finally {
+    await clearEntityRows(DV);
+  }
+});
+
 await t("route handlers on v4: /api/upsell answers from doc_cart, the manifest and the offline page use doc_design's brand", async () => {
   const req = (url) => ({ headers: { get: (k) => (k.toLowerCase() === "host" ? "dv.test" : null) }, nextUrl: new URL(url), url });
   const upsell = await (await import("../app/api/upsell/route.js")).GET(req("https://dv.test/api/upsell?exclude="));
@@ -673,6 +726,56 @@ await t("lib/content/presentation.js still exports the four helpers, now the leg
   const Pm = await import("../lib/content/presentation.js");
   const Lr = await import("../lib/content/legacy-release.js");
   for (const k of ["presentationProductOverride", "presentationCollectionPins", "presentationPlacements", "presentationSlugRedirect"]) eq(Pm[k], Lr[k], `${k}:`);
+});
+
+// P4-OVL07: the legacy readers never read the entity live tables, whatever
+// rows they hold (a backfill writes them before the flip; a reversal keeps a
+// copy). A v1 release still reads the legacy tables live (it never froze
+// them); v2 and v3 read their frozen arrays; drafts read the tables.
+const v1Envelope = { v: 1, blocks: { surface_templates: { pdp: "classic" } }, pages: [], brand: null, theme: null };
+const v3Envelope = { v: 3, blocks: {}, pages: [], brand: null, theme: null, product_overrides: [], collection_pins: [], placements: [], redirects: [] };
+async function putLegacyRelease(T, id, content) {
+  await withTenant(T, async () => {
+    await libsql.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES (?, ?, ?, 'rr', NULL, ?, NULL, ?)", args: [id, R.stableStringify(content), `hash_${id}`, NOW, NOW] });
+    await libsql.execute({ sql: "UPDATE release_state SET live_release_id = ? WHERE id = 1", args: [id] });
+  });
+}
+const OV1 = await tenant("ov1");
+const OV3 = await tenant("ov3");
+const OVD = await tenant("ovd");
+await putLegacyRelease(OV1, "rel_ov1", v1Envelope);
+await putLegacyRelease(OV3, "rel_ov3", v3Envelope);
+for (const T of [OV1, OV3, OVD]) await putEntityRows(T);
+
+await t("P4-OVL07: a v1 release still reads product_overrides, collection_overrides and placements live, and never the entity live tables (rows present)", async () => {
+  const { result, statements } = await asRequest("ov1.test", () => withTenant(OV1, () => watch(entityGetters)));
+  const [override, pairs, , pdp, pins, coll] = result;
+  same([override.modules, override.badge], [[{ title: "From the table", html: "<p>table</p>" }], "TABLE"], "override from the table:");
+  same([pairs.source, pairs.title, pairs.products.map((p) => p.handle)], ["manual", "Table pairs", ["whey-gold"]], "pairs from the table:");
+  same(pins, [P(2)], "pins from the table:");
+  same(pdp, { template: "classic", source: "family" }, "the release's template:");
+  same(coll, { template: "standard", source: "platform" }, "no collection template:");
+  for (const table of ["product_overrides", "collection_overrides", "placements"]) ok(statements.some((st) => new RegExp(`\\b${table}\\b`).test(st.sql)), `no read of ${table}`);
+  same(statements.filter((st) => ENTITY_LIVE_SQL.test(st.sql)).map((st) => st.sql), [], "entity live table reads:");
+});
+
+await t("P4-OVL07: on a legacy store (v3 live, and drafts) with modules, pairs, pins and template rows in the live tables, shoppers see none of them", async () => {
+  const v3 = await asRequest("ov3.test", () => withTenant(OV3, () => watch(entityGetters)));
+  const [o3, p3, , t3, pins3, c3] = v3.result;
+  same(o3, { modules: [], badge: "" }, "v3 override (frozen empty):");
+  same([p3.source, p3.title], ["auto", "Pairs well with"], "v3 pairs (none frozen: the automatic strip):");
+  same([pins3, t3, c3], [[], { template: "classic", source: "platform" }, { template: "standard", source: "platform" }], "v3 pins and templates:");
+  same(v3.statements.filter((st) => ENTITY_LIVE_SQL.test(st.sql)).map((st) => st.sql), [], "v3 entity live table reads:");
+  const drafts = await asRequest("ovd.test", () => withTenant(OVD, () => watch(entityGetters)));
+  const [od, pd, , td, pinsd] = drafts.result;
+  same([od.badge, pd.title, td.template, pinsd], ["TABLE", "Table pairs", "classic", [P(2)]], "drafts read the legacy tables:");
+  same(drafts.statements.filter((st) => ENTITY_LIVE_SQL.test(st.sql)).map((st) => st.sql), [], "drafts entity live table reads:");
+  // the home rails of a legacy store read collection_overrides, never the live pins
+  const { resolveHomeSectionData } = await import("../lib/cms/section-data.js");
+  const rail = { id: "sec_r9", kind: "product_rail", v: 1, enabled: true, settings: { title: "Serums", collection: { handle: "serums", id: COL(2) }, limit: 4 }, blocks: [] };
+  const home = await withTenant(OV3, () => watch(() => resolveHomeSectionData([rail], { documents: false })));
+  eq(home.statements.filter((st) => ENTITY_LIVE_SQL.test(st.sql)).length, 0, "legacy rail live pin reads:");
+  same(home.result.get("sec_r9").products.map((p) => p.handle), ["night-cream", "glow-serum"], "the legacy rail (collection_overrides pins P2):");
 });
 
 // =====================================================================================
