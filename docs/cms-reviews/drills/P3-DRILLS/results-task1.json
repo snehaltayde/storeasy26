@@ -1,0 +1,75 @@
+{
+  "id": "P3-DRILLS",
+  "part": "task1",
+  "title": "P3-DRILLS — task1",
+  "ranAt": "2026-11-04T07:50:19.334Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "task 1: the new hero title and button text are live, checked at phone width (375)",
+      "detail": {
+        "phase": "done",
+        "title": "Glow that lasts 6420",
+        "button": "Shop the glow"
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 1: 4 clicks plus typing (target at most 4)",
+      "detail": {
+        "seconds": 2.8,
+        "clicks": 4,
+        "path": [
+          "section:400 products · 30 collections\n\nSkin first.",
+          "input:",
+          "button:Publish",
+          "button:Publish"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 1: 2.8 s from start to live (target under 60 s; a drill types faster than a person)",
+      "detail": {
+        "seconds": 2.8,
+        "clicks": 4,
+        "path": [
+          "section:400 products · 30 collections\n\nSkin first.",
+          "input:",
+          "button:Publish",
+          "button:Publish"
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_5659b61f7ca87be6, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.9s",
+    "hero tests paused for this part: hero-promise",
+    "task 1 timing: {\"seconds\":2.8,\"clicks\":4,\"path\":[\"section:400 products · 30 collections\\n\\nSkin first.\",\"input:\",\"button:Publish\",\"button:Publish\"]}"
+  ],
+  "screenshots": [
+    {
+      "name": "task1-published-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/task1-published-1440.png",
+      "bytes": 39898,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "task1-live-375",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/task1-live-375.png",
+      "bytes": 31730,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    }
+  ]
+}

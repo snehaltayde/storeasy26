@@ -1,0 +1,78 @@
+{
+  "id": "P3-DRILLS",
+  "part": "session",
+  "title": "P3-DRILLS — session",
+  "ranAt": "2026-11-04T07:54:27.357Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the Designer redirect: /admin/storefront/designer opens the editor at the home page, never the Designer",
+      "detail": {
+        "at": "/admin/editor?doc=doc_home",
+        "shell": false,
+        "editor": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "logout ends the preview: after one click on Sign out, the same browser sees the live store, the preview cookie is gone and no preview session is left open",
+      "detail": {
+        "sawDraft": true,
+        "cookies": [],
+        "openSessions": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff: Publish is disabled, with the reason",
+      "detail": {
+        "reason": "Publish\n\nOnly the store owner or an admin can publish. You can edit and preview."
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff: Undo in Recently published is disabled, with the reason",
+      "detail": {
+        "undoReason": "Only the store owner or an admin can publish or undo. You can edit and preview."
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_8e9af912ac6cb206, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.6s",
+    "hero tests paused for this part: hero-promise"
+  ],
+  "screenshots": [
+    {
+      "name": "session-after-sign-out-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/session-after-sign-out-1440.png",
+      "bytes": 29314,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "session-staff-publish-disabled-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/session-staff-publish-disabled-1440.png",
+      "bytes": 39126,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "session-staff-undo-disabled-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/session-staff-undo-disabled-1440.png",
+      "bytes": 28754,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 {
   "id": "P1-HARNESS",
   "title": "P1-HARNESS: the storefront on the edge runtime, on the design harness, with no code edit",
-  "ranAt": "2026-11-04T00:13:03.269Z",
-  "harness": "http://localhost:3800",
+  "ranAt": "2026-11-04T07:49:54.298Z",
+  "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 151,
   "failed": 0,
@@ -682,7 +682,7 @@
       "ok": true,
       "label": "Designer: the preview's page came from the edge runtime (200, x-edge-runtime: 1)",
       "detail": {
-        "url": "http://localhost:3800/",
+        "url": "http://localhost:6100/",
         "status": 200,
         "edge": "1"
       }
@@ -700,7 +700,7 @@
       "ok": true,
       "label": "designer-product: the preview's page came from the edge runtime (200, x-edge-runtime: 1)",
       "detail": {
-        "url": "http://localhost:3800/products/glow-serum",
+        "url": "http://localhost:6100/products/glow-serum",
         "status": 200,
         "edge": "1"
       }
@@ -712,13 +712,13 @@
     {
       "ok": true,
       "label": "designer-collection: the preview shows a real collection page (/collections/serums)",
-      "detail": "Draft preview — this is NOT what shoppers see. Exit preview\nFestive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\n\nD"
+      "detail": "Draft preview — this is NOT what shoppers see. Exit preview\nFestive sale — free shipping over ₹1,499\nDesign Demo Co\nShop all\nBestsellers\nNight routine\nSerums\nHo"
     },
     {
       "ok": true,
       "label": "designer-collection: the preview's page came from the edge runtime (200, x-edge-runtime: 1)",
       "detail": {
-        "url": "http://localhost:3800/collections/serums",
+        "url": "http://localhost:6100/collections/serums",
         "status": 200,
         "edge": "1"
       }
@@ -760,7 +760,7 @@
     {
       "ok": false,
       "label": "maintenance: the product page's raw HTML carries no store content (\"Radiance Glow Serum 30ml\", \"1299\", \"1,299\")",
-      "detail": "status 200; found \"Radiance Glow Serum 30ml\" 24 times, \"1299\" 10 times",
+      "detail": "status 200; found \"Radiance Glow Serum 30ml\" 24 times, \"1299\" 9 times",
       "known": "finding 5"
     },
     {
@@ -903,7 +903,7 @@
     {
       "name": "account-sign-in-768",
       "file": "docs/cms-reviews/drills/P1-HARNESS/account-sign-in-768.png",
-      "bytes": 52325,
+      "bytes": 51964,
       "width": 720,
       "height": 960,
       "viewport": 768,
@@ -1038,7 +1038,7 @@
     {
       "name": "designer-collection-1440",
       "file": "docs/cms-reviews/drills/P1-HARNESS/designer-collection-1440.png",
-      "bytes": 34464,
+      "bytes": 34469,
       "width": 720,
       "height": 450,
       "viewport": 1440,

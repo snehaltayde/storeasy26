@@ -1,0 +1,159 @@
+{
+  "ranAt": "2026-11-04T07:50:04.708Z",
+  "finishedAt": "2026-11-04T07:55:00.306Z",
+  "stages": [
+    "matrix"
+  ],
+  "rows": [
+    {
+      "stage": "matrix",
+      "name": "task1",
+      "exit": 0,
+      "seconds": 15,
+      "passed": 3,
+      "failed": 0,
+      "known": 0,
+      "clicks": [
+        "task 1 timing: {\"seconds\":2.8,\"clicks\":4,\"path\":[\"section:400 products · 30 collections\\n\\nSkin first.\",\"input:\",\"button:Publish\",\"button:Publish\"]}"
+      ],
+      "results": "results-task1.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "task4",
+      "exit": 0,
+      "seconds": 14,
+      "passed": 7,
+      "failed": 0,
+      "known": 0,
+      "clicks": [
+        "task 4 timing: {\"seconds\":3,\"clicks\":4,\"path\":[\"a:Edit this page\",\"section:Dispatch\\n\\nOrders dispatch withn 24 hours o\",\"button:Publish\",\"button:Publish\"]}; panel: Published “Shipping policy”.\n\nShipping policy\nSee it live\nUndo\nClose"
+      ],
+      "results": "results-task4.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "task5",
+      "exit": 0,
+      "seconds": 49,
+      "passed": 8,
+      "failed": 0,
+      "known": 0,
+      "clicks": [
+        "task 5 timing: same document {\"seconds\":1.4,\"clicks\":2,\"path\":[\"button:Undo\",\"button:Undo\"]}; another document {\"seconds\":31.5,\"clicks\":3,\"path\":[\"a:Publishing\\n2\",\"button:Undo\",\"button:Undo\"]}"
+      ],
+      "results": "results-task5.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "closed",
+      "exit": 0,
+      "seconds": 18,
+      "passed": 10,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-closed.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "publish-both",
+      "exit": 0,
+      "seconds": 10,
+      "passed": 3,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-publish-both.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "offline",
+      "exit": 0,
+      "seconds": 72,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-offline.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "keep-live",
+      "exit": 0,
+      "seconds": 15,
+      "passed": 3,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-keep-live.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "conflict",
+      "exit": 0,
+      "seconds": 18,
+      "passed": 5,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-conflict.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "keepalive",
+      "exit": 0,
+      "seconds": 17,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-keepalive.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "pv01",
+      "exit": 0,
+      "seconds": 18,
+      "passed": 6,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-pv01.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "session",
+      "exit": 0,
+      "seconds": 17,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-session.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "design",
+      "exit": 0,
+      "seconds": 21,
+      "passed": 4,
+      "failed": 0,
+      "known": 1,
+      "clicks": [],
+      "results": "results-design.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "error-chrome",
+      "exit": 0,
+      "seconds": 11,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-error-chrome.json"
+    }
+  ],
+  "failed": 0
+}

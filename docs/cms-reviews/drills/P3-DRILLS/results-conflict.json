@@ -1,0 +1,97 @@
+{
+  "id": "P3-DRILLS",
+  "part": "conflict",
+  "title": "P3-DRILLS — conflict",
+  "ranAt": "2026-11-04T07:53:35.566Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "conflict (Keep mine): tab A's save after tab B's asks which to keep, with A's text still on screen",
+      "detail": {
+        "words": "Changes: This page was changed in another tab.\n\nPreview: Up to date\n\nThis page was changed in another tab.\n\nYour text is still here. Choose which version to keep. The other one is kept in Earlier versions.\n\nUse the newer version\nKeep mine"
+      }
+    },
+    {
+      "ok": true,
+      "label": "conflict (Keep mine): one click; the draft and the field hold tab A's text",
+      "detail": {
+        "title": "Tab A mine 9133",
+        "shown": "Tab A mine 9133",
+        "kept": [
+          "Kept from another tab",
+          "published",
+          "published",
+          "Created"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "conflict (Use the newer version): tab A's save after tab B's asks which to keep, with A's text still on screen",
+      "detail": {
+        "words": "Changes: This page was changed in another tab.\n\nPreview: Up to date\n\nThis page was changed in another tab.\n\nYour text is still here. Choose which version to keep. The other one is kept in Earlier versions.\n\nUse the newer version\nKeep mine"
+      }
+    },
+    {
+      "ok": true,
+      "label": "conflict (Use the newer version): one click; the draft and the field hold tab B's text",
+      "detail": {
+        "title": "Tab B newer 1836",
+        "shown": "Tab B newer 1836",
+        "kept": [
+          "Kept from another tab",
+          "Kept from another tab",
+          "published",
+          "published",
+          "Created"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "conflict: Earlier versions lists the text that wasn't chosen ('Kept from another tab')",
+      "detail": {
+        "panel": "Restoring puts this version in your draft. It doesn't go live until you publish.\n\nKept from another tab\n\n4 Nov, 13:23 · Asha Founder\n\nRestore to draft\n\nKept from another tab\n\n4 Nov, 13:23 · Asha Founder\n\nRestore to draft\n\nPublished\nLive now\n\n4 Nov, 13:23 · Asha Founder\n\nRestore to draft\n\nPublished\n\n4 Nov, 13:23 · Someone on your team\n\nRestore to draft\n\nSaved while you edited\n\n4 Nov, 13:23 · Someon"
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_e1870ee2215c611a, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.6s",
+    "conflict (Keep mine): earlier versions now [\"Kept from another tab\",\"published\",\"published\",\"Created\"]",
+    "conflict (Use the newer version): earlier versions now [\"Kept from another tab\",\"Kept from another tab\",\"published\",\"published\",\"Created\"]"
+  ],
+  "screenshots": [
+    {
+      "name": "conflict-mine-choice-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/conflict-mine-choice-1440.png",
+      "bytes": 38266,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "conflict-newer-choice-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/conflict-newer-choice-1440.png",
+      "bytes": 47879,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "conflict-earlier-versions-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/conflict-earlier-versions-1440.png",
+      "bytes": 37411,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    }
+  ]
+}

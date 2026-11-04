@@ -1,0 +1,112 @@
+{
+  "id": "P3-DRILLS",
+  "part": "task4",
+  "title": "P3-DRILLS — task4",
+  "ranAt": "2026-11-04T07:50:32.996Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 7,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "task 4 set-up: the live shipping policy shows the typo",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 4: the live page shows 'Edit this page' to the signed-in founder",
+      "detail": {
+        "at": "/policies/shipping"
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 4: 'Edit this page' opens the policy in the editor, and a click on the typo focuses its paragraph",
+      "detail": {
+        "opened": "doc_xuzaxxtslowwf5mo",
+        "want": "doc_xuzaxxtslowwf5mo",
+        "focused": "f-sec_demoship-body-0"
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 4: the fix is live",
+      "detail": {
+        "phase": "done"
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 4: the half-finished home draft is not live (it stays a draft)",
+      "detail": {
+        "homeLive": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 4: 4 clicks plus typing (target at most 4)",
+      "detail": {
+        "seconds": 3,
+        "clicks": 4,
+        "path": [
+          "a:Edit this page",
+          "section:Dispatch\n\nOrders dispatch withn 24 hours o",
+          "button:Publish",
+          "button:Publish"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 4: 3 s from the live page to the fix live (target under 60 s)",
+      "detail": {
+        "seconds": 3,
+        "clicks": 4,
+        "path": [
+          "a:Edit this page",
+          "section:Dispatch\n\nOrders dispatch withn 24 hours o",
+          "button:Publish",
+          "button:Publish"
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_1a69a47f963ea881, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s",
+    "hero tests paused for this part: hero-promise",
+    "task 4 timing: {\"seconds\":3,\"clicks\":4,\"path\":[\"a:Edit this page\",\"section:Dispatch\\n\\nOrders dispatch withn 24 hours o\",\"button:Publish\",\"button:Publish\"]}; panel: Published “Shipping policy”.\n\nShipping policy\nSee it live\nUndo\nClose"
+  ],
+  "screenshots": [
+    {
+      "name": "task4-live-page-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/task4-live-page-1440.png",
+      "bytes": 20170,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/shipping"
+    },
+    {
+      "name": "task4-published-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/task4-published-1440.png",
+      "bytes": 31712,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "task4-live-375",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/task4-live-375.png",
+      "bytes": 24294,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/policies/shipping"
+    }
+  ]
+}

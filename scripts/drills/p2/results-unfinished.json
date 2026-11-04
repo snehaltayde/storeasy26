@@ -2,12 +2,12 @@
   "id": "P2-DRILLS",
   "part": "unfinished",
   "title": "P2-DRILLS — unfinished",
-  "ranAt": "2026-11-04T00:10:12.444Z",
-  "harness": "http://localhost:3800",
+  "ranAt": "2026-11-04T07:46:58.520Z",
+  "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
-  "passed": 8,
+  "passed": 9,
   "failed": 0,
-  "knownFailures": 1,
+  "knownFailures": 0,
   "checks": [
     {
       "ok": true,
@@ -70,24 +70,26 @@
       "detail": null
     },
     {
-      "ok": false,
-      "label": "the real Designer previews a documents store, so a click on the note selects the section there",
+      "ok": true,
+      "label": "the editor previews a documents store (the Designer's address leads to it), and a click on the unfinished note selects that section there (replaces finding 2)",
       "detail": {
-        "frames": 0
-      },
-      "known": "finding 2"
+        "at": "/admin/editor?doc=doc_home",
+        "label": "Up to date",
+        "selected": 1
+      }
     }
   ],
   "notes": [
-    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_f80073b410d524b7, 0.5s",
+    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_2cbf3b849565518a, 0.5s",
     "hero tests paused for this part: hero-promise (running again afterwards)",
-    "the Designer on a documents store: 0 preview frame(s); \"Preview couldn't start\\n\""
+    "the Designer on a documents store: 1 preview frame(s); \"\"",
+    "retired: \"the real Designer previews a documents store, so a click on the note selects the section there\" (finding 2): the Designer redirects to the new editor on a documents store, so it is never reached; the editor preview check after this part replaces it"
   ],
   "screenshots": [
     {
       "name": "unfinished-preview-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/unfinished-preview-1440.png",
-      "bytes": 28169,
+      "bytes": 28132,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -96,7 +98,7 @@
     {
       "name": "unfinished-live-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/unfinished-live-1440.png",
-      "bytes": 44698,
+      "bytes": 44432,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -105,11 +107,20 @@
     {
       "name": "unfinished-designer-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/unfinished-designer-1440.png",
-      "bytes": 21690,
+      "bytes": 39504,
       "width": 720,
       "height": 450,
       "viewport": 1440,
-      "path": "/admin/storefront/designer"
+      "path": "/admin/editor"
+    },
+    {
+      "name": "unfinished-editor-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/unfinished-editor-1440.png",
+      "bytes": 36620,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
     }
   ]
 }

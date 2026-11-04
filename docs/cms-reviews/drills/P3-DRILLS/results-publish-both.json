@@ -1,0 +1,80 @@
+{
+  "id": "P3-DRILLS",
+  "part": "publish-both",
+  "title": "P3-DRILLS — publish-both",
+  "ranAt": "2026-11-04T07:51:50.122Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "checks: the link to the unpublished campaign is caught, and Publish offers to publish both",
+      "detail": {
+        "phase": "offer",
+        "offer": "Publish these together\n\nThis page links to The spring edit, which isn't published yet.\n\nShoppers would reach a page that isn't live. Publish them together, so every link works:\n\nMust fix\nBanner · Button\n\nThis page links to The spring edit, which isn't published yet.\n\nHide this section and publish\nGo to this field\n\nSpring guide\n\nBanner: added\n\nThe spring edit\n\nThis goes live for the first time, with:\n\nCampaign page title: \"The spring edit\"\nText\nCancel\nPublish both"
+      }
+    },
+    {
+      "ok": true,
+      "label": "publish both: the campaign's own changes are shown before Confirm",
+      "detail": {
+        "lists": [
+          "Spring guide\n\nBanner: added",
+          "The spring edit\n\nThis goes live for the first time, with:\n\nCampaign page title: \"The spring edit\"\nText"
+        ],
+        "early": {
+          "waiting": false,
+          "disabled": false
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "publish both: both are live: the guide's live version links to the campaign (its refs name it), and the campaign's page answers",
+      "detail": {
+        "phase": "done",
+        "campaign": 200,
+        "refs": [
+          "doc_54xclv3cyleanvij"
+        ],
+        "clicks": 3,
+        "done": "Published 2 pages.\n\nSpring guide\nSee it live\nThe spring edit\nSee it live\nUndo all 2\nClose"
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_0d6791ef4a38b339, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.9s"
+  ],
+  "screenshots": [
+    {
+      "name": "publish-both-offer-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/publish-both-offer-1440.png",
+      "bytes": 32806,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "publish-both-done-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/publish-both-done-1440.png",
+      "bytes": 30864,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "publish-both-live-campaign-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/publish-both-live-campaign-1440.png",
+      "bytes": 24890,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/campaigns/p3-spring-edit"
+    }
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "id": "P3-DRILLS",
+  "part": "closed",
+  "title": "P3-DRILLS — closed",
+  "ranAt": "2026-11-04T07:51:39.718Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 10,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "closed: a shopper sees 'Opening soon' and no draft",
+      "detail": {
+        "status": 200,
+        "text": "Closed Demo Co\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: a shopper's contact form and checkout are refused (403 STORE_CLOSED)",
+      "detail": {
+        "contact": 403,
+        "checkout": 403,
+        "words": "This store isn't open yet."
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: the RSC probe, 64 requests (8 routes × 4 cookie sets × page and RSC), finds no draft text",
+      "detail": {
+        "leaked": [],
+        "statuses": [
+          200
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: the founder's preview shows the home draft",
+      "detail": {
+        "at": "http://closed.localhost:6100/"
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: in the preview, a card or UPI payment is refused with the COD-only words",
+      "detail": {
+        "status": 403,
+        "words": "Card and UPI payments open when your store does. Use cash on delivery for a test order."
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: the founder places a cash on delivery test order through the real checkout, in the preview",
+      "detail": {
+        "order": {
+          "id": "DES-BB629872",
+          "status": "sync_failed",
+          "payment_status": "cod",
+          "email": "snehal@mediastic.in"
+        },
+        "clicks": 4,
+        "at": "/checkout/confirmation/DES-BB629872?t=2.1796370695.572f16c4a042d13f7d2d",
+        "confirm": "You're seeing your unpublished changes. See the live store\nClosed Demo Co\nShop all\n✓\nOrder confirmed\n\nOrder DES-BB629872"
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: the test order is cancelled at once",
+      "detail": {
+        "cancel": {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "already": false,
+            "from": "sync_failed",
+            "shopifyCancelled": false
+          }
+        },
+        "row": {
+          "id": "DES-BB629872",
+          "status": "cancelled"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: publishing a page first (FIRST_PUBLISH_NEEDS_HOME) offers to publish it with the home page, both lists shown before Confirm",
+      "detail": {
+        "phase": "offer",
+        "lists": 2,
+        "sawWaiting": false,
+        "review": "What will go live\n\nThis goes live for the first time, with:\n\nPage title: \"About us\"\nText\nCancel\nPublish",
+        "offer": "Publish these together\n\nPublish your home page with this, so the store opens with a home page.\n\nYour store opens with its home page, so it goes live with this:\n\nAbout us\n\nThis goes live for the first time, with:\n\nPage title: \"About us\"\nText\n\nHome page\n\nThis goes live for the first time, with:\n\nHero\nCancel\nPublish with the home page"
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: after that publish the store is open: a shopper sees the home page",
+      "detail": {
+        "phase": "done",
+        "clicks": 3
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: control: once the store is open, the same RSC request does carry the home page's words (the probe can see content)",
+      "detail": null
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_3a7ba8f3ba649b70, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.9s",
+    "copied product advanced-anti-dandruff-shampoo-197 (3 variants) into the closed store's database for the test order",
+    "RSC probe: [\"html / [none] 200\",\"rsc / [none] 200\",\"html /contact [none] 200\",\"rsc /contact [none] 200\",\"html /about [none] 200\",\"rsc /about [none] 200\",\"html /policies/about [none] 200\",\"rsc /policies/about [none] 200\",\"html /campaigns/spring [none] 200\",\"rsc /campaigns/spring [none] 200\",\"html /journal [none] 200\",\"rsc /journal [none] 200\",\"html /journal/first-post [none] 200\",\"rsc /journal/first-post [none] 200\",\"html /collections [none] 200\",\"rsc /collections [none] 200\",\"html / [_admin] 200\",\"rsc / [_admin] 200\",\"html /contact [_admin] 200\",\"rsc /contact [_admin] 200\",\"html /about [_admin] 200\",\"rsc /about [_admin] 200\",\"html /policies/about [_admin] 200\",\"rsc /policies/about [_admin] 200\",\"html /campaigns/spring [_admin] 200\",\"rsc /campaigns/spring [_admin] 200\",\"html /journal [_admin] 200\",\"rsc /journal [_admin] 200\",\"html /journal/first-post [_admin] 200\",\"rsc /journal/first-post [_admin] 200\",\"html /collections [_admin] 200\",\"rsc /collections [_admin] 200\",\"html / [_platform] 200\",\"rsc / [_platform] 200\",\"html /contact [_platform] 200\",\"rsc /contact [_platform] 200\",\"html /about [_platform] 200\",\"rsc /about [_platform] 200\",\"html /policies/about [_platform] 200\",\"rsc /policies/about [_platform] 200\",\"html /campaigns/spring [_platform] 200\",\"rsc /campaigns/spring [_platform] 200\",\"html /journal [_platform] 200\",\"rsc /journal [_platform] 200\",\"html /journal/first-post [_platform] 200\",\"rsc /journal/first-post [_platform] 200\",\"html /collections [_platform] 200\",\"rsc /collections [_platform] 200\",\"html / [_mx] 200\",\"rsc / [_mx] 200\",\"html /contact [_mx] 200\",\"rsc /contact [_mx] 200\",\"html /about [_mx] 200\",\"rsc /about [_mx] 200\",\"html /policies/about [_mx] 200\",\"rsc /policies/about [_mx] 200\",\"html /campaigns/spring [_mx] 200\",\"rsc /campaigns/spring [_mx] 200\",\"html /journal [_mx] 200\",\"rsc /journal [_mx] 200\",\"html /journal/first-post [_mx] 200\",\"rsc /journal/first-post [_mx] 200\",\"html /collections [_mx] 200\",\"rsc /collections [_mx] 200\"]",
+    "test order DES-BB629872 (snehal@mediastic.in) placed and cancelled: {\"id\":\"DES-BB629872\",\"status\":\"cancelled\"}"
+  ],
+  "screenshots": [
+    {
+      "name": "closed-opening-soon-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/closed-opening-soon-1440.png",
+      "bytes": 5873,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "closed-founder-preview-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/closed-founder-preview-1440.png",
+      "bytes": 24417,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "closed-preview-checkout-cod-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/closed-preview-checkout-cod-1440.png",
+      "bytes": 18982,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "closed-preview-order-confirmation-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/closed-preview-order-confirmation-1440.png",
+      "bytes": 19290,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/DES-BB629872"
+    },
+    {
+      "name": "closed-first-open-offer-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/closed-first-open-offer-1440.png",
+      "bytes": 30476,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "closed-first-open-done-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/closed-first-open-done-1440.png",
+      "bytes": 28039,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "closed-store-open-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/closed-store-open-1440.png",
+      "bytes": 24652,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

@@ -2,10 +2,10 @@
   "id": "P2-DRILLS",
   "part": "error-chrome",
   "title": "P2-DRILLS — error-chrome",
-  "ranAt": "2026-11-04T00:07:45.315Z",
-  "harness": "http://localhost:3800",
+  "ranAt": "2026-11-04T07:44:24.819Z",
+  "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
-  "passed": 13,
+  "passed": 15,
   "failed": 0,
   "knownFailures": 0,
   "checks": [
@@ -104,6 +104,11 @@
     },
     {
       "ok": true,
+      "label": "/policies/shipping with only doc_header's version missing gives the error page (finding 3, P3-CLOSED)",
+      "detail": "/policies/shipping with only doc_header's version missing: status 500, error page true, h1 [\"Something went wrong\"]"
+    },
+    {
+      "ok": true,
       "label": "/ (only doc_header's version missing): the chrome is neutral, no announcement, no store menus",
       "detail": {
         "links": [
@@ -117,22 +122,27 @@
     },
     {
       "ok": true,
+      "label": "/ with only doc_header's version missing gives the error page (finding 3, P3-CLOSED)",
+      "detail": "/ with only doc_header's version missing: status 500, error page true, h1 [\"Something went wrong\"]"
+    },
+    {
+      "ok": true,
       "label": "after putting the list back, the store shows again",
       "detail": null
     }
   ],
   "notes": [
-    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_d4a13aa3bc396a52, 0.5s",
+    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_3d319aea23331fe5, 0.5s",
     "/ at 1440 corrupted: status 500, chrome links [\"/\",\"/collections\",\"/wishlist\",\"/account\",\"/contact\"]",
     "/ at 375 corrupted: status 500, chrome links [\"/\",\"/collections\",\"/wishlist\",\"/account\",\"/contact\"]",
-    "/policies/shipping with only doc_header's version missing: status 200, error page false, h1 [\"Shipping policy\"]",
-    "/ with only doc_header's version missing: status 200, error page false, h1 [\"Visibly brighter in 14 days\"]"
+    "/policies/shipping with only doc_header's version missing: status 500, error page true, h1 [\"Something went wrong\"]",
+    "/ with only doc_header's version missing: status 500, error page true, h1 [\"Something went wrong\"]"
   ],
   "screenshots": [
     {
       "name": "error-chrome-home-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/error-chrome-home-1440.png",
-      "bytes": 11448,
+      "bytes": 11478,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -141,7 +151,7 @@
     {
       "name": "error-chrome-home-375",
       "file": "docs/cms-reviews/drills/P2-DRILLS/error-chrome-home-375.png",
-      "bytes": 14910,
+      "bytes": 14916,
       "width": 375,
       "height": 812,
       "viewport": 375,
@@ -150,7 +160,7 @@
     {
       "name": "error-chrome-header-only-policies-shipping-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/error-chrome-header-only-policies-shipping-1440.png",
-      "bytes": 11305,
+      "bytes": 11417,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -159,7 +169,7 @@
     {
       "name": "error-chrome-header-only-home-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/error-chrome-header-only-home-1440.png",
-      "bytes": 46002,
+      "bytes": 11478,
       "width": 720,
       "height": 450,
       "viewport": 1440,

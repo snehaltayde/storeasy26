@@ -2,8 +2,8 @@
   "id": "P2-DRILLS",
   "part": "space",
   "title": "P2-DRILLS — space",
-  "ranAt": "2026-11-04T00:11:09.109Z",
-  "harness": "http://localhost:3800",
+  "ranAt": "2026-11-04T07:47:58.248Z",
+  "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 3,
   "failed": 0,
@@ -13,7 +13,7 @@
       "ok": true,
       "label": "perf-docs-fixture.js hash runs from a path with a space and prints the same hash",
       "detail": {
-        "path": "/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p2-b6/P2-DRILLS/tmp/p2-space-pVekdT/Projects 2026/storeasy26/scripts",
+        "path": "/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p3-b5/P3-DRILLS/tmp/p2-space-OGVqAJ/Projects 2026/storeasy26/scripts",
         "exit": 0,
         "hash": "b8e23347cb5cddb24882dbc918c883b1c2d3dfdc70a6a7db5fc6f599898fa825",
         "here": "b8e23347cb5cddb24882dbc918c883b1c2d3dfdc70a6a7db5fc6f599898fa825"
@@ -31,7 +31,7 @@
       "label": "seed-design-documents.js runs its CLI from a path with a space (an unknown option is refused, exit 1)",
       "detail": {
         "exit": 1,
-        "out": "✗ Unknown option \"--nonsense\". Use: node scripts/seed-design-documents.js [check] [--posts N] [--drafts-only] [--worst-case]"
+        "out": "✗ Unknown option \"--nonsense\". Use: node scripts/seed-design-documents.js [check] [--posts N] [--drafts-only] [--worst-case] [--p3]"
       }
     }
   ],

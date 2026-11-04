@@ -33,6 +33,20 @@
 // seed has no sessions) and reuses the cookies within it. Results go to
 // scripts/drills/p2/results-<part>.json, screenshots to
 // docs/cms-reviews/drills/P2-DRILLS/.
+//
+// P3-DRILLS: the four P2-DRILLS findings are fixed in phase 3, so their checks
+// are plain checks now (FLIPPED below), without editing the part files:
+//   finding 1  logout ends the preview (P3-SESSION): the preview part's known
+//              check is a plain check
+//   finding 2  the Designer can't preview a documents store: retired, because
+//              the Designer redirects to the new editor on a documents store
+//              (P3-ROUTES); replaced by the editor preview check after the
+//              unfinished part (the note's click selects the section there)
+//   finding 3  a missing chrome version alone gives the error page (P3-CLOSED):
+//              the error-chrome part's recorded note becomes a check
+//   finding 4  before its first publish a store shows "Opening soon", not the
+//              error page (P3-CLOSED): the preview part's --drafts-only note
+//              becomes a check
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -206,6 +220,41 @@ class PartDrill extends Drill {
     adminCookies = null;
   }
 
+  // P3-DRILLS: the former known checks, flipped (see the top of this file).
+  check(ok, label, detail, opts = {}) {
+    // a check whose words changed in phase 3: checked again, with the new
+    // words, on the page the part screenshots next (REWORDED)
+    if (REWORDED[label]) {
+      this.reworded = { ...REWORDED[label], label, was: Boolean(ok) };
+      return true;
+    }
+    const flip = opts?.known ? FLIPPED[opts.known] : null;
+    if (!flip) return super.check(ok, label, detail, opts);
+    if (flip.retired) {
+      super.note(`retired: "${label}" (${opts.known}): ${flip.retired}`);
+      return true;
+    }
+    return super.check(ok, label, detail);
+  }
+
+  async shoot(page, name, opts) {
+    const r = this.reworded;
+    if (r && r.shot === name) {
+      this.reworded = null;
+      const facts = await page.evaluate(r.facts).catch((e) => ({ error: String(e) }));
+      super.check(r.ok(facts), r.newLabel, { ...facts, oldCheck: r.label, oldResult: r.was });
+    }
+    return super.shoot(page, name, opts);
+  }
+
+  note(text) {
+    super.note(text);
+    for (const f of NOTE_CHECKS) {
+      const m = f.match.exec(text);
+      if (m) super.check(f.ok(m), f.label(m), text.slice(0, 300));
+    }
+  }
+
   finishPart(part, { error } = {}) {
     const results = {
       id: this.id,
@@ -226,6 +275,81 @@ class PartDrill extends Drill {
     return results;
   }
 }
+
+// ---------- P3-DRILLS: the former known checks ----------
+
+// A known marker whose issue is fixed: its check is plain now, or retired.
+export const FLIPPED = {
+  "finding 1": { fixedBy: "P3-SESSION (logout ends the preview)" },
+  "finding 2": { fixedBy: "P3-ROUTES", retired: "the Designer redirects to the new editor on a documents store, so it is never reached; the editor preview check after this part replaces it" },
+};
+
+// The preview part's --drafts-only bar check looked for the word "preview"
+// and the old Exit link. P3-FRAME's documents preview bar says "You're seeing
+// your unpublished changes." with "See the live store" (/api/preview?exit=1&to=…),
+// so the same check is made with those words.
+export const REWORDED = {
+  "before the first publish: the preview bar shows": {
+    shot: "preview-before-first-publish-1440",
+    newLabel: "before the first publish (--drafts-only): the preview bar shows, in the documents preview's words (\"You're seeing your unpublished changes.\", See the live store)",
+    facts: () => {
+      const a = [...document.querySelectorAll('a[href*="/api/preview?exit=1"]')].find((x) => /See the live store/.test(x.textContent));
+      const bar = a ? a.parentElement : null;
+      return { words: bar ? bar.innerText.replace(/\s+/g, " ").slice(0, 200) : null, href: a ? a.getAttribute("href") : null };
+    },
+    ok: (f) => Boolean(f.words && /You.re seeing your unpublished changes/.test(f.words) && /^\/api\/preview\?exit=1&to=/.test(f.href || "")),
+  },
+};
+
+// Recorded notes that are checks now (finding 3 and the --drafts-only line).
+export const NOTE_CHECKS = [
+  {
+    // preview.mjs: `before the first publish a shopper gets ${status} at /: ${text}`
+    match: /^before the first publish a shopper gets (\d+) at \/: (.*)$/s,
+    ok: (m) => m[1] === "200" && /Opening soon/.test(m[2]) && !/Something went wrong/.test(m[2]),
+    label: () => "before the first publish (--drafts-only): a shopper gets 200 'Opening soon', not the error page (finding 4, P3-CLOSED)",
+  },
+  {
+    // publish.mjs: `${path} with only doc_header's version missing: status ${s}, error page ${e}, h1 …`
+    match: /^(\S+) with only doc_header's version missing: status (\d+), error page (true|false)/,
+    ok: (m) => m[3] === "true" && Number(m[2]) >= 500,
+    label: (m) => `${m[1]} with only doc_header's version missing gives the error page (finding 3, P3-CLOSED)`,
+  },
+];
+
+// Steps that run after a part, while its harness and state are still there.
+export const AFTER = {
+  // finding 2's replacement: the unfinished banner's note, clicked in the new
+  // editor's preview (the Designer's address leads there), selects that section
+  async unfinished(drill) {
+    const ctx = await drill.context({ width: 1440 });
+    try {
+      const page = await drill.signIn(ctx);
+      await page.goto("/admin/storefront/designer", { waitUntil: "load", timeout: 120_000 });
+      await settle(page);
+      const at = new URL(page.url());
+      await page.waitForSelector("[data-inspector], [data-writing-view]", { timeout: 90_000 });
+      const label = () => page.locator("[data-preview-pane]").first().getAttribute("data-preview-label").catch(() => null);
+      const end = Date.now() + 90_000;
+      while (Date.now() < end && (await label()) !== "Up to date") await sleep(200);
+      const fr = page.frameLocator("[data-preview-frame]");
+      await fr.locator('[data-section-id="sec_drillbnr"]').first().click({ timeout: 15_000 });
+      let selected = 0;
+      for (let i = 0; i < 40 && !selected; i++) {
+        selected = await page.locator('[data-section-row="sec_drillbnr"][data-selected]').count();
+        if (!selected) await sleep(200);
+      }
+      drill.check(
+        at.pathname + at.search === "/admin/editor?doc=doc_home" && (await label()) === "Up to date" && selected === 1,
+        "the editor previews a documents store (the Designer's address leads to it), and a click on the unfinished note selects that section there (replaces finding 2)",
+        { at: at.pathname + at.search, label: await label(), selected },
+      );
+      await drill.shoot(page, "unfinished-editor-1440");
+    } finally {
+      await ctx.close();
+    }
+  },
+};
 
 // ---------- parts that live here ----------
 
@@ -310,6 +434,7 @@ async function main() {
       let error = null;
       try {
         await mod.parts[part](drill);
+        if (AFTER[part]) await AFTER[part](drill);
       } catch (e) {
         error = e;
         console.error(`✗ ${part} stopped: ${e.stack || e}`);
