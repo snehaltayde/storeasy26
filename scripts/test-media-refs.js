@@ -150,6 +150,23 @@ await t("links and images inside text: <a href> to a product, a collection and a
   eq(R.refsOf(rich), [], "registry refsOf (checks):");
 });
 
+// P5-BLOCKS: the bundle blocks hold bundle ids only. Their photos are read live
+// (the products' own), so a bundle section references no media, and its
+// references are the bundles, by id.
+await t("P5-BLOCKS: bundle_card and bundle_grid worst cases reference no media; their refs are bundles by id", () => {
+  for (const kind of ["bundle_card", "bundle_grid"]) {
+    ok(R.sectionKinds().includes(kind), `${kind} registered`);
+    for (const c of R.worstCase(kind).cases) {
+      const refs = R.refsOf(c.section);
+      ok(refs.length > 0 && refs.every((r) => r.ref === "bundle" && typeof r.id === "string"), `${kind}/${c.name}: ${JSON.stringify(refs)}`);
+      eq(Refs.mediaIdsIn(R.stableStringify(c.section)), [], `${kind}/${c.name} media in the body:`);
+      eq(Refs.refRows("ver_bun", { type: "home", sections: [c.section] }).filter((r) => r.ref_type === "media"), [], `${kind}/${c.name} media rows:`);
+    }
+  }
+  const grid = R.worstCase("bundle_grid").cases.find((c) => c.name === "max_items").section;
+  eq(R.refsOf(grid).map((r) => r.id), Array.from({ length: 12 }, (_, j) => `bun-worst-${j + 1}`), "the grid's 12 bundles, in order:");
+});
+
 await t("across every section fixture (worstCase of every kind, plus text images and an unknown kind) the registry's media set is a subset of the belt's", () => {
   const registrySet = (s) => {
     const rows = Refs.refRows("ver_sub", { type: "page", sections: [s] });

@@ -500,6 +500,63 @@ await t("P5-SOURCES: the bundle argOf turns { id } into the id and [{ id }] into
   eq(Src.SOURCES.collection_products.argOf({ id: "gid://c/1" }), undefined);
 });
 
+// ---- P5-BLOCKS (COM-02, TREE-01) ----------------------------------------------------
+const KINDS_NOW = ["hero", "collections", "new", "banner", "rich_text", "image_with_text", "product_rail", "text", "faq", "bundle_card", "bundle_grid", "product_main"];
+
+await t("P5-BLOCKS: the registry's section kinds, exactly; bundle_card and bundle_grid are home-only registry kinds with their bindings, and never legacy kinds", async () => {
+  same(Reg.sectionKinds(), KINDS_NOW, "kinds:");
+  same(Reg.sectionType("bundle_card").bindings, { bundle: { sources: ["bundle_by_id"], args: ["bundle"] } }, "card binding:");
+  same(Reg.sectionType("bundle_grid").bindings, { bundles: { sources: ["bundles_by_ids"], args: ["bundles"] } }, "grid binding:");
+  for (const k of ["bundle_card", "bundle_grid"]) {
+    same(Reg.sectionType(k).documentTypes, ["home"], `${k} types:`);
+    ok(Reg.sectionType(k).startsIncomplete && Reg.sectionType(k).placeholder, `${k} starts incomplete, with a placeholder`);
+    ok(!HOME_SECTION_KINDS.includes(k) && !PAGE_SECTION_KINDS.includes(k), `${k} in a legacy family`);
+    eq(componentFor(k) ?? null, null, `${k} legacy componentFor:`);
+  }
+  for (const f of ["lib/cms/registry.js", "lib/content/documents-reader.js"]) ok(!/bundle_card|bundle_grid/.test(await readFile(join(here, "..", f), "utf8")), `${f} names a bundle kind`);
+});
+
+await t("P5-BLOCKS (P5-SOURCES review): the bundle sources read their declared argument ('bundle', 'bundles'), whatever the key order; a binding that does not pass it is refused", async () => {
+  same(Src.SOURCES.bundle_by_id.args, ["bundle"], "card source args:");
+  same(Src.SOURCES.bundles_by_ids.args, ["bundles"], "grid source args:");
+  const byId = new Map([["bun-a", { id: "bun-a", state: "available" }], ["bun-x", { id: "bun-x", state: "available" }]]);
+  const ctx = { prefetched: () => Promise.resolve(byId) };
+  // another argument first: the old "first argument other than limit" read bun-x
+  eq((await Src.SOURCES.bundle_by_id.resolve({}, { other: "bun-x", bundle: "bun-a", limit: 8 }, ctx))?.id, "bun-a", "card reads 'bundle':");
+  same((await Src.SOURCES.bundles_by_ids.resolve({}, { other: ["bun-x"], bundles: ["bun-a", "bun-z"], limit: 8 }, ctx)).map((b) => [b.id, b.state]), [["bun-a", "available"], ["bun-z", "missing"]], "grid reads 'bundles':");
+  eq(await Src.SOURCES.bundle_by_id.resolve({}, { other: "bun-x", limit: 8 }, ctx), undefined, "no 'bundle' argument: nothing");
+  const asked = [];
+  await Src.SOURCES.bundle_by_id.prefetch([{ other: "bun-x", bundle: "bun-a", limit: 8 }, { zz: ["bun-y"], bundles: ["bun-b", "bun-a"], limit: 8 }], { bundlesByIds: async (ids) => (asked.push(ids), new Map()) });
+  same(asked, [["bun-a", "bun-b"]], "the prefetch reads only the declared names:");
+  let msg = "";
+  try {
+    Reg.defineSection({ kind: "p5_wrong_arg", documentTypes: ["home"], settings: [{ key: "pick", kind: "bundle", label: "Bundle", default: null }], bindings: { bundle: { sources: ["bundle_by_id"], args: ["pick"] } } });
+  } catch (e) {
+    msg = e.message;
+  }
+  eq(Reg.sectionType("p5_wrong_arg"), null, "registered anyway:");
+  ok(msg.includes('the source "bundle_by_id" reads "bundle"'), `refused with: ${msg}`);
+});
+
+await t("P5-BLOCKS (P5-SOURCES review): a binding that gives both source and sources is refused; either one alone still works", () => {
+  let msg = "";
+  try {
+    Reg.defineSection({ kind: "p5_both", documentTypes: ["home"], settings: [{ key: "limit", kind: "number", label: "N", min: 1, max: 4, default: 2 }], bindings: { products: { source: "newest_products", sources: ["newest_products"], args: ["limit"] } } });
+  } catch (e) {
+    msg = e.message;
+  }
+  eq(Reg.sectionType("p5_both"), null, "registered anyway:");
+  ok(/gives both source and sources/.test(msg), `refused with: ${msg}`);
+  for (const b of [{ source: "newest_products", args: ["limit"] }, { sources: ["newest_products"], args: ["limit"] }]) {
+    const d = Reg.defineSection({ kind: "p5_one", documentTypes: ["home"], settings: [{ key: "limit", kind: "number", label: "N", min: 1, max: 4, default: 2 }], bindings: { products: b } });
+    try {
+      same(d.bindings.products, { sources: ["newest_products"], args: ["limit"] }, JSON.stringify(b));
+    } finally {
+      Reg.removeSection("p5_one");
+    }
+  }
+});
+
 await t("P5-SOURCES: route_product resolves to no data and no log", async () => {
   Reg.defineSection({ kind: "p5_route", documentTypes: ["home"], settings: [], bindings: { product: { sources: ["route_product"], args: [] } } });
   try {
