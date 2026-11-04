@@ -36,7 +36,16 @@ const money = (v, cur) => {
   }
 };
 
-export default function CatalogAdmin({ initial }) {
+// P4-FIX3 (P4-EDITOR review): on a documents store the founder sets the brand
+// and product type shoppers see in the new editor, so "type and vendor come
+// from Shopify" would be half wrong there. The legacy line (PRODUCT_WORDS.
+// catalogShopify) is unchanged. The catalog page's own header on a documents
+// store says the same in its own words (a server file can't read a value
+// from this client file).
+export const CATALOG_DOCUMENTS_LINE =
+  "The brand and product type shoppers see are set in the editor. Only price, stock and Shopify's own type and vendor stay in Shopify: change those in Shopify; your store shows the new values after the next catalog update.";
+
+export default function CatalogAdmin({ initial, documentsStore = false }) {
   const [data, setData] = useState(initial);
   const [q, setQ] = useState("");
   const [searching, setSearching] = useState(false);
@@ -168,7 +177,7 @@ export default function CatalogAdmin({ initial }) {
 
           {/* Shopify-owned values: labeled, read-only */}
           <div className="rounded-ctl bg-surface-sunken px-3.5 py-2.5 text-xs text-fg-muted">
-            <p className="font-medium text-fg" data-shopify-owned="">{PRODUCT_WORDS.catalogShopify}</p>
+            <p className="font-medium text-fg" data-shopify-owned="">{documentsStore ? CATALOG_DOCUMENTS_LINE : PRODUCT_WORDS.catalogShopify}</p>
             <p className="mt-0.5">
               Type: {editing.product.product_type || "—"} · Vendor: {editing.product.vendor || "—"} · Price: {editing.product.price_min}
               {editing.product.price_max !== editing.product.price_min ? `–${editing.product.price_max}` : ""} {editing.product.currency} ·{" "}

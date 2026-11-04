@@ -1,0 +1,97 @@
+{
+  "id": "P4-FIX3",
+  "part": "fix3",
+  "title": "P4-FIX3 — description beside and notice, switching products",
+  "ranAt": "2026-11-04T17:16:07.023Z",
+  "harness": "http://localhost:6140",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "description: the founder's own description and name save",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "description: Shopify's description shows beside the founder's, as plain text",
+      "detail": {
+        "beside": "Shopify's description: Shopify's soft cotton & linen."
+      }
+    },
+    {
+      "ok": true,
+      "label": "description: the 'Changed in Shopify' notice reads in plain words, no raw HTML",
+      "detail": {
+        "words": "Shopify changed the description after you edited it. Shopify's description now reads: New Organic cotton, now softer."
+      }
+    },
+    {
+      "ok": true,
+      "label": "switching: from A (edited name) to B, A's draft is never shown with B's Shopify title; B opens with its own",
+      "detail": {
+        "pairs": [
+          {
+            "h": "Drill own name",
+            "s": "Shopify title: Advanced Anti-dandruff Shampoo",
+            "url": "?product=gid%3A%2F%2Fshopify%2FProduct%2F8000196"
+          },
+          {
+            "h": null,
+            "s": null,
+            "url": "?product=gid%3A%2F%2Fshopify%2FProduct%2F8000222"
+          },
+          {
+            "h": "Advanced BCAA Recovery",
+            "s": "Shopify title: Advanced BCAA Recovery",
+            "url": "?product=gid%3A%2F%2Fshopify%2FProduct%2F8000222"
+          }
+        ],
+        "mixed": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "no page errors in the console",
+      "detail": {
+        "errors": []
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_00624eca365671aa, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.4s"
+  ],
+  "screenshots": [
+    {
+      "name": "description-beside-1440",
+      "file": "docs/cms-reviews/drills/P4-FIX3/description-beside-1440.png",
+      "bytes": 29644,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "description-notice-1440",
+      "file": "docs/cms-reviews/drills/P4-FIX3/description-notice-1440.png",
+      "bytes": 31445,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "switched-to-b-1440",
+      "file": "docs/cms-reviews/drills/P4-FIX3/switched-to-b-1440.png",
+      "bytes": 36578,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    }
+  ]
+}

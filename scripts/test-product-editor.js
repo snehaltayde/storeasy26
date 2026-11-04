@@ -56,7 +56,7 @@ const TS = await import("../lib/typesense-search.js");
 const Sync = await import("../lib/sync.js");
 const EE = await import("../lib/admin/entity-entry.js");
 const EM = await import("../components/admin/editor/editorModel.js");
-const { PARITY, OLD_CONTROLS } = await import("../components/admin/editor/parity.js");
+const { PARITY, OLD_CONTROLS, OLD_FORM_CONTROLS, NOT_CARRIED, NOT_A_SETTING, oldFormControls } = await import("../components/admin/editor/parity.js");
 const { controlKindOf } = await import("../components/admin/editor/fields/inspectorModel.js");
 const { handleDocumentsPut } = await import("../lib/admin/documents-api.js");
 const I = await import("../lib/platform/identity.js");
@@ -572,7 +572,7 @@ await t("unit: only the allowed overlay fields have controls; price, variants an
     ok(!(await readFile(join(ROOT, f), "utf8")).includes("Shopify owns these"), `${f}: no 'Shopify owns these'`);
   }
   const cat = await readFile(join(ROOT, "components/admin/CatalogAdmin.js"), "utf8");
-  ok(cat.includes("{PRODUCT_WORDS.catalogShopify}"), "the Catalog screen shows the same plain words");
+  ok(cat.includes("documentsStore ? CATALOG_DOCUMENTS_LINE : PRODUCT_WORDS.catalogShopify"), "the Catalog screen shows the same plain words (the legacy line; the documents line on a documents store)");
   ok(!/Shopify owns|admin; they sync/.test(EM.PRODUCT_WORDS.catalogShopify), "and they are plain");
 });
 
@@ -628,13 +628,38 @@ await t("unit: with the gate open on a store with Typesense configured (dummy lo
 console.log("— 5. parity with the Catalog and Upsells screens; the collection form");
 // =====================================================================================
 
-await t("unit: the PARITY list covers every CatalogAdmin and UpsellsAdmin control and each maps to a registered setting with a working control", async () => {
-  eq(PARITY.map((p) => p.what).sort(), [...OLD_CONTROLS.CatalogAdmin, ...OLD_CONTROLS.UpsellsAdmin].sort(), "every old control is listed:");
-  for (const s of ["CatalogAdmin", "UpsellsAdmin"]) ok(PARITY.some((p) => p.screen === s), s);
-  // the old screens really have these controls (their labels in the source)
+await t("unit: the PARITY list covers every CatalogAdmin and UpsellsAdmin control (read from the old files; the upsell and cart-slot switches included) and each maps to a registered setting with a working control or a plain reason", async () => {
   const cat = await readFile(join(ROOT, "components/admin/CatalogAdmin.js"), "utf8");
   const ups = await readFile(join(ROOT, "components/admin/UpsellsAdmin.js"), "utf8");
-  for (const [src, words] of [[cat, ["Badge", "Product-page modules", "Pinned product handles", "Page template"]], [ups, ["Target product handles", "Source product handle", "Title", "cart_upsell", "pdp_pairs", "Delete placement"]]]) for (const w of words) ok(src.includes(w), `the old screen has ${w}`);
+  // P4-FIX3: every form control the old files render is in OLD_FORM_CONTROLS,
+  // and nothing else is (a control added to either file fails here)
+  const srcOf = { CatalogAdmin: cat, UpsellsAdmin: ups };
+  for (const screen of ["CatalogAdmin", "UpsellsAdmin"]) eq(oldFormControls(srcOf[screen]).sort(), Object.keys(OLD_FORM_CONTROLS[screen]).sort(), `${screen}'s form controls, read from its file:`);
+  // each old control maps to a PARITY entry, a NOT_CARRIED reason, or finds what to edit
+  const carried = new Set(PARITY.map((p) => `${p.screen}|${p.what}`));
+  const notCarried = new Set(NOT_CARRIED.map((n) => `${n.screen}|${n.what}`));
+  for (const screen of Object.keys(OLD_FORM_CONTROLS)) {
+    for (const [ident, whats] of Object.entries(OLD_FORM_CONTROLS[screen])) {
+      for (const w of [whats].flat()) ok(w === NOT_A_SETTING || carried.has(`${screen}|${w}`) || notCarried.has(`${screen}|${w}`), `${screen} ${ident}: "${w}" is neither carried nor a plain difference`);
+    }
+  }
+  eq(PARITY.map((p) => p.what).sort(), [...OLD_CONTROLS.CatalogAdmin, ...OLD_CONTROLS.UpsellsAdmin].filter((w) => !NOT_CARRIED.some((n) => n.what === w)).sort(), "every carried old control is listed:");
+  for (const n of NOT_CARRIED) ok([...OLD_CONTROLS[n.screen]].includes(n.what), `${n.what}: an old control`);
+  // the switches: the pairs strip's and the cart slot's, each with a plain reason
+  const sw = OLD_FORM_CONTROLS.UpsellsAdmin['${p.enabled ? "Disable" : "Enable"} ${rowTitle(p)}'];
+  eq(sw, ["Pairs: Enable or Disable switch", "Cart slot: Enable or Disable switch"], "UpsellsAdmin's Enable/Disable switch:");
+  for (const w of sw) {
+    const n = NOT_CARRIED.find((x) => x.what === w);
+    ok(n && /remove every/.test(n.why) && /Earlier versions/.test(n.why) && !/[A-Z]{3,}_[A-Z]/.test(n.why), `${w}: a plain reason: ${n?.why}`);
+  }
+  ok(!PARITY.some((p) => /switch/i.test(p.what)), "no switch is passed off as 'remove every product'");
+  // a control added to an old screen is caught
+  const grown = ups.replace('<Field label="Title"', '<Field label="Sticky" htmlFor="upsell-sticky"><Input id="upsell-sticky" value={form.sticky} onChange={(e) => setForm({ ...form, sticky: e.target.value })} /></Field>\n              <Field label="Title"');
+  ok(grown !== ups, "the old file was grown");
+  const unknown = oldFormControls(grown).filter((x) => !(x in OLD_FORM_CONTROLS.UpsellsAdmin));
+  eq(unknown, ["upsell-sticky"], "a new old control is not in the list:");
+  const grownCat = cat.replace("<Input id=\"cat-badge\"", "<Switch label=\"Hide this product\" checked={false} onChange={() => {}} />\n            <Input id=\"cat-badge\"");
+  eq(oldFormControls(grownCat).filter((x) => !(x in OLD_FORM_CONTROLS.CatalogAdmin)), ["Hide this product"], "a new switch on the Catalog screen too:");
   const { CONTROL_COMPONENTS } = await loadPlain(join(ROOT, "components/admin/editor/fields/SettingsForm.js"));
   for (const p of PARITY) {
     const type = R.documentType(p.type);
@@ -950,6 +975,249 @@ await t("unit: only rich text, text and FAQ modules are offered; an older image-
   const shown = formHtml({ body: { ...R.emptyBody("product_content"), settings: { ...R.emptyBody("product_content").settings, gallery: { value: many } } }, entity: await read(17) });
   ok(/data-cap="gallery"/.test(shown) && plain(shown).includes("at most 30 of your own"), "shown in the form");
   eq(EM.capNotes({ settings: { gallery: { value: many.slice(0, 30) } } }), {}, "at the cap: nothing to say:");
+});
+
+// =====================================================================================
+console.log("— 11. P4-FIX3: the P4-EDITOR review findings");
+// =====================================================================================
+
+await t("rendered: when the founder has their own description, Shopify's shows beside it as plain text; the 'Changed in Shopify' notice for the description has no raw HTML", async () => {
+  await open(18);
+  const id = await Ids.productDocumentId(P(18));
+  await sync(18, { descriptionHtml: "<p>Soft <b>cotton</b> &amp; linen</p>" });
+  let e = await read(18);
+  await save(id, (b) => (b.settings.description_html = EM.editOverlay("description_html", null, "<p>My own words</p>", e)));
+  e = await read(18);
+  let m = formHtml({ body: e.document.body, entity: e });
+  const beside = m.match(/<div[^>]*data-shopify-value="description_html"[\s\S]*?<\/div>/)?.[0];
+  ok(beside, `Shopify's description beside the founder's: ${plain(m).slice(0, 400)}`);
+  eq(plain(beside), "Shopify's description: Soft cotton & linen", "beside, as plain text:");
+  ok(!/&lt;|&gt;|<b>/.test(beside), "no markup in the line");
+  // Shopify changes it: the notice reads in plain words
+  await sync(18, { descriptionHtml: '<h2>New</h2><p>Organic <em>cotton</em>,&nbsp;now softer.</p><script>alert(1)</script>' });
+  e = await read(18);
+  m = formHtml({ body: e.document.body, entity: e });
+  const notice = m.match(/<section[^>]*data-shopify-changed="description_html"[\s\S]*?<\/section>/)?.[0];
+  ok(notice, "the notice is up");
+  const words = notice.match(/<p[^>]*data-notice-words="description_html"[^>]*>([\s\S]*?)<\/p>/)[1];
+  eq(plain(words), "Shopify changed the description after you edited it. Shopify's description now reads: New Organic cotton, now softer.", "the notice's sentence:");
+  ok(!/&lt;|&gt;|<[a-z]/i.test(words) && !words.includes("alert"), `no raw HTML in the sentence: ${words}`);
+  // a product that left Shopify: the description it had, as plain text
+  const orphan = formHtml({ body: e.document.body, entity: { ...e, inShopify: false, shopify: null } });
+  ok(plain(orphan).includes("Shopify's description when it left: Soft cotton & linen"), `when it left: ${plain(orphan).slice(0, 600)}`);
+  // a long description: a short line, and the rest behind "Show all"
+  const long = `<p>${"Word ".repeat(80)}end.</p>`;
+  const short = PF.plainSummary(long);
+  ok(short.length <= 161 && short.endsWith("…") && !short.includes("<"), short);
+  eq(PF.plainSummary("<style>p{}</style><p>a&lt;b &#8212; &#x41;</p>"), "a<b — A", "entities read back, style text dropped:");
+  eq([PF.plainSummary(""), PF.plainSummary(null)], ["", ""], "nothing:");
+});
+
+await t("unit: a product document opened without the entity answer shows plain words, never 'Loading Shopify's images…'", async () => {
+  const body = { ...R.emptyBody("product_content"), settings: { ...R.emptyBody("product_content").settings, title: { value: "Mine", base_hash: "b", base_value: "Old" } } };
+  const m = formHtml({ body, entity: null });
+  ok(plain(m).includes(PF.DESCRIPTION_WORDS.noEntity), `the plain words: ${plain(m)}`);
+  ok(!plain(m).includes("Loading Shopify"), "no endless loading line");
+  ok(!/<input|<button/.test(m), "no form to type into");
+  const E = await world({ "next/navigation": navStub, "@/components/console/Toast": toastStub })(join(ROOT, "components/admin/editor/DocumentEditor.js"));
+  const st = { id: "doc_prod_nullentity01", type: "product_content", body, revision: 1, draftHash: "h", document: { id: "doc_prod_nullentity01", type: "product_content", label: "Mine", access: { canPublish: true } }, issues: [], ackCount: 0 };
+  const shell = plain(html(h(E.EditorView, { entry: { id: st.id, type: st.type, label: "Mine" }, load: { status: "ready" }, state: st, docs: [], entity: null })));
+  ok(shell.includes(PF.DESCRIPTION_WORDS.noEntity) && !shell.includes("Loading Shopify"), `in the editor: ${shell.slice(0, 400)}`);
+});
+
+// A stub documents API for the mounted editor: getDocument answers each id
+// from `docsById`, held while `holds` has a promise for it.
+function editorApi({ docsById, holds = new Map(), calls = [], answers = {} }) {
+  return {
+    call: async (op, args, extra) => {
+      calls.push([op, clone(args ?? null), clone(extra ?? null)]);
+      if (op === "listDocuments") return { ok: true, data: { documents: [] } };
+      if (op === "listProductContent") return { ok: true, data: { items: [], nextCursor: null, counts: { all: 2, changedInShopify: calls.filter((c) => c[0] === "resolveShopifyChange").length ? 0 : 1, orphaned: 0 } } };
+      if (op === "getDocument") {
+        if (holds.has(args)) await holds.get(args);
+        return docsById[args] ? { ok: true, data: { document: clone(docsById[args]) } } : { error: true, code: "NOT_FOUND", message: "x" };
+      }
+      if (answers[op]) return answers[op](args, extra);
+      return { error: true, code: "X", message: "x" };
+    },
+    sendKeepalive: () => true,
+    startDocumentsPreview: async () => ({ error: true }),
+    setShowDesign: async () => ({ error: true }),
+  };
+}
+async function withBrowser(fn) {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ ok: true, items: [], nextCursor: null }), { status: 200, headers: { "content-type": "application/json" } });
+  globalThis.window = { location: { origin: "https://pedocs.test", host: "pedocs.test", pathname: "/admin/editor", search: "" }, addEventListener() {}, removeEventListener() {}, localStorage: null };
+  globalThis.document = { addEventListener() {}, removeEventListener() {} };
+  try {
+    return await fn();
+  } finally {
+    globalThis.fetch = realFetch;
+    delete globalThis.window;
+    delete globalThis.document;
+  }
+}
+const prodDoc = (id, entityId, label, settings) => ({ id, type: "product_content", label, slug: null, entityId, body: { type: "product_content", settings: { ...R.emptyBody("product_content").settings, ...settings }, sections: [] }, revision: 2, draftHash: `h-${id}`, publishedVersionId: null, publishedHash: null, access: { canPublish: true, reason: null } });
+const shopEntity = (title, extra = {}) => ({ inShopify: true, shopify: { title, handle: title.toLowerCase().replace(/\W+/g, "-"), description_html: `<p>${title}</p>`, vendor: "Labs", product_type: "Serum", gallery: [] }, titleEditable: true, titleBlockedReason: null, shopifyAdminUrl: null, commerce: null, ...extra });
+
+await t("unit: switching products holds the form back until the next document is open, so A's draft is never shown against B's Shopify values", async () => {
+  const A = prodDoc("doc_prod_aaaaaaaaaaaaaaaa", "gid://shopify/Product/1", "Alpha mine", { title: { value: "Alpha mine", base_hash: "x", base_value: "Alpha" } });
+  const B = prodDoc("doc_prod_bbbbbbbbbbbbbbbb", "gid://shopify/Product/2", "Beta", {});
+  let release;
+  const holds = new Map();
+  const api = editorApi({ docsById: { [A.id]: A, [B.id]: B }, holds });
+  await withBrowser(async () => {
+    const props = { document: { id: A.id, type: A.type, label: A.label, slug: null }, entity: shopEntity("Alpha"), readOnly: null, api };
+    const v = await mount("components/admin/editor/DocumentEditor.js", "default", () => props);
+    await v.flush();
+    const heading = () => v.find((n) => n.props?.["data-product-heading"] === "");
+    const titleLine = () => v.find((n) => n.props?.["data-shopify-title"] === "");
+    ok(heading() && textOf(heading().props.children) === "Alpha mine", "A is open with its draft");
+    // the page moves to B (the switcher's link): B's entry and entity arrive, B's document is still loading
+    holds.set(B.id, new Promise((r) => (release = r)));
+    props.document = { id: B.id, type: B.type, label: B.label, slug: null };
+    props.entity = shopEntity("Beta");
+    await v.flush();
+    ok(!v.find((n) => n.props?.["data-product-form"] === ""), `no product form while B loads: ${heading() ? textOf(heading().props.children) : ""} / ${titleLine() ? textOf(titleLine().props.children) : ""}`);
+    ok(!v.all((n) => n.type === "input").some((n) => n.props.value === "Alpha mine"), "A's name is not on screen");
+    const label = v.find((n) => n.props?.["data-document-label"] === "");
+    eq(textOf(label.props.children), "Beta", "the heading names the product being opened:");
+    release();
+    await v.flush();
+    for (let i = 0; i < 5 && !(heading() && textOf(heading().props.children) === "Beta"); i++) await v.flush();
+    eq([textOf(heading().props.children), textOf(titleLine().props.children)], ["Beta", "Shopify title: Beta"], "then B's own draft against B's Shopify values:");
+  });
+});
+
+await t("unit: the shell re-reads the product counts after 'Keep mine' and after 'Use Shopify's'", async () => {
+  const A = prodDoc("doc_prod_cccccccccccccccc", "gid://shopify/Product/3", "Mine", { title: { value: "Mine", base_hash: "b", base_value: "Old" } });
+  const calls = [];
+  const after = (args) => ({ ok: true, data: { document: { ...clone(A), revision: 3, draftHash: "h-after", body: { ...A.body, settings: { ...A.body.settings, title: args.choice === "keep" ? { value: "Mine", base_hash: "c", base_value: "Gamma" } : null } } } } });
+  const api = editorApi({ docsById: { [A.id]: A }, calls, answers: { resolveShopifyChange: after } });
+  await withBrowser(async () => {
+    const lists = () => calls.filter((c) => c[0] === "listProductContent").length;
+    for (const name of ["Keep mine: name", "Use Shopify's: name"]) {
+      // each time a fresh editor on a document whose name has the notice
+      const props = { document: { id: A.id, type: A.type, label: A.label, slug: null }, entity: shopEntity("Gamma"), readOnly: null, api };
+      const v = await mount("components/admin/editor/DocumentEditor.js", "default", () => props);
+      await v.flush();
+      const before = lists();
+      ok(v.button(name), `the notice offers ${name}`);
+      await v.click(name);
+      for (let i = 0; i < 5 && lists() === before; i++) await v.flush();
+      ok(calls.some((c) => c[0] === "resolveShopifyChange" && c[1].choice === (name.startsWith("Keep") ? "keep" : "shopify")), `${name} was sent`);
+      ok(lists() > before, `${name}: the counts are read again (${before} -> ${lists()})`);
+      const shown = v.find((n) => n.props?.["data-product-counts"] !== undefined || /Changed in Shopify \d/.test(textOf(n.props?.children ?? "")));
+      ok(shown, "the counts line is in the shell");
+      ok(!v.find((n) => n.props?.["data-shopify-changed"] === "title"), "the notice is gone");
+    }
+  });
+});
+
+await t("unit: ?doc=<id> of a product's content gives a read-only person the read-only view (an owner can edit)", async () => {
+  await open(22);
+  const id = await Ids.productDocumentId(P(22));
+  const support = await openPage({ doc: id }, SUPPORT_ACTOR);
+  eq([support.document.id, support.readOnly], [id, EE.ENTRY_WORDS.readOnly], "support, through ?doc=:");
+  ok(support.entity && support.entity.shopify.title === "Fixture product 22", "with what Shopify sends now");
+  const owner = await openPage({ doc: id });
+  eq([owner.document.id, owner.readOnly], [id, null], "the owner, through ?doc=:");
+  const viaProduct = await openPage({ product: P(22) }, SUPPORT_ACTOR);
+  eq(viaProduct.readOnly, support.readOnly, "the same as ?product=:");
+});
+
+await t("unit: a read-only person's entry finds a phase-3 random-id document by (type, entity_id), with its edits", async () => {
+  const made = await run(() => Docs.openEntityContent({ type: "product_content", entityId: P(19), actor: OWNER_ACTOR }));
+  const e = await read(19);
+  await save(made.document.id, (b) => (b.settings.title = EM.editOverlay("title", null, "Phase three name", e)));
+  await raw(docs).execute({ sql: "UPDATE documents SET id = 'doc_r24r24r24r24r24r2' WHERE id = ?", args: [made.document.id] });
+  for (const tbl of ["document_versions"]) await raw(docs).execute({ sql: `UPDATE ${tbl} SET document_id = 'doc_r24r24r24r24r24r2' WHERE document_id = ?`, args: [made.document.id] }).catch(() => null);
+  const before = await docCount();
+  const o = await open(19, SUPPORT_ACTOR);
+  eq(await docCount(), before, "nothing written:");
+  eq([o.document.id, o.readOnly], ["doc_r24r24r24r24r24r2", EE.ENTRY_WORDS.readOnly], "the phase-3 row, read only:");
+  eq(o.entity.document?.id, "doc_r24r24r24r24r24r2", "its document is in the answer:");
+  eq(o.entity.document.body.settings.title?.value, "Phase three name", "with the founder's edit:");
+});
+
+await t("rendered: the heading shows the founder's name (Shopify's under it), not Shopify's", async () => {
+  const e = await read(20);
+  const body = { ...R.emptyBody("product_content"), settings: { ...R.emptyBody("product_content").settings, title: { value: "Founder's name", base_hash: "b", base_value: "Fixture product 20" } } };
+  const m = formHtml({ body, entity: e });
+  eq(plain(m.match(/<h3[^>]*data-product-heading=""[^>]*>[\s\S]*?<\/h3>/)[0]), "Founder's name", "the heading:");
+  eq(plain(m.match(/<p[^>]*data-shopify-title=""[^>]*>[\s\S]*?<\/p>/)[0]), "Shopify title: Fixture product 20", "Shopify's name under it:");
+  eq(plain(formHtml({ body: R.emptyBody("product_content"), entity: e }).match(/<h3[^>]*data-product-heading=""[^>]*>[\s\S]*?<\/h3>/)[0]), "Fixture product 20", "while it follows Shopify: Shopify's:");
+});
+
+await t("rendered: 'Keep mine' and 'Use Shopify's' are disabled for a read-only person", async () => {
+  const e = await read(20);
+  const body = { ...R.emptyBody("product_content"), settings: { ...R.emptyBody("product_content").settings, title: { value: "Founder's name", base_hash: "b", base_value: "An older name" } } };
+  const editable = formHtml({ body, entity: e });
+  ok(/<button[^>]*data-keep-mine="title"/.test(editable) && !/\sdisabled=""/.test(editable.match(/<button[^>]*data-keep-mine="title"[^>]*>/)[0]), "an editor can press them");
+  const ro = formHtml({ body, entity: e, readOnly: EE.ENTRY_WORDS.readOnly });
+  for (const k of ["data-keep-mine", "data-use-shopify"]) ok(/\sdisabled=""/.test(ro.match(new RegExp(`<button[^>]*${k}="title"[^>]*>`))[0]), `${k} disabled for a read-only person`);
+});
+
+await t("unit: the read-only view honours the title gate", async () => {
+  Gate.setTitleGateForTest(true);
+  const o = await open(21, SUPPORT_ACTOR);
+  eq([o.readOnly, o.entity.titleEditable, typeof o.entity.titleBlockedReason], [EE.ENTRY_WORDS.readOnly, false, "string"], "support, gate closed:");
+  const r = await read(21);
+  eq(r.titleEditable, false, "readEntityContent:");
+  Gate.setTitleGateForTest(false);
+  eq((await open(21, SUPPORT_ACTOR)).entity.titleEditable, true, "gate open:");
+});
+
+await t("rendered: 'Discard edits' is never offered to a read-only person on a product that left Shopify, even when their role could publish", async () => {
+  const body = { ...R.emptyBody("product_content"), settings: { ...R.emptyBody("product_content").settings, title: { value: "Gone", base_hash: "b", base_value: "Was here" } } };
+  const gone = { inShopify: false, shopify: null, titleEditable: true, titleBlockedReason: null, shopifyAdminUrl: null, commerce: null };
+  ok(/data-discard=""/.test(formHtml({ body, entity: gone, access: { canPublish: true } })), "an owner is offered it");
+  const ro = formHtml({ body, entity: gone, access: { canPublish: true }, readOnly: EE.ENTRY_WORDS.readOnly });
+  ok(!/data-discard=""/.test(ro), "a read-only person is not");
+  ok(plain(ro).includes(EM.PRODUCT_WORDS.discardStaff), "they see why");
+});
+
+await t("rendered: on a documents store the catalog page and CatalogAdmin say the brand and product type shown are set in the editor, and only price, stock and Shopify's own type and vendor stay in Shopify; the legacy line is unchanged", async () => {
+  const marker = (name) => (p) => h("div", { "data-stub": name, "data-props": JSON.stringify(p ?? {}) });
+  const catWorld = world({
+    "next/navigation": navStub,
+    "@/components/console/Toast": toastStub,
+    "next/headers": { cookies: async () => ({ get: () => ({ value: "cookie" }) }) },
+    "@/lib/admin-auth": { adminActor: async () => OWNER_ACTOR, ADMIN_COOKIE: "_admin", PLATFORM_COOKIE: "_platform" },
+    "@/lib/console-request": { tfetch: (fn) => fn() },
+    "@/lib/cms-mode": { getCmsMode: async () => "documents" },
+    "@/lib/db": { db: {} },
+    "@/lib/catalog-overrides": { listProductOverrides: async () => [], getCollectionPins: async () => [] },
+    "@/lib/bundles": { listBundles: async () => [] },
+    "@/lib/quiz": { listQuizzes: async () => [] },
+    "@/components/admin/CatalogAdmin": { __esModule: true, default: marker("CatalogAdmin") },
+    "@/components/admin/CommercePanels": { BundlesPanel: marker("BundlesPanel"), QuizPanel: marker("QuizPanel") },
+  });
+  const CatalogPage = (await catWorld(join(ROOT, "app/(console)/admin/(authed)/catalog/page.js"))).default;
+  const page = plain(html(await CatalogPage({ searchParams: Promise.resolve({}) })));
+  for (const w of ["brand and product type shoppers see are set in the editor", "only price, stock and Shopify's own type and vendor stay in Shopify"]) ok(page.includes(w), `the header says "${w}": ${page.slice(0, 500)}`);
+  ok(page.includes("Price, stock and Shopify's own type and vendor stay in Shopify"), "the editor block says it too");
+  ok(!/edited in the editor now\.$|Their pages are edited in the editor;/.test(page), "the old half-true words are gone");
+  // CatalogAdmin's line, on the product's presentation screen
+  const shown = async (documentsStore) => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify({ ok: true, product: { id: P(1), handle: "fixture-product-1", title: "Fixture product 1", product_type: "Serum", vendor: "Labs", price_min: 100, price_max: 100, currency: "INR", available: true }, override: {}, surface: null }), { status: 200, headers: { "content-type": "application/json" } });
+    try {
+      const initial = { products: [{ id: P(1), handle: "fixture-product-1", title: "Fixture product 1", product_type: "Serum", price_min: 100, currency: "INR", available: true, customized: false }], overrides: [], collections: [] };
+      const v = await mount("components/admin/CatalogAdmin.js", "default", () => (documentsStore === undefined ? { initial } : { initial, documentsStore }));
+      await v.click("Presentation");
+      const line = v.find((n) => n.props?.["data-shopify-owned"] === "");
+      ok(line, "the Shopify line is shown");
+      return textOf(line.props.children);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  };
+  const CA = await loadPlain(join(ROOT, "components/admin/CatalogAdmin.js"));
+  eq(await shown(true), CA.CATALOG_DOCUMENTS_LINE, "documents store:");
+  ok(/brand and product type shoppers see are set in the editor/.test(CA.CATALOG_DOCUMENTS_LINE) && /Only price, stock and Shopify's own type and vendor stay in Shopify/.test(CA.CATALOG_DOCUMENTS_LINE), "the words name what the editor sets");
+  eq(await shown(undefined), EM.PRODUCT_WORDS.catalogShopify, "legacy (no prop), unchanged:");
 });
 
 console.log(`\n${pass} passed, ${failures.length} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);

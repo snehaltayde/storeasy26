@@ -142,7 +142,10 @@ export function EditorView({
   entityBusy = false,
   on = {},
 }) {
-  const label = state?.document?.label || entry?.label || "Home page";
+  // P4-FIX3: while the store still holds the document opened before (see
+  // staleEntity below), the heading names the one being opened
+  const switching = Boolean(state) && Boolean(entry?.id) && state.id !== entry.id && (ENTITY_TYPES.includes(state.type) || ENTITY_TYPES.includes(entry?.type));
+  const label = (switching ? entry?.label : state?.document?.label) || entry?.label || "Home page";
   const doc = state ? { ...(state.document || {}), type: state.type, body: state.body } : null;
   const type = state?.type || entry?.type || "home";
   const body = state?.body;
@@ -167,6 +170,15 @@ export function EditorView({
   };
   const entityDoc = ENTITY_TYPES.includes(type);
   const entityId = state?.document?.entityId || null;
+  // P4-FIX3 (P4-EDITOR review): switching from one product (or collection) to
+  // another changes the page's entry and entity at once, while the store still
+  // holds the earlier document until getDocument answers. Until the store
+  // holds the entry's own document, the product and collection forms are held
+  // back, so one product's draft is never shown against another's Shopify
+  // values. Each form is also keyed on its document AND the entry it belongs
+  // to, so it never carries one product's form state into the next.
+  const staleEntity = switching;
+  const formKey = `${state?.id || ""}:${entry?.id || ""}`;
 
   const inspector = () => {
     if (!state) return null;
@@ -174,7 +186,7 @@ export function EditorView({
     if (type === "product_content") {
       return (
         <ProductForm
-          key={`product-${state.id}`}
+          key={`product-${formKey}`}
           body={body}
           entity={entity}
           access={access}
@@ -195,7 +207,7 @@ export function EditorView({
       );
     }
     if (type === "collection_content") {
-      return <CollectionForm key={`collection-${state.id}`} body={body} entity={entity} readOnly={readOnly} issues={issues} context={context} on={{ edit: (m) => on.edit?.({ sectionId: null, path: m.path, value: m.value }) }} />;
+      return <CollectionForm key={`collection-${formKey}`} body={body} entity={entity} readOnly={readOnly} issues={issues} context={context} on={{ edit: (m) => on.edit?.({ sectionId: null, path: m.path, value: m.value }) }} />;
     }
     if (selected) {
       return (
@@ -330,14 +342,14 @@ export function EditorView({
         </Banner>
       )}
 
-      {state && actions}
-      {state && versions && (
+      {state && !staleEntity && actions}
+      {state && !staleEntity && versions && (
         <section aria-label="Earlier versions" className="rounded-card border border-edge bg-surface p-4" data-earlier-versions-panel="">
           {versions.status === "loading" ? <p className="text-[13px] text-fg-muted">Loading earlier versions…</p> : <EarlierVersions versions={versions.rows} onRestore={on.restore} message={versions.message} />}
         </section>
       )}
 
-      {state && writing && (
+      {state && !staleEntity && writing && (
         <div className="space-y-4" data-writing-view="">
           <p className="text-[13px] text-fg-muted">{WORDS.writingView}</p>
           <div className="space-y-6 rounded-card border border-edge bg-surface p-4">
@@ -355,7 +367,13 @@ export function EditorView({
         </div>
       )}
 
-      {state && !writing && entityDoc && (
+      {staleEntity && load.status !== "loading" && (
+        <p className="text-sm text-fg-muted" role="status" data-entity-switching="">
+          {WORDS.loading(label)}
+        </p>
+      )}
+
+      {state && !staleEntity && !writing && entityDoc && (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]" data-editor-layout="" data-entity-layout="">
           <section aria-label="Settings" className="min-w-0 rounded-card border border-edge bg-surface p-4" data-inspector="">
             {inspector()}
@@ -364,7 +382,7 @@ export function EditorView({
         </div>
       )}
 
-      {state && !writing && !entityDoc && (
+      {state && !staleEntity && !writing && !entityDoc && (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]" data-editor-layout="">
           <div className="min-w-0 space-y-4">
             {sections && (

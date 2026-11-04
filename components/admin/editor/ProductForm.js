@@ -24,6 +24,10 @@
 //   - the overlay fields (name, description, images, brand, product type):
 //     each with Shopify's value beside it, "Differs from Shopify" or "Same as
 //     Shopify", and "Reset to Shopify" (the field follows Shopify again).
+//     Shopify's description is shown as plain text (plainSummary), never as
+//     markup, beside the founder's own and in its "Changed in Shopify" notice
+//     (P4-FIX3)
+//   - no entity answer (what Shopify sends): plain words, no form (P4-FIX3)
 //     When the title gate is closed, the name, brand and type are disabled
 //     with the reason; Reset on them stays available.
 //   - a notice per EDITED field Shopify changed since: "Keep mine" or "Use
@@ -69,6 +73,46 @@ export const PRODUCT_CONTROLS = Object.freeze({
   pairs: "pairs",
   keep_variant_images: "toggle",
   sections: "modules",
+});
+
+// P4-FIX3 (P4-EDITOR review): Shopify's description as a short line of plain
+// text, for the line beside the founder's description and the "Changed in
+// Shopify" notice. Tags are dropped (a script's or style's text with them),
+// the common entities read back, spaces folded, and the text cut at a word
+// near `max` characters. React escapes what is left, so nothing here is ever
+// markup; the founder never sees raw HTML in a sentence.
+const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", hellip: "…", ndash: "–", mdash: "—" };
+export function plainSummary(html, max = 160) {
+  if (typeof html !== "string" || !html) return "";
+  const text = html
+    .replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    // a block ends a word; an inline tag (b, em, span, a) does not
+    .replace(/<\/?(p|div|br|hr|h[1-6]|li|ul|ol|dl|dt|dd|tr|td|th|table|thead|tbody|blockquote|section|article|header|footer|figure|figcaption|pre)\b[^>]*>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/<[^>]*$/, "")
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
+      if (e[0] === "#") {
+        const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return Number.isFinite(n) && n > 31 && n < 0x110000 ? String.fromCodePoint(n) : " ";
+      }
+      return ENTITIES[e.toLowerCase()] ?? m;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const at = cut.lastIndexOf(" ");
+  return `${(at > max * 0.6 ? cut.slice(0, at) : cut).replace(/[\s.,;:!?-]+$/, "")}…`;
+}
+
+export const DESCRIPTION_WORDS = Object.freeze({
+  empty: "(no text)",
+  beside: (s) => `Shopify's description: ${s || "(no text)"}`,
+  whenItLeft: (s) => `Shopify's description when it left: ${s || "(no text)"}`,
+  changed: (s) => `Shopify changed the description after you edited it. Shopify's description now reads: ${s || "(no text)"}`,
+  // a product document opened without the entity answer (what Shopify sends)
+  noEntity: "We couldn't read what Shopify sends for this product, so it can't be edited here right now. Reload the page to try again.",
 });
 
 const money = (v, cur) => {
@@ -236,6 +280,18 @@ function Modules({ sections, issues, context, readOnly, focusRequest, selection,
 }
 
 export default function ProductForm({ body, entity = null, access = null, readOnly = null, issues = [], context = {}, focusRequest = null, selection = null, busy = false, on = {} }) {
+  // P4-FIX3 (P4-EDITOR review): without the entity answer nothing on this
+  // form can be compared with Shopify (and the images would wait forever), so
+  // it says so in plain words instead of showing a form.
+  if (!isObj(entity)) {
+    return (
+      <div className="space-y-2" data-product-form="" data-no-entity="">
+        <p className="rounded-ctl border border-warning-edge bg-warning-bg px-3 py-2 text-xs text-fg" role="status">
+          {DESCRIPTION_WORDS.noEntity}
+        </p>
+      </div>
+    );
+  }
   const m = productFormModel({ body, entity, access, readOnly });
   const settings = isObj(body) && isObj(body.settings) ? body.settings : {};
   const shopify = isObj(entity?.shopify) ? entity.shopify : null;
@@ -321,7 +377,7 @@ export default function ProductForm({ body, entity = null, access = null, readOn
       {m.notices.map((n) => (
         <section key={n.field} aria-label={n.title} className="space-y-2 rounded-ctl border border-warning-edge bg-warning-bg px-3 py-3 text-xs text-fg" data-shopify-changed={n.field}>
           <p className="font-semibold">{n.title}</p>
-          <p>{n.words}</p>
+          <p data-notice-words={n.field}>{n.field === "description_html" ? DESCRIPTION_WORDS.changed(plainSummary(field(n.field).shopifyValue)) : n.words}</p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" disabled={busy || Boolean(readOnly)} onClick={() => on.resolve?.(n.field, "keep")} aria-label={`${n.keep}: ${field(n.field).label}`} data-keep-mine={n.field}>
               {n.keep}
@@ -353,6 +409,17 @@ export default function ProductForm({ body, entity = null, access = null, readOn
           />
           {!desc.following && descMax != null && <p className="mt-1 text-xs text-fg-subtle">{PRODUCT_WORDS.descriptionCount(descLen, descMax)}</p>}
           {desc.following && m.inShopify && <p className="mt-1 text-xs text-fg-muted">{"This is Shopify's description. Change it here to use your own."}</p>}
+          {!desc.following && (
+            <div className="mt-1 text-xs text-fg-muted" data-shopify-value="description_html">
+              <p>{m.inShopify ? DESCRIPTION_WORDS.beside(plainSummary(desc.shopifyValue)) : DESCRIPTION_WORDS.whenItLeft(plainSummary(desc.baseValue))}</p>
+              {plainSummary(m.inShopify ? desc.shopifyValue : desc.baseValue) !== plainSummary(m.inShopify ? desc.shopifyValue : desc.baseValue, 20000) && (
+                <details className="mt-1">
+                  <summary className="cursor-pointer font-medium text-fg">{"Show all of Shopify's description"}</summary>
+                  <p className="mt-1 whitespace-pre-line">{plainSummary(m.inShopify ? desc.shopifyValue : desc.baseValue, 20000)}</p>
+                </details>
+              )}
+            </div>
+          )}
           {m.caps.description_html && (
             <p className="mt-1 text-xs text-danger" data-cap="description_html">
               {m.caps.description_html}

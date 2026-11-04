@@ -66,11 +66,12 @@ Pinned products (ProductListControl) and layout (the store's layout, Standard or
 | ✓ | CatalogAdmin | Collection page template | Editor › a collection › Layout | `layout` |
 | ✓ | UpsellsAdmin | Pairs: title | Editor › the source product › Goes well with: title | `pairs` |
 | ✓ | UpsellsAdmin | Pairs: source product and target products | Editor › the source product › Goes well with: products | `pairs` |
-| ✓ | UpsellsAdmin | Pairs: switch off or delete | Editor › the source product › remove every product | `pairs` |
+| ✓ | UpsellsAdmin | Pairs: delete (P4-FIX3: was "switch off or delete") | Editor › the source product › remove every product | `pairs` |
 | ✓ | UpsellsAdmin | Cart slot: title | Editor › Cart › Suggestions title | `text` |
 | ✓ | UpsellsAdmin | Cart slot: target products | Editor › Cart › Suggested products | `products` |
+| ✓ | UpsellsAdmin | Cart slot: delete (P4-FIX3) | Editor › Cart › remove every suggested product | `products` |
 
-Not carried (deliberate): Upsells' Position (several strips on one product) and its Kind choice; a product has one "Goes well with" list and the cart slot is the Cart page.
+Not carried (deliberate): Upsells' Position (several strips on one product) and its Kind choice; a product has one "Goes well with" list and the cart slot is the Cart page. P4-FIX3 adds the Enable/Disable switch of a pairs strip and of the cart slot (no off switch that keeps the products; remove every product, the old list stays in Earlier versions) and reads the old screens' controls from their files (`P4-FIX3.md`).
 
 ### (6) Catalog screen copy
 
@@ -144,7 +145,7 @@ From review:
 
 ## From review
 
-(Empty: no review yet.)
+The findings in the review list above are fixed or covered by tests in P4-FIX3 (`docs/cms-reviews/P4-FIX3.md`): Shopify's description beside the founder's and a plain-words notice; the form held back while switching products and plain words for a missing entity answer; ?doc= read-only covered by a test; the documents-store catalog wording; the upsell and cart-slot switches in the parity list, with the old screens' controls read from their files; a test for each of R2, R4, R5, R10, R24, R25 and R27.
 
 ## Owner checks
 
