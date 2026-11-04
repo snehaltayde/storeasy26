@@ -616,6 +616,27 @@ await t("stale backfill (an aborted earlier run, then newer legacy edits): the m
   ok(r.report.counts.documentsChanged >= 3, `changed: ${r.report.counts.documentsChanged}`);
 });
 
+await t("the backfill writes only the legacy-derived live columns (never title, description, gallery or display_*); an old live row legacy no longer holds loses those columns only, and its overlay stays", async () => {
+  const S = await store("live_v3");
+  const dry = await inS(S, () => Rep.dryRun({ storeOpen: undefined, platform }));
+  // a row the plan doesn't hold: one with an overlay title, one without
+  await q(S, "INSERT INTO product_content_live (product_id, document_id, version_id, title, badge, modules, published_at) VALUES (?, 'doc_prod_x', 'ver_x', 'Founder title', 'Old badge', '[]', ?)", [P(9001), FIXED]);
+  await q(S, "INSERT INTO product_content_live (product_id, document_id, version_id, badge, published_at) VALUES (?, 'doc_prod_y', 'ver_y', 'Old badge', ?)", [P(9002), FIXED]);
+  const plan = await inS(S, () => Back.planBackfill(dry.mapped, { at: FIXED }));
+  const live = plan.chunks.filter((c) => /live rows/.test(c.kind)).flatMap((c) => c.statements);
+  ok(live.length > 0, "live-row statements");
+  for (const st of live) {
+    const cols = /\(([^)]*)\) VALUES/.exec(st.sql)?.[1] ?? st.sql;
+    for (const c of Back.PRODUCT_OVERLAY_COLUMNS) ok(!new RegExp(`\\b${c}\\b`).test(cols), `the backfill writes ${c}: ${st.sql.slice(0, 200)}`);
+  }
+  const r = await move(S);
+  ok(r.ok, JSON.stringify(r.refused || r.stopped));
+  same((await q(S, "SELECT title, badge, modules FROM product_content_live WHERE product_id = ?", [P(9001)]))[0], { title: "Founder title", badge: null, modules: null }, "the overlay stays, the legacy columns go:");
+  eq(await count(S, "product_content_live", `product_id = '${P(9002)}'`), 0, "a row with no overlay is removed:");
+  eq(r.report.counts.liveRowsCleared, 2, "counted:");
+  ok((await q(S, "SELECT product_id FROM search_outbox")).some((x) => x.product_id === P(9001)), "its search entry is refreshed");
+});
+
 await t("a phase-3 random-id product_content row is reused (never a second document for the product); a slug collision refuses before the lock", async () => {
   const S = await store("live_v3");
   const left = await buildPhase3Leftovers(S.db, { productId: P(201), slug: "made-in-new-editor" });
@@ -816,6 +837,18 @@ await t("a planted data-check difference stops before the flip: the store goes b
   await inS(S, () => Store.setBlock("announcement", { enabled: true, text: "Saved after the stop", href: "/" }));
 });
 
+await t("the data check refuses a bodies map holding a null or undefined entry (P4-SEAM review: the seam would read that version from the database instead)", async () => {
+  const S = await store("live_v3");
+  const dry = await inS(S, () => Rep.dryRun({ storeOpen: undefined, platform }));
+  for (const bad of [null, undefined, { document_id: "doc_home", body: null }]) {
+    const bodies = new Map(dry.mapped.bodies);
+    bodies.set([...bodies.keys()][0], bad);
+    const e = await inS(S, () => Chk.dataCheck({ ...dry.mapped, bodies }, { routes: dry.routes }).then(() => null, (x) => x));
+    ok(e && /would read it from the database instead/.test(e.message), `refused (${JSON.stringify(bad)}): ${e?.message}`);
+  }
+  eq((await inS(S, () => Chk.dataCheck(dry.mapped, { routes: dry.routes }))).differences.length, 0, "the real map passes:");
+});
+
 // =======================================================================================
 console.log("— 6. MED-03: release:<id> refs");
 
@@ -887,7 +920,7 @@ await t("a failed pin write is reported (the run stays open at the switch) and r
   const open = (await q(S, "SELECT step, finished_at FROM cms_migration_runs"))[0];
   eq([open.step, open.finished_at], ["flipped", null], "the run waits at the switch:");
   const status = Rep.renderStatusText(await inS(S, () => Cut.cutoverStatus()), { tenant: S.id });
-  ok(/last steps of the move didn't finish/.test(status) && /--resume/.test(status), status);
+  ok(/last steps of the move didn't finish/.test(status) && /the same command with --resume/.test(status), status);
   const again = await resume(S);
   ok(again.ok, JSON.stringify(again));
   eq(again.report.themePin.status, "written", "written on resume:");
@@ -950,8 +983,10 @@ await t("--status on a migrating store prints the step, the start time and the t
   ok(text.includes("Started: 2026-11-04 10:00 UTC, 42 minutes ago."), text);
   ok(text.includes("Done so far: your content was copied into the new editor."), text);
   ok(text.includes("the old editors don't save and the catalog copy from Shopify waits"), text);
-  ok(text.includes(`--tenant ${S.id} --resume`) && text.includes(`--tenant ${S.id} --abort`), text);
-  plainWords(text.replace(/pnpm migrate:documents -- --tenant \S+ --\w+/g, ""), "status");
+  ok(text.includes("the same command with --resume") && text.includes("the same command with --abort"), text);
+  const viaCli = Rep.renderStatusText(s, { tenant: S.id, now: Date.parse("2026-11-04T10:42:00.000Z"), command: (f) => `node --env-file=.env.local scripts/migrate-documents.js --tenant ${S.id} ${f}` });
+  ok(viaCli.includes(`scripts/migrate-documents.js --tenant ${S.id} --resume`) && viaCli.includes(`--tenant ${S.id} --abort`), viaCli);
+  plainWords(text, "status");
   same(await dump(S), before, "read only:");
   ok(/Your store uses the old editor\. No update is under way\./.test(Rep.renderStatusText({ mode: "legacy", run: null }, { tenant: "x" })), "a quiet store");
 });
@@ -992,7 +1027,7 @@ await t("--abort after the flip refuses and names the reversal tool; --abort wit
   Cut.resetCutoverTestHooks();
   const a = await inS(S, () => Cut.abortCutover({ now: fixedClock }));
   eq(a.refused?.code, "AFTER_FLIP", JSON.stringify(a));
-  ok(/pnpm reverse:documents/.test(a.refused.message) && /reversal tool/.test(a.refused.message), a.refused.message);
+  ok(/reverse:documents/.test(a.refused.message) && /reversal tool/.test(a.refused.message), a.refused.message);
   eq((await modeOf(S)).mode, "documents", "still on the new editor:");
   const none = await inS(STATE_STORES.live_v1, () => Cut.abortCutover({ now: fixedClock }));
   eq(none.refused?.code, "NOTHING", "nothing under way:");
@@ -1028,7 +1063,7 @@ await t("a pointer moved after the lock (test hook) makes the flip batch abort w
   same(await dump(S), before, "the flip changed nothing:");
   eq((await modeOf(S)).mode, "migrating", "still paused (the owner decides: --abort):");
   eq(await count(S, "releases", "id LIKE 'rel_mig_%'"), 0, "no v4 release:");
-  plainWords(r.stopped.words.replace(/pnpm migrate:documents -- --tenant \S+ --\w+/g, "").replace(/--\w+/g, ""), "stop words");
+  plainWords(r.stopped.words, "stop words");
 });
 
 // =======================================================================================

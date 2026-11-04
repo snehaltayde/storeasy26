@@ -144,8 +144,10 @@ if (tenantArg === "_default") {
 if (mode === "rehearsal-run") {
   const db = value("db");
   if (!db) fail("Give the copy to rehearse on: --db <file:copy.db, or a database on this machine serving the copy>.");
+  // only ever a database on this machine: a hosted store is never local, so
+  // a rehearsal can't write to one (the control-plane row may point at the
+  // copy too, as when the local harness serves it)
   if (!isLocalDbUrl(db)) fail("refusing: a rehearsal only ever runs on a copy on this machine (a file: database, or localhost).");
-  if (db === url) fail("refusing: --db is the store's own database. A rehearsal runs on a copy, never on the store itself.");
   url = db;
 }
 // the context the store runs in: its control-plane row (with --db, pointed at
@@ -164,6 +166,8 @@ const Rep = await import("../lib/migrate/report.js");
 const Cut = await import("../lib/migrate/cutover.js");
 
 const inStore = (fn) => (storeContext ? withTenant(storeContext, fn) : fn());
+// this command again, with a flag (the status and stop words name it)
+const again = (flag) => `node --env-file=.env.local scripts/migrate-documents.js --tenant ${tenantArg}${needsHosted ? ` --hosted --confirm ${tenantArg}` : ""} ${flag}`;
 
 function printCutover(res) {
   if (res.refused) {
@@ -173,6 +177,7 @@ function printCutover(res) {
   if (res.report) console.log(Rep.renderCutoverText(res.report));
   if (res.stopped) {
     console.error(`\n✗ ${res.stopped.words}`);
+    if (!res.stopped.unlocked) console.error(`  ${again("--status")}`);
     return 1;
   }
   if (res.unfinished) {
@@ -200,7 +205,7 @@ try {
   if (mode === "status") {
     const s = await inStore(() => Cut.cutoverStatus());
     if (has("json")) console.log(JSON.stringify({ mode: s.mode, run: s.run, report: s.report, last: s.last }, null, 2));
-    else console.log(Rep.renderStatusText(s, { tenant: tenantArg }));
+    else console.log(Rep.renderStatusText(s, { tenant: tenantArg, command: again }));
     process.exit(0);
   }
   if (mode === "abort") {
