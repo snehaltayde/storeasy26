@@ -1420,7 +1420,9 @@ await t("P3-COMMIT: archive is terminal: no code sets archived_at back to NULL (
   ok(files.length > 100, `only ${files.length} files found: the walk is broken`);
   const writers = [];
   for (const f of files) {
-    const src = await readFile(join(ROOT, f), "utf8");
+    // P4-MEDIA: media.archived_at (migration 0025) is another table's column,
+    // which a founder may set back (unarchive); only documents are terminal
+    const src = (await readFile(join(ROOT, f), "utf8")).replace(/UPDATE media SET archived_at[^\n]*/g, "");
     if (/archived_at\s*=\s*NULL/i.test(src.replace(/archived_at\s*=\s*NULL\b[^\n]*grep/gi, ""))) writers.push(`${f}: archived_at = NULL`);
     if (/\bSET\b[^;"`]*\barchived_at\s*=/i.test(src)) writers.push(f);
   }

@@ -1,0 +1,12 @@
+-- P4-MEDIA (MED-03; spec 8.2, phase 4 plan decision 6): a library file can be
+-- archived. An archived file is hidden from the media library list (lib/media.js
+-- listMedia) and is still served at /api/media/<id>, so nothing on the store
+-- breaks. NULL means not archived.
+--
+-- Expand only, one statement, alone in its file. Nothing is backfilled. Code
+-- works on a store this hasn't reached yet: the library lists as before and
+-- archiving is refused in plain words.
+--
+-- NOTE: the ALTER is not re-runnable (migrations/README.md rule 3); being alone
+-- in its file, it either ran or it didn't.
+ALTER TABLE media ADD COLUMN archived_at TEXT;
