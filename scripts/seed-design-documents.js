@@ -28,10 +28,17 @@
 //     everything. Adds an owner and a staff login, the drill content and a
 //     second, closed store (see "P3-HARNESS" below). Logins and ids go to
 //     .design-data/p3-seed.json, never to the screen.
-//   node scripts/seed-design-documents.js check [--p3]
+//   node scripts/seed-design-documents.js --p4
+//     P4-HARNESS: the phase 4 drill store. A LEGACY store live on a version 3
+//     release made with createRelease (no takeOver): the fresh perf seed plus
+//     the phase 4 content (see "P4-HARNESS" below). Re-running it resets
+//     everything. Logins and ids go to .design-data/p4-seed.json.
+//   node scripts/seed-design-documents.js check [--p3 | --p4]
 //     prints what the store holds (mode, live release, documents); writes
 //     nothing, and works with the harness running too. --p3 adds row counts,
-//     the document_refs check, the logins and the closed store
+//     the document_refs check, the logins and the closed store; --p4 counts
+//     every line of the phase 4 seed list (P4_SEED_LIST) and what the live
+//     release froze
 //
 // The store is moved to documents mode with its seeded v3 pointer cleared, as
 // perf-docs-fixture's publish does. Documents are only ever written through
@@ -511,29 +518,207 @@ export async function p3State({ libsql }) {
 }
 
 // ---------------------------------------------------------------------------
+// P4-HARNESS: the phase 4 drill store (--p4)
+// ---------------------------------------------------------------------------
+//
+// A LEGACY store, live on a version 3 release that createRelease made (no
+// takeOver, no documents): the store phase 4's cutover moves. It starts from
+// a fresh perf seed (which is already legacy and live on v3), changes it
+// through the same legacy writers the old consoles use, then publishes one
+// more release with createRelease. What it holds (P4_SEED_LIST; check --p4
+// counts each of these):
+//   24 product overrides, one of them (the chosen product) with 6 modules
+//   40 product pairs: one with its own title (the chosen product's), one
+//     switched off, and one source product with two placements; plus the
+//     cart upsell placement
+//   5 collections with pinned products
+//   one per-product template exception (the chosen product: editorial) and
+//     one per-collection one (the first pinned collection: sidebar)
+//   32 library photos, one of them used only inside the chosen product's
+//     module HTML (no product photo, page or block points at it)
+//   a running hero experiment (the demo seed's own, or P4_EXPERIMENT when
+//     there is none), one page redirect (a renamed journal post),
+//     two saved templates (page and journal)
+//   the P3 logins (owner and staff, fresh passwords in the seed config)
+// Facts the drills need go to .design-data/p4-seed.json (mode 600). A copy of
+// the stores and logins also goes to p3-seed.json, so the phase 3 helpers'
+// login() works on this store too (there is no closed store in --p4).
+
+export const P4_SEED_FILE = "p4-seed.json";
+export const P4_PAIRS_TITLE = "Goes well with your routine";
+export const P4_SECOND_PAIRS_TITLE = "More to try";
+export const P4_EXPERIMENT = Object.freeze({
+  slug: "p4-hero-words",
+  name: "Hero words (phase 4 drill)",
+  hypothesis: "Shorter hero words get more clicks",
+  target_kind: "hero",
+  variants: [
+    { key: "control", weight: 50, payload: null },
+    { key: "b", weight: 50, payload: { title: "Train, simply", highlight: "simply", primary: { label: "Shop all", href: "/collections/shop-all" } } },
+  ],
+  min_sample: 200,
+});
+export const P4_TEMPLATES = Object.freeze([
+  { name: "Plain page (saved)", family: "page", sections: [{ kind: "text", heading: "Intro", body: ["Start here."] }] },
+  { name: "Journal post (saved)", family: "journal", sections: [{ kind: "text", heading: "The short version", body: ["Write here."] }] },
+]);
+// What check --p4 must count after a --p4 seed (the "seed list").
+export const P4_SEED_LIST = Object.freeze({
+  mode: "legacy",
+  liveVersion: 3,
+  productOverrides: 24,
+  overridesWithSixModules: 1,
+  pdpPairs: 40,
+  pdpPairsDisabled: 1,
+  pdpPairsCustomTitle: 1,
+  sourcesWithTwoPairs: 1,
+  cartUpsell: 1,
+  pinnedCollections: 5,
+  productTemplateExceptions: 1,
+  collectionTemplateExceptions: 1,
+  media: 32,
+  moduleOnlyPhotos: 1,
+  runningHeroExperiments: 1,
+  pageRedirects: 1,
+  cmsTemplates: 2,
+  documents: 0,
+  owners: 1,
+  staff: 1,
+});
+
+// The perf fixture's own facts (pure): which product, collection and photos
+// the --p4 changes land on. Same answer every seed.
+export async function p4Plan() {
+  const { buildPerfFixture, mediaIdFor } = await import("./perf-fixture.js");
+  const fx = buildPerfFixture();
+  const chosen = fx.products.find((p) => p.handle === fx.measured.productHandle);
+  const byId = (id) => fx.placements.find((p) => p.id === id);
+  const pairs = fx.placements.filter((p) => p.kind === "pdp_pairs");
+  if (!chosen || pairs.length !== 40 || byId("pp-perf-1")?.sourceProductId !== chosen.id) throw new Error("p4Plan: the perf fixture no longer has the shape the --p4 seed expects (40 pairs, the first on the measured product)");
+  const pinned = fx.pins[0];
+  const pinnedCol = fx.collections.find((c) => c.id === pinned.collectionId);
+  const post = fx.posts[0];
+  return {
+    chosen: { id: chosen.id, handle: chosen.handle, title: chosen.title },
+    customPairs: byId("pp-perf-1"),
+    disabledPairs: byId("pp-perf-2"),
+    // the last fixture pairs placement moves onto pp-perf-3's source, after it
+    secondPairs: { ...byId("pp-perf-40"), sourceProductId: byId("pp-perf-3").sourceProductId, position: 1, title: P4_SECOND_PAIRS_TITLE },
+    pinned: { id: pinned.collectionId, handle: pinnedCol.handle, title: pinnedCol.title, first: pinned.productIds },
+    // product-photo-24 becomes the module-only photo; its catalog uses move to product-photo-23
+    moduleOnlyPhoto: mediaIdFor("product-23"),
+    standInPhoto: mediaIdFor("product-22"),
+    renamedPost: { from: post.slug, to: `${post.slug}-updated` },
+  };
+}
+
+// The writes themselves (seedP4Content: the legacy block, page, pairs,
+// override, template and experiment writers, then createRelease) live in
+// scripts/drills/p4/seed-p4.mjs: the writer guard in test-writers allows the
+// old block and page writers only in fixture and drill code.
+
+// The phase 4 drill store's facts, read only (check --p4). Inside withTenant(design).
+export async function p4State({ libsql }) {
+  const plan = await p4Plan();
+  const n = async (sql, args = []) => Number((await libsql.execute({ sql, args })).rows[0]?.n || 0);
+  const one = async (sql, args = []) => (await libsql.execute({ sql, args })).rows[0] || {};
+  const C = await import("../lib/platform/control.js");
+  const live = await one("SELECT s.live_release_id AS id, json_extract(r.content, '$.v') AS v, r.content AS content, r.note AS note, r.published_at AS published_at FROM release_state s LEFT JOIN releases r ON r.id = s.live_release_id WHERE s.id = 1");
+  const content = live.content ? JSON.parse(live.content) : null;
+  const st = JSON.parse((await one("SELECT value FROM cms_blocks WHERE key = 'surface_templates'")).value || "null") || {};
+  // where the module-only photo is used: only in product_overrides.modules
+  const like = `%${plan.moduleOnlyPhoto}%`;
+  const photoUses = {
+    products: await n("SELECT count(*) AS n FROM products WHERE featured_image LIKE ?", [like]),
+    product_images: await n("SELECT count(*) AS n FROM product_images WHERE url LIKE ?", [like]),
+    variants: await n("SELECT count(*) AS n FROM variants WHERE image_url LIKE ?", [like]),
+    collections: await n("SELECT count(*) AS n FROM collections WHERE image LIKE ?", [like]),
+    cms_blocks: await n("SELECT count(*) AS n FROM cms_blocks WHERE value LIKE ?", [like]),
+    cms_pages: await n("SELECT count(*) AS n FROM cms_pages WHERE sections LIKE ?", [like]),
+    product_overrides: await n("SELECT count(*) AS n FROM product_overrides WHERE modules LIKE ?", [like]),
+  };
+  const moduleOnly = photoUses.product_overrides === 1 && Object.entries(photoUses).every(([k, v]) => k === "product_overrides" || v === 0);
+  const pdb = C.platformDb();
+  const members = Object.fromEntries((await pdb.execute({ sql: "SELECT role, count(*) AS n FROM memberships WHERE tenant_id = ? GROUP BY role", args: ["design"] })).rows.map((r) => [r.role, Number(r.n)]));
+  const counts = {
+    mode: (await one("SELECT mode FROM cms_state WHERE id = 1")).mode ?? null,
+    liveVersion: live.v ?? null,
+    productOverrides: await n("SELECT count(*) AS n FROM product_overrides"),
+    overridesWithSixModules: await n("SELECT count(*) AS n FROM product_overrides WHERE json_array_length(modules) = 6"),
+    pdpPairs: await n("SELECT count(*) AS n FROM placements WHERE kind = 'pdp_pairs'"),
+    pdpPairsDisabled: await n("SELECT count(*) AS n FROM placements WHERE kind = 'pdp_pairs' AND enabled = 0"),
+    pdpPairsCustomTitle: await n("SELECT count(*) AS n FROM placements WHERE kind = 'pdp_pairs' AND title = ?", [P4_PAIRS_TITLE]),
+    sourcesWithTwoPairs: await n("SELECT count(*) AS n FROM (SELECT source_product_id FROM placements WHERE kind = 'pdp_pairs' GROUP BY source_product_id HAVING count(*) = 2)"),
+    cartUpsell: await n("SELECT count(*) AS n FROM placements WHERE kind = 'cart_upsell'"),
+    pinnedCollections: await n("SELECT count(*) AS n FROM collection_overrides WHERE json_array_length(pinned) > 0"),
+    productTemplateExceptions: Object.keys(st.products || {}).length,
+    collectionTemplateExceptions: Object.keys(st.collections || {}).length,
+    media: await n("SELECT count(*) AS n FROM media"),
+    moduleOnlyPhotos: moduleOnly ? 1 : 0,
+    runningHeroExperiments: await n("SELECT count(*) AS n FROM experiments WHERE status = 'running' AND target_kind = 'hero'"),
+    pageRedirects: await n("SELECT count(*) AS n FROM page_redirects"),
+    cmsTemplates: await n("SELECT count(*) AS n FROM cms_templates"),
+    documents: await n("SELECT count(*) AS n FROM documents"),
+    owners: members.owner || 0,
+    staff: members.staff || 0,
+  };
+  // the live release froze the same entity rows (v3 reads its own arrays)
+  const frozen = content
+    ? {
+        productOverrides: (content.product_overrides || []).length,
+        sixModules: (content.product_overrides || []).filter((o) => (o.modules || []).length === 6).length,
+        pdpPairs: (content.placements || []).filter((p) => p.kind === "pdp_pairs").length,
+        pdpPairsDisabled: (content.placements || []).filter((p) => p.kind === "pdp_pairs" && (p.enabled === false || p.enabled === 0)).length,
+        cartUpsell: (content.placements || []).filter((p) => p.kind === "cart_upsell").length,
+        pinnedCollections: (content.collection_pins || []).length,
+        redirects: (content.redirects || []).length,
+        templates: content.blocks?.surface_templates ?? null,
+      }
+    : null;
+  const mismatched = Object.entries(P4_SEED_LIST).filter(([k, v]) => counts[k] !== v).map(([k, v]) => ({ what: k, want: v, got: counts[k] }));
+  return { liveRelease: live.id ?? null, liveNote: live.note ?? null, livePublishedAt: live.published_at ?? null, releases: await n("SELECT count(*) AS n FROM releases"), counts, frozen, photoUses, mismatched, plan };
+}
+
+export function writeSeedFile(dataDir, name, config) {
+  const file = join(dataDir, name);
+  writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+  chmodSync(file, 0o600);
+  return file;
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
 export function parseArgs(argv) {
-  const out = { cmd: "seed", posts: 3, draftsOnly: false, worstCase: false, p3: false };
+  const out = { cmd: "seed", posts: 3, draftsOnly: false, worstCase: false, p3: false, p4: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "check" && i === 0) out.cmd = "check";
     else if (a === "--drafts-only") out.draftsOnly = true;
     else if (a === "--worst-case") out.worstCase = true;
     else if (a === "--p3") out.p3 = true;
+    else if (a === "--p4") out.p4 = true;
     else if (a === "--posts") {
       const v = Number(argv[++i]);
       if (!Number.isInteger(v) || v < 0 || v > 1000) throw new Error("--posts needs a whole number from 0 to 1000");
       out.posts = v;
-    } else throw new Error(`Unknown option "${a}". Use: node scripts/seed-design-documents.js [check] [--posts N] [--drafts-only] [--worst-case] [--p3]`);
+    } else throw new Error(`Unknown option "${a}". Use: node scripts/seed-design-documents.js [check] [--posts N] [--drafts-only] [--worst-case] [--p3 | --p4]`);
   }
   if (out.p3 && out.draftsOnly) throw new Error("--p3 publishes its drill content, so it can't be used with --drafts-only");
+  if (out.p4 && out.p3) throw new Error("--p3 makes a documents store and --p4 a legacy one: use one of them");
+  if (out.p4 && (out.draftsOnly || out.worstCase || out.posts !== 3)) throw new Error("--p4 is the perf store as it is, live on the old releases: it takes no --drafts-only, --worst-case or --posts");
   return out;
 }
 
 async function main(argv) {
   const opts = parseArgs(argv);
+  if (opts.cmd === "check" && opts.p4) {
+    const state = await withHarnessStore(async ({ libsql }) => ({ ...(await storeState({ libsql })), p4: await p4State({ libsql }) }), { write: false });
+    console.log(JSON.stringify(state));
+    return 0;
+  }
+  if (opts.p4) return seedP4();
   if (opts.cmd === "check") {
     const state = await withHarnessStore(async ({ libsql }) => ({ ...(await storeState({ libsql })), ...(opts.p3 ? { p3: await p3State({ libsql }) } : {}) }), { write: false, databases: opts.p3 ? ALL_DATABASES : undefined });
     console.log(JSON.stringify(state));
@@ -585,6 +770,49 @@ async function seedP3(opts, fx, started) {
   const r = out.p3;
   console.log(
     `✓ the harness store is in documents mode with the phase 3 drill content: ${out.state.documents} documents, live release ${out.state.liveRelease}, ${r.rows.publish_log} publish_log rows, ${r.rows.document_refs} document_refs rows, an owner and a staff login, and the closed store on ${CLOSED_STORE.host} (no release)${out.catalog ? ", worst-case catalog" : ""}. Logins and ids: ${H.DATA_DIR_NAME}/${P3_SEED_FILE}. ${((Date.now() - started) / 1000).toFixed(1)}s`,
+  );
+  return 0;
+}
+
+// --p4: a fresh perf seed (legacy, live on v3), then the phase 4 changes
+// through the legacy writers and one more createRelease. No takeOver.
+async function seedP4() {
+  const started = Date.now();
+  const H = await import("./design-harness.js");
+  await H.runHarness({ mode: "seed", fixture: "perf", log: (line) => console.log(line) });
+  const dataDir = join(H.ROOT, H.DATA_DIR_NAME);
+  const out = await withHarnessStore(async ({ libsql }) => {
+    const { seedP4Content } = await import("./drills/p4/seed-p4.mjs");
+    const content = await seedP4Content({ libsql, plan: await p4Plan(), P4_EXPERIMENT, P4_PAIRS_TITLE, P4_TEMPLATES });
+    const logins = await seedP3Logins();
+    const state = await storeState({ libsql });
+    const p4 = await p4State({ libsql });
+    const stores = { live: { id: H.TENANT_ID, host: "localhost" } };
+    const config = {
+      seededAt: new Date().toISOString(),
+      seed: "p4",
+      stores,
+      logins: { owner: logins.owner, staff: logins.staff },
+      liveRelease: content.release,
+      chosenProduct: { ...content.plan.chosen, path: `/products/${content.plan.chosen.handle}`, badge: "Bestseller", pairsTitle: P4_PAIRS_TITLE, template: "editorial", modules: 6 },
+      pinnedCollection: { ...content.plan.pinned, path: `/collections/${content.plan.pinned.handle}`, template: "sidebar" },
+      disabledPairs: { id: content.plan.disabledPairs.id, sourceProductId: content.plan.disabledPairs.sourceProductId },
+      secondPairs: { id: content.plan.secondPairs.id, sourceProductId: content.plan.secondPairs.sourceProductId, title: P4_SECOND_PAIRS_TITLE },
+      moduleOnlyPhoto: content.plan.moduleOnlyPhoto,
+      redirect: content.plan.renamedPost,
+      experiment: content.experiment,
+      templates: content.templates,
+      seedList: P4_SEED_LIST,
+    };
+    writeSeedFile(dataDir, P4_SEED_FILE, config);
+    // the phase 3 helpers read their logins from p3-seed.json (no closed store here)
+    writeSeedFile(dataDir, P3_SEED_FILE, { seededAt: config.seededAt, seed: "p4", stores, logins: config.logins });
+    return { state, p4 };
+  });
+  const c = out.p4.counts;
+  if (out.p4.mismatched.length) throw new Error(`the --p4 store doesn't match its seed list: ${out.p4.mismatched.map((m) => `${m.what} ${m.got} (want ${m.want})`).join(", ")}`);
+  console.log(
+    `✓ the harness store is a legacy store live on a version ${c.liveVersion} release (${out.p4.liveRelease}): ${c.productOverrides} product overrides, ${c.pdpPairs} pairs (${c.pdpPairsDisabled} switched off), ${c.pinnedCollections} pinned collections, ${c.media} photos, a running hero experiment, ${c.pageRedirects} redirect, ${c.cmsTemplates} saved templates, an owner and a staff login. Logins and ids: ${H.DATA_DIR_NAME}/${P4_SEED_FILE}. ${((Date.now() - started) / 1000).toFixed(1)}s`,
   );
   return 0;
 }

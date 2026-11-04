@@ -1,0 +1,28 @@
+P3 smoke.mjs run on a worktree at 17a08b7 (none of this branch's changes), same ports:
+ok   the seed run twice gives the same row counts
+ok   the second run started again from scratch (a new live release, new ids)
+FAIL document_refs holds exactly the refs of every seeded published version (none missing, none extra) ({"publishedVersions":43,"versionsWithRefs":25,"mismatched":[],"orphanRefs":22})
+ok   the closed store is in documents mode with no release (state none), drafts only
+ok   the design store has one owner and one staff login
+ok   the seed prints neither password (they are only in the seed config)
+ok   the seed config is readable by its owner only (mode 600)
+ok   the live home page's refs name the live campaign (who links to it, for take offline)
+ok   the last publish set holds three documents, one publish_log row each
+ok   the click counter saw the one click of the owner's sign-in
+ok   a second clickCounter call on the same context returns the same counter
+ok   owner: signed in, and may publish the home page
+ok   staff: signed in, may read the home page, may not publish it
+ok   staff: a publish is refused (403), nothing changes
+ok   at harness start the closed store already pointed at this run's third server (fresh seed)
+ok   a closed store row pointing at another port is pointed back at this run's third server
+ok   closed store: / shows 'Opening soon'
+ok   closed store: no draft reaches the shopper
+ok   live store: / shows the live home page (hero and the campaign banner)
+ok   live store: the home page links to the live campaign
+ok   live store: the product rail shows products from its collection
+ok   live store: the live campaign answers
+ok   live store: the unpublished campaign is not there (404, no draft text)
+ok   live store: the guide page is live, without its draft's link to the unpublished campaign (the published version has no banner and no ref to it)
+ok   the guide's draft holds the banner linking to the unpublished campaign, and differs from what is live
+ok   live store: the journal post answers
+-- smoke: 25 passed, 1 failed. Results in docs/cms-reviews/drills/P3-HARNESS/results-smoke.json

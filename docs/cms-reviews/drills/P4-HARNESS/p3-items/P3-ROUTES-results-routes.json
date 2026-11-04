@@ -1,0 +1,389 @@
+{
+  "id": "P3-ROUTES",
+  "part": "routes",
+  "title": "P3-ROUTES — the editor's address, the redirects, the nav, legacy unchanged",
+  "ranAt": "2026-11-04T13:53:57.960Z",
+  "harness": "http://localhost:6160",
+  "chrome": "156.0.8078.80",
+  "passed": 31,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the phase 3 seed's store is in documents mode",
+      "detail": "documents"
+    },
+    {
+      "ok": true,
+      "label": "documents: /admin/storefront lands on the editor at doc_home",
+      "detail": {
+        "status": 200,
+        "at": "/admin/editor?doc=doc_home",
+        "doc": "doc_home",
+        "label": "Home page"
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: /admin/storefront/designer lands on the editor at doc_home",
+      "detail": {
+        "status": 200,
+        "at": "/admin/editor?doc=doc_home",
+        "doc": "doc_home",
+        "label": "Home page"
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: /admin/storefront/home lands on the editor at doc_home",
+      "detail": {
+        "status": 200,
+        "at": "/admin/editor?doc=doc_home",
+        "doc": "doc_home",
+        "label": "Home page"
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: /admin/storefront/navigation lands on the editor at doc_header",
+      "detail": {
+        "status": 200,
+        "at": "/admin/editor?doc=doc_header",
+        "doc": "doc_header",
+        "label": "Header menu"
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: /admin/storefront/pages lands on the editor at doc_home",
+      "detail": {
+        "status": 200,
+        "at": "/admin/editor?doc=doc_home",
+        "doc": "doc_home",
+        "label": "Home page"
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: /admin/storefront/product-pages lands on the editor at doc_product_layout",
+      "detail": {
+        "status": 200,
+        "at": "/admin/editor?doc=doc_product_layout",
+        "doc": "doc_product_layout",
+        "label": "Product page layout"
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: /admin/brand lands on the editor at doc_design",
+      "detail": {
+        "status": 200,
+        "at": "/admin/editor?doc=doc_design",
+        "doc": "doc_design",
+        "label": "Brand"
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: /admin/theme lands on the editor at doc_design",
+      "detail": {
+        "status": 200,
+        "at": "/admin/editor?doc=doc_design",
+        "doc": "doc_design",
+        "label": "Brand"
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: the Designer is never reached (finding 2): no Designer shell, no legacy preview frame (the new editor's own frame aside)",
+      "detail": {
+        "at": "/admin/editor?doc=doc_home",
+        "legacyFrames": 0,
+        "editorFrames": 1,
+        "shell": false,
+        "editor": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: the sidebar has one Editor link, Media and Publishing, and none of the old screens",
+      "detail": [
+        "/admin/dashboard",
+        "/admin/analytics",
+        "/admin/setup",
+        "/admin/orders",
+        "/admin/catalog",
+        "/admin/editor",
+        "/admin/media",
+        "/admin/releases",
+        "/admin/offers",
+        "/admin/upsells",
+        "/admin/experiments",
+        "/admin/insights",
+        "/admin/automations",
+        "/admin/integrations",
+        "/admin/billing",
+        "/admin/settings"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "documents: one click on Editor opens the home page, and Editor is the current item",
+      "detail": {
+        "clicks": 1,
+        "doc": "doc_home",
+        "current": "page"
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: ?path=/campaigns/p3-weekend-offer opens that campaign",
+      "detail": {
+        "doc": "doc_bq2g24sguliqocf4",
+        "label": "Weekend offer",
+        "want": "doc_bq2g24sguliqocf4"
+      }
+    },
+    {
+      "ok": true,
+      "label": "documents: an unknown address opens home with a note that says so",
+      "detail": {
+        "doc": "doc_home",
+        "text": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDesign Demo Co\n\nlocalhost\n\nOVERVIEW\n\nDashboard\nAnalytics\nSetup\n3/9\n\nORDERS\n\nOrders\n1\n\nCATALOG\n\nCatalog\n\nSTOREFRONT\n\nEditor\nMedia\nPublishing\n2\n\nGROWTH\n\nOffers\nUpsells\nExperiments\nInsights\nAutomations"
+      }
+    },
+    {
+      "ok": true,
+      "label": "migrating: /admin/storefront/designer stays where it is (no redirect)",
+      "detail": {
+        "status": 200,
+        "at": "/admin/storefront/designer"
+      }
+    },
+    {
+      "ok": true,
+      "label": "migrating: /admin/brand stays where it is (no redirect)",
+      "detail": {
+        "status": 200,
+        "at": "/admin/brand"
+      }
+    },
+    {
+      "ok": true,
+      "label": "migrating: /admin/editor is a read-only note",
+      "detail": {
+        "note": "migrating",
+        "editor": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "migrating: the sidebar is the old one",
+      "detail": [
+        "/admin/dashboard",
+        "/admin/analytics",
+        "/admin/setup",
+        "/admin/orders",
+        "/admin/catalog",
+        "/admin/storefront",
+        "/admin/storefront/home",
+        "/admin/storefront/designer",
+        "/admin/storefront/pages",
+        "/admin/storefront/navigation",
+        "/admin/storefront/product-pages",
+        "/admin/theme",
+        "/admin/brand",
+        "/admin/media",
+        "/admin/releases",
+        "/admin/offers",
+        "/admin/upsells",
+        "/admin/experiments",
+        "/admin/insights",
+        "/admin/automations",
+        "/admin/integrations",
+        "/admin/billing",
+        "/admin/settings"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the perf seed's store is legacy",
+      "detail": "legacy"
+    },
+    {
+      "ok": true,
+      "label": "legacy: /admin/storefront renders where it is, as before",
+      "detail": {
+        "status": 200,
+        "at": "/admin/storefront"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: /admin/storefront/designer renders where it is, as before",
+      "detail": {
+        "status": 200,
+        "at": "/admin/storefront/designer"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: /admin/storefront/home renders where it is, as before",
+      "detail": {
+        "status": 200,
+        "at": "/admin/storefront/home"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: /admin/storefront/navigation renders where it is, as before",
+      "detail": {
+        "status": 200,
+        "at": "/admin/storefront/navigation"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: /admin/storefront/pages renders where it is, as before",
+      "detail": {
+        "status": 200,
+        "at": "/admin/storefront/pages"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: /admin/storefront/product-pages renders where it is, as before",
+      "detail": {
+        "status": 200,
+        "at": "/admin/storefront/product-pages"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: /admin/brand renders where it is, as before",
+      "detail": {
+        "status": 200,
+        "at": "/admin/brand"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: /admin/theme renders where it is, as before",
+      "detail": {
+        "status": 200,
+        "at": "/admin/theme"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: the sidebar is the old one, with no Editor link",
+      "detail": [
+        "/admin/dashboard",
+        "/admin/analytics",
+        "/admin/setup",
+        "/admin/orders",
+        "/admin/catalog",
+        "/admin/storefront",
+        "/admin/storefront/home",
+        "/admin/storefront/designer",
+        "/admin/storefront/pages",
+        "/admin/storefront/navigation",
+        "/admin/storefront/product-pages",
+        "/admin/theme",
+        "/admin/brand",
+        "/admin/media",
+        "/admin/releases",
+        "/admin/offers",
+        "/admin/upsells",
+        "/admin/experiments",
+        "/admin/insights",
+        "/admin/automations",
+        "/admin/integrations",
+        "/admin/billing",
+        "/admin/settings"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "legacy: /admin/editor is a note that links to the Designer",
+      "detail": {
+        "note": "legacy",
+        "link": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: a failed preview push shows a plain message, and the label no longer says it shows the edits",
+      "detail": {
+        "pushes": 1,
+        "status": "Preview didn't update: it shows an earlier version"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: the next push that works clears the message",
+      "detail": null
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_bc1e9803a4f7d87d, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s",
+    "re-seeded fresh: the perf seed alone (a legacy store)"
+  ],
+  "screenshots": [
+    {
+      "name": "documents-designer-redirect-1440",
+      "file": "docs/cms-reviews/drills/P3-ROUTES/documents-designer-redirect-1440.png",
+      "bytes": 41980,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "documents-editor-home-1440",
+      "file": "docs/cms-reviews/drills/P3-ROUTES/documents-editor-home-1440.png",
+      "bytes": 16668,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "documents-unknown-path-1440",
+      "file": "docs/cms-reviews/drills/P3-ROUTES/documents-unknown-path-1440.png",
+      "bytes": 41500,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "migrating-editor-note-1440",
+      "file": "docs/cms-reviews/drills/P3-ROUTES/migrating-editor-note-1440.png",
+      "bytes": 16945,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "legacy-editor-note-1440",
+      "file": "docs/cms-reviews/drills/P3-ROUTES/legacy-editor-note-1440.png",
+      "bytes": 17336,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "legacy-designer-push-failed-1440",
+      "file": "docs/cms-reviews/drills/P3-ROUTES/legacy-designer-push-failed-1440.png",
+      "bytes": 47922,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

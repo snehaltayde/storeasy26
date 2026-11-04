@@ -1,0 +1,191 @@
+{
+  "id": "P4-HARNESS",
+  "part": "smoke",
+  "title": "P4-HARNESS — smoke",
+  "ranAt": "2026-11-04T14:15:27.254Z",
+  "harness": "http://localhost:6160",
+  "chrome": "156.0.8078.80",
+  "passed": 16,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "lib.mjs: assertLocal refuses addresses that are not on this machine (and the owner's port 3017)",
+      "detail": {
+        "https://shop.example.com/": "Refusing https://shop.example.com: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "http://storeasy.in/products/x": "Refusing http://storeasy.in: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "https://staging.example.com/": "Refusing https://staging.example.com: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "http://10.0.0.5:6160/": "Refusing http://10.0.0.5:6160: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "http://localhost.example.com/": "Refusing http://localhost.example.com: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "libsql://shop-x.turso.io": "Refusing libsql:// addresses: phase 4 drills only open http or https pages on this machine.",
+        "file://other-host/x.db": "Refusing file://other-host/x.db: a file on another machine. Only files on this machine are allowed.",
+        "http://localhost:3017/": "Refusing http://localhost:3017: port 3017 is the owner's harness and a drill never uses it.",
+        "not a url": "\"not a url\" is not a full address. Phase 4 drills only use addresses on this machine, like http://localhost:6160."
+      }
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: assertLocal lets addresses on this machine through",
+      "detail": {
+        "http://localhost:6160/": null,
+        "http://127.0.0.1:7160": null,
+        "http://[::1]:6160/": null,
+        "http://closed.localhost:6160/": null,
+        "file:/tmp/x.db": null,
+        "file:.test-x.db": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: p3Ports still refuses 3017 (set or by default) and takes this run's own ports",
+      "detail": {
+        "DESIGN_PORT 3017": "Set DESIGN_PORT (and DESIGN_SQLD_PORT) to this run's own ports, for example DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880. Port 3017 is the owner's harness and a drill never uses it.",
+        "DESIGN_PORT unset (means 3017)": "Set DESIGN_PORT (and DESIGN_SQLD_PORT) to this run's own ports, for example DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880. Port 3017 is the owner's harness and a drill never uses it.",
+        "DESIGN_PORT 6160": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper captures: the home page, the chosen product, the pinned collection and the renamed post answer 200",
+      "detail": [
+        [
+          "home-1",
+          200
+        ],
+        [
+          "home-2",
+          200
+        ],
+        [
+          "chosen-product",
+          200
+        ],
+        [
+          "pinned-collection",
+          200
+        ],
+        [
+          "journal-old-address",
+          308
+        ],
+        [
+          "journal-new-address",
+          200
+        ]
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the renamed post's old address redirects to the new one (the page redirect)",
+      "detail": {
+        "status": 308,
+        "location": "/journal/protein-myths-1-updated"
+      }
+    },
+    {
+      "ok": true,
+      "label": "with a hero experiment running, two captures with the fixed unit show the same hero (captures are deterministic)",
+      "detail": {
+        "heroes": [
+          "Visibly brighter in 14 days",
+          "Visibly brighter in 14 days"
+        ],
+        "control": "Winter repair, started.",
+        "variants": [
+          "Visibly brighter in 14 days"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the chosen product (Micronised Creatine) renders the editorial template (its per-product exception)",
+      "detail": "editorial"
+    },
+    {
+      "ok": true,
+      "label": "the chosen product shows its badge \"Bestseller\"",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the chosen product shows its own pairs title \"Goes well with your routine\"",
+      "detail": "Goes well with your routine"
+    },
+    {
+      "ok": true,
+      "label": "the chosen product shows its six modules",
+      "detail": 6
+    },
+    {
+      "ok": true,
+      "label": "the module-only photo is inside the chosen product's module",
+      "detail": 1
+    },
+    {
+      "ok": true,
+      "label": "the pinned collection (Protein) renders the sidebar template (its per-collection exception)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the pinned collection lists its pinned products first, in the pinned order",
+      "detail": {
+        "pinned": [
+          "max-mass-gainer-391",
+          "max-plant-protein-blend-381",
+          "max-whey-protein-concentrate-371",
+          "max-whey-protein-isolate-361"
+        ],
+        "firstShown": [
+          "max-mass-gainer-391",
+          "max-plant-protein-blend-381",
+          "max-whey-protein-concentrate-371",
+          "max-whey-protein-isolate-361",
+          "whey-protein-isolate-1",
+          "whey-protein-concentrate-11"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "in Chrome, the old post address lands on the renamed post",
+      "detail": "http://localhost:6160/journal/protein-myths-1-updated"
+    },
+    {
+      "ok": true,
+      "label": "the owner signs in through the real form and reaches the console",
+      "detail": "http://localhost:6160/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "the staff signs in through the real form and reaches the console",
+      "detail": "http://localhost:6160/admin/dashboard"
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_24a2b019193de6d6): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.6s",
+    "with no cookie at all, 8 captures of / showed 2 different heroes: [\"Winter repair, started.\",\"Visibly brighter in 14 days\"] (a random unit per request; that is why captures send a fixed unit)",
+    "shopper captures in /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/wt/.design-data/p4-captures (index.json)"
+  ],
+  "screenshots": [
+    {
+      "name": "chosen-product-1440",
+      "file": "docs/cms-reviews/drills/P4-HARNESS/chosen-product-1440.png",
+      "bytes": 135980,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "pinned-collection-1440",
+      "file": "docs/cms-reviews/drills/P4-HARNESS/pinned-collection-1440.png",
+      "bytes": 70651,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/protein"
+    }
+  ]
+}

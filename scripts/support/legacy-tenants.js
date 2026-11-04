@@ -107,6 +107,10 @@ function urlOf(db) {
 
 // Throws unless the handle's database is a local file: URL. Called before any
 // statement, so a hosted URL is never opened.
+// It checks what the handle SAYS (its url and tenant.dbUrl); it trusts that the
+// handle's run(fn) opens that same database. Handles from openWorld and
+// tenant-fixture's makeTenant are made that way; a hand-made handle whose
+// run(fn) connects somewhere else would pass this check, so never make one.
 export function assertFileDb(db) {
   const url = urlOf(db);
   assertLocalDbUrl(url);
@@ -1064,7 +1068,21 @@ export const ENTITY_FIXTURES = Object.freeze({
       upsertPageBoth(model, { slug: "redirect-post", title: "Redirect post", description: "", sections: [{ kind: "text", heading: "Post", body: ["Moved here."] }], enabled: true, family: "journal", window_start: "2025-01-01T00:00:00.000Z" }),
     ),
   },
-  redirect_to_code_default_page: { describe: "An old address that redirects to a code-default page (terms) that has no cms_pages row", apply: entityRedirect("old-terms", "terms") },
+  // P4-HARNESS (from the P4-FIXTURES review): code-default pages are served
+  // only on the env store and on BeastLife, so on any other tenant this would
+  // be the same as redirect_to_nothing. It needs the right store, as the
+  // code_default_pages_* traps do.
+  redirect_to_code_default_page: {
+    describe: "An old address that redirects to a code-default page (terms) that has no cms_pages row; needs the env store or the BeastLife tenant, where code-default pages render",
+    requires: ["_default", "beastlife"],
+    apply: entityRedirect("old-terms", "terms", (model, { db }) => {
+      if (!["_default", "beastlife"].includes(db.id)) {
+        throw new Error(`legacy-tenants: redirect_to_code_default_page needs the env store (world.defaultStore()) or the tenant id "beastlife", where the terms page renders without a row of its own, not "${db.id}"`);
+      }
+      // a release or draft that holds its own terms page would hide the code default
+      removePageBoth(model, "terms");
+    }),
+  },
   redirect_to_nothing: { describe: "An old address that redirects to a slug nothing serves", apply: entityRedirect("old-gone", "gone-forever") },
   cms_templates_two_families: {
     describe: "Saved templates in two families (page and journal)",
@@ -1127,6 +1145,7 @@ export async function buildLegacyTenant(db, { state = "no_release_open", traps =
   for (const e of entities) if (!ENTITY_FIXTURES[e]) throw new Error(`legacy-tenants: unknown entity fixture "${e}"`);
   const platformNeeds = [...traps.filter((t) => MAPPING_TRAPS[t].needsPlatform), ...entities.filter((e) => ENTITY_FIXTURES[e].needsPlatform)];
   if (platformNeeds.length) await platformOf(db, platformNeeds.join(" and "));
+  await refuseSecondBuild(db);
   let release = null;
   if (st.release != null) {
     release = clone(cs.releases[`v${st.release}`]);
@@ -1197,6 +1216,25 @@ export async function buildLegacyTenant(db, { state = "no_release_open", traps =
     });
   }
   return { id: db.id, url: urlOf(db), set, state, flag: st.flag ?? null, traps: [...traps], entities: [...entities], drafts, releases, release: release ? clone(release) : null };
+}
+
+// P4-HARNESS (from the P4-FIXTURES review): each database is built once. A
+// second build on the same database used to stop half way with a database
+// error (the catalog's unique handles); now it is refused before anything is
+// written. A freshly migrated database holds none of these rows.
+const BUILT_TABLES = ["products", "collections", "releases", "cms_blocks", "cms_pages"];
+async function refuseSecondBuild(db) {
+  const { exec } = await lib();
+  const n = await db.run(async () => {
+    let total = 0;
+    for (const t of BUILT_TABLES) total += Number((await exec(`SELECT count(*) AS n FROM ${t}`)).rows[0]?.n || 0);
+    return total;
+  });
+  if (n > 0) {
+    throw new Error(
+      `legacy-tenants: this database (${db.id}) already holds a store's catalog or content, so it was built before. Each database can be built only once: make a new tenant with its own file (world.tenant({ file })) for another build.`,
+    );
+  }
 }
 
 // A registered tenant from the world, then buildLegacyTenant. The tenant's
@@ -1383,6 +1421,7 @@ export async function buildStaleBackfill(db) {
     pinned: [P(2), P(1)],
   };
   const versions = {};
+  let collectionBody = null;
   await db.run(async () => {
     const S = await import("../../lib/cms/store.js");
     const homeSections = (await S.getHomeSections()) || [];
@@ -1390,8 +1429,20 @@ export async function buildStaleBackfill(db) {
     versions.home = await insertDocument({ id: ids.home, type: "home", label: "Home page", ...home, at: STALE_AT, versionKind: "migrated", note: "Backfill (aborted run)" });
     const about = await bodyFor("page", { meta: { slug: "about", title: older.aboutTitle }, sections: legacyPageSectionsToSections([{ heading: "Story", body: ["Older words."] }]) });
     versions.about = await insertDocument({ id: ids.about, type: "page", slug: "about", label: older.aboutTitle, ...about, at: STALE_AT, versionKind: "migrated", note: "Backfill (aborted run)" });
-    const pc = await bodyFor("product_content");
+    // P4-HARNESS (from the P4-FIXTURES review): the version holds what the
+    // live row says wherever the registry has a place for it. The older
+    // modules are rich text sections of product_content; the badge and the
+    // pairs have no product_content field at this base, so they stay in the
+    // live row only.
+    const pc = await bodyFor("product_content", { sections: older.modules.map((m) => ({ kind: "rich_text", v: 1, enabled: true, settings: { title: m.title, html: m.html }, blocks: [] })) });
     versions.product = await insertDocument({ id: ids.product, type: "product_content", entityId: product, label: "Product content", ...pc, at: STALE_AT, versionKind: "migrated", note: "Backfill (aborted run)" });
+    // The collection's document and its version. collection_content is
+    // registered by P4-LIVEROW; until then its body cannot be built from the
+    // registry, so the fixture writes the smallest body of that type, and the
+    // older pins stay in the live row only (manifest: collectionBody).
+    const cc = await collectionBodyFor();
+    versions.collection = await insertDocument({ id: ids.collection, type: "collection_content", entityId: collection, label: "Collection content", ...cc.doc, at: STALE_AT, versionKind: "migrated", note: "Backfill (aborted run)" });
+    collectionBody = cc.from;
     // live rows the aborted run wrote (legacy-derived columns only)
     await exec(
       "INSERT INTO product_content_live (product_id, document_id, version_id, badge, modules, pairs, published_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(product_id) DO UPDATE SET badge = excluded.badge, modules = excluded.modules",
@@ -1400,7 +1451,7 @@ export async function buildStaleBackfill(db) {
     await exec("INSERT INTO collection_content_live (collection_id, document_id, version_id, pinned, published_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(collection_id) DO UPDATE SET pinned = excluded.pinned", [
       collection,
       ids.collection,
-      "ver_stalecollection",
+      versions.collection,
       JSON.stringify(older.pinned),
       STALE_AT,
     ]);
@@ -1428,7 +1479,26 @@ export async function buildStaleBackfill(db) {
       NEWER_AT,
     ]);
   });
-  return { ids, versions, older, newer, abortedAt: STALE_AT, editedAt: NEWER_AT };
+  // liveRowOnly: what the live rows hold that no version holds (CUTOVER can't
+  // check "the older differing draft is kept" for these from a version).
+  const liveRowOnly = ["product badge", "product pairs", ...(collectionBody === "registry" ? [] : ["collection pins"])];
+  return { ids, versions, older, newer, abortedAt: STALE_AT, editedAt: NEWER_AT, collectionBody, liveRowOnly };
+}
+
+// The collection content body: from the registry once collection_content is
+// registered ("registry"), else the smallest body of that type ("minimal").
+async function collectionBodyFor() {
+  const Reg = await import("../../lib/registry/index.js");
+  const { documentHash } = await import("../../lib/registry/body.js");
+  let registered = true;
+  try {
+    Reg.emptyBody("collection_content");
+  } catch {
+    registered = false;
+  }
+  if (registered) return { from: "registry", doc: await bodyFor("collection_content") };
+  const body = { schema: 1, type: "collection_content", meta: {}, sections: [] };
+  return { from: "minimal", doc: { body, hash: await documentHash(body), schema: Reg.SCHEMA_VERSION } };
 }
 
 export const RERUN_FIXTURES = Object.freeze({

@@ -7,7 +7,9 @@
 // three hand-made releases live in turn (v1, v2 and v3), and records what
 // getLiveReleaseState(), contentSource() and every resolved* getter return for
 // each. It imports the app through relative paths, so running this same file
-// inside an older checkout records that checkout's answers.
+// inside an older checkout records that checkout's answers. (P4-HARNESS) It now needs
+// scripts/support/legacy-tenants.js and scripts/support/tenant-fixture.js too:
+// copy all three files into the older checkout before running it there.
 // scripts/fixtures/legacy-release-outputs.a6d028e.json was recorded this way
 // from a6d028e, and test:releases compares today's answers with it.
 //

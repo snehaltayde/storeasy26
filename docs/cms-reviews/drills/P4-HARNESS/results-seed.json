@@ -1,0 +1,340 @@
+{
+  "id": "P4-HARNESS",
+  "part": "seed",
+  "title": "P4-HARNESS — seed",
+  "ranAt": "2026-11-04T14:15:05.246Z",
+  "harness": "http://localhost:6160",
+  "chrome": "156.0.8078.80",
+  "passed": 35,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "lib.mjs: assertLocal refuses addresses that are not on this machine (and the owner's port 3017)",
+      "detail": {
+        "https://shop.example.com/": "Refusing https://shop.example.com: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "http://storeasy.in/products/x": "Refusing http://storeasy.in: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "https://staging.example.com/": "Refusing https://staging.example.com: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "http://10.0.0.5:6160/": "Refusing http://10.0.0.5:6160: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "http://localhost.example.com/": "Refusing http://localhost.example.com: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "libsql://shop-x.turso.io": "Refusing libsql:// addresses: phase 4 drills only open http or https pages on this machine.",
+        "file://other-host/x.db": "Refusing file://other-host/x.db: a file on another machine. Only files on this machine are allowed.",
+        "http://localhost:3017/": "Refusing http://localhost:3017: port 3017 is the owner's harness and a drill never uses it.",
+        "not a url": "\"not a url\" is not a full address. Phase 4 drills only use addresses on this machine, like http://localhost:6160."
+      }
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: assertLocal lets addresses on this machine through",
+      "detail": {
+        "http://localhost:6160/": null,
+        "http://127.0.0.1:7160": null,
+        "http://[::1]:6160/": null,
+        "http://closed.localhost:6160/": null,
+        "file:/tmp/x.db": null,
+        "file:.test-x.db": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: p3Ports still refuses 3017 (set or by default) and takes this run's own ports",
+      "detail": {
+        "DESIGN_PORT 3017": "Set DESIGN_PORT (and DESIGN_SQLD_PORT) to this run's own ports, for example DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880. Port 3017 is the owner's harness and a drill never uses it.",
+        "DESIGN_PORT unset (means 3017)": "Set DESIGN_PORT (and DESIGN_SQLD_PORT) to this run's own ports, for example DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880. Port 3017 is the owner's harness and a drill never uses it.",
+        "DESIGN_PORT 6160": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "cms_state.mode is legacy (no takeOver)",
+      "detail": "legacy"
+    },
+    {
+      "ok": true,
+      "label": "the live release is version 3, and it is the one --p4 published",
+      "detail": {
+        "v": 3,
+        "live": "rel_917ae8a1d50baa5b",
+        "seeded": "rel_917ae8a1d50baa5b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the live release was made by createRelease and published (its note and time)",
+      "detail": {
+        "note": "P4-HARNESS drill store",
+        "publishedAt": "2026-11-04T14:15:00.346Z"
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: mode is legacy",
+      "detail": {
+        "got": "legacy"
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: liveVersion is 3",
+      "detail": {
+        "got": 3
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: productOverrides is 24",
+      "detail": {
+        "got": 24
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: overridesWithSixModules is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: pdpPairs is 40",
+      "detail": {
+        "got": 40
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: pdpPairsDisabled is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: pdpPairsCustomTitle is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: sourcesWithTwoPairs is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: cartUpsell is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: pinnedCollections is 5",
+      "detail": {
+        "got": 5
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: productTemplateExceptions is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: collectionTemplateExceptions is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: media is 32",
+      "detail": {
+        "got": 32
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: moduleOnlyPhotos is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: runningHeroExperiments is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: pageRedirects is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: cmsTemplates is 2",
+      "detail": {
+        "got": 2
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: documents is 0",
+      "detail": {
+        "got": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: owners is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "seed list: staff is 1",
+      "detail": {
+        "got": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "SQL counts match the whole seed list",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "the module-only photo is used by one product's module HTML and nothing else",
+      "detail": {
+        "products": 0,
+        "product_images": 0,
+        "variants": 0,
+        "collections": 0,
+        "cms_blocks": 0,
+        "cms_pages": 0,
+        "product_overrides": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "the live v3 release froze the same overrides, pairs (the switched-off one too), cart upsell, pins and redirect",
+      "detail": {
+        "productOverrides": 24,
+        "sixModules": 1,
+        "pdpPairs": 40,
+        "pdpPairsDisabled": 1,
+        "cartUpsell": 1,
+        "pinnedCollections": 5,
+        "redirects": 1,
+        "templates": {
+          "collections": {
+            "gid://shopify/Collection/7000001": "sidebar"
+          },
+          "products": {
+            "gid://shopify/Product/8000011": "editorial"
+          }
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the live release holds the per-product and per-collection template exceptions",
+      "detail": {
+        "collections": {
+          "gid://shopify/Collection/7000001": "sidebar"
+        },
+        "products": {
+          "gid://shopify/Product/8000011": "editorial"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the seed run twice gives the same counts",
+      "detail": {
+        "first": {
+          "mode": "legacy",
+          "liveVersion": 3,
+          "productOverrides": 24,
+          "overridesWithSixModules": 1,
+          "pdpPairs": 40,
+          "pdpPairsDisabled": 1,
+          "pdpPairsCustomTitle": 1,
+          "sourcesWithTwoPairs": 1,
+          "cartUpsell": 1,
+          "pinnedCollections": 5,
+          "productTemplateExceptions": 1,
+          "collectionTemplateExceptions": 1,
+          "media": 32,
+          "moduleOnlyPhotos": 1,
+          "runningHeroExperiments": 1,
+          "pageRedirects": 1,
+          "cmsTemplates": 2,
+          "documents": 0,
+          "owners": 1,
+          "staff": 1
+        },
+        "second": {
+          "mode": "legacy",
+          "liveVersion": 3,
+          "productOverrides": 24,
+          "overridesWithSixModules": 1,
+          "pdpPairs": 40,
+          "pdpPairsDisabled": 1,
+          "pdpPairsCustomTitle": 1,
+          "sourcesWithTwoPairs": 1,
+          "cartUpsell": 1,
+          "pinnedCollections": 5,
+          "productTemplateExceptions": 1,
+          "collectionTemplateExceptions": 1,
+          "media": 32,
+          "moduleOnlyPhotos": 1,
+          "runningHeroExperiments": 1,
+          "pageRedirects": 1,
+          "cmsTemplates": 2,
+          "documents": 0,
+          "owners": 1,
+          "staff": 1
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the second run started again from scratch (a new live release)",
+      "detail": {
+        "first": "rel_917ae8a1d50baa5b",
+        "second": "rel_4bbba61c27a35236"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the seed prints neither password (they are only in the seed files)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "p4-seed.json is readable by its owner only (mode 600)",
+      "detail": "600"
+    },
+    {
+      "ok": true,
+      "label": "p3-seed.json is readable by its owner only (mode 600)",
+      "detail": "600"
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_917ae8a1d50baa5b): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.6s",
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_4bbba61c27a35236): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.7s"
+  ],
+  "screenshots": []
+}

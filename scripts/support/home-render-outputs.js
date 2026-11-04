@@ -18,7 +18,9 @@
 //   v1, v2, v3      a version 1, 2 and 3 release live
 //   empty           a store with no products yet (GEN-03)
 // It imports the app through relative paths, so running this same file inside
-// an older checkout records that checkout's output.
+// an older checkout records that checkout's output. (P4-HARNESS) It now needs
+// scripts/support/legacy-tenants.js and scripts/support/tenant-fixture.js too:
+// copy all three files into the older checkout before running it there.
 // scripts/fixtures/home-render-outputs.a6d028e.json was recorded this way from
 // a6d028e, and test:sections-render compares today's output with it (after
 // taking out the data-section-id and data-section-kind attributes P2-SECTIONS
