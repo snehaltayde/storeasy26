@@ -558,6 +558,31 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] If you already have a local-tenants build from before this fix (for example in `.design-data/p4-local`), delete that folder by hand once. Its manifest has no tool field, so a rebuild into it is now refused.
 - [ ] CI sqld download (carried over): its source and checksum still need your approval; nothing under `.github/` was touched.
 
+## Phase 4, batch 3
+
+### Search and the console read the names shoppers see (P4-SEARCH)
+- [ ] On staging with a real Typesense: publish two renames of the same product within about a second, then confirm search shows the second name once the job tick has run.
+- [ ] The job tick: confirm the hosted scheduler runs `runDueJobs` often enough for `search_reindex` retries, including the new 'kept changing' give-up.
+
+### Product and collection content on the shopper side (P4-OVL07)
+- [ ] Old module HTML: on stores whose product modules were saved before sanitizing, the dry run reports a shopper change on those products (the cleaned HTML). Decide per store whether that is acceptable, or have CUTOVER list it in `allowed-differences.js`.
+- [ ] Spec 8.9 deviation (plan section 2): a product's or collection's draft shows to any valid documents preview session, on that page only, not only when it is open in the editor. Confirm this is acceptable.
+- [ ] Hosted speed (OQ-19): on a staging documents store, measure the product page (one more statement: the content row) and the collection page (two more: the handle's id and the row) against the local counts.
+- [ ] Phone and Safari: the drill ran in desktop Chrome only.
+- [ ] Staging (hosted Turso): nothing ran against a hosted store; product and collection content on a real cut-over store waits for CUTOVER's runbook.
+- [ ] CI: the sqld download in `.github/` still needs the owner's approval of its source and checksum (nothing under `.github/` was changed).
+
+### The library picker, gallery, pairs and pins, and media archive (P4-PICKER)
+- [ ] On a phone and in Safari: open a product's content in the editor, add a library image to its images, and archive an unused file on the Media screen.
+- [ ] After P4-SEARCH merges: in the pairs and pinned-products lists, check that a renamed product shows its new name with 'Shopify title: …' under it.
+- [ ] CI sqld download: nothing under `.github/` was changed. Its source and checksum still need the owner's approval (carried over from P4-SCAFFOLD).
+
+### The MAPPER review's findings (P4-FIX1)
+- [ ] `{store_name}` binding: decide between keeping 'no title of its own' and a real store-name token. Keeping it: the first edit to any hero field blocks publishing until the founder types a title, which then stops following the store name, and experiments' `unpublishableDrafts` reports a migrated half-customized home as blocked. A token needs a named owner for `resolve.js`, `documents-reader.js` and the home page. After a real cutover, open the home page in the editor and try a subtitle-only experiment adopt.
+- [ ] A real hosted dry run per store (owner only): `pnpm migrate:documents -- --tenant <id> --dry-run --hosted --confirm <id>`, with `PLATFORM_DB_URL` and its token in the environment; check that the Details 'routes given to the data check' list covers the store's pages and old addresses.
+- [ ] P4-CUTOVER note: rehearsal and cutover version and release ids may differ while source hashes match (a Shopify handle change of a cart product); compare source hashes only.
+- [ ] The CI sqld download in `.github/` still needs the owner's approval of its source and checksum (unchanged here).
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
