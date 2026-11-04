@@ -107,13 +107,19 @@ if (!isLocalDbUrl(url)) {
 if (hosted && !needsHosted) fail("--hosted is only for a hosted database; this store's database and the control plane are local. Run it without --hosted.");
 
 const { mapTenant } = await import("../lib/migrate/map.js");
-const { dataCheck, routesFor } = await import("../lib/migrate/check.js");
+const { dataCheck, entityRoutesFor, routesFor } = await import("../lib/migrate/check.js");
 const { buildReport, renderText, reportDigest } = await import("../lib/migrate/report.js");
 
 try {
   const out = await withTenant(tenant, async () => {
     const mapped = await mapTenant({ storeOpen, platform: tenant ? platformDb() : null });
-    const routes = routesFor(mapped.source);
+    // routesFor's routes plus the entity routes dataCheck always adds
+    // (P4-OVL07), once each, so the listed routes are the ones compared
+    const seen = new Set();
+    const routes = [...routesFor(mapped.source), ...(await entityRoutesFor(mapped))].filter((r) => {
+      const k = JSON.stringify(r);
+      return seen.has(k) ? false : (seen.add(k), true);
+    });
     const check = await dataCheck(mapped, { routes });
     // the report's Details list the routes this comparison covered
     const report = buildReport(mapped, check, { routes });
