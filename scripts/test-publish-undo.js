@@ -228,6 +228,15 @@ const offered = async (store, id) => (await recent(store)).find((r) => r.documen
 const liveText = async (store, slug) => (await inT(() => Res.resolvedContentPage(slug), store))?.sections?.[0]?.body ?? null;
 const stripped = (b) => canon(R.stripIds(b));
 
+// P3-CHECKS (PUB-06): a closed store's first publish must include the home
+// page (FIRST_PUBLISH_NEEDS_HOME). These cases are about an open store, so
+// each store opens here with its home page (one publish row on doc_home).
+async function openStore(store) {
+  const home = await create(store, "home", { body: body("home", { sections: [textSec("sec_h1", "Welcome", "Hello.")] }) });
+  published(await publishApi(store, home.id), `open ${store} with its home page`);
+}
+for (const s of STORES) await openStore(s);
+
 // A live version written straight through the commit with a 'migrated' log
 // row, as the migration will write one.
 async function migratedFixture(docId, b, store = "docs") {
@@ -620,8 +629,8 @@ await t("unit (negative): staff calling undo, undoSet or unpublish get 403 with 
   await unchanged(before, "staff");
   ok(p, "published");
   // a singleton's first publish: nothing earlier
-  const home = await create("docs", "home", { body: body("home", { sections: [textSec("sec_h1", "Welcome", "Hello.")] }) });
-  published(await publishApi("docs", home.id), "home");
+  // (the store opened with doc_home's first publish: see openStore)
+  const home = await current("docs", "doc_home");
   const hb = await dump();
   const first = await undoApi("docs", home.id, (await lastLog("docs", home.id)).id);
   likeShape(first, SHAPES.undo.outcomes.nothing, "singleton first version");
@@ -700,6 +709,9 @@ await t("unit: whole-set Undo after a 3-document publishSet restores all three i
 console.log("— take offline (PUB-04, decision 4)");
 
 await t("unit: unpublish of a live page and of a journal post writes an 'unpublish' row, 404s it, keeps its draft, nulls published_version_id (archive allowed), sets undone_version_id; dryRun returns linkers and change words and writes nothing; Undo of that row brings it back with redirects and refs and clears undone", async () => {
+  // P3-CHECKS: a link to a collection the store doesn't have blocks a
+  // publish (LINK_COLLECTION_MISSING), so the store has the linen collection
+  await raw.docs.execute({ sql: "INSERT OR IGNORE INTO collections (id, handle, title, synced_at) VALUES (?, ?, ?, ?)", args: ["gid://shopify/Collection/linen", "linen", "Linen", new Date().toISOString()] });
   const target = await create("docs", "page", { body: page("off-target", "Off target", "Live words.", "page", { redirect_from: ["off-target-old"] }) });
   // the page itself links somewhere, so its versions have refs
   await save("docs", target.id, { ...page("off-target", "Off target", "Live words.", "page", { redirect_from: ["off-target-old"] }), sections: [textSec("sec_t1", "Off target", "Live words."), sec("banner", "sec_bnx", { title: "B", text: "x", button: { label: "Go", link: { type: "collection", handle: "linen" } } })] });
@@ -789,7 +801,8 @@ await t("unit: listRecentlyPublished gives plain names, labels and summaries (ne
   // names, labels and words
   for (const r of rows) {
     eq(r.byName, "Asha Rao", "plain name:");
-    ok(["List A", "List B"].includes(r.label), `label ${r.label}`);
+    // "Home page" is the publish that opened the store (openStore)
+    ok(["List A", "List B", "Home page"].includes(r.label), `label ${r.label}`);
     eq(r.actionWords, "Published", "action words:");
     const text = JSON.stringify([r.byName, r.label, r.actionWords, r.summary, r.note ?? null]);
     ok(!/merchant:|usr_|[0-9a-f]{32,}|\b(?:doc|ver|log|set|rel)_[A-Za-z0-9]/.test(text), `no raw ids or hashes: ${text}`);
@@ -798,7 +811,9 @@ await t("unit: listRecentlyPublished gives plain names, labels and summaries (ne
   const can = rows.filter((r) => r.canUndo).map((r) => r.logId).sort();
   const aLatest = rows.find((r) => r.setId === a2.setId);
   const bSet = rows.find((r) => r.setId === set.setId && r.documentId === b.id);
-  eq(can, [aLatest.logId, bSet.logId].sort(), "current rows:");
+  // (plus the home page's publish that opened the store: see openStore)
+  const homeOpen = rows.find((r) => r.documentId === "doc_home");
+  eq(can, [aLatest.logId, bSet.logId, homeOpen.logId].sort(), "current rows:");
   for (const r of rows) eq(r.undo === null, !r.canUndo, "undo args only when it can:");
   eq(aLatest.undo, { id: a.id, revision: (await current(st, a.id)).revision, logId: aLatest.logId }, "undo args:");
   eq(aLatest.summary, [{ words: "Text: a paragraph changed" }], "the summary of a2:");
@@ -915,6 +930,7 @@ try {
   sqld = H.startSqld({ bin: found.bin, key: "publish-undo", port: sqldPort || (await freePort()), dataDir });
   await H.waitForHealth(sqld.url, sqld.child, { logFile: sqld.logFile, label: "test:publish-undo" });
   await addStore("sqld", sqld.url, createClient({ url: sqld.url }));
+  await openStore("sqld");
 
   await t("unit (sqld): after Undo the live list serves the previous version, the draft equals it with revision+1, documents.slug and label follow the target, and publishing the unchanged draft is skipped", async () => {
     await undoBackCase("sqld");
