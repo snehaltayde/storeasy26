@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { listProductOverrides, getCollectionPins } from "@/lib/catalog-overrides";
 import CatalogAdmin from "@/components/admin/CatalogAdmin";
 import { BundlesPanel, QuizPanel } from "@/components/admin/CommercePanels";
-import { listBundles } from "@/lib/bundles";
+import { listBundles, bundleCurrency } from "@/lib/bundles";
 import { listQuizzes } from "@/lib/quiz";
 import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
@@ -34,6 +34,17 @@ const CATALOG_DOCUMENTS_WORDS = Object.freeze({
   block: "Names, descriptions, photos, the brand and product type shoppers see, badges, modules and pairs are set in the editor now. Price, stock and Shopify's own type and vendor stay in Shopify: change those in Shopify.",
 });
 
+// P5-PANEL: the store's currency for the bundle prices (formatMoney). When
+// it can't be read the panel gets undefined and formatMoney uses its own
+// default, as Price.js does.
+const currencyForBundles = async () => {
+  try {
+    return await bundleCurrency();
+  } catch {
+    return undefined;
+  }
+};
+
 export default async function AdminCatalogPage({ searchParams } = {}) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
@@ -43,7 +54,7 @@ export default async function AdminCatalogPage({ searchParams } = {}) {
   if (cmsMode === "documents") {
     const to = catalogHref((await searchParams) || {});
     if (to !== PRODUCTS_LIST_HREF) redirect(to);
-    const [bundles, quizzes] = await tfetch(async () => [await listBundles(), await listQuizzes()]);
+    const [bundles, quizzes, currency] = await tfetch(async () => [await listBundles(), await listQuizzes(), await currencyForBundles()]);
     return (
       <>
         <PageHeader title="Catalog" description={CATALOG_DOCUMENTS_WORDS.header} />
@@ -55,14 +66,14 @@ export default async function AdminCatalogPage({ searchParams } = {}) {
           </a>
         </div>
         <div className="mt-4 space-y-4">
-          <BundlesPanel initial={bundles} />
+          <BundlesPanel initial={bundles} currency={currency} />
           <QuizPanel initial={quizzes} />
         </div>
       </>
     );
   }
 
-  const [initial, bundles, quizzes] = await tfetch(async () => {
+  const [initial, bundles, quizzes, currency] = await tfetch(async () => {
     const [products, overrides, collections] = await Promise.all([
       db
         .selectFrom("products")
@@ -88,6 +99,7 @@ export default async function AdminCatalogPage({ searchParams } = {}) {
       },
       await listBundles(),
       await listQuizzes(),
+      await currencyForBundles(),
     ];
   });
 
@@ -99,7 +111,7 @@ export default async function AdminCatalogPage({ searchParams } = {}) {
       />
       <CatalogAdmin initial={initial} />
       <div className="mt-4 space-y-4">
-        <BundlesPanel initial={bundles} />
+        <BundlesPanel initial={bundles} currency={currency} />
         <QuizPanel initial={quizzes} />
       </div>
     </>
