@@ -649,6 +649,11 @@ await t("a media id used only in a doc_home draft, or only in a retained version
   const camp = made.camp;
   const live = await V.versionRow({ documentId: camp.id, kind: "published", body: { ...camp.body, sections: [{ id: "sec_iw1", kind: "image_with_text", v: 1, enabled: true, settings: { image: { media: M.mediaUrl(inLive.id), alt: "x" } }, blocks: [] }] }, schemaVersion: 1, createdAt: new Date().toISOString() });
   await raw.docs.execute(V.versionStatement(live));
+  // P4-MEDIA: a documents store reads usage from the reference index, which
+  // the publish batch writes with every published version; this hand-made
+  // live version gets its rows the same way (refRows of its body)
+  const Refs = await import("../lib/documents/refs.js");
+  for (const st of Refs.refInsertStatements(Refs.refRows(live.id, JSON.parse(live.body)))) await raw.docs.execute(st);
   await raw.docs.execute({ sql: "UPDATE documents SET published_version_id = ? WHERE id = ?", args: [live.id, camp.id] });
   ok(!(await docRow(camp.id)).draft.includes(inLive.id), "the campaign draft doesn't use it:");
   made.home = home;

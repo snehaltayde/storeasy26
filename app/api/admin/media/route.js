@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
 import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
-import { saveMedia, listMedia, setMediaAlt, deleteMedia, mediaUsage, mediaUrl, MEDIA_MIME } from "@/lib/media";
+import { saveMedia, listMedia, setMediaAlt, deleteMedia, mediaUsage, mediaUrl, archiveMedia, unarchiveMedia, MEDIA_MIME } from "@/lib/media";
 import { audit } from "@/lib/platform/audit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
 
 // Media library API (S38 / BE15 + MC12).
-//   GET                      → library listing (originals + their variants)
+//   GET                      → library listing (originals + their variants);
+//                              P4-MEDIA: archived files are left out unless
+//                              ?archived=include
 //   POST multipart           → upload: `file` (original) + optional `thumb`
 //                              (client-side canvas derivative) + alt/width/height
 //   PATCH {id, alt}          → update alt text
-//   DELETE {id, force?}      → delete; 409 + usage list while referenced
+//   PATCH {id, archived}     → P4-MEDIA: archive (true) or bring back (false);
+//                              409 MEDIA_ARCHIVE_UNAVAILABLE on a store without
+//                              migration 0025, 404 MEDIA_NOT_FOUND
+//   DELETE {id, force?}      → delete; 409 + usage list while referenced;
+//                              P4-MEDIA: 409 STORE_MIGRATING while the store
+//                              is being moved to the new editor
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -20,7 +27,8 @@ const shape = (m) => ({ ...m, url: mediaUrl(m.id) });
 export const GET = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.read");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  const media = (await listMedia()).map(shape);
+  const includeArchived = new URL(request.url, "http://local").searchParams.get("archived") === "include";
+  const media = (await listMedia({ includeArchived })).map(shape);
   return NextResponse.json({ ok: true, media, limits: Object.fromEntries(Object.entries(MEDIA_MIME).map(([k, v]) => [k, v.max])) });
 });
 
@@ -79,10 +87,18 @@ export const PATCH = tenantHandler(async (request) => {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
   try {
+    if (typeof body.archived === "boolean") {
+      const r = await (body.archived ? archiveMedia : unarchiveMedia)(String(body.id || ""));
+      slog(body.archived ? "media_archived" : "media_unarchived", { id: r.id });
+      await audit({ actor: auth.actor, action: "storefront.write", resource: `media:${r.id}`, diff: { archived: body.archived } });
+      return NextResponse.json({ ok: true, id: r.id, archived_at: r.archived_at });
+    }
     await setMediaAlt(String(body.id || ""), body.alt);
     await audit({ actor: auth.actor, action: "storefront.write", resource: `media:${body.id}`, diff: { alt: true } });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    // P4-MEDIA: a deliberate refusal in plain words (archive unavailable, gone)
+    if (e?.name === "MediaError") return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
     const infra = infraResponse(e, { route: "admin/media" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 422 });
@@ -102,6 +118,8 @@ export const DELETE = tenantHandler(async (request) => {
   } catch (e) {
     // the "still used on …" guard is the only way to the force-delete, so it comes first
     if (e?.code === "MEDIA_IN_USE") return NextResponse.json({ error: e.message, code: e.code, usage: e.usage }, { status: 409 });
+    // P4-MEDIA: the store is being moved (STORE_MIGRATING) or the file changed
+    if (e?.name === "MediaError") return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
     const infra = infraResponse(e, { route: "admin/media" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 422 });

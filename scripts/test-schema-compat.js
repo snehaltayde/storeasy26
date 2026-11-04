@@ -1044,10 +1044,11 @@ console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LI
       const before = await tables(at23.file);
       await c.executeMultiple(M24.sql);
       await c.executeMultiple(M24.sql);
-      same((await runMigrations(c, MIGRATIONS)).applied, [], "runner re-run applied:");
+      // P4-MEDIA: the runner up to 0024 (0025 and later are other files)
+      same((await runMigrations(c, upTo(CONTENT_LIVE))).applied, [], "runner re-run applied:");
       same(await tables(at23.file), before, "schema after re-running 0024:");
       eq(Number((await c.execute("SELECT count(*) AS n FROM cms_migration_runs")).rows[0].n), 2, "rows kept:");
-      ok((await checkLedger(c, MIGRATIONS)).current, "ledger current after 0024");
+      ok((await checkLedger(c, upTo(CONTENT_LIVE))).current, "ledger current after 0024");
     } finally {
       c.close();
       await at23.cleanup();
