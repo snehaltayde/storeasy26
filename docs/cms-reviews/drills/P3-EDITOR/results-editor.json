@@ -2,7 +2,7 @@
   "id": "P3-EDITOR",
   "part": "editor",
   "title": "P3-EDITOR — the editor: edit, pick, add, cart, conflict, leave, reconnect, publish, Undo",
-  "ranAt": "2026-11-04T05:54:53.967Z",
+  "ranAt": "2026-11-04T06:18:25.304Z",
   "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 22,
@@ -23,7 +23,7 @@
       "label": "edit: select the hero, type its title: Saving, then Saved; the draft holds the text (one autosave)",
       "detail": {
         "clicks": 1,
-        "stored": "Drill title 64227",
+        "stored": "Drill title 75101",
         "revisions": [
           2,
           3
@@ -70,7 +70,7 @@
       "label": "add: a new section shows 'Adding to preview…' until the refresh holds it, then it is outlined in the frame",
       "detail": {
         "sawAdding": true,
-        "newId": "sec_97dc22f5",
+        "newId": "sec_974853f9",
         "clicks": 2
       }
     },
@@ -98,7 +98,7 @@
       "detail": {
         "title": "Tab A's title",
         "clicks": 2,
-        "panel": "Restoring puts this version in your draft. It doesn't go live until you publish.\n\nKept from another tab\n\n4 Nov, 11:24 · Asha Founder\n\nRestore to draft\n\nPublished\nLive now\n\n4 Nov, 11:24 · Asha Founder\n\nRestore to draft\n\nPublished\n\n4 Nov, 11:24 · Someone on your team\n\nRestore to draft\n\nSaved while you",
+        "panel": "Restoring puts this version in your draft. It doesn't go live until you publish.\n\nKept from another tab\n\n4 Nov, 11:48 · Asha Founder\n\nRestore to draft\n\nPublished\nLive now\n\n4 Nov, 11:47 · Asha Founder\n\nRestore to draft\n\nPublished\n\n4 Nov, 11:47 · Someone on your team\n\nRestore to draft\n\nSaved while you",
         "notes": [
           [
             "undo_saved",
@@ -124,7 +124,7 @@
       "label": "link: typed then clicked a console link within the pause, nothing lost (the page waited for the save, then went)",
       "detail": {
         "statusAtClick": "pending",
-        "stored": "Typed then left 76548",
+        "stored": "Typed then left 87352",
         "clicks": 1
       }
     },
@@ -135,7 +135,6 @@
         "labels": [
           "Up to date",
           "Updating (Reconnecting)",
-          "Updating",
           "Up to date"
         ],
         "clicks": 1,
@@ -163,8 +162,8 @@
       "ok": true,
       "label": "undo: Undo shows what will change, then the live store is back to before",
       "detail": {
-        "confirmText": "Undo this publish?\n\nThis changes on your live store:\n\nHero: title changed\nText: removed\n\nIt goes back to: Published 4 Nov, 11:24 by Asha Founder.\n\nUndo\nCancel",
-        "status": "“Home page” is back to the version that went live on 4 Nov, 11:24.",
+        "confirmText": "Undo this publish?\n\nThis changes on your live store:\n\nHero: title changed\nText: removed\n\nIt goes back to: Published 4 Nov, 11:47 by Asha Founder.\n\nUndo\nCancel",
+        "status": "“Home page” is back to the version that went live on 4 Nov, 11:47.",
         "clicks": 2
       }
     },
@@ -172,7 +171,7 @@
       "ok": true,
       "label": "releases: /admin/releases shows Recently published on a documents store",
       "detail": {
-        "text": "Undid Home page\n\nAsha Founder · 4 Nov, 11:24\n\nHero: title changed\nText: removed\nOpen in the editor\n\nPublished Home page\n\nAsha Founder · 4 Nov, 11:24\n\nHero: title changed\nText: added, hidden\nOpen in th"
+        "text": "Undid Home page\n\nAsha Founder · 4 Nov, 11:48\n\nHero: title changed\nText: removed\nOpen in the editor\n\nPublished Home page\n\nAsha Founder · 4 Nov, 11:48\n\nHero: title changed\nText: added, hidden\nOpen in th"
       }
     },
     {
@@ -241,7 +240,7 @@
     }
   ],
   "notes": [
-    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_6220ba41efadcc4e, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.6s",
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_3a5239367065cc9e, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.6s",
     "no seeded page is all rich text, so the drill made one through createDocument (200)",
     "click totals: owner context 22"
   ],
@@ -258,7 +257,7 @@
     {
       "name": "editor-edited-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/editor-edited-1440.png",
-      "bytes": 40919,
+      "bytes": 40660,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -267,7 +266,7 @@
     {
       "name": "editor-other-document-pick-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/editor-other-document-pick-1440.png",
-      "bytes": 35407,
+      "bytes": 35745,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -276,7 +275,7 @@
     {
       "name": "editor-added-section-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/editor-added-section-1440.png",
-      "bytes": 34055,
+      "bytes": 36254,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -294,7 +293,7 @@
     {
       "name": "editor-conflict-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/editor-conflict-1440.png",
-      "bytes": 43724,
+      "bytes": 43438,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -303,7 +302,7 @@
     {
       "name": "editor-kept-from-another-tab-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/editor-kept-from-another-tab-1440.png",
-      "bytes": 35415,
+      "bytes": 35061,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -312,7 +311,7 @@
     {
       "name": "editor-reconnected-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/editor-reconnected-1440.png",
-      "bytes": 39861,
+      "bytes": 40291,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -321,7 +320,7 @@
     {
       "name": "editor-publish-review-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/editor-publish-review-1440.png",
-      "bytes": 31454,
+      "bytes": 31455,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -330,7 +329,7 @@
     {
       "name": "editor-publish-blocked-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/editor-publish-blocked-1440.png",
-      "bytes": 30948,
+      "bytes": 30569,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -339,7 +338,7 @@
     {
       "name": "editor-published-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/editor-published-1440.png",
-      "bytes": 29259,
+      "bytes": 27403,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -348,7 +347,7 @@
     {
       "name": "editor-undone-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/editor-undone-1440.png",
-      "bytes": 31022,
+      "bytes": 31240,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -357,7 +356,7 @@
     {
       "name": "releases-recently-published-1440",
       "file": "docs/cms-reviews/drills/P3-EDITOR/releases-recently-published-1440.png",
-      "bytes": 25531,
+      "bytes": 25499,
       "width": 720,
       "height": 450,
       "viewport": 1440,

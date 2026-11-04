@@ -217,12 +217,20 @@ export async function editor(drill) {
   await waitLabel(page, "Up to date", 45_000);
   const labels = [];
   let watching = true;
+  // the label and the reconnecting mark are read in one go, so a change
+  // between two reads can't make up a label the pane never showed
+  const paneTag = () =>
+    page
+      .locator("[data-preview-pane]")
+      .first()
+      .evaluate((el) => `${el.getAttribute("data-preview-label")}${el.hasAttribute("data-preview-reconnecting") ? " (Reconnecting)" : ""}`)
+      .catch(() => null);
+  const record = (tag) => {
+    if (tag && labels.at(-1) !== tag) labels.push(tag);
+  };
   const watch = (async () => {
     while (watching) {
-      const l = await previewLabel(page);
-      const rc = await page.locator("[data-preview-pane][data-preview-reconnecting]").count().catch(() => 0);
-      const tag = `${l}${rc ? " (Reconnecting)" : ""}`;
-      if (labels.at(-1) !== tag) labels.push(tag);
+      record(await paneTag());
       await sleep(25);
     }
   })();
@@ -231,7 +239,11 @@ export async function editor(drill) {
   const back = await waitFor(async () => labels.some((l) => /Reconnecting/.test(l)) && (await previewLabel(page)) === "Up to date", 60_000);
   watching = false;
   await watch;
-  drill.check(Boolean(back) && labels.some((l) => /Updating \(Reconnecting\)/.test(l)) && labels.at(-1) === "Up to date", "live: See the live store, back to the editor, Reconnecting then Up to date", { labels, clicks: clicks.since(m), log: await page.locator("[data-preview-pane]").getAttribute("data-preview-log").catch(() => null) });
+  record(await paneTag()); // the label the pane ended on
+  // once reconnecting, it says Reconnecting until Up to date (never a plain Updating meanwhile)
+  const afterRc = labels.slice(labels.findIndex((l) => /Reconnecting/.test(l)));
+  const steady = afterRc.every((l) => l === "Updating (Reconnecting)" || l === "Up to date");
+  drill.check(Boolean(back) && labels.some((l) => /Updating \(Reconnecting\)/.test(l)) && steady && labels.at(-1) === "Up to date", "live: See the live store, back to the editor, Reconnecting then Up to date", { labels, clicks: clicks.since(m), log: await page.locator("[data-preview-pane]").getAttribute("data-preview-log").catch(() => null) });
   await drill.screenshot(page, "editor-reconnected-1440");
 
   // ---- publish, then Undo ----

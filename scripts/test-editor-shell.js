@@ -289,9 +289,19 @@ await t("unit: re-mint is requested on ready ok:false (live, revoked, expired) w
     release();
     await tick();
     eq(r.srcs.at(-1), "/", `${reason}: the frame loads the address again with the new cookie:`);
+    // the founder sees Reconnecting for the whole reconnect, not only the mint
+    eq([r.last().label, r.last().words, r.last().reconnecting], ["Updating", PREVIEW_WORDS.reconnecting, true], `${reason}: minted, the new frame loading, still Reconnecting:`);
+    r.ctl.frameLoad();
+    eq([r.last().words, r.last().reconnecting], [PREVIEW_WORDS.reconnecting, true], `${reason}: the new frame loaded, no ready yet, still Reconnecting:`);
     await connect(r);
-    eq(r.last().label, "Up to date", `${reason}: then Up to date:`);
+    eq([r.last().label, r.last().words, r.last().reconnecting], ["Up to date", null, false], `${reason}: then Up to date:`);
+    // the next ordinary update is not a reconnect
+    r.ctl.saveAck({ draftHash: "h_next" });
+    eq([r.last().label, r.last().words, r.last().reconnecting], ["Updating", PREVIEW_WORDS.loading, false], `${reason}: the next save says Showing your latest changes, not Reconnecting:`);
   }
+  const first = previewRig();
+  await first.ctl.start();
+  eq([first.last().words, first.last().reconnecting], [PREVIEW_WORDS.loading, false], "the first load says Showing your latest changes, not Reconnecting:");
   const legacy = previewRig();
   await legacy.ctl.start();
   legacy.ctl.frameLoad();
