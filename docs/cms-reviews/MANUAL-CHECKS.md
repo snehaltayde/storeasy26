@@ -493,6 +493,15 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] Production build: the editor opens one preview session per editor open.
 - [ ] CI: approve the sqld download's source and checksum (nothing under `.github/` was touched).
 
+## Phase 4, batch 0
+
+### Phase 4 ground: migration 0024, ids, editability, fixture (P4-SCAFFOLD)
+- [ ] Owner step: apply 0023, 0024 and 0025 on every tenant and on the env store before code that reads or writes them deploys. Run `pnpm tenant:migrate -- --all`, then `pnpm migrate` (the env store), then `pnpm tenant:migrate -- --check --include-env`, which must exit 0 (`migrations/README.md`, "Phase 4").
+- [ ] CI: approve the source and checksum of the sqld download under `.github/` before CI runs the phase 4 sqld suites. Nothing under `.github/` was changed.
+- [ ] OQ-6, the `doc_cart` ruling: `CART_EDITABLE = true` is the default in `lib/registry/editability.js`. Confirm it before batch 2 (LIVEROW and MAPPER).
+- [ ] Orchestrator: add `scripts/test-publish.js` (one assertion relaxed to "0023 and later") to P4-SCAFFOLD's file list, and name an owner to add the new 0024 tables to `lib/platform/export.js`.
+- [ ] Orchestrator: the operator commands carry no `--env-file=.env.local`. If CUTOVER's hosted owner run needs it, `package.json` must change, and only SCAFFOLD may edit it.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
