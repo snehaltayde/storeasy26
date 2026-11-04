@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createPreviewController, WORDS } from "./editorModel";
+import { applyDesignToggle, createPreviewController, WORDS } from "./editorModel";
 
 // P3-EDITOR (PV-01, PUB-11, ED-04): the preview frame. The logic is
 // editorModel.createPreviewController (pure, unit-tested); this file only
@@ -52,6 +52,15 @@ export default function PreviewPane({ api, documentId, path, ack = null, problem
           }
         },
         currentPath: () => frameRef.current?.contentWindow?.location?.pathname ?? null,
+        // P4-EDITOR (P3-FIX5 review): no "Hide them" in the frame's bar while
+        // the design is open (the frame is this store's own page)
+        designOpen: (open) => {
+          try {
+            applyDesignToggle(frameRef.current?.contentDocument, open);
+          } catch {
+            /* the frame is navigating */
+          }
+        },
       };
       ctl = createPreviewController({
         api,

@@ -1144,6 +1144,48 @@ await t("P3-FIX3: closing the panel while a fix runs says it keeps running; the 
   ok(!textOf(html(h(Panel.PublishPanelView, { state: { phase: "blocked", busy: false, outcome: { issues: [], message: "x" }, items: [], order: [], lists: {} } }))).includes(M.WORDS.keepsRunning), "not said when nothing runs");
 });
 
+// P4-EDITOR (P4-LIVEROW review): a publish of only products and collections
+// writes no release, so its lost answer is PUBLISH_UNKNOWN with release: null.
+// It is settled by reading the document again FROM THE SERVER: the editor's
+// store call answers getDocument with the store's own copy, which still holds
+// what was live before, so DocumentEditor passes readDocument.
+await t("P4-EDITOR: a lost products-only publish answer (release: null) settles from the server's document, not the store's copy", async () => {
+  const { createDocumentStore } = await import("../components/admin/editor/store.js");
+  const EM = await import("../components/admin/editor/editorModel.js");
+  const PROD = { id: "doc_prod_0123456789abcdef", type: "product_content", label: "Moon serum", slug: null, body: { type: "product_content", settings: { title: { value: "Moon serum", base_hash: "b", base_value: "Night serum" } }, sections: [] }, revision: 4, draftHash: "h_prod_draft", publishedVersionId: "ver_old", publishedHash: "h_prod_old", access: { canPublish: true, reason: null } };
+  const lost = { ...answer(P.unknown), release: null };
+  const run = async ({ serverPublishedHash, viaServer }) => {
+    const calls = [];
+    const api = {
+      async call(op, args, extra) {
+        calls.push(op);
+        if (op === "listChanges") return changes([{ kind: "edited", sectionId: null, words: "Name: your own instead of Shopify's" }]);
+        if (op === "publish") return clone(lost);
+        if (op === "getDocument") return { ok: true, data: { ok: true, document: { ...clone(PROD), publishedVersionId: "ver_new", publishedHash: serverPublishedHash } } };
+        throw new Error(`unexpected ${op}`);
+      },
+      sendKeepalive: () => true,
+    };
+    const store = createDocumentStore({ api, document: clone(PROD), tenant: "t", timers: { setTimeout: () => 0, clearTimeout: () => {} }, storage: null });
+    const call = EM.createStoreCall({ api, getStore: () => store });
+    const flow = M.createPublishFlow({ call, ...(viaServer ? { readDocument: (id) => api.call("getDocument", id) } : {}) });
+    await flow.open([{ id: PROD.id, label: PROD.label, type: PROD.type, revision: PROD.revision, draftHash: PROD.draftHash }]);
+    await flow.confirm();
+    return { state: flow.getState(), calls };
+  };
+  // as the editor builds it: readDocument straight to the server
+  let r = await run({ serverPublishedHash: "h_prod_draft", viaServer: true });
+  eq([r.state.phase, r.state.outcome.live], ["checked", true], "went live (the server's published hash is the draft sent):");
+  ok(r.state.outcome.words === M.WORDS.checkedLive, r.state.outcome.words);
+  r = await run({ serverPublishedHash: "h_prod_old", viaServer: true });
+  eq([r.state.phase, r.state.outcome.live], ["checked", false], "did not go live:");
+  // without readDocument the store's stale copy answers: the old false "didn't go live"
+  r = await run({ serverPublishedHash: "h_prod_draft", viaServer: false });
+  eq(r.state.outcome.live, false, "the store's copy can't tell (why the editor passes readDocument):");
+  const src = await readFile(join(ROOT, "components/admin/editor/DocumentEditor.js"), "utf8");
+  ok(/createPublishFlow\(\{[^}]*readDocument: \(id\) => api\.call\("getDocument", id\)/.test(src), "DocumentEditor passes readDocument to the publish flow");
+});
+
 const secs = ((Date.now() - started) / 1000).toFixed(1);
 console.log(`\n${pass} passed, ${fail} failed (${secs} s)`);
 process.exit(fail ? 1 : 0);

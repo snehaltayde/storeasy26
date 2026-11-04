@@ -440,7 +440,10 @@ await t("P3-FIX5 unit: showDesign reaches the session the frame renders; the pre
     s.ctl.message(readyWith({ sid: OWN, skipped: ["doc_design"], designShown: false }));
     await tick();
   }
-  eq([s.last().label, s.last().words], ["Could not update", PREVIEW_WORDS.designHidden], "after the tries: Could not update, in words:");
+  // P4-EDITOR (P3-FIX5 review): the session's colours ARE on here (minted on,
+  // never adopted away), so a draft still skipped is one that can't be read:
+  // its own words, not "isn't showing your new colours"
+  eq([s.last().label, s.last().words], ["Could not update", M.DESIGN_WORDS.unreadable], "after the tries: Could not update, in words:");
   ok(s.views.every((v) => v.label !== "Up to date"), "never Up to date on the way");
   s.ctl.retry();
   await tick();
@@ -744,7 +747,7 @@ await t("unit: tree changes become store operations by section id; the UX ruling
   eq(M.inspectorPath({ sectionId: null, path: "brand" }), "settings.brand", "document setting:");
 });
 
-await t("unit: the switcher lists every document by label with name search, and products by name as not yet editable", () => {
+await t("unit: the switcher lists every document by label with name search; products are listProductContent's rows, each opening its own content (P4-EDITOR)", () => {
   const docs = [
     { id: "doc_home", type: "home", label: "Home page", live: true },
     { id: "doc_header", type: "header", label: "Header", live: true },
@@ -752,14 +755,102 @@ await t("unit: the switcher lists every document by label with name search, and 
     { id: "doc_x2", type: "campaign", label: "Diwali sale", slug: "diwali", live: true, unpublishedChanges: true },
     { id: "doc_ji", type: "journal_index", label: "Journal", live: true },
     { id: "doc_old", type: "page", label: "Old", archivedAt: "2026-01-01" },
+    { id: "doc_prod_0123456789abcdef", type: "product_content", label: "Night serum", entityId: "gid://shopify/Product/7", live: true },
+    { id: "doc_coll_0123456789abcdef", type: "collection_content", label: "Summer", entityId: "gid://shopify/Collection/5", live: true },
   ];
-  const all = M.switcherRows({ documents: docs, products: [{ handle: "serum", title: "Night serum" }], openId: "doc_home" });
-  eq(all.documents.map((d) => d.label), ["Home page", "Header", "Diwali sale", "Returns policy"], "every editable document, home first:");
+  const items = [{ productId: "gid://shopify/Product/7", title: "Moon serum", shopifyTitle: "Night serum", edited: true, live: true, inShopify: true, changedInShopify: false }];
+  const all = M.switcherRows({ documents: docs, products: items, openId: "doc_home" });
+  eq(all.documents.map((d) => d.label), ["Home page", "Header", "Diwali sale", "Returns policy"], "every editable page, home first; product and collection content are not pages:");
   eq(all.documents[0].open, true, "the open one is marked:");
   eq(all.documents.map((d) => d.state), ["Live", "Live", "Changes not published", "Not published yet"], "states:");
-  eq(all.products, [{ kind: "product", id: "serum", label: "Night serum", state: "Not yet editable here" }], "products:");
+  eq(all.products, [{ kind: "product", id: "gid://shopify/Product/7", label: "Moon serum", secondary: "Shopify title: Night serum", state: "Your edits are live", href: "/admin/editor?product=gid%3A%2F%2Fshopify%2FProduct%2F7", open: false }], "products open their own content:");
+  ok(!all.products.some((p) => p.state === M.WORDS.productNotEditable), "no product says 'Not yet editable here'");
   eq(M.switcherRows({ documents: docs, products: [], query: "RETURN" }).documents.map((d) => d.id), ["doc_x1"], "name search:");
-  eq(M.switcherRows({ documents: docs, products: [{ handle: "serum", title: "Night serum" }], query: "night" }).products.length, 1, "product search by name:");
+  eq(M.productListArgs({ query: "  moon ", filter: "changed_in_shopify", cursor: "c1" }), { q: "moon", filter: "changed_in_shopify", cursor: "c1", limit: 30 }, "the product search goes to listProductContent:");
+  eq(M.productListArgs({ filter: "bogus" }), { limit: 30 }, "an unknown filter is all:");
+  eq(M.collectionRows([{ id: "gid://shopify/Collection/5", title: "Summer" }, { id: "x", missing: true }]).map((c) => [c.label, c.href]), [["Summer", "/admin/editor?collection=gid%3A%2F%2Fshopify%2FCollection%2F5"]], "collections:");
+  eq(M.productCounts({ all: 412, changedInShopify: 3, orphaned: 1 }).map((c) => `${c.label} ${c.count}`), ["Products 412", "Changed in Shopify 3", "No longer in Shopify 1"], "the counts line:");
+});
+
+await t("P4-EDITOR unit (P3-FIX5 review): designProblem tells colours that are hidden from a design draft that can't be read; each gets its own words", async () => {
+  eq(M.designProblem({ skipped: ["doc_design"] }, { sessionShowsDesign: false }), "hidden", "colours off:");
+  eq(M.designProblem({ skipped: ["doc_design"] }, { sessionShowsDesign: null }), "hidden", "not known to be on:");
+  eq(M.designProblem({ skipped: ["doc_design"] }, { sessionShowsDesign: true }), "unreadable", "on, still skipped:");
+  eq(M.designProblem({ skipped: [] }, { sessionShowsDesign: true }), null, "shown:");
+  ok(M.DESIGN_WORDS.unreadable !== PREVIEW_WORDS.designHidden && !/isn't showing your new colours/.test(M.DESIGN_WORDS.unreadable), "the unreadable words are not the hidden words");
+  // hidden for good: the frame keeps rendering another session (another tab keeps
+  // taking over) whose colours are off, so this controller never knows them on
+  const r = previewRig({ documentId: "doc_design" });
+  r.setMint(() => ({ ok: true, sid: OWN }));
+  await r.ctl.start();
+  const sids = ["ps_00000000000000c1", "ps_00000000000000c2", "ps_00000000000000c3"];
+  for (const sid of sids) {
+    r.ctl.frameLoad();
+    r.ctl.message(readyWith({ sid, skipped: ["doc_design"], designShown: false }));
+    await tick();
+  }
+  eq([r.last().label, r.last().words], ["Could not update", PREVIEW_WORDS.designHidden], "colours hidden: the hidden words:");
+});
+
+await t("P4-EDITOR unit (P3-FIX5 review): 'Hide them' is not offered while the design is open; it is on any other document", async () => {
+  const opens = [];
+  const ctl = M.createPreviewController({
+    api: { startDocumentsPreview: async () => ({ ok: true, sid: OWN }), setShowDesign: async () => ({ ok: true }) },
+    timers: fakeTimers(),
+    documentId: "doc_design",
+    frame: { setSrc() {}, post() {}, currentPath: () => "/", designOpen: (open) => opens.push(open) },
+  });
+  await ctl.start();
+  ctl.frameLoad();
+  ctl.message(readyWith({ sid: OWN, skipped: [], designShown: true }));
+  eq(opens, [true], "the design is open: the frame is told to hide the toggle:");
+  await ctl.openDocument("doc_home");
+  await tick();
+  ctl.frameLoad();
+  ctl.message(readyWith({ sid: OWN, skipped: ["doc_design"] }));
+  eq(opens, [true, false], "home: the toggle is offered again:");
+  // the frame's document: a style rule hides the bar's design button, removed again
+  const els = new Map();
+  const head = { kids: [], appendChild(el) { this.kids.push(el); els.set(el.id, el); } };
+  const fakeDoc = {
+    head,
+    getElementById: (id) => els.get(id) || null,
+    createElement: (tag) => ({ tag, id: "", textContent: "", remove() { els.delete(this.id); head.kids = head.kids.filter((k) => k !== this); } }),
+  };
+  eq(M.applyDesignToggle(fakeDoc, true), true, "applied:");
+  M.applyDesignToggle(fakeDoc, true);
+  eq(head.kids.length, 1, "once, however often it is called:");
+  ok(head.kids[0].textContent.includes('[data-preview-note="design"] button') && head.kids[0].textContent.includes("display:none"), "it hides the bar's Hide them button");
+  eq(M.applyDesignToggle(fakeDoc, false), false, "removed:");
+  eq(head.kids.length, 0, "nothing left:");
+  eq(M.applyDesignToggle(null, true), false, "no document (navigating): nothing, no throw:");
+  // the real bar's button is the one the rule matches
+  const banner = await readFile(join(ROOT, "components/PreviewBanner.js"), "utf8");
+  ok(/<form data-preview-note="design"[\s\S]*?<button type="submit"[^>]*>\s*\{overlay\.showDesign \? "Hide them" : "Show them"\}/.test(banner), "PreviewBanner's Hide them is a button inside [data-preview-note=design]");
+  const pane = await readFile(join(ROOT, "components/admin/editor/PreviewPane.js"), "utf8");
+  ok(/designOpen: \(open\) =>[\s\S]*?applyDesignToggle\(frameRef\.current\?\.contentDocument, open\)/.test(pane), "PreviewPane gives the controller designOpen on the frame's document");
+});
+
+await t("P4-EDITOR unit: 'Keep mine', 'Use Shopify's' and 'Discard edits' go through the store: saved first, on the current revision, and the answer replaces the store", async () => {
+  const srv = server({ id: "doc_prod_1", type: "product_content", body: { type: "product_content", settings: { title: { value: "Mine", base_hash: "b", base_value: "Old" } }, sections: [] } });
+  const store = makeStore(srv);
+  await store.open?.();
+  store.setField("settings.badge", "New");
+  const replaced = [];
+  srv.answer("resolveShopifyChange", (args, extra) => ({ ok: true, data: { document: { ...clone(srv.doc), revision: extra.revision + 1, body: { ...srv.doc.body, settings: { ...srv.doc.body.settings, title: null } } } } }));
+  const call = M.createStoreCall({ api: srv.api, getStore: () => store, onReplaced: (d) => replaced.push(d) });
+  const r = await call("resolveShopifyChange", { id: "doc_prod_1", field: "title", choice: "shopify" });
+  ok(r.ok, "answered");
+  const ops = srv.ops();
+  ok(ops.indexOf("saveDraft") >= 0 && ops.indexOf("saveDraft") < ops.indexOf("resolveShopifyChange"), `saved first: ${ops.join(",")}`);
+  const sent = srv.calls.find((c) => c.op === "resolveShopifyChange");
+  eq([sent.args, sent.extra], [{ id: "doc_prod_1", field: "title", choice: "shopify" }, { revision: srv.doc.revision }], "on the current revision:");
+  eq(replaced.length, 1, "the store is replaced with the answer:");
+  eq(replaced[0].body.settings.title, null, "the field follows Shopify again:");
+  srv.answer("discardOrphanEdits", () => ({ ok: true, data: { document: { ...clone(srv.doc), body: { type: "product_content", settings: {}, sections: [] } } } }));
+  await call("discardOrphanEdits", { id: "doc_prod_1" });
+  eq(srv.calls.at(-1).args, { id: "doc_prod_1" }, "discard names only the document:");
+  eq(replaced.length, 2, "and replaces the store:");
 });
 
 // =====================================================================================
@@ -941,6 +1032,7 @@ await t("editorModel imports only the registry, paths and the preview machine (n
   const src = await readFile(join(ROOT, "components/admin/editor/editorModel.js"), "utf8");
   const imports = [...src.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
   eq(imports, ["../../../lib/registry/index.js", "../../../lib/documents/paths.js", "./previewMachine.js"], "imports:");
+  ok(!/\bfetch\(/.test(src), "the model fetches nothing");
   ok(!/\bwindow\.|\bdocument\.|localStorage|node:/.test(src.replace(/\/\/.*$/gm, "")), "no DOM globals or node: in the model");
 });
 

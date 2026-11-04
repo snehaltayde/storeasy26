@@ -17,7 +17,20 @@
 //   createPreviewController(…)    the preview frame: mint, showDesign,
 //                                 re-mint, ready timer, refresh (PV-01)
 //   switcherRows(…), isStoreClosed(…), isWritingDocument(…), framePathFor(…)
-import { documentType } from "../../../lib/registry/index.js";
+//
+// P4-EDITOR (OVL-04, OVL-01, OVL-06, ED-12, ED-02): a product's and a
+// collection's content.
+//   productRows(…), collectionRows(…), productListArgs(…), PRODUCT_FILTERS
+//                                 the switcher's Products and Collections
+//                                 sections (listProductContent, the refs read)
+//   entityHref(…)                 where a product or collection row opens
+//                                 (lib/admin/editor-entry.js's URL contract)
+//   overlayState(…), editOverlay(…), sameAsShopify(…), shopifyChanges(…),
+//   productFormModel(…), capNotes(…), moduleOptions(…), PRODUCT_WORDS
+//                                 the product form's rules (pure)
+//   applyDesignToggle(doc, open)  the preview bar's Hide them, hidden while
+//                                 the design is open (P3-FIX5 review)
+import { documentType, allowedKinds, stableStringify } from "../../../lib/registry/index.js";
 import { livePath } from "../../../lib/documents/paths.js";
 import { createPreviewMachine, designHiddenIn, READY_TIMEOUT_MS, PREVIEW_WORDS } from "./previewMachine.js";
 
@@ -33,7 +46,7 @@ export const WORDS = Object.freeze({
   leaveBlocked: "Your latest changes aren't saved yet, so we stayed on this page. They are still here.",
   leaveAnyway: "Leave anyway",
   productNotEditable: "Not yet editable here",
-  productNote: "Product pages share one layout for now. Editing one product's own content comes later.",
+  productNote: "Pick a product to change its name, images, description and more. Price, variants and stock stay Shopify's.",
   writingView: "This page is all text, so it opens as a writing page. Show the preview to see it on your store.",
   showPreview: "Show the preview",
   hidePreview: "Hide the preview",
@@ -65,8 +78,12 @@ export function isStoreClosed(rows) {
 
 // The address the preview frame shows for a document. A product or a
 // collection layout shows one real product or collection page.
-export function framePathFor(doc, { productHandle = null, collectionHandle = null } = {}) {
+export function framePathFor(doc, { productHandle = null, collectionHandle = null, entityHandle = null } = {}) {
   if (!isObj(doc)) return "/";
+  // P4-EDITOR: a product's or collection's own page (decision 14: the page
+  // merges its own draft in a preview session)
+  if (doc.type === "product_content") return entityHandle ? `/products/${encodeURIComponent(entityHandle)}` : "/";
+  if (doc.type === "collection_content") return entityHandle ? `/collections/${encodeURIComponent(entityHandle)}` : "/collections";
   if (doc.type === "product_layout") return productHandle ? `/products/${encodeURIComponent(productHandle)}` : "/";
   if (doc.type === "collection_layout") return collectionHandle ? `/collections/${encodeURIComponent(collectionHandle)}` : "/collections";
   if (doc.type === "collections_index") return "/collections";
@@ -74,9 +91,12 @@ export function framePathFor(doc, { productHandle = null, collectionHandle = nul
   return livePath(doc.type, { slug });
 }
 
+// P4-EDITOR: product and collection content are listed in their own sections
+// (Products, Collections), never among the pages, and are editable.
+export const ENTITY_TYPES = Object.freeze(["product_content", "collection_content"]);
 const SYSTEM = (type) => {
   const t = documentType(type);
-  return !t || t.system === true || t.editable === false || type === "product_content";
+  return !t || t.system === true || t.editable === false || ENTITY_TYPES.includes(type);
 };
 const ORDER = ["home", "header", "announcement", "footer", "design", "collections_index", "product_layout", "collection_layout", "cart"];
 const rank = (type) => {
@@ -84,10 +104,10 @@ const rank = (type) => {
   return i < 0 ? ORDER.length : i;
 };
 
-// The switcher's list: every document by label (search by name or address),
-// and the store's products by name, each marked "not yet editable here"
-// (product content waits for OVL-02).
-export function switcherRows({ documents = [], products = [], query = "", openId = null } = {}) {
+// The switcher's list: every document by label (search by name or address).
+// P4-EDITOR: products are listProductContent's rows (productRows), each one
+// opening its own content.
+export function switcherRows({ documents = [], products = [], query = "", openId = null, openEntityId = null } = {}) {
   const term = String(query ?? "").trim().toLowerCase();
   const hit = (...words) => !term || words.some((w) => typeof w === "string" && w.toLowerCase().includes(term));
   const docs = (Array.isArray(documents) ? documents : [])
@@ -103,10 +123,57 @@ export function switcherRows({ documents = [], products = [], query = "", openId
       open: d.id === openId,
       state: d.live ? (d.unpublishedChanges ? "Changes not published" : "Live") : "Not published yet",
     }));
-  const prods = (Array.isArray(products) ? products : [])
-    .filter((p) => isObj(p) && typeof p.title === "string" && hit(p.title, p.handle))
-    .map((p) => ({ kind: "product", id: String(p.handle ?? p.id), label: p.title, state: WORDS.productNotEditable }));
-  return { documents: docs, products: prods };
+  // P4-EDITOR: products come from listProductContent (searched there), so
+  // they are not filtered here; see productRows
+  return { documents: docs, products: productRows(products, { openEntityId }) };
+}
+
+// ---- the switcher's Products and Collections (P4-EDITOR) ------------------------------
+
+export const PRODUCT_FILTERS = Object.freeze([
+  { key: "all", label: "All products", count: "all" },
+  { key: "changed_in_shopify", label: "Changed in Shopify", count: "changedInShopify" },
+  { key: "orphaned", label: "No longer in Shopify", count: "orphaned" },
+]);
+export const LIST_PAGE = 30;
+
+// The listProductContent arguments for the switcher's search box and filter.
+export function productListArgs({ query = "", filter = "all", cursor = null, limit = LIST_PAGE } = {}) {
+  const q = String(query ?? "").trim();
+  const f = PRODUCT_FILTERS.some((x) => x.key === filter) ? filter : "all";
+  return { ...(q ? { q: q.slice(0, 120) } : {}), ...(f !== "all" ? { filter: f } : {}), ...(cursor ? { cursor } : {}), limit };
+}
+
+// Where a product or a collection row opens (plan section 4).
+export const entityHref = ({ product = null, collection = null } = {}) =>
+  product ? `/admin/editor?product=${encodeURIComponent(product)}` : collection ? `/admin/editor?collection=${encodeURIComponent(collection)}` : "/admin/editor";
+
+// listProductContent's items as switcher rows.
+export function productRows(items, { openEntityId = null } = {}) {
+  return (Array.isArray(items) ? items : [])
+    .filter((p) => isObj(p) && typeof p.productId === "string")
+    .map((p) => ({
+      kind: "product",
+      id: p.productId,
+      label: String(p.title || "Untitled product"),
+      secondary: typeof p.shopifyTitle === "string" && p.shopifyTitle && p.shopifyTitle !== p.title ? `Shopify title: ${p.shopifyTitle}` : null,
+      state: p.inShopify === false ? PRODUCT_WORDS.orphan : p.changedInShopify ? "Changed in Shopify" : p.live ? (p.edited ? "Your edits are live" : "Live") : p.edited ? "Edited, not published" : "Same as Shopify",
+      href: entityHref({ product: p.productId }),
+      open: openEntityId != null && p.productId === openEntityId,
+    }));
+}
+
+// The refs read's collections as switcher rows.
+export function collectionRows(items, { openEntityId = null } = {}) {
+  return (Array.isArray(items) ? items : [])
+    .filter((c) => isObj(c) && typeof c.id === "string" && !c.missing)
+    .map((c) => ({ kind: "collection", id: c.id, label: String(c.title || c.handle || "Untitled collection"), href: entityHref({ collection: c.id }), open: openEntityId != null && c.id === openEntityId }));
+}
+
+// The shell's counts line: "Products 412 · Changed in Shopify 3 · No longer in Shopify 1"
+export function productCounts(counts) {
+  const c = isObj(counts) ? counts : {};
+  return PRODUCT_FILTERS.map((f) => ({ key: f.key, label: f.key === "all" ? "Products" : f.label, count: Number.isFinite(Number(c[f.count])) ? Number(c[f.count]) : 0 }));
 }
 
 // ---- click to select (ED-04) -----------------------------------------------------------
@@ -224,6 +291,10 @@ export const storeDocument = (s) => ({ ...(s.document || {}), id: s.id, type: s.
 //                      current revision (never the publish-time one)
 //   undoSet            flushed first; a returned document for this page
 //                      replaces the store (onReplaced)
+//   resolveShopifyChange, discardOrphanEdits (P4-EDITOR)
+//                      flushed first, on the current revision; the answer's
+//                      document replaces the store (onReplaced)
+
 // Everything else goes to api.call as it is.
 export function createStoreCall({ api, getStore, getPinned = () => null, onReplaced = () => {} }) {
   const refusal = { refused: true, code: "DRAFT_CHANGED", message: WORDS.changedSinceReview };
@@ -292,6 +363,26 @@ export function createStoreCall({ api, getStore, getPinned = () => null, onRepla
       case "discardDraft":
         if (!mine) break;
         return store.discardDraft();
+      // P4-EDITOR (OVL-04): "Keep mine" / "Use Shopify's" on a Changed in
+      // Shopify notice, and "Discard edits" on a product that left Shopify.
+      // Saved first, then run on the current revision; the answer's document
+      // replaces the store (text typed meanwhile is kept as an earlier draft
+      // first, as undoSet does).
+      case "resolveShopifyChange":
+      case "discardOrphanEdits": {
+        if (!mine) break;
+        const e = await flushed(store);
+        if (e) return e;
+        const s = store.getState();
+        const r = await api.call(op, op === "resolveShopifyChange" ? { id: openId, field: args.field, choice: args.choice } : { id: openId }, { revision: s.revision });
+        if (r && r.ok && store.getState().unacknowledged) {
+          const k = await store.keepAsEarlierDraft(store.getState().body);
+          if (!k || !k.ok) return r;
+        }
+        const doc = r && r.ok && isObj(r.data?.document) ? r.data.document : null;
+        if (doc && isObj(doc.body)) onReplaced(doc);
+        return r;
+      }
       case "undoSet": {
         const members = isObj(args) && Array.isArray(args.members) ? args.members : [];
         if (!members.some((m) => isObj(m) && m.id === openId) || args.dryRun) break;
@@ -451,9 +542,29 @@ const defaultTimers = () => ({
 });
 export const showDesignFor = (documentId) => documentId === "doc_design";
 
+// P4-EDITOR (P3-FIX5 review): why the frame doesn't show the design draft's
+// colours. The frame's ready lists doc_design in `skipped` both when the
+// session's showDesign is off (the colours are hidden) and when the design
+// draft can't be read. The frame's state can't tell them apart, but the
+// controller knows whether the session it steers has showDesign on.
+//   "hidden"      the session's colours are off (or not known to be on)
+//   "unreadable"  showDesign is on in that session, and the draft still isn't
+//                 shown: it couldn't be read
+//   null          the frame shows them
+export const DESIGN_WORDS = Object.freeze({
+  hidden: PREVIEW_WORDS.designHidden,
+  unreadable: "Your new colours couldn't be read, so the preview shows your live colours. Try again. If it keeps happening, go back to an earlier version of your design in Earlier versions.",
+});
+export function designProblem(frameState, { sessionShowsDesign = null } = {}) {
+  if (!designHiddenIn(frameState)) return null;
+  return sessionShowsDesign === true ? "unreadable" : "hidden";
+}
+
 // Drives one preview frame across documents.
 //   api      { startDocumentsPreview({showDesign}), setShowDesign(sid, on) }
-//   frame    { setSrc(path), post(msg), currentPath() }
+//   frame    { setSrc(path), post(msg), currentPath(), designOpen?(open) }
+//            designOpen(open) (P4-EDITOR): hide the frame bar's "Hide them"
+//            while the design is open (applyDesignToggle)
 //   pathFor(documentId)   the address the frame shows
 //   onChange(view)        view: { label, words, field, note, phase, reconnecting, shownAck }
 //   onPick(pick)
@@ -510,8 +621,11 @@ export function createPreviewController({ api, frame, pathFor = () => "/", docum
     if (timer != null) timers.clearTimeout(timer);
     timer = null;
   };
-  function act(a) {
+  function act(a0) {
     if (disposed) return;
+    // P4-EDITOR: a design draft that can't be read gets its own words, not
+    // "isn't showing your new colours" (showDesign is already on)
+    const a = a0.state.phase === "failed" && a0.words === PREVIEW_WORDS.designHidden && shown === true ? { ...a0, words: DESIGN_WORDS.unreadable } : a0;
     last = a;
     if (a.state.phase === "shown") shownAck = expectAck;
     onChange(view());
@@ -657,6 +771,14 @@ export function createPreviewController({ api, frame, pathFor = () => "/", docum
         bridge = true;
         clearTimer();
         log.push(`ready:${data.ok === true ? "ok" : data.reason || "live"}`);
+        // P4-EDITOR (P3-FIX5 review): while the design is open the bar inside
+        // the frame doesn't offer "Hide them" (fixDesign would turn the
+        // colours straight back on); on any other document it does
+        try {
+          frame.designOpen?.(showDesignFor(docId));
+        } catch {
+          /* the frame is navigating */
+        }
         // P3-FIX5: the frame's own session (the cookie's) is the one to steer
         const frameSid = data.ok === true && isObj(data.state) && typeof data.state.sid === "string" && /^ps_[0-9a-f]{16}$/.test(data.state.sid) ? data.state.sid : null;
         if (frameSid && frameSid !== sid) {
@@ -698,4 +820,243 @@ export function createPreviewController({ api, frame, pathFor = () => "/", docum
       clearTimer();
     },
   };
+}
+
+// ---- a product's content (P4-EDITOR: OVL-04, OVL-01, OVL-06) ---------------------------
+//
+// The stored shape (P4-LIVEROW (3b), enforced by lib/documents/service.js):
+// each overlay field is null (follow Shopify) or { value, base_hash,
+// base_value } (the founder's own value, and what Shopify sent when it was
+// first changed). The rules here mirror the service, so the form never sends
+// what the service would turn back:
+//   Reset and "Use Shopify's"  the field becomes null (follow Shopify again)
+//   a value equal to Shopify's null too (image addresses without their query
+//                              string); a description equal once both are
+//                              cleaned is made null by the service
+//   "Keep mine"                resolveShopifyChange 'keep' (the service
+//                              re-bases it; the base is never sent from here)
+// A description the founder did not touch is always sent as null: while it
+// follows Shopify the box shows Shopify's text and the field never changes it
+// on its own (RichTextField), so only a real edit sends a value; one that
+// only cleans Shopify's markup is stored null by the service.
+
+export const PRODUCT_WORDS = Object.freeze({
+  shopifyOwns: "Price, variants and stock come from Shopify. Change them in Shopify; your store shows the new values after the next catalog update.",
+  // the Catalog screen's line (components/admin/CatalogAdmin.js), same words
+  catalogShopify: "Type, vendor, price and stock come from Shopify. Change them in Shopify; your store shows the new values after the next catalog update.",
+  changeInShopify: "Change in Shopify",
+  noAdminLink: "Your store's Shopify address isn't set, so there is no link to Shopify here.",
+  differs: "Differs from Shopify",
+  same: "Same as Shopify",
+  reset: "Reset to Shopify",
+  shopifyTitle: (t) => `Shopify title: ${t == null || t === "" ? "(none)" : t}`,
+  shopifySays: (label, v) => `Shopify's ${label}: ${v == null || v === "" ? "(none)" : v}`,
+  lastKnown: (label, v) => `Shopify's ${label} when it left: ${v == null || v === "" ? "(none)" : v}`,
+  changed: (label, v) => `Shopify changed the ${label} after you edited it. Shopify's ${label} is now: ${v == null || v === "" ? "(none)" : v}.`,
+  keepMine: "Keep mine",
+  useShopify: "Use Shopify's",
+  galleryFirstEdit: "Your images replace Shopify's for this product. New images added in Shopify won't show until you choose Use Shopify's images.",
+  galleryChanged: "Shopify's images changed",
+  galleryChangedWords: "Shopify's images for this product changed after you made your own list. Shoppers still see your list.",
+  useShopifyImages: "Use Shopify's images",
+  orphan: "No longer in Shopify",
+  orphanWords: "This product isn't in your Shopify catalog any more, so shoppers can't see it. Your edits are kept here until you discard them.",
+  orphanReset: "Reset isn't available: there is no Shopify version to go back to.",
+  discard: "Discard edits",
+  discardConfirm: "Discard every edit of this product? Shoppers can't see it either way. The edits are kept in Earlier versions.",
+  discardStaff: "Only an owner or admin can discard these edits.",
+  readOnly: "You can look at this, but your role can't change it. Ask the store owner or an admin.",
+  untouched: "Nothing has been changed on this product yet. It shows what Shopify sends.",
+  galleryCap: (n, max) => `You have ${n} images; a product can show at most ${max} of your own. Remove ${n - max} before you publish, or choose Use Shopify's images.`,
+  descriptionCap: (n, max) => `The description is ${n.toLocaleString("en-US")} characters long; at most ${max.toLocaleString("en-US")} can go live. Shorten it before you publish, or choose Reset to Shopify.`,
+  descriptionCount: (n, max) => `${n.toLocaleString("en-US")} of ${max.toLocaleString("en-US")} characters`,
+  modulesTitle: "Modules on this product's page",
+  addModule: "Add a module",
+  noModules: "No modules yet.",
+  gated: (reason) => reason || "A new name can't be saved right now.",
+  variants: "Variants",
+  price: "Price",
+  stock: "Stock",
+  inStock: "In stock",
+  soldOut: "Sold out",
+});
+
+// Each overlay field: its key, its words and where Shopify's value is in
+// openEntityContent's `shopify` answer.
+export const PRODUCT_OVERLAYS = Object.freeze([
+  Object.freeze({ key: "title", label: "name", shopifyKey: "title", gated: true }),
+  Object.freeze({ key: "description_html", label: "description", shopifyKey: "description_html", gated: false }),
+  Object.freeze({ key: "gallery", label: "images", shopifyKey: "gallery", gated: false }),
+  Object.freeze({ key: "display_vendor", label: "brand", shopifyKey: "vendor", gated: true }),
+  Object.freeze({ key: "display_type", label: "product type", shopifyKey: "product_type", gated: true }),
+]);
+const overlayOf = (key) => PRODUCT_OVERLAYS.find((o) => o.key === key) || null;
+
+const stripQuery = (u) => (typeof u === "string" ? u.replace(/[?#].*$/, "") : u);
+function comparableOverlay(field, value) {
+  if (field === "gallery") return Array.isArray(value) ? value.map((g) => (isObj(g) ? { media: stripQuery(g.media), alt: g.alt == null ? "" : g.alt } : g)) : value;
+  return value;
+}
+const sameRaw = (field, a, b) => stableStringify({ v: comparableOverlay(field, a) ?? null }) === stableStringify({ v: comparableOverlay(field, b) ?? null });
+
+// Is `value` what Shopify sends now? Compared as sent (image addresses without
+// their query string). The client never cleans HTML (the server is the only
+// sanitizer, P3-RTE): a description an editor sends back cleaned is turned
+// into null by the service (normalizeOverlays compares both cleaned).
+export function sameAsShopify(field, value, shopifyValue) {
+  return sameRaw(field, value, shopifyValue);
+}
+
+export function shopifyValueOf(field, shopify) {
+  const o = overlayOf(field);
+  if (!o || !isObj(shopify)) return null;
+  const v = shopify[o.shopifyKey];
+  return v === undefined ? null : v;
+}
+
+const overlayValue = (v) => (isObj(v) && v.value !== undefined ? v.value : null);
+
+// One overlay field's state for the form.
+//   following         null in the draft: shoppers see Shopify's value
+//   value             what shoppers see once published (Shopify's while following)
+//   shopifyValue      what Shopify sends now (null when the product is gone)
+//   baseValue         what Shopify sent when the founder first changed it
+//   differs           the founder's value is not Shopify's ("Differs from Shopify")
+//   changedInShopify  the founder changed it AND Shopify changed it since
+//   canReset          there is something to reset, and Shopify is there
+export function overlayState(field, setting, { shopify = null, inShopify = true } = {}) {
+  const following = setting == null || overlayValue(setting) == null;
+  const shopifyValue = inShopify ? shopifyValueOf(field, shopify) : null;
+  const own = following ? null : overlayValue(setting);
+  const baseValue = isObj(setting) && setting.base_value !== undefined ? setting.base_value : null;
+  const hasBase = isObj(setting) && typeof setting.base_hash === "string";
+  return {
+    field,
+    following,
+    value: following ? shopifyValue : own,
+    shopifyValue,
+    baseValue,
+    differs: !following && !(inShopify && sameAsShopify(field, own, shopifyValue)),
+    changedInShopify: !following && inShopify && hasBase && !sameRaw(field, baseValue, shopifyValue),
+    canReset: !following && inShopify,
+  };
+}
+
+// The stored value after the founder edits a field to `next`: null when it
+// is (again) what Shopify sends, else the founder's value with the rest of
+// the overlay kept (the service keeps the first base).
+export function editOverlay(field, current, next, { shopify = null, inShopify = true } = {}) {
+  if (next == null) return null;
+  if (inShopify && sameAsShopify(field, next, shopifyValueOf(field, shopify))) return null;
+  const rest = isObj(current) ? current : {};
+  return { ...rest, value: next };
+}
+
+// The "Changed in Shopify" notices: one per EDITED field whose Shopify value
+// moved since it was edited. Never for a field that follows Shopify, never
+// for a product that is gone.
+export function shopifyChanges(body, { shopify = null, inShopify = true } = {}) {
+  const settings = isObj(body) && isObj(body.settings) ? body.settings : {};
+  if (!inShopify) return [];
+  return PRODUCT_OVERLAYS.map((o) => ({ o, st: overlayState(o.key, settings[o.key], { shopify, inShopify }) }))
+    .filter(({ st }) => st.changedInShopify)
+    .map(({ o, st }) =>
+      o.key === "gallery"
+        ? { field: o.key, title: PRODUCT_WORDS.galleryChanged, words: PRODUCT_WORDS.galleryChangedWords, keep: PRODUCT_WORDS.keepMine, useShopify: PRODUCT_WORDS.useShopifyImages }
+        : { field: o.key, title: `Shopify changed the ${o.label}`, words: PRODUCT_WORDS.changed(o.label, st.shopifyValue), keep: PRODUCT_WORDS.keepMine, useShopify: PRODUCT_WORDS.useShopify },
+    );
+}
+
+// Plain-words caps before publish fails: the gallery (30 of the founder's own
+// images) and the description (20,000 characters), from the registry.
+export function capNotes(body) {
+  const t = documentType("product_content");
+  const settings = isObj(body) && isObj(body.settings) ? body.settings : {};
+  const decl = (k) => t?.settings.find((s) => s.key === k) || {};
+  const out = {};
+  const g = overlayValue(settings.gallery);
+  const gmax = decl("gallery").max;
+  if (Array.isArray(g) && gmax != null && g.length > gmax) out.gallery = PRODUCT_WORDS.galleryCap(g.length, gmax);
+  const d = overlayValue(settings.description_html);
+  const dmax = decl("description_html").max;
+  if (typeof d === "string" && dmax != null && d.length > dmax) out.description_html = PRODUCT_WORDS.descriptionCap(d.length, dmax);
+  return out;
+}
+
+// The module kinds a founder can add to this document type (offeredKinds:
+// rich text, text and FAQ on a product; image-with-text stays editable on
+// products that have one, but is never offered).
+const PRODUCT_MODULE_KINDS = ["rich_text", "text", "faq"];
+export function moduleOptions(type) {
+  const all = allowedKinds(type);
+  return type === "product_content" ? all.filter((k) => PRODUCT_MODULE_KINDS.includes(k)) : all;
+}
+
+// Everything the product form shows, from the draft and the entity answer.
+//   access   { canPublish, reason } (getDocument's)
+//   readOnly plain words when this person can't change anything
+export function productFormModel({ body = null, entity = null, access = null, readOnly = null } = {}) {
+  const e = isObj(entity) ? entity : {};
+  const inShopify = e.inShopify !== false;
+  const shopify = isObj(e.shopify) ? e.shopify : null;
+  const settings = isObj(body) && isObj(body.settings) ? body.settings : {};
+  const gateClosed = e.titleEditable === false;
+  const fields = PRODUCT_OVERLAYS.map((o) => {
+    const st = overlayState(o.key, settings[o.key], { shopify, inShopify });
+    const disabled = Boolean(readOnly) || (o.gated && gateClosed);
+    return {
+      ...st,
+      key: o.key,
+      label: o.label,
+      disabled,
+      disabledReason: readOnly || (o.gated && gateClosed ? PRODUCT_WORDS.gated(e.titleBlockedReason) : null),
+      // Reset clears a field, so it stays available while the name is gated
+      resetDisabled: Boolean(readOnly) || !st.canReset,
+      resetReason: !inShopify ? PRODUCT_WORDS.orphanReset : null,
+      shopifyLine: !inShopify ? (st.following ? null : PRODUCT_WORDS.lastKnown(o.label, o.key === "gallery" ? null : st.baseValue)) : o.key === "title" ? PRODUCT_WORDS.shopifyTitle(st.shopifyValue) : o.key === "gallery" || o.key === "description_html" ? null : PRODUCT_WORDS.shopifySays(o.label, st.shopifyValue),
+    };
+  });
+  const title = fields.find((f) => f.key === "title");
+  const canPublish = isObj(access) ? access.canPublish !== false : true;
+  return {
+    inShopify,
+    orphan: !inShopify,
+    readOnly: readOnly || null,
+    gateClosed,
+    gateReason: gateClosed ? PRODUCT_WORDS.gated(e.titleBlockedReason) : null,
+    // OVL-06: the editor always shows Shopify's name beside the override
+    heading: title.following ? title.shopifyValue : title.value,
+    shopifyTitleLine: inShopify ? PRODUCT_WORDS.shopifyTitle(title.shopifyValue) : PRODUCT_WORDS.lastKnown("name", title.baseValue),
+    fields,
+    notices: inShopify ? shopifyChanges(body, { shopify, inShopify }) : [],
+    galleryNote: fields.find((f) => f.key === "gallery").following ? null : PRODUCT_WORDS.galleryFirstEdit,
+    caps: capNotes(body),
+    adminUrl: typeof e.shopifyAdminUrl === "string" ? e.shopifyAdminUrl : null,
+    commerce: isObj(e.commerce) ? e.commerce : null,
+    discard: !inShopify ? (canPublish && !readOnly ? { offered: true, reason: null } : { offered: false, reason: PRODUCT_WORDS.discardStaff }) : null,
+    modules: moduleOptions("product_content"),
+  };
+}
+
+// ---- the preview bar's "Hide them" (P3-FIX5 review) ------------------------------------
+// While the design document is open its colours are always shown (fixDesign
+// turns them straight back on), so the bar inside the frame must not offer
+// "Hide them". The frame is this store's own page (same origin): the editor
+// marks its document, and a style rule hides the bar's design toggle. Called
+// after every frame load (a ready), so a reload never brings it back.
+export const DESIGN_TOGGLE_STYLE_ID = "storeasy-editor-design-open";
+export const DESIGN_TOGGLE_CSS = '[data-preview-note="design"] button{display:none!important}';
+export function applyDesignToggle(doc, open) {
+  if (!doc || typeof doc.getElementById !== "function") return false;
+  const had = doc.getElementById(DESIGN_TOGGLE_STYLE_ID);
+  if (!open) {
+    if (had) had.remove();
+    return false;
+  }
+  if (had) return true;
+  const el = doc.createElement("style");
+  el.id = DESIGN_TOGGLE_STYLE_ID;
+  el.textContent = DESIGN_TOGGLE_CSS;
+  (doc.head || doc.documentElement)?.appendChild(el);
+  return true;
 }

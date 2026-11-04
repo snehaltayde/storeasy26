@@ -1,0 +1,209 @@
+{
+  "id": "P4-EDITOR",
+  "part": "editor",
+  "title": "P4-EDITOR — rename, publish, shopper, pickers, reset",
+  "ranAt": "2026-11-04T16:38:38.411Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 14,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "rename: the shell shows the Products count and the two filter counts",
+      "detail": {
+        "counts": "Products 400 · Changed in Shopify 0 · No longer in Shopify 0"
+      }
+    },
+    {
+      "ok": true,
+      "label": "rename: the product opens from the product list, with 'Shopify title: …' shown",
+      "detail": {
+        "shopLine": "Shopify title: Advanced Anti-dandruff Shampoo"
+      }
+    },
+    {
+      "ok": true,
+      "label": "rename: the new name saves; 'Differs from Shopify' and Shopify's name show beside it",
+      "detail": {
+        "heading": "Aurora Drill Tonic",
+        "differs": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "rename: Publish goes live (the product's live row holds the new name)",
+      "detail": {
+        "phase": "done",
+        "live": {
+          "title": "Aurora Drill Tonic"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the product page shows the new name",
+      "detail": {
+        "h1": "Aurora Drill Tonic"
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: storefront search finds it by its new name, and its card shows the new name",
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the product's card on its collection page shows the new name",
+      "detail": {
+        "collection": "sugar-free",
+        "cardText": "HaircareAurora Drill Tonicfrom ₹639"
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: the cart (drawer and the cart the browser gets) shows the new name, never Shopify's",
+      "detail": {
+        "status": 200,
+        "drawer": "Your cart (1)\n\nAurora Drill Tonic\n\n100ml\n\n−\n1\n+\n₹639\nApply\nSubtotal\n₹639\nShipping\n₹79\nTotal\n₹718\nCheckout →\n\nAny cash on delivery fee is added at checkout",
+        "line": {
+          "variantId": "gid://shopify/ProductVariant/90001960",
+          "productId": "gid://shopify/Product/8000196",
+          "variantNumericId": "90001960",
+          "handle": "advanced-anti-dandruff-shampoo-197",
+          "title": "Aurora Drill Tonic",
+          "variantTitle": "100ml",
+          "image": "/api/media/med_8b9f1aeffff0a92bee",
+          "price": 639,
+          "currency": "INR",
+          "quantity": 1,
+          "lineTotal": 639,
+          "available": true,
+          "discount": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "shopper: no editor-only words on the shopper's pages",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "pickers: in another product's Goes well with, the renamed product shows its new name with 'Shopify title: …' under it",
+      "detail": {
+        "pairTitle": "1. Aurora Drill Tonic",
+        "pairShop": "Shopify title: Advanced Anti-dandruff Shampoo"
+      }
+    },
+    {
+      "ok": true,
+      "label": "pickers: in a collection's pinned products, the renamed product shows its new name with 'Shopify title: …' under it",
+      "detail": {
+        "pinTitle": "1. Aurora Drill Tonic",
+        "pinShop": "Shopify title: Advanced Anti-dandruff Shampoo"
+      }
+    },
+    {
+      "ok": true,
+      "label": "reset: 'Reset to Shopify' puts Shopify's name back, 'Same as Shopify'",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "reset: published, the shopper sees Shopify's name again and search no longer finds the new one",
+      "detail": {
+        "phase2": "done",
+        "liveTitle": null,
+        "h1b": "Advanced Anti-dandruff Shampoo"
+      }
+    },
+    {
+      "ok": true,
+      "label": "no page errors in the console",
+      "detail": {
+        "errors": []
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_6331ce8abc11b59b, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.1s"
+  ],
+  "screenshots": [
+    {
+      "name": "editor-renamed-1440",
+      "file": "docs/cms-reviews/drills/P4-EDITOR/editor-renamed-1440.png",
+      "bytes": 39274,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-renamed-published-1440",
+      "file": "docs/cms-reviews/drills/P4-EDITOR/editor-renamed-published-1440.png",
+      "bytes": 35788,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "shopper-product-page-1440",
+      "file": "docs/cms-reviews/drills/P4-EDITOR/shopper-product-page-1440.png",
+      "bytes": 8482,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/advanced-anti-dandruff-shampoo-197"
+    },
+    {
+      "name": "shopper-search-1440",
+      "file": "docs/cms-reviews/drills/P4-EDITOR/shopper-search-1440.png",
+      "bytes": 30300,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/search"
+    },
+    {
+      "name": "shopper-cart-1440",
+      "file": "docs/cms-reviews/drills/P4-EDITOR/shopper-cart-1440.png",
+      "bytes": 84189,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/advanced-anti-dandruff-shampoo-197"
+    },
+    {
+      "name": "editor-pairs-renamed-1440",
+      "file": "docs/cms-reviews/drills/P4-EDITOR/editor-pairs-renamed-1440.png",
+      "bytes": 39285,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-pins-renamed-1440",
+      "file": "docs/cms-reviews/drills/P4-EDITOR/editor-pins-renamed-1440.png",
+      "bytes": 33130,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "shopper-after-reset-1440",
+      "file": "docs/cms-reviews/drills/P4-EDITOR/shopper-after-reset-1440.png",
+      "bytes": 19067,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/search"
+    }
+  ]
+}
