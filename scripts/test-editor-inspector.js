@@ -667,6 +667,58 @@ await t("rendered: the design form shows every token, the look, the default note
   ok(shown.includes("Go back to the platform"), "a custom brand can go back to the default");
 });
 
+// ============================== fix round 1 =======================================
+console.log("fix round 1: a page link never keeps another page's document id");
+
+// Drive the real LinkControl: a host renders it as a plain call, so its hooks are
+// the host's, and the element tree it returns can be searched for a control's
+// onChange. Each "event" re-renders with the stored value, as the editor does.
+const Controls = await loadJsx(join(FIELDS, "controls.js"));
+function driveLink(props) {
+  let tree = null;
+  const Host = () => {
+    tree = Controls.LinkControl(props);
+    return null;
+  };
+  render(h(Host));
+  const find = (node, id) => {
+    if (!node || typeof node !== "object") return null;
+    if (Array.isArray(node)) {
+      for (const n of node) {
+        const f = find(n, id);
+        if (f) return f;
+      }
+      return null;
+    }
+    if (node.props?.id === id && typeof node.props.onChange === "function") return node.props;
+    return find(node.props?.children, id);
+  };
+  return (id) => find(tree, id);
+}
+
+await t("unit+driven: changing the kind of page drops or looks up the document id again", () => {
+  const pages = [
+    { slug: "shipping", family: "page", document: "doc_ship" },
+    { slug: "shipping", family: "journal", document: "doc_jship" },
+  ];
+  // the pure lookup
+  eq(M.pageLinkTarget(pages, "shipping", "page"), { slug: "shipping", family: "page", document: "doc_ship" }, "a known page");
+  eq(M.pageLinkTarget(pages, "shipping", "campaign"), { slug: "shipping", family: "campaign" }, "no such campaign: no document");
+  eq(M.pageLinkTarget(pages, "shipping", "journal"), { slug: "shipping", family: "journal", document: "doc_jship" }, "the journal post's own id");
+  eq(M.pageLinkTarget(undefined, " shipping ", "page"), { slug: "shipping", family: "page" }, "no pages given");
+  // the real control
+  const stored = [];
+  const at = (value) => driveLink({ owner: null, path: "items.0.link", label: "Link", value, onChange: (v) => stored.push(v), issues: [], context: { pages } });
+  at({ type: "page", slug: "", family: "page" })("f-doc-items-0-link-slug").onChange("shipping");
+  eq(stored.at(-1), { type: "page", slug: "shipping", family: "page", document: "doc_ship" }, "typing the slug attaches the page's id");
+  at(stored.at(-1))("f-doc-items-0-link-family").onChange({ target: { value: "campaign" } });
+  eq(stored.at(-1), { type: "page", slug: "shipping", family: "campaign" }, "a campaign called shipping doesn't exist: the stale id is dropped");
+  at(stored.at(-1))("f-doc-items-0-link-family").onChange({ target: { value: "journal" } });
+  eq(stored.at(-1), { type: "page", slug: "shipping", family: "journal", document: "doc_jship" }, "the journal post's id is looked up");
+  at(stored.at(-1))("f-doc-items-0-link-family").onChange({ target: { value: "page" } });
+  eq(stored.at(-1), { type: "page", slug: "shipping", family: "page", document: "doc_ship" }, "back to the page's own id");
+});
+
 const seconds = ((Date.now() - started) / 1000).toFixed(1);
 console.log(`\n${pass} passed, ${failures.length} failed in ${seconds} s`);
 if (failures.length) {

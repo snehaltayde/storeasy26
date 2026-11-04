@@ -39,6 +39,7 @@ import {
   moveIn,
   removeAt,
   linkFrom,
+  pageLinkTarget,
   linkHref,
   LINK_KIND_WORDS,
   PAGE_FAMILY_KEYS,
@@ -445,7 +446,7 @@ export function LinkControl({ owner, path, label, value, onChange, issues, conte
               value={link?.type === "page" ? textOf(link.family) : pending?.family || "page"}
               disabled={readOnly}
               aria-describedby={described(partId("family"), notesAt(issues, partId("family")))}
-              onChange={(e) => (link?.type === "page" ? pick("page", { ...link, family: e.target.value }) : setPending({ kind: "page", family: e.target.value }))}
+              onChange={(e) => (link?.type === "page" ? pick("page", pageLinkTarget(context.pages, link.slug, e.target.value)) : setPending({ kind: "page", family: e.target.value }))}
             >
               {PAGE_FAMILY_KEYS.map((f) => (
                 <option key={f} value={f}>
@@ -462,8 +463,7 @@ export function LinkControl({ owner, path, label, value, onChange, issues, conte
             value={link?.type === "page" ? textOf(link.slug) : ""}
             onChange={(t) => {
               const family = link?.type === "page" ? link.family : pending?.family || "page";
-              const known = (context.pages || []).find((p) => isObj(p) && p.slug === t.trim() && (p.family || "page") === family);
-              pick("page", { slug: t.trim(), family, document: known?.document });
+              pick("page", pageLinkTarget(context.pages, t, family));
             }}
             notes={notesAt(issues, partId("slug"))}
             readOnly={readOnly}

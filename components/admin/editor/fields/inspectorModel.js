@@ -395,6 +395,15 @@ export function linkFrom(kind, target) {
   }
   return null;
 }
+// A page link's target from a web name and a kind of page. The document id is
+// looked up again in the editor's pages every time, so a link never keeps the id
+// of a page with another web name or kind (P3-INSPECTOR fix round 1).
+export function pageLinkTarget(pages, slug, family) {
+  const s = String(slug ?? "").trim();
+  const f = own(PAGE_FAMILIES, family) ? family : "page";
+  const known = Array.isArray(pages) ? pages.find((p) => isObj(p) && p.slug === s && (p.family || "page") === f) : null;
+  return typeof known?.document === "string" && known.document ? { slug: s, family: f, document: known.document } : { slug: s, family: f };
+}
 // What a link shows as, in words ("Collection: Summer sale").
 export function linkWords(link, context = {}) {
   if (!isObj(link)) return "No link";

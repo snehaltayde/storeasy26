@@ -9,7 +9,7 @@ No real store changes mode, and nothing a shopper or a legacy screen uses is tou
 | Stage | Status |
 |---|---|
 | Implemented | Yes, on this branch |
-| Locally tested | Yes. `pnpm test`: 81 of 81 suites passed in 140.9 s. `pnpm test:editor-inspector`: 33 passed in 0.5 s (1,076 issues checked at their fields, 24 issue codes, 79 checklist rows against 72 legacy controls). `pnpm build` passes (its 2 Turbopack warnings were there on the base commit too) |
+| Locally tested | Yes. After fix round 1: `pnpm test`: 81 of 81 suites passed in 134.5 s; `pnpm test:editor-inspector`: 34 passed in 0.4 s. First round: 33 passed in 0.5 s (1,076 issues checked at their fields, 24 issue codes, 79 checklist rows against 72 legacy controls). `pnpm build` passes (its 2 Turbopack warnings were there on the base commit too) |
 | Browser verified | **NOT DONE.** There is no page that hosts these forms until P3-EDITOR (batch 4), so no desktop Chrome drill ran. Every acceptance item is proved by a unit or rendered (SSR) test below. No server was started; ports 6120 and 7120 to 7129 were not used |
 | Staging verified | **NOT DONE** |
 | Production enabled | **NOT DONE.** Nothing was pushed or deployed |
@@ -107,6 +107,14 @@ The interface is documented in the file header and is final: `{ value, onChange(
 
 Pickers take catalog rows `[{ handle, id, title, available_count?, product_count? }]` from `context`. Option labels show "(N available)" only when a real available count is given. An empty product rail offers "Use <collection>" from `railSuggestion`, which passes `available_count` (or `availableProducts`) to `pickRailCollection` and never `product_count` in its place. A row with no count is "unknown", not "full".
 
+## Fix round 1 (review blocker)
+
+**A page link kept a stale document id when the kind of page changed.** In `LinkControl`, changing "Kind of page" spread the old link, so a link typed as the page `shipping` (with that page's document id) became a campaign `shipping` that still carried the policy page's id. Shoppers would get `/campaigns/shipping`, which doesn't exist, and the publish check looks a link up by its document id first, so it found the live policy page and raised no `LINK_TARGET_MISSING`.
+
+Fix: a new pure helper, `pageLinkTarget(pages, slug, family)` in `inspectorModel.js`, builds a page link's target and looks the document id up again in `context.pages` for that exact web name and kind. Both the web name box and the kind of page select now use it, so the id is kept only when a page with that web name and kind is known, and dropped otherwise.
+
+Test: "unit+driven: changing the kind of page drops or looks up the document id again". It checks the helper, then drives the real `LinkControl` (a host component calls it and the test fires the select's and the text box's `onChange`): typing `shipping` stores the page's id; switching to Campaign drops it; switching to Journal picks up the journal post's own id; switching back to Page gets the page's id again. Before the fix, the driven part failed with `document: "doc_ship"` still on the campaign link.
+
 ## Acceptance
 
 | Item | Status | Evidence |
@@ -126,9 +134,9 @@ TOK-03 has two more tests: "the design form keeps the accent button text in step
 
 ## Tests
 
-- `pnpm test:editor-inspector` (`scripts/test-editor-inspector.js`): 33 tests in 0.5 s, no database, no server. It renders with Next's SWC and `react-dom/server`, through the same loader pattern as `test-sections-render`.
+- `pnpm test:editor-inspector` (`scripts/test-editor-inspector.js`): 34 tests in 0.4 s (33 in the first round, plus the fix round 1 test), no database, no server. It renders with Next's SWC and `react-dom/server`, through the same loader pattern as `test-sections-render`.
 - Mutations: 12 mutations of the model, controls, forms, rich text field and checklist were applied one at a time, and each failed the suite. The script is outside the repo, in the scratch folder.
-- `pnpm test`: 81 of 81 suites, 140.9 s. `pnpm build`: passes.
+- `pnpm test`: 81 of 81 suites, 134.5 s after fix round 1 (140.9 s in the first round). `pnpm build`: passes.
 
 ## Known limits
 
@@ -139,7 +147,7 @@ TOK-03 has two more tests: "the design form keeps the accent button text in step
 - **The look.** Choosing a look in the form stores `{ kit, version }` only (no `applied_at`) and doesn't apply the kit's brand or hero words; applying a kit is P3-DESIGN's.
 - **A half-typed colour.** It is a brand error at document level, so a draft save of it answers 422 (P3-STORE keeps the text). The form shows a note under the colour while it is half typed.
 - **Dates.** Start and end dates are entered in the founder's browser time zone and stored as ISO times. `effective_at` and `window_start` are both called "Start date" (the registry's words in `issue-words.js`); the hint under each says which is which.
-- **Page links.** The web address of a page link is typed. `context.pages` is used only to attach the page's document id when the address matches.
+- **Page links.** The web address of a page link is typed. `context.pages` is used only to attach the page's document id when both the address and the kind of page match; changing either looks it up again. A link saved before this fix, or by another screen, can still carry a stale id: the publish check (`lib/documents/checks.js`, not owned by this item) trusts the id before the web name, so a check that also compares the found page's web name and kind would close that gap. It is noted here for the owner of that file.
 - **Still waiting.** Cart (capability ruling), product content (OVL-02) and collection content (no type) are recorded in the checklist.
 
 ## Owner checks
