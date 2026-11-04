@@ -268,6 +268,63 @@ await t("P4-SEARCH: a store with no live rows answers exactly as before (no seco
   eq(r.body.items[0].title, "Product 001", "Shopify's name");
 });
 
+// --- P5-BUNDLEREAD (OQ-A): type=bundle for the editor's bundle picker --------
+// rf3 (every migration) gets four variants and three bundles; rows come from
+// the bounded bundle read, so they carry the state a block would show.
+const Bun = await import("../lib/bundles.js");
+for (let i = 1; i <= 4; i++) {
+  const n = String(i).padStart(3, "0");
+  await t3db.execute({ sql: "INSERT INTO variants (id, product_id, title, sku, price, currency, available, position) VALUES (?,?,?,?,?,?,?,0)", args: [`gid://v3/${n}`, `gid://p3/${n}`, "Default", `SKU-B-${i}`, 100 * i, "INR", i === 4 ? 0 : 1] });
+}
+const bv = (...ns) => ns.map((i) => ({ variantId: `gid://v3/${String(i).padStart(3, "0")}`, quantity: 1 }));
+const BUN = await withTenant(T3, async () => ({
+  gym: (await Bun.upsertBundle({ slug: "gym-kit", title: "Gym Kit", items: bv(1, 2), bundle_price: 250, enable: true })).id,
+  night: (await Bun.upsertBundle({ slug: "night-pack", title: "Night Pack", items: bv(2, 3), bundle_price: 400, enable: false })).id,
+  gymSold: (await Bun.upsertBundle({ slug: "gym-sold", title: "Gym Sold Out", items: bv(1, 3), bundle_price: 350, enable: true })).id,
+}));
+await t3db.execute({ sql: "UPDATE variants SET available = 0 WHERE id = ?", args: ["gid://v3/003"] });
+
+await t("P5-BUNDLEREAD: type=bundle lists bundles with their state, title order", async () => {
+  const r = await get3("type=bundle");
+  eq(r.status, 200, JSON.stringify(r.body));
+  eq(JSON.stringify(r.body.items.map((b) => [b.title, b.state])), JSON.stringify([["Gym Kit", "available"], ["Gym Sold Out", "sold_out"], ["Night Pack", "disabled"]]), "rows");
+  const g = r.body.items[0];
+  eq(JSON.stringify(Object.keys(g).sort()), JSON.stringify(["bundle_price", "componentCount", "currency", "enabled", "id", "overlapsWith", "reasons", "saving", "slug", "state", "title"]), "keys");
+  eq(JSON.stringify([g.slug, g.enabled, g.bundle_price, g.saving, g.currency, g.componentCount, g.overlapsWith.map((o) => o.title)]), JSON.stringify(["gym-kit", true, 250, 50, "INR", 2, ["Gym Sold Out"]]), "the Gym Kit row");
+  ok(r.body.items[1].reasons.some((x) => x.kind === "sold_out"), "sold-out reason");
+  const p = await get3("type=bundle&limit=2");
+  eq(p.body.items.length, 2, "a page");
+  ok(p.body.nextCursor, "and a cursor");
+  const p2 = await get3(`type=bundle&limit=2&cursor=${p.body.nextCursor}`);
+  eq(JSON.stringify(p2.body.items.map((b) => b.title)), JSON.stringify(["Night Pack"]), "the next page");
+});
+
+await t("P5-BUNDLEREAD: ids= hydrates bundles in the given order, a deleted one marked missing", async () => {
+  const r = await get3(`type=bundle&ids=${encodeURIComponent([BUN.night, "bun-gone", BUN.gym].join(","))}`);
+  eq(r.status, 200);
+  eq(JSON.stringify(r.body.items.map((b) => [b.id, b.state, b.missing === true])), JSON.stringify([[BUN.night, "disabled", false], ["bun-gone", "missing", true], [BUN.gym, "available", false]]), "order and states");
+});
+
+await t("P5-BUNDLEREAD: q= searches bundle titles", async () => {
+  const r = await get3("type=bundle&q=gym");
+  eq(JSON.stringify(r.body.items.map((b) => b.title)), JSON.stringify(["Gym Kit", "Gym Sold Out"]), "two gym bundles");
+  eq((await get3("type=bundle&q=zzz")).body.items.length, 0, "no match");
+});
+
+await t("P5-BUNDLEREAD: a session without storefront.read gets 403 for type=bundle; support (which has it) reads", async () => {
+  // a membership whose stored role is outside the role map grants nothing
+  const viewer = await I.createUser({ email: "viewer@rf.test", password: "viewer-pass-p5" });
+  await C.platformDb().execute({ sql: "INSERT INTO memberships (user_id, tenant_id, role, created_at) VALUES (?, 'rf3', 'viewer', ?)", args: [viewer.id, new Date().toISOString()] });
+  const viewerTok = (await S.createSession({ userId: viewer.id, kind: "merchant", ttlMs: 60_000 })).token;
+  const denied = await withTenant(T3, () => handleRefsGet(req(viewerTok, "type=bundle")));
+  eq(denied.status, 403, JSON.stringify(denied.body));
+  eq(denied.body.items, undefined, "no rows");
+  const sup = await I.createUser({ email: "support@rf.test", password: "support-pass-p5" });
+  await I.addMembership(sup.id, "rf3", "support");
+  const supTok = (await S.createSession({ userId: sup.id, kind: "merchant", ttlMs: 60_000 })).token;
+  eq((await withTenant(T3, () => handleRefsGet(req(supTok, "type=bundle")))).status, 200, "support reads");
+});
+
 // ----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });

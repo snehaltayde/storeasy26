@@ -438,7 +438,12 @@ export async function seedPerfFixture({ libsql, log = () => {}, spec = PERF_FIXT
   const { upsertOffer } = await import("../lib/offers/store.js");
   for (const o of fx.offers) await upsertOffer(o);
   const { upsertBundle } = await import("../lib/bundles.js");
-  for (const b of fx.bundles) await upsertBundle(b);
+  // P5-BUNDLEREAD: a bundle whose slug is already there is edited (a create
+  // onto a taken slug is refused now), so a reseed onto a used database works
+  for (const b of fx.bundles) {
+    const had = (await libsql.execute({ sql: "SELECT id FROM bundles WHERE slug = ?", args: [b.slug] })).rows[0];
+    await upsertBundle({ ...b, id: had?.id ?? null });
+  }
   const { upsertQuiz } = await import("../lib/quiz.js");
   for (const q of fx.quizzes) await upsertQuiz(q);
   const { upsertPlacement } = await import("../lib/cms/placements.js");
