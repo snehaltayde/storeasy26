@@ -334,6 +334,60 @@ No owner checks for this item.
 - [ ] Hosted: force a failure on a staging tenant and check that section_render_failed and section_binding_failed lines show up in the Vercel log search.
 - [ ] No desktop Chrome drill ran. The browser check of these notes waits for P3-EDITOR's drill.
 
+## Phase 3, batch 2
+
+### Publish checks, "publish both", publish again and the first publish (P3-CHECKS)
+- [ ] CI sqld download (standing): .github/ was not touched; the owner must approve the sqld binary's source and checksum for CI.
+- [ ] Ruling: missing alt text now warns at publish, where phase 2 blocked it (PUB-03 wording).
+- [ ] Ruling: a closed store's first publish must include the home page (409 FIRST_PUBLISH_NEEDS_HOME); with no home page document yet the answer offers nothing (offer null). This holds until PUB-12 (open question).
+- [ ] Ruling: a plain publish clears undone_version_id; the confirm guards only republishing the content that was taken offline.
+- [ ] Ruling (standing from P3-COMMIT): liveEntryOf's narrower offline rule, under which a page hidden by its own meta.enabled keeps the inherited rule. Now pinned by tests.
+- [ ] Wording review: the new founder messages in lib/documents/checks.js, the three new refusals, and 'another tab'.
+- [ ] Hosted Turso staging tenant: publish both (one set, all or nothing) and publish again after take offline, through the real handler.
+- [ ] Orchestrator: accept the out-of-list edits to scripts/test-failure-matrix.js and scripts/test-schema-compat.js, which open their stores with a home page first. Neither file has a batch 2 owner.
+- [ ] Orchestrator: P3-PUBLISHUI must handle the openField action, offer on VALIDATION_FAILED and offer null on FIRST_PUBLISH_NEEDS_HOME. P3-HARNESS seeds and the drills (scripts/drills/p2/run.mjs) must publish the home page in a closed store's first set.
+
+### Undo, whole-set Undo, take offline and Recently published (P3-UNDO)
+- [ ] Wording/ruling: after the Undo of a publish made while offline, no further Undo is offered (the earlier unpublish row no longer matches); the founder publishes again or restores from Earlier versions. Confirm that is acceptable.
+- [ ] The mutation runner (mut/run.py) was not rerun in fix round 1; the fix's own check was running the suite on the unfixed undo.js.
+- [ ] Standing: hosted Turso staging check and the CI sqld download approval (.github/ untouched).
+
+### The change list, keep the live section, keep as an earlier draft (P3-CHANGES)
+- [ ] Staging (hosted Turso), documents-mode staging tenant: keepLiveSection and keepAsEarlierDraft, including two tabs keeping at once (the cap of 10 holds) and a stale keep whose 409 names the other person.
+- [ ] Ruling: where a restored removed or moved section goes. I put it after its nearest live neighbour still in the draft; the brief says the live index clamped. Both agree when nothing around the section changed.
+- [ ] Ruling: the TOO_MANY_KEPT words say 'Open Earlier versions to tidy them', but undo_saved versions can't be deleted today (the 0021 trigger and no delete operation). Either build a way to tidy kept drafts or reword the message.
+- [ ] Ruling: PUT /api/admin/documents has no rate limit for any operation, so 'stays under the storefront.write rate limit' means only the normal auth plus the cap of 10. Decide whether to add a limiter (the route file is not in this item's files).
+- [ ] Wording: 'another tab' (lower case, as the shapes give it) and the two keepLiveSection 404 sentences ('This page has never been published, so there is no live version to keep.' and 'That section is no longer in this page or on your live store. Reload to see the latest changes.').
+- [ ] Merge: scripts/test-publish-service.js (stub loop and 'restored' check) and scripts/test-api-shapes.js (the NEW_CODES checks) were edited outside this item's ownership. P3-UNDO and P3-CHECKS will hit the same lines; keep both sides' changes.
+- [ ] Browser: NOT DONE. No screen uses these operations yet. Drill them when P3-PUBLISHUI and P3-EDITOR land (the changes panel, 'Keep the live version', and 'Keep mine as an earlier draft').
+- [ ] CI sqld download: still needs the owner's approval of its source and checksum (.github/ was not touched).
+
+### The storefront side of the editor, preview only (P3-FRAME)
+- [ ] On a staging tenant in documents mode (hosted Turso): check a preview, an ended preview (revoke it from another tab), 'See the live store', and 'Edit this page' from the live store with a console session.
+- [ ] On the same staging tenant: force a section_render_failed and confirm it appears in the Vercel log search under the store's id.
+- [ ] On a local production build (next build && next start): run docs/cms-reviews/drills/P3-FRAME/quiz-probe.mjs against a closed copy of the harness and confirm 0 of 12 answers carry founder copy.
+- [ ] On the same production build: open a documents preview and confirm the data-field and data-doc attributes render (this checks the per-request holder under production React).
+- [ ] On a real phone: look at the banner, the ended bar, the offline line and 'Edit this page' (so far seen only at 375 wide in desktop Chrome).
+- [ ] Confirm the words: "You're seeing your unpublished changes." / "See the live store"; "Your preview has ended, so you're seeing the live store." / "Exit"; "This page is offline. Publishing it brings it back."; "Edit this page".
+- [ ] Rule on the field names: data-field follows validate's paths (primary.label, button.label, items.N.q, items.N.a) instead of the brief's buttons.N.label and items.N.question/answer.
+- [ ] Accept that on a closed store the 'Opening soon' page gets no bridge and no ended bar (P3-CLOSED's page is pinned byte-identical), so the editor relies on its 3-second re-mint there.
+- [ ] Approve the source and checksum of the CI sqld download. .github/ was not touched.
+
+### The phase 3 seed and shared drill helpers (P3-HARNESS)
+- [ ] CI sqld download: not touched (no .github/ change). Its source and checksum still need the owner's approval.
+- [ ] Optional: run DESIGN_PORT=<port> DESIGN_SQLD_PORT=<port> node scripts/drills/p3/smoke.mjs once, and open http://closed.localhost:<port>/ in your own Chrome.
+- [ ] Staging: NOT DONE. The harness is local only; whole-set Undo, take offline and LINKS_TO_UNPUBLISHED flows are proved by later drills once P3-UNDO and P3-CHECKS merge.
+
+### The batch 1 review findings no other item owns (P3-FIX1)
+- [ ] Ruling: logout ends previews on every device on documents-mode stores only; a legacy Designer preview cookie on another device lasts until it expires (up to an hour).
+- [ ] Ruling: a cms_state read fault on a store with no release refuses checkout, contact and quiz until the database answers (fail closed, a known legacy change).
+- [ ] Accept the deviation: app/api/preview/route.js (outside the item's file list, no batch 2 owner) answers JSON only when the editor's x-storeasy-preview-confirm header is sent. Without the header it answers as before.
+- [ ] Desktop Chrome, at P3-EDITOR's drill: on a documents-mode test tenant, open the editor preview. Check the cookie is set by the confirm fetch, the network panel shows no request for '/', and the frame shows the draft. A spoilt token should show 'didn't open'.
+- [ ] Read the three draft cap messages (too big to save, text too long to save, list too many to save) and confirm they suit a founder.
+- [ ] Known limit to accept: publish has no body size limit, so a body over 512 KB with every field inside its own publish limit publishes but can't be saved as a draft (founders can't build one through saves).
+- [ ] Known limit to accept: /api/leads on a store host now answers 429 after 5 calls an hour from one address, instead of 404.
+- [ ] CI sqld download: unchanged (no .github/ change). Its source and checksum still need the owner's approval.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
