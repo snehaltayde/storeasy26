@@ -140,6 +140,14 @@ All in `scripts/test-media-refs.js` (`pnpm test:media-refs`). "Fails without" me
 - **Refs of pruned checkpoints stay in `document_refs`** as orphans. They never count, because usage joins `document_versions`. The reindex does not prune them.
 - **The brand and site settings** are read from the store's config as this request resolved it. Console routes read it fresh.
 
+From review:
+
+- The round-0 blocker is fixed at b9f1916. lib/media.js now has mediaRefMatch(ids), which matches a media ref by id, or by `instr(ref_id, '/api/media/<id>') > 0` for the file and each of its variants. documentsModeUsage uses it for both the version rows and the release:<id> rows, and guardedDelete uses it in both NOT EXISTS clauses. It reads only document_refs and never a version body. I checked 607cde2's refs.js: before this branch, media refs were stored as the image src, so the address match covers every row written then. A plain address, a full address with a query string, and a variant's address all count.
+- I broke the fix on purpose twice and the tests caught both. Making only the usage query match by id again failed 2 of 21 cases (the address-form case and the guard case). Making only the guard's version NOT EXISTS clause match by id again failed 1 of 21 (the guard case). The address match in the release:<id> clause has no test of its own. That does no harm today, because release:<id> rows are only ever written by the new code, by id.
+- Leftover gap, not a regression anyone sees: a documents store that has not had `media:reindex --releases` run has no release:<id> rows. A file used only by an old retained release will delete without force. On 607cde2 the scan of releases.content refused a plain delete there (force still went through). Shoppers never see this: in documents mode the live content is the documents, and release rollback answers 409 until PUB-08. Only the operator's reversal tool could bring such a release back, and only test, harness and staging stores are in documents mode now. The packet's owner check to run `media:reindex -- --tenant <id> --releases` covers it. It would help if the packet's Known limits named this release case, next to the checkpoint case it already lists.
+- The address match can over-match an id that starts with another id (med_ab inside /api/media/med_abc). The only effect is a refused delete, never an allowed one, and the packet says so. Media ids are a fixed length, so in practice this cannot happen.
+- Verified: test:media-refs passed 21 of 21. The full `pnpm test` passed 96 of 96 suites in 146.0 s, on DESIGN_PORT 6320 and DESIGN_SQLD_PORT 7320. The diff from 607cde2 adds no node:, fs or path imports in lib/ or app/. It does not touch scripts/test-releases.js, package.json, .github or MANUAL-CHECKS.md. The fix round changed only the documents path, so legacy usage output is unchanged. The worktree rv1 is removed and no processes were left running.
+
 ## From review
 
 ### Fix round 1
