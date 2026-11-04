@@ -1,0 +1,3172 @@
+{
+  "id": "P2-DRILLS",
+  "part": "sections",
+  "title": "P2-DRILLS — sections",
+  "ranAt": "2026-11-04T00:06:03.029Z",
+  "harness": "http://localhost:3800",
+  "chrome": "156.0.8078.80",
+  "passed": 453,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "hero long_text: published through the documents API",
+      "detail": {
+        "release": "rel_957a12d420390993"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 375: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 375: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 375: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 768: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 768: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 768: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 1440: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 1440: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-long_text at 1440: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero long_text: the shopper sees the case's own 120-character title",
+      "detail": "Extraordinarily comprehensive handcrafted everyday essentials collection with internationally sourced materials and acce"
+    },
+    {
+      "ok": true,
+      "label": "hero no_image: published through the documents API",
+      "detail": {
+        "release": "rel_9814a49bea7b2ecd"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 375: no_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 375: no_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 375: no_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 768: no_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 768: no_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 768: no_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 1440: no_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 1440: no_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-no_image at 1440: no_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero no_image: the shopper sees the case's own 120-character title",
+      "detail": "Extraordinarily comprehensive handcrafted everyday essentials collection with internationally sourced materials and acce"
+    },
+    {
+      "ok": true,
+      "label": "hero tall_image: published through the documents API",
+      "detail": {
+        "release": "rel_043faab758f7e360"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 375: tall_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 375: tall_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 375: tall_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 768: tall_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 768: tall_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 768: tall_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 1440: tall_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 1440: tall_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero-tall_image at 1440: tall_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "hero tall_image: the shopper sees the case's own 120-character title",
+      "detail": "Extraordinarily comprehensive handcrafted everyday essentials collection with internationally sourced materials and acce"
+    },
+    {
+      "ok": true,
+      "label": "collections (long_text, one_item, max_items): published through the documents API",
+      "detail": {
+        "release": "rel_4dd676975b4712dc"
+      }
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 375: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 768: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "collections at 1440: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new (long_text, one_item, max_items): published through the documents API",
+      "detail": {
+        "release": "rel_a156c57d54dc7e7a"
+      }
+    },
+    {
+      "ok": true,
+      "label": "new at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "new at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "new at 375: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 375: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 375: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 375: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 375: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 375: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 375: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 375: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 375: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "new at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "new at 768: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 768: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 768: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 768: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 768: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 768: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 768: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 768: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 768: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new at 1440: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new sold_out: published through the documents API",
+      "detail": {
+        "release": "rel_42a00d538c07c3a7"
+      }
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 375: sold_out: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 375: sold_out: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 375: sold_out: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 768: sold_out: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 768: sold_out: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 768: sold_out: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 1440: sold_out: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 1440: sold_out: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new-sold-out at 1440: sold_out: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "new sold_out: the cards say \"Sold out\"",
+      "detail": "Extraordinarily comprehensive handcrafted everyday essentials collection with in\nSOLD OUT\n\nWORST CASE\n\nExtraordinarily comprehensive handcrafted everyday essent"
+    },
+    {
+      "ok": true,
+      "label": "banner (long_text): published through the documents API",
+      "detail": {
+        "release": "rel_1ba7b051ee62e459"
+      }
+    },
+    {
+      "ok": true,
+      "label": "banner at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "banner at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "banner at 375: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "banner at 375: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "banner at 375: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "banner at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "banner at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "banner at 768: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "banner at 768: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "banner at 768: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "banner at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "banner at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "banner at 1440: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "banner at 1440: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "banner at 1440: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "rich_text (long_text): published through the documents API",
+      "detail": {
+        "release": "rel_c70db7eefce215c4"
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 375: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 375: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 375: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 768: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 768: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 768: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 1440: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 1440: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "rich_text at 1440: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text no_image: the draft saves, and publishing it is refused (the image is required), so shoppers never get an empty one",
+      "detail": {
+        "save": 200,
+        "publish": 422,
+        "code": "VALIDATION_FAILED"
+      }
+    },
+    {
+      "ok": true,
+      "label": "image_with_text (long_text, tall_image): published through the documents API",
+      "detail": {
+        "release": "rel_278c04deae943ee9"
+      }
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 375: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 375: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 375: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 375: tall_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 375: tall_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 375: tall_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 768: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 768: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 768: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 768: tall_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 768: tall_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 768: tall_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 1440: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 1440: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 1440: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 1440: tall_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 1440: tall_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "image_with_text at 1440: tall_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail (long_text, one_item, max_items): published through the documents API",
+      "detail": {
+        "release": "rel_f4ac066cebea2c04"
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 375: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 768: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail at 1440: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail sold_out: published through the documents API",
+      "detail": {
+        "release": "rel_c7f5039c3343a3d1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 375: sold_out: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 375: sold_out: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 375: sold_out: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 768: sold_out: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 768: sold_out: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 768: sold_out: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 1440: sold_out: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 1440: sold_out: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail-sold-out at 1440: sold_out: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_rail sold_out: the cards say \"Sold out\"",
+      "detail": "Extraordinarily comprehensive handcrafted everyday essentials collection with in\nView all →\nSOLD OUT\n\nWORST CASE\n\nExtraordinarily comprehensive handcrafted ever"
+    },
+    {
+      "ok": true,
+      "label": "text (long_text, one_item, max_items): published through the documents API",
+      "detail": {
+        "release": "rel_5f7229ef2e5d796c"
+      }
+    },
+    {
+      "ok": true,
+      "label": "text at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "text at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "text at 375: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 375: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 375: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 375: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 375: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 375: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 375: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 375: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 375: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "text at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "text at 768: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 768: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 768: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 768: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 768: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 768: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 768: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 768: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 768: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "text at 1440: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq (long_text, one_item, max_items): published through the documents API",
+      "detail": {
+        "release": "rel_94b1764e17adef2e"
+      }
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 375: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 768: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "faq at 1440: max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "the worst-case content page is published",
+      "detail": {
+        "release": "rel_705281266feb4bc5"
+      }
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: no sideways scroll (scrollWidth 375 <= innerWidth 375)",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: text long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: text long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: text long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: text one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: text one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: text one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: text max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: text max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: text max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: rich_text long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: rich_text long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: rich_text long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: image_with_text long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: image_with_text long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: image_with_text long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: image_with_text tall_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: image_with_text tall_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: image_with_text tall_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: faq long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: faq long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: faq long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: faq one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: faq one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: faq one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: faq max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: faq max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 375: faq max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: no sideways scroll (scrollWidth 768 <= innerWidth 768)",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: text long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: text long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: text long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: text one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: text one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: text one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: text max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: text max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: text max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: rich_text long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: rich_text long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: rich_text long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: image_with_text long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: image_with_text long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: image_with_text long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: image_with_text tall_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: image_with_text tall_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: image_with_text tall_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: faq long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: faq long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: faq long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: faq one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: faq one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: faq one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: faq max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: faq max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 768: faq max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: 200 on the edge runtime",
+      "detail": {
+        "status": 200,
+        "edge": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: no sideways scroll (scrollWidth 1440 <= innerWidth 1440)",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: text long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: text long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: text long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: text one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: text one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: text one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: text max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: text max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: text max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: rich_text long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: rich_text long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: rich_text long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: image_with_text long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: image_with_text long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: image_with_text long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: image_with_text tall_image: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: image_with_text tall_image: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: image_with_text tall_image: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: faq long_text: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: faq long_text: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: faq long_text: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: faq one_item: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: faq one_item: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: faq one_item: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: faq max_items: no text past the window",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: faq max_items: no clipped text",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "page-kinds at 1440: faq max_items: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 375: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 375: no sideways scroll",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 375: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 375: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 768: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 768: no sideways scroll",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 768: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 768: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 1440: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 1440: no sideways scroll",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 1440: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-long-wide at 1440: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 375: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 375: no sideways scroll",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 375: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 375: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 768: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 768: no sideways scroll",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 768: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 768: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 1440: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 1440: no sideways scroll",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 1440: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-tall at 1440: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 375: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 375: no sideways scroll",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 375: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 375: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 768: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 768: no sideways scroll",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 768: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 768: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 1440: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 1440: no sideways scroll",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 1440: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-no-image at 1440: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 375: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 375: no sideways scroll",
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 375: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 375: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 375: says sold out"
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 768: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 768: no sideways scroll",
+      "detail": {
+        "scrollWidth": 768,
+        "innerWidth": 768
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 768: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 768: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 768: says sold out"
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 1440: 200 on the edge runtime, not an error page",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 1440: no sideways scroll",
+      "detail": {
+        "scrollWidth": 1440,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 1440: no clipped text in the product area",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 1440: no broken image",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "product_main product-sold-out at 1440: says sold out"
+    },
+    {
+      "ok": true,
+      "label": "every registered section kind was drilled",
+      "detail": {
+        "kinds": [
+          "hero",
+          "collections",
+          "new",
+          "banner",
+          "rich_text",
+          "image_with_text",
+          "product_rail",
+          "text",
+          "faq",
+          "product_main"
+        ],
+        "covered": [
+          "hero",
+          "collections",
+          "new",
+          "banner",
+          "rich_text",
+          "image_with_text",
+          "product_rail",
+          "text",
+          "faq",
+          "product_main"
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--worst-case): the harness store is in documents mode: 36 documents, live release rel_8f039e60435016bc, worst-case catalog (24 products, 25 collections, 2 photos), 1.0s",
+    "registered section kinds: hero, collections, new, banner, rich_text, image_with_text, product_rail, text, faq, product_main",
+    "new at 375: long_text: 23 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new at 375: one_item: 1 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new at 375: max_items: 23 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new at 768: long_text: 23 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new at 768: one_item: 1 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new at 768: max_items: 23 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new at 1440: long_text: 23 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new at 1440: one_item: 1 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new at 1440: max_items: 23 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new-sold-out at 375: sold_out: 24 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new-sold-out at 768: sold_out: 24 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "new-sold-out at 1440: sold_out: 24 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "image_with_text no_image can't reach shoppers on a documents store (publish refuses it); its fallback look is covered by test-sections-render §4, not by this drill",
+    "product_rail at 375: long_text: 12 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail at 375: one_item: 1 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail at 375: max_items: 12 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail at 768: long_text: 12 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail at 768: one_item: 1 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail at 768: max_items: 12 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail at 1440: long_text: 12 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail at 1440: one_item: 1 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail at 1440: max_items: 12 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail-sold-out at 375: sold_out: 12 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail-sold-out at 768: sold_out: 12 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_rail-sold-out at 1440: sold_out: 12 text(s) cut with an ellipsis or a line clamp by design, e.g. [\"h3: Extraordinarily comprehensive handcrafte\",\"h3: Extraordinarily comprehensive handcrafte\"]",
+    "product_main product-long-wide at 375: 5 text(s) cut with an ellipsis or line clamp by design",
+    "product_main product-long-wide at 768: 5 text(s) cut with an ellipsis or line clamp by design",
+    "product_main product-long-wide at 1440: 4 text(s) cut with an ellipsis or line clamp by design",
+    "product_main product-tall at 375: 5 text(s) cut with an ellipsis or line clamp by design",
+    "product_main product-tall at 768: 5 text(s) cut with an ellipsis or line clamp by design",
+    "product_main product-tall at 1440: 4 text(s) cut with an ellipsis or line clamp by design",
+    "product_main product-no-image at 375: 5 text(s) cut with an ellipsis or line clamp by design",
+    "product_main product-no-image at 768: 5 text(s) cut with an ellipsis or line clamp by design",
+    "product_main product-no-image at 1440: 4 text(s) cut with an ellipsis or line clamp by design",
+    "product_main product-sold-out at 375: 1 text(s) cut with an ellipsis or line clamp by design",
+    "product_main product-sold-out at 768: 1 text(s) cut with an ellipsis or line clamp by design"
+  ],
+  "screenshots": [
+    {
+      "name": "sections-hero-long_text-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-hero-long_text-375.png",
+      "bytes": 34708,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-hero-long_text-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-hero-long_text-768.png",
+      "bytes": 86892,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-hero-long_text-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-hero-long_text-1440.png",
+      "bytes": 44745,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-hero-no_image-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-hero-no_image-375.png",
+      "bytes": 34945,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-hero-no_image-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-hero-no_image-768.png",
+      "bytes": 97004,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-hero-no_image-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-hero-no_image-1440.png",
+      "bytes": 43047,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-hero-tall_image-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-hero-tall_image-375.png",
+      "bytes": 34199,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-hero-tall_image-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-hero-tall_image-768.png",
+      "bytes": 83731,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-hero-tall_image-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-hero-tall_image-1440.png",
+      "bytes": 42286,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-collections-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-collections-375.png",
+      "bytes": 41237,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-collections-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-collections-768.png",
+      "bytes": 145734,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-collections-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-collections-1440.png",
+      "bytes": 51901,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-new-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-new-375.png",
+      "bytes": 35561,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-new-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-new-768.png",
+      "bytes": 89598,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-new-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-new-1440.png",
+      "bytes": 33151,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-new-sold-out-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-new-sold-out-375.png",
+      "bytes": 35719,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-new-sold-out-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-new-sold-out-768.png",
+      "bytes": 93835,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-new-sold-out-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-new-sold-out-1440.png",
+      "bytes": 32943,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-banner-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-banner-375.png",
+      "bytes": 20763,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-banner-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-banner-768.png",
+      "bytes": 52128,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-banner-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-banner-1440.png",
+      "bytes": 22175,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-rich_text-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-rich_text-375.png",
+      "bytes": 22210,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-rich_text-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-rich_text-768.png",
+      "bytes": 78571,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-rich_text-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-rich_text-1440.png",
+      "bytes": 32616,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-image_with_text-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-image_with_text-375.png",
+      "bytes": 24984,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-image_with_text-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-image_with_text-768.png",
+      "bytes": 58525,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-image_with_text-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-image_with_text-1440.png",
+      "bytes": 20828,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-product_rail-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_rail-375.png",
+      "bytes": 34224,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-product_rail-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_rail-768.png",
+      "bytes": 89130,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-product_rail-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_rail-1440.png",
+      "bytes": 30209,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-product_rail-sold-out-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_rail-sold-out-375.png",
+      "bytes": 35133,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-product_rail-sold-out-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_rail-sold-out-768.png",
+      "bytes": 89165,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-product_rail-sold-out-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_rail-sold-out-1440.png",
+      "bytes": 31148,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-text-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-text-375.png",
+      "bytes": 15058,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-text-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-text-768.png",
+      "bytes": 101735,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-text-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-text-1440.png",
+      "bytes": 55500,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-faq-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-faq-375.png",
+      "bytes": 28278,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "sections-faq-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-faq-768.png",
+      "bytes": 109888,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/"
+    },
+    {
+      "name": "sections-faq-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-faq-1440.png",
+      "bytes": 37020,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "sections-page-kinds-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-page-kinds-375.png",
+      "bytes": 26103,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/policies/worst-case"
+    },
+    {
+      "name": "sections-page-kinds-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-page-kinds-768.png",
+      "bytes": 173478,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/policies/worst-case"
+    },
+    {
+      "name": "sections-page-kinds-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-page-kinds-1440.png",
+      "bytes": 51000,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/worst-case"
+    },
+    {
+      "name": "sections-product_main-product-long-wide-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-long-wide-375.png",
+      "bytes": 20515,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/products/worst-case-product-0"
+    },
+    {
+      "name": "sections-product_main-product-long-wide-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-long-wide-768.png",
+      "bytes": 35080,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/products/worst-case-product-0"
+    },
+    {
+      "name": "sections-product_main-product-long-wide-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-long-wide-1440.png",
+      "bytes": 29826,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/worst-case-product-0"
+    },
+    {
+      "name": "sections-product_main-product-tall-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-tall-375.png",
+      "bytes": 21728,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/products/worst-case-product-1"
+    },
+    {
+      "name": "sections-product_main-product-tall-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-tall-768.png",
+      "bytes": 34123,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/products/worst-case-product-1"
+    },
+    {
+      "name": "sections-product_main-product-tall-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-tall-1440.png",
+      "bytes": 29522,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/worst-case-product-1"
+    },
+    {
+      "name": "sections-product_main-product-no-image-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-no-image-375.png",
+      "bytes": 20381,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/products/worst-case-product-2"
+    },
+    {
+      "name": "sections-product_main-product-no-image-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-no-image-768.png",
+      "bytes": 34464,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/products/worst-case-product-2"
+    },
+    {
+      "name": "sections-product_main-product-no-image-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-no-image-1440.png",
+      "bytes": 25916,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/worst-case-product-2"
+    },
+    {
+      "name": "sections-product_main-product-sold-out-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-sold-out-375.png",
+      "bytes": 18666,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/products/worst-case-product-23"
+    },
+    {
+      "name": "sections-product_main-product-sold-out-768",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-sold-out-768.png",
+      "bytes": 33079,
+      "width": 720,
+      "height": 960,
+      "viewport": 768,
+      "path": "/products/worst-case-product-23"
+    },
+    {
+      "name": "sections-product_main-product-sold-out-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/sections-product_main-product-sold-out-1440.png",
+      "bytes": 28657,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/worst-case-product-23"
+    }
+  ]
+}

@@ -1,0 +1,197 @@
+{
+  "id": "P2-DRILLS",
+  "part": "preview",
+  "title": "P2-DRILLS — preview",
+  "ranAt": "2026-11-04T00:09:45.652Z",
+  "harness": "http://localhost:3800",
+  "chrome": "156.0.8078.80",
+  "passed": 20,
+  "failed": 0,
+  "knownFailures": 1,
+  "checks": [
+    {
+      "ok": true,
+      "label": "before the first publish: a shopper sees none of the drafts",
+      "detail": "Store\nShop all\nSomething went wrong\n\nA temporary error stopped this page from loading. It's usually gone on retry.\n\nRef:"
+    },
+    {
+      "ok": true,
+      "label": "a preview session starts (POST /api/admin/preview-session)",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "before the first publish: the founder's preview shows the drafts (hero, announcement) over the empty list",
+      "detail": {
+        "hero": "Skin first. Makeup second."
+      }
+    },
+    {
+      "ok": true,
+      "label": "before the first publish: the preview bar shows",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "drafts saved: a new home hero title and a new accent colour in doc_design",
+      "detail": {
+        "home": 200,
+        "design": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "after the first publish: a shopper sees the live hero",
+      "detail": "Skin first. Makeup second."
+    },
+    {
+      "ok": true,
+      "label": "a shopper's page has none of the draft colours",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "a preview session starts",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "after the first publish: the founder's preview shows the home draft over the live store",
+      "detail": "Preview only: a draft hero nobody published"
+    },
+    {
+      "ok": true,
+      "label": "the preview says the new colours are not shown, and doesn't apply them",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "\"Show them\" applies doc_design's draft colours in the preview",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the home draft is still shown with the colours on",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the shopper still sees the live hero and live colours",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "\"Hide them\" takes the draft colours off again",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the legacy preview button is refused on a documents store (409)",
+      "detail": 409
+    },
+    {
+      "ok": true,
+      "label": "an old-format token (p.<exp>.<hmac>) was minted while the store was legacy",
+      "detail": "3 parts"
+    },
+    {
+      "ok": true,
+      "label": "the old token still sets the preview cookie (it verifies)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "an old-format token on a documents store shows live content only, no drafts",
+      "detail": "Skin first. Makeup second."
+    },
+    {
+      "ok": true,
+      "label": "before signing out: the founder's tab shows the draft",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "signing out of the console works (the dashboard asks to sign in again)",
+      "detail": {
+        "logout": 200,
+        "landed": "/admin/login"
+      }
+    },
+    {
+      "ok": false,
+      "label": "after signing out of the console, the same browser no longer sees the draft overlay",
+      "detail": {
+        "hero": "Preview only: a draft hero nobody published",
+        "previewCookie": true
+      },
+      "known": "finding 1"
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--drafts-only): the harness store is in documents mode: 36 documents, none published (before the first publish), 0.5s",
+    "hero tests paused for this part: hero-promise (running again afterwards)",
+    "before the first publish a shopper gets 500 at /: \"Store\\nShop all\\nSomething went wrong\\n\\nA temporary error stopped this page from loading. It's usually gone on retry.\\n\\nRef: 1016449659\\n\\nTry again\\nBack to home\\n\\nSto\"",
+    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_80cf474321515c8b, 0.5s",
+    "hero tests paused for this part: hero-promise (running again afterwards)"
+  ],
+  "screenshots": [
+    {
+      "name": "preview-before-first-publish-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/preview-before-first-publish-1440.png",
+      "bytes": 42449,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "preview-before-first-publish-shopper-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/preview-before-first-publish-shopper-1440.png",
+      "bytes": 15772,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "preview-colours-not-shown-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/preview-colours-not-shown-1440.png",
+      "bytes": 38936,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "preview-colours-shown-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/preview-colours-shown-1440.png",
+      "bytes": 38745,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "preview-old-token-live-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/preview-old-token-live-1440.png",
+      "bytes": 44599,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "preview-after-sign-out-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/preview-after-sign-out-1440.png",
+      "bytes": 38936,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "id": "P2-DRILLS",
+  "part": "policy-typo",
+  "title": "P2-DRILLS — policy-typo",
+  "ranAt": "2026-11-04T00:07:16.953Z",
+  "harness": "http://localhost:3800",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "setup: a shipping page with a typo is live",
+      "detail": {
+        "save": 200,
+        "publish": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "a shopper sees the typo on /policies/shipping before the fix",
+      "detail": "Orders dispach within 24 hours on business days."
+    },
+    {
+      "ok": true,
+      "label": "the home draft is saved dirty and incomplete (an empty banner)",
+      "detail": {
+        "status": 200,
+        "issues": [
+          "sec_hero:highlight:HIGHLIGHT_NOT_IN_TITLE:warning",
+          "sec_drillbanner:title:SECTION_EMPTY:incomplete"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the policy fix publishes on its own (200, one document)",
+      "detail": {
+        "status": 200,
+        "published": [
+          {
+            "id": "doc_aw7xago7j3ib465q",
+            "versionId": "ver_e562fded80f9fe31",
+            "hash": "eafed59d4ee7e2ea3d2a9eea048f3b81d137cdfae66f2942db9c9e7322c7f7a5"
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "a shopper sees the fixed text on /policies/shipping",
+      "detail": "Orders dispatch within 24 hours on business days."
+    },
+    {
+      "ok": true,
+      "label": "home is live exactly as before (same text, same sections)",
+      "detail": {
+        "before": 13,
+        "after": 13,
+        "firstDifference": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "home shows neither the draft title nor an unfinished note",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the home draft is still there, dirty, with its unfinished banner",
+      "detail": {
+        "draftHash": "50a3b64563b6",
+        "publishedHash": "0640cd2cfc32"
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_18029eeecaefac1a, 0.5s",
+    "home draft issues reported at save: [\"sec_hero:highlight:HIGHLIGHT_NOT_IN_TITLE:warning\",\"sec_drillbanner:title:SECTION_EMPTY:incomplete\"] (empty banner flagged: true)"
+  ],
+  "screenshots": [
+    {
+      "name": "policy-typo-fixed-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/policy-typo-fixed-1440.png",
+      "bytes": 20161,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/shipping"
+    },
+    {
+      "name": "policy-typo-home-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/policy-typo-home-1440.png",
+      "bytes": 45053,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

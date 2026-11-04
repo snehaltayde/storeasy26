@@ -1,0 +1,115 @@
+{
+  "id": "P2-DRILLS",
+  "part": "unfinished",
+  "title": "P2-DRILLS — unfinished",
+  "ranAt": "2026-11-04T00:10:12.444Z",
+  "harness": "http://localhost:3800",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 1,
+  "checks": [
+    {
+      "ok": true,
+      "label": "a home draft with an empty banner and a rail with no collection is saved",
+      "detail": {
+        "status": 200,
+        "issues": [
+          "sec_drillbnr:title:SECTION_EMPTY:incomplete",
+          "sec_drillrail:collection:REQUIRED:incomplete"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "a preview session starts",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "preview: the unfinished banner shows the 'not finished yet' note",
+      "detail": {
+        "id": "sec_drillbnr",
+        "sec": "sec_drillbnr",
+        "kind": "banner",
+        "text": "Banner: not finished yet Write a short message, with an optional button. Only you can see this in your preview. Finish this section to publish this page."
+      }
+    },
+    {
+      "ok": true,
+      "label": "preview: the unfinished rail shows the 'not finished yet' note",
+      "detail": {
+        "id": "sec_drillrail",
+        "sec": "sec_drillrail",
+        "kind": "product_rail",
+        "text": "Product rail: not finished yet Pick a collection to show its products. Only you can see this in your preview. Finish this section to publish this page."
+      }
+    },
+    {
+      "ok": true,
+      "label": "live: a shopper sees neither the notes nor the unfinished sections",
+      "detail": {
+        "unfinished": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "the preview's bridge answers the Designer's hello",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "clicking the banner's note in the preview sends the Designer that section's id (storeasy:sec:click)",
+      "detail": "sec_drillbnr"
+    },
+    {
+      "ok": true,
+      "label": "the note is outlined as selected in the preview",
+      "detail": null
+    },
+    {
+      "ok": false,
+      "label": "the real Designer previews a documents store, so a click on the note selects the section there",
+      "detail": {
+        "frames": 0
+      },
+      "known": "finding 2"
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_f80073b410d524b7, 0.5s",
+    "hero tests paused for this part: hero-promise (running again afterwards)",
+    "the Designer on a documents store: 0 preview frame(s); \"Preview couldn't start\\n\""
+  ],
+  "screenshots": [
+    {
+      "name": "unfinished-preview-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/unfinished-preview-1440.png",
+      "bytes": 28169,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "unfinished-live-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/unfinished-live-1440.png",
+      "bytes": 44698,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "unfinished-designer-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/unfinished-designer-1440.png",
+      "bytes": 21690,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    }
+  ]
+}

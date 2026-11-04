@@ -1,0 +1,169 @@
+{
+  "id": "P2-DRILLS",
+  "part": "error-chrome",
+  "title": "P2-DRILLS — error-chrome",
+  "ranAt": "2026-11-04T00:07:45.315Z",
+  "harness": "http://localhost:3800",
+  "chrome": "156.0.8078.80",
+  "passed": 13,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the live release is a v4 list that names doc_header and doc_home",
+      "detail": {
+        "v": 4
+      }
+    },
+    {
+      "ok": true,
+      "label": "before: the live store shows its announcement and its own menus",
+      "detail": {
+        "menuLinks": 31
+      }
+    },
+    {
+      "ok": true,
+      "label": "/ at 1440 (doc_home and doc_header versions missing): the error page shows",
+      "detail": {
+        "status": 500,
+        "h1": [
+          "Something went wrong"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "/ at 1440: no announcement",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "/ at 1440: neutral chrome, no default nav (no collection list, no store menus)",
+      "detail": {
+        "links": [
+          "/",
+          "/collections",
+          "/wishlist",
+          "/account",
+          "/contact"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "/ at 1440: the chrome doesn't carry the store's brand name",
+      "detail": "Store\nShop all Shop all Store\n\nShop\n\nAll collections\n\nCompany\n\nContact\n\nSupport\n\n© Store Your cart"
+    },
+    {
+      "ok": true,
+      "label": "/ at 375 (doc_home and doc_header versions missing): the error page shows",
+      "detail": {
+        "status": 500,
+        "h1": [
+          "Something went wrong"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "/ at 375: no announcement",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "/ at 375: neutral chrome, no default nav (no collection list, no store menus)",
+      "detail": {
+        "links": [
+          "/",
+          "/collections",
+          "/wishlist",
+          "/account",
+          "/contact"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "/ at 375: the chrome doesn't carry the store's brand name",
+      "detail": "Store Shop all Store\n\nShop\n\nAll collections\n\nCompany\n\nContact\n\nSupport\n\n© Store Your cart"
+    },
+    {
+      "ok": true,
+      "label": "/policies/shipping (only doc_header's version missing): the chrome is neutral, no announcement, no store menus",
+      "detail": {
+        "links": [
+          "/",
+          "/collections",
+          "/wishlist",
+          "/account",
+          "/contact"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "/ (only doc_header's version missing): the chrome is neutral, no announcement, no store menus",
+      "detail": {
+        "links": [
+          "/",
+          "/collections",
+          "/wishlist",
+          "/account",
+          "/contact"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "after putting the list back, the store shows again",
+      "detail": null
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_d4a13aa3bc396a52, 0.5s",
+    "/ at 1440 corrupted: status 500, chrome links [\"/\",\"/collections\",\"/wishlist\",\"/account\",\"/contact\"]",
+    "/ at 375 corrupted: status 500, chrome links [\"/\",\"/collections\",\"/wishlist\",\"/account\",\"/contact\"]",
+    "/policies/shipping with only doc_header's version missing: status 200, error page false, h1 [\"Shipping policy\"]",
+    "/ with only doc_header's version missing: status 200, error page false, h1 [\"Visibly brighter in 14 days\"]"
+  ],
+  "screenshots": [
+    {
+      "name": "error-chrome-home-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/error-chrome-home-1440.png",
+      "bytes": 11448,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "error-chrome-home-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/error-chrome-home-375.png",
+      "bytes": 14910,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "error-chrome-header-only-policies-shipping-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/error-chrome-header-only-policies-shipping-1440.png",
+      "bytes": 11305,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/shipping"
+    },
+    {
+      "name": "error-chrome-header-only-home-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/error-chrome-header-only-home-1440.png",
+      "bytes": 46002,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}
