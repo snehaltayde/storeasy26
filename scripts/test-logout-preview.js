@@ -627,7 +627,8 @@ await t(`call() maps every example outcome of every operation (${ALL_OPS.length}
         if (r.current) eq(r.current.updatedByName, "Asha", `${where} updatedByName`);
       }
       if (kind === "refused" || kind === "issues") {
-        if (want.offer) same(r.offer, want.offer, `${where} offer`);
+        // offer null (FIRST_PUBLISH_NEEDS_HOME, no home page yet) is kept as sent
+        if (want.offer !== undefined) same(r.offer, want.offer, `${where} offer`);
         else eq(r.offer, undefined, `${where} no offer`);
       }
       if (kind === "refused") {

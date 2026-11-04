@@ -102,7 +102,9 @@ export function mapResponse(status, body) {
     }
     const out = { refused: true, code, message };
     if ("other" in b) out.other = b.other;
-    if (isObj(b.offer)) out.offer = b.offer;
+    // offer null (FIRST_PUBLISH_NEEDS_HOME with no home page yet) means
+    // "nothing to offer", so it is kept as sent
+    if (isObj(b.offer) || b.offer === null) out.offer = b.offer;
     if (isObj(b.current)) out.current = b.current;
     if (Array.isArray(b.documents)) out.documents = b.documents;
     return withBodyFields(out, b);
