@@ -13,6 +13,7 @@
 // The browser proof is scripts/drills/p3/routes.mjs on the design harness.
 //   pnpm test:editor-routes
 import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -814,6 +815,125 @@ await t("rendered: Designer's static render is unchanged when nothing failed (no
   const html = renderToStaticMarkup(React.createElement(DesignerMod.default, { initial: designerInitial }));
   ok(!html.includes("data-preview-push-failed") && !html.includes("The preview didn"), "a failure message on first render");
   ok(html.includes("data-editor-shell"), "not the Designer");
+});
+
+// ---- P4-SCAFFOLD: product and collection addresses, document ids, editability --
+console.log("— P4-SCAFFOLD: the editor's product and collection addresses (plan section 4)");
+const IDS = await import("../lib/documents/ids.js");
+const EDIT = await import("../lib/registry/editability.js");
+const Reg = await import("../lib/registry/index.js");
+
+await t("P4-SCAFFOLD unit: entityEditorHref and parseEditorTarget round-trip product and collection gids, encoded", () => {
+  const P = "gid://shopify/Product/8123456789";
+  const Cn = "gid://shopify/Collection/4455";
+  eq(E.entityEditorHref({ product: P }), "/admin/editor?product=gid%3A%2F%2Fshopify%2FProduct%2F8123456789", "product href:");
+  eq(E.entityEditorHref({ collection: Cn }), "/admin/editor?collection=gid%3A%2F%2Fshopify%2FCollection%2F4455", "collection href:");
+  for (const [target, key] of [
+    [{ product: P }, "product"],
+    [{ collection: Cn }, "collection"],
+    [{ product: "gid://shopify/Product/orphan" }, "product"],
+  ]) {
+    const href = E.entityEditorHref(target);
+    const url = new URL(href, "https://shop.test");
+    eq(url.pathname, "/admin/editor", `${key} path:`);
+    // both the URLSearchParams form and Next's plain searchParams object
+    eq(E.parseEditorTarget(url.searchParams), target, `${key} via URLSearchParams:`);
+    eq(E.parseEditorTarget(Object.fromEntries(url.searchParams)), target, `${key} via a plain object:`);
+    eq(E.parseEditorTarget({ [key]: [target[key], "gid://shopify/Product/2"] }), target, `${key} first of an array:`);
+  }
+  eq(E.parseEditorTarget(new URLSearchParams("doc=doc_home")), { doc: "doc_home" }, "doc:");
+  eq(E.parseEditorTarget({ doc: "doc_prod_0123456789abcdef" }), { doc: "doc_prod_0123456789abcdef" }, "a product document id:");
+});
+
+await t("P4-SCAFFOLD unit: one key wins (doc, then product, then collection); junk gives {} and a junk href is the bare editor", () => {
+  const P = "gid://shopify/Product/1";
+  const Cn = "gid://shopify/Collection/2";
+  eq(E.parseEditorTarget({ doc: "doc_home", product: P, collection: Cn }), { doc: "doc_home" }, "doc first:");
+  eq(E.parseEditorTarget({ product: P, collection: Cn }), { product: P }, "product before collection:");
+  // the winning key's bad value is {}, never a fall-through
+  eq(E.parseEditorTarget({ doc: "../etc", product: P }), {}, "bad doc:");
+  eq(E.parseEditorTarget({ product: Cn, collection: Cn }), {}, "a collection gid under product:");
+  for (const junk of [
+    undefined,
+    null,
+    "",
+    "product=gid://shopify/Product/1",
+    42,
+    {},
+    { product: "" },
+    { product: "gid://shopify/Product/" },
+    { product: "gid://shopify/Product/1 2" },
+    { product: "gid://shopify/Product/1/2" },
+    { product: "gid://shopify/Product/1?x=1" },
+    { product: `gid://shopify/Product/${"9".repeat(65)}` },
+    { product: "gid://shopify/ProductVariant/1" },
+    { product: "javascript:alert(1)" },
+    { collection: "gid://shopify/Product/1" },
+    { collection: ["", Cn] },
+    { doc: "DOC_HOME" },
+    { doc: "doc_home<script>" },
+    { product: 7 },
+    { other: P },
+    new URLSearchParams("product=gid%3A%2F%2Fshopify%2FProduct%2F1%23x"),
+  ]) {
+    eq(E.parseEditorTarget(junk), {}, `parse ${JSON.stringify(junk instanceof URLSearchParams ? String(junk) : junk)}:`);
+  }
+  for (const junk of [undefined, null, {}, [], "x", { product: "1" }, { product: Cn }, { collection: P }, { product: P, collection: Cn }, { product: "gid://shopify/Product/a b" }]) {
+    eq(E.entityEditorHref(junk), "/admin/editor", `href ${JSON.stringify(junk)}:`);
+  }
+  // LEGACY_ROUTE_DOCS is ED05's, unchanged here
+  eq(Object.keys(E.LEGACY_ROUTE_DOCS).length, 8, "LEGACY_ROUTE_DOCS entries:");
+});
+
+await t("P4-SCAFFOLD unit: productDocumentId and collectionDocumentId are async, deterministic, shaped and differ per id", async () => {
+  const P1 = "gid://shopify/Product/101";
+  const P2 = "gid://shopify/Product/102";
+  const C1 = "gid://shopify/Collection/101";
+  const pending = IDS.productDocumentId(P1);
+  ok(pending instanceof Promise, "productDocumentId returns a Promise");
+  ok(IDS.collectionDocumentId(C1) instanceof Promise, "collectionDocumentId returns a Promise");
+  const a = await pending;
+  ok(/^doc_prod_[0-9a-f]{16}$/.test(a), `product id shape: ${a}`);
+  eq(a, await IDS.productDocumentId(P1), "same product, same id:");
+  ok(a !== (await IDS.productDocumentId(P2)), "a different product gets a different id");
+  // doc_prod_ + the first 16 hex of SHA-256(productId), as the brief pins it
+  const { createHash } = await import("node:crypto");
+  eq(a, `doc_prod_${createHash("sha256").update(P1).digest("hex").slice(0, 16)}`, "the hash:");
+  const c = await IDS.collectionDocumentId(C1);
+  ok(/^doc_coll_[0-9a-f]{16}$/.test(c), `collection id shape: ${c}`);
+  eq(c, await IDS.collectionDocumentId(C1), "same collection, same id:");
+  ok(c !== (await IDS.collectionDocumentId("gid://shopify/Collection/102")), "a different collection gets a different id");
+  eq((await IDS.collectionDocumentId(P1)).slice(9), a.slice(9), "same input string, same hash, different prefix:");
+  eq(c, `doc_coll_${createHash("sha256").update(C1).digest("hex").slice(0, 16)}`, "the collection hash:");
+  // both open through ?doc= (the parser accepts them)
+  eq(E.parseEditorTarget({ doc: a }), { doc: a }, "parse product doc id:");
+  eq(E.parseEditorTarget({ doc: c }), { doc: c }, "parse collection doc id:");
+  for (const bad of ["", null, undefined, 5]) {
+    let threw = 0;
+    await IDS.productDocumentId(bad).catch(() => threw++);
+    await IDS.collectionDocumentId(bad).catch(() => threw++);
+    eq(threw, 2, `refuses ${JSON.stringify(bad)}:`);
+  }
+  // backfillRouteId is unchanged by the shared helper
+  eq(await IDS.backfillRouteId("page", "about"), `doc_p_${createHash("sha256").update("route:about").digest("hex").slice(0, 16)}`, "backfillRouteId:");
+});
+
+await t("P4-SCAFFOLD unit: typeHasEditor and cartEditable are pure; the system journal index and unknown types have no editor", () => {
+  for (const type of Reg.documentTypeNames()) {
+    const d = Reg.documentType(type);
+    eq(EDIT.typeHasEditor(type), d.editable && !d.system, `${type}:`);
+  }
+  eq(EDIT.typeHasEditor("journal_index"), false, "journal_index:");
+  for (const yes of ["home", "header", "page", "cart", "product_content", "design"]) eq(EDIT.typeHasEditor(yes), true, `${yes}:`);
+  for (const no of ["", null, undefined, "nope", "__proto__", "constructor", 3]) eq(EDIT.typeHasEditor(no), false, `${String(no)}:`);
+  eq(EDIT.CART_EDITABLE, true, "CART_EDITABLE:");
+  eq(EDIT.cartEditable(), true, "cartEditable():");
+  eq(EDIT.cartEditable(), EDIT.cartEditable(), "stable:");
+  // pure: no database, no request, no node: import
+  const src = readFileSync(join(ROOT, "lib/registry/editability.js"), "utf8");
+  ok(!/from\s+["']node:/.test(src) && !/\b(libsql|db|cookies|headers|fetch)\s*\(/.test(src) && !/lib\/db\.js/.test(src), "editability.js is not pure");
+  const ids = readFileSync(join(ROOT, "lib/documents/ids.js"), "utf8");
+  ok(!/from\s+["']node:/.test(ids), "ids.js imports node:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

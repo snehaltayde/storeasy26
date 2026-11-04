@@ -52,3 +52,26 @@ Two tracks, each with its own ledger (`schema_migrations` in every database):
      order creation against a tenant at the previous schema. Move its
      `OLDER_SCHEMA` to the migration before yours when you add one that those
      paths depend on.
+
+## Phase 4: 0023, 0024 and 0025 (owner step)
+
+`0023_document_refs`, `0024_content_live` and `0025_media_archived` must be
+applied on **every tenant and on the env store** before any code that reads or
+writes them deploys. Builders never run this against a hosted or real store;
+it is an owner step:
+
+1. `pnpm tenant:migrate -- --all` exits 0 (every registered tenant).
+2. `pnpm migrate` exits 0 (the env store: the `_default` database the app uses
+   with no tenant, `TURSO_DB_URL` / `DATABASE_URL`). `--all` does not reach it.
+3. `pnpm tenant:migrate -- --check --include-env` exits 0. `--include-env`
+   adds the env store's ledger to the read-only check; without it, `--check`
+   reads the tenants only, exactly as before.
+4. Deploy.
+
+0023 must be applied before any code that writes refs; 0024 and 0025 before
+phase 4 batch 2 code deploys (docs/cms-reviews/P4-PLAN.md section 5).
+
+`0024_content_live` is pinned: its tables and columns are fixed. A later column
+need is a new `0026_*` file with a named owner, never an edit to 0024. Nothing
+reads its tables until later phase 4 items ship, and their presence changes no
+behaviour.

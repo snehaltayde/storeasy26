@@ -3,6 +3,7 @@
 //   pnpm tenant:migrate -- --tenant demo    # one tenant
 //   pnpm tenant:migrate -- --check          # MIG-05: read only, every tenant
 //   pnpm tenant:migrate -- --check --tenant demo
+//   pnpm tenant:migrate -- --check --include-env   # also the env store (_default)
 // One tenant's failure never stops the others; the summary names failures and
 // the exit code reflects them. Suspended tenants are migrated too (their data
 // must stay schema-current for reactivation).
@@ -11,6 +12,12 @@
 // ledger and exits 0 only if every tenant, suspended ones included, holds every
 // migration this code ships, unedited. Deploy order: `--all` exits 0, then
 // `--check` exits 0, then deploy (migrations/README.md, docs/operations.md).
+//
+// --include-env (P4-SCAFFOLD, MIG-05; only with --check) also reads the ledger
+// of the env store: the database the app uses with no tenant context (the
+// "_default" store, TURSO_DB_URL / DATABASE_URL, as lib/db.js picks it). That
+// store is migrated with `pnpm migrate`, not `--all`. Without the flag the
+// check is exactly what it was.
 import { createClient } from "@libsql/client";
 import { listTenants, getTenant } from "../lib/platform/control.js";
 import { loadMigrations, runMigrations, checkLedger } from "../lib/platform/migrate.js";
@@ -23,9 +30,14 @@ function flag(name) {
 const one = flag("tenant");
 const all = process.argv.includes("--all");
 const check = process.argv.includes("--check");
+const includeEnv = process.argv.includes("--include-env");
 
 if (!one && !all && !check) {
-  console.error("Usage: pnpm tenant:migrate -- (--all | --tenant <slug> | --check [--tenant <slug>])");
+  console.error("Usage: pnpm tenant:migrate -- (--all | --tenant <slug> | --check [--tenant <slug>] [--include-env])");
+  process.exit(1);
+}
+if (includeEnv && !check) {
+  console.error("✗ --include-env only goes with --check. Migrate the env store with pnpm migrate.");
   process.exit(1);
 }
 
@@ -92,6 +104,11 @@ async function checkAll() {
     return 1;
   }
   let notReady = 0;
+  let checked = targets.length;
+  if (includeEnv) {
+    checked++;
+    if (!(await checkEnvStore(newest))) notReady++;
+  }
   for (const row of targets) {
     let client;
     try {
@@ -115,12 +132,40 @@ async function checkAll() {
     }
   }
   if (notReady) {
+    const what = includeEnv ? `${notReady} of ${checked} store(s) (${targets.length} tenant(s) and the env store)` : `${notReady} of ${targets.length} tenant(s)`;
     console.error(
-      `✗ ${notReady} of ${targets.length} tenant(s) not ready for code that needs ${newest}. ` +
-        "Do not deploy. Run pnpm tenant:migrate -- --all until it exits 0, then --check again.",
+      `✗ ${what} not ready for code that needs ${newest}. ` +
+        `Do not deploy. Run pnpm tenant:migrate -- --all${includeEnv ? " and pnpm migrate" : ""} until ${includeEnv ? "they exit" : "it exits"} 0, then --check again.`,
     );
     return 1;
   }
-  console.log(`✓ all ${targets.length} tenant(s) hold every migration up to ${newest}. Safe to deploy.`);
+  if (includeEnv) console.log(`✓ all ${targets.length} tenant(s) and the env store hold every migration up to ${newest}. Safe to deploy.`);
+  else console.log(`✓ all ${targets.length} tenant(s) hold every migration up to ${newest}. Safe to deploy.`);
   return 0;
+}
+
+// --include-env: the env store's ledger, read only. Returns true when current.
+// The URL is printed without its query string or credentials.
+async function checkEnvStore(newest) {
+  const url = process.env.TURSO_DB_URL || process.env.DATABASE_URL || "file:local.db";
+  const token = process.env.TURSO_DB_AUTH_TOKEN || process.env.DATABASE_AUTH_TOKEN || "";
+  const label = "the env store (_default)";
+  let client;
+  try {
+    client = createClient({ url, authToken: token || undefined });
+    const r = await checkLedger(client, migrations);
+    const ahead = r.unknown.length ? ` (its ledger also holds ${r.unknown.join(", ")}, which this code does not ship)` : "";
+    if (r.current) {
+      console.log(`✓ ${label}: current, all ${migrations.length} migrations up to ${newest}${ahead}`);
+      return true;
+    }
+    if (r.missing.length) console.error(`✗ ${label}: behind, missing ${r.missing.join(", ")}${ahead}. Run pnpm migrate.`);
+    if (r.edited.length) console.error(`✗ ${label}: changed since it ran: ${r.edited.join(", ")}`);
+    return false;
+  } catch (e) {
+    console.error(`✗ ${label}: could not read its ledger: ${String(e?.message || e).slice(0, 300)}`);
+    return false;
+  } finally {
+    client?.close();
+  }
 }
