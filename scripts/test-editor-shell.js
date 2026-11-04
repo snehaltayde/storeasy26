@@ -1041,6 +1041,26 @@ await t("P4-FIX3 rendered: while the store still holds product A and the page ha
   ok(settled.includes("Alpha mine") && settled.includes("Shopify title: Alpha"), `A's own form when A is the entry: ${settled.slice(0, 300)}`);
 });
 
+// P4-FIX5 (P4-FIX3 review (a), (b)): while the page has moved to B and the
+// store still holds A, A's actions (Publish, Discard…) and A's Earlier
+// versions panel are held back with the form
+await t("P4-FIX5 rendered: during a switch from product A to B the actions bar and the Earlier versions panel are hidden; once B is open both show again", () => {
+  const settings = { title: { value: "Alpha mine", base_hash: "x", base_value: "Alpha" } };
+  const a = snap({ id: "doc_prod_aaaaaaaaaaaaaaaa", type: "product_content", body: { type: "product_content", settings, sections: [] }, document: { id: "doc_prod_aaaaaaaaaaaaaaaa", type: "product_content", label: "Alpha mine", entityId: "gid://shopify/Product/1", access: { canPublish: true, reason: null } } });
+  const bEntry = { id: "doc_prod_bbbbbbbbbbbbbbbb", type: "product_content", label: "Beta", slug: null };
+  const beta = { inShopify: true, shopify: { title: "Beta", handle: "beta", description_html: "", vendor: "", product_type: "", gallery: [] }, titleEditable: true };
+  const versions = { status: "ready", rows: [], message: null };
+  const moving = view({ entry: bEntry, state: a, entity: beta, versions });
+  ok(textOf(moving).includes("Opening Beta"), "the editor says it is opening B");
+  ok(!/data-editor-actions=""/.test(moving), "no actions bar while B loads");
+  ok(!/data-versions-toggle=""/.test(moving), "no Earlier versions button while B loads");
+  ok(!/data-earlier-versions-panel=""/.test(moving), "no Earlier versions panel while B loads");
+  // the same view with A as the entry shows both (the check above is not vacuous)
+  const settled = view({ entry: entryOf(a), state: a, entity: { ...beta, shopify: { ...beta.shopify, title: "Alpha" } }, versions });
+  ok(/data-editor-actions=""/.test(settled), "A's actions bar when A is the entry");
+  ok(/data-earlier-versions-panel=""/.test(settled), "A's Earlier versions panel when A is the entry");
+});
+
 // edge safety and imports
 await t("editorModel imports only the registry, paths and the preview machine (no React, no DOM, no node:)", async () => {
   const src = await readFile(join(ROOT, "components/admin/editor/editorModel.js"), "utf8");

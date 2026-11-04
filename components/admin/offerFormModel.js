@@ -109,10 +109,16 @@ export function formProblems(form, offer, { currency = "INR" } = {}) {
 
 export const randomSuffix = () => Array.from(globalThis.crypto.getRandomValues(new Uint8Array(3)), (b) => b.toString(16).padStart(2, "0")).join("");
 
+// The next 6-hex ending after `suffix` (wraps at ffffff): a clash retries
+// with it, so the id stays the same on every render for the same offer.
+const nextSuffix = (suffix) => ((parseInt(suffix, 16) + 1) % 0x1000000).toString(16).padStart(6, "0");
+
 // A new offer's id: its kind, a few words from what it's for, and a random
 // ending so two similar offers never share one (the create route refuses a
-// taken id rather than replace a live offer).
-export function newOfferId(offer, { names = {}, suffix = randomSuffix() } = {}) {
+// taken id rather than replace a live offer). P4-FIX5: `taken` holds the ids
+// the store's offers already use; an id among them retries with the next
+// ending until it is free, so a new id never repeats an existing one.
+export function newOfferId(offer, { names = {}, suffix = randomSuffix(), taken = [] } = {}) {
   const t = offer?.target;
   const words =
     offer?.type === "COUPON"
@@ -130,7 +136,11 @@ export function newOfferId(offer, { names = {}, suffix = randomSuffix() } = {}) 
       .replace(/^-+|-+$/g, "")
       .slice(0, 40)
       .replace(/-+$/g, "") || "offer";
-  return `${TYPE_SLUG[offer?.type] || "offer"}-${slug}-${suffix}`;
+  const stem = `${TYPE_SLUG[offer?.type] || "offer"}-${slug}-`;
+  const used = taken instanceof Set ? taken : new Set(Array.isArray(taken) ? taken.map(String) : []);
+  let end = /^[0-9a-f]{6}$/.test(String(suffix)) ? String(suffix) : randomSuffix();
+  for (let tries = 0; used.has(stem + end) && tries < 0x1000000; tries++) end = nextSuffix(end);
+  return stem + end;
 }
 
 // Same settings? Key order doesn't count, and a value left out means what the

@@ -434,6 +434,9 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   const [productFilter, setProductFilter] = useState("all");
   const [entityBusy, setEntityBusy] = useState(false);
   const productSeq = useRef(0);
+  // P4-FIX5: only the latest openEntry may adopt its answer (A to B to C with
+  // B answering last must never leave the store on B while the page is on C)
+  const openSeq = useRef(0);
   const picker = useMemo(() => createLibraryPicker(setPickerOpen), []);
   const lookupProducts = useCallback(async (ids) => (await fetchRefs({ type: "product", ids: ids.join(","), limit: ids.length })).items || [], []);
   const storeRef = useRef(null);
@@ -515,13 +518,17 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
 
   const openEntry = useCallback(
     async (id) => {
+      const mine = ++openSeq.current;
       setLoad({ status: "loading" });
       setVersions(null);
       setGoBack(null);
       setPending({});
       const r = await api.call("getDocument", id);
+      // a later openEntry started while this one waited: its answer wins
+      if (mine !== openSeq.current) return;
       if (r?.ok && isObj(r.data?.document)) {
         await adopt(r.data.document);
+        if (mine !== openSeq.current) return;
         setLoad({ status: "ready" });
         const p = pickRef.current;
         pickRef.current = null;
