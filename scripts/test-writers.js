@@ -538,7 +538,10 @@ await t("heroVariantSettings merges a flat variant payload into hero settings, e
 // ======================================================================================
 console.log("— theme kits");
 
-await t("kit apply in documents mode is 409 (brand and theme are TOK-03): no pin, no brand, no draft", async () => {
+// P3-DESIGN (TOK-03): kit apply on a documents store now saves a doc_design
+// draft through the documents service (scripts/test-design-doc.js proves it in
+// full). Without the service handed in, it still refuses: fail closed.
+await t("kit apply in documents mode without the documents service is 409: no pin, no brand, no draft; the route saves a doc_design draft and never the config", async () => {
   const cfg = (await C.platformDb().execute("SELECT config FROM tenants WHERE id = 'wd'")).rows[0].config;
   const docs = await sql("docs", "SELECT id, revision, draft_hash FROM documents ORDER BY id");
   const e = await rejects(() => inD(() => K.applyKit("glow", { actor: ACTOR })));
@@ -546,9 +549,13 @@ await t("kit apply in documents mode is 409 (brand and theme are TOK-03): no pin
   eq((await C.platformDb().execute("SELECT config FROM tenants WHERE id = 'wd'")).rows[0].config, cfg, "config unchanged:");
   eq(await sql("docs", "SELECT id, revision, draft_hash FROM documents ORDER BY id"), docs, "documents unchanged:");
   eq(await sql("docs", "SELECT count(*) AS n FROM cms_blocks"), [{ n: 0 }], "no block:");
-  // and the route keeps its own refusal
-  const r = await route("docs", "admin/theme", { action: "apply", kit: "glow" });
-  eq([r.status, r.body.code], [409, "STORE_USES_DOCUMENTS"], "route:");
+  // the route hands the service in: a doc_design draft, the config untouched
+  const r = await route("docs", "admin/theme", { action: "apply", kit: "glow", withPresets: false });
+  eq([r.status, r.body.applied?.theme?.kit], [200, "glow"], `route: ${JSON.stringify(r.body).slice(0, 200)}`);
+  eq((await C.platformDb().execute("SELECT config FROM tenants WHERE id = 'wd'")).rows[0].config, cfg, "config still unchanged:");
+  const design = await sql("docs", "SELECT draft, published_version_id FROM documents WHERE id = 'doc_design'");
+  eq([JSON.parse(design[0].draft).settings.theme.kit, design[0].published_version_id], ["glow", null], "a doc_design draft, nothing published:");
+  eq(await sql("docs", "SELECT count(*) AS n FROM cms_blocks"), [{ n: 0 }], "still no block:");
 });
 
 await t("kit apply in legacy works as today: pin, brand defaults and the hero preset as a draft (audited, with history)", async () => {

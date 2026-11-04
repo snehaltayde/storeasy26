@@ -52,7 +52,7 @@ export default function TenantDetail({ id }) {
             { key: "Shop", value: t.config.shop_domain || "—", mono: true },
             { key: "Site", value: t.config.site_name || "—" },
             { key: "Checkout", value: t.config.checkout_mode },
-            t.config.theme && { key: "Kit", value: `${t.config.theme.kit} v${t.config.theme.version}`, mono: true },
+            t.config.theme_pin && { key: "Kit", value: `${t.config.theme_pin.kit} v${t.config.theme_pin.version}`, mono: true },
           ]}
         />
         <p className="mt-3 text-xs font-semibold text-fg">Credentials (presence only)</p>

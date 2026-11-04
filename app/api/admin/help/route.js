@@ -4,6 +4,19 @@ import { currentTenant, tenantId } from "@/lib/tenant-context";
 import { db } from "@/lib/db";
 import { freshness, discrepancies } from "@/lib/reporting";
 import { tenantHandler } from "@/lib/tenant-request";
+import { storeDesign } from "@/lib/admin/brand-readability";
+
+// P3-DESIGN (TOK-03): the look in the bundle is the one shoppers see: on a
+// documents store the LIVE design document's (doc_design), on legacy the
+// control-plane pin as before. "unknown" when it can't be read.
+async function themeLine() {
+  try {
+    const { theme } = await storeDesign();
+    return theme?.kit ? `${theme.kit}@${theme.version}` : "default";
+  } catch {
+    return "unknown";
+  }
+}
 
 // Help & support diagnostics (S43 / MC27). Builds the EXACT diagnostics
 // bundle the merchant can copy into a support message — config PRESENCE
@@ -34,7 +47,7 @@ export const GET = tenantHandler(async (request) => {
     status: tenant?.status || "legacy",
     plan: tenant?.config?.billing?.plan || "none",
     billing_status: tenant?.config?.billing?.status || null,
-    theme: tenant?.config?.theme ? `${tenant.config.theme.kit}@${tenant.config.theme.version}` : "default",
+    theme: await themeLine(),
     maintenance: Boolean(tenant?.config?.maintenance?.enabled),
     configured: {
       shopify: Boolean(tenant?.secrets?.shopify_admin_token),
