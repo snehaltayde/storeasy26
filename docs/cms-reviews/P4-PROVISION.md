@@ -116,6 +116,14 @@ Mutation runs (each restored after): M1 left 16 passed, 11 failed; M2 25/2; M3 2
 - **`launchedAt` on a documents store** is the first release's time (`min(releases.created_at)`).
 - Build warnings: 3 file-tracing warnings through `lib/platform/migrate.js` (via `/api/platform/*`). That file is unchanged here. `provision.js` already imported it dynamically before this item.
 
+From review:
+
+- Earlier blocker is FIXED at c876789. content_mode now reads getTenant(id). A store already registered under this id, and not registered by this run, keeps its editor with the plain 'already registered' reason. This covers the refused re-provision, --force, and the /platform form with an existing slug. A database this run did not create (an adopted --db-url, or a Turso 409 / existing-name database) moves only if it also has no rows in products, collections, customers or orders. That check is part of the same single guarded UPDATE. getTenant returns tenants of any status, so suspended tenants are covered too. The three new fix-1 tests use the default contentMode, and test (a) checks that the refused run leaves cms_state unchanged, including updated_at.
+- Mutations I ran: setting `registered = false` makes 3 tests fail, including both fix-1 re-provision tests. Setting `requireNoStoreData: false` fails the adopted-database-with-orders/products test. test-provision passes 30 of 30. Full pnpm test passes 96 of 96 suites in 179.5s.
+- Remaining gap, already listed in Known limits: an adopted --db-url that points at another registered tenant's database can still be moved to documents mode under a new id, as long as that database has no catalog, customers, orders or editor content. That would close the other tenant's (empty) storefront. A cheap extra guard: refuse the move when listTenants() already has a tenant with the same db_url. This is a suggestion, not a blocker, since such a store has nothing to sell.
+- Old issue outside this item: createDbViaCli uses `existing.includes(name)` on the `turso db list` output, so the name 'storeasy-t-shop' matches inside 'storeasy-t-shop2'. Provisioning 'shop' while 'shop2' exists would set created=false and skip create, so `db show` fails. With fix 1 this case now fails safe (requireNoStoreData is on), but the substring match is still wrong.
+- Edge runtime: the fix only touches lib/platform/provision.js, which is server-only and already used node: APIs. lib/admin/onboarding.js is unchanged by the fix and has no node: imports. Worktree rv1 is removed and no sqld or server processes are left running.
+
 ## From review
 
 - **Fixed (round 1, blocker):** `content_mode` ran before the "already exists" check and only looked at content tables, so a failed or forced re-provision (or an adopted live database, or the `/platform` form with an existing slug) moved a live old-editor store to the new editor and closed it to shoppers. See Design (6) and the fix round 1 tests.
