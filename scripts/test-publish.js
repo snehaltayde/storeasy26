@@ -34,7 +34,7 @@ process.env.PLATFORM_DB_TOKEN = "";
 process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
-const FILES = [".test-pub-default.db", ".test-pub-platform.db", ".test-pub-file.db", ".test-pub-x21.db", ".test-pub-x20.db"];
+const FILES = [".test-pub-default.db", ".test-pub-platform.db", ".test-pub-file.db", ".test-pub-x21.db", ".test-pub-x20.db", ".test-pub-x23.db", ".test-pub-x22.db"];
 for (const f of FILES) await rm(join(root, f), { force: true });
 
 const { withTenant } = await import("../lib/tenant-context.js");
@@ -73,6 +73,7 @@ const eq = (got, want, label = "") => {
 const schema = await readFile(join(root, "lib/schema.sql"), "utf8");
 const MIGRATIONS = await loadMigrations("tenant");
 const M21 = MIGRATIONS.find((m) => m.id === "0021_documents");
+const M23 = MIGRATIONS.find((m) => m.id === "0023_document_refs");
 const SINGLETONS = ["header", "footer", "announcement", "design", "cart", "home"];
 
 async function migrate(client, migrations = MIGRATIONS) {
@@ -371,6 +372,210 @@ async function commonCases(name, client, { commit }) {
   });
 }
 
+// ---------- P3-COMMIT: undo-shaped builds -------------------------------------
+// A build as Undo and take offline make it: a fresh published version of the
+// target body, the draft rewritten (slug, label, revision + 1), undone_version_id
+// set, the pointer fields null (taken offline), an undo_saved extra version, an
+// undo log row with undoes_log_id and saved_version_id, and refs rows.
+
+let undoSeq = 0;
+async function seedUndoDoc(client, { slug } = {}) {
+  undoSeq++;
+  const id = `doc_p_undo${String(undoSeq).padStart(4, "0")}`;
+  await seedDocument(client, { id, type: "page", slug: slug ?? `undo-${undoSeq}` });
+  return id;
+}
+
+async function makeUndoBuild(client, id, { prev, slug, label = "Earlier about", expectPublished, savedBody, overrides = {} } = {}) {
+  const live = prev || (await pointerOf(client));
+  const prevList = L.isV4List(live.list) ? live.list : L.emptyList(1, SINGLETONS);
+  const doc = (await client.execute({ sql: "SELECT revision, slug, type FROM documents WHERE id = ?", args: [id] })).rows[0];
+  const setId = ids.setId();
+  const target = { type: doc.type, meta: { slug: slug ?? String(doc.slug), title: label }, sections: [{ id: "s1", type: "rich_text", settings: { text: `target ${id} ${setId}` } }] };
+  const canonical = stableStringify(target);
+  const hash = await sha256Hex(canonical);
+  const v = { id: ids.verId(), document_id: id, kind: "published", body: canonical, body_hash: hash, schema_version: 1, created_at: NOW };
+  const keptText = stableStringify(savedBody === undefined ? { type: doc.type, sections: [], kept: setId } : savedBody);
+  const saved = { id: ids.verId(), document_id: id, kind: "undo_saved", body: savedBody === null ? null : keptText, body_hash: await sha256Hex(keptText), schema_version: 1, note: "Kept before Undo", created_at: NOW };
+  const undone = prevList.documents[id]?.version ?? null;
+  const d = {
+    id,
+    revision: Number(doc.revision),
+    published: { versionId: null, hash: null },
+    undone,
+    draft: { body: target, hash: `dh_undo_${setId}`, slug: target.meta.slug, label, by: "merchant:u_test", at: NOW },
+  };
+  if (expectPublished !== undefined) d.expectPublished = expectPublished;
+  const list = L.setEntries(prevList, [{ document: id, entry: { version: v.id, hash }, pages: [{ slug: target.meta.slug, type: doc.type, title: label, enabled: false }] }]);
+  return {
+    releaseId: ids.relId(),
+    setId,
+    pointer: live.pointer,
+    list,
+    versions: [v],
+    extraVersions: [saved],
+    documents: [d],
+    log: [{ id: ids.logId(), document_id: id, action: "undo", from_version_id: undone, to_version_id: v.id, undoes_log_id: `log_undone_${setId.slice(4)}`, saved_version_id: saved.id }],
+    refs: [
+      { version_id: v.id, ref_type: "collection", ref_id: "shirts" },
+      { version_id: v.id, ref_type: "document", ref_id: "doc_p_faq" },
+    ],
+    actor: "test",
+    now: NOW,
+    ...overrides,
+  };
+}
+
+const docRow = async (client, id) => ({ ...(await client.execute({ sql: "SELECT * FROM documents WHERE id = ?", args: [id] })).rows[0] });
+async function undoRows(client, b) {
+  const n = async (sql, args) => Number((await client.execute({ sql, args })).rows[0].n);
+  return {
+    versions: await n("SELECT count(*) AS n FROM document_versions WHERE id = ?", [b.versions[0].id]),
+    saved: await n("SELECT count(*) AS n FROM document_versions WHERE id = ? AND kind = 'undo_saved'", [b.extraVersions[0].id]),
+    releases: await n("SELECT count(*) AS n FROM releases WHERE id = ?", [b.releaseId]),
+    log: await n("SELECT count(*) AS n FROM publish_log WHERE id = ?", [b.log[0].id]),
+    refs: await n("SELECT count(*) AS n FROM document_refs WHERE version_id = ?", [b.versions[0].id]),
+  };
+}
+const NONE = { versions: 0, saved: 0, releases: 0, log: 0, refs: 0 };
+const ALL = { versions: 1, saved: 1, releases: 1, log: 1, refs: 2 };
+
+async function assertUndoWritten(client, b, before, label = "") {
+  eq(await undoRows(client, b), ALL, `${label} rows:`);
+  eq((await pointerOf(client)).pointer, b.releaseId, `${label} pointer:`);
+  const d = b.documents[0];
+  const row = await docRow(client, d.id);
+  eq(
+    { draft: JSON.parse(String(row.draft)), draft_hash: row.draft_hash, slug: row.slug, label: row.label, revision: Number(row.revision), updated_at: row.updated_at, updated_by: row.updated_by, undone_version_id: row.undone_version_id, published_version_id: row.published_version_id, published_hash: row.published_hash },
+    { draft: d.draft.body, draft_hash: d.draft.hash, slug: d.draft.slug, label: d.draft.label, revision: Number(before.revision) + 1, updated_at: NOW, updated_by: d.draft.by, undone_version_id: d.undone, published_version_id: null, published_hash: null },
+    `${label} documents row:`,
+  );
+  const log = (await client.execute({ sql: "SELECT action, undoes_log_id, saved_version_id, from_version_id, to_version_id FROM publish_log WHERE id = ?", args: [b.log[0].id] })).rows[0];
+  eq({ ...log }, { action: "undo", undoes_log_id: b.log[0].undoes_log_id, saved_version_id: b.extraVersions[0].id, from_version_id: b.log[0].from_version_id, to_version_id: b.versions[0].id }, `${label} log row:`);
+  const refs = (await client.execute({ sql: "SELECT ref_type, ref_id FROM document_refs WHERE version_id = ? ORDER BY ref_type, ref_id", args: [b.versions[0].id] })).rows.map((x) => ({ ...x }));
+  eq(refs, b.refs.map((r) => ({ ref_type: r.ref_type, ref_id: r.ref_id })), `${label} refs:`);
+}
+async function assertUndoNothing(client, b, before, label = "") {
+  eq(await undoRows(client, b), NONE, `${label} rows:`);
+  eq(await docRow(client, b.documents[0].id), before, `${label} documents row:`);
+}
+
+async function undoCases(name, client, { commit }) {
+  await t(`${name}: P3-COMMIT an undo-shaped build (draft rewrite with slug and label, revision+1, undone, published null, undo_saved, undo log row, refs) commits all together`, async () => {
+    const id = await seedUndoDoc(client);
+    const first = await makeBuild(client, [id]);
+    eq((await commit(first)).outcome, "ok", "publish it first:");
+    const before = await docRow(client, id);
+    const b = await makeUndoBuild(client, id, { slug: `${before.slug}-earlier`, label: "Earlier words" });
+    const r = await commit(b);
+    eq(r.outcome, "ok", `outcome (${r.code || ""} ${r.cause?.message || ""}):`);
+    eq(r.reconciled, false, "reconciled:");
+    await assertUndoWritten(client, b, before);
+    eq((await pointerOf(client)).list.pages.find((p) => p.document === id)?.enabled, false, "its page row is offline:");
+  });
+
+  await t(`${name}: P3-COMMIT an undo-shaped build whose last statement fails writes nothing: no draft change, no undo_saved, no refs, no log row`, async () => {
+    const id = await seedUndoDoc(client);
+    const before = await docRow(client, id);
+    const b = await makeUndoBuild(client, id, { slug: `${before.slug}-x` });
+    b.refs = [...b.refs, { version_id: b.versions[0].id, ref_type: "collection", ref_id: "shirts" }]; // a duplicate primary key is absorbed…
+    b.log[0] = { ...b.log[0], document_id: null }; // …but a log row without a document is refused
+    const r = await commit(b);
+    eq(r.outcome, "failed", "outcome:");
+    await assertUndoNothing(client, b, before);
+  });
+
+  await t(`${name}: P3-COMMIT a lost pointer race leaves no undo_saved, refs or log row and the draft as it was`, async () => {
+    const id = await seedUndoDoc(client);
+    const b = await makeUndoBuild(client, id);
+    const other = await makeBuild(client, ["doc_footer"]);
+    eq((await commit(other)).outcome, "ok", "the other publish:");
+    const before = await docRow(client, id);
+    const r = await commit(b);
+    eq(r.outcome, "lost", "outcome:");
+    await assertUndoNothing(client, b, before);
+  });
+
+  await t(`${name}: P3-COMMIT expectPublished that no longer matches makes the batch lose with nothing written; a matching one commits`, async () => {
+    const id = await seedUndoDoc(client);
+    const first = await makeBuild(client, [id]);
+    eq((await commit(first)).outcome, "ok", "publish it first:");
+    const live = first.versions[0].id;
+    const stale = await makeUndoBuild(client, id, { expectPublished: "ver_0000000000000bad" });
+    const before = await docRow(client, id);
+    const r = await commit(stale);
+    eq(r.outcome, "lost", "a stale expectPublished:");
+    await assertUndoNothing(client, stale, before);
+    const nullish = await makeUndoBuild(client, id, { expectPublished: null });
+    eq((await commit(nullish)).outcome, "lost", "expectPublished null while one is live:");
+    await assertUndoNothing(client, nullish, before);
+    const good = await makeUndoBuild(client, id, { expectPublished: live });
+    eq((await commit(good)).outcome, "ok", "the matching one:");
+    await assertUndoWritten(client, good, before);
+  });
+
+  await t(`${name}: P3-COMMIT the flip refuses when an extraVersions row is missing (statement left out, or its id held by another body)`, async () => {
+    const id = await seedUndoDoc(client);
+    const b = await makeUndoBuild(client, id);
+    const stmts = await publishStatements(b);
+    const extraAt = stmts.findIndex((s) => s.sql.startsWith("INSERT INTO document_versions") && s.args[0] === b.extraVersions[0].id);
+    ok(extraAt >= 0, "the extra version has its own INSERT");
+    const flip = stmts.find((s) => s.sql.startsWith("UPDATE release_state"));
+    ok(flip.args.includes(b.extraVersions[0].id), "the flip guard names the extra version");
+    const before = await docRow(client, id);
+    let e = null;
+    try {
+      await client.batch(stmts.filter((_, i) => i !== extraAt), "write");
+    } catch (err) {
+      e = err;
+    }
+    ok(e && /CHECK constraint failed/i.test(e.message), `the batch without the extra row: ${e?.message}`);
+    await assertUndoNothing(client, b, before, "without the row:");
+    // the extra id already belongs to another body: ON CONFLICT DO NOTHING keeps the old row, the count misses
+    const clash = await makeUndoBuild(client, id);
+    await client.execute({ sql: "INSERT INTO document_versions (id, document_id, kind, body, body_hash, schema_version, created_at) VALUES (?, ?, 'undo_saved', '{}', 'other', 1, ?)", args: [clash.extraVersions[0].id, id, NOW] });
+    const r = await commit(clash);
+    eq(r.outcome, "failed", "outcome:");
+    eq(r.code, "VERSION_ID_CLASH", "code:");
+    eq({ ...(await undoRows(client, clash)), saved: 1 }, { ...NONE, saved: 1 }, "only the old row:");
+    eq(await docRow(client, id), before, "documents row:");
+  });
+
+  await t(`${name}: P3-COMMIT P2's 'null body or null hash' still fails whole, and so does an undo_saved with a null body`, async () => {
+    const id = await seedUndoDoc(client);
+    const before = await docRow(client, id);
+    for (const [label, edit] of [
+      ["published version body null", (b) => { b.versions[0] = { ...b.versions[0], body: null }; }],
+      ["release hash null", (b) => { b.hash = null; }],
+      ["undo_saved body null", (b) => { b.extraVersions[0] = { ...b.extraVersions[0], body: null }; }],
+    ]) {
+      const b = await makeUndoBuild(client, id);
+      edit(b);
+      const r = await commit(b);
+      eq(r.outcome, "failed", `${label} outcome:`);
+      ok(/NOT NULL/i.test(String(r.cause?.message)), `${label} cause: ${r.cause?.message}`);
+      await assertUndoNothing(client, b, before, `${label}:`);
+    }
+  });
+
+  await t(`${name}: P3-COMMIT a draft slug another non-archived draft holds is failed SLUG_TAKEN (not DB_REFUSED), nothing written; an archived holder doesn't count`, async () => {
+    const holder = await seedUndoDoc(client, { slug: `held-${undoSeq + 1}` });
+    const heldSlug = String((await docRow(client, holder)).slug);
+    const id = await seedUndoDoc(client);
+    const before = await docRow(client, id);
+    const b = await makeUndoBuild(client, id, { slug: heldSlug });
+    const r = await commit(b);
+    eq(r.outcome, "failed", "outcome:");
+    eq(r.code, "SLUG_TAKEN", "code:");
+    eq(r.slugs, [heldSlug], "slugs:");
+    await assertUndoNothing(client, b, before);
+    await client.execute({ sql: "UPDATE documents SET archived_at = ? WHERE id = ?", args: [NOW, holder] });
+    const again = await makeUndoBuild(client, id, { slug: heldSlug });
+    eq((await commit(again)).outcome, "ok", "once the holder is archived:");
+    eq(String((await docRow(client, id)).slug), heldSlug, "slug:");
+  });
+}
+
 async function seedTenant(client) {
   await migrate(client);
   for (const [id, type, slug] of [
@@ -513,6 +718,51 @@ await t("the publish statements are in the planned order and never use INSERT OR
   ok(!/\.transaction\(/.test(src.replace(/^\s*\/\/.*$/gm, "")), "commit.js must not use transaction()");
 });
 
+// P3-COMMIT: the order with the new parts, and the draft columns.
+await t("P3-COMMIT: an undo-shaped build's statements: the extra version beside the versions, the draft in the documents UPDATE, refs last, ON CONFLICT everywhere", async () => {
+  const draft = { body: { type: "page", sections: [] }, hash: "dh", slug: "about-old", label: "About", by: "merchant:u", at: NOW };
+  const b = {
+    releaseId: "rel_x",
+    pointer: null,
+    list: L.emptyList(1, SINGLETONS),
+    versions: [{ id: "ver_a", document_id: "doc_p_a", body: "{}", body_hash: "h", schema_version: 1 }],
+    extraVersions: [{ id: "ver_s", document_id: "doc_p_a", kind: "undo_saved", body: "{}", body_hash: "hs", schema_version: 1 }],
+    documents: [{ id: "doc_p_a", revision: 4, published: { versionId: null, hash: null }, undone: "ver_old", expectPublished: "ver_old", draft }],
+    log: [{ id: "log_a", document_id: "doc_p_a", action: "undo", undoes_log_id: "log_u", saved_version_id: "ver_s" }],
+    refs: [{ version_id: "ver_a", ref_type: "collection", ref_id: "shirts" }],
+    setId: "set_a",
+  };
+  const stmts = await publishStatements(b);
+  const kinds = stmts.map((x) => x.sql.split(" (")[0].replace(/ SET.*/, "").replace(/ WHERE.*/, "").replace(/ VALUES.*/, ""));
+  eq(kinds, ["INSERT INTO document_versions", "INSERT INTO document_versions", "INSERT INTO releases", "UPDATE release_state", "INSERT INTO release_state", "UPDATE releases", "INSERT INTO publish_log", "UPDATE documents", "INSERT INTO document_refs"], "order:");
+  for (const x of stmts) ok(!/OR IGNORE|OR REPLACE/i.test(x.sql), `forbidden insert: ${x.sql}`);
+  ok(/ON CONFLICT DO NOTHING$/.test(stmts[8].sql), "refs: ON CONFLICT DO NOTHING");
+  const flip = stmts[3];
+  ok(/\(SELECT revision FROM documents WHERE id = \? AND published_version_id IS \? AND archived_at IS NULL\) = \?/.test(flip.sql), `the document's guard: ${flip.sql}`);
+  ok(/= \?\)? AND|\) = \?/.test(flip.sql) && flip.args.includes("ver_s") && flip.args.includes(2), "the flip counts both version rows");
+  const upd = stmts[7];
+  const set = /^UPDATE documents SET (.*) WHERE id = \?$/.exec(upd.sql)[1].split(", ").map((c) => c.split(" = ")[0]);
+  eq(set, ["published_version_id", "published_hash", "undone_version_id", "draft", "draft_hash", "slug", "label", "revision", "updated_at", "updated_by"], "documents UPDATE columns:");
+  eq(upd.args, [null, null, "ver_old", JSON.stringify(draft.body), "dh", "about-old", "About", NOW, "merchant:u", "doc_p_a"], "documents UPDATE values:");
+});
+
+await t("P3-COMMIT: the commit's draft UPDATE sets exactly the columns service.draftWrite sets", async () => {
+  const src = await readFile(join(root, "lib/documents/service.js"), "utf8");
+  const m = /function draftWrite\([^)]*\) \{[\s\S]*?sql: "UPDATE documents SET (.*?) WHERE/.exec(src);
+  ok(m, "can't read service.js draftWrite");
+  const service = m[1].split(", ").map((c) => c.split(" = ")[0].trim());
+  const { DRAFT_COLUMNS } = await import("../lib/documents/commit.js");
+  eq([...DRAFT_COLUMNS], service, "DRAFT_COLUMNS vs draftWrite:");
+  const stmts = await publishStatements({
+    releaseId: "rel_x",
+    list: L.emptyList(1, SINGLETONS),
+    documents: [{ id: "doc_p_a", revision: 1, draft: { body: { type: "page" }, hash: "dh", slug: null, label: "A" } }],
+  });
+  const upd = stmts.find((x) => x.sql.startsWith("UPDATE documents"));
+  const cols = /^UPDATE documents SET (.*) WHERE/.exec(upd.sql)[1].split(", ").map((c) => c.split(" = ")[0]);
+  eq(cols.filter((c) => !["published_version_id", "published_hash"].includes(c)), service, "commit's draft columns vs draftWrite:");
+});
+
 await t("a malformed build returns {failed, code BAD_BUILD} with no database call (P2-HARDEN)", async () => {
   let calls = 0;
   const spy = { batch: async () => { calls++; return []; }, execute: async () => { calls++; return { rows: [] }; } };
@@ -543,6 +793,16 @@ await t("a malformed build returns {failed, code BAD_BUILD} with no database cal
     ["no list", (b) => { delete b.list; }],
     ["a schema_version of NaN (caught in the arguments)", (b) => { b.versions[0].schema_version = NaN; }],
     ["a note that is an object (caught in the arguments)", (b) => { b.note = { x: 1 }; }],
+    // P3-COMMIT
+    ["a draft without a body", (b) => { b.documents[0].draft = { hash: "h", slug: null, label: "A" }; }],
+    ["a draft without a label", (b) => { b.documents[0].draft = { body: {}, hash: "h", slug: null }; }],
+    ["undone that is a number", (b) => { b.documents[0].undone = 3; }],
+    ["expectPublished that is an object", (b) => { b.documents[0].expectPublished = {}; }],
+    ["published that is a string", (b) => { b.documents[0].published = "ver_x"; }],
+    ["an extra version of another kind", (b) => { b.extraVersions = [{ id: "ver_0000000000000002", document_id: "doc_home", kind: "published", body: "{}", body_hash: "h" }]; }],
+    ["an extra version reusing a version id", (b) => { b.extraVersions = [{ id: "ver_0000000000000001", document_id: "doc_home", kind: "undo_saved", body: "{}", body_hash: "h" }]; }],
+    ["a ref naming a version outside the build", (b) => { b.refs = [{ version_id: "ver_elsewhere", ref_type: "media", ref_id: "m" }]; }],
+    ["a ref without a ref_id", (b) => { b.refs = [{ version_id: "ver_0000000000000001", ref_type: "media" }]; }],
     ["not an object", () => null],
   ];
   for (const [label, edit] of cases) {
@@ -618,6 +878,39 @@ await t("cms_state is seeded 'legacy' with one row; tenant-migrate --check's led
   for (const x of [c, c21, fresh]) x.close();
 });
 
+await t("P3-COMMIT: 0023 is additive (IF NOT EXISTS only) and applies twice cleanly; its tables and indexes are there", async () => {
+  ok(M23, "0023_document_refs is not in migrations/tenant");
+  const sql = M23.sql.replace(/--.*$/gm, "");
+  for (const m of sql.matchAll(/\b(CREATE\s+(?:UNIQUE\s+)?(?:TABLE|INDEX|TRIGGER))\s+(\w+)/gi)) ok(/^IF$/i.test(m[2]), `${m[1]} without IF NOT EXISTS`);
+  ok(!/\b(DROP|ALTER|UPDATE|DELETE|INSERT)\b/i.test(sql), "a statement that is not CREATE … IF NOT EXISTS");
+  const c = createClient({ url: "file:.test-pub-x23.db" });
+  await migrate(c, MIGRATIONS.filter((m) => m.id < "0023"));
+  eq((await checkLedger(c, MIGRATIONS)).missing, ["0023_document_refs"], "a 0022 store misses exactly 0023:");
+  await runMigrations(c, MIGRATIONS);
+  await c.executeMultiple(M23.sql); // a second run changes nothing
+  await c.executeMultiple(M23.sql);
+  ok((await checkLedger(c, MIGRATIONS)).current, "current after 0023");
+  const names = (await c.execute("SELECT name FROM sqlite_master WHERE name IN ('document_refs', 'document_refs_target', 'publish_log_set', 'publish_log_undoes', 'publish_log_recent') ORDER BY name")).rows.map((r) => String(r.name));
+  eq(names, ["document_refs", "document_refs_target", "publish_log_recent", "publish_log_set", "publish_log_undoes"], "objects:");
+  eq((await c.execute("PRAGMA table_info(document_refs)")).rows.map((r) => [String(r.name), Number(r.pk)]), [["version_id", 1], ["ref_type", 2], ["ref_id", 3]], "columns and primary key:");
+  await c.execute("INSERT INTO document_refs (version_id, ref_type, ref_id) VALUES ('ver_a', 'media', 'm1') ON CONFLICT DO NOTHING");
+  await c.execute("INSERT INTO document_refs (version_id, ref_type, ref_id) VALUES ('ver_a', 'media', 'm1') ON CONFLICT DO NOTHING");
+  eq(Number((await c.execute("SELECT count(*) AS n FROM document_refs")).rows[0].n), 1, "a repeated row is absorbed:");
+  const plan = async (q) => (await c.execute(`EXPLAIN QUERY PLAN ${q}`)).rows.map((r) => String(r.detail)).join(" ");
+  // set_id is NOT NULL, and SQLite does not infer "set_id IS NOT NULL" from
+  // "set_id = ?" for that column: a query must say it to use publish_log_set
+  // (a known limit for P3-UNDO's whole-set read)
+  const setPlan = await plan("SELECT * FROM publish_log WHERE set_id = 'set_x' AND set_id IS NOT NULL");
+  ok(/publish_log_set/.test(setPlan), `set_id lookups (with IS NOT NULL) use the index: ${setPlan}`);
+  const undoesPlan = await plan("SELECT * FROM publish_log WHERE undoes_log_id = 'log_x'");
+  ok(/publish_log_undoes/.test(undoesPlan), `undoes_log_id lookups use the index: ${undoesPlan}`);
+  const recentPlan = await plan("SELECT * FROM publish_log ORDER BY created_at DESC LIMIT 20");
+  ok(/publish_log_recent/.test(recentPlan), `the recent list uses the index: ${recentPlan}`);
+  const refsPlan = await plan("SELECT * FROM document_refs WHERE ref_type = 'document' AND ref_id = 'doc_x'");
+  ok(/document_refs_target/.test(refsPlan), `linkers use the target index: ${refsPlan}`);
+  c.close();
+});
+
 await t("tenant export includes documents, document_versions, publish_log and cms_state; a tenant at 0020 still exports", async () => {
   await C.migratePlatform(await readFile(join(root, "lib/platform/schema.sql"), "utf8"));
   await runMigrations(C.platformDb(), await loadMigrations("platform"), {});
@@ -631,9 +924,20 @@ await t("tenant export includes documents, document_versions, publish_log and cm
   eq(e21.manifest.tables.document_versions, 0, "document_versions:");
   eq(e21.manifest.tables.publish_log, 0, "publish_log:");
   eq(e21.manifest.tables.cms_state, 1, "cms_state:");
+  // P3-COMMIT: document_refs (0023)
+  eq(e21.manifest.tables.document_refs, 0, "document_refs:");
+  ok(Array.isArray(e21.data.document_refs), "document_refs data:");
   eq(e21.data.documents[0].id, "doc_home", "documents data:");
   const e20 = await X.buildTenantExport("x20");
-  for (const tb of ["documents", "document_versions", "publish_log", "cms_state"]) eq(e20.manifest.tables[tb], null, `${tb} at 0020 is recorded absent:`);
+  for (const tb of ["documents", "document_versions", "publish_log", "cms_state", "document_refs"]) eq(e20.manifest.tables[tb], null, `${tb} at 0020 is recorded absent:`);
+  // a tenant at 0022: the documents tables export, document_refs is absent
+  const c22 = createClient({ url: "file:.test-pub-x22.db" });
+  await migrate(c22, MIGRATIONS.filter((m) => m.id < "0023"));
+  c22.close();
+  await C.upsertTenant({ id: "x22", name: "X22", domains: ["x22.test"], dbUrl: "file:.test-pub-x22.db", config: {}, secrets: {} });
+  const e22 = await X.buildTenantExport("x22");
+  eq(e22.manifest.tables.document_refs, null, "document_refs at 0022 is recorded absent:");
+  eq(e22.manifest.tables.documents, 0, "documents at 0022:");
   eq(e20.manifest.tables.releases, 0, "the rest of a 0020 export still works:");
 });
 
@@ -644,6 +948,7 @@ const FILE_TENANT = { id: "pub-file", dbUrl: "file:.test-pub-file.db" };
 await withTenant(FILE_TENANT, async () => {
   await seedTenant(libsql);
   await commonCases("file", libsql, { commit: (b) => commitPublishBatch(b) });
+  await undoCases("file", libsql, { commit: (b) => commitPublishBatch(b) });
 
   // The reconcile's classification, with a client whose batch throws a chosen
   // error and whose reads are the real database.
@@ -716,6 +1021,7 @@ try {
   });
 
   await commonCases("sqld (HEAD lib/db.js)", direct, { commit: headCommit });
+  await undoCases("sqld (HEAD lib/db.js)", direct, { commit: headCommit });
 
   await t("sqld, commit_then_drop once, HEAD lib/db.js: reports ok; 2 batch requests; exactly one version, release and log row", async () => {
     const b = await makeBuild(direct, ["doc_p_faq"]);
@@ -811,6 +1117,83 @@ try {
     eq(r.outcome, "ok", "outcome:");
     eq(r.reconciled, true, "reconciled:");
     eq(await rowsOfBuild(direct, b), { versions: 1, releases: 1, log: 1 }, "our rows, once:");
+  });
+
+  // ---- P3-COMMIT: an undo-shaped build through the proxy ----
+  const { __commitInternals } = await import("../lib/documents/commit.js");
+
+  await t("sqld, P3-COMMIT commit_then_drop once, HEAD lib/db.js, undo-shaped: the resend loses on the revision it moved, the reconcile reports ok, single rows", async () => {
+    const id = await seedUndoDoc(direct);
+    const before = await docRow(direct, id);
+    const b = await makeUndoBuild(direct, id);
+    proxy.resetCounters();
+    proxy.commitThenDrop(1);
+    const r = await headCommit(b);
+    proxy.pass();
+    eq(r.outcome, "ok", `outcome (${r.cause?.message || ""}):`);
+    eq(proxy.counters.committedThenDropped, 1, "dropped after commit:");
+    eq(proxy.counters.batches, 2, "HEAD resent the batch once:");
+    await assertUndoWritten(direct, b, before);
+  });
+
+  await t("sqld, P3-COMMIT commit_then_drop of an undo-shaped build, then a publish on top: ok through oursPresent (its release row), single rows; liveListHoldsMine is pinned to versions only", async () => {
+    const id = await seedUndoDoc(direct);
+    const before = await docRow(direct, id);
+    const b = await makeUndoBuild(direct, id);
+    proxy.resetCounters();
+    proxy.commitThenDrop(1);
+    const orig = noRetry.execute.bind(noRetry);
+    let replaced = null;
+    const client = {
+      batch: (...a) => noRetry.batch(...a),
+      execute: async (...a) => {
+        if (!replaced) {
+          // someone takes over this document in the list before the reconcile
+          replaced = await makeBuild(direct, [id]);
+          eq((await commitPublishBatch(replaced, { client: direct })).outcome, "ok", "the publish on top:");
+        }
+        return orig(...a);
+      },
+    };
+    const r = await commitPublishBatch(b, { client });
+    proxy.pass();
+    eq(r.outcome, "ok", "outcome:");
+    eq(r.reconciled, true, "reconciled:");
+    const live = await pointerOf(direct);
+    ok(live.pointer !== b.releaseId, "the pointer moved on, so only the release row proves it");
+    ok(!__commitInternals.liveListHoldsMine(b.list, live.list, b.versions), "the live list no longer holds our version");
+    eq({ ...(await undoRows(direct, b)) }, ALL, "single rows:");
+    eq(Number((await direct.execute({ sql: "SELECT count(*) AS n FROM publish_log WHERE set_id = ?", args: [b.setId] })).rows[0].n), 1, "one log row for the set:");
+    // The pin: liveListHoldsMine looks at `versions` only. Counting the
+    // undo_saved version would make it false even for a build that is live,
+    // because no list slot ever names a kept version.
+    const fresh = await makeUndoBuild(direct, id, { prev: live });
+    eq((await headCommit(fresh)).outcome, "ok", "a fresh undo-shaped build:");
+    const now = (await pointerOf(direct)).list;
+    eq(__commitInternals.liveListHoldsMine(fresh.list, now, fresh.versions), true, "versions only: held");
+    eq(__commitInternals.liveListHoldsMine(fresh.list, now, [...fresh.versions, ...fresh.extraVersions]), false, "with the undo_saved counted it would never be held:");
+    void before;
+  });
+
+  await t("sqld, P3-COMMIT busy case, undo-shaped: a batch sent while another connection holds the write lock and moves the pointer is lost, with nothing of it written", async () => {
+    const holder = raw(sqld.url);
+    const id = await seedUndoDoc(direct);
+    const b = await makeUndoBuild(direct, id);
+    const before = await docRow(direct, id);
+    const other = ids.relId();
+    const content = stableStringify(L.emptyList(1, SINGLETONS));
+    const tx = await holder.transaction("write");
+    await tx.execute("SELECT 1 FROM release_state");
+    await tx.execute({ sql: "INSERT INTO releases (id, content, content_hash, created_at, published_at) VALUES (?, ?, ?, ?, ?)", args: [other, content, await sha256Hex(content), NOW, NOW] });
+    const pending = commitPublishBatch(b, { client: noRetry });
+    await new Promise((r) => setTimeout(r, 300));
+    await tx.execute({ sql: "UPDATE release_state SET live_release_id = ?, updated_at = ? WHERE id = 1", args: [other, NOW] });
+    await tx.commit();
+    const r = await pending;
+    eq(r.outcome, "lost", `outcome (${r.cause?.message || ""}):`);
+    await assertUndoNothing(direct, b, before);
+    eq((await pointerOf(direct)).pointer, other, "the holder's pointer:");
+    console.log(`    (undo busy case: ${r.busy ? "busy" : "guard"}: ${String(r.cause?.message || "").slice(0, 80)})`);
   });
 
   await t("sqld, drop_before once, HEAD lib/db.js: the retried batch succeeds once, with single rows", async () => {

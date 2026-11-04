@@ -11,6 +11,9 @@
 //      legacy content and publishes through the real console handlers.
 //   5. P2-READ: a tenant at READ_BEFORE_DOCUMENTS renders legacy content exactly
 //      as a current tenant with the same content does, before and after a publish.
+//   6. P3-COMMIT: a documents-mode tenant at BEFORE_REFS (no document_refs)
+//      creates, saves and publishes through the real console handler, with no
+//      refs; once REFS runs, its next publish writes them.
 //   pnpm test:schema-compat
 import { readFile, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -34,6 +37,11 @@ const BEFORE_DOCUMENTS = "0020_sync_runs_resumable";
 // table must read as legacy on the shopper path (drafts before the first
 // publish, the frozen legacy reader after it).
 const READ_BEFORE_DOCUMENTS = "0020_sync_runs_resumable";
+
+// P3-COMMIT's pin: the last migration before 0023 (document_refs). A store in
+// documents mode here still publishes; it just gets no refs rows.
+const BEFORE_REFS = "0022_preview_sessions";
+const REFS = "0023_document_refs";
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -62,6 +70,7 @@ const dbs = [
   ".test-compat-pre21.db",
   ".test-compat-read20.db",
   ".test-compat-readcur.db",
+  ".test-compat-pre23.db",
 ];
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
@@ -826,6 +835,61 @@ console.log(`— a tenant at ${READ_BEFORE_DOCUMENTS} renders legacy content as 
     const a = await outputs("read20");
     sameEach(a, await outputs("readcur"), "live");
     eq(a["resolvedAnnouncement()"].text, "Same bar", "announcement:");
+  });
+}
+
+// =============================================================================
+// 6. P3-COMMIT: a documents tenant at BEFORE_REFS publishes without refs
+// =============================================================================
+console.log(`— a documents tenant at ${BEFORE_REFS} (no document_refs) publishes`);
+{
+  const I = await import("../lib/platform/identity.js");
+  const Sess = await import("../lib/platform/sessions.js");
+  const { handleDocumentsPut } = await import("../lib/admin/documents-api.js");
+  const { __forgetRefsTable } = await import("../lib/documents/build.js");
+  const Reg = await import("../lib/registry/index.js");
+  await C.upsertTenant({ id: "pre23", name: "PRE23", domains: ["pre23.test"], dbUrl: "file:.test-compat-pre23.db", config: {}, secrets: {} });
+  await inT("pre23", () => runMigrations(libsql, upTo(BEFORE_REFS)));
+  await inT("pre23", () => libsql.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1"));
+  const u = await I.createUser({ email: "owner@pre23.test", password: "pre23-owner-pass" });
+  await I.addMembership(u.id, "pre23", "owner");
+  const tok = (await Sess.createSession({ userId: u.id, kind: "merchant", ttlMs: 60_000 })).token;
+  const call = (body) =>
+    inT("pre23", () =>
+      handleDocumentsPut({ cookies: { get: (n) => (n === "_admin" ? { value: tok } : undefined) }, headers: { get: (k) => ({ host: "pre23.test" })[k.toLowerCase()] ?? null }, json: async () => body }),
+    );
+  const pageBody = (words) => {
+    const b = Reg.emptyBody("page");
+    b.meta = { ...b.meta, slug: "pre-refs", title: "Pre refs" };
+    const s = Reg.newSection("product_rail", { id: "sec_r1" });
+    b.sections = [{ ...s, settings: { ...s.settings, title: words, collection: { handle: "shirts" } } }];
+    return b;
+  };
+  const refsTables = () => inT("pre23", async () => (await libsql.execute("SELECT name FROM sqlite_master WHERE name = 'document_refs'")).rows.length);
+
+  await t(`the tenant really is at ${BEFORE_REFS}, with no document_refs table, in documents mode`, async () => {
+    ok(MIGRATIONS.some((m) => m.id === REFS), `${REFS} is not in migrations/tenant`);
+    eq(MIGRATIONS.filter((m) => m.id > BEFORE_REFS)[0]?.id, REFS, "the next migration:");
+    const ids = await inT("pre23", async () => (await libsql.execute("SELECT id FROM schema_migrations ORDER BY id")).rows.map((r) => r.id));
+    eq(ids[ids.length - 1], BEFORE_REFS, "newest in its ledger:");
+    eq(await refsTables(), 0, "document_refs tables:");
+  });
+
+  await t(`at ${BEFORE_REFS}: create, save and publish a page through the real handler; no refs; after ${REFS} the next publish writes them`, async () => {
+    __forgetRefsTable();
+    const c = await call({ createDocument: { type: "page", body: pageBody("Rail") } });
+    eq(c.status, 200, `create: ${JSON.stringify(c.body).slice(0, 200)}`);
+    const p = await call({ publish: { id: c.body.document.id, draftHash: c.body.document.draftHash }, revision: c.body.document.revision });
+    eq(p.status, 200, `publish: ${JSON.stringify(p.body).slice(0, 300)}`);
+    eq(p.body.published.length, 1, "published:");
+    eq(await refsTables(), 0, "still no table:");
+    await inT("pre23", () => runMigrations(libsql, MIGRATIONS));
+    const s = await call({ saveDraft: { id: c.body.document.id, body: pageBody("Rail two") }, revision: c.body.document.revision });
+    eq(s.status, 200, "save:");
+    const p2 = await call({ publish: { id: s.body.document.id, draftHash: s.body.document.draftHash }, revision: s.body.document.revision });
+    eq(p2.status, 200, `publish after ${REFS}: ${JSON.stringify(p2.body).slice(0, 300)}`);
+    const rows = await inT("pre23", async () => (await libsql.execute({ sql: "SELECT ref_type, ref_id FROM document_refs WHERE version_id = ?", args: [p2.body.published[0].versionId] })).rows.map((r) => ({ ref_type: String(r.ref_type), ref_id: String(r.ref_id) })));
+    same(rows, [{ ref_type: "collection", ref_id: "shirts" }], "refs:");
   });
 }
 

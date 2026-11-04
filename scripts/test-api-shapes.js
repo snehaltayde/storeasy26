@@ -16,6 +16,13 @@
 //    rows, the publish result, the legacy and 428 words, and the requests of
 //    today's operations parse with today's parser.
 // No database is opened: the parser and lib/cms/issues.js are pure.
+//
+// P3-COMMIT (the review of P3-SCAFFOLD): source checks read every
+// lib/documents file together, so moving code between those files keeps this
+// green; the dispatcher's 200 bodies are compared by their keys, read from the
+// object literals, never by their exact text; a key the shapes mark as added
+// in phase 3 may be present or not. The real answers are compared with these
+// shapes, key by key, in scripts/test-publish-service.js.
 import { readFile, readdir } from "node:fs/promises";
 import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -55,6 +62,14 @@ const sameList = (a, b, what) => {
   const y = [...b].sort().join(", ");
   if (x !== y) fail(`${what}: shapes have [${x}], the code has [${y}]`);
 };
+// The code's keys must be the shapes' keys, except that a key the shapes mark
+// as added in phase 3 (or optional) may be there or not.
+const keysBetween = (shapeKeys, codeKeys, maybe, what) => {
+  const may = new Set(maybe);
+  const extra = codeKeys.filter((k) => !shapeKeys.includes(k));
+  const missing = shapeKeys.filter((k) => !may.has(k) && !codeKeys.includes(k));
+  if (extra.length || missing.length) fail(`${what}: shapes have [${[...shapeKeys].sort().join(", ")}], the code has [${[...codeKeys].sort().join(", ")}]`);
+};
 
 const SHAPES_FILE = join(ROOT, "lib/admin/documents-api-shapes.js");
 const shapesSource = await readFile(SHAPES_FILE, "utf8");
@@ -84,6 +99,7 @@ const { SHAPES, COMMON, SHAPES_VERSION } = Sh;
 
 const read = (p) => readFile(join(ROOT, p), "utf8");
 const apiSource = await read("lib/admin/documents-api.js");
+const authSource = await read("lib/admin-auth.js");
 const issuesSource = await read("lib/cms/issues.js");
 const docFiles = (await readdir(join(ROOT, "lib/documents"))).filter((f) => f.endsWith(".js")).sort();
 const docSources = Object.fromEntries(await Promise.all(docFiles.map(async (f) => [f, await read(`lib/documents/${f}`)])));
@@ -99,7 +115,8 @@ const EMITTERS = { "lib/admin/documents-api.js": apiSource, "lib/cms/issues.js":
 
 // Codes phase 3 adds (plan section 2 and the P3 briefs). Every other code a
 // "p3" outcome uses must already exist.
-const NEW_CODES = new Set(["NOT_BUILT", "REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "TOO_MANY_KEPT", "CANNOT_TAKE_OFFLINE"]);
+// NOT_BUILT is no longer new: P3-COMMIT's NotBuiltError emits it.
+const NEW_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "TOO_MANY_KEPT", "CANNOT_TAKE_OFFLINE"]);
 
 // ---- walking the shapes ------------------------------------------------------------
 
@@ -203,6 +220,8 @@ function statusesFor(code) {
     for (const re of [
       new RegExp(`DocumentError\\(\\s*(\\d{3})\\s*,\\s*["']${esc(code)}["']`, "g"),
       new RegExp(`status:\\s*(\\d{3})\\s*,\\s*(?:body:\\s*\\{[^}]*?)?code:\\s*["']${esc(code)}["']`, "g"),
+      // a DocumentError subclass (P3-COMMIT NotBuiltError)
+      new RegExp(`super\\(\\s*(\\d{3})\\s*,\\s*["']${esc(code)}["']`, "g"),
     ]) {
       for (const m of src.matchAll(re)) out.add(Number(m[1]));
     }
@@ -226,6 +245,9 @@ check("every code the API gives today is copied exactly, with its status", () =>
       fail(`${where}: ${code} is neither a code of today nor one of phase 3's new codes`);
     } else if (statuses && NEW_CODES.has(code)) {
       fail(`${where}: ${code} is listed as new but the code already emits it`);
+    } else if (statuses && statuses.size && !statuses.has(o.status)) {
+      // a p3 outcome reusing a code of today keeps its status
+      fail(`${where}: ${code} is ${o.status} here, the code says ${[...statuses].join(" or ")}`);
     }
   }
 });
@@ -305,6 +327,72 @@ function literalKeys(src, startMarker, indent) {
   return keys;
 }
 
+// The text of the balanced {…} that starts at `at` (strings and template
+// literals skipped).
+function balanced(src, at) {
+  if (src[at] !== "{") fail(`expected { at ${at}`);
+  let depth = 0;
+  for (let i = at; i < src.length; i++) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === "`") {
+      for (i++; i < src.length && src[i] !== c; i++) if (src[i] === "\\") i++;
+      continue;
+    }
+    if (c === "{" || c === "(" || c === "[") depth++;
+    else if (c === "}" || c === ")" || c === "]") {
+      depth--;
+      if (depth === 0) return src.slice(at, i + 1);
+    }
+  }
+  fail("unbalanced object literal");
+}
+// An object literal's own parts: { keys, spreads, values: {key: text} }.
+function literalParts(text) {
+  const inner = text.slice(1, -1);
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i];
+    if (c === '"' || c === "'" || c === "`") {
+      for (i++; i < inner.length && inner[i] !== c; i++) if (inner[i] === "\\") i++;
+      continue;
+    }
+    if ("{([".includes(c)) depth++;
+    else if ("})]".includes(c)) depth--;
+    else if (c === "," && depth === 0) {
+      parts.push(inner.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(inner.slice(start));
+  const out = { keys: [], spreads: [], values: {} };
+  for (const raw of parts.map((x) => x.trim()).filter(Boolean)) {
+    if (raw.startsWith("...")) out.spreads.push(raw.slice(3));
+    else {
+      const m = /^(\w+)\s*(?::\s*([\s\S]*))?$/.exec(raw);
+      if (!m) fail(`can't read "${raw.slice(0, 60)}"`);
+      out.keys.push(m[1]);
+      out.values[m[1]] = (m[2] ?? m[1]).trim();
+    }
+  }
+  return out;
+}
+// The 200 body literal that follows `marker` in documents-api.js.
+function bodyAfter(marker) {
+  const at = apiSource.indexOf(marker);
+  if (at < 0) fail(`can't find ${marker} in documents-api.js`);
+  const b = apiSource.indexOf("body: {", at);
+  if (b < 0) fail(`no body after ${marker}`);
+  return literalParts(balanced(apiSource, b + "body: ".length));
+}
+// The case block of one operation in the dispatcher.
+function caseBlock(kind) {
+  const at = apiSource.indexOf(`case "${kind}": {`, apiSource.indexOf("export async function handleDocumentsPut"));
+  if (at < 0) fail(`can't find the ${kind} case in the dispatcher`);
+  return apiSource.slice(at, apiSource.indexOf("\n      }\n", at));
+}
+
 check("DOCUMENT is service.js fromRow() plus publicDocument()", () => {
   const row = literalKeys(serviceSource, "function fromRow(r) {", 4);
   const pub = /export function publicDocument\(d\) \{[\s\S]*?return \{ \.\.\.d, ([^}]*)\};/.exec(serviceSource);
@@ -317,15 +405,29 @@ check("DOCUMENT is service.js fromRow() plus publicDocument()", () => {
 
 check("CURRENT is DOCUMENT plus updatedBy and updatedByName", () => sameList(Object.keys(Sh.CURRENT), [...Object.keys(Sh.DOCUMENT), "updatedBy", "updatedByName"], "current keys"));
 
-check("getDocument and listDocuments rows match service.js (access is phase 3)", () => {
+check("getDocument and listDocuments rows match service.js, plus access", () => {
   const ok = SHAPES.getDocument.outcomes.ok;
   sameList(keysWithout(ok.body.document, ok.addedInPhase3, "document."), Object.keys(Sh.DOCUMENT), "getDocument document");
   sameList(Object.keys(ok.body.document.access), ["canPublish", "reason"], "access");
+  sameList(Object.keys(Sh.ACCESS), ["canPublish", "reason"], "ACCESS");
   const lo = SHAPES.listDocuments.outcomes.ok;
   const row = literalKeys(serviceSource, "return r.rows.map((d) => ({", 4);
   sameList(keysWithout(lo.body.documents[0], lo.addedInPhase3, "documents[]."), row, "listDocuments row");
-  if (!/body: \{ ok: true, documents: await Docs\.listDocuments/.test(apiSource)) fail("listDocuments 200 body changed");
-  if (!/body: \{ ok: true, document: Docs\.publicDocument\(await Docs\.getDocument/.test(apiSource)) fail("getDocument 200 body changed");
+  // the dispatcher's 200 bodies, by their keys
+  const g = caseBlock("getDocument");
+  const gb = literalParts(balanced(g, g.indexOf("body: {") + 6));
+  keysBetween(Object.keys(ok.body), gb.keys, [], "getDocument 200");
+  const gd = literalParts(gb.values.document);
+  if (!gd.spreads.some((x) => /publicDocument\(/.test(x))) fail("getDocument's document is no longer publicDocument()");
+  keysBetween(Object.keys(ok.body.document), [...Object.keys(Sh.DOCUMENT), ...gd.keys], ["access"], "getDocument document");
+  const l = caseBlock("listDocuments");
+  const lb = literalParts(balanced(l, l.indexOf("body: {") + 6));
+  keysBetween(Object.keys(lo.body), lb.keys, [], "listDocuments 200");
+  const mapAt = l.indexOf(".map((d) => ({");
+  const lr = mapAt < 0 ? { keys: [], spreads: ["d"] } : literalParts(balanced(l, mapAt + ".map((d) => (".length));
+  if (!lr.spreads.includes("d")) fail("a listDocuments row is no longer the service row");
+  keysBetween(Object.keys(lo.body.documents[0]), [...row, ...lr.keys], ["access"], "listDocuments row");
+  for (const w of [Sh.ACCESS.reason]) if (!apiSource.includes(JSON.stringify(w))) fail(`access reason "${w}" is not in documents-api.js`);
 });
 
 check("listHistory versions match versions.js listVersions()", () => {
@@ -335,19 +437,18 @@ check("listHistory versions match versions.js listVersions()", () => {
 });
 
 check("draft writes answer { ok, document, issues }", () => {
-  if (!/body: \{ ok: true, document: Docs\.publicDocument\(r\.document\), issues: r\.issues \|\| \[\] \}/.test(apiSource)) fail("the write 200 body changed in documents-api.js");
+  keysBetween(["ok", "document", "issues"], bodyAfter('slog("documents_write"').keys, [], "the write 200 in documents-api.js");
   for (const op of ["createDocument", "saveDraft", "discardDraft", "restoreVersion", "archive"]) sameList(Object.keys(SHAPES[op].outcomes.ok.body), ["ok", "document", "issues"], `${op} 200`);
 });
 
 check("publish answers today's keys, plus liveUrl and undo per item", () => {
-  const m = /body: \{ ok: true, (release: p\.release[^}]*)\}/.exec(apiSource);
-  if (!m) fail("can't read the publish 200 body");
-  const keys = ["ok", ...[...m[1].matchAll(/(\w+):/g)].map((x) => x[1])];
   const ok = SHAPES.publish.outcomes.ok;
-  sameList(Object.keys(ok.body), keys, "publish 200");
-  const item = /published: build\.documents\.map\(\(d\) => \(\{ ([^}]*) \}\)\)/.exec(documentsSource);
-  if (!item) fail("can't read a published item");
-  sameList(keysWithout(ok.body.published[0], ok.addedInPhase3, "published[]."), [...item[1].matchAll(/(\w+):/g)].map((x) => x[1]), "published item");
+  keysBetween(Object.keys(ok.body), bodyAfter('slog("documents_publish_api"').keys, [], "publish 200");
+  const at = documentsSource.indexOf("published: build.documents.map((d) => ({");
+  if (at < 0) fail("can't read a published item");
+  const item = literalParts(balanced(documentsSource, at + "published: build.documents.map((d) => (".length));
+  const added = ok.addedInPhase3.filter((x) => x.startsWith("published[].")).map((x) => x.slice("published[].".length));
+  keysBetween(Object.keys(ok.body.published[0]), item.keys, added, "published item");
   sameList(Object.keys(ok.body.published[0].undo), ["id", "revision", "logId"], "undo args");
   if (!ok.body.published[0].liveUrl.startsWith("/api/preview?exit=1&to=") || /token/i.test(ok.body.published[0].liveUrl)) fail("liveUrl");
   sameList(Object.keys(SHAPES.publish.outcomes.validationFailed.body), [...Object.keys(Issues.validationBody([])), "documents"], "publish 422");
@@ -381,6 +482,17 @@ check("constant words are copied exactly", () => {
     if (!all.includes(JSON.stringify(w)) && !all.includes(`"${w}"`)) fail(`${op}.${name}: "${w}" is not in the code`);
   }
   if (!apiSource.includes(JSON.stringify(COMMON.outcomes.malformed.body.error))) fail("UNREADABLE words");
+  if (!apiSource.includes(JSON.stringify(COMMON.outcomes.malformedPublish.body.error))) fail("UNREADABLE publish words");
+  for (const op of ["listChanges", "listRecentlyPublished"]) if (!apiSource.includes(JSON.stringify(SHAPES[op].outcomes.legacy.body.error))) fail(`${op}.legacy words are not in documents-api.js`);
+  if (!Object.values(EMITTERS).join("\n").includes(JSON.stringify(COMMON.outcomes.notBuilt.body.error))) fail("NOT_BUILT words are not in the code");
+});
+
+// requireAdmin's own words (the shapes copy them; they carry no code)
+check("401 and 403 words are lib/admin-auth.js's", () => {
+  if (!authSource.includes(JSON.stringify(COMMON.outcomes.unauthorized.body.error))) fail(`401 "${COMMON.outcomes.unauthorized.body.error}" is not in admin-auth.js`);
+  const m = /error: `Your role \(\$\{user\.role\}\) can't do that`/.exec(authSource);
+  if (!m) fail("admin-auth.js no longer says `Your role (${user.role}) can't do that`");
+  if (COMMON.outcomes.forbidden.body.error !== "Your role (staff) can't do that") fail(`403 example: ${COMMON.outcomes.forbidden.body.error}`);
 });
 
 check("error bodies of DocumentError refusals carry today's extra fields", () => {
@@ -399,12 +511,25 @@ check("error bodies of DocumentError refusals carry today's extra fields", () =>
 });
 
 const { parseDocumentsOperation } = await import("../lib/admin/documents-api.js");
-check("the request of every operation of today parses with today's parser", () => {
+// P3-COMMIT parses every phase 3 operation too.
+check("the request of every operation parses, and dryRun, logId and confirmRepublish are copied", () => {
   for (const [name, op] of Object.entries(SHAPES)) {
-    const today = Object.values(outcomesOf(op)).some((o) => o.since === "p2" && o.status === 200);
-    if (!today) continue;
     const r = parseDocumentsOperation(op.request);
     if (r.error || r.op.kind !== name) fail(`${name}: ${JSON.stringify(r)}`);
+  }
+  const p = (b) => parseDocumentsOperation(b).op;
+  if (p(SHAPES.publish.request).confirmRepublish !== true) fail("publish confirmRepublish");
+  if (p(SHAPES.publishSet.request).items[1].confirmRepublish !== true) fail("publishSet confirmRepublish");
+  const u = p(SHAPES.undo.request);
+  if (u.logId !== "log_1" || u.dryRun !== false || u.revision !== 4) fail(`undo: ${JSON.stringify(u)}`);
+  if (p({ undo: { id: "doc_home", logId: "log_1", dryRun: true }, revision: 4 }).dryRun !== true) fail("undo dryRun");
+  const s = p({ undoSet: { ...SHAPES.undoSet.request.undoSet, dryRun: true } });
+  if (s.dryRun !== true || s.setId !== "set_1" || s.members[1].logId !== "log_2") fail(`undoSet: ${JSON.stringify(s)}`);
+  if (p({ unpublish: { id: "doc_x", dryRun: true }, revision: 2 }).dryRun !== true) fail("unpublish dryRun");
+  if (p(SHAPES.listRecentlyPublished.request).limit !== 20 || p({ listRecentlyPublished: {} }).limit !== 20) fail("listRecentlyPublished limit");
+  for (const bad of [{ listRecentlyPublished: { limit: 0 } }, { listRecentlyPublished: { limit: 51 } }, { undo: { id: "doc_home" }, revision: 1 }, { undoSet: { setId: "s", members: [] } }, { publish: { id: "d", confirmRepublish: "yes" }, revision: 1 }]) {
+    const r = parseDocumentsOperation(bad);
+    if (r.code !== "MALFORMED") fail(`not refused: ${JSON.stringify(bad)}`);
   }
 });
 
