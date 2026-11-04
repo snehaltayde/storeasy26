@@ -22,6 +22,9 @@
 //   - the design document blocks only changed colour pairs
 //   - the P3-COMMIT review pins: draftSlugOwner and archived holders,
 //     liveEntryOf's narrower offline rule, the commit.js liveListHoldsMine call
+//   - P5-CHECKS: bundle warnings (deleted, turned off, unavailable, overlap)
+//     with their Remove actions, a failing bundles read, the bundle read's
+//     statement count, and the BINDING_INVALID remove path
 import "./support/request-cache.js";
 import { readFile, rm } from "node:fs/promises";
 import { registerHooks } from "node:module";
@@ -1191,7 +1194,282 @@ await t("checks.js: linkTarget reads page links, store urls and catalog links; l
   eq(Object.keys(Checks.decorate(i, { body: { type: "home", sections: [] } })), Object.keys(SHAPES.publish.outcomes.validationFailed.body.issues[0]), "keys:");
 });
 
+// =========================================================================================
+// P5-CHECKS (COM-01, PUB-03, TREE-01): bundle warnings at publish, and the
+// BINDING_INVALID remove path. A tenant-fixture file database ("pcbun", in
+// USD so no sentence may show ₹ or INR), registered on this suite's control
+// plane. Bundles are made with lib/bundles.js; stock and prices change
+// through the sync writer (lib/sync.js writeProduct), as a real sync would.
+// The real bundle_card and bundle_grid kinds land in P5-BLOCKS: a throwaway
+// home kind with a `bundle` and a `bundle_list` setting stands in for them.
+console.log("— P5-CHECKS: bundles at publish (COM-01) and the BINDING_INVALID remove path (TREE-01)");
+
+const TF = await import("./support/tenant-fixture.js");
+const Bun = await import("../lib/bundles.js");
+const { bundlesByIds } = await import("../lib/commerce/bundle-read.js");
+const Words = await import("../lib/commerce/bundle-words.js");
+const { formatMoney } = await import("../lib/format.js");
+const { writeProduct } = await import("../lib/sync.js");
+const { actionLabel } = await import("../components/admin/editor/publish/publishModel.js");
+
+const usd = (p) => ({
+  ...p,
+  priceRange: { minVariantPrice: { ...p.priceRange.minVariantPrice, currencyCode: "USD" }, maxVariantPrice: { ...p.priceRange.maxVariantPrice, currencyCode: "USD" } },
+  variants: { nodes: p.variants.nodes.map((v) => ({ ...v, price: { ...v.price, currencyCode: "USD" } })) },
+});
+const BUN_PRODUCTS = Array.from({ length: 25 }, (_, i) => usd(TF.fixtureProduct(i + 1)));
+const tnBun = await TF.makeTenant({ name: "pc-bun", id: "pcbun", products: BUN_PRODUCTS });
+await C.upsertTenant({ id: "pcbun", name: "PC bun", domains: ["pcbun.test"], dbUrl: tnBun.url, config: { site: { name: "PC bun Store" }, site_url: "https://pcbun.test" }, secrets: {} });
+TEN.bun = await C.getTenant("pcbun");
+await I.addMembership(ownerU.id, "pcbun", "owner");
+raw.bun = createClient({ url: tnBun.url });
+await raw.bun.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+const V = (n) => `gid://shopify/ProductVariant/${9100 + n}1`;
+const pair = (a, b) => [{ variantId: V(a) }, { variantId: V(b) }];
+// a product re-synced with new stock or price (the sync writer, never a raw UPDATE)
+const resync = (n, over) => inT(() => writeProduct(usd(TF.fixtureProduct(n, over)), new Date().toISOString(), null), "bun");
+const soldOut = (p) => ({ ...p, availableForSale: false, variants: { nodes: p.variants.nodes.map((v) => ({ ...v, availableForSale: false })) } });
+
+const BK = "p5c_bundles";
+R.defineSection({
+  kind: BK,
+  version: 1,
+  label: "Test bundles",
+  documentTypes: ["home"],
+  settings: [
+    { key: "bundle", kind: "bundle", label: "Bundle", default: null },
+    { key: "bundles", kind: "bundle_list", label: "Bundles to show", default: [] },
+  ],
+});
+const card = (id, bundleId) => sec(BK, id, { bundle: { id: bundleId }, bundles: [] });
+const grid = (id, ids) => sec(BK, id, { bundle: null, bundles: ids.map((x) => ({ id: x })) });
+
+// the bundles, each on its own products unless the case is about sharing
+const BUNS = await inT(async () => {
+  const make = (title, items, price) => Bun.createBundle({ title, items, bundle_price: price, enable: true, mustPass: true });
+  const gone = await make("Gone kit", pair(13, 14), 2000);
+  const gridGone = await make("Grid gone kit", pair(15, 16), 2500);
+  const off = await make("Grid off kit", pair(15, 16), 2600);
+  const fine = await make("Grid fine kit", pair(17, 18), 3000);
+  const sold = await make("Sold kit", pair(19, 20), 3500);
+  const pricey = await make("Pricey kit", pair(21, 22), 4000); // 2100 + 2200 = 4300 today
+  const ovlA = await make("Overlap A kit", pair(23, 24), 4500);
+  const ovlB = await make("Overlap B kit", pair(24, 25), 4600);
+  await Bun.deleteBundle(gone.id);
+  await Bun.deleteBundle(gridGone.id);
+  await Bun.setBundleEnabled(off.id, false);
+  return { gone: gone.id, gridGone: gridGone.id, off: off.id, fine: fine.id, sold: sold.id, pricey: pricey.id, ovlA: ovlA.id, ovlB: ovlB.id };
+}, "bun");
+// a component sells out, and two components get cheaper (2500 < the 4000 price)
+await inT(() => writeProduct(soldOut(usd(TF.fixtureProduct(19))), new Date().toISOString(), null), "bun");
+await resync(21, { price: 1000 });
+await resync(22, { price: 1500 });
+const states = await inT(() => bundlesByIds(Object.values(BUNS)), "bun");
+eq(
+  Object.fromEntries(Object.entries(BUNS).map(([k, id]) => [k, states.get(id).state])),
+  { gone: "missing", gridGone: "missing", off: "disabled", fine: "available", sold: "sold_out", pricey: "no_saving", ovlA: "available", ovlB: "available" },
+  "fixture states:",
+);
+eq(states.get(BUNS.pricey).componentsSum, 2500, "the live sum:");
+eq(states.get(BUNS.pricey).currency, "USD", "the fixture's currency:");
+
+const BUN_HOME = await openStore("bun");
+const allFour = () =>
+  homeBody([
+    card("sec_cgone", BUNS.gone),
+    grid("sec_grid", [BUNS.gridGone, BUNS.off, BUNS.fine]),
+    card("sec_csold", BUNS.sold),
+    card("sec_cpricey", BUNS.pricey),
+    card("sec_covl", BUNS.ovlA),
+  ]);
+const bunIssues = (r) => (r.body.issues || []).filter((i) => /^BUNDLE_/.test(i.code));
+let ALL_FOUR = null; // the 200 answer of the publish carrying all four warnings
+
+await t("P5-CHECKS: publishing a home carrying all four bundle warnings (missing, turned off, unavailable, overlap) succeeds, each one 'warns'; every message is plain words with no ₹ or INR on a USD store, and checks.js holds no such literal", async () => {
+  await save("bun", BUN_HOME.id, allFour());
+  const r = published(await publishApi("bun", BUN_HOME.id), "all four bundle warnings");
+  ALL_FOUR = r;
+  checkIssues(r.issues, "bundles 200");
+  const got = bunIssues({ body: r }).map((i) => [i.code, i.sectionId, i.field, i.level, i.severity]);
+  eq(got, [
+    ["BUNDLE_MISSING", "sec_cgone", "bundle", "warns", "warning"],
+    ["BUNDLE_MISSING", "sec_grid", "bundles.0", "warns", "warning"],
+    ["BUNDLE_DISABLED", "sec_grid", "bundles.1", "warns", "warning"],
+    ["BUNDLE_UNAVAILABLE", "sec_csold", "bundle", "warns", "warning"],
+    ["BUNDLE_UNAVAILABLE", "sec_cpricey", "bundle", "warns", "warning"],
+    ["BUNDLE_OVERLAP", "sec_covl", "bundle", "warns", "warning"],
+  ], "the bundle warnings, in body order:");
+  ok(!r.issues.some((i) => i.sectionId === "sec_grid" && i.field === "bundles.2"), "the available grid entry is silent");
+  for (const i of r.issues) ok(!/₹|INR/.test(i.message) && !/[A-Z]{3,}_/.test(i.message), `plain words, no ₹ or INR: ${i.message}`);
+  const live = await inT(() => B.readLive(), "bun");
+  const v = (await inT(() => B.readVersionBodies([live.list.documents[BUN_HOME.id].version]), "bun")).get(live.list.documents[BUN_HOME.id].version).body;
+  eq(v.sections.map((s) => s.id), ["sec_hero", "sec_cgone", "sec_grid", "sec_csold", "sec_cpricey", "sec_covl"], "all of it is live:");
+  const src = await readFile(join(ROOT, "lib/documents/checks.js"), "utf8");
+  ok(!/₹|\bINR\b/.test(src), "checks.js has no ₹ or INR literal");
+  for (const code of ["BUNDLE_MISSING", "BUNDLE_DISABLED", "BUNDLE_UNAVAILABLE", "BUNDLE_OVERLAP"]) ok(!Pub.__publishInternals.STRUCTURE_CODES.has(code), `${code} is not a structure code`);
+});
+
+await t("P5-CHECKS: a card on a deleted bundle is BUNDLE_MISSING naming its id with removeSection ('Remove this section and publish'); replaying it removes the section and the next publish has no BUNDLE_MISSING for it", async () => {
+  ok(ALL_FOUR, "needs the all-four publish");
+  const i = ALL_FOUR.issues.find((x) => x.code === "BUNDLE_MISSING" && x.sectionId === "sec_cgone");
+  ok(i.message.includes(`“${BUNS.gone}”`) && i.message.includes(Words.stateLine("missing")) && /takes this whole section off the page/.test(i.message), `words: ${i.message}`);
+  eq(i.actions, [{ type: "removeSection", documentId: BUN_HOME.id, sectionId: "sec_cgone" }], "remove the section:");
+  eq(actionLabel(i.actions[0]), "Remove this section and publish", "the button:");
+  eq(i.where, "Test bundles · Bundle", "where:");
+  // the founder's click, replayed
+  const d = await current("bun", BUN_HOME.id);
+  await save("bun", BUN_HOME.id, { ...d.body, sections: d.body.sections.filter((s) => s.id !== i.actions[0].sectionId) });
+  const r2 = published(await publishApi("bun", BUN_HOME.id), "after removing the card");
+  eq(r2.issues.filter((x) => x.sectionId === "sec_cgone"), [], "nothing about the removed card:");
+  eq(r2.issues.filter((x) => x.code === "BUNDLE_MISSING").map((x) => x.field), ["bundles.0"], "only the grid's deleted entry is left:");
+  await save("bun", BUN_HOME.id, allFour());
+});
+
+await t("P5-CHECKS: a grid with one deleted and one turned-off bundle gives BUNDLE_MISSING and BUNDLE_DISABLED, each with removeItem for its own index only ('Remove it and publish'; the message says 'Remove this bundle from the grid'); replaying both leaves the available entry and no warning", async () => {
+  ok(ALL_FOUR, "needs the all-four publish");
+  const miss = ALL_FOUR.issues.find((x) => x.code === "BUNDLE_MISSING" && x.sectionId === "sec_grid");
+  const off = ALL_FOUR.issues.find((x) => x.code === "BUNDLE_DISABLED");
+  eq(miss.actions, [{ type: "removeItem", documentId: BUN_HOME.id, sectionId: "sec_grid", field: "bundles", index: 0 }], "the deleted entry only:");
+  eq(off.actions, [{ type: "removeItem", documentId: BUN_HOME.id, sectionId: "sec_grid", field: "bundles", index: 1 }], "the turned-off entry only:");
+  for (const i of [miss, off]) {
+    eq(actionLabel(i.actions[0]), "Remove it and publish", "the button:");
+    ok(i.message.includes("Remove this bundle from the grid"), `says what goes: ${i.message}`);
+  }
+  ok(miss.message.includes(`“${BUNS.gridGone}”`) && miss.message.includes(Words.stateLine("missing")), `deleted, by id: ${miss.message}`);
+  ok(off.message.includes("“Grid off kit”") && off.message.includes(Words.stateLine("disabled")), `turned off, by name: ${off.message}`);
+  eq(miss.where, "Test bundles · Bundles to show · bundle 1", "where:");
+  // replay both clicks, highest index first (as the editor applies one, then reloads)
+  const d = await current("bun", BUN_HOME.id);
+  let b = d.body;
+  for (const a of [off.actions[0], miss.actions[0]]) b = { ...b, sections: b.sections.map((s) => (s.id === a.sectionId ? { ...s, settings: { ...s.settings, [a.field]: s.settings[a.field].filter((_, j) => j !== a.index) } } : s)) };
+  eq(b.sections.find((s) => s.id === "sec_grid").settings.bundles, [{ id: BUNS.fine }], "only the available bundle stays:");
+  await save("bun", BUN_HOME.id, b);
+  const r2 = published(await publishApi("bun", BUN_HOME.id), "after removing the two entries");
+  eq(r2.issues.filter((x) => x.sectionId === "sec_grid"), [], "the grid is clean:");
+  await save("bun", BUN_HOME.id, allFour());
+});
+
+await t("P5-CHECKS: a sold-out component gives BUNDLE_UNAVAILABLE saying shoppers see 'Currently unavailable'; no_saving names the live sum through formatMoney in the bundle's currency (USD) and says to lower the price in Catalog > Bundles, never 'Currently unavailable'", async () => {
+  ok(ALL_FOUR, "needs the all-four publish");
+  const sold = ALL_FOUR.issues.find((x) => x.code === "BUNDLE_UNAVAILABLE" && x.sectionId === "sec_csold");
+  ok(sold.message.startsWith("“Sold kit”: ") && sold.message.includes("Currently unavailable") && sold.message.includes(Words.stateLine("sold_out")), `sold out: ${sold.message}`);
+  eq(sold.actions, [{ type: "removeSection", documentId: BUN_HOME.id, sectionId: "sec_csold" }], "removable:");
+  const pricey = ALL_FOUR.issues.find((x) => x.code === "BUNDLE_UNAVAILABLE" && x.sectionId === "sec_cpricey");
+  const sum = formatMoney(2500, "USD");
+  ok(!/₹|INR/.test(sum) && /2,500/.test(sum), `the USD sum: ${sum}`);
+  const b = (await inT(() => bundlesByIds([BUNS.pricey]), "bun")).get(BUNS.pricey);
+  const line = Words.stateLine("no_saving", b.reasons, { currency: "USD" });
+  ok(line.includes(sum), `bundle-words names the sum: ${line}`);
+  ok(pricey.message.startsWith("“Pricey kit”: ") && pricey.message.includes(line), `no saving, from bundle-words: ${pricey.message}`);
+  ok(pricey.message.includes(sum) && pricey.message.includes("Lower the price in Catalog > Bundles"), `names the sum and the fix: ${pricey.message}`);
+  ok(!pricey.message.includes("Currently unavailable"), `no_saving is not 'Currently unavailable': ${pricey.message}`);
+  // the owner's OQ-B words ("so shoppers don't see it") come with P5-BLOCKS'
+  // change to bundle-words.js; this message is bundle-words' sentence as it
+  // stands, so it carries them once that lands
+  eq(pricey.actions, [{ type: "removeSection", documentId: BUN_HOME.id, sectionId: "sec_cpricey" }], "removable:");
+});
+
+await t("P5-CHECKS: two turned-on bundles that share a product give BUNDLE_OVERLAP on the picked one, naming the other, with openField only (not removable)", async () => {
+  ok(ALL_FOUR, "needs the all-four publish");
+  const o = ALL_FOUR.issues.filter((x) => x.code === "BUNDLE_OVERLAP");
+  eq(o.length, 1, "one overlap, for the picked bundle:");
+  ok(o[0].message.startsWith("“Overlap A kit”: ") && o[0].message.includes(Words.overlapLine()) && o[0].message.includes("“Overlap B kit”"), `words: ${o[0].message}`);
+  eq(o[0].actions, [{ type: "openField", documentId: BUN_HOME.id, sectionId: "sec_covl", field: "bundle" }], "open the field only:");
+  // the turned-off bundle shares its products with the deleted one: no overlap
+  ok(!ALL_FOUR.issues.some((x) => x.code === "BUNDLE_OVERLAP" && x.sectionId === "sec_grid"), "no overlap from a turned-off or deleted bundle");
+});
+
+await t("P5-CHECKS: when the bundles read fails, no BUNDLE_MISSING (or any bundle warning) is reported, the failure is logged as documents_publish_check_unreadable (table bundles), and the publish still succeeds", async () => {
+  await save("bun", BUN_HOME.id, { ...allFour(), sections: [...allFour().sections.map((s) => (s.id === "sec_hero" ? { ...s, settings: { ...s.settings, title: "Hero, read fails" } } : s))] });
+  await raw.bun.execute("ALTER TABLE bundles RENAME TO bundles_away");
+  const lines = [];
+  const log = console.log;
+  console.log = (...a) => {
+    lines.push(a.join(" "));
+  };
+  let r;
+  try {
+    r = await publishApi("bun", BUN_HOME.id);
+  } finally {
+    console.log = log;
+    await raw.bun.execute("ALTER TABLE bundles_away RENAME TO bundles");
+  }
+  const out = published(r, "with the bundles read failing");
+  eq(bunIssues({ body: out }), [], "no bundle warning at all, never a false 'deleted':");
+  const unread = lines.map((l) => {
+    try {
+      return JSON.parse(l);
+    } catch {
+      return null;
+    }
+  }).filter((e) => e?.evt === "documents_publish_check_unreadable");
+  eq(unread.map((e) => e.table), ["bundles"], "logged once, for the bundles:");
+  eq((await inT(() => Res.resolvedHero(), "bun")).title, "Hero, read fails", "published:");
+  // and with the table back, the warnings return
+  await save("bun", BUN_HOME.id, allFour());
+  const again = published(await publishApi("bun", BUN_HOME.id), "table back");
+  eq(bunIssues({ body: again }).length, 6, "the six warnings are back:");
+});
+
+await t("P5-CHECKS: the bundle checks send the same statements for 1 and for 12 bundle refs, at most 3 (after one warm-up for the schema probe); a document with no bundle reference sends no bundles, offers or variants statement during publish", async () => {
+  // twelve more turned-on bundles, on products 1 to 12
+  const twelve = await inT(async () => {
+    const out = [];
+    for (let k = 1; k <= 12; k++) out.push((await Bun.createBundle({ title: `Count kit ${k}`, items: pair(k, (k % 12) + 1), bundle_price: 50, enable: true, mustPass: true })).id);
+    return out;
+  }, "bun");
+  const doc = { id: "doc_count", type: "home" };
+  const run = (ids) => inT(() => watchStatements(currentDatabase().libsql, () => Checks.referenceChecks({ items: [{ doc, body: homeBody([grid("sec_count", ids)]) }], list: { pages: [], redirects: [] } })), "bun");
+  await run(twelve.slice(0, 1)); // warm-up (the schema probe)
+  const one = await run(twelve.slice(0, 1));
+  const many = await run(twelve);
+  eq(one.statements.length, many.statements.length, `the same count (${one.statements.join(" | ")}) vs (${many.statements.join(" | ")}):`);
+  ok(many.statements.length >= 1 && many.statements.length <= 3, `at most 3: ${many.statements.length}`);
+  eq(many.statements.filter((s) => /FROM bundles/.test(s)).length, 1, "one bundles statement:");
+  eq(many.result.issues.filter((i) => i.code === "BUNDLE_MISSING"), [], "all twelve are there:");
+  ok(many.result.issues.some((i) => i.code === "BUNDLE_OVERLAP"), "(they share products, so they overlap)");
+  // no bundle ref: not one bundles, offers or variants statement in a whole publish
+  await save("bun", BUN_HOME.id, homeBody([], "No bundles here"));
+  const d = await current("bun", BUN_HOME.id);
+  const { result: r, statements } = await inT(() => watchStatements(currentDatabase().libsql, () => api({ publish: { id: BUN_HOME.id, draftHash: d.draftHash }, revision: d.revision }, { store: "bun" })), "bun");
+  published(r, "a home with no bundle");
+  ok(statements.length > 0, "the publish was watched");
+  eq(statements.filter((s) => /\bbundles\b|\boffers\b|FROM variants/i.test(s)), [], "no bundles, offers or variants statement:");
+  // a planted refs-less check: the same with referenceChecks alone
+  const none = await inT(() => watchStatements(currentDatabase().libsql, () => Checks.referenceChecks({ items: [{ doc, body: homeBody([]) }], list: { pages: [], redirects: [] } })), "bun");
+  eq(none.statements, [], "referenceChecks sends nothing for a body with no reference:");
+});
+
+await t("P5-CHECKS (TREE-01): a planted body binding to an unknown source gives BINDING_INVALID with 'Remove it and add it again' and removeSection; replaying it clears the issue and publish succeeds", async () => {
+  // a named test-only plant: the draft writer refuses this body (saveDraft
+  // validates bindings), so it goes straight into the test database, as a
+  // migrated or older row could hold it
+  const d0 = await current("bun", BUN_HOME.id);
+  const planted = homeBody([sec("new", "sec_badbind", { title: "Fresh in" }, { bindings: { products: { source: "no_such_source", args: { limit: 4 } } } })]);
+  const refused = await api({ saveDraft: { id: BUN_HOME.id, body: planted }, revision: d0.revision }, { store: "bun" });
+  ok(refused.status !== 200, `the writer refuses it: ${refused.status}`);
+  await raw.bun.execute({ sql: "UPDATE documents SET draft = ?, draft_hash = ?, revision = revision + 1 WHERE id = ?", args: [JSON.stringify(planted), await R.documentHash(planted), BUN_HOME.id] });
+  const before = await dump("bun");
+  const r = await publishApi("bun", BUN_HOME.id);
+  eq([r.status, r.body.code], [422, "VALIDATION_FAILED"], "it blocks:");
+  await unchanged(before, "refused publish", "bun");
+  const bi = issuesOf(r, "BINDING_INVALID");
+  eq(bi.map((i) => [i.sectionId, i.field, i.level]), [["sec_badbind", "bindings.products", "blocks"]], "the binding:");
+  eq(bi[0].message, "This newest products section is set up in a way the editor can't fix. Remove it and add it again.", "the remove words:");
+  eq(bi[0].actions, [{ type: "removeSection", documentId: BUN_HOME.id, sectionId: "sec_badbind" }], "remove, never hide:");
+  eq(actionLabel(bi[0].actions[0]), "Remove this section and publish", "the button:");
+  checkIssues(r.body.issues, "binding 422");
+  // replay the click
+  const d = await current("bun", BUN_HOME.id);
+  await save("bun", BUN_HOME.id, { ...d.body, sections: d.body.sections.filter((s) => s.id !== bi[0].actions[0].sectionId) });
+  const r2 = published(await publishApi("bun", BUN_HOME.id), "after removing it");
+  eq(r2.issues.filter((i) => i.code === "BINDING_INVALID"), [], "cleared:");
+});
+
+R.removeSection(BK);
+
 for (const c of Object.values(raw)) c.close();
+await tnBun.cleanup();
 for (const f of FILES) await rm(join(ROOT, f), { force: true });
 console.log(`\n${pass} passed, ${fail} failed in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
 process.exit(fail ? 1 : 0);
