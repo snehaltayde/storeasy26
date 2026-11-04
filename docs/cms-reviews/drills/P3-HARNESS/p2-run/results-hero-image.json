@@ -1,0 +1,335 @@
+{
+  "id": "P2-DRILLS",
+  "part": "hero-image",
+  "title": "P2-DRILLS — hero-image",
+  "ranAt": "2026-11-04T03:10:04.966Z",
+  "harness": "http://localhost:3880",
+  "chrome": "156.0.8078.80",
+  "passed": 32,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "a hero photo is uploaded to the media library (POST /api/admin/media)",
+      "detail": {
+        "status": 200,
+        "url": "/api/media/med_fc924a65a00f953708"
+      }
+    },
+    {
+      "ok": true,
+      "label": "library photo: the hero image is saved and published through PUT /api/admin/documents",
+      "detail": {
+        "save": 200,
+        "publish": 200,
+        "issues": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "library photo at 1440: home answers 200 on the edge runtime",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "library photo at 1440: the hero renders the image with its alt text",
+      "detail": {
+        "src": "/api/media/med_fc924a65a00f953708",
+        "currentSrc": "http://localhost:3880/api/media/med_fc924a65a00f953708",
+        "alt": "A jar on linen in morning light",
+        "complete": true,
+        "naturalWidth": 1600,
+        "srcset": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "library photo at 1440: the image loaded (not broken)",
+      "detail": {
+        "naturalWidth": 1600,
+        "currentSrc": "http://localhost:3880/api/media/med_fc924a65a00f953708"
+      }
+    },
+    {
+      "ok": true,
+      "label": "library photo at 1440: a library photo is served from its own /api/media url",
+      "detail": "/api/media/med_fc924a65a00f953708"
+    },
+    {
+      "ok": true,
+      "label": "library photo at 375: home answers 200 on the edge runtime",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "library photo at 375: the hero renders the image with its alt text",
+      "detail": {
+        "src": "/api/media/med_fc924a65a00f953708",
+        "currentSrc": "http://localhost:3880/api/media/med_fc924a65a00f953708",
+        "alt": "A jar on linen in morning light",
+        "complete": true,
+        "naturalWidth": 1600,
+        "srcset": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "library photo at 375: the image loaded (not broken)",
+      "detail": {
+        "naturalWidth": 1600,
+        "currentSrc": "http://localhost:3880/api/media/med_fc924a65a00f953708"
+      }
+    },
+    {
+      "ok": true,
+      "label": "library photo at 375: a library photo is served from its own /api/media url",
+      "detail": "/api/media/med_fc924a65a00f953708"
+    },
+    {
+      "ok": true,
+      "label": "library photo: no /_next/image request for the hero photo",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "own path photo: the hero image is saved and published through PUT /api/admin/documents",
+      "detail": {
+        "save": 200,
+        "publish": 200,
+        "issues": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "own path photo at 1440: home answers 200 on the edge runtime",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "own path photo at 1440: the hero renders the image with its alt text",
+      "detail": {
+        "src": "/icons/icon-512.png",
+        "currentSrc": "http://localhost:3880/icons/icon-512.png",
+        "alt": "The store's own icon, as a hero photo",
+        "complete": true,
+        "naturalWidth": 512,
+        "srcset": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "own path photo at 1440: the image loaded (not broken)",
+      "detail": {
+        "naturalWidth": 512,
+        "currentSrc": "http://localhost:3880/icons/icon-512.png"
+      }
+    },
+    {
+      "ok": true,
+      "label": "own path photo at 1440: a photo off the Shopify CDN loads from its own url, not /_next/image",
+      "detail": {
+        "src": "/icons/icon-512.png",
+        "currentSrc": "http://localhost:3880/icons/icon-512.png"
+      }
+    },
+    {
+      "ok": true,
+      "label": "own path photo at 375: home answers 200 on the edge runtime",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "own path photo at 375: the hero renders the image with its alt text",
+      "detail": {
+        "src": "/icons/icon-512.png",
+        "currentSrc": "http://localhost:3880/icons/icon-512.png",
+        "alt": "The store's own icon, as a hero photo",
+        "complete": true,
+        "naturalWidth": 512,
+        "srcset": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "own path photo at 375: the image loaded (not broken)",
+      "detail": {
+        "naturalWidth": 512,
+        "currentSrc": "http://localhost:3880/icons/icon-512.png"
+      }
+    },
+    {
+      "ok": true,
+      "label": "own path photo at 375: a photo off the Shopify CDN loads from its own url, not /_next/image",
+      "detail": {
+        "src": "/icons/icon-512.png",
+        "currentSrc": "http://localhost:3880/icons/icon-512.png"
+      }
+    },
+    {
+      "ok": true,
+      "label": "own path photo: no /_next/image request for the hero photo",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "https photo off the Shopify CDN: the hero image is saved and published through PUT /api/admin/documents",
+      "detail": {
+        "save": 200,
+        "publish": 200,
+        "issues": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "https photo off the Shopify CDN at 1440: home answers 200 on the edge runtime",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "https photo off the Shopify CDN at 1440: the hero renders the image with its alt text",
+      "detail": {
+        "src": "https://localhost:4886/hero.jpg",
+        "currentSrc": "https://localhost:4886/hero.jpg",
+        "alt": "A photo from another https host",
+        "complete": true,
+        "naturalWidth": 1200,
+        "srcset": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "https photo off the Shopify CDN at 1440: the image loaded (not broken)",
+      "detail": {
+        "naturalWidth": 1200,
+        "currentSrc": "https://localhost:4886/hero.jpg"
+      }
+    },
+    {
+      "ok": true,
+      "label": "https photo off the Shopify CDN at 1440: a photo off the Shopify CDN loads from its own url, not /_next/image",
+      "detail": {
+        "src": "https://localhost:4886/hero.jpg",
+        "currentSrc": "https://localhost:4886/hero.jpg"
+      }
+    },
+    {
+      "ok": true,
+      "label": "https photo off the Shopify CDN at 375: home answers 200 on the edge runtime",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "https photo off the Shopify CDN at 375: the hero renders the image with its alt text",
+      "detail": {
+        "src": "https://localhost:4886/hero.jpg",
+        "currentSrc": "https://localhost:4886/hero.jpg",
+        "alt": "A photo from another https host",
+        "complete": true,
+        "naturalWidth": 1200,
+        "srcset": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "https photo off the Shopify CDN at 375: the image loaded (not broken)",
+      "detail": {
+        "naturalWidth": 1200,
+        "currentSrc": "https://localhost:4886/hero.jpg"
+      }
+    },
+    {
+      "ok": true,
+      "label": "https photo off the Shopify CDN at 375: a photo off the Shopify CDN loads from its own url, not /_next/image",
+      "detail": {
+        "src": "https://localhost:4886/hero.jpg",
+        "currentSrc": "https://localhost:4886/hero.jpg"
+      }
+    },
+    {
+      "ok": true,
+      "label": "https photo off the Shopify CDN: no /_next/image request for the hero photo",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "the browser fetched the https photo straight from its host",
+      "detail": [
+        "/hero.jpg",
+        "/hero.jpg",
+        "/hero.jpg"
+      ]
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_ad0574f9207ca330, 0.6s"
+  ],
+  "screenshots": [
+    {
+      "name": "hero-image-library-photo-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/hero-image-library-photo-1440.png",
+      "bytes": 25534,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "hero-image-library-photo-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/hero-image-library-photo-375.png",
+      "bytes": 31258,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "hero-image-own-path-photo-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/hero-image-own-path-photo-1440.png",
+      "bytes": 22161,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "hero-image-own-path-photo-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/hero-image-own-path-photo-375.png",
+      "bytes": 27642,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "hero-image-https-photo-off-the-shopify-cdn-1440",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/hero-image-https-photo-off-the-shopify-cdn-1440.png",
+      "bytes": 23595,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "hero-image-https-photo-off-the-shopify-cdn-375",
+      "file": "docs/cms-reviews/drills/P2-DRILLS/hero-image-https-photo-off-the-shopify-cdn-375.png",
+      "bytes": 29159,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    }
+  ]
+}

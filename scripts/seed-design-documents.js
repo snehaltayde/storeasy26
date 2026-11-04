@@ -22,9 +22,16 @@
 //                     long names, a wide, a tall and no photo, one sold out,
 //                     and two library photos standing in for the fixtures'
 //                     /api/media/worst-case-*.jpg
-//   node scripts/seed-design-documents.js check
+//   node scripts/seed-design-documents.js --p3 [--posts N] [--worst-case]
+//     P3-HARNESS: the phase 3 drill store. Starts from a fresh perf seed by
+//     itself, so it needs no step before it and re-running it resets
+//     everything. Adds an owner and a staff login, the drill content and a
+//     second, closed store (see "P3-HARNESS" below). Logins and ids go to
+//     .design-data/p3-seed.json, never to the screen.
+//   node scripts/seed-design-documents.js check [--p3]
 //     prints what the store holds (mode, live release, documents); writes
-//     nothing, and works with the harness running too
+//     nothing, and works with the harness running too. --p3 adds row counts,
+//     the document_refs check, the logins and the closed store
 //
 // The store is moved to documents mode with its seeded v3 pointer cleared, as
 // perf-docs-fixture's publish does. Documents are only ever written through
@@ -32,6 +39,7 @@
 // never deletes any: to start again, seed the harness fresh. The drill runner
 // (scripts/drills/p2/run.mjs) does that before every part that changes the store.
 import { createHash } from "node:crypto";
+import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -172,7 +180,9 @@ export async function storeState({ libsql }) {
 // the harness store: running (its sqld are used) or stopped (sqld started here)
 // ---------------------------------------------------------------------------
 
-export async function withHarnessStore(fn, { env = process.env, write = true } = {}) {
+// databases: which of the harness's local servers to start when it is stopped.
+// The P3 seed (--p3) also needs "default", which holds the closed store.
+export async function withHarnessStore(fn, { env = process.env, write = true, databases = ["platform", "tenant"] } = {}) {
   const H = await import("./design-harness.js");
   const dataDir = join(H.ROOT, H.DATA_DIR_NAME);
   const seeded = H.readSeeded(dataDir);
@@ -189,9 +199,9 @@ export async function withHarnessStore(fn, { env = process.env, write = true } =
   } else {
     ports = H.harnessPorts(env);
     await H.stopLeftovers(dataDir, console.log);
-    for (const key of ["platform", "tenant"]) if (await H.isPortBusy(ports.sqld[key])) throw new H.HarnessError(`Port ${ports.sqld[key]} is already in use.`);
+    for (const key of databases) if (await H.isPortBusy(ports.sqld[key])) throw new H.HarnessError(`Port ${ports.sqld[key]} is already in use.`);
     const sqld = H.findSqld({ env });
-    servers = ["platform", "tenant"].map((key) => H.startSqld({ bin: sqld.bin, key, port: ports.sqld[key], dataDir }));
+    servers = databases.map((key) => H.startSqld({ bin: sqld.bin, key, port: ports.sqld[key], dataDir }));
   }
   try {
     for (const s of servers) await H.waitForHealth(s.url, s.child, { logFile: s.logFile, label: s.key });
@@ -211,10 +221,273 @@ export async function withHarnessStore(fn, { env = process.env, write = true } =
     const tenant = await C.getTenant(H.TENANT_ID);
     if (!tenant) throw new H.HarnessError("The harness has no design store. Seed it again.");
     H.assertLocalDbUrl("the design store's database", tenant.dbUrl || tenant.db_url);
-    return await withTenant(tenant, () => fn({ libsql, running: !!running }));
+    return await withTenant(tenant, () => fn({ libsql, running: !!running, urls, adminPassword: hEnv.DESIGN_ADMIN_PASSWORD }));
   } finally {
     await Promise.all(servers.map((s) => H.stopChild(s.child)));
   }
+}
+
+// ---------------------------------------------------------------------------
+// P3-HARNESS: the phase 3 drill store (--p3)
+// ---------------------------------------------------------------------------
+//
+// On top of the documents store above:
+//   - two logins on the design store: an owner and a staff member (staff can
+//     edit and preview, never publish). Their passwords are made fresh on
+//     every seed and written only to .design-data/p3-seed.json (mode 600,
+//     gitignored with the rest of .design-data). Nothing prints them. Once a
+//     store has members, its shared setup password no longer signs in, so
+//     the P3 drills sign in by email (scripts/drills/p3/lib.mjs login()).
+//   - drill content, every publish through lib/documents/publish.js as the
+//     owner, so publish_log, document_refs (0023) and the live addresses are
+//     all there:
+//       a campaign that is never published (P3_SLUGS.unpublishedCampaign)
+//       a page, live, whose draft links to that campaign (P3_SLUGS.guide)
+//       a live campaign linked from the home page's banner, which a drill can
+//         take offline (P3_SLUGS.liveCampaign; published on its own first,
+//         so its Undo is "take offline")
+//       a journal post (the fixture's first) and the home page's product rail
+//         (its collection has products)
+//       last, one three-document publish set (P3_SET), for whole-set Undo
+//   - a second documents store, "design-closed" on closed.localhost, in state
+//     none: documents mode, no release, a few drafts. Shoppers there see
+//     "Opening soon". Its database is the harness's third local server (the
+//     env default one, DESIGN_SQLD_PORT + 2), which no request otherwise
+//     uses: an unknown host never falls back to it (lib/tenant-request.js).
+//     The harness has three database servers and scripts/design-harness.js
+//     isn't this item's, so the closed store borrows that one.
+//
+// --p3 starts from a fresh perf seed itself (node scripts/dev-design.js seed
+// --fixture perf, the same call), so running it again resets everything:
+// the same rows, the same counts, new ids and passwords.
+
+export const P3_SEED_FILE = "p3-seed.json";
+export const CLOSED_STORE = Object.freeze({ id: "design-closed", host: "closed.localhost", name: "Closed Demo Co" });
+export const P3_LOGINS = Object.freeze({
+  owner: { email: "founder@design.test", name: "Asha Founder", role: "owner" },
+  staff: { email: "staff@design.test", name: "Ravi Staff", role: "staff" },
+});
+export const P3_SLUGS = Object.freeze({ unpublishedCampaign: "p3-spring-edit", liveCampaign: "p3-weekend-offer", guide: "p3-spring-guide" });
+// the three documents of the last publish set: two pages and the announcement
+export const P3_SET = Object.freeze({ pages: ["faq", "size-guide"], singleton: "announcement" });
+export const P3_SET_TITLE = "Updated in the spring set";
+const CLOSED_DRAFT_TITLE = "Closed draft: not for shoppers yet";
+
+const p3Actor = (owner) => ({ kind: "merchant", id: owner.id, role: "owner" });
+const sec = (id, kind, settings) => ({ id, kind, v: 1, enabled: true, settings, blocks: [] });
+const pageLink = (family, doc) => ({ type: "page", family, slug: doc.slug, document: doc.id });
+
+// A route document body: the registry's empty body with this meta and these sections.
+async function routeDoc(type, { slug, title, description = "" }, sections) {
+  const Reg = await import("../lib/registry/index.js");
+  const b = Reg.emptyBody(type);
+  b.meta = { ...b.meta, slug, title, description };
+  b.sections = sections;
+  return b;
+}
+
+// The owner and staff logins on the design store. Passwords: fresh, local, random.
+export async function seedP3Logins({ tenantId = "design" } = {}) {
+  const { randomBytes } = await import("node:crypto");
+  const { createUser, addMembership } = await import("../lib/platform/identity.js");
+  const out = {};
+  for (const [role, who] of Object.entries(P3_LOGINS)) {
+    const password = `${role}-${randomBytes(9).toString("hex")}`;
+    const user = await createUser({ email: who.email, name: who.name, password });
+    await addMembership(user.id, tenantId, who.role);
+    out[role] = { id: user.id, email: who.email, name: who.name, role: who.role, password };
+  }
+  return out;
+}
+
+// Inside withTenant(design), after publishDocumentsFixture.
+export async function seedP3Content({ libsql, owner }) {
+  const Docs = await import("../lib/documents/service.js");
+  const { publish } = await import("../lib/documents/publish.js");
+  const { livePath, liveExitUrl } = await import("../lib/documents/paths.js");
+  const actor = p3Actor(owner);
+  const pin = (d) => ({ id: d.id, revision: d.revision, draftHash: d.draftHash });
+  const pub = async (docs, what) => {
+    const r = await publish({ ids: docs.map(pin), actor });
+    if (r.published.length !== docs.length) throw new Error(`seedP3Content: ${what} published ${r.published.length} of ${docs.length}`);
+    const log = await libsql.execute({ sql: "SELECT id, document_id FROM publish_log WHERE set_id = ? ORDER BY document_id", args: [r.setId] });
+    return { setId: r.setId, releaseId: r.release?.id ?? null, logIds: Object.fromEntries(log.rows.map((x) => [x.document_id, x.id])) };
+  };
+  const edit = async (id, mutate) => {
+    const d = await Docs.getDocument(id);
+    const body = mutate(structuredClone(d.body));
+    return (await Docs.saveDraft({ id, revision: d.revision, body, actor })).document;
+  };
+  const create = async (type, meta, sections) => (await Docs.createDocument({ type, body: await routeDoc(type, meta, sections), actor })).document;
+
+  // 1. a campaign that is never published
+  const soon = await create("campaign", { slug: P3_SLUGS.unpublishedCampaign, title: "The spring edit", description: "Coming soon." }, [
+    sec("sec_p3soon", "text", { title: "The spring edit is on its way", body: ["New routines for warmer days. This page is still a draft."] }),
+  ]);
+
+  // 2. a page, live without the link, whose draft then links to that campaign
+  let guide = await create("page", { slug: P3_SLUGS.guide, title: "Spring guide", description: "How to change your routine for spring." }, [
+    sec("sec_p3guide", "text", { title: "Changing your routine for spring", body: ["Lighter layers, more SPF, and a gentler cleanser."] }),
+  ]);
+  const guideLive = await pub([guide], "the spring guide");
+  guide = await edit(guide.id, (b) => {
+    b.sections.push(sec("sec_p3guidebn", "banner", { title: "The spring edit", text: "See what's coming.", button: { label: "Take a look", link: pageLink("campaign", soon) } }));
+    return b;
+  });
+
+  // 3. a live campaign, published on its own (its first publish), then linked from home
+  const offer = await create("campaign", { slug: P3_SLUGS.liveCampaign, title: "Weekend offer", description: "This weekend only." }, [
+    sec("sec_p3offer", "text", { title: "This weekend only", body: ["Free shipping on every order until Sunday night."] }),
+  ]);
+  const offerLive = await pub([offer], "the weekend offer");
+  const home = await edit("doc_home", (b) => {
+    const at = b.sections.findIndex((s) => s.kind === "hero") + 1;
+    b.sections.splice(at, 0, sec("sec_p3camp", "banner", { title: "This weekend only", text: "Free shipping on every order.", button: { label: "See the offer", link: pageLink("campaign", offer) } }));
+    return b;
+  });
+  const homeLive = await pub([home], "the home page");
+
+  // 4. the journal post and the home page's product rail (from the fixture)
+  const post = (await libsql.execute("SELECT id FROM documents WHERE type = 'journal' AND published_version_id IS NOT NULL ORDER BY slug LIMIT 1")).rows[0];
+  const homeBody = (await Docs.getDocument("doc_home")).body;
+  const rail = homeBody.sections.find((s) => s.kind === "product_rail" && s.enabled !== false);
+  const railProducts = rail
+    ? Number((await libsql.execute({ sql: "SELECT count(*) AS n FROM collection_products cp JOIN collections c ON c.id = cp.collection_id WHERE c.handle = ?", args: [rail.settings.collection.handle] })).rows[0].n)
+    : 0;
+  if (!post || !rail || railProducts < 1) throw new Error(`seedP3Content: the fixture has no live journal post or no product rail with products (post ${!!post}, rail ${!!rail}, products ${railProducts})`);
+
+  // 5. last: one publish set of three documents, for whole-set Undo
+  const pageIds = [];
+  for (const slug of P3_SET.pages) {
+    const row = (await libsql.execute({ sql: "SELECT id FROM documents WHERE type = 'page' AND slug = ?", args: [slug] })).rows[0];
+    if (!row) throw new Error(`seedP3Content: the fixture has no page "${slug}"`);
+    pageIds.push(row.id);
+  }
+  const setDocs = [];
+  for (const id of pageIds) {
+    setDocs.push(
+      await edit(id, (b) => {
+        const s = b.sections.find((x) => typeof x.settings?.title === "string");
+        if (s) s.settings.title = P3_SET_TITLE;
+        else b.sections.push(sec("sec_p3set", "text", { title: P3_SET_TITLE, body: ["Added in the spring set."] }));
+        return b;
+      }),
+    );
+  }
+  setDocs.push(
+    await edit(`doc_${P3_SET.singleton}`, (b) => {
+      b.settings.text = "New: the spring edit is coming soon";
+      return b;
+    }),
+  );
+  const setLive = await pub(setDocs, "the three-document set");
+
+  // what the drills need, with each document's live address
+  const describe = async (id, extra = {}) => {
+    const d = await Docs.getDocument(id);
+    const path = livePath(d.type, d.body?.meta);
+    return { id: d.id, type: d.type, slug: d.slug ?? null, label: d.label, path, liveUrl: d.publishedVersionId ? liveExitUrl(path) : null, publishedVersionId: d.publishedVersionId ?? null, ...extra };
+  };
+  return {
+    documents: {
+      home: await describe("doc_home", { logId: homeLive.logIds.doc_home, bannerSectionId: "sec_p3camp", productRail: { sectionId: rail.id, collection: rail.settings.collection.handle, products: railProducts } }),
+      liveCampaign: await describe(offer.id, { logId: offerLive.logIds[offer.id], linkedFrom: ["doc_home"] }),
+      unpublishedCampaign: await describe(soon.id, { linkedFromDraftOf: [guide.id] }),
+      guide: await describe(guide.id, { logId: guideLive.logIds[guide.id], draftLinksTo: soon.id }),
+      journalPost: await describe(post.id),
+    },
+    publishSet: { setId: setLive.setId, releaseId: setLive.releaseId, members: await Promise.all(setDocs.map(async (d) => ({ ...(await describe(d.id)), logId: setLive.logIds[d.id] }))) },
+  };
+}
+
+// The second store: documents mode, no release (state none), a few drafts.
+export async function seedClosedStore({ urls, adminPassword }) {
+  const { readFile } = await import("node:fs/promises");
+  const H = await import("./design-harness.js");
+  H.assertLocalDbUrl("the closed store's database", urls.default);
+  const C = await import("../lib/platform/control.js");
+  const { withTenant } = await import("../lib/tenant-context.js");
+  const { libsql } = await import("../lib/db.js");
+  const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+  await C.upsertTenant({
+    id: CLOSED_STORE.id,
+    name: CLOSED_STORE.name,
+    domains: [CLOSED_STORE.host],
+    dbUrl: urls.default,
+    config: { currency: "INR", merchant_timezone: "Asia/Kolkata", site: { name: CLOSED_STORE.name, title: CLOSED_STORE.name, tagline: "A store before its first publish", support_email: "support@closed.test" } },
+    secrets: { admin_password: adminPassword, order_link_secret: "design-closed-order-secret" },
+  });
+  const tenant = await C.getTenant(CLOSED_STORE.id);
+  return withTenant(tenant, async () => {
+    await libsql.executeMultiple(await readFile(join(H.ROOT, "lib", "schema.sql"), "utf8"));
+    await runMigrations(libsql, await loadMigrations("tenant"));
+    const { takeOverHarnessStore } = await import("./perf-docs-fixture.js");
+    await takeOverHarnessStore({ libsql });
+    const Reg = await import("../lib/registry/index.js");
+    const { createDocument } = await import("../lib/documents/service.js");
+    const home = Reg.emptyBody("home");
+    home.sections = [sec("sec_closedhero", "hero", { title: CLOSED_DRAFT_TITLE, highlight: "", subtitle: "Drafts never reach shoppers before the first publish.", primary: { label: "Shop all", link: { type: "url", href: "/collections" } }, secondary: null, badge: "", image: null })];
+    const ids = [(await createDocument({ type: "home", body: home, actor: "seed:design-documents" })).document.id];
+    ids.push((await createDocument({ type: "page", body: await routeDoc("page", { slug: "about", title: "About us" }, [sec("sec_closedabout", "text", { title: "About the closed store", body: ["This page is a draft."] })]), actor: "seed:design-documents" })).document.id);
+    return { id: CLOSED_STORE.id, host: CLOSED_STORE.host, drafts: ids, draftTitle: CLOSED_DRAFT_TITLE };
+  });
+}
+
+// The harness seed config: logins (with their passwords), stores and drill
+// content. Owner-only file mode; never printed.
+export function writeP3Seed(dataDir, config) {
+  const file = join(dataDir, P3_SEED_FILE);
+  writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+  chmodSync(file, 0o600);
+  return file;
+}
+
+// The phase 3 drill store's facts, read only (check --p3). Inside withTenant(design).
+export async function p3State({ libsql }) {
+  const C = await import("../lib/platform/control.js");
+  const { withTenant } = await import("../lib/tenant-context.js");
+  const { refRows } = await import("../lib/documents/refs.js");
+  const n = async (db, sql, args = []) => Number((await db.execute({ sql, args })).rows[0]?.n || 0);
+  const tables = ["documents", "document_versions", "publish_log", "document_refs", "releases", "products", "collections", "collection_products", "media"];
+  const rows = {};
+  for (const t of tables) rows[t] = await n(libsql, `SELECT count(*) AS n FROM ${t}`);
+  rows.publish_sets = await n(libsql, "SELECT count(DISTINCT set_id) AS n FROM publish_log");
+  // refs: every published version holds exactly the rows refRows makes from its body
+  const versions = (await libsql.execute("SELECT v.id, v.body FROM document_versions v WHERE v.kind = 'published'")).rows;
+  const stored = new Map();
+  for (const r of (await libsql.execute("SELECT version_id, ref_type, ref_id FROM document_refs")).rows) {
+    if (!stored.has(r.version_id)) stored.set(r.version_id, new Set());
+    stored.get(r.version_id).add(`${r.ref_type}:${r.ref_id}`);
+  }
+  let withRefs = 0;
+  const mismatched = [];
+  for (const v of versions) {
+    const want = new Set(refRows(v.id, JSON.parse(v.body)).map((r) => `${r.ref_type}:${r.ref_id}`));
+    const got = stored.get(v.id) || new Set();
+    if (want.size) withRefs++;
+    if (want.size !== got.size || [...want].some((k) => !got.has(k))) mismatched.push(v.id);
+  }
+  const versionIds = new Set(versions.map((v) => v.id));
+  const orphanRefs = [...stored.keys()].filter((id) => !versionIds.has(id)).length;
+  const live = (await libsql.execute("SELECT live_release_id AS id FROM release_state WHERE id = 1")).rows[0]?.id ?? null;
+  const pdb = C.platformDb();
+  const members = Object.fromEntries((await pdb.execute({ sql: "SELECT role, count(*) AS n FROM memberships WHERE tenant_id = ? GROUP BY role ORDER BY role", args: ["design"] })).rows.map((r) => [r.role, Number(r.n)]));
+  const platform = { tenants: await n(pdb, "SELECT count(*) AS n FROM tenants"), users: await n(pdb, "SELECT count(*) AS n FROM users"), memberships: await n(pdb, "SELECT count(*) AS n FROM memberships") };
+  const closedTenant = await C.getTenant(CLOSED_STORE.id);
+  let closed = null;
+  if (closedTenant) {
+    const { libsql: db } = await import("../lib/db.js");
+    closed = await withTenant(closedTenant, async () => ({
+      mode: (await db.execute("SELECT mode FROM cms_state WHERE id = 1")).rows[0]?.mode ?? null,
+      liveRelease: (await db.execute("SELECT live_release_id AS id FROM release_state WHERE id = 1")).rows[0]?.id ?? null,
+      releases: await n(db, "SELECT count(*) AS n FROM releases"),
+      documents: await n(db, "SELECT count(*) AS n FROM documents"),
+      published: await n(db, "SELECT count(*) AS n FROM documents WHERE published_version_id IS NOT NULL"),
+      publishLog: await n(db, "SELECT count(*) AS n FROM publish_log"),
+      domains: closedTenant.domains,
+    }));
+  }
+  return { liveRelease: live, rows, refs: { publishedVersions: versions.length, versionsWithRefs: withRefs, mismatched, orphanRefs }, members, platform, closed };
 }
 
 // ---------------------------------------------------------------------------
@@ -222,31 +495,34 @@ export async function withHarnessStore(fn, { env = process.env, write = true } =
 // ---------------------------------------------------------------------------
 
 export function parseArgs(argv) {
-  const out = { cmd: "seed", posts: 3, draftsOnly: false, worstCase: false };
+  const out = { cmd: "seed", posts: 3, draftsOnly: false, worstCase: false, p3: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "check" && i === 0) out.cmd = "check";
     else if (a === "--drafts-only") out.draftsOnly = true;
     else if (a === "--worst-case") out.worstCase = true;
+    else if (a === "--p3") out.p3 = true;
     else if (a === "--posts") {
       const v = Number(argv[++i]);
       if (!Number.isInteger(v) || v < 0 || v > 1000) throw new Error("--posts needs a whole number from 0 to 1000");
       out.posts = v;
-    } else throw new Error(`Unknown option "${a}". Use: node scripts/seed-design-documents.js [check] [--posts N] [--drafts-only] [--worst-case]`);
+    } else throw new Error(`Unknown option "${a}". Use: node scripts/seed-design-documents.js [check] [--posts N] [--drafts-only] [--worst-case] [--p3]`);
   }
+  if (out.p3 && out.draftsOnly) throw new Error("--p3 publishes its drill content, so it can't be used with --drafts-only");
   return out;
 }
 
 async function main(argv) {
   const opts = parseArgs(argv);
   if (opts.cmd === "check") {
-    const state = await withHarnessStore(({ libsql }) => storeState({ libsql }), { write: false });
+    const state = await withHarnessStore(async ({ libsql }) => ({ ...(await storeState({ libsql })), ...(opts.p3 ? { p3: await p3State({ libsql }) } : {}) }), { write: false, databases: opts.p3 ? ALL_DATABASES : undefined });
     console.log(JSON.stringify(state));
     return 0;
   }
   const { buildDocumentsFixture, publishDocumentsFixture } = await import("./perf-docs-fixture.js");
   const fx = await buildDocumentsFixture({ posts: opts.posts });
   const started = Date.now();
+  if (opts.p3) return seedP3(opts, fx, started);
   const out = await withHarnessStore(async ({ libsql, running }) => {
     await takeOver({ libsql });
     const catalog = opts.worstCase ? await seedWorstCaseCatalog({ libsql }) : null;
@@ -255,6 +531,40 @@ async function main(argv) {
   });
   console.log(
     `✓ the harness store is in documents mode: ${out.state.documents} documents, ${opts.draftsOnly ? "none published (before the first publish)" : `live release ${out.state.liveRelease}`}${out.catalog ? `, worst-case catalog (${out.catalog.products} products, ${out.catalog.collections} collections, ${out.catalog.media} photos)` : ""}, ${((Date.now() - started) / 1000).toFixed(1)}s`,
+  );
+  return 0;
+}
+
+const ALL_DATABASES = ["platform", "tenant", "default"];
+
+// --p3: a fresh perf seed, the documents store, then the phase 3 drill store.
+async function seedP3(opts, fx, started) {
+  const H = await import("./design-harness.js");
+  const { publishDocumentsFixture } = await import("./perf-docs-fixture.js");
+  await H.runHarness({ mode: "seed", fixture: "perf", log: (line) => console.log(line) });
+  const dataDir = join(H.ROOT, H.DATA_DIR_NAME);
+  const out = await withHarnessStore(
+    async ({ libsql, urls, adminPassword }) => {
+      await takeOver({ libsql });
+      const catalog = opts.worstCase ? await seedWorstCaseCatalog({ libsql }) : null;
+      await publishDocumentsFixture(fx);
+      const logins = await seedP3Logins();
+      const content = await seedP3Content({ libsql, owner: logins.owner });
+      const closed = await seedClosedStore({ urls, adminPassword });
+      const config = {
+        seededAt: new Date().toISOString(),
+        stores: { live: { id: H.TENANT_ID, host: "localhost" }, closed },
+        logins: { owner: logins.owner, staff: logins.staff },
+        ...content,
+      };
+      writeP3Seed(dataDir, config);
+      return { catalog, state: await storeState({ libsql }), p3: await p3State({ libsql }) };
+    },
+    { databases: ALL_DATABASES },
+  );
+  const r = out.p3;
+  console.log(
+    `✓ the harness store is in documents mode with the phase 3 drill content: ${out.state.documents} documents, live release ${out.state.liveRelease}, ${r.rows.publish_log} publish_log rows, ${r.rows.document_refs} document_refs rows, an owner and a staff login, and the closed store on ${CLOSED_STORE.host} (no release)${out.catalog ? ", worst-case catalog" : ""}. Logins and ids: ${H.DATA_DIR_NAME}/${P3_SEED_FILE}. ${((Date.now() - started) / 1000).toFixed(1)}s`,
   );
   return 0;
 }
