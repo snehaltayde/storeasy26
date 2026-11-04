@@ -31,13 +31,44 @@ import { publishedGetters } from "@/lib/cms/view";
 // stores answer as before. The POST's mode refusal, before or inside the
 // write's own batch, answers 409 with its plain words (never the catch-all).
 // shopifyAdminBase is the shared one (lib/admin/shopify-admin-url.js).
+//
+// P4-FIX4: the editor's product and collection pickers read this GET, so on a
+// documents store whose live release can't be read (a broken release, a
+// failed read) it still answers: the Shopify catalog with no overlays (no
+// template, modules, badge or pins; never the frozen tables), with
+// `published: "unavailable"` and a plain note, and the failure is logged. The
+// per-product and per-collection reads run a few at a time, not one by one.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const UNAVAILABLE_NOTE = "We couldn't read what's published right now, so modules, badges, templates and pinned products aren't shown here. The products themselves are listed.";
+
 // The published presentation of a documents store, or null on any other.
+// { getters } when the live release reads, { unavailable: true } when it
+// doesn't (logged). A mode that can't be read still throws (a 5xx), as before.
 async function publishedPresentation() {
   if ((await getCmsMode()) !== "documents") return null;
-  return publishedGetters();
+  // (a promise .catch, not a catch block: this is a deliberate fallback that
+  // answers 200, not a failure the route's catch-alls would map)
+  const getters = await publishedGetters().catch((e) => unavailable(e, "release"));
+  return getters ? { getters } : { unavailable: true };
+}
+
+// logs why the published presentation can't be shown; answers null
+function unavailable(e, part) {
+  slog("catalog_published_unreadable", { part, error: String(e?.message || e).slice(0, 300), ...(e?.detail ? { detail: String(e.detail).slice(0, 300) } : {}) });
+  return null;
+}
+
+// run fn over items, a few at a time (each getter does one or two reads)
+async function mapLimited(items, fn, limit = 8) {
+  const out = new Array(items.length);
+  for (let i = 0; i < items.length; i += limit) {
+    const part = items.slice(i, i + limit);
+    const done = await Promise.all(part.map((x) => fn(x)));
+    for (let j = 0; j < done.length; j++) out[i + j] = done[j];
+  }
+  return out;
 }
 
 export const GET = tenantHandler(async (request) => {
@@ -52,13 +83,13 @@ export const GET = tenantHandler(async (request) => {
     if (!p) return NextResponse.json({ error: "product not found" }, { status: 404 });
     const base = shopifyAdminBase();
     if (live) {
-      const o = await live.resolvedProductOverride(p.id);
-      return NextResponse.json({
-        ok: true,
-        product: productView(p, base),
-        override: { modules: o?.modules ?? [], badge: o?.badge ?? "" },
-        surface: await live.resolvedSurfaceTemplateFor("pdp", p.id),
-      });
+      const shown = live.getters
+        ? await Promise.all([live.getters.resolvedProductOverride(p.id), live.getters.resolvedSurfaceTemplateFor("pdp", p.id)])
+            .then(([o, surface]) => ({ override: { modules: o?.modules ?? [], badge: o?.badge ?? "" }, surface }))
+            .catch((e) => unavailable(e, "product"))
+        : null;
+      if (!shown) return NextResponse.json({ ok: true, product: productView(p, base), override: { modules: [], badge: "" }, surface: null, published: "unavailable", note: UNAVAILABLE_NOTE });
+      return NextResponse.json({ ok: true, product: productView(p, base), ...shown });
     }
     return NextResponse.json({
       ok: true,
@@ -85,16 +116,29 @@ export const GET = tenantHandler(async (request) => {
     db.selectFrom("collections").select(["id", "handle", "title"]).orderBy("handle").execute(),
   ]);
   const overridden = new Set(overrides.map((o) => o.product_id));
-  if (live) {
-    for (const p of products) {
-      const o = await live.resolvedProductOverride(p.id);
-      if (o?.modules?.length || o?.badge) overridden.add(p.id);
-    }
-  }
   const pins = {};
-  for (const c of collections) {
-    const pinned = live ? await live.resolvedCollectionPins(c.handle) : await getCollectionPins(c.id);
-    if (pinned.length) pins[c.handle] = pinned.length;
+  let published = null;
+  if (live) {
+    // what is published (the live rows), never the frozen tables; when that
+    // can't be read, the catalog alone (no overlays), logged
+    const g = live.getters;
+    const read = g
+      ? await Promise.all([mapLimited(products, (p) => g.resolvedProductOverride(p.id)), mapLimited(collections, (c) => g.resolvedCollectionPins(c.handle))]).catch((e) => unavailable(e, "list"))
+      : null;
+    if (read) {
+      const [os, pinned] = read;
+      os.forEach((o, i) => {
+        if (o?.modules?.length || o?.badge) overridden.add(products[i].id);
+      });
+      pinned.forEach((list, i) => {
+        if (list.length) pins[collections[i].handle] = list.length;
+      });
+    } else published = "unavailable";
+  } else {
+    for (const c of collections) {
+      const pinned = await getCollectionPins(c.id);
+      if (pinned.length) pins[c.handle] = pinned.length;
+    }
   }
   return NextResponse.json({
     ok: true,
@@ -102,6 +146,7 @@ export const GET = tenantHandler(async (request) => {
     overrides,
     collections: collections.map((c) => ({ handle: c.handle, title: c.title, pinned: pins[c.handle] || 0 })),
     shopify_admin: shopifyAdminBase(),
+    ...(published ? { published, note: UNAVAILABLE_NOTE } : {}),
   });
 });
 

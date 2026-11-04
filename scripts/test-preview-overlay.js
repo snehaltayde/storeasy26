@@ -1339,6 +1339,31 @@ await t("P4-FIX2: an archived product content document's draft never previews (r
   }
 });
 
+// ---- P4-FIX4 -----------------------------------------------------------------------------
+await t("P4-FIX4: a clean product or collection document (draft_hash = published_hash) is never listed: readDirtyEntityDrafts reads only drafts that differ from what is published", async () => {
+  const cc = await inT(PX, async () => String((await libsql.execute({ sql: "SELECT id FROM documents WHERE type = 'collection_content' AND entity_id = ?", args: [COL(2)] })).rows[0].id));
+  const saved = await inT(PX, async () => ({ ...(await libsql.execute({ sql: "SELECT draft_hash, published_hash, draft FROM documents WHERE id = ?", args: [cc] })).rows[0] }));
+  // a clean document whose stored draft could not even be read: listing it
+  // would put it in skipped, so its absence shows it was never read
+  await inT(PX, () => libsql.execute({ sql: "UPDATE documents SET draft_hash = 'dh_fix4_clean', published_hash = 'dh_fix4_clean', draft = '{not json' WHERE id = ?", args: [cc] }));
+  try {
+    const Reader = await import("../lib/content/documents-reader.js");
+    const rows = await inT(PX, () => Reader.readDirtyEntityDrafts());
+    ok(!rows.some((r) => r.id === cc), `the clean document was read: ${JSON.stringify(rows.map((r) => r.id))}`);
+    ok(rows.some((r) => r.id === pcId), "control: the dirty product draft is read");
+    const s2 = await newSession(PX);
+    const o = (await asRequest(PX, () => Res.contentSource(), withToken(s2.token))).overlay;
+    ok(!Object.hasOwn(o.docs, cc) && !o.skipped.includes(cc), `not listed: ${JSON.stringify({ docs: o.docs, skipped: o.skipped })}`);
+    eq(o.docs[pcId], "dh_ovl07", "the dirty product draft still is:");
+    // dirty again (the founder saves): listed
+    await inT(PX, () => libsql.execute({ sql: "UPDATE documents SET draft_hash = 'dh_fix4_dirty' WHERE id = ?", args: [cc] }));
+    const again = await inT(PX, () => Reader.readDirtyEntityDrafts());
+    ok(again.some((r) => r.id === cc), "a draft that differs is read");
+  } finally {
+    await inT(PX, () => libsql.execute({ sql: "UPDATE documents SET draft_hash = ?, published_hash = ?, draft = ? WHERE id = ?", args: [saved.draft_hash, saved.published_hash, saved.draft, cc] }));
+  }
+});
+
 console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 process.exit(fail ? 1 : 0);

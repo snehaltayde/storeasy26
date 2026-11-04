@@ -8,7 +8,7 @@ import { sql } from "kysely";
 import { liveTableReady } from "@/lib/catalog/effective";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
-import { legacyWritesRefusal } from "@/lib/cms-mode";
+import { legacyWritesRefusal, getCmsMode } from "@/lib/cms-mode";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,9 +55,26 @@ async function listWithHandles() {
   }));
 }
 
+// P4-FIX4 (ED-05, spec 8.13): on a documents store the placements table is
+// frozen (pairs live on each product's document, the cart's offer in the cart
+// document), so the old list would show content from before the move. The
+// GET refuses there in plain words (409 STORE_USES_DOCUMENTS) and reads
+// nothing; the old upsells screen redirects to the editor before it calls
+// this. A mode that can't be read is a 5xx, never the frozen list. Legacy and
+// migrating stores answer as before.
+const UPSELLS_IN_EDITOR = "This store now uses the new editor, so its upsells are there: a product's pairs on that product, and the cart's offer in the cart. Open them in the editor.";
+
 export const GET = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "upsells.read");
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  let mode;
+  try {
+    mode = await getCmsMode();
+  } catch (e) {
+    slog("upsells_mode_unreadable", { error: String(e?.message || e).slice(0, 300) });
+    return NextResponse.json({ error: "We couldn't check which editor this store uses, so the upsells didn't load. Try again in a minute.", code: "CMS_MODE_UNAVAILABLE", retryable: true }, { status: 503 });
+  }
+  if (mode === "documents") return NextResponse.json({ error: UPSELLS_IN_EDITOR, code: "STORE_USES_DOCUMENTS" }, { status: 409 });
   return NextResponse.json({ ok: true, placements: await listWithHandles() });
 });
 
