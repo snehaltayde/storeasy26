@@ -1,0 +1,27 @@
+[
+  {
+    "name": "the bridge mounts for an ended preview",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "ready ok:false, reason revoked",
+    "pass": true,
+    "detail": "{\"type\":\"storeasy:ready\",\"v\":2,\"state\":null,\"ok\":false,\"reason\":\"revoked\",\"unfinished\":[]}"
+  },
+  {
+    "name": "the ended bar shows, with Exit",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "the live store shows (no draft hero, no attributes)",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "Exit clears the preview cookie",
+    "pass": true,
+    "detail": ""
+  }
+]

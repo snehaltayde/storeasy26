@@ -1,0 +1,113 @@
+{
+  "label": "closed store, this branch",
+  "results": [
+    {
+      "path": "/quiz/skin",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/quiz/skin",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/quiz/skin",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/quiz/skin",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/quiz/skin",
+      "kind": "html",
+      "cookies": "_platform,_mx",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/quiz/skin",
+      "kind": "rsc",
+      "cookies": "_platform,_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "html",
+      "cookies": "_platform,_mx",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "rsc",
+      "cookies": "_platform,_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": true,
+      "leaks": []
+    }
+  ]
+}

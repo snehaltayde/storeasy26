@@ -25,9 +25,14 @@ const AccountIcon = () => (
   </svg>
 );
 
-const Announcement = ({ announcement }) =>
+// P3-FRAME (ED-04): `editing` (a documents preview only) adds data-doc, the
+// document a click in the editor's frame picks: doc_header on the header,
+// doc_announcement on the bar. Shoppers' markup is unchanged.
+const docAttr = (editing, id) => (editing ? { "data-doc": id } : {});
+
+const Announcement = ({ announcement, editing = false }) =>
   announcement?.enabled && announcement.text ? (
-    <div data-sec="announcement" className="bg-sf-accent px-4 py-1.5 text-center text-xs font-semibold text-sf-on-accent">
+    <div data-sec="announcement" {...docAttr(editing, "doc_announcement")} className="bg-sf-accent px-4 py-1.5 text-center text-xs font-semibold text-sf-on-accent">
       {announcement.href ? (
         <Link href={announcement.href} className="hover:underline">
           {announcement.text}
@@ -99,15 +104,15 @@ const NavStrip = ({ items, centered = false }) =>
     </nav>
   );
 
-export default function Header({ collections = [], logo = { text1: "Store", text2: "" }, nav = null, announcement = null, variant = "standard" }) {
+export default function Header({ collections = [], logo = { text1: "Store", text2: "" }, nav = null, announcement = null, variant = "standard", editing = false }) {
   const stripItems = Array.isArray(nav)
     ? nav.map((i) => ({ key: i.href + i.label, href: i.href, label: i.label, children: i.children || null }))
     : collections.map((c) => ({ key: c.handle, href: `/collections/${c.handle}`, label: c.title }));
 
   if (variant === "centered") {
     return (
-      <header className="sticky top-0 z-30 bg-header text-header-fg">
-        <Announcement announcement={announcement} />
+      <header {...docAttr(editing, "doc_header")} className="sticky top-0 z-30 bg-header text-header-fg">
+        <Announcement announcement={announcement} editing={editing} />
         <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 py-3 sm:px-6">
           <nav className="hidden items-center text-sm font-medium md:flex">
             <Link href="/collections" className="text-header-muted transition hover:text-header-fg">
@@ -130,8 +135,8 @@ export default function Header({ collections = [], logo = { text1: "Store", text
   }
 
   return (
-    <header className="sticky top-0 z-30 bg-header text-header-fg">
-      <Announcement announcement={announcement} />
+    <header {...docAttr(editing, "doc_header")} className="sticky top-0 z-30 bg-header text-header-fg">
+      <Announcement announcement={announcement} editing={editing} />
 
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
         <Wordmark logo={logo} />

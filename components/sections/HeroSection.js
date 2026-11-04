@@ -23,6 +23,12 @@ import { isOptimizable } from "@/lib/image-src";
 //   stats   { products, collections } for the default badge
 //   notice  PV-08's "a test is running" note, preview only
 //
+// P3-FRAME (ED-04): in a documents preview (ctx.preview true) the words carry
+// data-field with validate's field paths (title, subtitle, primary.label,
+// secondary.label, badge), so a click in the editor's frame picks that field.
+// The section is picked by its data-section-id; the old data-sec="hero" (the
+// legacy Designer's target) stays. Live markup is unchanged.
+//
 // A hero button linked to a sold-out product (DOC-03 state table): the hero
 // stays as it is and the button still opens the product page, which says the
 // product is sold out. Nothing here looks at stock.
@@ -48,6 +54,10 @@ export function heroImageOf(settings) {
   return { media: image.media, alt: typeof image.alt === "string" ? image.alt : "" };
 }
 
+// The badge's words: a bare text node live (as before); in a preview, the
+// founder's own badge sits in a span carrying its field.
+const BadgeWords = ({ field, words }) => (field["data-field"] ? <span {...field}>{words}</span> : <>{words}</>);
+
 const text = (v) => (typeof v === "string" ? v : v == null ? "" : String(v));
 
 function HeroSection({ section, ctx = {}, attrs = {} }) {
@@ -63,21 +73,27 @@ function HeroSection({ section, ctx = {}, attrs = {} }) {
   const subtitle = empty && hero.subtitle === DEFAULT_HERO_SUBTITLE ? EMPTY_STORE_HERO_SUBTITLE : hero.subtitle;
   const showSecondary = hero.secondary?.label && !(empty && (hero.secondary.href || "#new") === "#new");
   const image = heroImageOf(section?.settings);
+  const field = (path) => (ctx.preview === true ? { "data-field": path } : {});
 
   const words = (
     <>
       <ExperimentNote notice={ctx.notice || null} />
       <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-sf-hero-accent">
         <span className="h-1.5 w-1.5 rounded-full bg-sf-hero-accent" />
-        {empty ? "Coming soon" : hero.badge || `${stats.products} products · ${stats.collections} collections`}
+        <BadgeWords field={!empty && hero.badge ? field("badge") : {}} words={empty ? "Coming soon" : hero.badge || `${stats.products} products · ${stats.collections} collections`} />
       </p>
-      <h1 className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
+      <h1 {...field("title")} className="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
         <HeroTitle title={title} highlight={highlight} />
       </h1>
-      {subtitle ? <p className="mt-5 max-w-xl text-lg text-hero-muted">{subtitle}</p> : null}
+      {subtitle ? (
+        <p {...field("subtitle")} className="mt-5 max-w-xl text-lg text-hero-muted">
+          {subtitle}
+        </p>
+      ) : null}
       <div className="mt-8 flex flex-wrap gap-3">
         {hero.primary?.label ? (
           <Link
+            {...field("primary.label")}
             href={hero.primary.href || "/collections"}
             className="rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover"
           >
@@ -86,6 +102,7 @@ function HeroSection({ section, ctx = {}, attrs = {} }) {
         ) : null}
         {showSecondary ? (
           <Link
+            {...field("secondary.label")}
             href={hero.secondary.href || "#new"}
             className="rounded-sf-button border border-hero-fg/20 px-6 py-3 text-sm font-semibold text-hero-fg transition hover:bg-hero-fg/10"
           >

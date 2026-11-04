@@ -13,7 +13,11 @@ export default function Footer({
   // hardcoded /policies/* list 404'd on tenants without those pages.
   pages = { about: true, policies: [] },
   variant = "columns", // S61: "columns" (default, original) | "minimal"
+  // P3-FRAME (ED-04): a documents preview only: data-doc="doc_footer", the
+  // document a click in the editor's frame picks. Shoppers' markup is unchanged.
+  editing = false,
 }) {
+  const doc = editing ? { "data-doc": "doc_footer" } : {};
   // nested nav items flatten here (dropdowns are a header affordance)
   const shopItems = Array.isArray(nav)
     ? nav.flatMap((i) => [
@@ -33,7 +37,7 @@ export default function Footer({
       ...pages.policies.map((p) => ({ key: p.href, href: p.href, label: p.label })),
     ];
     return (
-      <footer className="mt-20 border-t border-sf-border-soft bg-sf-surface-muted">
+      <footer {...doc} className="mt-20 border-t border-sf-border-soft bg-sf-surface-muted">
         <div className="mx-auto max-w-7xl px-4 py-10 text-center sm:px-6">
           <p className="text-xl font-extrabold">
             {logo.text1}
@@ -68,7 +72,7 @@ export default function Footer({
   }
 
   return (
-    <footer className="mt-20 border-t border-sf-border-soft bg-sf-surface-muted">
+    <footer {...doc} className="mt-20 border-t border-sf-border-soft bg-sf-surface-muted">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
