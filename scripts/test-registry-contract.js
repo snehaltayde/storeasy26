@@ -1037,6 +1037,11 @@ function badValues(s) {
       return [5, { title: long(81), products: [] }, { products: [5] }, { products: ["gid://shopify/Product/1", "gid://shopify/Product/1"] }, { products: [], z: 1 }, { products: Array.from({ length: (s.max ?? 1) + 1 }, (_, j) => `gid://shopify/Product/${j}`) }];
     case "product_ids":
       return [5, [5], ["a", "a"], Array.from({ length: (s.max ?? 1) + 1 }, (_, j) => `gid://shopify/Product/${j}`)];
+    // P5-SETTING
+    case "bundle":
+      return [5, "bun-1", {}, { id: 5 }, { id: "" }, { id: "has space" }, { id: "x".repeat(65) }, { id: "bun-1", price: 100 }, { id: "bun-1", title: "Duo" }];
+    case "bundle_list":
+      return [5, [5], [{ id: 5 }], [{ id: "bun-1" }, { id: "bun-1" }], [{ id: "bun-1", slug: "duo" }], Array.from({ length: (s.max ?? 12) + 1 }, (_, j) => ({ id: `bun-${j}` }))];
     default:
       throw new Error(`no bad values for the setting kind "${s.kind}": add them here`);
   }
@@ -1064,7 +1069,17 @@ await t("crafted bad values for every setting kind of every section and document
       for (const bad of badValues(s)) for (const mode of ["draft", "publish"]) validate({ ...R.emptyBody(type), settings: { ...R.emptyBody(type).settings, [s.key]: bad } }, { mode });
     }
   }
-  for (const k of Object.keys(R.SETTING_KINDS)) ok(kinds.has(k) || k === "number" || k === "product", `setting kind ${k} is declared somewhere`);
+  // bundle and bundle_list: declared by bundle_card/bundle_grid in P5-BLOCKS
+  // (P5-SETTING adds the kinds in batch 1; P5-BLOCKS takes this exemption out)
+  const NOT_DECLARED_YET = ["bundle", "bundle_list"];
+  for (const k of Object.keys(R.SETTING_KINDS)) ok(kinds.has(k) || k === "number" || k === "product" || NOT_DECLARED_YET.includes(k), `setting kind ${k} is declared somewhere`);
+  // the bad values of the waiting kinds still speak, through a throwaway kind
+  R.defineSection({ kind: "zz_badbundle", label: "Bundle probe", documentTypes: ["home"], settings: [{ key: "pick", kind: "bundle", label: "Bundle", required: true, default: null }, { key: "grid", kind: "bundle_list", label: "Bundles to show", default: [] }] });
+  try {
+    for (const s of R.sectionType("zz_badbundle").settings) for (const bad of badValues(s)) for (const mode of ["draft", "publish"]) validate(home([sec("zz_badbundle", "sec_bad1", { [s.key]: bad })]), { mode });
+  } finally {
+    R.removeSection("zz_badbundle");
+  }
   // each section rules() and document rules() function, made to speak
   validate(home([sec("hero", "sec_h1", { title: "T", highlight: "X" })]), { mode: "draft" });
   validate(home([sec("banner", "sec_b1", { title: "", text: "" })]), { mode: "publish" });
@@ -1119,6 +1134,143 @@ await t("P4-SEARCH: a rich text or text product module with no title is incomple
   for (const media of ["https://cdn.shopify.com/s/a.png", "/api/media/med_1"]) eq(find(validate(img(media), { mode: "publish" }), "IMAGE_HOST_NOT_ALLOWED").length, 0, `${media}:`);
   // a page's image-with-text is not held to the product allowlist
   eq(find(validate({ schema: 1, type: "page", meta: { slug: "a", title: "A" }, sections: [sec("image_with_text", "sec_i1", { image: { media: "https://images.example.com/a.png", alt: "A" }, title: "Look" })] }, { mode: "publish" }), "IMAGE_HOST_NOT_ALLOWED").length, 0, "a page:");
+});
+
+// ---- P5-SETTING (COM-01, COM-02, TREE-01): bundles chosen by id ---------------------
+
+const VAL = await import("../lib/registry/validate.js");
+// A throwaway home kind with the two bundle kinds (P5-BLOCKS declares the real
+// bundle_card and bundle_grid).
+const withBundleProbe = async (fn) => {
+  R.defineSection({
+    kind: "zz_bundles",
+    label: "Bundle probe",
+    documentTypes: ["home"],
+    settings: [
+      { key: "bundle", kind: "bundle", label: "Bundle", required: true, default: null },
+      { key: "bundles", kind: "bundle_list", label: "Bundles to show", default: [] },
+      { key: "few", kind: "bundle_list", label: "A few bundles", max: 3, default: [] },
+    ],
+  });
+  try {
+    await fn();
+  } finally {
+    R.removeSection("zz_bundles");
+  }
+};
+const bundleDoc = (settings) => home([sec("zz_bundles", "sec_bp1", { bundle: { id: "bun-0a1b2c" }, ...settings })]);
+
+await t("P5-SETTING: a bundle setting takes { id } (bun-<hex> and older raw ids like bnd_p1c); price, title or stock keys are UNKNOWN_FIELD of class structure; null on a required bundle is incomplete", async () => {
+  await withBundleProbe(async () => {
+    for (const id of ["bun-0a1b2c3d4e5f6a7b8c", "bnd_p1c"]) for (const mode of ["draft", "publish"]) none(validate(bundleDoc({ bundle: { id } }), { mode }), `${id} ${mode}:`);
+    for (const key of ["price", "title", "available", "slug", "bundle_price", "items"]) {
+      for (const mode of ["draft", "publish"]) {
+        const i = one(validate(bundleDoc({ bundle: { id: "bun-0a1b2c", [key]: key === "available" ? true : "x" } }), { mode }), "UNKNOWN_FIELD", { sectionId: "sec_bp1", field: `bundle.${key}` });
+        eq(VAL.issueClass(i), "structure", `${key} ${mode} class:`);
+        eq(i.severity, "error", `${key} ${mode} severity:`);
+      }
+    }
+    const draft = one(validate(bundleDoc({ bundle: null }), { mode: "draft" }), "REQUIRED", { sectionId: "sec_bp1", field: "bundle" });
+    eq(draft.severity, "incomplete", "null in a draft:");
+    eq(VAL.issueClass(draft), "incomplete", "null class:");
+    eq(one(validate(bundleDoc({ bundle: null }), { mode: "publish" }), "REQUIRED", { field: "bundle" }).severity, "error", "null at publish:");
+    for (const bad of [{ id: "" }, { id: "has space" }, { id: 7 }, "bun-1", { id: "x".repeat(65) }]) eq(VAL.issueClass(find(validate(bundleDoc({ bundle: bad }), { mode: "draft" }), "INVALID_VALUE")[0]), "structure", `${JSON.stringify(bad).slice(0, 30)}:`);
+    // the editor's control and the refs
+    deq(
+      R.controlsFor("zz_bundles").map((c) => [c.key, c.control, c.kind]),
+      [
+        ["bundle", "bundle", "bundle"],
+        ["bundles", "bundle_list", "bundle_list"],
+        ["few", "bundle_list", "bundle_list"],
+      ],
+    );
+    deq(R.refsOf(sec("zz_bundles", "sec_bp1", { bundle: { id: "bun-a" }, bundles: [{ id: "bun-b" }, { id: "bnd_c" }] })), [
+      { field: "bundle", ref: "bundle", id: "bun-a" },
+      { field: "bundles.0", ref: "bundle", id: "bun-b" },
+      { field: "bundles.1", ref: "bundle", id: "bnd_c" },
+    ]);
+  });
+});
+
+await t("P5-SETTING: a bundle list refuses the same bundle twice and more than its max (12 when none is declared), each with its plain message; an issue on its third bundle says 'bundle 3'", async () => {
+  await withBundleProbe(async () => {
+    const ids = (n) => Array.from({ length: n }, (_, j) => ({ id: `bun-${j}` }));
+    none(validate(bundleDoc({ bundles: ids(12), few: ids(3) }), { mode: "publish" }), "12 and 3:");
+    const dup = validate(bundleDoc({ bundles: [{ id: "bun-a" }, { id: "bun-b" }, { id: "bun-a" }] }), { mode: "publish" });
+    const d = one(dup, "INVALID_VALUE", { sectionId: "sec_bp1", field: "bundles.2" });
+    eq(d.message, "This bundle is already in the grid.", "duplicate words:");
+    eq(d.severity, "error", "duplicate at publish:");
+    eq(R.where(d, bundleDoc({})), "Bundle probe · Bundles to show · bundle 3", "where:");
+    const over = one(validate(bundleDoc({ bundles: ids(13) }), { mode: "publish" }), "INVALID_VALUE", { field: "bundles" });
+    eq(over.message, "A grid shows at most 12 bundles.", "over the default max:");
+    eq(one(validate(bundleDoc({ few: ids(4) }), { mode: "publish" }), "INVALID_VALUE", { field: "few" }).message, "A grid shows at most 3 bundles.", "over a declared max:");
+    for (const key of ["title", "price", "available"]) {
+      const i = one(validate(bundleDoc({ bundles: [{ id: "bun-a", [key]: 1 }] }), { mode: "publish" }), "UNKNOWN_FIELD", { field: `bundles.0.${key}` });
+      eq(VAL.issueClass(i), "structure", `${key}:`);
+    }
+    eq(VAL.issueClass(one(validate(bundleDoc({ bundles: "bun-a" }), { mode: "draft" }), "INVALID_VALUE", { field: "bundles" })), "structure", "not a list:");
+    // worst cases: one bundle, and the grid at its max
+    const wc = R.worstCase("zz_bundles");
+    const max = wc.cases.find((c) => c.name === "max_items").section.settings;
+    deq([max.bundle, max.bundles.length, max.few.length, new Set(max.bundles.map((b) => b.id)).size], [{ id: "bun-worst" }, 12, 3, 12], "max_items:");
+    for (const c of wc.cases) none(validate(R.fixtureDocument("home", [c.section]), { mode: "publish" }), `worst case ${c.name}:`);
+  });
+});
+
+// TREE-01: a version body never holds a price or stock value. Every setting
+// kind whose value is (or holds) an object refuses those keys as a structure
+// error, so nothing can be published that carries them. A new kind must be
+// placed in one of the two tables below, or this test fails.
+const PRICE_KEYS = ["price", "bundle_price", "compare_at_price", "inventory", "available", "sold_out", "soldOut"];
+const OK_LINK = { type: "collection", handle: "mugs" };
+// kind -> [a valid value, the path inside it where a key goes ("" is the value itself), extra declaration]
+const OBJECT_KINDS = {
+  link: [OK_LINK, ""],
+  cta: [{ label: "Go", link: OK_LINK }, ""],
+  image: [{ media: "/api/media/med_a", alt: "A jar" }, ""],
+  collection: [{ handle: "mugs", id: "gid://shopify/Collection/1" }, ""],
+  product: [{ handle: "tee", id: "gid://shopify/Product/1" }, ""],
+  bundle: [{ id: "bun-0a1b" }, ""],
+  brand: [{ accent: "#7c3aed", background: "#ffffff", foreground: "#0a0a0b" }, ""],
+  theme: [{ kit: "pulse", version: 1 }, ""],
+  pairs: [{ title: "Goes with", products: ["gid://shopify/Product/1"] }, ""],
+  overlay: [{ value: "Mug", base_hash: null, base_value: null }, "", { of: "text" }],
+  collection_list: [[{ handle: "mugs" }], "0"],
+  product_list: [[{ handle: "tee" }], "0"],
+  bundle_list: [[{ id: "bun-0a1b" }], "0"],
+  qa_list: [[{ q: "Is it warm?", a: "<p>Yes.</p>" }], "0"],
+  nav_items: [[{ label: "Shop", link: OK_LINK, children: [{ label: "Mugs", link: OK_LINK }] }], "0"],
+  gallery: [[{ media: "https://cdn.shopify.com/a.jpg", alt: "A" }], "0"],
+};
+// values with no object to put a key in
+const PLAIN_KINDS = ["text", "number", "boolean", "choice", "rich_text", "paragraphs", "entries", "product_ids"];
+
+await t("TREE-01: for every object-valued setting kind (and every list kind's items), a price or stock key is UNKNOWN_FIELD of class structure in publish mode", async () => {
+  deq(Object.keys(R.SETTING_KINDS).filter((k) => !Object.hasOwn(OBJECT_KINDS, k) && !PLAIN_KINDS.includes(k)), [], "setting kinds placed in neither table:");
+  const settings = Object.entries(OBJECT_KINDS).map(([kind, [, , extra]]) => ({ key: `v_${kind}`, kind, label: `Probe ${kind.replace(/_/g, " ")}`, default: null, ...(extra || {}) }));
+  R.defineSection({ kind: "zz_tree", label: "Tree probe", documentTypes: ["home"], settings });
+  try {
+    const body = (over = {}) => home([sec("zz_tree", "sec_tree1", { ...Object.fromEntries(Object.entries(OBJECT_KINDS).map(([kind, [v]]) => [`v_${kind}`, v])), ...over })]);
+    const base = validate(body(), { mode: "publish" });
+    deq(base.issues.filter((i) => i.sectionId === "sec_tree1").map((i) => [i.code, i.field]), [], "the valid values:");
+    let n = 0;
+    for (const [kind, [value, at]] of Object.entries(OBJECT_KINDS)) {
+      for (const key of PRICE_KEYS) {
+        const v = structuredClone(value);
+        const target = at === "" ? v : v[Number(at)];
+        target[key] = key === "price" || key === "inventory" || key === "bundle_price" || key === "compare_at_price" ? 1999 : true;
+        const field = `v_${kind}${at === "" ? "" : `.${at}`}.${key}`;
+        const r = validate(body({ [`v_${kind}`]: v }), { mode: "publish" });
+        const i = one(r, "UNKNOWN_FIELD", { sectionId: "sec_tree1", field });
+        eq(VAL.issueClass(i), "structure", `${kind}.${key} class:`);
+        eq(i.severity, "error", `${kind}.${key} severity:`);
+        n++;
+      }
+    }
+    eq(n, Object.keys(OBJECT_KINDS).length * PRICE_KEYS.length, "cases:");
+  } finally {
+    R.removeSection("zz_tree");
+  }
 });
 
 // The codes lib/registry reports: every upper-case string literal in its files

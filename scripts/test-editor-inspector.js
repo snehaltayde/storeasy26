@@ -283,17 +283,38 @@ console.log("1. every kind has a control, every kind and type a form");
 // registered, but its controls are P4-EDITOR's (batch 4): the editor UI
 // stays read-only for these until then. These kinds and their two types are
 // the only coverage gaps allowed, and exactly these.
-const WAITING_KINDS = ["overlay", "gallery", "pairs", "product_ids"];
+// P5-SETTING: bundle and bundle_list (COM-02) are registered in batch 1;
+// their controls (the bundle picker) are P5-EDITOR's, which removes them here.
+const WAITING_KINDS = ["overlay", "gallery", "pairs", "product_ids", "bundle", "bundle_list"];
 const WAITING_TYPES = ["product_content", "collection_content"];
-const WAITING_PROBLEMS = [
+// The coverage gaps allowed, worked out when asked: the waiting kinds, the
+// document fields above, and (P5-SETTING) every setting of a waiting kind on
+// any registered section kind, read from the registry, so a section kind
+// registered with a waiting setting (P5-BLOCKS' bundle_card and bundle_grid)
+// is expected here without editing this list.
+const waitingProblems = () => [
   ...WAITING_KINDS.map((k) => `setting kind "${k}" has no control`),
+  ...Reg.sectionKinds().flatMap((kind) =>
+    Reg.sectionType(kind)
+      .settings.filter((s) => WAITING_KINDS.includes(s.kind))
+      .map((s) => `section kind "${kind}": setting "${s.key}" has no control`),
+  ),
   ...["title", "description_html", "gallery", "display_vendor", "display_type", "pairs"].map((k) => `document type "product_content": setting "${k}" has no control`),
   'document type "collection_content": setting "pinned" has no control',
 ];
 const waitingField = (field) => WAITING_KINDS.includes(field?.setting?.kind);
+// P5-SETTING: the issues a section form can't place yet, because their field
+// is a waiting setting of that section (no control renders it). Nothing else
+// is left out.
+const waitingKeysOf = (kind) => new Set((Reg.sectionType(kind)?.settings || []).filter((s) => WAITING_KINDS.includes(s.kind)).map((s) => s.key));
+const placeableIssues = (issues, s) => {
+  const waiting = waitingKeysOf(s.kind);
+  if (!waiting.size) return issues;
+  return issues.filter((i) => !(i?.sectionId === s.id && typeof i.field === "string" && waiting.has(i.field.split(".")[0])));
+};
 
 await t("unit: every registered setting kind maps to a control, and every control name to a component", () => {
-  eq([...M.inspectorCoverage()].sort(), [...WAITING_PROBLEMS].sort(), "inspectorCoverage() (only P4-EDITOR's kinds wait)");
+  eq([...M.inspectorCoverage()].sort(), [...waitingProblems()].sort(), "inspectorCoverage() (only P4-EDITOR's and P5-EDITOR's kinds wait)");
   for (const kind of Object.keys(SETTING_KINDS)) if (!WAITING_KINDS.includes(kind)) ok(M.controlKindOf(kind), `setting kind ${kind} has no control`);
   eq([...Object.keys(SF.CONTROL_COMPONENTS)].sort(), [...M.CONTROL_NAMES].sort(), "the components are exactly the control names");
   for (const [name, C] of Object.entries(SF.CONTROL_COMPONENTS)) ok(typeof C === "function", `control ${name} is not a component`);
@@ -381,9 +402,10 @@ function renderAll(type, body, label) {
       continue;
     }
     ok(shtml.includes(`id="${Reg.fieldAnchor({ sectionId: s.id, field: null })}"`), `${label}: section ${s.kind} has no root id`);
-    checked += checkPlacement(shtml, issues, s.id, `${label} ${s.kind} ${s.id}`);
+    checked += checkPlacement(shtml, placeableIssues(issues, s), s.id, `${label} ${s.kind} ${s.id}`);
     const sknown = new Set(fieldIds(tags(shtml)));
     for (const field of M.formOf({ kind: s.kind, sectionId: s.id }).fields) {
+      if (waitingField(field)) continue; // P5-SETTING: P5-EDITOR's controls
       for (const a of M.anchorsOf(field, s.settings?.[field.key] ?? null, s.id)) ok(sknown.has(a), `${label} ${s.kind}: ${field.path} should render ${a}`);
       controlsRendered.add(field.control);
     }
@@ -402,6 +424,43 @@ await t("rendered: a setting kind no registered section uses yet (product) rende
   } finally {
     Reg.removeSection("zz_probe");
   }
+});
+
+await t("rendered: a throwaway home kind with bundle and bundle-list settings (P5-EDITOR's controls) renders its other fields, and inspectorCoverage() expects its waiting settings", () => {
+  Reg.defineSection({
+    kind: "zz_bundleprobe",
+    version: 1,
+    label: "Bundle probe",
+    documentTypes: ["home"],
+    settings: [
+      { key: "title", kind: "text", label: "Title", max: 80, default: "" },
+      { key: "pick", kind: "bundle", label: "Bundle", required: true, default: null },
+      { key: "grid", kind: "bundle_list", label: "Bundles to show", default: [] },
+    ],
+  });
+  try {
+    const problems = waitingProblems();
+    ok(problems.includes('section kind "zz_bundleprobe": setting "pick" has no control'), "the derived list names pick");
+    ok(problems.includes('section kind "zz_bundleprobe": setting "grid" has no control'), "the derived list names grid");
+    eq([...M.inspectorCoverage()].sort(), [...problems].sort(), "inspectorCoverage() with the probe registered");
+    const s = Reg.newSection("zz_bundleprobe", { id: "sec_bprobe1" });
+    renderAll("home", Reg.fixtureDocument("home", [s]), "bundle probe empty");
+    // a broken one: the title too long (placed), the bundle missing and a
+    // duplicate in the grid (waiting: not placed until the picker exists)
+    s.settings = { title: "x".repeat(90), pick: null, grid: [{ id: "bun-a" }, { id: "bun-a" }] };
+    const body = Reg.fixtureDocument("home", [s]);
+    const issues = issuesFor(body).filter((i) => i.sectionId === "sec_bprobe1");
+    ok(issues.some((i) => i.field === "title"), "the title issue is there");
+    ok(issues.some((i) => i.field === "pick") && issues.some((i) => i.field === "grid.1"), "the waiting issues are there");
+    const placeable = placeableIssues(issues, s);
+    ok(placeable.length > 0 && placeable.every((i) => i.field === "title"), `only the title issue is placed: ${JSON.stringify(placeable.map((i) => i.field))}`);
+    eq(placeableIssues(issuesFor(Reg.fixtureDocument("home", [{ ...Reg.newSection("text", { id: "sec_other1" }), settings: { title: 5, body: 3 } }])), { id: "sec_other1", kind: "text" }).length > 0, true, "a kind with no waiting setting keeps every issue");
+    renderAll("home", body, "bundle probe broken");
+    for (const c of Reg.worstCase("zz_bundleprobe").cases) renderAll("home", Reg.fixtureDocument("home", [{ ...c.section, id: freshId() }]), `bundle probe ${c.name}`);
+  } finally {
+    Reg.removeSection("zz_bundleprobe");
+  }
+  eq([...M.inspectorCoverage()].sort(), [...waitingProblems()].sort(), "after removing the probe");
 });
 
 for (const type of Reg.documentTypeNames()) {
