@@ -677,7 +677,7 @@ await t("unit: whole-set Undo after a 3-document publishSet restores all three i
   await unchanged(beforeDry, "set dry run", st);
   const r = await api({ undoSet: { setId: s2.setId, members } }, { store: st });
   likeShape(r, SHAPES.undoSet.outcomes.ok, "undoSet");
-  ok(/3 pages are back/.test(r.body.message) && r.body.message.includes("Earlier versions"), `message: ${r.body.message}`);
+  eq(r.body.message, "“Set a”, “Set b” and “Set c” are live again, as they were before that publish. Newer changes to “Set b” are kept in Earlier versions.", "message:");
   eq((await sql("SELECT count(*) AS n FROM releases", [], st))[0].n, releasesBefore + 1, "one release:");
   for (const n of ["a", "b", "c"]) eq(await liveText(st, `set-${n}`), [`${n} one.`], `set-${n} back:`);
   const undoRows = await sql("SELECT set_id, document_id, saved_version_id FROM publish_log WHERE action = 'undo' AND undoes_log_id IN (?, ?, ?)", members.map((m) => m.logId), st);
@@ -707,6 +707,28 @@ await t("unit: whole-set Undo after a 3-document publishSet restores all three i
 });
 
 console.log("— take offline (PUB-04, decision 4)");
+
+await t("P3-FIX2 unit: a whole-set Undo where one member goes offline names which pages are live again and which are offline, and says 'open it and publish it again'", async () => {
+  const st = "sets";
+  const p = await create(st, "page", { body: page("mix-p", "Mix p", "p one.") });
+  const q = await create(st, "page", { body: page("mix-q", "Mix q", "q one.") });
+  published(await publishApi(st, p.id), "p first, alone");
+  await save(st, p.id, page("mix-p", "Mix p", "p two."));
+  const s = published(await publishSetApi(st, [p.id, q.id]), "p again with q's first publish");
+  const members = (await sql("SELECT id, document_id FROM publish_log WHERE set_id = ?", [s.setId], st)).map((x) => ({ id: String(x.document_id), logId: String(x.id) }));
+  const r = await api({ undoSet: { setId: s.setId, members } }, { store: st });
+  likeShape(r, SHAPES.undoSet.outcomes.ok, "undoSet");
+  eq(r.body.message, "“Mix p” is live again, as it was before that publish. “Mix q” is offline now, as it was before that publish. To bring it back, open it and publish it again.", "message:");
+  eq(await liveText(st, "mix-p"), ["p one."], "p is back:");
+  ok(!/\d+ pages? (is|are) back/.test(r.body.message), "no count that reads as if every page is live");
+  // both offline: plural words
+  const u = await create(st, "page", { body: page("mix-u", "Mix u", "u one.") });
+  const v = await create(st, "page", { body: page("mix-v", "Mix v", "v one.") });
+  const s2 = published(await publishSetApi(st, [u.id, v.id]), "two first publishes");
+  const m2 = (await sql("SELECT id, document_id FROM publish_log WHERE set_id = ?", [s2.setId], st)).map((x) => ({ id: String(x.document_id), logId: String(x.id) }));
+  const r2 = await api({ undoSet: { setId: s2.setId, members: m2 } }, { store: st });
+  ok(/^“Mix [uv]” and “Mix [uv]” are offline now, as they were before that publish\. To bring them back, open each one and publish it again\.$/.test(r2.body.message), `plural: ${r2.body.message}`);
+});
 
 await t("unit: unpublish of a live page and of a journal post writes an 'unpublish' row, 404s it, keeps its draft, nulls published_version_id (archive allowed), sets undone_version_id; dryRun returns linkers and change words and writes nothing; Undo of that row brings it back with redirects and refs and clears undone", async () => {
   // P3-CHECKS: a link to a collection the store doesn't have blocks a
@@ -812,8 +834,12 @@ await t("unit: listRecentlyPublished gives plain names, labels and summaries (ne
   const aLatest = rows.find((r) => r.setId === a2.setId);
   const bSet = rows.find((r) => r.setId === set.setId && r.documentId === b.id);
   // (plus the home page's publish that opened the store: see openStore)
+  // P3-FIX2: the home page's first publish is current, but its Undo would
+  // only say "This is the first published version", so it is not offered
   const homeOpen = rows.find((r) => r.documentId === "doc_home");
-  eq(can, [aLatest.logId, bSet.logId, homeOpen.logId].sort(), "current rows:");
+  eq(can, [aLatest.logId, bSet.logId].sort(), "current rows:");
+  eq([homeOpen.canUndo, homeOpen.undo], [false, null], "a singleton's first publish is not offered:");
+  eq((await undoApi(st, "doc_home", homeOpen.logId)).body.nothing, true, "(its Undo would only say nothing)");
   for (const r of rows) eq(r.undo === null, !r.canUndo, "undo args only when it can:");
   eq(aLatest.undo, { id: a.id, revision: (await current(st, a.id)).revision, logId: aLatest.logId }, "undo args:");
   eq(aLatest.summary, [{ words: "Text: a paragraph changed" }], "the summary of a2:");

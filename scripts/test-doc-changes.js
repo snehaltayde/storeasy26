@@ -419,6 +419,57 @@ await t("keepLiveSection, the pure part: every case on plain bodies, and a secti
   eq(Ch.keepLiveBody(L, meta, "sec_pb").meta, meta.meta, "the rest of the draft is untouched:");
 });
 
+await t("P3-FIX2: keepLiveBody keeps the draft's id for a section paired by content under another valid id (moved back, never renamed to the live id)", async () => {
+  const L = { sections: [text("sec_la", "A"), text("sec_lb", "B")] };
+  // the draft has A's content under a new id, after B: paired by content, one of them moved
+  const D = { sections: [text("sec_lb", "B"), text("sec_dx", "A")] };
+  const { diffBodies } = await import("../lib/documents/diff.js");
+  const before = diffBodies("page", { type: "page", ...L }, { type: "page", ...D });
+  ok(before.some((r) => r.sectionId === "sec_dx" && r.kind === "moved"), `listed as moved: ${JSON.stringify(before)}`);
+  const out = Ch.keepLiveBody(L, D, "sec_dx");
+  eq(out.sections.map((s) => [s.id, s.settings.title]), [["sec_dx", "A"], ["sec_lb", "B"]], "back in its live place, under the draft's id:");
+  eq(diffBodies("page", { type: "page", ...L }, { type: "page", ...out }), [], "no row left:");
+});
+
+await t("P3-FIX2: keepLiveSection never leaves a row for the section it restored, even when the draft's order is scrambled (live [l0..l4], draft [l4,l2,l3,l0], keep l1); and over every keep in a small exhaustive sweep", async () => {
+  const { diffBodies } = await import("../lib/documents/diff.js");
+  const ls = [0, 1, 2, 3, 4].map((n) => text(`sec_l${n}`, `T${n}`));
+  const L = { type: "page", sections: ls };
+  const D = { type: "page", sections: [4, 2, 3, 0].map((n) => ls[n]) };
+  const out = Ch.keepLiveBody(L, D, "sec_l1");
+  const rows = diffBodies("page", L, out);
+  eq(rows.filter((r) => r.sectionId === "sec_l1"), [], `no row for l1 (got ${JSON.stringify(rows)}, order ${out.sections.map((s) => s.id)}):`);
+  ok(out.sections.some((s) => s.id === "sec_l1"), "l1 is back");
+  // every permutation of a 4-section subset of live, every live section kept
+  const perms = (a) => (a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map((p) => [x, ...p])));
+  let cases = 0;
+  for (let drop = 0; drop < 5; drop++) {
+    const rest = [0, 1, 2, 3, 4].filter((n) => n !== drop);
+    for (const order of perms(rest)) {
+      const draft = { type: "page", sections: order.map((n) => ls[n]) };
+      for (let keepN = 0; keepN < 5; keepN++) {
+        const kept = Ch.keepLiveBody(L, draft, `sec_l${keepN}`);
+        const left = diffBodies("page", L, kept).filter((r) => r.sectionId === `sec_l${keepN}`);
+        if (left.length) throw new Error(`draft [${order}] keep l${keepN}: ${JSON.stringify(left)}`);
+        cases++;
+      }
+    }
+  }
+  ok(cases === 5 * 24 * 5, `swept ${cases}`);
+});
+
+await t("P3-FIX2: keepLiveSection on a page taken offline is 404 with words that say it's offline (not 'never been published')", async () => {
+  let d = await publishedPage("keep-offline", [text("sec_oa", "A")]);
+  const off = await api({ unpublish: { id: d.id }, revision: d.revision });
+  eq(off.status, 200, `taken offline: ${JSON.stringify(off.body).slice(0, 200)}`);
+  d = (await api({ getDocument: d.id })).body.document;
+  const before = await dump();
+  const r = await keepLive(d, "sec_oa");
+  likeShape(r, "keepLiveSection", "notFound");
+  eq(r.body.error, "This page is offline, so there is no live version to keep. Publish it again to bring it back.", "the words:");
+  await unchanged(before, "offline keepLiveSection");
+});
+
 // --- ED-03: keep as an earlier draft -----------------------------------------------------
 console.log("— keep as an earlier draft (ED-03)");
 
@@ -490,6 +541,25 @@ await t("keepAsEarlierDraft dedupes an identical body (and one that differs only
   // staff may keep
   const other = await publishedPage("kept-staff", [text("sec_ks", "Live")]);
   eq((await keep(other.id, { ...route("kept-staff", "x"), sections: [text("sec_ks", "Staff tab")] }, { as: STAFF })).status, 200, "staff:");
+});
+
+await t("P3-FIX2: keepAsEarlierDraft refuses an archived page (409 DOCUMENT_ARCHIVED, like saveDraft) and the cart (409 CART_NOT_AVAILABLE), storing nothing", async () => {
+  const d = await create({ type: "page", meta: { slug: "kept-archived", title: "Kept archived" } });
+  const a = await api({ archive: d.id, revision: d.revision });
+  eq(a.status, 200, `archived: ${JSON.stringify(a.body).slice(0, 200)}`);
+  let before = await dump();
+  const r = await keep(d.id, { ...route("kept-archived", "Kept archived"), sections: [text("sec_ar", "Tab copy")] });
+  likeShape(r, "keepAsEarlierDraft", "archived");
+  await unchanged(before, "archived keep");
+  // the cart: no API makes it (createDocument refuses it), so its row is written straight in
+  const cartBody = R.emptyBody("cart");
+  const now = new Date().toISOString();
+  await raw.docs.execute({ sql: "INSERT INTO documents (id, type, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES ('doc_cart', 'cart', 'Cart', ?, ?, 1, ?, ?, ?)", args: [JSON.stringify(cartBody), await R.documentHash(cartBody), cartBody.schema ?? 1, now, now] });
+  before = await dump();
+  const c = await keep("doc_cart", cartBody);
+  likeShape(c, "keepAsEarlierDraft", "cartLocked");
+  await unchanged(before, "cart keep");
+  await raw.docs.execute("DELETE FROM documents WHERE id = 'doc_cart'");
 });
 
 await t("keepAsEarlierDraft: two tabs keeping at the same moment can't pass the cap, and a statement resent after a lost answer stores one version", async () => {

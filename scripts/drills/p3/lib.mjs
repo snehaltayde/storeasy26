@@ -13,6 +13,8 @@
 //                             results file, closes Chrome and stops the harness
 //                             it started. Refuses a harness someone else started
 //                             in this checkout (a reseed would wipe it).
+//   startOwned()              starts the harness and points the closed store's
+//                             tenant row at this run's third server
 //   reseed(drill, {start})    stops the harness this run started, seeds it fresh
 //                             (node scripts/seed-design-documents.js --p3: the
 //                             perf seed, the documents store and the phase 3
@@ -25,7 +27,8 @@
 //                             'closed' signs in to the closed store (owner only,
 //                             its setup password: it has no members).
 //   drill.clickCounter(ctx)   counts every real click in a browser context,
-//                             across navigations
+//                             across navigations; a second call for the same
+//                             context returns the same counter
 //   drill.screenshot(page, name)  a small PNG in the drill's results folder
 //   drill.writeResults()      results-<part>.json in the results folder, in the
 //                             P2 drill format (scripts/drills/p2/run.mjs)
@@ -39,7 +42,8 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Drill, DrillError, connectHarness, launchChrome, settle } from "../../drill.js";
-import { DATA_DIR_NAME, ROOT, harnessPorts, readCredentials, runningHarness } from "../../design-harness.js";
+import { DATA_DIR_NAME, ROOT, harnessPorts, harnessUrls, readCredentials, runningHarness } from "../../design-harness.js";
+import { pointClosedStoreAt } from "../../seed-design-documents.js";
 
 export { DrillError, settle };
 export const OWNER_PORT = 3017;
@@ -92,7 +96,11 @@ export async function seedState() {
 }
 
 // The harness this run started (one per process).
-const owned = { harness: null, drills: new Set() };
+const owned = { harness: null, drills: new Set(), closedRepointed: null };
+export const closedRepointed = () => owned.closedRepointed;
+// P3-FIX2: one click counter per browser context (exposeBinding throws on a
+// second call for the same name)
+const counters = new WeakMap();
 // Console cookies per sign-in, for this seed (the sign-in route allows 5 tries
 // a minute per address, so each role signs in through the form once per seed).
 let signedIn = new Map();
@@ -107,6 +115,10 @@ export async function startOwned() {
   const h = await connectHarness({ start: true, log: () => {} });
   owned.harness = h;
   for (const d of owned.drills) Object.assign(d.harness, h);
+  // P3-FIX2: the closed store borrows the harness's third server; point its
+  // tenant row at this run's ports before any request reaches it (the harness
+  // itself re-points only the design store)
+  owned.closedRepointed = await pointClosedStoreAt(harnessUrls(harnessPorts()));
   // the first request compiles the storefront; let it finish before anything is measured
   await fetch(`${h.baseUrl}/`).catch(() => {});
   return h;
@@ -210,6 +222,7 @@ export class P3Drill extends Drill {
   // Counts every real (trusted) click in this context, on every page and
   // across navigations. { count, clicks: [{ n, path, tag, text }], reset(), mark() }
   async clickCounter(context) {
+    if (counters.has(context)) return counters.get(context);
     const counter = {
       clicks: [],
       get count() {
@@ -226,6 +239,7 @@ export class P3Drill extends Drill {
         return this.clicks.length - mark;
       },
     };
+    counters.set(context, counter);
     await context.exposeBinding("__p3Click", (_src, info) => {
       counter.clicks.push({ n: counter.clicks.length + 1, ...info });
     });

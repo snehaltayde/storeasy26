@@ -7,13 +7,18 @@
 //    closed store's state, and that the seed never prints a password.
 // 2. Starts the harness, signs in as the owner and as staff through the real
 //    form, and reads what each may do with the home page.
+// P3-FIX2: the guide check reads the published version and the draft (the
+//    storefront never renders a link to a page that is not live), the click
+//    counter is reused per context, and the closed store is re-pointed.
 // 3. Opens / on the closed store ("Opening soon", no draft) and / on the live
 //    store (the hero, the banner to the live campaign, the product rail), plus
 //    the live and the unpublished campaign and the page whose draft links to it.
 // Results: docs/cms-reviews/drills/P3-HARNESS/results-smoke.json, with screenshots.
 import { statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DrillError, SEED_FILE, bodyText, docsApi, noThanks, readSeed, reseed, runDrill, seedState, settle, startOwned, storeSql, storeUrl } from "./lib.mjs";
+import { DrillError, SEED_FILE, bodyText, closedRepointed, docsApi, noThanks, readSeed, reseed, runDrill, seedState, settle, startOwned, storeSql, storeUrl } from "./lib.mjs";
+import { harnessPorts, harnessUrls } from "../../design-harness.js";
+import { CLOSED_STORE, pointClosedStoreAt } from "../../seed-design-documents.js";
 
 const counts = (s) => ({ rows: s.p3.rows, refs: { publishedVersions: s.p3.refs.publishedVersions, versionsWithRefs: s.p3.refs.versionsWithRefs }, members: s.p3.members, platform: s.p3.platform, closed: s.p3.closed, documents: s.documents, published: s.published, dirty: s.dirty });
 
@@ -47,6 +52,14 @@ export async function smoke(drill) {
   const clicks = await drill.clickCounter(ownerCtx);
   const owner = await drill.login("owner", { context: ownerCtx });
   drill.check(clicks.count === 1 && clicks.clicks[0].text === "Sign in", "the click counter saw the one click of the owner's sign-in", clicks.clicks);
+  // P3-FIX2: a second call for the same context gives the same counter (no throw)
+  let again = null;
+  try {
+    again = await drill.clickCounter(ownerCtx);
+  } catch (e) {
+    again = e;
+  }
+  drill.check(again === clicks, "a second clickCounter call on the same context returns the same counter", again instanceof Error ? String(again.message).slice(0, 200) : null);
   const ownHome = await docsApi(owner, { getDocument: "doc_home" });
   drill.check(ownHome.status === 200 && ownHome.body?.document?.access?.canPublish === true, "owner: signed in, and may publish the home page", { status: ownHome.status, access: ownHome.body?.document?.access });
   await settle(owner);
@@ -63,6 +76,17 @@ export async function smoke(drill) {
   await drill.screenshot(staff, "staff-dashboard");
   await ownerCtx.close();
   await staffCtx.close();
+
+  // P3-FIX2: the closed store's tenant row is pointed at this run's third
+  // server at harness start. Spoil it (no request has reached the closed
+  // store since the start), point it again, and read it back.
+  const ports = harnessPorts();
+  const want = harnessUrls(ports).default;
+  drill.check(closedRepointed() === 0, "at harness start the closed store already pointed at this run's third server (fresh seed)", { repointed: closedRepointed() });
+  await storeSql("platform", [{ sql: "UPDATE tenants SET db_url = 'http://127.0.0.1:9' WHERE id = ?", args: [CLOSED_STORE.id] }]);
+  const changedRows = await pointClosedStoreAt(harnessUrls(ports));
+  const [closedRow] = await storeSql("platform", [{ sql: "SELECT db_url FROM tenants WHERE id = ?", args: [CLOSED_STORE.id] }]);
+  drill.check(changedRows === 1 && closedRow.rows[0]?.db_url === want, "a closed store row pointing at another port is pointed back at this run's third server", { changedRows, dbUrl: closedRow.rows[0]?.db_url, want });
 
   // ---- 3. the two stores, as a shopper ----
   const shopper = await drill.context();
@@ -94,7 +118,27 @@ export async function smoke(drill) {
   drill.check(soon.status === 404 && !soonText.includes("still a draft"), "live store: the unpublished campaign is not there (404, no draft text)", { status: soon.status });
   const guide = await drill.open(page, storeUrl(drill, "live", seed.documents.guide.path));
   const guideText = await bodyText(page);
-  drill.check(guide.status === 200 && /Changing your routine for spring/.test(guideText) && !/Take a look/.test(guideText), "live store: the guide page is live, without its draft's link to the unpublished campaign", { status: guide.status });
+  const soonPath = seed.documents.unpublishedCampaign.path;
+  const guideHrefs = await page.evaluate((href) => [...document.querySelectorAll("a")].filter((a) => a.getAttribute("href") === href).length, soonPath);
+  // P3-FIX2: the storefront never renders a button whose link goes to a page
+  // that isn't live, so the page's text can't show whether the link went
+  // live. Read what is live and what is in the draft instead: the published
+  // version has no banner and no ref to the unpublished campaign; the draft
+  // holds the banner and differs from what is live (the precondition of the
+  // LINKS_TO_UNPUBLISHED drills).
+  const [guideRow] = await storeSql("tenant", [{ sql: "SELECT d.draft AS draft, d.draft_hash AS draft_hash, d.published_hash AS published_hash, v.body AS live FROM documents d LEFT JOIN document_versions v ON v.id = d.published_version_id WHERE d.id = ?", args: [seed.documents.guide.id] }]);
+  const gr = guideRow.rows[0] || {};
+  const liveGuide = gr.live ? JSON.parse(String(gr.live)) : null;
+  const draftGuide = gr.draft ? JSON.parse(String(gr.draft)) : null;
+  const hasBanner = (b) => Boolean(b?.sections?.some((x) => x.id === "sec_p3guidebn"));
+  const [guideRefs] = await storeSql("tenant", [{ sql: "SELECT count(*) AS n FROM document_refs WHERE version_id = ? AND ref_type = 'document' AND ref_id = ?", args: [seed.documents.guide.publishedVersionId, seed.documents.unpublishedCampaign.id] }]);
+  const guideFacts = { status: guide.status, liveHasBanner: hasBanner(liveGuide), draftHasBanner: hasBanner(draftGuide), draftDiffers: gr.draft_hash != null && gr.draft_hash !== gr.published_hash, liveRefsToCampaign: Number(guideRefs.rows[0]?.n ?? -1), renderedLinks: guideHrefs };
+  drill.check(
+    guide.status === 200 && /Changing your routine for spring/.test(guideText) && guideFacts.liveHasBanner === false && guideFacts.liveRefsToCampaign === 0 && guideHrefs === 0,
+    "live store: the guide page is live, without its draft's link to the unpublished campaign (the published version has no banner and no ref to it)",
+    guideFacts,
+  );
+  drill.check(guideFacts.draftHasBanner && guideFacts.draftDiffers, "the guide's draft holds the banner linking to the unpublished campaign, and differs from what is live", guideFacts);
   const post = await drill.open(page, storeUrl(drill, "live", seed.documents.journalPost.path));
   drill.check(post.status === 200, "live store: the journal post answers", { status: post.status, path: seed.documents.journalPost.path });
   await shopper.close();

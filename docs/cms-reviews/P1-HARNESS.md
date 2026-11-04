@@ -420,7 +420,7 @@ What it holds, on top of the P2 documents store (the perf content as documents, 
 
 Every publish goes through `lib/documents/publish.js`, as the owner, so `publish_log`, `document_refs` (migration 0023) and the live addresses all exist. `check --p3` compares each published version's `document_refs` rows with what `refRows` makes from its body.
 
-**The closed store's database** is the harness's third server (`DESIGN_SQLD_PORT + 2`, the env default database). No request otherwise uses it: an unknown host never falls back to it. `scripts/design-harness.js` still starts three servers, and only the design store's address is updated at start (`pointTenantAtThisRun`), so after changing `DESIGN_SQLD_PORT` reseed with `--p3` before using the closed store.
+**The closed store's database** is the harness's third server (`DESIGN_SQLD_PORT + 2`, the env default database). No request otherwise uses it: an unknown host never falls back to it. `scripts/design-harness.js` still starts three servers and updates only the design store's address (`pointTenantAtThisRun`). Since P3-FIX2, the phase 3 drill helpers also point the closed store's tenant row at this run's third server when they start the harness (`startOwned()` in `scripts/drills/p3/lib.mjs`, through `pointClosedStoreAt` in `scripts/seed-design-documents.js`, local addresses only), so a drill on new ports never reaches another checkout's database. A harness you start by hand with `pnpm dev:design` does not do this: after changing `DESIGN_SQLD_PORT`, reseed with `--p3` (or run a phase 3 drill) before using the closed store.
 
 **`closed.localhost`** resolves to this machine in Chrome without any hosts-file change. Other tools may need `--resolve` or a `Host` header.
 
@@ -441,10 +441,31 @@ DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880 node scripts/drills/p3/smoke.mjs [--heade
 | `reseed(drill, { start, flags })` | Stops the harness this run started, runs `seed-design-documents.js --p3`, and (by default) starts the harness again. Returns `{ seed, out }` |
 | `readSeed()`, `seedState()` | The seed config, and `check --p3`'s answer |
 | `drill.login(role, { context, store })` | `'owner'` or `'staff'` through the real form, by email, on the live store; `store: 'closed'` signs in to the closed store as its owner. Cookies are reused per role within one seed (the sign-in route allows 5 tries a minute) |
-| `drill.clickCounter(context)` | Counts every real click in that context, on every page, across navigations: `count`, `clicks` (`path`, `tag`, `text`), `mark()`, `since(mark)`, `reset()` |
+| `drill.clickCounter(context)` | Counts every real click in that context, on every page, across navigations: `count`, `clicks` (`path`, `tag`, `text`), `mark()`, `since(mark)`, `reset()`. A second call for the same context returns the same counter |
 | `drill.screenshot(page, name)` | A small PNG in the results folder (`drill.shoot`) |
 | `drill.writeResults()` | `results-<part>.json` in the P2 format: id, part, title, ranAt, harness, chrome, passed, failed, knownFailures, aborted, checks, notes, screenshots |
 | `storeUrl(drill, 'live' \| 'closed', path)`, `storeSql(store, statements)` | An address on either store; a read of either store's database (or `'platform'`) through the running harness's ports |
 | `docsApi(page, body)`, `bodyText`, `noThanks`, `settle` | The documents API from a signed-in page, the page's text, the cookie banner's "No thanks", wait for quiet |
 
 The results folder is `docs/cms-reviews/drills/<id>/`: screenshots and `results-<part>.json` together. Everything else from `scripts/drill.js` (`check`, `note`, `open`, `facts`, `atWidths`, `context`) works on a `P3Drill`.
+
+### Running drills on an agent's own ports (P3-FIX2)
+
+Every drill takes its ports from the environment. An agent (or a second checkout) sets all of them to its own range, so nothing it starts meets the owner's harness on 3017 or another run:
+
+| Variable | Used by | Default | What it is |
+|---|---|---|---|
+| `DESIGN_PORT` | every drill, the harness | 3017 (refused by the P3 drills) | the Next server |
+| `DESIGN_SQLD_PORT` | every drill, the harness | 18017 | the first of three database servers in a row (platform, tenant, default; the closed store uses the third) |
+| `DRILL_HTTPS_PORT` | `scripts/drills/p2/publish.mjs` | 4806 | the small local HTTPS server the P2 publish drill serves an outside image from. Outside most agents' ranges, so set it |
+| `DRILL_SCRATCH` | `scripts/drills/p2/publish.mjs` | `.design-data/p2-drills` | where that HTTPS server's throwaway key and certificate are written |
+| `DRILL_TMP` | `scripts/drills/p2/run.mjs` | the system temp folder | where the "path with a space" part copies scripts (a folder named `Projects 2026`); point it at your scratch folder |
+
+For example, on ports 6200 and 7200 to 7209 with a scratch folder `$S`:
+
+```
+DESIGN_PORT=6200 DESIGN_SQLD_PORT=7200 DRILL_HTTPS_PORT=7206 DRILL_SCRATCH=$S/p2 DRILL_TMP=$S/tmp node scripts/drills/p2/run.mjs
+DESIGN_PORT=6200 DESIGN_SQLD_PORT=7200 node scripts/drills/p3/smoke.mjs
+```
+
+**Ports to avoid on the owner's Mac.** 5000 and 7000 are taken by ControlCenter (AirPlay Receiver), and 5037 and 5500 are in use. Node's `fetch` refuses 5060 and 5061 (blocked SIP ports), so a database server there can't be reached and the harness never comes up. A port that is busy shows as a 20-second health timeout or "didn't come up within 3 minutes", which looks like a code failure: check the port first (`lsof -nP -iTCP:<port> -sTCP:LISTEN`).

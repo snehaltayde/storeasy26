@@ -464,12 +464,16 @@ await t("coverage, the rest: a link to a missing collection or product blocks; a
   const sh = await create("ck", "page", { body: page("shadowed", "Shadowed", undefined, "page", { redirect_from: ["gifts"] }) });
   const rs = published(await publishApi("ck", sh.id), "shadowed redirect");
   eq(rs.issues.filter((i) => i.code === "REDIRECT_SHADOWED").map((i) => [i.field, i.level, i.actions[0].type]), [["meta.redirect_from.0", "warns", "removeItem"]], "shadowed:");
-  // two hidden pages whose old addresses point at each other: a loop blocks
+  // two hidden pages whose old addresses point at each other. P3-FIX2: a
+  // hidden page still holds its address (the storefront's page row wins over
+  // an old address and answers "not found"), so each old address is shadowed
+  // and shoppers are never sent round in a circle
   const lb = await create("ck", "page", { body: page("loop-b", "Loop b", undefined, "page", { enabled: false, redirect_from: ["loop-a"] }) });
   published(await publishApi("ck", lb.id), "loop b live, hidden");
   const la = await create("ck", "page", { body: page("loop-a", "Loop a", undefined, "page", { enabled: false, redirect_from: ["loop-b"] }) });
-  const rl = await publishApi("ck", la.id);
-  eq(issuesOf(rl, "REDIRECT_LOOP").map((i) => [i.field, i.level, i.actions[0].type]), [["meta.redirect_from.0", "blocks", "removeItem"]], "a loop:");
+  const rl = published(await publishApi("ck", la.id), "loop a: shadowed, not a loop");
+  eq(rl.issues.filter((i) => i.code === "REDIRECT_LOOP"), [], "no loop:");
+  eq(rl.issues.filter((i) => i.code === "REDIRECT_SHADOWED").map((i) => [i.field, i.level, i.actions[0].type]), [["meta.redirect_from.0", "warns", "removeItem"]], "a hidden page's address shadows the old address:");
   // a header menu item to a missing page: blocks, and removeItem on the menu
   const header = await create("ck", "header", { body: body("header", { settings: { mode: "custom", items: [{ label: "Help", link: urlLink("/policies/help-missing") }] } }) });
   const rh = await publishApi("ck", header.id);
@@ -840,6 +844,201 @@ await t("P3-COMMIT pin: commit.js passes build.versions (never extraVersions) to
   const decl = /const versions = ([^;]+);/.exec(fn);
   eq(decl?.[1], "build.versions || []", "versions is build.versions:");
   ok(!/extraVersions/.test(fn.slice(0, fn.indexOf("liveListHoldsMine("))), "extraVersions is never in reach of the call");
+});
+
+// =========================================================================================
+console.log("— P3-FIX2: links by id, old addresses, hidden holders, the set applied, menus");
+
+const rename = async (store, id, slug, title, type = "page", meta = {}) => {
+  await save(store, id, page(slug, title, undefined, type, meta));
+  return published(await publishApi(store, id), `rename to ${slug}`);
+};
+
+await t("P3-FIX2: a link by document id to a page renamed with no old address that forwards is LINK_TARGET_MISSING naming the new address (alone, and inside one set); a page's old address doesn't forward, a journal post's does", async () => {
+  // renamed and published: the link still carries the old slug
+  const moved = await create("ck", "page", { body: page("moves", "Moves") });
+  published(await publishApi("ck", moved.id), "moves live");
+  await rename("ck", moved.id, "moved", "Moves");
+  const a = await create("ck", "page", { body: page("to-moves", "To moves", [textSec("sec_t1", "To moves", "Words."), bannerTo("sec_bn1", pageLink("page", "moves", moved.id))]) });
+  const before = await dump();
+  const r = await publishApi("ck", a.id);
+  eq([r.status, r.body.code], [422, "VALIDATION_FAILED"], "a stale link by id blocks:");
+  const m = issuesOf(r, "LINK_TARGET_MISSING");
+  eq([m.length, m[0]?.sectionId, m[0]?.level], [1, "sec_bn1", "blocks"], "names it:");
+  eq(m[0].message, "This link goes to /policies/moves, but “Moves” is at /policies/moved now, so shoppers who click it get “not found”. Choose the page again so the link uses its new address.", "the words:");
+  likeShape(r, shapeOf("validationFailed"), "422");
+  await unchanged(before, "the refusal");
+  // chosen again (the new slug): it passes
+  await save("ck", a.id, page("to-moves", "To moves", [textSec("sec_t1", "To moves", "Words."), bannerTo("sec_bn1", pageLink("page", "moved", moved.id))]));
+  eq(published(await publishApi("ck", a.id), "the new address").issues.filter((i) => /^LINK/.test(i.code)), [], "no link issue:");
+
+  // inside one set: B renamed in the same publish as A, which links to B's old slug by id
+  const b = await create("ck", "page", { body: page("b-before", "B page") });
+  published(await publishApi("ck", b.id), "b live");
+  await save("ck", b.id, page("b-after", "B page"));
+  const a2 = await create("ck", "page", { body: page("to-b", "To b", [textSec("sec_t1", "To b", "Words."), bannerTo("sec_bn1", pageLink("page", "b-before", b.id))]) });
+  const rs = await publishSetApi("ck", [a2.id, b.id]);
+  eq([rs.status, rs.body.code], [422, "VALIDATION_FAILED"], "in one set:");
+  ok(issuesOf(rs, "LINK_TARGET_MISSING").some((i) => i.documentId === a2.id && /\/policies\/b-after/.test(i.message)), `names the new address: ${JSON.stringify(rs.body.issues.map((i) => i.message))}`);
+
+  // a page's old address (redirect_from) doesn't forward /policies/<old>: still blocked, and the words say why
+  await save("ck", b.id, page("b-after", "B page", undefined, "page", { redirect_from: ["b-before"] }));
+  const rs2 = await publishSetApi("ck", [a2.id, b.id]);
+  eq(rs2.status, 422, "a page's old address doesn't forward:");
+  ok(issuesOf(rs2, "LINK_TARGET_MISSING").some((i) => /Old addresses only forward shoppers on journal posts/.test(i.message)), "says only posts forward");
+
+  // a journal post renamed with its old address: a link by id to the old slug passes, alone and in one set
+  const post = await create("ck", "journal", { body: page("old-post", "Old post", undefined, "journal") });
+  published(await publishApi("ck", post.id), "post live");
+  await save("ck", post.id, page("new-post", "Old post", undefined, "journal", { redirect_from: ["old-post"] }));
+  const a3 = await create("ck", "page", { body: page("to-post", "To post", [textSec("sec_t1", "To post", "Words."), bannerTo("sec_bn1", pageLink("journal", "old-post", post.id))]) });
+  const rs3 = published(await publishSetApi("ck", [a3.id, post.id]), "renamed post with its old address, in one set");
+  eq(rs3.issues.filter((i) => /^LINK/.test(i.code)), [], "the old address forwards:");
+  // and alone, after: the live redirect covers it
+  await save("ck", a3.id, page("to-post", "To post", [textSec("sec_t1", "To post (again)", "Words."), bannerTo("sec_bn1", pageLink("journal", "old-post", post.id))]));
+  eq(published(await publishApi("ck", a3.id), "alone").issues.filter((i) => /^LINK/.test(i.code)), [], "alone, the live redirect covers it:");
+  // the post renamed again with no old address kept: the link by id blocks
+  await rename("ck", post.id, "newer-post", "Old post", "journal");
+  await save("ck", a3.id, page("to-post", "To post", [textSec("sec_t1", "To post (third)", "Words."), bannerTo("sec_bn1", pageLink("journal", "old-post", post.id))]));
+  eq(issuesOf(await publishApi("ck", a3.id), "LINK_TARGET_MISSING").length, 1, "no forwarding old address left:");
+});
+
+await t("P3-FIX2: a link to an old address that a live redirect covers passes (/journal/<old>); /policies/<old> with a redirect is still missing; a link to a live journal post passes (needJournal)", async () => {
+  const post = await create("ck", "journal", { body: page("first-name", "Renamed post", undefined, "journal") });
+  published(await publishApi("ck", post.id), "post live");
+  await rename("ck", post.id, "second-name", "Renamed post", "journal", { redirect_from: ["first-name"] });
+  const l = await create("ck", "page", { body: page("to-old-addr", "To old addr", [textSec("sec_t1", "To old addr", "Words."), bannerTo("sec_bn1", urlLink("/journal/first-name")), bannerTo("sec_bn2", urlLink("/journal/second-name"))]) });
+  const r = published(await publishApi("ck", l.id), "links to an old and a live post address");
+  eq(r.issues.filter((i) => /^LINK/.test(i.code)), [], "both pass:");
+  // a page with an old address: /policies/<old> isn't forwarded, so it stays missing
+  const pg = await create("ck", "page", { body: page("new-addr", "New addr", undefined, "page", { redirect_from: ["old-addr"] }) });
+  published(await publishApi("ck", pg.id), "page with old address");
+  const l2 = await create("ck", "page", { body: page("to-old-page", "To old page", [textSec("sec_t1", "To old page", "Words."), bannerTo("sec_bn1", urlLink("/policies/old-addr"))]) });
+  eq(issuesOf(await publishApi("ck", l2.id), "LINK_TARGET_MISSING").length, 1, "/policies/<old> isn't forwarded:");
+});
+
+await t("P3-FIX2: an old address held by a hidden live page warns REDIRECT_SHADOWED (the hidden row wins on the storefront and answers 'not found')", async () => {
+  const hid = await create("ck", "page", { body: page("hidden-holder", "Hidden holder", undefined, "page", { enabled: false }) });
+  published(await publishApi("ck", hid.id), "hidden holder live");
+  const p = await create("ck", "page", { body: page("wants-hidden", "Wants hidden", undefined, "page", { redirect_from: ["hidden-holder"] }) });
+  const r = published(await publishApi("ck", p.id), "shadowed by a hidden page");
+  const sh = r.issues.filter((i) => i.code === "REDIRECT_SHADOWED");
+  eq(sh.map((i) => [i.field, i.level, i.actions[0].type]), [["meta.redirect_from.0", "warns", "removeItem"]], "warns:");
+  ok(/hidden from shoppers or offline/.test(sh[0].message), `the words: ${sh[0].message}`);
+  // on the storefront, the hidden row wins: the old address forwards nowhere
+  eq(await inT(() => Res.resolvedSlugRedirect("hidden-holder")), null, "(resolve.js agrees: no redirect)");
+  checkIssues(r.issues, "200");
+});
+
+await t("P3-FIX2 pin: the checks read M2, the live list with the set applied (the set's own rows replace its documents' list rows)", async () => {
+  // the set hides B while A links to it: blocked as hidden
+  const b = await create("ck", "page", { body: page("m2-b", "M2 b") });
+  published(await publishApi("ck", b.id), "b live");
+  await save("ck", b.id, page("m2-b", "M2 b", undefined, "page", { enabled: false }));
+  const a = await create("ck", "page", { body: page("m2-a", "M2 a", [textSec("sec_t1", "M2 a", "Words."), bannerTo("sec_bn1", urlLink("/policies/m2-b"))]) });
+  const r = await publishSetApi("ck", [a.id, b.id]);
+  eq(issuesOf(r, "LINK_TARGET_HIDDEN").map((i) => [i.documentId, i.level]), [[a.id, "blocks"]], "the set hides b:");
+  // the set renames B while A links to its old url: blocked
+  await save("ck", b.id, page("m2-b2", "M2 b"));
+  const r2 = await publishSetApi("ck", [a.id, b.id]);
+  eq(issuesOf(r2, "LINK_TARGET_MISSING").map((i) => i.documentId), [a.id], "the set renames b:");
+});
+
+await t("P3-FIX2: an unchanged header menu item to a page taken offline is inherited as a warning that says 'menu'; a new menu item to an offline page blocks with menu words; a footer says footer", async () => {
+  const tgt = await create("ck", "page", { body: page("menu-tgt", "Menu tgt") });
+  published(await publishApi("ck", tgt.id), "menu target live");
+  const header = await current("ck", "doc_header");
+  await save("ck", header.id, body("header", { settings: { mode: "custom", items: [{ label: "Help", link: urlLink("/policies/menu-tgt") }] } }));
+  published(await publishApi("ck", header.id), "header live with the item");
+  await takeOffline("ck", tgt.id);
+  // only an unrelated item added: publishes, the old item is inherited
+  await save("ck", header.id, body("header", { settings: { mode: "custom", items: [{ label: "Help", link: urlLink("/policies/menu-tgt") }, { label: "Shop", link: urlLink("/collections") }] } }));
+  const r = published(await publishApi("ck", header.id), "an unrelated item added");
+  const inh = r.issues.filter((i) => i.code === "LINKS_TO_UNPUBLISHED");
+  eq(inh.map((i) => [i.field, i.level, i.severity]), [["items.0.link", "inherited", "warning"]], "inherited:");
+  eq(inh[0].message, "Your header menu links to Menu tgt, which isn't published yet. It was already live like this, so it doesn't stop publishing.", "the words say menu:");
+  ok(!/This page/.test(inh[0].message), "not 'page'");
+  eq(inh[0].actions, [{ type: "removeItem", documentId: header.id, field: "items", index: 0 }], "it can still be removed:");
+  checkIssues(r.issues, "inherited menu 200");
+  // a new item to another offline page blocks, with menu words, and offers both
+  const tgt2 = await create("ck", "page", { body: page("menu-tgt2", "Menu tgt two") });
+  published(await publishApi("ck", tgt2.id), "second target live");
+  await takeOffline("ck", tgt2.id);
+  await save("ck", header.id, body("header", { settings: { mode: "custom", items: [{ label: "Help", link: urlLink("/policies/menu-tgt") }, { label: "Shop", link: urlLink("/collections") }, { label: "New", link: urlLink("/policies/menu-tgt2") }] } }));
+  const r2 = await publishApi("ck", header.id);
+  likeShape(r2, shapeOf("linksToUnpublished"), "a new menu item");
+  eq(r2.body.error, "Your header menu links to Menu tgt two, which isn't published yet.", "the answer's words:");
+  const nb = issuesOf(r2, "LINKS_TO_UNPUBLISHED");
+  eq(nb.map((i) => [i.field, i.level]), [["items.0.link", "inherited"], ["items.2.link", "blocks"]], "old inherited, new blocks:");
+  eq(r2.body.offer.publishSet.map((x) => x.id), [header.id, tgt2.id], "offers the new target only:");
+  // a footer's menu says footer (and a fresh footer has nothing live, so nothing is inherited)
+  const footer = await current("ck", "doc_footer").catch(() => null) || (await create("ck", "footer"));
+  await save("ck", footer.id, body("footer", { settings: { mode: "custom", items: [{ label: "Help", link: urlLink("/policies/menu-tgt") }] } }));
+  const rf = await publishApi("ck", footer.id);
+  eq(rf.body.error, "Your footer menu links to Menu tgt, which isn't published yet.", "footer words:");
+  // the words' lead, on its own
+  eq([Checks.linkLead("header", null, "x"), Checks.linkLead("announcement", null, "x"), Checks.linkLead("header", "sec_1", "x"), Checks.linkLead("page", null, "x")], ["Your header menu links to", "Your announcement bar links to", "x", "x"], "linkLead:");
+});
+
+await t("P3-FIX2 fix 1: an unchanged menu item is not inherited when this same set is what breaks it (the set hides its page, or renames it by id or by address); an announcement bar too", async () => {
+  const header = await current("ck", "doc_header");
+  const menu = (items) => body("header", { settings: { mode: "custom", items } });
+  // hidden inside the set
+  const x = await create("ck", "page", { body: page("rv-x", "Rv x") });
+  published(await publishApi("ck", x.id), "x live");
+  await save("ck", header.id, menu([{ label: "X", link: urlLink("/policies/rv-x") }]));
+  published(await publishApi("ck", header.id), "header live with the x item");
+  await save("ck", header.id, menu([{ label: "X", link: urlLink("/policies/rv-x") }, { label: "Shop", link: urlLink("/collections") }]));
+  await save("ck", x.id, page("rv-x", "Rv x", undefined, "page", { enabled: false }));
+  let before = await dump();
+  const r = await publishSetApi("ck", [header.id, x.id]);
+  eq([r.status, r.body.code], [422, "VALIDATION_FAILED"], `the set hides x: ${JSON.stringify((r.body.issues || []).map((i) => [i.code, i.level]))}`);
+  const h = issuesOf(r, "LINK_TARGET_HIDDEN");
+  eq(h.map((i) => [i.documentId, i.field, i.level]), [[header.id, "items.0.link", "blocks"]], "blocks:");
+  ok(!/already live/.test(h[0].message), `no 'already live' words: ${h[0].message}`);
+  checkIssues(r.body.issues, "hide in set");
+  await unchanged(before, "the refusal");
+  // x hidden on its own first: then the header's unchanged item is inherited, as before
+  published(await publishApi("ck", x.id), "x hidden alone");
+  const ri = published(await publishApi("ck", header.id), "header after x was hidden");
+  eq(issuesOf({ body: ri }, "LINK_TARGET_HIDDEN").map((i) => i.level), ["inherited"], "inherited once x was already hidden:");
+
+  // renamed inside the set, a link by id
+  const y = await create("ck", "page", { body: page("rv-y", "Rv y") });
+  published(await publishApi("ck", y.id), "y live");
+  await save("ck", header.id, menu([{ label: "Y", link: pageLink("page", "rv-y", y.id) }]));
+  published(await publishApi("ck", header.id), "header live with the y item");
+  await save("ck", header.id, menu([{ label: "Y", link: pageLink("page", "rv-y", y.id) }, { label: "Shop", link: urlLink("/collections") }]));
+  await save("ck", y.id, page("rv-y2", "Rv y"));
+  before = await dump();
+  const r2 = await publishSetApi("ck", [header.id, y.id]);
+  eq([r2.status, r2.body.code], [422, "VALIDATION_FAILED"], `the set renames y: ${JSON.stringify((r2.body.issues || []).map((i) => [i.code, i.level]))}`);
+  const m = issuesOf(r2, "LINK_TARGET_MISSING");
+  eq(m.map((i) => [i.documentId, i.field, i.level]), [[header.id, "items.0.link", "blocks"]], "blocks:");
+  ok(/\/policies\/rv-y2/.test(m[0].message) && !/already live/.test(m[0].message), `the words: ${m[0].message}`);
+  await unchanged(before, "the refusal");
+
+  // renamed inside the set, a link by address
+  const z = await create("ck", "page", { body: page("rv-z", "Rv z") });
+  published(await publishApi("ck", z.id), "z live");
+  await save("ck", header.id, menu([{ label: "Z", link: urlLink("/policies/rv-z") }]));
+  published(await publishApi("ck", header.id), "header live with the z item");
+  await save("ck", header.id, menu([{ label: "Z", link: urlLink("/policies/rv-z") }, { label: "Shop", link: urlLink("/collections") }]));
+  await save("ck", z.id, page("rv-z2", "Rv z"));
+  const r3 = await publishSetApi("ck", [header.id, z.id]);
+  eq([r3.status, issuesOf(r3, "LINK_TARGET_MISSING").map((i) => [i.documentId, i.level])], [422, [[header.id, "blocks"]]], `the set renames z: ${JSON.stringify((r3.body.issues || []).map((i) => [i.code, i.level]))}`);
+
+  // the announcement bar: hidden inside the set
+  const w = await create("ck", "page", { body: page("rv-w", "Rv w") });
+  published(await publishApi("ck", w.id), "w live");
+  const ann = (await current("ck", "doc_announcement").catch(() => null)) || (await create("ck", "announcement"));
+  const bar = (text) => ({ ...R.emptyBody("announcement"), settings: { ...(R.emptyBody("announcement").settings || {}), enabled: true, text, link: urlLink("/policies/rv-w") } });
+  await save("ck", ann.id, bar("Sale on"));
+  published(await publishApi("ck", ann.id), "bar live");
+  await save("ck", ann.id, bar("Sale on now"));
+  await save("ck", w.id, page("rv-w", "Rv w", undefined, "page", { enabled: false }));
+  const r4 = await publishSetApi("ck", [ann.id, w.id]);
+  eq([r4.status, issuesOf(r4, "LINK_TARGET_HIDDEN").map((i) => [i.documentId, i.level])], [422, [[ann.id, "blocks"]]], `the set hides w: ${JSON.stringify((r4.body.issues || []).map((i) => [i.code, i.level, i.field]))}`);
 });
 
 // =========================================================================================
