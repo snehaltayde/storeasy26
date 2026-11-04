@@ -526,7 +526,7 @@ const LEGACY = {
   ],
   "components/admin/cms/PdpExtrasEditor.js": [[1, 999]],
   "components/admin/cms/SurfaceTemplatesCard.js": [[1, 999]],
-  "components/admin/cms/Designer.js": [[855, 886]],
+  "components/admin/cms/Designer.js": [[888, 919]],
   "components/admin/BrandAdmin.js": [[1, 999]],
   "components/admin/ThemeAdmin.js": [[1, 999]],
 };

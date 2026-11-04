@@ -83,10 +83,10 @@ Scanned: `NavigationEditor` (whole file: the announcement bar, header and footer
 | `components/admin/cms/SurfaceTemplatesCard.js:219` | A template exception for one product or collection | waits | Per-product layout: product content (OVL-02). Per-collection layout: collection content, which has no document type yet | |
 | `components/admin/cms/SurfaceTemplatesCard.js:231` | Remove an exception | waits | As above: product content (OVL-02) and collection content (no type yet) | |
 | `components/admin/cms/SurfaceTemplatesCard.js:240` | Add product or collection exceptions | waits | As above: product content (OVL-02) and collection content (no type yet) | |
-| `components/admin/cms/Designer.js:866` | The announcement bar's history | shell | P3-PUBLISHUI earlier versions | |
-| `components/admin/cms/Designer.js:869` | Show the bar | field | announcement: enabled | |
-| `components/admin/cms/Designer.js:873` | The bar's text | field | announcement: text | |
-| `components/admin/cms/Designer.js:882` | The bar's link | field | announcement: link | |
+| `components/admin/cms/Designer.js:899` | The announcement bar's history | shell | P3-PUBLISHUI earlier versions | |
+| `components/admin/cms/Designer.js:902` | Show the bar | field | announcement: enabled | |
+| `components/admin/cms/Designer.js:906` | The bar's text | field | announcement: text | |
+| `components/admin/cms/Designer.js:915` | The bar's link | field | announcement: link | |
 | `components/admin/BrandAdmin.js:39` | Colour picker (accent, background, text) | field | design: brand.accent, brand.background, brand.foreground | DesignForm keeps a picker beside each colour. |
 | `components/admin/BrandAdmin.js:46` | Colour as #rrggbb (accent, background, text) | field | design: brand.accent, brand.background, brand.foreground | A half-typed colour shows a note; the button text colour on the accent is worked out again on each change. |
 | `components/admin/BrandAdmin.js:186` | Corner radius | field | design: brand.radius | "Corners": Small, Medium, Large, Extra large. |
