@@ -157,6 +157,16 @@ The drill reseeds with `--p3`, makes one click counter per browser context, sign
 - **`data-preview-log`** on the preview pane holds the controller's last 16 steps (console markup only, founder-only), for drills and support.
 - Next dev only, Chrome only, headless, macOS, 1440 and 375.
 
+From review:
+
+- The earlier blocker is fixed. In components/admin/editor/previewMachine.js, answer() now shows PREVIEW_WORDS.reconnecting while the phase is 'minting' or 'loading' and remints > 0. remints still resets only on a ready ok or on Retry, so the first load and the next ordinary save still say 'Showing your latest changes…'. The only other code that reads this is editorModel.js, which works out reconnecting from these words. The legacy Designer does not use it.
+- I put the old line back in previewMachine.js as a test. test:editor-shell then failed (23 passed, 1 failed), and so did the drill (21 passed, 1 failed, on the step 'See the live store … Reconnecting then Up to date'). I also tried a second change, never resetting remints on ready ok, and test:editor-shell caught that too. test:editor-store passes 30 of 30 with the fix.
+- I ran the drill (scripts/drills/p3/editor.mjs) on ports 6300 and 7300 to 7302 at d451612. It passed 5 runs in a row, 22 of 22 each time. The labels for the See the live store step were ['Up to date','Updating (Reconnecting)','Up to date'] in every run. The drill's check is stricter now: after Reconnecting, only Reconnecting or Up to date may show.
+- pnpm test passed 81 of 81 suites in 133.1 s (PORT=6300, publish ports 7301 to 7305).
+- This was not a code problem. My first three drill runs stopped at sign-in because /admin/login returned 500. The Next dev log showed a Turbopack next/font/google error for Fraunces ('next/font/google queries have exactly one entry'), from a stale .next cache in my new worktree. After I deleted .next, every run passed. The fix round touched no font or layout files. If a drill stops at '#login-email', clear .next first.
+- These are still open from the builder's report and do not block: the staff Undo prop waits for P3-FIX3; routes.mjs's 'no legacy preview frame' check needs narrowing by P3-DRILLS; editorLayout.js still sets the page width. Staging is not verified.
+- Clean-up: I stopped everything I started, ports 6300 and 7300 to 7305 are free, the worktree rv1 is removed and pruned, and nothing was committed or pushed.
+
 ## Owner checks
 
 - **Desktop Chrome on a documents test tenant on staging** (no real tenant): open `/admin/editor`, type and click a sidebar link within a second (nothing lost), close the tab within a second (the warning, and the keepalive PUT in the network panel), reopen (the backup offer), two tabs with Keep mine and Use the newer version, See the live store and back, publish and Undo.
