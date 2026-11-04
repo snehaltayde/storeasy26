@@ -91,8 +91,8 @@ function answer(state, actions = {}) {
   const words =
     s.phase === "failed"
       ? s.failure?.words ?? PREVIEW_WORDS.mintFailed
-      : s.phase === "minting" && s.remints > 0
-        ? PREVIEW_WORDS.reconnecting
+      : (s.phase === "minting" || s.phase === "loading") && s.remints > 0
+        ? PREVIEW_WORDS.reconnecting // the whole reconnect: the mint, then the new frame's load, until a ready ok resets remints
         : s.phase === "loading" || s.phase === "minting"
           ? PREVIEW_WORDS.loading
           : null;

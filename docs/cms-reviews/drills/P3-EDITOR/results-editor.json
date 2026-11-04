@@ -1,0 +1,429 @@
+{
+  "id": "P3-EDITOR",
+  "part": "editor",
+  "title": "P3-EDITOR — the editor: edit, pick, add, cart, conflict, leave, reconnect, publish, Undo",
+  "ranAt": "2026-11-04T06:18:25.304Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 22,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "preview: the cookie is set through the confirm fetch (header sent), no fetch of / in the network log, and the label says Up to date",
+      "detail": {
+        "up": true,
+        "confirms": 2,
+        "rootFetches": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "edit: select the hero, type its title: Saving, then Saved; the draft holds the text (one autosave)",
+      "detail": {
+        "clicks": 1,
+        "stored": "Drill title 75101",
+        "revisions": [
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "edit: the frame shows the draft, and the label says Up to date",
+      "detail": {
+        "label": "Up to date"
+      }
+    },
+    {
+      "ok": true,
+      "label": "pick: one click on the banner section's title in the frame selects it and focuses its field",
+      "detail": {
+        "field": "title",
+        "focused": "f-sec_p3camp-title",
+        "clicks": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "pick: one click on the header in the frame opens the header with a visible note, and nothing is written to the home page",
+      "detail": {
+        "note": "You picked “Header menu” in the preview, so the editor opened it. Nothing changed on “Home page”.",
+        "revisions": [
+          3,
+          3
+        ],
+        "clicks": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "switcher: two clicks (All pages, Home page) open the home page",
+      "detail": {
+        "clicks": 2
+      }
+    },
+    {
+      "ok": true,
+      "label": "add: a new section shows 'Adding to preview…' until the refresh holds it, then it is outlined in the frame",
+      "detail": {
+        "sawAdding": true,
+        "newId": "sec_974853f9",
+        "clicks": 2
+      }
+    },
+    {
+      "ok": true,
+      "label": "cart: in the editor frame, one click on Add to cart selects the product section and adds nothing to the cart",
+      "detail": {
+        "cartWrites": 0,
+        "lines": 0,
+        "selectedRow": 1,
+        "path": "/products/advanced-anti-dandruff-shampoo-197"
+      }
+    },
+    {
+      "ok": true,
+      "label": "conflict: tab A's save after tab B's gets the choice (Use the newer version / Keep mine), with the text still on screen",
+      "detail": {
+        "status": "conflict",
+        "value": "Tab A's title"
+      }
+    },
+    {
+      "ok": true,
+      "label": "conflict: Keep mine saves tab A's text, and Earlier versions lists tab B's as 'Kept from another tab'",
+      "detail": {
+        "title": "Tab A's title",
+        "clicks": 2,
+        "panel": "Restoring puts this version in your draft. It doesn't go live until you publish.\n\nKept from another tab\n\n4 Nov, 11:48 · Asha Founder\n\nRestore to draft\n\nPublished\nLive now\n\n4 Nov, 11:47 · Asha Founder\n\nRestore to draft\n\nPublished\n\n4 Nov, 11:47 · Someone on your team\n\nRestore to draft\n\nSaved while you",
+        "notes": [
+          [
+            "undo_saved",
+            "Kept from another tab"
+          ],
+          [
+            "published",
+            null
+          ],
+          [
+            "published",
+            null
+          ],
+          [
+            "checkpoint",
+            "Created"
+          ]
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "link: typed then clicked a console link within the pause, nothing lost (the page waited for the save, then went)",
+      "detail": {
+        "statusAtClick": "pending",
+        "stored": "Typed then left 87352",
+        "clicks": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "live: See the live store, back to the editor, Reconnecting then Up to date",
+      "detail": {
+        "labels": [
+          "Up to date",
+          "Updating (Reconnecting)",
+          "Up to date"
+        ],
+        "clicks": 1,
+        "log": "mint:false minted src:/ frameLoad armReadyTimer ready:ok frameLoad ready:live mint:false minted refresh frameLoad armReadyTimer ready:ok"
+      }
+    },
+    {
+      "ok": true,
+      "label": "publish: the unfinished new section blocks the publish, in words, with 'Hide this section and publish'",
+      "detail": {
+        "phase": "blocked",
+        "words": "Not published yet\n\nThere's 1 thing to fix in “Home page”, so nothing was published.\nCheck\nHero · Title\n\nThe highlighted words aren't in the title any more, so nothing will be highlighted. Pick words from the title to highlight.\n\nGo to this field\nMust fix\nText · Paragraphs\n\nAdd a title or some text, "
+      }
+    },
+    {
+      "ok": true,
+      "label": "publish: Publish, review, Publish, then the fix: published with the new section hidden, and the live store shows the text",
+      "detail": {
+        "phase": "done",
+        "clicks": 3,
+        "newSectionEnabled": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "undo: Undo shows what will change, then the live store is back to before",
+      "detail": {
+        "confirmText": "Undo this publish?\n\nThis changes on your live store:\n\nHero: title changed\nText: removed\n\nIt goes back to: Published 4 Nov, 11:47 by Asha Founder.\n\nUndo\nCancel",
+        "status": "“Home page” is back to the version that went live on 4 Nov, 11:47.",
+        "clicks": 2
+      }
+    },
+    {
+      "ok": true,
+      "label": "releases: /admin/releases shows Recently published on a documents store",
+      "detail": {
+        "text": "Undid Home page\n\nAsha Founder · 4 Nov, 11:48\n\nHero: title changed\nText: removed\nOpen in the editor\n\nPublished Home page\n\nAsha Founder · 4 Nov, 11:48\n\nHero: title changed\nText: added, hidden\nOpen in th"
+      }
+    },
+    {
+      "ok": true,
+      "label": "policy: a page that is all rich text opens in the full-width writing view, the preview behind a toggle (one click shows it, Up to date)",
+      "detail": {
+        "label": "Returns",
+        "writing": 1,
+        "hiddenPane": 1,
+        "clicks": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed store: the editor says 'Your store isn't open yet. Publishing your home page opens it.'",
+      "detail": {
+        "text": "Changes: Saved\n\nPreview: Up to date\n\nOpening soon\n\nYour store isn't open yet. Publishing your home page opens it."
+      }
+    },
+    {
+      "ok": true,
+      "label": "preview: a spoilt token says the preview didn't open",
+      "detail": {
+        "words": "Changes: Saved\n\nPreview: Could not update · This preview link has expired or isn't valid, so the preview didn't open. Close it and open the preview again.\n\nTry the preview again"
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff: Publish is disabled with the reason",
+      "detail": {
+        "disabled": true,
+        "reason": "Publish\n\nOnly the store owner or an admin can publish. You can edit and preview."
+      }
+    },
+    {
+      "ok": true,
+      "label": "phone: at 375 the documents-mode nav drawer links storefront items to the editor (two clicks: menu, Editor)",
+      "detail": {
+        "drawerLinks": [
+          "/admin/dashboard",
+          "/admin/analytics",
+          "/admin/setup",
+          "/admin/orders",
+          "/admin/catalog",
+          "/admin/editor",
+          "/admin/media",
+          "/admin/releases",
+          "/admin/offers",
+          "/admin/upsells",
+          "/admin/experiments",
+          "/admin/insights",
+          "/admin/automations",
+          "/admin/integrations",
+          "/admin/billing",
+          "/admin/settings"
+        ],
+        "clicks": 2
+      }
+    },
+    {
+      "ok": true,
+      "label": "phone: the editor has no sideways scroll at 375",
+      "detail": {
+        "overflow": 0
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_3a5239367065cc9e, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.6s",
+    "no seeded page is all rich text, so the drill made one through createDocument (200)",
+    "click totals: owner context 22"
+  ],
+  "screenshots": [
+    {
+      "name": "editor-home-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-home-1440.png",
+      "bytes": 39306,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-edited-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-edited-1440.png",
+      "bytes": 40660,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-other-document-pick-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-other-document-pick-1440.png",
+      "bytes": 35745,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-added-section-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-added-section-1440.png",
+      "bytes": 36254,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-add-to-cart-picks-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-add-to-cart-picks-1440.png",
+      "bytes": 32967,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-conflict-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-conflict-1440.png",
+      "bytes": 43438,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-kept-from-another-tab-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-kept-from-another-tab-1440.png",
+      "bytes": 35061,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-reconnected-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-reconnected-1440.png",
+      "bytes": 40291,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-publish-review-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-publish-review-1440.png",
+      "bytes": 31455,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-publish-blocked-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-publish-blocked-1440.png",
+      "bytes": 30569,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-published-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-published-1440.png",
+      "bytes": 27403,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-undone-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-undone-1440.png",
+      "bytes": 31240,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "releases-recently-published-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/releases-recently-published-1440.png",
+      "bytes": 25499,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "editor-policy-writing-view-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-policy-writing-view-1440.png",
+      "bytes": 23099,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-policy-preview-shown-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-policy-preview-shown-1440.png",
+      "bytes": 24786,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "closed-store-editor-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/closed-store-editor-1440.png",
+      "bytes": 33768,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-spoilt-token-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-spoilt-token-1440.png",
+      "bytes": 24606,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "editor-staff-1440",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/editor-staff-1440.png",
+      "bytes": 37237,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "phone-nav-drawer-375",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/phone-nav-drawer-375.png",
+      "bytes": 15312,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "phone-editor-375",
+      "file": "docs/cms-reviews/drills/P3-EDITOR/phone-editor-375.png",
+      "bytes": 20045,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/admin/editor"
+    }
+  ]
+}
