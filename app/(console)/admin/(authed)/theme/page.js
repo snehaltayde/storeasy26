@@ -8,6 +8,8 @@ import SurfaceTemplatesCard from "@/components/admin/cms/SurfaceTemplatesCard";
 import { getBlockRow } from "@/lib/cms/store";
 import { PageHeader } from "@/components/console/PageHeader";
 import { tfetch } from "@/lib/console-request";
+import { getCmsMode } from "@/lib/cms-mode";
+import { editorHref, LEGACY_ROUTE_DOCS } from "@/lib/admin/editor-entry";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Theme · Admin", robots: { index: false } };
@@ -16,6 +18,10 @@ export default async function AdminThemePage() {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
+
+  // P3-ROUTES: a documents store edits this in the new editor (a mode read error keeps this screen; its writes refuse)
+  const cmsMode = await tfetch(() => getCmsMode()).catch(() => null);
+  if (cmsMode === "documents") redirect(editorHref(LEGACY_ROUTE_DOCS["/admin/theme"]));
 
   const { initial, surfaceTemplates } = await tfetch(async () => {
     const theme = tenantOwnCfg("theme", null, null) || null;

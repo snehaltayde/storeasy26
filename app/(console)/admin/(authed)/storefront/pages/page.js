@@ -9,6 +9,8 @@ import { notMigratedYet } from "@/lib/schema-shape";
 import { PageHeader } from "@/components/console/PageHeader";
 import { PagesList } from "@/components/admin/cms/PagesList";
 import { tfetch } from "@/lib/console-request";
+import { getCmsMode } from "@/lib/cms-mode";
+import { editorHref, LEGACY_ROUTE_DOCS } from "@/lib/admin/editor-entry";
 
 // S52: the Pages area of the storefront CMS — every content page (policies,
 // campaigns, journal posts) in one filterable list, with the editor one click
@@ -21,6 +23,10 @@ export default async function StorefrontPagesPage() {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
+
+  // P3-ROUTES: a documents store edits this in the new editor (a mode read error keeps this screen; its writes refuse)
+  const cmsMode = await tfetch(() => getCmsMode()).catch(() => null);
+  if (cmsMode === "documents") redirect(editorHref(LEGACY_ROUTE_DOCS["/admin/storefront/pages"]));
 
   const { pages, pageRevisions } = await tfetch(async () => {
     const view = await storefrontView();

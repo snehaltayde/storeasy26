@@ -15,8 +15,15 @@ export default async function AdminAuthedLayout({ children }) {
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value)).catch(() => null);
   if (!actor) redirect("/admin/login");
 
-  const [name, host, badges] = await tfetch(async () => {
+  const [name, host, badges, cmsMode] = await tfetch(async () => {
     const badges = {};
+    // P3-ROUTES: a documents store's storefront links go to the new editor.
+    // Best-effort like the badges: an unread mode keeps today's links.
+    let cmsMode = null;
+    try {
+      const { getCmsMode } = await import("@/lib/cms-mode");
+      cmsMode = await getCmsMode();
+    } catch {}
     try {
       const { listReturns } = await import("@/lib/returns");
       const open = (await listReturns({ status: "requested" })).length;
@@ -34,11 +41,11 @@ export default async function AdminAuthedLayout({ children }) {
       const publish = await publishingBadge();
       if (publish) badges.publish = publish;
     } catch {}
-    return [siteName(), currentTenant()?.domains?.[0] || null, badges];
-  }).catch(() => ["Store", null, {}]);
+    return [siteName(), currentTenant()?.domains?.[0] || null, badges, cmsMode];
+  }).catch(() => ["Store", null, {}, null]);
 
   return (
-    <ConsoleShell storeName={name} host={host} role={actor.role} actorKind={actor.kind} badges={badges}>
+    <ConsoleShell storeName={name} host={host} role={actor.role} actorKind={actor.kind} badges={badges} cmsMode={cmsMode}>
       {children}
     </ConsoleShell>
   );

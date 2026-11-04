@@ -41,6 +41,7 @@ const ICONS = {
   catalog: Package,
   media: ImageIcon,
   storefront: PanelsTopLeft,
+  editor: Brush,
   "cms-home": Home,
   "cms-designer": Brush,
   "cms-pages": FileText,
@@ -115,14 +116,28 @@ export const NAV_GROUPS = [
   },
 ];
 
+// P3-ROUTES (ED-02, US-38): on a documents store one "Editor" link replaces
+// the old content, theme and brand screens (each of them redirects to the
+// editor there anyway); Media and Publishing stay. Every other mode gets
+// NAV_GROUPS exactly as it is.
+const DOCUMENTS_STOREFRONT = new Set(["media", "releases"]);
+export function navGroups(cmsMode) {
+  if (cmsMode !== "documents") return NAV_GROUPS;
+  return NAV_GROUPS.map((group) =>
+    group.label !== "Storefront"
+      ? group
+      : { ...group, items: [{ id: "editor", label: "Editor", href: "/admin/editor" }, ...group.items.filter((it) => DOCUMENTS_STOREFRONT.has(it.id))] }
+  );
+}
+
 const ADMIN_ROLES = new Set(["admin", "owner"]);
 
-export function SidebarNav({ role, badges = {}, collapsed = false, onNavigate }) {
+export function SidebarNav({ role, badges = {}, cmsMode = null, collapsed = false, onNavigate }) {
   const pathname = usePathname();
   const isAdmin = ADMIN_ROLES.has(role);
   return (
     <nav aria-label="Console" className="flex flex-col gap-4">
-      {NAV_GROUPS.map((group) => {
+      {navGroups(cmsMode).map((group) => {
         const items = group.items.filter((it) => !it.adminOnly || isAdmin);
         if (!items.length) return null;
         return (

@@ -12,6 +12,8 @@ import { Banner } from "@/components/console/Banner";
 import { EmptyState } from "@/components/console/bits";
 import { diffItemInfo, BLOCK_INFO, pageUrl, FAMILY_LABELS } from "@/components/admin/cms/labels";
 import { tfetch } from "@/lib/console-request";
+import { getCmsMode } from "@/lib/cms-mode";
+import { editorHref, LEGACY_ROUTE_DOCS } from "@/lib/admin/editor-entry";
 import { issueText } from "@/lib/cms/issues";
 
 // S52: the Storefront OVERVIEW — published state, what's changed since live,
@@ -38,6 +40,10 @@ export default async function StorefrontOverviewPage() {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
+
+  // P3-ROUTES: a documents store edits this in the new editor (a mode read error keeps this screen; its writes refuse)
+  const cmsMode = await tfetch(() => getCmsMode()).catch(() => null);
+  if (cmsMode === "documents") redirect(editorHref(LEGACY_ROUTE_DOCS["/admin/storefront"]));
 
   const [view, diff, live, validation] = await tfetch(async () => {
     const [view, diff, live, snap] = await Promise.all([storefrontView(), releaseDiff(), getLiveRelease(), snapshotContent()]);
