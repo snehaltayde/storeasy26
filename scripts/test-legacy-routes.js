@@ -861,6 +861,69 @@ await t("P4-FIX4: catalog route: when the live release can't be read, the produc
   eq([again.status, again.body.published, again.body.products.filter((p) => p.customized).map((p) => p.id)], [200, undefined, [PROD(2)]], "restored:");
 });
 
+// P4-FIX5 (P4-FIX4 review): a view over a live table whose key fails on
+// every row, so each read of it throws (not "no such table", which reads as no row)
+async function withFailingLiveTable(fx, table, key, fn) {
+  const cols = (await sql(fx, `PRAGMA table_info(${table})`)).map((c) => c.name);
+  ok(cols.includes(key), `${table} has ${key}`);
+  await sql(fx, `ALTER TABLE ${table} RENAME TO ${table}_hidden`);
+  await sql(fx, `CREATE VIEW ${table} AS SELECT ${cols.map((c) => (c === key ? `json_extract('{not json', '$') AS ${c}` : c)).join(", ")} FROM ${table}_hidden`);
+  try {
+    return await fn();
+  } finally {
+    await sql(fx, `DROP VIEW ${table}`);
+    await sql(fx, `ALTER TABLE ${table}_hidden RENAME TO ${table}`);
+  }
+}
+
+await t("P4-FIX5: catalog route: one product (?product=) whose published override or template can't be read still answers 200 with the product, no overlays and the plain note, and it is logged (part 'product')", async () => {
+  const NOTE = "We couldn't read what's published right now, so modules, badges, templates and pinned products aren't shown here. The products themselves are listed.";
+  // the release reads; the product's live row read fails
+  const since = SLOGS.length;
+  const one = await withFailingLiveTable(docs, "product_content_live", "product_id", () => route(docs, "catalog", "GET", { query: `?product=${encodeURIComponent(PROD(2))}` }));
+  eq([one.status, one.body.ok, one.body.product?.id, one.body.override, one.body.surface, one.body.published, one.body.note], [200, true, PROD(2), { modules: [], badge: "" }, null, "unavailable", NOTE], `one product: ${JSON.stringify(one.body).slice(0, 300)}`);
+  ok(!JSON.stringify(one.body).includes("Hot"), "no published badge shown from a failed read");
+  const logs = logged("catalog_published_unreadable", since);
+  ok(logs.some((l) => l.part === "product"), `logged (product): ${JSON.stringify(SLOGS.slice(since))}`);
+  ok(!logs.some((l) => l.part === "release"), "the release itself read");
+  // back to normal: product 2's published badge and template
+  const again = await route(docs, "catalog", "GET", { query: `?product=${encodeURIComponent(PROD(2))}` });
+  eq([again.status, again.body.override.badge, again.body.surface, again.body.published], [200, "Hot", { template: "editorial", source: "entity" }, undefined], "restored:");
+});
+
+await t("P4-FIX5: catalog route: with more than 8 products and collections (past mapLimited's first batch), each product's 'customized' and each collection's pin count belong to that row", async () => {
+  const XP = (n) => `gid://shopify/Product/95${String(n).padStart(2, "0")}`;
+  const XC = (n) => `gid://shopify/Collection/96${String(n).padStart(2, "0")}`;
+  const N = 12;
+  for (let n = 1; n <= N; n++) {
+    await sql(docs, "INSERT INTO products (id, handle, title, available) VALUES (?, ?, ?, 1)", [XP(n), `zz-batch-${n}`, `Zz batch ${String(n).padStart(2, "0")}`]);
+    await sql(docs, "INSERT INTO collections (id, handle, title) VALUES (?, ?, ?)", [XC(n), `zz-col-${String(n).padStart(2, "0")}`, `Zz col ${n}`]);
+  }
+  // published content only on rows past the first batch of 8: product 10 and 12 (a badge), collection 11 (two pins)
+  for (const n of [10, 12]) await sql(docs, "INSERT INTO product_content_live (product_id, document_id, version_id, badge, modules, published_at) VALUES (?, ?, 'ver_zz', 'Zz', '[]', '2026-11-01')", [XP(n), `doc_prod_zz${n}`]);
+  await sql(docs, "INSERT INTO collection_content_live (collection_id, document_id, version_id, pinned, published_at) VALUES (?, 'doc_coll_zz11', 'ver_zz', ?, '2026-11-01')", [XC(11), JSON.stringify([XP(1), XP(2)])]);
+  try {
+    const list = await route(docs, "catalog", "GET");
+    eq(list.status, 200, "status:");
+    ok(list.body.products.length > 8 && list.body.collections.length > 8, `more than 8 of each: ${list.body.products.length}, ${list.body.collections.length}`);
+    const at = list.body.products.findIndex((p) => p.id === XP(10));
+    ok(at >= 8, `product 10 is past the first batch (index ${at})`);
+    eq(list.body.products.filter((p) => p.customized).map((p) => p.id).sort(), [PROD(2), XP(10), XP(12)].sort(), "customized, each on its own row:");
+    const pins = Object.fromEntries(list.body.collections.map((c) => [c.handle, c.pinned]));
+    ok(list.body.collections.findIndex((c) => c.handle === "zz-col-11") >= 8, "collection 11 is past the first batch");
+    eq(Array.from({ length: N }, (_, i) => pins[`zz-col-${String(i + 1).padStart(2, "0")}`]), Array.from({ length: N }, (_, i) => (i + 1 === 11 ? 2 : 0)), "pins, each on its own collection:");
+    eq([pins["live-only"], pins.both, pins["frozen-only"]], [1, 1, 0], "the earlier collections keep theirs:");
+    // the narrowed list (?q=) keeps each flag on its row too
+    const narrowed = await route(docs, "catalog", "GET", { query: "?q=Zz%20batch" });
+    eq(narrowed.body.products.map((p) => [p.handle, p.customized]), Array.from({ length: N }, (_, i) => [`zz-batch-${i + 1}`, i + 1 === 10 || i + 1 === 12]), "the Zz rows in order:");
+  } finally {
+    await sql(docs, "DELETE FROM product_content_live WHERE document_id LIKE 'doc_prod_zz%'");
+    await sql(docs, "DELETE FROM collection_content_live WHERE document_id = 'doc_coll_zz11'");
+    await sql(docs, "DELETE FROM products WHERE id LIKE 'gid://shopify/Product/95%'");
+    await sql(docs, "DELETE FROM collections WHERE id LIKE 'gid://shopify/Collection/96%'");
+  }
+});
+
 await t("P4-FIX4: upsells GET never reads the frozen placements on a documents store (409, plain words, even with the table gone); legacy and migrating list as before", async () => {
   await sql(docs, "INSERT INTO placements (id, kind, source_product_id, target_product_ids, title, enabled, position) VALUES ('pl_frozen', 'pdp_pairs', ?, ?, 'FROZEN pairs', 1, 0)", [PROD(1), JSON.stringify([PROD(2)])]);
   const WORDS = "This store now uses the new editor, so its upsells are there: a product's pairs on that product, and the cart's offer in the cart. Open them in the editor.";

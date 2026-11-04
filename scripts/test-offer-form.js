@@ -885,6 +885,35 @@ await t("Buy some, get some free: started by picking a product, no identifier ty
   v.unmount();
 });
 
+await t("P4-FIX5: the form's new id is never one the store's offers already use (the form passes their ids in)", async () => {
+  await inIN(() => db.deleteFrom("offers").execute());
+  const realRandom = globalThis.crypto.getRandomValues;
+  // the form's random ending, fixed for this test: abcdef
+  globalThis.crypto.getRandomValues = (a) => (a.set([0xab, 0xcd, 0xef].slice(0, a.length)), a);
+  let v;
+  try {
+    v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [{ id: "bxgy-radiance-glow-serum-abcdef", type: "BXGY", config: {} }] });
+    v.choose("Buy some, get some free");
+  } finally {
+    globalThis.crypto.getRandomValues = realRandom;
+  }
+  v.choose("One product");
+  v.click("Choose a product");
+  const [serum] = await refItem(IN, "type=product&q=Radiance");
+  v.picker("Choose the product").props.onConfirm([serum]);
+  await v.idle();
+  await v.submit();
+  const post = v.calls.find((c) => c.method === "POST" && c.url === "/api/admin/offers");
+  try {
+    eq(post?.body.offer.id, "bxgy-radiance-glow-serum-abcdf0", "the next free id, not the store's own:");
+    eq(v.done.length, 1, "started");
+  } finally {
+    // whatever was made, so the tests after this one start clean
+    if (post) await inIN(() => STORE.deleteOffer(post.body.offer.id));
+    v.unmount();
+  }
+});
+
 await t("an example for rules that have since changed is never shown next to the new sentence", async () => {
   const v = await mountForm({ existing: null, currency: "INR", names: {}, offers: [] });
   v.choose("Buy some, get some free");
@@ -1109,9 +1138,28 @@ await t("a code another offer already uses is flagged in the form", async () => 
 
 await t("the model: new ids never collide, edits keep the id, and a saved 'handle' pick still reads as one product", () => {
   const offer = base("BXGY", { target: { kind: "productId", value: G(1), label: "Serum" }, buy: 2, free: 1 });
-  const ids = new Set(Array.from({ length: 200 }, () => MODEL.newOfferId(offer)));
+  // P4-FIX5: deterministic (the random endings were 6 hex, so 200 random ids
+  // collided once). Fixed endings that repeat on purpose: each new id is made
+  // with the ids so far as the store's own, so a repeat retries and never clashes.
+  const endings = Array.from({ length: 200 }, (_, i) => (0xa00000 + Math.floor(i / 3)).toString(16)); // each ending three times
+  const ids = new Set();
+  for (const suffix of endings) ids.add(MODEL.newOfferId(offer, { suffix, taken: [...ids] }));
   eq(ids.size, 200, "200 new ids:");
-  for (const id of ids) eq(validateOffer({ ...offer, id }), [], `valid id ${id}`);
+  for (const id of ids) {
+    eq(validateOffer({ ...offer, id }), [], `valid id ${id}`);
+    ok(/^bxgy-serum-[0-9a-f]{6}$/.test(id), `the id's shape: ${id}`);
+  }
+  // a clash retries with the next ending, the same way every time (a form's id holds still between renders)
+  const taken = ["bxgy-serum-abcdef", "bxgy-serum-abcdf0"];
+  eq(MODEL.newOfferId(offer, { suffix: "abcdef", taken }), "bxgy-serum-abcdf1", "past two taken ids:");
+  eq(MODEL.newOfferId(offer, { suffix: "abcdef", taken: new Set(taken) }), "bxgy-serum-abcdf1", "a Set of taken ids:");
+  eq(MODEL.newOfferId(offer, { suffix: "ffffff", taken: ["bxgy-serum-ffffff"] }), "bxgy-serum-000000", "it wraps at ffffff:");
+  eq(MODEL.newOfferId(offer, { suffix: "abcdef" }), "bxgy-serum-abcdef", "nothing taken: the ending as given:");
+  eq(MODEL.newOfferId(offer, { suffix: "abcdef", taken: ["coupon-serum-abcdef", "bxgy-serum-abcdef-x"] }), "bxgy-serum-abcdef", "only an exact id counts as taken:");
+  // random endings with the ids so far: 200 distinct, whatever the endings are
+  const randomIds = [];
+  for (let i = 0; i < 200; i++) randomIds.push(MODEL.newOfferId(offer, { taken: randomIds }));
+  eq(new Set(randomIds).size, 200, "200 random ids:");
   ok(/^coupon-[a-z0-9-]+-[0-9a-f]{6}$/.test(MODEL.newOfferId(base("COUPON", { code: "ÉTÉ 20%" }))), "odd characters fold into the id");
   const legacy = MODEL.formFromOffer({ type: "TIERED_QTY", config: { target: { kind: "handle", value: "glow-serum" }, tiers: [{ minQty: 2, percent: 15 }] } });
   eq(legacy.choice, "product", "handle shows as One product:");

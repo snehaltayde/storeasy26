@@ -1011,6 +1011,15 @@ await t("rendered: when the founder has their own description, Shopify's shows b
   ok(short.length <= 161 && short.endsWith("…") && !short.includes("<"), short);
   eq(PF.plainSummary("<style>p{}</style><p>a&lt;b &#8212; &#x41;</p>"), "a<b — A", "entities read back, style text dropped:");
   eq([PF.plainSummary(""), PF.plainSummary(null)], ["", ""], "nothing:");
+  // P4-FIX5 (P4-FIX3 review (c)): the cut line has the whole of Shopify's
+  // description behind "Show all of Shopify's description"; a short one has none
+  const longEntity = { ...e, shopify: { ...e.shopify, description_html: long } };
+  const lm = formHtml({ body: e.document.body, entity: longEntity });
+  const besideLong = lm.match(/<div[^>]*data-shopify-value="description_html"[\s\S]*?<\/details>/)?.[0];
+  ok(besideLong, `the details under Shopify's line: ${plain(lm).slice(0, 300)}`);
+  eq(plain(besideLong.match(/<summary[^>]*>([\s\S]*?)<\/summary>/)?.[1] || ""), "Show all of Shopify's description", "its summary:");
+  ok(plain(besideLong.match(/<\/summary>([\s\S]*?)<\/details>/)[1]).endsWith("Word end."), "it holds the whole description");
+  ok(!plain(m).includes("Show all of Shopify's description"), "a short description has no 'Show all'");
 });
 
 await t("unit: a product document opened without the entity answer shows plain words, never 'Loading Shopify's images…'", async () => {
@@ -1087,6 +1096,44 @@ await t("unit: switching products holds the form back until the next document is
     await v.flush();
     for (let i = 0; i < 5 && !(heading() && textOf(heading().props.children) === "Beta"); i++) await v.flush();
     eq([textOf(heading().props.children), textOf(titleLine().props.children)], ["Beta", "Shopify title: Beta"], "then B's own draft against B's Shopify values:");
+  });
+});
+
+// P4-FIX5 (P4-FIX3 review): openEntry has a sequence guard, like loadProducts
+await t("unit (P4-FIX5): A to B to C with B's document answering after C's never leaves the editor stuck on 'Opening C…': C's own form shows and B's late answer is dropped", async () => {
+  const A = prodDoc("doc_prod_aaaaaaaaaaaaaaab", "gid://shopify/Product/11", "Alpha mine", { title: { value: "Alpha mine", base_hash: "x", base_value: "Alpha" } });
+  const B = prodDoc("doc_prod_bbbbbbbbbbbbbbbc", "gid://shopify/Product/12", "Beta mine", { title: { value: "Beta mine", base_hash: "y", base_value: "Beta" } });
+  const C = prodDoc("doc_prod_cccccccccccccccd", "gid://shopify/Product/13", "Gamma", {});
+  let releaseB;
+  const holds = new Map();
+  const calls = [];
+  const api = editorApi({ docsById: { [A.id]: A, [B.id]: B, [C.id]: C }, holds, calls });
+  await withBrowser(async () => {
+    const props = { document: { id: A.id, type: A.type, label: A.label, slug: null }, entity: shopEntity("Alpha"), readOnly: null, api };
+    const v = await mount("components/admin/editor/DocumentEditor.js", "default", () => props);
+    await v.flush();
+    const heading = () => v.find((n) => n.props?.["data-product-heading"] === "");
+    const switchingLine = () => v.find((n) => n.props?.["data-entity-switching"] === "");
+    ok(heading() && textOf(heading().props.children) === "Alpha mine", "A is open");
+    // to B, whose document is slow
+    holds.set(B.id, new Promise((r) => (releaseB = r)));
+    props.document = { id: B.id, type: B.type, label: B.label, slug: null };
+    props.entity = shopEntity("Beta");
+    await v.flush();
+    // then to C, which answers at once
+    props.document = { id: C.id, type: C.type, label: C.label, slug: null };
+    props.entity = shopEntity("Gamma");
+    await v.flush();
+    for (let i = 0; i < 5 && !(heading() && textOf(heading().props.children) === "Gamma"); i++) await v.flush();
+    eq(heading() ? textOf(heading().props.children) : null, "Gamma", "C is open:");
+    // B answers last
+    releaseB();
+    for (let i = 0; i < 5; i++) await v.flush();
+    eq(calls.filter((c) => c[0] === "getDocument").map((c) => c[1]), [A.id, B.id, C.id], "each document asked for once:");
+    ok(!switchingLine(), `not stuck on 'Opening Gamma…': ${switchingLine() ? textOf(switchingLine().props.children) : ""}`);
+    eq([heading() ? textOf(heading().props.children) : null, textOf(v.find((n) => n.props?.["data-shopify-title"] === "").props.children)], ["Gamma", "Shopify title: Gamma"], "C's own draft against C's Shopify values:");
+    ok(!v.all((n) => n.type === "input").some((n) => n.props.value === "Beta mine"), "B's late draft is not on screen");
+    ok(v.find((n) => n.props?.["data-product-form"] === ""), "C's form is there");
   });
 });
 

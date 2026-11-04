@@ -54,7 +54,9 @@ export default function OfferForm({ existing, onDone, onCancel, onChanged, curre
   const sign = currencySign(currency);
   const id = existing ? existing.id : null;
   const draft = form.type ? offerFromForm(form, { id: id || "new-offer", ...say }) : null;
-  const offer = draft ? { ...draft, id: id || newOfferId(draft, { names: allNames, suffix }) } : null;
+  // P4-FIX5: never an id another offer of this store already uses
+  const takenIds = offers.map((o) => o?.id).filter(Boolean);
+  const offer = draft ? { ...draft, id: id || newOfferId(draft, { names: allNames, suffix, taken: takenIds }) } : null;
   const problems = formProblems(form, offer, { currency });
   const sentence = offer ? offerSentence(offer, say) : null;
   const details = offer ? offerDetails(offer) : [];
