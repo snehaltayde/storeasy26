@@ -92,6 +92,32 @@ await t("export: versioned manifest, real counts, media metadata only, no secret
   ok(!json.includes("shopper-B@x.test"), "other tenant's data CANNOT appear (separate DB)");
 });
 
+// P4-LIVEROW: the live product and collection content and the search outbox
+// are the store's own (migration 0024); the operator's cutover and reversal
+// records are not in this format.
+await t("P4-LIVEROW: export includes product_content_live, collection_content_live and search_outbox rows, not the operator's run tables", async () => {
+  const at = new Date().toISOString();
+  await inB(async () => {
+    await libsql.execute({ sql: "INSERT INTO product_content_live (product_id, document_id, version_id, title, badge, published_at) VALUES (?, ?, ?, ?, ?, ?)", args: ["gid://shopify/Product/7", "doc_prod_0000000000000007", "ver_7", "Renamed", "NEW", at] });
+    await libsql.execute({ sql: "INSERT INTO collection_content_live (collection_id, document_id, version_id, pinned, layout_template, published_at) VALUES (?, ?, ?, ?, ?, ?)", args: ["gid://shopify/Collection/3", "doc_coll_0000000000000003", "ver_3", JSON.stringify(["gid://shopify/Product/7"]), "sidebar", at] });
+    await libsql.execute({ sql: "INSERT INTO search_outbox (product_id, handle, reason, created_at, done_at) VALUES (?, ?, 'publish', ?, NULL)", args: ["gid://shopify/Product/7", "seven", at] });
+    await libsql.execute({ sql: "INSERT INTO cms_migration_runs (id, kind, step, started_at) VALUES ('run_1', 'cutover', 'lock', ?)", args: [at] });
+  });
+  const exp = await X.buildTenantExport("tb");
+  eq(exp.manifest.tables.product_content_live, 1, "product_content_live count:");
+  eq(exp.manifest.tables.collection_content_live, 1, "collection_content_live count:");
+  eq(exp.manifest.tables.search_outbox, 1, "search_outbox count:");
+  eq(exp.data.product_content_live[0].title, "Renamed", "the live title:");
+  eq(exp.data.product_content_live[0].badge, "NEW", "the live badge:");
+  eq(exp.data.collection_content_live[0].layout_template, "sidebar", "the collection layout:");
+  eq(exp.data.collection_content_live[0].pinned, JSON.stringify(["gid://shopify/Product/7"]), "the pins:");
+  eq(exp.data.search_outbox[0].handle, "seven", "the outbox handle:");
+  ok(!("cms_migration_runs" in exp.manifest.tables) && !("content_live_reversed" in exp.manifest.tables), "operator run tables are not in the export");
+  // tenant A has none of B's rows
+  const a = await X.buildTenantExport("ta");
+  eq(a.manifest.tables.product_content_live, 0, "tenant A live rows:");
+});
+
 await t("export tokens: expiring + tenant-bound + tamper-proof", async () => {
   const tok = await X.mintExportToken("ta");
   eq(await X.verifyExportToken("ta", tok), true);

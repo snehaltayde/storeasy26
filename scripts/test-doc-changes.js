@@ -565,7 +565,7 @@ await t("keepAsEarlierDraft dedupes an identical body (and one that differs only
   eq((await keep(other.id, { ...route("kept-staff", "x"), sections: [text("sec_ks", "Staff tab")] }, { as: STAFF })).status, 200, "staff:");
 });
 
-await t("P3-FIX2: keepAsEarlierDraft refuses an archived page (409 DOCUMENT_ARCHIVED, like saveDraft) and the cart (409 CART_NOT_AVAILABLE), storing nothing", async () => {
+await t("P3-FIX2: keepAsEarlierDraft refuses an archived page (409 DOCUMENT_ARCHIVED, like saveDraft), storing nothing; the cart keeps one like any document (P4-LIVEROW, plan OQ-6)", async () => {
   const d = await create({ type: "page", meta: { slug: "kept-archived", title: "Kept archived" } });
   const a = await api({ archive: d.id, revision: d.revision });
   eq(a.status, 200, `archived: ${JSON.stringify(a.body).slice(0, 200)}`);
@@ -573,14 +573,12 @@ await t("P3-FIX2: keepAsEarlierDraft refuses an archived page (409 DOCUMENT_ARCH
   const r = await keep(d.id, { ...route("kept-archived", "Kept archived"), sections: [text("sec_ar", "Tab copy")] });
   likeShape(r, "keepAsEarlierDraft", "archived");
   await unchanged(before, "archived keep");
-  // the cart: no API makes it (createDocument refuses it), so its row is written straight in
+  // P4-LIVEROW: the cart's old refusal is gone; it keeps an earlier draft too
   const cartBody = R.emptyBody("cart");
   const now = new Date().toISOString();
   await raw.docs.execute({ sql: "INSERT INTO documents (id, type, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES ('doc_cart', 'cart', 'Cart', ?, ?, 1, ?, ?, ?)", args: [JSON.stringify(cartBody), await R.documentHash(cartBody), cartBody.schema ?? 1, now, now] });
-  before = await dump();
-  const c = await keep("doc_cart", cartBody);
-  likeShape(c, "keepAsEarlierDraft", "cartLocked");
-  await unchanged(before, "cart keep");
+  const c = await keep("doc_cart", { ...cartBody, settings: { ...cartBody.settings, title: "Another tab's title" } });
+  likeShape(c, "keepAsEarlierDraft", "ok");
   await raw.docs.execute("DELETE FROM documents WHERE id = 'doc_cart'");
 });
 
