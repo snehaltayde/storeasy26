@@ -1027,6 +1027,20 @@ await t("unit: PublishingHistory hands access to RecentlyPublished (staff: Undo 
   S.actor = { kind: "member", role: "owner" };
 });
 
+// P4-FIX3 (P4-EDITOR review): the view while one product's page has moved to
+// another and the store still holds the first
+await t("P4-FIX3 rendered: while the store still holds product A and the page has moved to product B, no product form is shown (A's draft never meets B's Shopify values); once B is open, B's form is", () => {
+  const settings = { title: { value: "Alpha mine", base_hash: "x", base_value: "Alpha" } };
+  const a = snap({ id: "doc_prod_aaaaaaaaaaaaaaaa", type: "product_content", body: { type: "product_content", settings, sections: [] }, document: { id: "doc_prod_aaaaaaaaaaaaaaaa", type: "product_content", label: "Alpha mine", entityId: "gid://shopify/Product/1", access: { canPublish: true, reason: null } } });
+  const bEntry = { id: "doc_prod_bbbbbbbbbbbbbbbb", type: "product_content", label: "Beta", slug: null };
+  const beta = { inShopify: true, shopify: { title: "Beta", handle: "beta", description_html: "", vendor: "", product_type: "", gallery: [] }, titleEditable: true };
+  const moving = textOf(view({ entry: bEntry, state: a, entity: beta }));
+  ok(!moving.includes("Alpha mine") && !moving.includes("Shopify title: Beta"), `no form while B loads: ${moving.slice(0, 400)}`);
+  ok(moving.includes("Opening Beta"), "the editor says it is opening B");
+  const settled = textOf(view({ entry: entryOf(a), state: a, entity: { ...beta, shopify: { ...beta.shopify, title: "Alpha" } } }));
+  ok(settled.includes("Alpha mine") && settled.includes("Shopify title: Alpha"), `A's own form when A is the entry: ${settled.slice(0, 300)}`);
+});
+
 // edge safety and imports
 await t("editorModel imports only the registry, paths and the preview machine (no React, no DOM, no node:)", async () => {
   const src = await readFile(join(ROOT, "components/admin/editor/editorModel.js"), "utf8");

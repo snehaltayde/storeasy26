@@ -26,6 +26,14 @@ export const metadata = { title: "Catalog · Admin", robots: { index: false } };
 // editor's Products list in place of the old product editor (whose saves
 // refuse on a documents store), then the Bundles and Quiz panels. Legacy and
 // migrating stores (and a mode that can't be read) render as before.
+// P4-FIX3 (P4-EDITOR review): on a documents store, what the editor sets and
+// what stays in Shopify, in plain words (CatalogAdmin's CATALOG_DOCUMENTS_LINE
+// says the same). Legacy and migrating stores keep their words.
+const CATALOG_DOCUMENTS_WORDS = Object.freeze({
+  header: "Your products, synced from Shopify. The name, description, photos, brand and product type shoppers see are set in the editor; only price, stock and Shopify's own type and vendor stay in Shopify. Bundles and quizzes stay here.",
+  block: "Names, descriptions, photos, the brand and product type shoppers see, badges, modules and pairs are set in the editor now. Price, stock and Shopify's own type and vendor stay in Shopify: change those in Shopify.",
+});
+
 export default async function AdminCatalogPage({ searchParams } = {}) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
@@ -38,10 +46,10 @@ export default async function AdminCatalogPage({ searchParams } = {}) {
     const [bundles, quizzes] = await tfetch(async () => [await listBundles(), await listQuizzes()]);
     return (
       <>
-        <PageHeader title="Catalog" description="Your products, synced from Shopify. Their pages are edited in the editor; bundles and quizzes stay here." />
+        <PageHeader title="Catalog" description={CATALOG_DOCUMENTS_WORDS.header} />
         <div data-documents-mode="" className="rounded-card border border-edge bg-surface p-4 shadow-card">
           <p className="text-sm font-semibold text-fg">Product pages</p>
-          <p className="mt-0.5 text-sm text-fg-muted">Names, descriptions, photos, badges, modules and pairs are edited in the editor now.</p>
+          <p className="mt-0.5 text-sm text-fg-muted" data-catalog-editor-sets="">{CATALOG_DOCUMENTS_WORDS.block}</p>
           <a href={PRODUCTS_LIST_HREF} className="mt-2 inline-flex rounded-ctl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-fg focus-ring hover:bg-primary-hover">
             Open products in the editor
           </a>
