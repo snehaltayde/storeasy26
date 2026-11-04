@@ -1588,6 +1588,7 @@ await t("P3-COMMIT API: a legacy store answers 409 STORE_USES_LEGACY for the new
   await raw.legacy.execute("DELETE FROM documents WHERE id = 'doc_home'");
 });
 
+const BUILT_UNDO_OPS = new Set(["unpublish", "undo", "undoSet", "listRecentlyPublished"]);
 await t("P3-COMMIT API: 428 without a revision for unpublish, undo and keepLiveSection; 501 NOT_BUILT from every stub; storage unchanged", async () => {
   const d = await create("docs", "page", { body: page("stub-target", "Stub target", "x") });
   const before = await dump();
@@ -1601,6 +1602,12 @@ await t("P3-COMMIT API: 428 without a revision for unpublish, undo and keepLiveS
       likeShape(r, SHAPES[name].outcomes.revisionRequired, `${name} 428`);
     }
     const r = await api(req0);
+    // P3-UNDO built these four (scripts/test-publish-undo.js covers them):
+    // they no longer answer 501, and on this fixture they refuse or read
+    if (BUILT_UNDO_OPS.has(name)) {
+      ok(r.status !== 501, `${name} is built: ${r.status}`);
+      continue;
+    }
     eq([r.status, r.body.code], [501, "NOT_BUILT"], `${name} stub:`);
     likeShape(r, COMMON.outcomes.notBuilt, `${name} 501`);
   }
