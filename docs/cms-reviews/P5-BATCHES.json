@@ -1,0 +1,311 @@
+[
+ {
+  "name": "Batch 1: foundation (server and pure)",
+  "items": [
+   {
+    "id": "P5-SOURCES",
+    "branch": "cms/p5-sources",
+    "reqs": [
+     "TREE-01"
+    ],
+    "brief": "Turn bindings into a table. Merge this item FIRST in batch 1 (plan 0.2).\n\n1. Create the pure, edge-safe lib/registry/sources.js. It is imported by lib/registry/index.js, which 'use client' editor modules import, so it ships to the browser: it may import only pure modules under lib/registry/ (no lib/db, lib/repo, lib/catalog, lib/commerce, lib/offers, lib/cms, next/*, node:). Resolvers only call the injected repo and ctx.\n   Exports: SOURCES (name -> { args, resolve(repo, args, ctx), prefetch?(argsList, repo, ctx), argOf?(settingValue) }), getSource(name), and the test seams defineSource(decl) and removeSource(name).\n   Declare six sources:\n   - featured_collections (curated slice or repo.getFeaturedCollections);\n   - newest_products;\n   - collection_products (railProducts, with documents pins vs legacy pins);\n   - route_product (known, no home data: resolves to undefined, never logs);\n   - bundle_by_id: argOf { id } -> id; resolve returns the bundle entry from the prefetched Map (undefined when absent; the component treats that as missing);\n   - bundles_by_ids: argOf [{ id }] -> ids (order kept); resolve returns the entries in the picked order, skipping none (absent ids give { id, state: 'missing' }).\n   The two bundle sources share one prefetch that gathers every bundle id across all instances of both sources (dedupe) into ONE repo.bundlesByIds(ids) call. A rejected prefetch rejects every bundle instance (bindingFailed path). No kind uses the bundle sources until P5-BLOCKS, and repo.bundlesByIds is wired into DEFAULT_REPO there, not here.\n   Move the existing resolver bodies out of the if/else in lib/cms/section-data.js run(). The collection argOf replaces the special case in argOf() for { handle, id } -> handle. The curated and pins pre-reads stay as they are; expose them to resolvers through ctx.\n2. lib/registry/index.js:\n   - defineSection normalises a singular `source` to `sources`, checks each binding is { sources: [nonEmpty strings], args: [keys of its settings] }, and throws when a source is not in SOURCES.\n   - checkRegistry() reports every kind whose binding names a source no longer in SOURCES (so a removeSource after registration is caught).\n3. lib/cms/section-data.js run(): look the source up in the table. Unknown -> a rejected promise with an Error whose code is 'source_unknown'. The existing catch adds the field to data.bindingFailed and logs slog section_binding_failed with a new cause field ('source_unknown' or 'fault'). Also set data.bindingFailedCause = { [field]: cause } (P5-HIDDEN reads it to pick the preview words). Run each source's prefetch once, with every instance's args, before the per-instance loop. Keep the queryCache key and the limit default (Number(limit) || defaults.limit || 8) exactly as they are for the existing sources.\n4. lib/registry/validate.js: an instance section.bindings source not in SOURCES is also BINDING_INVALID (guard the existing declared.sources.includes against a declaration without sources). New BINDING_INVALID message, matching the removeSection action checks.js already offers for it: \"This <label> section is set up in a way the editor can't fix. Remove it and add it again.\" Update any test that pins the old wording.\n5. package.json (the only package.json edit in phase 5): register test:commerce-blocks -> node scripts/test-commerce-blocks.js and test:bundle-form -> node scripts/test-bundle-form.js. Create both files as passing placeholders that print 'placeholder: filled by P5-BLOCKS' / 'placeholder: filled by P5-PANEL'. The gate goes from 96 to 98 suites.\n6. scripts/test-sections.js tests:\n   - a throwaway source (defineSource) plus a throwaway kind resolves through resolveHomeSectionData with no other file changed; removeSource restores the table;\n   - defineSection refuses an unknown source; checkRegistry reports a source removed after registration;\n   - runtime: a source removed after registration gives bindingFailed [field], bindingFailedCause source_unknown, one section_binding_failed log with cause source_unknown, no collections, no throw. This is the ONLY proof of the runtime path (a draft cannot hold an unknown body binding: the writer refuses it);\n   - registry-shaped sections ({ id, kind, settings }): collections at limits 3 and 6 and two `new` instances resolve independently, identical queries made once;\n   - bundle sources with a fake repo: 2 bundle_by_id instances and 1 bundles_by_ids instance of 4 make exactly one repo.bundlesByIds call with the 5 to 6 deduped ids; order kept; a rejecting fake gives bindingFailed (cause fault) on all three;\n   - route_product: no data, no log;\n   - an import scan: lib/registry/sources.js imports only lib/registry/* pure modules (none of lib/db, lib/repo, lib/catalog, lib/commerce, lib/offers, lib/cms, node:);\n   - a body key scan over section SETTINGS only: every registry default, every SETTING_KINDS empty() value, the starter bodies, and the worst-case SECTION SETTINGS in lib/registry/fixtures.js (not its render data, which legitimately carries soldOut) contain no key price, compare_at_price, bundle_price, inventory, total_inventory, available, sold_out or soldOut. seed-design-documents bodies need a database and are not scanned; P5-SETTING's structural UNKNOWN_FIELD test carries that guarantee.\n\nThe unknown-body-binding validator case already exists (test-registry-contract.js about line 1098, source 'every_product'); this item does not edit test-registry-contract.js (P5-SETTING owns it in batch 1, P5-BLOCKS adds the explicit checkRegistry negative there in batch 2).\n\nLegacy: lib/cms/registry.js and componentFor stay untouched; legacy declarations (singular source) resolve through the same table. The a6d028e home-render fixtures and test-release-readers v1 to v4 stay byte-identical.",
+    "migrations": [],
+    "files": [
+     "lib/registry/sources.js",
+     "lib/registry/index.js",
+     "lib/registry/validate.js",
+     "lib/cms/section-data.js",
+     "scripts/test-sections.js",
+     "scripts/test-commerce-blocks.js",
+     "scripts/test-bundle-form.js",
+     "package.json",
+     "docs/cms-reviews/P5-SOURCES.md"
+    ],
+    "acceptance": [
+     "test-sections: defineSource plus one throwaway kind resolves data through resolveHomeSectionData with no other edit, and removeSource restores the table.",
+     "test-sections: defineSection throws on a binding whose source is not in SOURCES; checkRegistry() names the kind and source when a source is removed after registration.",
+     "test-sections: at runtime a removed source sets data.bindingFailed to [field] and bindingFailedCause[field] to 'source_unknown', logs section_binding_failed with cause source_unknown once, never resolves collections and never throws.",
+     "test-sections: two registry-shaped collections instances (limits 3 and 6) and two new instances get independent data, with getNewestProducts and getCollectionsByHandles each called once.",
+     "test-sections: with a fake repo, 2 bundle_by_id and 1 bundles_by_ids instances make exactly one repo.bundlesByIds call with deduped ids, keep the picked order, and a rejecting fake gives bindingFailed with cause fault on all three.",
+     "test-sections: route_product resolves to no data with no log.",
+     "test-sections: the import scan of lib/registry/sources.js finds only pure lib/registry modules.",
+     "test-sections: no registry default, empty() value, starter body or worst-case section settings value holds a key from the price/stock list.",
+     "The existing test-registry-contract unknown-binding case (source 'every_product') still reports BINDING_INVALID, now with the 'Remove it and add it again' message, and it is still in publish.js STRUCTURE_CODES.",
+     "test-sections-render: the a6d028e legacy home fixtures are byte-identical; test-release-readers passes unchanged.",
+     "pnpm test passes with 98 suites, including the two placeholders."
+    ]
+   },
+   {
+    "id": "P5-SETTING",
+    "branch": "cms/p5-setting",
+    "reqs": [
+     "COM-01",
+     "COM-02",
+     "TREE-01"
+    ],
+    "brief": "Add the setting kinds that let a section bind to a bundle by id, and the words and fixtures that go with them.\n\n1. lib/registry/settings.js SETTING_KINDS:\n   - `bundle`: value { id } or null. id is a string matching /^[A-Za-z0-9_-]{1,64}$/ (bun-<hex> from lib/bundles.js rid() and older raw ids such as the drills' bnd_p1c both pass). Any other key (title, slug, price, bundle_price, items, available) is UNKNOWN_FIELD (structure, blocks). control 'bundle'; empty() null; required -> incomplete when null. Label in plain words ('Bundle').\n   - `bundle_list`: an array of { id }, max from the setting (default 12). A duplicate id is INVALID_VALUE ('This bundle is already in the grid.'); more than max is INVALID_VALUE ('A grid shows at most <max> bundles.'); other keys UNKNOWN_FIELD. control 'bundle_list'; empty() [].\n   - refsOfSetting gives { ref: 'bundle', id } for both.\n2. Words: lib/registry/issue-words.js ITEM_NOUN bundle_list -> 'bundle' (so issues say 'bundle 3'); lib/documents/diff.js ITEM_NOUNS / NAMED_LISTS / settingPhrases so a publish diff says 'added a bundle', 'removed a bundle', 'changed the bundle' (ids only, no title lookup).\n3. lib/documents/refs.js rowOf: a bundle setting ref -> ['bundle', id]. fromHref's /bundles/<slug> -> ['bundle', slug] stays; update the header comment: block refs keyed by id, link refs by slug (known limit).\n4. lib/registry/fixtures.js: isList knows bundle_list, and the worst-case SETTINGS values for bundle ({ id: 'bun-worst' }) and bundle_list (12 ids). Render data for bundle bindings is P5-BLOCKS'.\n5. scripts/test-registry-contract.js:\n   - the 'setting kind declared somewhere' assertion (about line 1067) gets a temporary exemption for bundle and bundle_list, commented 'declared by bundle_card/bundle_grid in P5-BLOCKS';\n   - settings tests: { id } passes; { id, price }, { id, title }, { id, available } refused UNKNOWN_FIELD severity structure; duplicate and over-max in bundle_list refused with the plain messages; null on a required bundle is incomplete;\n   - a structural guarantee for TREE-01: for EVERY object-valued SETTING_KIND (collection, product, variant, bundle, and the list kinds' items), adding price, bundle_price, compare_at_price, inventory, available, sold_out or soldOut to a valid value is refused as UNKNOWN_FIELD with severity structure in publish mode.\n6. scripts/test-editor-inspector.js: add bundle and bundle_list to WAITING_KINDS (comment: P5-EDITOR removes them), AND apply the waitingField skip to the SECTION-field loop as well as the document-field loop (about line 369 and the worst-case section forms around lines 384-388), so registering bundle_card / bundle_grid in batch 2 does not fail this suite before the controls exist. ALSO derive the section-kind half of WAITING_PROBLEMS from the registry instead of a fixed list: for every Reg.sectionKinds() kind and every setting whose kind is in WAITING_KINDS, expect `section kind \"<kind>\": setting \"<key>\" has no control` (inspectorModel.js inspectorCoverage line 182 reports exactly that). In batch 1 this adds nothing; in batch 2 it absorbs bundle_card.bundle and bundle_grid.bundles, which would otherwise break the eq(inspectorCoverage(), WAITING_PROBLEMS) assertion that BLOCKS cannot edit. Likewise skip checkPlacement only for issues whose field is a waiting setting of that section (nothing else is skipped).\n7. scripts/test-documents.js: a throwaway kind with a bundle and a bundle_list setting writes document_refs rows ('bundle', <id>) for each, and a /bundles/<slug> link still writes ('bundle', <slug>).\n8. scripts/test-doc-diff.js (only if it fails or lists kinds): a bundle_list add / remove diff phrase.\n\nNo section declarations here (P5-BLOCKS). Legacy untouched.",
+    "migrations": [],
+    "files": [
+     "lib/registry/settings.js",
+     "lib/registry/issue-words.js",
+     "lib/documents/diff.js",
+     "lib/documents/refs.js",
+     "lib/registry/fixtures.js",
+     "scripts/test-registry-contract.js",
+     "scripts/test-documents.js",
+     "scripts/test-editor-inspector.js",
+     "scripts/test-doc-diff.js",
+     "docs/cms-reviews/P5-SETTING.md"
+    ],
+    "acceptance": [
+     "test-registry-contract: bundle accepts { id: 'bun-\u2026' } and { id: 'bnd_p1c' }; refuses { id, price }, { id, title } and { id, available } as UNKNOWN_FIELD severity structure; null on a required bundle is incomplete.",
+     "test-registry-contract: bundle_list refuses a duplicate id and more than max items, each with the plain message.",
+     "test-registry-contract: for every object-valued setting kind, a price or stock key is refused as UNKNOWN_FIELD with severity structure in publish mode.",
+     "test-documents: bundle and bundle_list settings produce document_refs rows ref_type 'bundle' keyed by id; a /bundles/<slug> link still produces ref_id <slug>.",
+     "test-editor-inspector: bundle and bundle_list are waiting kinds, and the section-field loop skips waiting fields (a throwaway home kind with a bundle setting does not fail the anchors assertion, and inspectorCoverage() for it equals the derived WAITING_PROBLEMS, which include `section kind \"<throwaway>\": setting \"<key>\" has no control`).",
+     "An issue on bundle_list item 3 says 'bundle 3'; a diff of an added bundle says 'added a bundle'.",
+     "pnpm test is green on the branch (96 suites before SOURCES merges, 98 after)."
+    ]
+   },
+   {
+    "id": "P5-BUNDLEREAD",
+    "branch": "cms/p5-bundleread",
+    "reqs": [
+     "COM-01",
+     "COM-02"
+    ],
+    "brief": "Build a bounded, honest bundle read, one place for bundle words, and safe bundle writes (create, edit, slug).\n\n1. New pure lib/commerce/bundle-compat.js: compatFrom({ items, bundle_price, variantsById, productsById }) -> { ok, state, reasons, problems, components, componentsSum, saving, liveSaving }.\n   - state: available, sold_out, no_saving or not_ready. Order: not_ready (fewer than 2 components, a duplicate variantId, a bad price, mixed currencies), then sold_out (a component variant or product unavailable, or missing from the catalog), then no_saving.\n   - reasons: structured [{ kind: 'too_few'|'duplicate'|'bad_price'|'mixed_currency'|'sold_out'|'missing'|'no_saving', index?, title?, sum?, price? }]. New UI words come only from reasons, never from problems.\n   - problems: the legacy strings, byte for byte (they carry \u20b9 and 'component N:'; only the getBundle snapshot and legacy callers use them). A duplicate variantId adds a new legacy-style problem only for rows that have one (none in the snapshot).\n   - saving: legacy value Math.max(0, sum - price) as today (getBundle snapshot unchanged). liveSaving: sum > 0 && price > 0 ? Math.round(Math.max(0, sum - price)) : 0, which equals the engine's BUNDLE discount for one set.\n   lib/bundles.js checkBundleCompatibility calls it and keeps its output shape byte for byte (test-effective-read snapshot).\n2. New pure lib/commerce/bundle-words.js: the ONLY source of bundle-state wording. stateLine(state, reasons, { currency, formatMoney }) and reasonSentence(reason, \u2026) give the final sentences (plan section 1.9 lists them). Money uses formatMoney(amount, currency). No \u20b9, no 'INR', no 'component N:'. Used by P5-BLOCKS, P5-CHECKS, P5-PANEL and P5-EDITOR.\n3. New edge-safe lib/commerce/bundle-read.js, importing only lib/db.js, lib/catalog/effective.js, bundle-compat.js (never lib/offers, never node:). bundlesByIds(ids) -> Map id -> { id, slug, title, description, bundle_price, currency, componentsSum, saving (= liveSaving), state, reasons, overlapsWith:[{ id, title }], components:[{ variantId, quantity, title, image, available, state: 'ok'|'sold_out'|'missing' }] }.\n   - state: available, sold_out, no_saving, not_ready, disabled, missing.\n   - Statement 1: bundles b LEFT JOIN offers o ON o.id = 'bundle-' || b.id WHERE b.id IN (ids) OR b.enabled = 1. From it: the requested rows; not_ready when the bundle is enabled but its offer row is missing, disabled, scheduled out (starts_at/ends_at), or its config price or item set differs from the bundle row (read the config shape from lib/offers/store.js rowToOffer by reading the code, do not import it); overlapsWith = other enabled bundles sharing any variantId (the engine gives every BUNDLE offer priority 5 and no order, so overlap can change the cart saving).\n   - Statement 2: variants WHERE id IN (every component variant id). Statement 3: effective byIds (every product id). currency: the variants' currency, falling back to the product's; mixed -> not_ready (mixed_currency); none -> null. Every caller formats with formatMoney(amount, currency ?? undefined): formatMoney's 'INR' default applies only to undefined, and null gives 'null 1500.00'.\n   - At most 3 statements for any number of bundles, excluding lib/schema-compat.js hasColumns probes (warm them before counting in tests).\n   - A database fault throws; never folded into missing or an empty Map. Payloads carry effective titles only, never catalog_title or sku.\n4. lib/bundles.js writes:\n   - Items are normalised on every write: duplicate variantIds are merged into one entry with the summed quantity (so a new bundle can never get the engine's per-entry double discount).\n   - upsertBundle(id = null) with a slug that exists throws SLUG_TAKEN ('A bundle with this link already exists.'), never overwrites. An edit whose slug hits UNIQUE(slug) also throws SLUG_TAKEN (map the constraint error), not a database 5xx.\n   - upsertBundle on edit (id given) keeps the stored slug, description and enabled state when those fields are undefined. An edit of an ENABLED bundle whose new items or price fail compat is refused (BUNDLE_INCOMPATIBLE with reasons), with no row or offer change; it is never turned off silently. enable: false still turns it off; enable: true is compat-gated as today.\n   - createBundle({ title, items, bundle_price, description?, enable, mustPass }) derives the slug: lowercase ASCII, non-alphanumerics to '-', trimmed; empty -> 'bundle'; the base is cut so base + suffix \u2264 61 characters (the slug rule /^[a-z0-9][a-z0-9-]{0,60}$/); adds -2, -3 \u2026 until free, and retries on a UNIQUE violation (race). mustPass: true refuses (BUNDLE_INCOMPATIBLE, reasons) and saves nothing when compat fails; otherwise it saves turned off and returns the reasons.\n   - Check scripts/test-commerce-exp.js lines ~105-108 still pass (the first upsert of slug 'broken' throws 'can't enable' before any write, so the second is a fresh create and needs no change; keep the 'can't enable' prefix in that legacy error) and scripts/perf-fixture.js (look the id up by slug before upsertBundle, so a reseed onto a non-fresh DB does not throw).\n5. app/api/admin/bundles/route.js (alias hooks needed in tests, see 7):\n   - POST { create: { title, items:[{ variantId gid, quantity }], bundle_price, description?, enable?, mustPass? } } (offers.write): items must be variant GIDs (a handle is refused 422 'Pick the product again.'); calls createBundle; same audit line; returns { bundle, compat: { state, reasons }, currency }.\n   - The existing `bundle` action passes enable through only when sent (`'enable' in b ? !!b.enable : undefined`) so edits keep enabled; description likewise. SLUG_TAKEN and BUNDLE_INCOMPATIBLE map to 409 / 422 with the plain message, never 5xx.\n   - GET and POST { check } add currency (storeCurrency from lib/offers/catalog: a console route, not a block) and structured reasons. Handle resolution in resolveItems is left for P5-PANEL.\n6. lib/admin/refs.js handleRefsGet: type=bundle under storefront.read (OQ-A). Rows { id, slug, title, state, reasons, enabled, bundle_price, saving, currency, componentCount, overlapsWith }, ids= hydrate (in the given order), q= title search (LIKE, limit), read through bundlesByIds (q= first selects matching ids, one extra statement).\n7. Tests:\n   - scripts/test-commerce-exp.js gains the registerHooks '@/' alias block and next/server shim copied from scripts/test-cms-api.js so it can call the route handler.\n   - State matrix on a tenant-fixture file DB: available, sold_out, no_saving, not_ready (offer row deleted; offer disabled; offer price changed; duplicate items written raw), disabled, missing.\n   - Statement count (warm probe first): equal for 1 bundle of 2 components and 6 bundles of 4, and at most 3.\n   - A rejected bundles read throws.\n   - liveSaving equals the BUNDLE discount getCart (lib/cart.js) gives for one complete set; with a bundle whose items were [{v1,1},{v1,1}], the write merges to [{v1,2}] and the engine discount equals the advertised saving.\n   - Overlap: A={v1,v2} and B={v1,v2,v3} both enabled -> each lists the other in overlapsWith.\n   - Slugs: SLUG_TAKEN on create and on edit; 'Gym Kit' twice -> gym-kit, gym-kit-2; a 61-character title -> the -2 slug passes the rule; a Hindi-only title -> 'bundle'; mustPass with a failing compat saves nothing.\n   - Edits: editing an enabled bundle's price (no enable, no description sent) leaves it enabled, its offer enabled with the new price, and the description kept; an edit that breaks compat on an enabled bundle gives 422 and no row or offer change.\n   - Route: POST { create } with a handle -> 422 'Pick the product again.', no row.\n   - Import scan: bundle-read.js, bundle-compat.js and bundle-words.js import nothing under lib/offers/ and no node: module (transitively for bundle-read: lib/db.js, tenant-context, schema-compat, effective.js).\n   - scripts/test-refs.js: type=bundle rows with state; ids= hydrate; q= search; a session without storefront.read gets 403.\n\ntest-effective-read must pass unchanged (getBundle snapshot and the raw-read allowlist: no new raw products read outside effective.js). The bundle page (getBundle) is not changed.",
+    "migrations": [],
+    "files": [
+     "lib/commerce/bundle-compat.js",
+     "lib/commerce/bundle-words.js",
+     "lib/commerce/bundle-read.js",
+     "lib/bundles.js",
+     "app/api/admin/bundles/route.js",
+     "lib/admin/refs.js",
+     "scripts/perf-fixture.js",
+     "scripts/test-commerce-exp.js",
+     "scripts/test-refs.js",
+     "docs/cms-reviews/P5-BUNDLEREAD.md"
+    ],
+    "acceptance": [
+     "test-commerce-exp: bundlesByIds returns available, sold_out, no_saving, not_ready (offer missing, offer disabled, offer price differs, raw duplicate items), disabled and missing on a tenant-fixture file DB.",
+     "test-commerce-exp: after a warm-up, watchStatements counts the same number (at most 3) for 1 bundle of 2 components and for 6 bundles of 4.",
+     "test-commerce-exp: when the bundles read rejects, bundlesByIds throws.",
+     "test-commerce-exp: saving equals the BUNDLE discount getCart gives for one complete set; duplicate items are merged on write and the engine discount then equals the advertised saving.",
+     "test-commerce-exp: overlapping enabled bundles list each other in overlapsWith.",
+     "test-commerce-exp: upsertBundle({ id: null, slug: existing }) and an edit onto another bundle's slug both throw SLUG_TAKEN and change nothing.",
+     "test-commerce-exp: createBundle 'Gym Kit' twice gives gym-kit and gym-kit-2; a 61-character title and a non-Latin title both give valid slugs; mustPass with failing compat saves nothing.",
+     "test-commerce-exp: editing an enabled bundle's price without enable or description keeps enabled=1, the offer enabled with the new price, and the description; an edit that breaks compat on an enabled bundle returns 422 with no change.",
+     "test-commerce-exp: POST { create } with a handle instead of a GID is refused 422 with a plain message and no row.",
+     "test-commerce-exp: a source scan of bundle-words.js finds no '\u20b9', 'INR' or 'component ' literal; rendered with currency 'USD' every money sentence uses ' and contains no '\u20b9' or 'INR' (formatMoney with 'INR' legitimately prints \u20b9, so the rendered check must use a non-INR currency); with currency null it never prints 'null'.",
+     "test-commerce-exp: the import scan of bundle-read, bundle-compat and bundle-words finds no lib/offers/ module and no node: import.",
+     "test-refs: GET type=bundle with storefront.read lists rows with state; ids= hydrates in order; q= searches titles; a session without storefront.read gets 403.",
+     "test-effective-read passes unchanged.",
+     "pnpm test is green on the branch."
+    ]
+   },
+   {
+    "id": "P5-HIDDEN",
+    "branch": "cms/p5-hidden",
+    "reqs": [
+     "COM-01"
+    ],
+    "brief": "Give the founder a reason in preview for a section, or a part of one, that hides itself, without changing live markup.\n\n1. components/sections/index.js:\n   - an optional static component hook hiddenReason(section, data, ctx) -> string | null;\n   - export hiddenNote(section, data, ctx): returns the founder note element only in a documents preview and only when the component declares hiddenReason and it returns text; otherwise null. The note uses the existing founder-note look (unfinished / failed notes), carries data-sec from ctx.secKey (as SectionView does) so click-to-select works, and data-hidden-reason;\n   - export isFounderPreview(ctx) and a FounderNote part (or put it in parts.js) so a component can render a per-cell note in preview (P5-BLOCKS uses it for dropped grid cells);\n   - the bindingFailed preview note reads data.bindingFailedCause (set by P5-SOURCES): cause source_unknown says 'This section is set up in a way the editor can't fix. Remove it and add it again.'; a fault keeps 'Reload the preview to try again'. Missing cause = today's text.\n2. components/sections/HomeSections.js: where !sectionShows(s, data) returns null, return hiddenNote(s, data, ctxFor(s)) instead, building ctx with secKey the same way SectionView gets it. Shoppers still get null. A hidden note never counts as a shown section for the #new anchor; it counts towards emptyNote in preview only. First find and record in the packet how the documents preview is detected today (inDocumentsPreview() or the flag the preview route sets) and use exactly that signal; legacy previews must not trigger it.\n3. Only kinds whose component declares hiddenReason are affected. No existing component gets the hook, so product_rail (PV-09, P1) and all live pages are unchanged.\n4. scripts/test-sections-render.js: use the existing registerSectionComponent seam (index.js about line 61) with a throwaway kind. Test that:\n   - a hidden section with hiddenReason renders the note in a documents preview render (through the same preview signal the preview route sets) with data-sec and data-hidden-reason, and nothing live;\n   - a kind without the hook renders nothing in both;\n   - a bindingFailed section with cause source_unknown shows the remove words in preview, and with cause fault the reload words;\n   - live home markup for the worst-case and a6d028e fixtures is byte-identical before and after.\n\nHOME_EMPTY is unaffected (it counts enabled body sections, not rendered ones). No legacy impact.",
+    "migrations": [],
+    "files": [
+     "components/sections/index.js",
+     "components/sections/HomeSections.js",
+     "components/sections/parts.js",
+     "scripts/test-sections-render.js",
+     "docs/cms-reviews/P5-HIDDEN.md"
+    ],
+    "acceptance": [
+     "test-sections-render: a throwaway kind whose shows() is false and whose hiddenReason returns a sentence renders that sentence in a documents preview render, with data-sec and data-hidden-reason, and an empty string live.",
+     "test-sections-render: product_rail bound to an empty collection still renders nothing in preview and live.",
+     "test-sections-render: a bindingFailed section with cause source_unknown says 'Remove it and add it again' in preview; with cause fault it says reload; live renders nothing for both.",
+     "test-sections-render: live renders of every registered kind against the worst-case fixtures, and the a6d028e legacy home fixtures, are byte-identical to the base.",
+     "test-sections-render: a legacy preview render shows no hidden note.",
+     "test-sections-render: the edge-safety scan still passes for components/sections/*.",
+     "pnpm test is green on the branch."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 2: blocks, publish checks and the console bundle form",
+  "items": [
+   {
+    "id": "P5-BLOCKS",
+    "branch": "cms/p5-blocks",
+    "reqs": [
+     "COM-01",
+     "COM-02",
+     "TREE-01"
+    ],
+    "brief": "Ship the bundle_card and bundle_grid sections. Data sources and the bounded read already exist (P5-SOURCES, P5-BUNDLEREAD); words come from lib/commerce/bundle-words.js; the preview note helpers from P5-HIDDEN.\n\n1. lib/registry/sections.js:\n   - bundle_card (label 'Bundle card'): documentTypes ['home']; settings title (text, label 'Heading', default ''), bundle (kind bundle, label 'Bundle', required, default null); bindings { bundle: { sources: ['bundle_by_id'], args: ['bundle'] } }; startsIncomplete: true; a placeholder.\n   - bundle_grid (label 'Bundle grid'): documentTypes ['home']; settings title (default 'Bundles'), bundles (bundle_list, label 'Bundles to show', required, max 12, default []); bindings { bundles: { sources: ['bundles_by_ids'], args: ['bundles'] } }; startsIncomplete: true; a placeholder.\n   - Neither goes in HOME_LEGACY, HOME_SECTION_KINDS or lib/cms/registry.js.\n2. lib/cms/section-data.js: add bundlesByIds (from lib/commerce/bundle-read.js) to DEFAULT_REPO only. Nothing else changes there.\n3. lib/registry/token-usage.js: SECTION_TOKENS entries for both kinds (the token groups the components use). test-design-doc must stay green.\n4. lib/registry/fixtures.js: worst-case binding DATA for both (a 120-character title, 6 components, a missing image, one sold-out component, currency set; a grid of 12 with mixed states).\n5. New components/sections/BundleCardSection.js and BundleGridSection.js (server components; edge-safe):\n   - Show the heading, the bundle title, each component's title and image (token fallback when missing) with a per-component mark the same as the bundle page ('Sold out' / 'No longer available'), the bundle price and, when saving > 0, 'You save <formatMoney(saving, bundle.currency ?? undefined)>', and a link to /bundles/<slug>. Never a hard-coded \u20b9 or INR.\n   - Add uses components/BundleAddButton.js with only variantId, quantity and available per component (the same props the bundle page passes).\n   - shows(): the card shows for available, sold_out, no_saving and not_ready, hides for disabled and missing (and when the entry is absent). The grid shows when at least one picked bundle is showable; it keeps sold-out / no-saving / not-ready cells (each 'Currently unavailable', add disabled) and drops disabled and missing cells.\n   - sold_out, no_saving and not_ready render 'Currently unavailable' with add disabled.\n   - hiddenReason uses bundle-words: disabled, missing, and for the grid 'None of the bundles in this grid can be shown, so shoppers don't see it.' plus the per-bundle reasons.\n   - In a documents preview only (isFounderPreview(ctx)), the grid renders a FounderNote in place of each dropped cell, with that bundle's reason ('Turned off \u2026', 'Deleted \u2026'). Live markup has nothing for dropped cells.\n   - Register both in components/sections/index.js COMPONENTS (and textFields if titles are text fields).\n6. scripts/test-commerce-blocks.js (replace the placeholder; SWC + react-dom/server loader as test-sections-render does). Render inside CartProvider (components/cart/CartContext.js; SSR runs no effects) so BundleAddButton's useCart does not throw; if CartProvider cannot render server-side, stub BundleAddButton through the loader and assert on the props it receives, and record that in the packet. Cases, each live and in preview:\n   - card: available (title, components, price, saving with the bundle currency, add enabled); sold_out (the component marked 'Sold out', 'Currently unavailable', add disabled); no_saving; not_ready; disabled (nothing live, turned-off reason in preview); missing (nothing live, deleted reason in preview, no throw);\n   - grid: all disabled or missing (nothing live, no-results reason in preview); mixed (available + sold-out + disabled + missing): live shows the available and sold-out cells in picked order, the sold-out cell says 'Currently unavailable' with add disabled; preview also shows a note for each dropped cell with its reason;\n   - a database fault (bundlesByIds rejects): every bundle section gets bindingFailed and section_binding_failed (hidden live, failed note in preview);\n   - bounded reads: a home with 2 bundle_card and 1 bundle_grid of 4 calls bundlesByIds once, at most 3 statements after a warm-up (watchStatements, tenant-fixture file DB);\n   - transitive import scan from BundleCardSection.js, BundleGridSection.js, lib/registry/sources.js and lib/commerce/bundle-read.js: no lib/offers/ module and no node:;\n   - same cart: lib/cart.js addItem with the block's props and with getBundle(slug).components as the bundle page does gives equal getCart lines and appliedOffers (BUNDLE saving included);\n   - overlap fixture: A={v1,v2}@180 and B={v1,v2,v3}@200 both enabled: B's entry lists A in overlapsWith (P5-CHECKS warns, P5-EDITOR shows it; the engine order itself is OQ-D);\n   - no rendered or serialised block payload contains catalog_title or sku.\n7. Kind lists, without weakening them: test-sections.js (exact kind list), test-registry-contract.js (remove the P5-SETTING exemption; add an explicit negative: define a throwaway kind on a throwaway source, removeSource, checkRegistry names it; the existing deq(R.checkRegistry(), []) still holds), test-sections-render.js (checkSectionComponents; edge scan of the new files), test-editor-tree.js (offered on home only, not page, campaign or journal), test-surfaces.js, test-design-doc.js, test-media-refs.js. If another suite fails only because it lists or iterates kinds, BLOCKS may edit it on its branch provided it is not owned by another batch-2 item (test-publish-checks.js is P5-CHECKS'; test-commerce-exp.js and test-bundle-form.js are P5-PANEL's) and names it in its packet; never weaken an assertion. test-editor-inspector.js should need no edit (P5-SETTING derived its waiting lines); if it does, stop and ask.\n\nLegacy: the legacy home and the a6d028e fixtures stay byte-identical.",
+    "migrations": [],
+    "files": [
+     "lib/registry/sections.js",
+     "lib/cms/section-data.js",
+     "lib/registry/token-usage.js",
+     "lib/registry/fixtures.js",
+     "components/sections/BundleCardSection.js",
+     "components/sections/BundleGridSection.js",
+     "components/sections/index.js",
+     "scripts/test-commerce-blocks.js",
+     "scripts/test-sections.js",
+     "scripts/test-registry-contract.js",
+     "scripts/test-sections-render.js",
+     "scripts/test-editor-tree.js",
+     "scripts/test-surfaces.js",
+     "scripts/test-design-doc.js",
+     "scripts/test-media-refs.js",
+     "docs/cms-reviews/P5-BLOCKS.md"
+    ],
+    "acceptance": [
+     "test-commerce-blocks: an available card renders title, components, price, saving formatted with the bundle's currency, and an enabled add button.",
+     "test-commerce-blocks: a card with a sold-out component marks that component 'Sold out', says 'Currently unavailable' and disables add, live and in preview; no_saving and not_ready do the same.",
+     "test-commerce-blocks: disabled and missing cards render nothing live and the bundle-words reason in preview, without throwing.",
+     "test-commerce-blocks: an all-hidden grid renders nothing live and the no-results reason in preview.",
+     "test-commerce-blocks: a mixed grid renders only the available and sold-out cells live, in picked order, the sold-out cell with 'Currently unavailable' and add disabled; in preview each dropped cell has a note with its reason; live markup has no note.",
+     "test-commerce-blocks: when bundlesByIds rejects, every bundle section gets bindingFailed and logs section_binding_failed.",
+     "test-commerce-blocks: 2 cards and 1 grid of 4 call bundlesByIds once with at most 3 statements after a warm-up.",
+     "test-commerce-blocks: the transitive import scan finds no lib/offers/ module and no node: import.",
+     "test-commerce-blocks: the cart from the block's add props equals the cart from getBundle components (lines and appliedOffers).",
+     "test-commerce-blocks: the overlap fixture lists the overlapping bundle; no payload contains catalog_title or sku.",
+     "test-registry-contract: no P5-SETTING exemption remains; checkRegistry names a kind whose source was removed; checkRegistry() is [] for the real registry.",
+     "test-editor-tree: bundle_card and bundle_grid are offered on home only.",
+     "test-sections-render and test-design-doc: every kind has a component and token entry; the a6d028e legacy fixtures are unchanged.",
+     "pnpm test is green (98 suites)."
+    ]
+   },
+   {
+    "id": "P5-CHECKS",
+    "branch": "cms/p5-checks",
+    "reqs": [
+     "COM-01",
+     "PUB-03",
+     "TREE-01"
+    ],
+    "brief": "Add bundle publish warnings that never block, and prove the BINDING_INVALID remove path.\n\n1. lib/documents/checks.js referenceChecks:\n   - Collect every { ref: 'bundle', id } from refsOf(section) across the document (settings only; /bundles/<slug> links are not checked in phase 5, a recorded known limit).\n   - When the document has no bundle ref, make NO bundle statement (existing statement-count tests in test-publish-checks and test-publish-service must not move). Otherwise read them with ONE guarded bundlesByIds(ids) call (lib/commerce/bundle-read.js), at most 3 statements whatever the number of refs. A read failure gives the existing 'checks could not run' handling, never a false missing.\n   - Warnings (text from lib/commerce/bundle-words.js, naming the bundle title or the id when gone):\n     - BUNDLE_MISSING (deleted);\n     - BUNDLE_DISABLED (turned off);\n     - BUNDLE_UNAVAILABLE (sold_out, no_saving, not_ready; says shoppers see 'Currently unavailable', and for no_saving gives the live component sum through formatMoney(sum, currency ?? undefined) and says to lower the price in Catalog > Bundles);\n     - BUNDLE_OVERLAP (a picked, enabled bundle shares a product with another enabled bundle: 'Another bundle uses the same products, so the cart may give a different saving than this block shows.'). Not removable; openField.\n   - BUNDLE_MISSING, BUNDLE_DISABLED and BUNDLE_UNAVAILABLE go in REMOVABLE_WARNINGS: decorate() gives removeSection for a card's bundle setting and removeItem (that index only) for a bundle_list entry. The button words come from components/admin/editor/publish/publishModel.js actionLabel, which is not changed in phase 5: removeSection reads 'Remove this section and publish' and removeItem 'Remove it and publish'; the warning message itself names what goes (for a grid entry: 'Remove this bundle from the grid' is said in the message text, not the button). None is in publish.js STRUCTURE_CODES.\n2. scripts/test-publish-checks.js: register a throwaway kind with a bundle setting and a bundle_list setting (defineSection plus removeSection), because the real kinds land in P5-BLOCKS in the same batch. Seed with lib/bundles.js createBundle / setBundleEnabled / deleteBundle on a tenant-fixture file DB; plant a sold-out variant through the sync writer (tenant-fixture's writeProduct path, availableForSale false). Assert:\n   - BUNDLE_MISSING on the card with removeSection, and replaying it removes the section;\n   - BUNDLE_MISSING on ONE bundle_list entry with removeItem for that index only (the grid half of the missing cell);\n   - BUNDLE_DISABLED on a bundle_list entry with removeItem for that index only;\n   - BUNDLE_UNAVAILABLE for a sold-out component ('Currently unavailable') and for no_saving (names the sum);\n   - BUNDLE_OVERLAP for two overlapping enabled bundles, with openField only;\n   - publishing a document carrying all four succeeds (follow the existing PRODUCT_UNAVAILABLE pattern for any acknowledgement the publish flow needs);\n   - a faulting read gives no BUNDLE_MISSING and the existing checks-failed handling;\n   - the bundle checks use the same statement count (at most 3, warm probe) for 1 and for 12 refs;\n   - BINDING_INVALID remove path (TREE-01, from review): a draft holding an instance binding with source 'no_such_source', written straight into the test DB (the writer refuses it, so this is a named test-only plant), gets BINDING_INVALID with the 'Remove it and add it again' message and a removeSection action; replaying the action clears the issue and publish succeeds.\n\nNo legacy impact: checks run only on documents publish.",
+    "migrations": [],
+    "files": [
+     "lib/documents/checks.js",
+     "scripts/test-publish-checks.js",
+     "docs/cms-reviews/P5-CHECKS.md"
+    ],
+    "acceptance": [
+     "test-publish-checks: a card bound to a deleted bundle gives BUNDLE_MISSING with removeSection, and replaying it removes the section.",
+     "test-publish-checks: a bundle_list with one deleted and one disabled bundle gives BUNDLE_MISSING and BUNDLE_DISABLED, each with removeItem for its own index only.",
+     "test-publish-checks: a sold-out component gives BUNDLE_UNAVAILABLE saying shoppers see 'Currently unavailable'; no_saving names the live sum through formatMoney; with a USD fixture currency no message has '\u20b9' or 'INR' (and checks.js has no such literal).",
+     "test-publish-checks: overlapping enabled bundles give BUNDLE_OVERLAP with openField only.",
+     "test-publish-checks: publishing a document carrying all four warnings succeeds.",
+     "test-publish-checks: when the bundles read throws, no BUNDLE_MISSING is reported and the checks-failed handling applies.",
+     "test-publish-checks: the bundle checks use the same statement count, at most 3, for 1 and 12 refs.",
+     "test-publish-checks: a planted unknown body binding gives BINDING_INVALID with the remove words; replaying removeSection clears it and publish succeeds.",
+     "test-publish-checks: a document with no bundle reference sends no bundles, offers or bundle-variants statement during publish checks.",
+     "pnpm test is green."
+    ]
+   },
+   {
+    "id": "P5-PANEL",
+    "branch": "cms/p5-panel",
+    "reqs": [
+     "COM-02"
+    ],
+    "brief": "Make the console bundle form pick products instead of typing them, derive the slug, and never turn a live bundle off by accident.\n\n1. New components/admin/bundles/BundleForm.js (client), exported for P5-EDITOR:\n   - Fields: Name (title); Products: rows that each open VariantPicker (components/admin/cms/RefPicker.js) plus a quantity, no typed input; picking a variant already in the list adds to its quantity instead of a second row; Price; Description (full mode only, kept on edit).\n   - A live check (POST { check }) shows, per product row, the reason from bundle-words ('Sold out', 'No longer available') and, under the price, the saving or 'Price must be lower than <sum>' through formatMoney(\u2026, currency). Reasons come from the structured reasons only, never the legacy problems strings.\n   - Full mode (console): 'Save as draft' (enable false) and 'Save and show to shoppers' (enable true, compat-gated) for a new bundle, as today's panel offers; on edit one 'Save changes' that keeps the stored enabled state (P5-BUNDLEREAD semantics) plus the existing on/off control. After save it shows the derived link read-only: 'Shoppers' link: /bundles/<slug>'.\n   - Compact mode (the editor's Dialog): Name, Products, Price only; one 'Create bundle' that sends POST { create, enable: true, mustPass: true } and is disabled until the live check passes (OQ-C).\n   - Props: currency, onSaved(bundle), compact, initial.\n2. components/admin/CommercePanels.js BundlesPanel: use BundleForm; remove the typed Slug input and the 'product-handle or gid://\u2026' input; replace 'Bundle price (\u20b9)' and inr() with formatMoney and the currency; give the card id='bundles' (the anchor the editor and warnings link to: /admin/catalog#bundles). On Disable and in the Delete ConfirmDialog, when the bundle is used on the live home (usedOnHome from the API) say 'Shoppers will stop seeing this bundle on your home page right away.'\n3. app/(console)/admin/(authed)/catalog/page.js: pass the currency (storeCurrency) to BundlesPanel at both render sites.\n4. app/api/admin/bundles/route.js:\n   - resolveItems no longer resolves handles: a non-GID variantId on the `bundle` and `check` actions is refused 422 'Pick the product again.' and nothing is written (deviation 3.10, owner sign-off);\n   - GET rows add usedOnHome from document_refs ('bundle', id) rows of the live home version (the same lookup media 'Where it's used' uses);\n   - offers.write unchanged.\n5. Tests:\n   - scripts/test-commerce-exp.js: POST { bundle: { items: [{ variantId: 'some-handle' }] } } -> 422, no row; edit POST { bundle: { id, title, items, bundle_price } } keeps slug, enabled and description and updates the bundle-<id> offer price; usedOnHome true for a bundle on the live home.\n   - scripts/test-bundle-form.js (replace the placeholder; SWC + react-dom/server loader as in test-sections-render): BundleForm full mode renders Name, Products (picker rows), Price, Description and the two save buttons; compact mode renders only Name, Products and Price and 'Create bundle'; a source scan of BundleForm.js and CommercePanels.js finds no 'gid://' placeholder, no slug Input, no '\u20b9' or 'INR' literal, and no use of compat.problems; rendering a failing check shows bundle-words sentences only (no 'component 2:').\n   - test-product-editor.js and test-legacy-routes.js stub CommercePanels and are not changed.\n\nLegacy: /admin/catalog keeps working for legacy and documents stores alike (the P4-ED05 deviation stands).",
+    "migrations": [],
+    "files": [
+     "components/admin/bundles/BundleForm.js",
+     "components/admin/CommercePanels.js",
+     "app/(console)/admin/(authed)/catalog/page.js",
+     "app/api/admin/bundles/route.js",
+     "scripts/test-commerce-exp.js",
+     "scripts/test-bundle-form.js",
+     "docs/cms-reviews/P5-PANEL.md"
+    ],
+    "acceptance": [
+     "test-bundle-form: the source scan finds no 'gid://' placeholder input, no slug Input, no '\u20b9' or 'INR' literal and no compat.problems use in BundleForm.js and CommercePanels.js.",
+     "test-bundle-form: full mode renders Name, Products, Price, Description and 'Save as draft' / 'Save and show to shoppers'; compact mode renders only Name, Products, Price and 'Create bundle'.",
+     "test-bundle-form: a failing check renders bundle-words reasons per product row and no 'component N:' text.",
+     "test-commerce-exp: a handle variantId on bundle or check is refused 422 with 'Pick the product again.' and no row is written.",
+     "test-commerce-exp: an edit without slug, enable or description keeps all three and updates the bundle-<id> offer price.",
+     "test-commerce-exp: GET marks usedOnHome for a bundle referenced by the live home.",
+     "pnpm test is green."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 3: editor bundle picker and inline create",
+  "items": [
+   {
+    "id": "P5-EDITOR",
+    "branch": "cms/p5-editor",
+    "reqs": [
+     "COM-02",
+     "COM-01"
+    ],
+    "brief": "Let the founder pick or create a bundle from the inspector, and tell them each bundle's state in plain words.\n\n1. New controls BundleControl (single) and BundleListControl (ordered list: add, remove, move), registered in components/admin/editor/fields/controls.js CONTROLS and inspectorModel.js CONTROL_OF_KIND (bundle -> 'bundle', bundle_list -> 'bundle_list'):\n   - a search field (refs q=) over the bundle list from editor context; each option shows title, price (formatMoney with its currency) and a state chip;\n   - picking writes { id } only (re-picking replaces any old value, including an invalid { id, title } one);\n   - EVERY picked bundle (the single one, and each row of the list) shows its chip and the bundle-words status line: available 'Showing to shoppers'; disabled 'Turned off: shoppers don't see this section. Turn it on in Catalog > Bundles.'; sold_out 'A product in this bundle is sold out: shoppers see Currently unavailable and can't add it.'; no_saving 'The price no longer saves anything (the products add up to <sum>): shoppers can't add it. Lower the price in Catalog > Bundles.'; not_ready 'This bundle isn't ready for the cart yet: shoppers can't add it. Open it in Catalog > Bundles and save it again.'; missing 'This bundle was deleted. Pick another or remove it.'; plus, when overlapsWith is not empty, 'Another bundle uses the same products, so the cart may give a different saving.' Each 'Catalog > Bundles' is a link to /admin/catalog#bundles (new tab).\n   - BundleListControl refuses a duplicate pick with 'This bundle is already in the grid.' and keeps the order;\n   - anchorsOf entries so validation issues (incomplete, UNKNOWN_FIELD, INVALID_VALUE on an index) land on the control or row.\n2. components/admin/editor/DocumentEditor.js: load bundles once at mount alongside products and collections (fetchRefs({ type: 'bundle', limit: 50 }) plus ids= hydrate for picked ids not in the first page; search goes to q=). Refresh on window focus and after an inline create, so the chips match the preview. A failed or 403 read shows 'You can't see bundles here.'; a picked bundle then shows its id with that sentence and can still be removed (not replaced).\n3. Inline create: a 'Create a bundle' button opens a Dialog with BundleForm compact (P5-PANEL). The Dialog says: 'The bundle is saved and turned on now: its discount works in the cart and its page /bundles/<slug> opens right away, even if you don't publish. It shows on your home page after you publish.' Save stays disabled until the live check passes (no failed bundle is ever saved, so retries never make gym-kit-2, gym-kit-3). On save it picks the new id and refreshes context. The button is hidden, with 'Ask an owner to create bundles.', when the session lacks offers.write: app/(console)/admin/(authed)/editor/page.js passes a can={{ offersWrite }} prop to DocumentEditor (OQ-A).\n4. BundleForm.js may get small compact-mode fixes here (P5-PANEL has merged).\n5. Tests:\n   - scripts/test-editor-inspector.js: remove bundle and bundle_list from WAITING_KINDS; inspectorCoverage() has no bundle or bundle_list problem (other waiting kinds stay); status line per state (available, sold_out, no_saving, not_ready, disabled, missing, overlap, can't-see); a pick writes exactly { id }; re-picking over { id, title } writes { id } and validateDocument then has no UNKNOWN_FIELD for it; BundleListControl keeps order and refuses a duplicate; anchorsOf maps incomplete, UNKNOWN_FIELD and an indexed INVALID_VALUE.\n   - scripts/test-bundle-form.js: the inline-create Dialog renders only Name, Products and Price, the 'turned on now \u2026 even if you don't publish' sentence, and Save disabled while the check fails; the 'Create a bundle' button is absent without offers.write.\n\nNo legacy impact: the editor only opens on documents stores.",
+    "migrations": [],
+    "files": [
+     "components/admin/editor/fields/BundleControl.js",
+     "components/admin/editor/fields/controls.js",
+     "components/admin/editor/fields/inspectorModel.js",
+     "components/admin/editor/DocumentEditor.js",
+     "app/(console)/admin/(authed)/editor/page.js",
+     "components/admin/bundles/BundleForm.js",
+     "scripts/test-editor-inspector.js",
+     "scripts/test-bundle-form.js",
+     "docs/cms-reviews/P5-EDITOR.md"
+    ],
+    "acceptance": [
+     "test-editor-inspector: WAITING_KINDS has no bundle or bundle_list, and inspectorCoverage() reports no problem for them.",
+     "test-editor-inspector: the status line is the bundle-words sentence for each state, the overlap line, and 'You can't see bundles here.' when the read failed.",
+     "test-editor-inspector: a pick writes exactly { id }; re-picking over { id, title } clears the UNKNOWN_FIELD issue; BundleListControl keeps order and refuses a duplicate.",
+     "test-editor-inspector: anchorsOf maps a bundle incomplete, UNKNOWN_FIELD and an indexed bundle_list INVALID_VALUE to the control or row anchor.",
+     "test-bundle-form: the inline-create Dialog shows only Name, Products and Price plus the live-now sentence, and Save is disabled while the check fails.",
+     "test-bundle-form: without offers.write the 'Create a bundle' button is absent and the sentence is shown.",
+     "pnpm test is green."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 4: drills",
+  "items": [
+   {
+    "id": "P5-DRILLS",
+    "branch": "cms/p5-drills",
+    "reqs": [
+     "TREE-01",
+     "COM-01",
+     "COM-02"
+    ],
+    "brief": "Prove US-28, US-33 and the bundle half of US-34 in desktop Chrome on the design harness, check legacy stores are untouched, and hand over the owner checks.\n\nRules: the harness rules in docs/cms-reviews/P1-HARNESS.md and P4-DRILLS.md apply (local addresses only through assertLocal, harness env never .env.local, nothing written to Shopify, no Typesense). No app code changes; a bug found is recorded in the packet's From review and reported, not fixed here. Do not edit scripts/drills/p3/* or p4/* (import their helpers), scripts/seed-design-documents.js or package.json; if seeding needs one of them, stop and ask. Seed bundles in-process against the harness DB through lib/bundles.js createBundle / setBundleEnabled (writers only); stock changes go through the sync writer (writeProduct shape), never a raw catalog UPDATE.\n\n1. scripts/drills/p5/run.mjs (node scripts/drills/p5/run.mjs [stage,\u2026]), lib.mjs and the stages below; results in docs/cms-reviews/drills/P5-DRILLS/ (results per stage, results-run.json, screenshots). Use a documents-mode store (the P4 helper that moves a --p4 store, or a new documents-mode tenant; record which).\n2. Stages:\n   - baseline: from a throwaway read-only git worktree at afd7881 (outside the repo's .claude/worktrees, removed after), start the harness and capture the legacy store's shopper routes (home, a product, a collection, /bundles/<slug>, cart JSON) and the a6d028e-style home render; save as baseline-legacy/.\n   - legacy: on the phase 5 tree, the same captures for the same legacy store are byte-identical to baseline-legacy (masking only fields the P4 drill already masks), and the legacy editors show no bundle kinds.\n   - pick (US-28, benchmark row 2): from a fresh browser, time from opening the editor to the live home showing a Bundle card: add 'Bundle card', search and pick an enabled bundle, check the Mobile preview (screenshot), publish, see it on the live home in a fresh browser. Record the time; target under 2 minutes.\n   - create (COM-02): 'Create a bundle' in the inspector with a price above the sum: Save stays disabled with the plain reason; fix the price; save; the new bundle is picked; exactly one new bundles row exists (no -2); the Dialog's live-now sentence is shown; /bundles/<slug> opens before publish.\n   - states (US-33): a component goes sold out through the sync writer: preview card says 'Currently unavailable' with the component marked; the inspector status line says so; publish shows BUNDLE_UNAVAILABLE and still publishes; the live card has add disabled.\n   - disabled (US-34 bundle half): turn the bundle off in Catalog > Bundles (the panel says it is on the live home): the live home hides the card at once; preview shows the turned-off reason; publish shows BUNDLE_DISABLED with the 'Remove this section and publish' action.\n   - grid: a Bundle grid of 4 (available, sold out, disabled, deleted): live shows 2 cells in order; preview shows a note for each dropped cell; publish shows the per-entry warnings, each with a 'Remove it and publish' action that removes only that bundle from the grid.\n   - cart: add from the live card: the cart equals adding the same bundle from /bundles/<slug> (lines, discount); checkout review shows the saving; one cash on delivery test order to snehal@mediastic.in, then cancelled at once (after checking that neither the store's row nor the harness env holds a Shopify domain or token or a payment secret; no card details ever).\n   - console: /admin/catalog has no slug or GID inputs; editing an enabled bundle's price keeps it on and the live card shows the new price.\n   - unknown (TREE-01, validator regression): a draft save carrying an instance binding with source 'no_such_source' through the documents writer API is refused 422 with the plain message and nothing stored; the live home is byte-identical. The runtime source_unknown path is proved in test-sections only (a draft cannot hold it).\n3. docs/cms-reviews/MANUAL-CHECKS.md: add the phase 5 owner checks from plan section 4 (only this item edits it).\n4. docs/cms-reviews/P5-DRILLS.md with Known limits, From review and Owner checks; collect every P5 packet's Known limits there.",
+    "migrations": [],
+    "files": [
+     "scripts/drills/p5/run.mjs",
+     "scripts/drills/p5/lib.mjs",
+     "scripts/drills/p5/seed-p5.mjs",
+     "scripts/drills/p5/blocks.mjs",
+     "scripts/drills/p5/legacy.mjs",
+     "docs/cms-reviews/drills/P5-DRILLS/",
+     "docs/cms-reviews/MANUAL-CHECKS.md",
+     "docs/cms-reviews/P5-DRILLS.md"
+    ],
+    "acceptance": [
+     "The baseline and legacy stages show the legacy store's shopper captures byte-identical between afd7881 and the phase 5 tree.",
+     "The pick stage records the time from editor to live card (target under 2 minutes) and a Mobile preview screenshot.",
+     "The create stage shows Save disabled on a failing price, then exactly one new bundle after the fix, picked in the section, with the live-now sentence.",
+     "The states, disabled and grid stages show the live and preview outcomes and warnings named in the brief, with screenshots.",
+     "The cart stage shows equal carts from the block and the bundle page, and the test order to snehal@mediastic.in is cancelled.",
+     "The unknown stage shows the draft save refused 422 with nothing stored and the live home unchanged.",
+     "MANUAL-CHECKS.md lists every phase 5 owner check from plan section 4.",
+     "pnpm test is green; no app code changed on this branch."
+    ]
+   }
+  ]
+ }
+]
