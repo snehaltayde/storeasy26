@@ -161,6 +161,8 @@ const cli = (args) =>
   });
 
 let world = null;
+let mapped = null;
+let tenantDb = null;
 try {
   // ====================================================================================
   console.log("— 1. normalizing: what differs between two visits to the same store");
@@ -272,6 +274,45 @@ try {
     ok(o.differences.some((d) => d.selector === "$.products" && d.before.startsWith("in this order:")), `reordered offer: ${show(o)}`);
   });
 
+  await t("P4-FIX4: only an href, only a src or only an alt changes: each is a difference at that element", async () => {
+    const pg = (href, src, alt) => `<html><head><title>Shop</title></head><body><main><a class="block" href="${href}"><img src="${src}" alt="${alt}"/><span>Whey Protein</span></a></main></body></html>`;
+    const A = pg("/products/whey-protein", "/api/media/whey", "Whey Protein");
+    eq(compare(cap(A, "/"), cap(A, "/")).same, true, "the same page:");
+    const cases = [
+      ["href", pg("/products/whey-isolate", "/api/media/whey", "Whey Protein"), "html > body > main > a", 'href="/products/whey-protein"', 'href="/products/whey-isolate"'],
+      ["src", pg("/products/whey-protein", "/api/media/whey-old", "Whey Protein"), "html > body > main > a > img", 'src="/api/media/whey"', 'src="/api/media/whey-old"'],
+      ["alt", pg("/products/whey-protein", "/api/media/whey", ""), "html > body > main > a > img", 'alt="Whey Protein"', "alt"],
+    ];
+    for (const [name, B, sel, before, after] of cases) {
+      const r = compare(cap(A, "/"), cap(B, "/"), { allowed: ALLOWED_DIFFERENCES });
+      ok(!r.same, `${name}: must differ`);
+      eq(r.differences.length, 1, `${name}: exactly one difference:`);
+      eq(r.differences[0].selector, sel, `${name}: where:`);
+      ok(String(r.differences[0].before).includes(before), `${name}: before ${r.differences[0].before}`);
+      ok(String(r.differences[0].after).includes(after), `${name}: after ${r.differences[0].after}`);
+    }
+  });
+
+  await t("P4-FIX4: preview-only markup is stripped (data-preview*, data-field* attributes; preview bar and note elements)", async () => {
+    const plain = `<html><head><title>Shop</title></head><body><main><section data-sec="hero"><h1>Winter repair</h1></section><p>Free shipping</p></main></body></html>`;
+    const preview = `<html><head><title>Shop</title></head><body><div data-preview-bar="1" class="fixed"><span>Preview: your draft</span><a href="/admin/editor">Back to the editor</a></div><main><section data-sec="hero" data-preview-section="sec_hero" data-field-path="hero.title"><h1 data-field="title" data-preview-target="hero">Winter repair</h1><aside data-preview-note="" class="note">A test runs on this section</aside></section><p data-field-id="x">Free shipping</p></main></body></html>`;
+    const n = normalize(preview);
+    for (const gone of ["data-preview", "data-field", "Preview: your draft", "Back to the editor", "A test runs on this section"]) ok(!n.includes(gone), `normalized page still holds ${gone}:\n${n}`);
+    eq(n, normalize(plain), "the preview page normalizes to the shopper page:");
+    ok(compare(cap(plain, "/"), cap(preview, "/")).same, "and compares the same, strictly");
+    // a shopper attribute next to them still counts
+    ok(!compare(cap(plain, "/"), cap(preview.replace('<p data-field-id="x">', '<p data-field-id="x" class="sale">'), "/")).same, "a real attribute beside them is still compared");
+  });
+
+  await t("P4-FIX4: attribute order does not matter", async () => {
+    const a = `<html><body><main><a class="block" href="/products/x" data-sec="pdp-pairs" aria-label="X"><img alt="X" src="/api/media/x" loading="lazy"/></a></main></body></html>`;
+    const b = `<html><body><main><a aria-label="X" data-sec="pdp-pairs" href="/products/x" class="block"><img loading="lazy" src="/api/media/x" alt="X"/></a></main></body></html>`;
+    eq(normalize(a), normalize(b), "normalized pages:");
+    ok(normalize(a).includes('<a aria-label="X" class="block" data-sec="pdp-pairs" href="/products/x">'), `attributes are sorted: ${normalize(a)}`);
+    const r = compare(cap(a, "/"), cap(b, "/"));
+    ok(r.same, `the same: ${show(r)}`);
+  });
+
   // ====================================================================================
   console.log("— 3. ALLOWED_DIFFERENCES (also asserted by test-migrate-documents, P4-CUTOVER)");
   // ====================================================================================
@@ -291,14 +332,15 @@ try {
     await t(`${a.id}: its fixture differs without it, is the same with it (and with the whole list)`, async () => {
       const before = cap(a.fixture.before, a.fixture.route);
       const after = cap(a.fixture.after, a.fixture.route);
-      const strict = compare(before, after, { allowed: [] });
+      const heroExperiments = a.fixture.heroExperiments ?? null;
+      const strict = compare(before, after, { allowed: [], heroExperiments });
       ok(!strict.same, `${a.id}: the fixture must differ without the entry (it proves the entry is needed)`);
-      const others = compare(before, after, { allowed: ALLOWED_DIFFERENCES.filter((x) => x !== a) });
+      const others = compare(before, after, { allowed: ALLOWED_DIFFERENCES.filter((x) => x !== a), heroExperiments });
       ok(!others.same, `${a.id}: no other entry covers it`);
-      const withIt = compare(before, after, { allowed: [a] });
+      const withIt = compare(before, after, { allowed: [a], heroExperiments });
       ok(withIt.same, `${a.id}: with the entry, the same; got ${show(withIt)}`);
       ok(withIt.allowedApplied.some((x) => x.id === a.id && x.route === a.fixture.route), `${a.id}: reported as used`);
-      ok(compare(before, after, { allowed: ALLOWED_DIFFERENCES }).same, `${a.id}: the same with the whole list`);
+      ok(compare(before, after, { allowed: ALLOWED_DIFFERENCES, heroExperiments }).same, `${a.id}: the same with the whole list`);
     });
   }
 
@@ -316,16 +358,37 @@ try {
   await t("hero-test-variant only applies when both captures show the same running test", async () => {
     const entry = ALLOWED_DIFFERENCES.find((a) => a.id === "hero-test-variant");
     const { before, after } = entry.fixture;
+    const H = { allowed: ALLOWED_DIFFERENCES, heroExperiments: ["hero-promise"] };
     eq(normalizeTree(before).experiments.join(), "hero-promise", "the test is seen in the page's data:");
     const noTest = after.replace(/<script>self\.__next_f[\s\S]*?<\/script>/, "");
     eq(normalizeTree(noTest).experiments.length, 0, "no test without the data:");
-    ok(!compare(cap(before, "/"), cap(noTest, "/"), { allowed: ALLOWED_DIFFERENCES }).same, "a test that stopped (or started) is a difference");
+    ok(!compare(cap(before, "/"), cap(noTest, "/"), H).same, "a test that stopped (or started) is a difference");
     const otherTest = after.replace("hero-promise", "hero-other");
-    ok(!compare(cap(before, "/"), cap(otherTest, "/"), { allowed: ALLOWED_DIFFERENCES }).same, "a different test is a difference");
-    const heroOnly = compare(cap(before.replace("Shop now", "Buy"), "/"), cap(after, "/"), { allowed: ALLOWED_DIFFERENCES });
+    ok(!compare(cap(before, "/"), cap(otherTest, "/"), H).same, "a different test is a difference");
+    const heroOnly = compare(cap(before.replace("Shop now", "Buy"), "/"), cap(after, "/"), H);
     ok(heroOnly.same, "inside the hero only, while the same test runs, it is set aside");
-    const outside = compare(cap(before.replace("</main>", "<p>Free shipping</p></main>"), "/"), cap(after, "/"), { allowed: ALLOWED_DIFFERENCES });
+    const outside = compare(cap(before.replace("</main>", "<p>Free shipping</p></main>"), "/"), cap(after, "/"), H);
     ok(!outside.same, "outside the hero it still counts");
+  });
+
+  await t("P4-FIX4: hero-test-variant matches the hero test by its slug, never any running test", async () => {
+    const entry = ALLOWED_DIFFERENCES.find((a) => a.id === "hero-test-variant");
+    const { before, after } = entry.fixture;
+    // the same pages, but the only test the pages name is not the store's hero test
+    const r1 = compare(cap(before, "/"), cap(after, "/"), { allowed: ALLOWED_DIFFERENCES, heroExperiments: ["hero-winter"] });
+    ok(!r1.same, `a running test that is not the hero test never sets the hero aside: ${show(r1)}`);
+    ok(r1.differences.some((d) => d.selector.includes('section[data-sec="hero"]')), `the hero change is shown: ${show(r1)}`);
+    // no hero test known (a plain route list): strict
+    ok(!compare(cap(before, "/"), cap(after, "/"), { allowed: ALLOWED_DIFFERENCES }).same, "with no hero test known nothing is set aside");
+    // only one side's store lists it as the hero test
+    ok(!compare(cap(before, "/", { heroExperiments: ["hero-promise"] }), cap(after, "/", { heroExperiments: [] }), { allowed: ALLOWED_DIFFERENCES }).same, "both sides must name it");
+    // per capture (as loadCapture gives them): the slug the store named
+    ok(compare(cap(before, "/", { heroExperiments: ["hero-promise"] }), cap(after, "/", { heroExperiments: ["hero-promise"] }), { allowed: ALLOWED_DIFFERENCES }).same, "named on both captures: set aside");
+    // a non-hero test pinging on the home page beside the hero test: still only the hero test counts
+    const extra = (html) => html.replace("</body>", `<script>self.__next_f.push([1,"2b:[\\"$\\",\\"$L177\\",null,{\\"slug\\":\\"home-banner\\",\\"unit\\":\\"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee\\"}]\\n"])</script></body>`);
+    eq(normalizeTree(extra(before)).experiments.join(), "hero-promise,home-banner", "both tests are seen:");
+    const onlyOther = compare(cap(extra(before.replace(/hero-promise/g, "hero-stopped")), "/"), cap(extra(after.replace(/hero-promise/g, "hero-stopped")), "/"), { allowed: ALLOWED_DIFFERENCES, heroExperiments: ["hero-promise"] });
+    ok(!onlyOther.same, "a home page whose only shared test is another one keeps its hero compared");
   });
 
   // ====================================================================================
@@ -429,6 +492,35 @@ try {
     eq(r.status, 2, `exit code: ${r.stderr}`);
   });
 
+  await t("P4-FIX4: a '/\\evil.com/x' route (one slash, then a backslash) is refused by the origin check, before any request", async () => {
+    const path = "/\\evil.example.com/x";
+    eq(path[1], "\\", "the route is / then a backslash:");
+    ok(path.startsWith("/") && !path.startsWith("//"), "it passes the leading-slash check, so only the origin check can stop it");
+    eq(new URL(path, BASE_URL).host, "evil.example.com", "a browser-style parser sends it to another host:");
+    seen.length = 0;
+    let refused = null;
+    let fetched = 0;
+    try {
+      await captureRoutes(BASE_URL, [{ name: "evil", path }], join(TMP, "never-evil"), {
+        fetchImpl: async () => {
+          fetched++;
+          throw new Error("must not fetch");
+        },
+      });
+    } catch (e) {
+      refused = e.message;
+    }
+    ok(refused && /leaves the store/.test(refused), `refused in words: ${refused}`);
+    eq(fetched, 0, "fetches:");
+    ok(!existsSync(join(TMP, "never-evil")), "no folder was made");
+    const f = join(TMP, "evil-routes.json");
+    writeFileSync(f, JSON.stringify([path]));
+    const r = await cli(["--base", BASE_URL, "--routes", f, "--out", join(TMP, "cli-evil")]);
+    eq(r.status, 2, `exit code: ${r.stderr}`);
+    ok(/leaves the store/.test(r.stderr), `plain words: ${r.stderr}`);
+    eq(seen.length, 0, "no request reached any server:");
+  });
+
   await t("--compare exits 1 on a difference and names it; 0 when the same", async () => {
     variant = "after";
     await captureRoutes(BASE_URL, readRoutes(routesFile), capAfter);
@@ -451,6 +543,94 @@ try {
     eq(await main(["--compare"], { log() {}, error() {} }), 2, "usage:");
   });
 
+  // a capture folder written by hand, in this tool's format
+  const writeCapture = (dir, pages, extra = {}) => {
+    mkdirSync(dir, { recursive: true });
+    const routes = pages.map((p, i) => {
+      const file = `${p.name ?? `p${i}`}.html`;
+      writeFileSync(join(dir, file), p.body ?? "");
+      return { name: p.name ?? `p${i}`, path: p.path, kind: p.kind ?? "canary", file, status: p.status ?? 200, contentType: "text/html; charset=utf-8", location: null };
+    });
+    writeFileSync(join(dir, "index.json"), JSON.stringify({ tool: "migrate-render", version: 1, origin: "http://localhost:6140", routes, ...extra }));
+    return dir;
+  };
+
+  await t("P4-FIX4: --compare refuses (exit 2, plain words) when no page was compared", async () => {
+    const a = writeCapture(join(TMP, "empty-a"), []);
+    const b = writeCapture(join(TMP, "empty-b"), []);
+    const r = await cli(["--compare", a, b]);
+    eq(r.status, 2, `exit code: ${r.stdout}${r.stderr}`);
+    ok(/no page was compared/.test(r.stderr), `plain words: ${r.stderr}`);
+    ok(!/Result: the same/.test(r.stdout), "never reports the same");
+    let threw = null;
+    try {
+      compareDirs(a, b);
+    } catch (e) {
+      threw = e.message;
+    }
+    ok(threw && /no page was compared/.test(threw), `the library refuses too: ${threw}`);
+  });
+
+  await t("P4-FIX4: --compare refuses when a canary in the before capture did not answer 2xx or 3xx (the same broken store before and after)", async () => {
+    const broken = "<html><body><h1>500: Internal Server Error</h1></body></html>";
+    const pages = [
+      { name: "home", path: "/", status: 500, body: broken },
+      { name: "product", path: "/products/x", status: 500, body: broken },
+    ];
+    const a = writeCapture(join(TMP, "broken-a"), pages);
+    const b = writeCapture(join(TMP, "broken-b"), pages);
+    eq(compareDirs(a, b, { gate: false }).same, true, "without the gate these compare the same:");
+    const r = await cli(["--compare", a, b]);
+    eq(r.status, 2, `exit code: ${r.stdout}${r.stderr}`);
+    ok(/didn't load before the move: \/ \(500\), \/products\/x \(500\)/.test(r.stderr), `names the pages: ${r.stderr}`);
+    ok(!/Result: the same/.test(r.stdout), "never reports the same");
+    // one canary broken is enough; a 404 counts as broken too
+    const one = writeCapture(join(TMP, "broken-one"), [{ name: "home", path: "/", status: 200, body: "<p>ok</p>" }, { name: "page", path: "/policies/x", status: 404, body: "<p>Not found</p>" }]);
+    const r2 = await cli(["--compare", one, one]);
+    eq(r2.status, 2, `one 404 canary: ${r2.stderr}`);
+    // a redirect (3xx) canary and a broken non-canary page are fine
+    const fine = writeCapture(join(TMP, "fine"), [{ name: "home", path: "/", status: 200, body: "<p>ok</p>" }, { name: "old", path: "/old", status: 308, body: "" }, { name: "prod", path: "/products/gone", kind: "product", status: 404, body: "<p>Not found</p>" }]);
+    eq((await cli(["--compare", fine, fine])).status, 0, "redirect canaries and a broken non-canary page pass");
+    // a capture that marks no canary is refused
+    const nokind = writeCapture(join(TMP, "nokind"), [{ name: "home", path: "/", kind: "product", status: 200, body: "<p>ok</p>" }]);
+    const r3 = await cli(["--compare", nokind, nokind]);
+    eq(r3.status, 2, `no canary: ${r3.stderr}`);
+    ok(/marks no canary/.test(r3.stderr), r3.stderr);
+  });
+
+  await t("P4-FIX4: the command applies ALLOWED_DIFFERENCES (and the hero slug kept in the capture)", async () => {
+    const sid = ALLOWED_DIFFERENCES.find((a) => a.id === "section-ids").fixture;
+    const a = writeCapture(join(TMP, "allowed-a"), [{ name: "home", path: "/", body: sid.before }]);
+    const b = writeCapture(join(TMP, "allowed-b"), [{ name: "home", path: "/", body: sid.after }]);
+    eq(compareDirs(a, b, { allowed: [] }).same, false, "strictly they differ:");
+    const r = await cli(["--compare", a, b]);
+    eq(r.status, 0, `the command sets the allowed difference aside: ${r.stdout}${r.stderr}`);
+    ok(/Set aside as allowed/.test(r.stdout) && /section-ids on \//.test(r.stdout), `and says so with its reason: ${r.stdout}`);
+    ok(/Result: the same/.test(r.stdout), r.stdout);
+    // the hero test: set aside only when the captures name it as the store's hero test
+    const hero = ALLOWED_DIFFERENCES.find((x) => x.id === "hero-test-variant").fixture;
+    const ha = writeCapture(join(TMP, "hero-a"), [{ name: "home", path: "/", body: hero.before }], { heroExperiments: ["hero-promise"] });
+    const hb = writeCapture(join(TMP, "hero-b"), [{ name: "home", path: "/", body: hero.after }], { heroExperiments: ["hero-promise"] });
+    const hr = await cli(["--compare", ha, hb]);
+    eq(hr.status, 0, `hero test named in both captures: ${hr.stdout}${hr.stderr}`);
+    ok(/hero-test-variant on \//.test(hr.stdout), hr.stdout);
+    const na = writeCapture(join(TMP, "hero-na"), [{ name: "home", path: "/", body: hero.before }]);
+    const nb = writeCapture(join(TMP, "hero-nb"), [{ name: "home", path: "/", body: hero.after }]);
+    eq((await cli(["--compare", na, nb])).status, 1, "no hero test named: the hero is compared");
+  });
+
+  await t("P4-FIX4: a capture keeps the hero test's slug from a --make-routes list", async () => {
+    const f = join(TMP, "routes-hero.json");
+    writeFileSync(f, JSON.stringify({ routes: [{ name: "home", path: "/", kind: "canary" }], heroExperiments: ["hero-promise", "bad slug!"] }));
+    const out = join(TMP, "cli-hero-capture");
+    const r = await cli(["--base", BASE_URL, "--routes", f, "--out", out]);
+    eq(r.status, 0, r.stderr);
+    const index = JSON.parse(readFileSync(join(out, "index.json"), "utf8"));
+    eq(JSON.stringify(index.heroExperiments), '["hero-promise"]', "index.json heroExperiments:");
+    eq(JSON.stringify(loadCapture(out)[0].heroExperiments), '["hero-promise"]', "loadCapture:");
+    eq(loadCapture(out)[0].kind, "canary", "kind kept:");
+  });
+
   // ====================================================================================
   console.log("— 6. the route list from a store");
   // ====================================================================================
@@ -468,7 +648,10 @@ try {
     const { renderRoutesFor } = await import("../lib/migrate/render-compare.js");
     const { libsql } = await import("../lib/db.js");
     const out = await db.run(() => M.mapTenant({ platform: world.control.platformDb() }));
-    const { routes } = await db.run(() => renderRoutesFor(out));
+    mapped = out;
+    tenantDb = db;
+    const { routes, heroExperiments } = await db.run(() => renderRoutesFor(out));
+    eq(JSON.stringify(heroExperiments), "[]", "no hero test runs:");
     const paths = routes.map((r) => r.path);
     eq(new Set(paths).size, paths.length, "no route twice:");
     eq(new Set(routes.map((r) => r.name)).size, routes.length, "unique names:");
@@ -493,6 +676,69 @@ try {
     ok(ch.has(COL(241)) && paths.includes(`/collections/${ch.get(COL(241))}`), "the collection with a template");
     const bp = canary("a product with")?.path;
     ok(bp && bp.startsWith("/products/"), `product canary: ${bp}`);
+  });
+
+  await t("P4-FIX4: renderRoutesFor rethrows a real database error (a short route list never passes silently); only a table not there yet reads as none", async () => {
+    ok(mapped && tenantDb, "the store from the case above");
+    const { renderRoutesFor } = await import("../lib/migrate/render-compare.js");
+    const { libsql } = await import("../lib/db.js");
+    const driverError = (message, code = "SQLITE_ERROR") => Object.assign(new Error(message), { name: "LibsqlError", code });
+    const full = await tenantDb.run(() => renderRoutesFor(mapped));
+    const products = full.routes.filter((r) => r.kind === "product").length;
+    ok(products >= 3, `products listed: ${products}`);
+    // a busy database, a network failure, a damaged schema: each stops the list
+    for (const [name, err] of [
+      ["busy", driverError("SQLITE_BUSY: database is locked", "SQLITE_BUSY")],
+      ["network", Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } })],
+      ["a damaged schema", driverError("SQLITE_ERROR: no such column: handle")],
+      ["another table missing", driverError("SQLITE_ERROR: no such table: products_v2")],
+    ]) {
+      const db = { execute: async (q) => (/FROM products\b/.test(q.sql) ? Promise.reject(err) : libsql.execute(q)) };
+      let threw = null;
+      try {
+        await tenantDb.run(() => renderRoutesFor(mapped, { db }));
+      } catch (e) {
+        threw = e;
+      }
+      ok(threw === err, `${name}: the error must be rethrown, got ${threw ? threw.message : "a route list"}`);
+    }
+    // the collections lookup and the hero test lookup too
+    for (const table of ["collections", "experiments"]) {
+      const err = driverError("SQLITE_BUSY: database is locked", "SQLITE_BUSY");
+      const db = { execute: async (q) => (new RegExp(`FROM ${table}\\b`).test(q.sql) ? Promise.reject(err) : libsql.execute(q)) };
+      let threw = null;
+      try {
+        await tenantDb.run(() => renderRoutesFor(mapped, { db }));
+      } catch (e) {
+        threw = e;
+      }
+      ok(threw === err, `${table}: rethrown`);
+    }
+    // only "no such table: products" (a store from before that table) reads as no rows
+    const missing = { execute: async (q) => (/FROM products\b/.test(q.sql) ? Promise.reject(driverError("SQLITE_ERROR: no such table: products")) : libsql.execute(q)) };
+    const short = await tenantDb.run(() => renderRoutesFor(mapped, { db: missing }));
+    eq(short.routes.filter((r) => r.kind === "product").length, 0, "no products when the table isn't there:");
+    ok(short.routes.some((r) => r.path === "/"), "the canaries are still listed");
+  });
+
+  await t("P4-FIX4: the route list names the store's running hero test by its slug", async () => {
+    const { renderRoutesFor } = await import("../lib/migrate/render-compare.js");
+    const { libsql } = await import("../lib/db.js");
+    const now = "2026-11-04T10:00:00Z";
+    await tenantDb.run(async () => {
+      for (const [id, slug, kind, status] of [
+        ["exp-1", "hero-promise", "hero", "running"],
+        ["exp-2", "hero-old", "hero", "completed"],
+        ["exp-3", "other-surface", "banner", "running"],
+      ])
+        await libsql.execute({ sql: "INSERT INTO experiments (id, slug, name, target_kind, variants, status, created_at, updated_at) VALUES (?, ?, ?, ?, '[]', ?, ?, ?)", args: [id, slug, slug, kind, status, now, now] });
+    });
+    try {
+      const { heroExperiments } = await tenantDb.run(() => renderRoutesFor(mapped));
+      eq(JSON.stringify(heroExperiments), '["hero-promise"]', "only the running hero test:");
+    } finally {
+      await tenantDb.run(() => libsql.execute("DELETE FROM experiments WHERE id IN ('exp-1', 'exp-2', 'exp-3')"));
+    }
   });
 } finally {
   server.close();

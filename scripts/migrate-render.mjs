@@ -23,6 +23,9 @@
 //       normalizes both captures and compares them page by page, setting
 //       aside only lib/migrate/allowed-differences.js. Exit 0: the same.
 //       Exit 1: a difference (each named by page and where on the page).
+//       Refused (exit 2) when no page was compared, when the before capture
+//       marks no canary page, or when any canary in the before capture did
+//       not answer 2xx or 3xx: a store broken before the move proves nothing.
 //
 // Exit 2: a refusal or a usage mistake; nothing was captured or compared.
 import { createHash } from "node:crypto";
@@ -74,13 +77,25 @@ function routeUrl(base, path) {
 
 // ---------- the route list ----------
 
-export function readRoutes(file) {
-  let data;
+function readRouteFile(file) {
   try {
-    data = JSON.parse(readFileSync(file, "utf8"));
+    return JSON.parse(readFileSync(file, "utf8"));
   } catch (e) {
     throw new Refusal(`couldn't read the route list ${file}: ${String(e?.message || e).slice(0, 160)}`);
   }
+}
+
+// The running hero test's slug, as --make-routes read it from the store
+// (empty for a plain list): kept in each capture so the comparison sets the
+// hero aside only for that test.
+export function readHeroExperiments(file) {
+  const data = readRouteFile(file);
+  const list = Array.isArray(data?.heroExperiments) ? data.heroExperiments : [];
+  return list.filter((x) => typeof x === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(x));
+}
+
+export function readRoutes(file) {
+  const data = readRouteFile(file);
   const list = Array.isArray(data) ? data : Array.isArray(data?.routes) ? data.routes : null;
   if (!list || !list.length) throw new Refusal(`the route list ${file} holds no routes.`);
   const names = new Set();
@@ -121,11 +136,11 @@ function prepareOut(dir) {
  * Capture every route from `base` into `outDir`. No cookie header is ever
  * sent; redirects are recorded, not followed. Returns the index.
  */
-export async function captureRoutes(baseUrl, routes, outDir, { fetchImpl = fetch, timeoutMs = 180_000, log = () => {} } = {}) {
+export async function captureRoutes(baseUrl, routes, outDir, { fetchImpl = fetch, timeoutMs = 180_000, log = () => {}, heroExperiments = [] } = {}) {
   const base = assertLocalBase(baseUrl);
   const urls = routes.map((r) => routeUrl(base, r.path));
   const out = prepareOut(outDir);
-  const index = { tool: TOOL, version: 1, base: base.origin, origin: base.origin, capturedAt: new Date().toISOString(), routes: [] };
+  const index = { tool: TOOL, version: 1, base: base.origin, origin: base.origin, capturedAt: new Date().toISOString(), heroExperiments: [...heroExperiments], routes: [] };
   for (let i = 0; i < routes.length; i++) {
     const r = routes[i];
     const ctrl = new AbortController();
@@ -176,11 +191,37 @@ export function loadCapture(dir) {
     throw new Refusal(`${d} is not a capture of this tool (no index.json). Capture with --base … --routes … --out first.`);
   }
   if (index?.tool !== TOOL || !Array.isArray(index.routes)) throw new Refusal(`${d} is not a capture of this tool.`);
-  return index.routes.map((r) => ({ route: r.path, status: r.status, contentType: r.contentType, location: r.location ?? null, origin: index.origin ?? null, body: readFileSync(join(d, r.file), "utf8") }));
+  const heroExperiments = Array.isArray(index.heroExperiments) ? index.heroExperiments.map(String) : [];
+  return index.routes.map((r) => ({ route: r.path, kind: r.kind ?? null, status: r.status, contentType: r.contentType, location: r.location ?? null, origin: index.origin ?? null, heroExperiments, body: readFileSync(join(d, r.file), "utf8") }));
 }
 
-export function compareDirs(beforeDir, afterDir, { allowed = ALLOWED_DIFFERENCES } = {}) {
-  return compare(loadCapture(beforeDir), loadCapture(afterDir), { allowed });
+const answered = (status) => {
+  const n = Number(status);
+  return Number.isInteger(n) && n >= 200 && n < 400;
+};
+
+/**
+ * P4-FIX4: refuse a comparison that proves nothing. A rehearsal passes only
+ * when pages were compared and the store worked before the move: every canary
+ * (home, a page, a product, the cart, …) of the before capture answered 2xx
+ * or 3xx. Two captures of the same broken store compare "the same".
+ */
+export function assertComparable(beforeList, result) {
+  if (!result || !Number(result.compared)) throw new Refusal("Refused: no page was compared, so this proves nothing. Capture the route list from --make-routes before and after the move, then compare those two folders.");
+  const canaries = beforeList.filter((c) => c.kind === "canary");
+  if (!canaries.length) throw new Refusal("Refused: the before capture marks no canary page (home, a page, a product, the cart …), so it can't show the store worked before the move. Capture with a route list from --make-routes.");
+  const broken = canaries.filter((c) => !answered(c.status));
+  if (broken.length) {
+    const names = broken.slice(0, 10).map((c) => `${c.route} (${c.status})`).join(", ");
+    throw new Refusal(`Refused: ${broken.length} canary page${broken.length === 1 ? "" : "s"} didn't load before the move: ${names}${broken.length > 10 ? ", …" : ""}. A store that is broken before the move proves nothing. Fix the harness and capture again.`);
+  }
+}
+
+export function compareDirs(beforeDir, afterDir, { allowed = ALLOWED_DIFFERENCES, gate = true } = {}) {
+  const before = loadCapture(beforeDir);
+  const result = compare(before, loadCapture(afterDir), { allowed });
+  if (gate) assertComparable(before, result);
+  return result;
 }
 
 export function renderResult(result) {
@@ -270,7 +311,7 @@ export async function main(argv, { log = console.log, error = console.error } = 
       const list = await makeRoutes({ tenantId, storeOpen });
       writeFileSync(file, `${JSON.stringify(list, null, 2)}\n`);
       const count = (k) => list.routes.filter((r) => r.kind === k).length;
-      log(`Wrote ${list.routes.length} routes to ${file}: ${count("canary")} canaries, ${count("product")} more products and ${count("collection")} more collections with old content.`);
+      log(`Wrote ${list.routes.length} routes to ${file}: ${count("canary")} canaries, ${count("product")} more products and ${count("collection")} more collections with old content.${list.heroExperiments?.length ? ` A hero test is running (${list.heroExperiments.join(", ")}): its hero is set aside when both captures show it.` : ""}`);
       return 0;
     }
     const base = value("base");
@@ -281,7 +322,8 @@ export async function main(argv, { log = console.log, error = console.error } = 
     const routes = readRoutes(routesFile);
     const t = Number(value("timeout"));
     log(`Capturing ${routes.length} pages from ${new URL(base).origin} as a shopper with no cookies…`);
-    const index = await captureRoutes(base, routes, out, { timeoutMs: Number.isFinite(t) && t > 0 ? t * 1000 : undefined, log });
+    const heroExperiments = readHeroExperiments(routesFile);
+    const index = await captureRoutes(base, routes, out, { timeoutMs: Number.isFinite(t) && t > 0 ? t * 1000 : undefined, log, heroExperiments });
     log(`Captured ${index.routes.length} pages into ${resolve(out)}.`);
     return 0;
   } catch (e) {

@@ -158,6 +158,15 @@ From review:
 
 (none yet)
 
+## Changed by P4-FIX4
+
+The review findings above were fixed in P4-FIX4 (`docs/cms-reviews/P4-FIX4.md`):
+
+- `--compare` (and `compareDirs`, whose gate is on by default) refuses with exit 2 and plain words when no page was compared, when the before capture marks no canary page, or when any canary in the before capture did not answer 2xx or 3xx. A broken harness no longer passes as "the same".
+- `renderRoutesFor` rethrows every database error except "this table isn't there yet" (as `lib/migrate/check.js` does), so a short route list can't pass silently. It also returns `heroExperiments`: the slugs of the store's running hero tests.
+- `hero-test-variant` matches the hero test by its slug. The slug comes from `--make-routes` (`routes.json` `heroExperiments`), is kept in each capture's `index.json`, and reaches `compare()` per capture (or through its `heroExperiments` option). With no hero slug known, nothing in the hero is set aside. The entry's fixture carries `heroExperiments: ["hero-promise"]`; **P4-CUTOVER's `test-migrate-documents` must pass `fixture.heroExperiments` to `compare()`** when it replays the fixtures.
+- New tests pin: the CLI applying `ALLOWED_DIFFERENCES`, href-only, src-only and alt-only changes, preview-only markup stripping, attribute order, and the `/\evil.com/x` route.
+
 ## Owner checks
 
 - **CI `sqld` download:** not touched (no `.github/` change). Its source and checksum still need your approval (carried from P4-SCAFFOLD).

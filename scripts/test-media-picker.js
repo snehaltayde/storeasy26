@@ -733,6 +733,43 @@ await t("unit: MediaAdmin archive and unarchive call the API and the archived fi
   eq(sf.calls.at(-1).url, "/api/admin/media", "the filter off:");
 });
 
+await t("unit (P4-FIX4): MediaAdmin says '<file> was archived. It's back in your library now.' when an upload's bytes match an archived file (the real saveMedia brings it back); a plain duplicate says 'reused'", async () => {
+  const n = pngN++;
+  const first = await docs.run(() => M.saveMedia({ filename: "amber-jar.png", mime: "image/png", bytes: PNG(n) }));
+  await sql(docs, "UPDATE media SET archived_at = ? WHERE id = ?", ["2026-11-01T00:00:00Z", first.id]);
+  ok((await archivedAt(docs, first.id)) != null, "archived first");
+  const sf = storeFetch(docs.id);
+  const initial = await listFor(docs);
+  // the upload itself is the real saveMedia on this store (the upload route spreads its answer)
+  const uploaded = [];
+  const uploadStub = {
+    uploadImage: async (file) => {
+      const media = await docs.run(() => M.saveMedia({ filename: file.name, mime: "image/png", bytes: PNG(n) }));
+      uploaded.push(media);
+      return { ok: true, media };
+    },
+  };
+  const view = await withFetch(sf.fetch, () => mount("components/admin/MediaAdmin.js", "default", () => ({ initial }), { inflight: sf.inflight, stubs: { "@/lib/media-upload": uploadStub } }));
+  const pick = async (name) =>
+    withFetch(sf.fetch, async () => {
+      const input = view.find((n2) => n2.type === "input" && n2.props?.type === "file");
+      ok(input, "the file input");
+      input.props.onChange({ target: { files: [{ name }] } });
+      await view.flush();
+    });
+  toasts.length = 0;
+  await pick("amber-jar-again.png");
+  eq(uploaded.length, 1, "one upload:");
+  eq([uploaded[0].id, uploaded[0].deduped, uploaded[0].unarchived], [first.id, true, true], "the store brought the archived file back:");
+  eq(await archivedAt(docs, first.id), null, "no longer archived");
+  eq(toasts, [["success", "amber-jar-again.png was archived. It's back in your library now."]], "the founder is told:");
+  // the same bytes again: a plain duplicate, no longer archived
+  toasts.length = 0;
+  await pick("amber-jar-third.png");
+  eq([uploaded[1].deduped, uploaded[1].unarchived ?? false], [true, false], "a plain duplicate:");
+  eq(toasts, [["success", "amber-jar-third.png was already in the library — reused"]], "reused:");
+});
+
 await t("unit: MediaAdmin, delete of a used file shows the plain reason and where it is used, offers Archive it instead and no way round it (documents store); 'Where it's used' lists pages by name", async () => {
   // a fresh store's view: one used file only
   await sql(docs, "DELETE FROM media");

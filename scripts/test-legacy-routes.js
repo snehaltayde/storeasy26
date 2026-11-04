@@ -55,10 +55,20 @@ globalThis.fetch = async (url) => {
   throw new Error(`test-legacy-routes: no network (${String(url?.url ?? url).slice(0, 80)})`);
 };
 const realLog = console.log;
+const SLOGS = []; // P4-FIX4: the slog lines, for the cases that check what was logged
 console.log = (...a) => {
-  if (a.length === 1 && typeof a[0] === "string" && a[0].startsWith("{")) return; // slog lines
+  if (a.length === 1 && typeof a[0] === "string" && a[0].startsWith("{")) {
+    try {
+      SLOGS.push(JSON.parse(a[0]));
+      if (SLOGS.length > 2000) SLOGS.splice(0, 1000);
+    } catch {
+      /* not JSON */
+    }
+    return; // slog lines
+  }
   realLog(...a);
 };
+const logged = (evt, since = 0) => SLOGS.slice(since).filter((l) => l.evt === evt);
 
 const require = createRequire(import.meta.url);
 const started = Date.now();
@@ -540,8 +550,12 @@ await t("links: no hard-coded console link in components/admin or lib/admin targ
 // ---- 4. the read guard ------------------------------------------------------------------------
 realLog("— 4. the read guard (spec 8.13)");
 const FROZEN = "cms_blocks|cms_pages|placements|product_overrides|collection_overrides|page_redirects|cms_templates";
+// P4-FIX4: the wrapper readers over the same tables (announcement and home
+// sections blocks, one page, a product's modules, a collection's pins, the
+// upsell placements) count as reads too.
+const READ_FNS = "getBlock|getBlockRow|getHero|getNav|listContentPages|listTemplates|getAnnouncement|getHomeSections|getContentPage|getProductOverride|getCollectionPins|listPlacements";
 const READS = [
-  /\b(getBlock|getBlockRow|getHero|getNav|listContentPages|listTemplates)\s*\(/g,
+  new RegExp(`\\b(${READ_FNS})\\s*\\(`, "g"),
   new RegExp(`\\b(?:selectFrom|innerJoin|leftJoin|join)\\(\\s*["'\`](?:${FROZEN})\\b`, "g"),
   new RegExp(`\\b(?:FROM|JOIN)\\s+(?:${FROZEN})\\b`, "g"),
 ];
@@ -560,7 +574,19 @@ const READ_ALLOW = {
   "lib/ai/insights.js": { why: "the legacy hero, behind the documents check (the published home's hero)", check: modeChecked(/getCmsMode\(\)\)\s*===\s*"documents"\)\s*\{[\s\S]*publishedGetters/) },
   "lib/admin/onboarding.js": { why: "the legacy page list, behind the documents check (the published page documents)", check: modeChecked(/documents \? documentsPages\(\) : listContentPages\(\)/) },
   "app/api/admin/catalog/route.js": { why: "the legacy template, behind the documents check (the live rows)", check: modeChecked(/if \(live\) \{[\s\S]*resolvedSurfaceTemplateFor\("pdp"/) },
-  "lib/admin/cms-api.js": { why: "the old storefront API: its writes refuse on a documents store (P2-GUARD) and its view is cms/view's; its template list only reads the saved templates, as the saved templates page does" },
+  "lib/admin/cms-api.js": { why: "the old storefront API: its writes refuse on a documents store (P2-GUARD), its page and history reads answer the published page and no history there (P4-FIX4) and its view is cms/view's; its template list only reads the saved templates, as the saved templates page does", check: modeChecked(/if \(DOCUMENTS_READS\.has\(op\.kind\)\) \{[\s\S]*?if \(\(await getCmsMode\(\)\) === "documents"\) \{[\s\S]*?publishedGetters/) },
+  // P4-FIX4: the wrapper readers' call sites
+  "app/(console)/admin/(authed)/catalog/page.js": {
+    why: "the old product editor's lists (product modules, collection pins), after the documents branch has returned (Bundles and Quiz only there)",
+    check: (s) => {
+      const i = s.search(/if \(cmsMode === "documents"\) \{/);
+      const j = s.indexOf("getCollectionPins(c.id)");
+      return i >= 0 && j > i && /\n\s*return \(/.test(s.slice(i, j));
+    },
+  },
+  "app/(console)/admin/(authed)/upsells/page.js": { why: "the old upsells screen: a documents store is redirected before any read", check: (s) => /if \(cmsMode === "documents"\) redirect\(/.test(s) },
+  "app/api/admin/upsells/route.js": { why: "the old upsells API: GET refuses on a documents store before reading (P4-FIX4), POST reads only after the write refusal", check: modeChecked(/if \(mode === "documents"\) return NextResponse\.json\(\{ error: UPSELLS_IN_EDITOR[\s\S]*listWithHandles\(\) \}\);\n\}\);\n\nexport const POST[\s\S]*if \(refused\) return[\s\S]*listPlacements\(\)/) },
+  "app/api/admin/upsells/[id]/route.js": { why: "the old upsells toggle reads the row it writes, only after the write refusal", check: modeChecked(/if \(refused\) return [^\n]*\n\s*const row = \(await listPlacements\(\)\)/) },
   "app/(console)/admin/(authed)/editor/templates/page.js": { why: "the read-only saved templates page reads cms_templates on a documents store by design (DOC-09 partly pulled in)" },
   "app/(console)/admin/(authed)/storefront/pages/page.js": { why: "the old pages screen: a documents store is redirected before any read", check: redirectsOn },
   "app/(console)/admin/(authed)/storefront/pages/[slug]/page.js": { why: "the old page editor: a documents store is redirected before any read", check: redirectsOn },
@@ -574,7 +600,7 @@ const READ_ALLOW_PREFIX = { "lib/migrate/": "the cutover, its dry run and the re
 function readScan(files, allow = READ_ALLOW, prefixes = READ_ALLOW_PREFIX) {
   const problems = [];
   for (const { path, text } of files) {
-    const body = stripComments(text).replace(/\b(?:async\s+)?function\s+(getBlock|getBlockRow|getHero|getNav|listContentPages|listTemplates)\s*\(/g, "function_def(");
+    const body = stripComments(text).replace(new RegExp(`\\b(?:async\\s+)?function\\s+(${READ_FNS})\\s*\\(`, "g"), "function_def(");
     const hits = READS.flatMap((re) => [...body.matchAll(re)].map((m) => m[0]));
     if (!hits.length) continue;
     if (Object.keys(prefixes).some((p) => path.startsWith(p))) continue;
@@ -602,6 +628,16 @@ await t("read guard: frozen-table reads only in allowlisted files, each with its
   eq(readScan([{ path: "app/(console)/admin/(authed)/storefront/designer/product/page.js", text: 'await getBlockRow("surface_templates")' }]).length, 1, "a designer that stops redirecting:");
   // definitions and comments are not reads
   eq(readScan([{ path: "lib/x.js", text: "// getHero() is old\nexport async function getHero() { return 1; }\n/* listTemplates() */" }]), [], "definitions:");
+});
+
+await t("P4-FIX4: read guard: READS includes the wrapper readers (announcement, home sections, a page, a product's modules, a collection's pins, placements); each planted call fails, a definition does not", async () => {
+  for (const text of ["await getAnnouncement()", "await getHomeSections()", 'await getContentPage("about")', "await getProductOverride(p.id)", "await getCollectionPins(c.id)", "await listPlacements()"]) {
+    eq(readScan([{ path: "components/admin/editor/X.js", text }]).length, 1, `${text}:`);
+  }
+  eq(readScan([{ path: "lib/x.js", text: "export async function getContentPage(slug) { return slug; }\nexport async function listPlacements() { return []; }" }]), [], "definitions:");
+  // the routes this item changed: a documents refusal moved after the read fails its entry
+  eq(readScan([{ path: "app/api/admin/upsells/route.js", text: "export const GET = async () => NextResponse.json({ ok: true, placements: await listPlacements() });" }]).length, 1, "upsells GET without its refusal:");
+  eq(readScan([{ path: "lib/admin/cms-api.js", text: "if (op.kind === \"getPage\") return { status: 200, body: { ok: true, page: await getContentPage(op.slug) } };" }]).length, 1, "cms-api without its documents branch:");
 });
 
 // ---- 5. real stores ---------------------------------------------------------------------------
@@ -767,6 +803,151 @@ await t("catalog route: GET answers 200 on a documents store with the template f
   ok(lg.body.product.shopify_url === `https://admin.shopify.com/store/lr-store/products/${9101}`, `legacy url: ${lg.body.product.shopify_url}`);
   const src = await readFile(join(ROOT, "app/api/admin/catalog/route.js"), "utf8");
   ok(/import \{ shopifyAdminBase \} from "@\/lib\/admin\/shopify-admin-url"/.test(src) && !/const shopifyAdminBase\s*=/.test(src) && !src.includes("tenantOwnCfg"), "the route still has its own shopifyAdminBase");
+});
+
+await t("P4-FIX4: catalog route: the documents-store list's pins come from the live collection rows (live wins over a frozen collection_overrides row; a frozen-only pin is not counted)", async () => {
+  const C = (n) => `gid://shopify/Collection/77${n}`;
+  for (const [n, handle] of [[1, "frozen-only"], [2, "live-only"], [3, "both"]]) await sql(docs, "INSERT INTO collections (id, handle, title) VALUES (?, ?, ?)", [C(n), handle, `Col ${handle}`]);
+  await sql(docs, "INSERT INTO collection_overrides (collection_id, pinned, updated_at) VALUES (?, ?, '2026-10-01'), (?, ?, '2026-10-01')", [C(1), JSON.stringify([PROD(1), PROD(2)]), C(3), JSON.stringify([PROD(1), PROD(2), PROD(3)])]);
+  await sql(docs, "INSERT INTO collection_content_live (collection_id, document_id, version_id, pinned, published_at) VALUES (?, 'doc_coll_a', 'ver_a', ?, '2026-11-01'), (?, 'doc_coll_b', 'ver_b', ?, '2026-11-01')", [C(2), JSON.stringify([PROD(3)]), C(3), JSON.stringify([PROD(2)])]);
+  const list = await route(docs, "catalog", "GET");
+  eq(list.status, 200, "status:");
+  const pins = Object.fromEntries(list.body.collections.map((c) => [c.handle, c.pinned]));
+  eq([pins["frozen-only"], pins["live-only"], pins.both], [0, 1, 1], "pins (frozen-only, live-only, both):");
+  eq(list.body.published, undefined, "a readable release gives no notice:");
+  // legacy reads the old table, as before
+  await sql(legacy, "INSERT INTO collections (id, handle, title) VALUES (?, 'legacy-col', 'Legacy col')", [C(9)]);
+  await sql(legacy, "INSERT INTO collection_overrides (collection_id, pinned, updated_at) VALUES (?, ?, '2026-10-01')", [C(9), JSON.stringify([PROD(1), PROD(2)])]);
+  const lg = await route(legacy, "catalog", "GET");
+  eq(lg.body.collections.find((c) => c.handle === "legacy-col")?.pinned, 2, "legacy pins:");
+});
+
+await t("P4-FIX4: catalog route: when the live release can't be read, the product and collection picker list still answers (the catalog with no overlays, never the frozen tables), with a plain note, and it is logged", async () => {
+  const [{ live_release_id: liveId }] = await sql(docs, "SELECT live_release_id FROM release_state WHERE id = 1");
+  ok(liveId, "the documents store has a live release");
+  const [{ content }] = await sql(docs, "SELECT content FROM releases WHERE id = ?", [liveId]);
+  const NOTE = "We couldn't read what's published right now, so modules, badges, templates and pinned products aren't shown here. The products themselves are listed.";
+  await sql(docs, "UPDATE releases SET content = ? WHERE id = ?", ["{not json", liveId]);
+  try {
+    const since = SLOGS.length;
+    const list = await route(docs, "catalog", "GET");
+    eq(list.status, 200, `the list answers: ${JSON.stringify(list.body).slice(0, 200)}`);
+    eq(list.body.products.length, 3, "products:");
+    eq(list.body.products.filter((p) => p.customized).length, 0, "no overlays (customized):");
+    eq(list.body.collections.map((c) => c.pinned), list.body.collections.map(() => 0), "no overlays (pins), never the frozen ones:");
+    eq([list.body.overrides, list.body.published, list.body.note], [[], "unavailable", NOTE], "the notice:");
+    ok(logged("catalog_published_unreadable", since).some((l) => l.part === "release" && /not valid JSON/.test(l.detail)), `logged: ${JSON.stringify(SLOGS.slice(since))}`);
+    // one product, too
+    const one = await route(docs, "catalog", "GET", { query: `?product=${encodeURIComponent(PROD(2))}` });
+    eq([one.status, one.body.product.id, one.body.override, one.body.surface, one.body.published], [200, PROD(2), { modules: [], badge: "" }, null, "unavailable"], "one product:");
+  } finally {
+    await sql(docs, "UPDATE releases SET content = ? WHERE id = ?", [content, liveId]);
+  }
+  // a live-row read that fails (the release reads, a live table doesn't): the same
+  // (a view that fails on every row, not "no such table", which reads as no row)
+  await sql(docs, "ALTER TABLE collection_content_live RENAME TO collection_content_live_hidden");
+  await sql(docs, "CREATE VIEW collection_content_live AS SELECT json_extract('{not json', '$') AS collection_id, document_id, version_id, pinned, layout_document_id, published_at, layout_template FROM collection_content_live_hidden");
+  try {
+    const since = SLOGS.length;
+    const list = await route(docs, "catalog", "GET");
+    eq([list.status, list.body.published, list.body.products.length], [200, "unavailable", 3], "a failing live-row read:");
+    ok(logged("catalog_published_unreadable", since).some((l) => l.part === "list"), "logged (list)");
+  } finally {
+    await sql(docs, "DROP VIEW collection_content_live");
+    await sql(docs, "ALTER TABLE collection_content_live_hidden RENAME TO collection_content_live");
+  }
+  // and back to normal
+  const again = await route(docs, "catalog", "GET");
+  eq([again.status, again.body.published, again.body.products.filter((p) => p.customized).map((p) => p.id)], [200, undefined, [PROD(2)]], "restored:");
+});
+
+await t("P4-FIX4: upsells GET never reads the frozen placements on a documents store (409, plain words, even with the table gone); legacy and migrating list as before", async () => {
+  await sql(docs, "INSERT INTO placements (id, kind, source_product_id, target_product_ids, title, enabled, position) VALUES ('pl_frozen', 'pdp_pairs', ?, ?, 'FROZEN pairs', 1, 0)", [PROD(1), JSON.stringify([PROD(2)])]);
+  const WORDS = "This store now uses the new editor, so its upsells are there: a product's pairs on that product, and the cart's offer in the cart. Open them in the editor.";
+  const r = await route(docs, "upsells", "GET");
+  eq([r.status, r.body.code, r.body.error, r.body.placements], [409, "STORE_USES_DOCUMENTS", WORDS, undefined], "documents:");
+  ok(!JSON.stringify(r.body).includes("FROZEN"), "frozen content in the answer");
+  // proof it reads nothing: with the table renamed away the answer is the same
+  await sql(docs, "ALTER TABLE placements RENAME TO placements_hidden");
+  try {
+    const gone = await route(docs, "upsells", "GET");
+    eq([gone.status, gone.body.code], [409, "STORE_USES_DOCUMENTS"], "documents, table gone:");
+  } finally {
+    await sql(docs, "ALTER TABLE placements_hidden RENAME TO placements");
+  }
+  const lg = await route(legacy, "upsells", "GET");
+  eq([lg.status, Array.isArray(lg.body.placements)], [200, true], "legacy:");
+  await setMode(legacy, "migrating");
+  try {
+    const mg = await route(legacy, "upsells", "GET");
+    eq([mg.status, Array.isArray(mg.body.placements)], [200, true], "migrating:");
+  } finally {
+    await setMode(legacy, "legacy");
+  }
+});
+
+await t("P4-FIX4: cms-api's page and history reads never read the frozen tables on a documents store (the published page, no history, even with the tables gone); legacy answers as before; templates stay readable", async () => {
+  const { handleStorefrontPut, HISTORY_IN_EDITOR } = await import("../lib/admin/cms-api.js");
+  const put = (fx, body) => fx.run(() => handleStorefrontPut(req(fx, body)));
+  const frozen = (await sql(docs, "SELECT title FROM cms_pages WHERE slug = 'privacy'"))[0]?.title;
+  eq(frozen, "FROZEN privacy", "the frozen row is there:");
+  const check = async (label) => {
+    const page = await put(docs, { getPage: "privacy" });
+    eq([page.status, page.body.page?.title, page.body.documents], [200, "Privacy", true], `${label} getPage (the published page document):`);
+    ok(!JSON.stringify(page.body).includes("FROZEN"), `${label}: frozen page in the answer`);
+    const hist = await put(docs, { history: { kind: "page", key: "privacy" } });
+    eq([hist.status, hist.body.history, hist.body.note], [200, [], HISTORY_IN_EDITOR], `${label} history:`);
+  };
+  await check("documents");
+  // proof neither reads the frozen tables: with them renamed away the answers are the same
+  await sql(docs, "ALTER TABLE cms_pages RENAME TO cms_pages_hidden");
+  await sql(docs, "ALTER TABLE cms_history RENAME TO cms_history_hidden");
+  try {
+    await check("tables gone");
+  } finally {
+    await sql(docs, "ALTER TABLE cms_pages_hidden RENAME TO cms_pages");
+    await sql(docs, "ALTER TABLE cms_history_hidden RENAME TO cms_history");
+  }
+  // a store not open yet: no page (never a frozen one)
+  const cl = await put(closed, { getPage: "privacy" });
+  eq([cl.status, cl.body.page], [200, null], "closed:");
+  const tpl = await put(docs, { listTemplates: true });
+  eq([tpl.status, tpl.body.templates.length >= 2], [200, true], "templates stay readable:");
+  const lp = await put(legacy, { getPage: "privacy" });
+  eq([lp.status, lp.body.page?.slug, lp.body.page?.title, lp.body.documents], [200, "privacy", "Privacy", undefined], "legacy getPage:");
+  const lh = await put(legacy, { history: { kind: "page", key: "privacy" } });
+  eq([lh.status, Array.isArray(lh.body.history), lh.body.note], [200, true, undefined], "legacy history:");
+});
+
+await t("P4-FIX4: publishedSource's closed branch: a documents store that never published is 'closed' (not an error), so insights gives no hero fact and logs no failure; a broken release is an error, logged", async () => {
+  const src = await closed.run(() => View.publishedSource());
+  eq([src.mode, src.releaseId, src.preview], ["closed", null, false], "closed source:");
+  const g = await closed.run(() => View.publishedGetters());
+  eq(g.closed, true, "getters closed:");
+  eq((await docs.run(() => View.publishedGetters())).closed, false, "an open store is not closed:");
+  const since = SLOGS.length;
+  const facts = await closed.run(() => Insights.gatherTenantFacts());
+  eq(facts.find((f) => f.kind === "content") ?? null, null, "no hero fact:");
+  eq(logged("insights_hero_unavailable", since).length, 0, `a closed store is not a failure: ${JSON.stringify(SLOGS.slice(since))}`);
+  // the error branch, for contrast: a live release that can't be read
+  const [{ live_release_id: liveId }] = await sql(docs, "SELECT live_release_id FROM release_state WHERE id = 1");
+  const [{ content }] = await sql(docs, "SELECT content FROM releases WHERE id = ?", [liveId]);
+  await sql(docs, "UPDATE releases SET content = ? WHERE id = ?", ["{not json", liveId]);
+  try {
+    let threw = null;
+    try {
+      await docs.run(() => View.publishedSource());
+    } catch (e) {
+      threw = e;
+    }
+    ok(threw && threw.name !== "TypeError", `a broken release throws: ${threw}`);
+    const s2 = SLOGS.length;
+    const f2 = await docs.run(() => Insights.gatherTenantFacts());
+    eq(f2.find((f) => f.kind === "content") ?? null, null, "no hero fact on a broken release:");
+    eq(logged("insights_hero_unavailable", s2).length, 1, "logged:");
+  } finally {
+    await sql(docs, "UPDATE releases SET content = ? WHERE id = ?", [content, liveId]);
+  }
 });
 
 await t("writes: catalog POST and upsells POST, PUT and DELETE refused by the mode guard inside their batch answer 409 with the plain words (never 422 or 500), and write nothing", async () => {

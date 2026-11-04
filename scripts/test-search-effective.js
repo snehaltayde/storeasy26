@@ -384,6 +384,58 @@ await t("P4-FIX2: a full sync whose drain succeeds enqueues no extra job", async
   eq(await pending(docs), [], "nothing pending:");
 });
 
+await t("P4-FIX4: two failed full syncs in a row, with nothing written between them, each get a job of their own (the requeue key's random suffix)", async () => {
+  await rename(docs, 8, "Eight Twice");
+  const top = (await pending(docs)).at(-1).rid;
+  const catalogSize = Number((await sql(docs, "SELECT count(*) AS n FROM products WHERE handle IS NOT NULL AND handle != ''"))[0].n);
+  // a client whose rebuild reports Eight's document as refused (so the rows
+  // before the read stay pending for the drain), and whose drain then fails
+  const failingSync = () => {
+    let rebuilt = 0;
+    const s = spy({
+      onImport: async (call) => {
+        if (rebuilt >= catalogSize) throw new Error("search went down");
+        rebuilt += call.docs.length;
+      },
+    });
+    return {
+      collections(name) {
+        const c = s.collections(name);
+        if (name === undefined) return c;
+        return {
+          ...c,
+          documents(id) {
+            const d = c.documents(id);
+            if (id !== undefined) return d;
+            return { import: async (docsIn, opts) => (await d.import(docsIn, opts)).map((x, i) => (docsIn[i].id === H(8) ? { success: false } : x)) };
+          },
+        };
+      },
+    };
+  };
+  const jobsBefore = (await J.listJobs({ limit: 500 })).filter((j) => j.type === "search_reindex").length;
+  TS.setSearchAdminClientForTest(failingSync());
+  const r1 = await docs.run(() => Sync.indexTypesense());
+  TS.setSearchAdminClientForTest(failingSync());
+  const r2 = await docs.run(() => Sync.indexTypesense());
+  ok(r1.requeued?.key && r2.requeued?.key, `both requeued: ${JSON.stringify([r1, r2])}`);
+  eq((await pending(docs)).at(-1).rid, top, "nothing new was written between them (the same highest pending row):");
+  const prefix = `search_reindex:sedocs:${top}:sync:`;
+  ok(r1.requeued.key.startsWith(prefix) && r2.requeued.key.startsWith(prefix), `same top and read: ${r1.requeued.key} / ${r2.requeued.key}`);
+  ok(/:[0-9a-f]{8}$/.test(r1.requeued.key) && /:[0-9a-f]{8}$/.test(r2.requeued.key), "each key ends in a random suffix");
+  ok(r1.requeued.key !== r2.requeued.key, "the two keys differ");
+  const jobs = (await J.listJobs({ limit: 500 })).filter((j) => j.type === "search_reindex");
+  eq(jobs.length, jobsBefore + 2, "two new jobs:");
+  ok(r1.requeued.job && r2.requeued.job && r1.requeued.job !== r2.requeued.job, `two job ids: ${r1.requeued.job} / ${r2.requeued.job}`);
+  // the jobs drain it
+  const index = new Map();
+  TS.setSearchAdminClientForTest(indexedSpy(index).s);
+  await W.runDueJobs({ limit: 50 });
+  eq((await J.getJobByKey(r1.requeued.key)).status, "done", "first job:");
+  eq((await J.getJobByKey(r2.requeued.key)).status, "done", "second job:");
+  eq(await pending(docs), [], "nothing pending:");
+});
+
 await t("on a store without Typesense, or without its own namespace, a full sync marks pending rows done and prunes, with no client call", async () => {
   typesenseOff();
   await rename(docs, 6, "Six Without Search");
