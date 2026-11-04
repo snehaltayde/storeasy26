@@ -1095,6 +1095,29 @@ await t("crafted bad values for every setting kind of every section and document
   validate(home([sec("collections", "sec_c1", {}, { bindings: { collections: { source: "every_product" } }, blocks: [{ id: "blk_a1", kind: "x" }] })]), { mode: "draft" });
 });
 
+// P4-SEARCH (the P4-LIVEROW review): what product modules need to reach shoppers.
+await t("P4-SEARCH: a rich text or text product module with no title is incomplete in a draft and an error at publish, naming the module; an image-with-text module's image from another website warns in a draft and is an error at publish; titled modules and allowed images are clean", async () => {
+  const pc = (sections) => ({ ...R.emptyBody("product_content"), sections });
+  for (const [kind, settings, what] of [["rich_text", { title: "", html: "<p>Care</p>" }, "rich text"], ["text", { title: " ", body: ["Care"] }, "text"]]) {
+    const d = one(validate(pc([sec(kind, "sec_m1", settings)]), { mode: "draft" }), "MODULE_TITLE_MISSING", { sectionId: "sec_m1" });
+    eq(d.severity, "incomplete", `${kind} draft:`);
+    eq(d.field, "title", `${kind} field:`);
+    eq(d.message, `This ${what} module has no title, so shoppers won't see it: on the product page a module shows as a title they tap to open. Add a title.`, `${kind} words:`);
+    eq(one(validate(pc([sec(kind, "sec_m1", settings)]), { mode: "publish" }), "MODULE_TITLE_MISSING").severity, "error", `${kind} publish:`);
+  }
+  none(validate(pc([sec("rich_text", "sec_m1", { title: "Care", html: "<p>Care</p>" }), sec("text", "sec_m2", { title: "Fit", body: ["Snug"] })]), { mode: "publish" }), "titled modules");
+  // an FAQ's questions are its titles; a page's rich text is not a product module
+  none(validate(pc([sec("faq", "sec_f1", { items: [{ q: "Q?", a: "<p>A</p>" }] })]), { mode: "publish" }), "faq");
+  none(validate({ schema: 1, type: "page", meta: { slug: "a", title: "A" }, sections: [sec("rich_text", "sec_r1", { html: "<p>Hi</p>" })] }, { mode: "publish" }), "a page's untitled rich text");
+  const img = (media) => pc([sec("image_with_text", "sec_i1", { image: { media, alt: "A" }, title: "Look" })]);
+  eq(one(validate(img("https://evil.example.com/a.png"), { mode: "draft" }), "IMAGE_HOST_NOT_ALLOWED").severity, "warning", "draft:");
+  const e = one(validate(img("https://evil.example.com/a.png"), { mode: "publish" }), "IMAGE_HOST_NOT_ALLOWED", { sectionId: "sec_i1" });
+  deq([e.severity, e.field], ["error", "image"], "publish:");
+  for (const media of ["https://cdn.shopify.com/s/a.png", "/api/media/med_1"]) eq(find(validate(img(media), { mode: "publish" }), "IMAGE_HOST_NOT_ALLOWED").length, 0, `${media}:`);
+  // a page's image-with-text is not held to the product allowlist
+  eq(find(validate({ schema: 1, type: "page", meta: { slug: "a", title: "A" }, sections: [sec("image_with_text", "sec_i1", { image: { media: "https://images.example.com/a.png", alt: "A" }, title: "Look" })] }, { mode: "publish" }), "IMAGE_HOST_NOT_ALLOWED").length, 0, "a page:");
+});
+
 // The codes lib/registry reports: every upper-case string literal in its files
 // (labels taken out). A code here that no check in this suite produced is a
 // message nobody has read.

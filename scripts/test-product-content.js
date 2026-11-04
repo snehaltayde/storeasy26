@@ -9,7 +9,11 @@
 //   4. mixed sets, the title belt, collections, the cart ruling, unpublish
 //   5. a sqld behind the fault proxy (commitThenDrop and a retry)
 // Typesense: dummy localhost values set in this process only; nothing is ever
-// sent to it. sqld is required (the suite fails, never skips, without it).
+// sent to it (P4-SEARCH: a spy client takes every call). sqld is required
+// (the suite fails, never skips, without it).
+// P4-SEARCH (batch 3) rewrote the title-gate cases to the new rule (the gate is
+// open on every store; its shape, refusal and belt stay for a future gate) and
+// added the LIVEROW review's cases (section 7).
 // Ports: TEST_PRODUCT_CONTENT_PORTS="<sqld>,<proxy>", else free ports.
 //   pnpm test:product-content
 import "./support/request-cache.js";
@@ -53,6 +57,8 @@ const Ch = await import("../lib/documents/changes.js");
 const LR = await import("../lib/documents/live-rows.js");
 const Ids = await import("../lib/documents/ids.js");
 const Gate = await import("../lib/catalog/title-gate.js");
+const TS = await import("../lib/typesense-search.js");
+const SR = await import("../lib/catalog/search-reindex.js");
 const AdminUrl = await import("../lib/admin/shopify-admin-url.js");
 const Mode = await import("../lib/cms-mode.js");
 const Sync = await import("../lib/sync.js");
@@ -78,6 +84,8 @@ async function t(name, fn) {
     Pub.setPublishHooks({});
     Docs.discardHooks.beforeBatch = null;
     Gate.setTitleGateForTest(false);
+    TS.setSearchAdminClientForTest(null);
+    Docs.openEntityHooks.beforeUnarchive = null;
     for (const k of ["TYPESENSE_HOST", "TYPESENSE_ADMIN_API_KEY", "TYPESENSE_COLLECTION"]) delete process.env[k];
   }
 }
@@ -99,7 +107,7 @@ const refused = async (p) => {
 
 // ---- stores and people ---------------------------------------------------------------
 const CONFIG = { site: { name: "PC Store" }, site_url: "https://pc.test", shopify_store_domain: "pc-store.myshopify.com" };
-const docs = await F.makeTenant({ name: "pc-docs", id: "pcdocs", products: 12, config: CONFIG });
+const docs = await F.makeTenant({ name: "pc-docs", id: "pcdocs", products: 20, config: CONFIG });
 const legacy = await F.makeTenant({ name: "pc-legacy", id: "pclegacy", products: 2, config: CONFIG });
 const moving = await F.makeTenant({ name: "pc-moving", id: "pcmoving", products: 2, config: CONFIG });
 const ownTs = await F.makeTenant({ name: "pc-ts", id: "pcts", products: 2, config: { ...CONFIG, typesense_collection: "pcts_products" } });
@@ -123,14 +131,34 @@ for (const [i, n] of [[0, 1], [1, 2]]) await raw(docs).execute({ sql: "INSERT IN
 
 const ownerU = await I.createUser({ email: "owner@pc.test", name: "Asha Rao", password: "owner-pass-content" });
 const staffU = await I.createUser({ email: "staff@pc.test", name: "Ravi", password: "staff-pass-content" });
+const adminU = await I.createUser({ email: "admin@pc.test", name: "Meera Iyer", password: "admin-pass-content" });
 for (const fx of [docs, legacy, moving, ownTs]) {
   await I.addMembership(ownerU.id, fx.id, "owner");
   await I.addMembership(staffU.id, fx.id, "staff");
+  await I.addMembership(adminU.id, fx.id, "admin");
 }
 const tok = async (u) => (await S.createSession({ userId: u.id, kind: "merchant", ttlMs: 600_000 })).token;
 const OWNER = await tok(ownerU);
 const STAFF = await tok(staffU);
 const ACTOR = { kind: "merchant", id: ownerU.id };
+const ADMIN_ACTOR = { kind: "merchant", id: adminU.id };
+// P4-SEARCH: the Typesense client every call reaches here (never a real one)
+function spyClient() {
+  const calls = [];
+  return {
+    calls,
+    collections(name) {
+      if (name === undefined) return { create: async (sch) => (calls.push({ op: "create", name: sch?.name }), {}) };
+      return {
+        delete: async () => (calls.push({ op: "dropCollection", name }), {}),
+        documents(id) {
+          if (id === undefined) return { import: async (list, opts) => (calls.push({ op: "import", name, docs: JSON.parse(JSON.stringify(list)), action: opts?.action }), list.map(() => ({ success: true }))) };
+          return { delete: async () => (calls.push({ op: "delete", name, id }), {}) };
+        },
+      };
+    },
+  };
+}
 const req = (fx, cookie, body) => ({
   cookies: { get: (name) => (name === "_admin" && cookie ? { value: cookie } : undefined) },
   headers: { get: (k) => ({ host: `${fx.id}.test` })[k.toLowerCase()] ?? null },
@@ -299,39 +327,66 @@ await t("resolveShopifyChange 'keep' re-bases base_hash and base_value in the dr
   await docs.run(() => Sync.writeProduct(F.fixtureProduct(3)));
 });
 
-await t("title gate: Typesense on _default (env collection, no own setting) and on a tenant with its own collection refuses a new name or display_* at save with the plain words; badge and modules save and publish; openEntityContent says titleEditable false with the reason", async () => {
+await t("title gate (P4-SEARCH, OQ-1 (b)): TITLE_READERS_READY is true and the Typesense condition is gone: with Typesense configured on _default (env collection) and on a store with its own collection (dummy config, spy client), saving and publishing a name and display_* succeeds and the spy shows the new name indexed; openEntityContent says the name is editable", async () => {
   Gate.setTitleGateForTest(null); // the real conditions
   process.env.TYPESENSE_HOST = "127.0.0.1";
   process.env.TYPESENSE_ADMIN_API_KEY = "dummy-local-key";
-  const defaultTenant = { ...docs.tenant, id: "_default", config: {} };
+  eq(Gate.TITLE_READERS_READY, true, "readers flag:");
+  eq(Gate.CONDITIONS.map((c) => c.cause), ["readers"], "the conditions left:");
+  ok(!Gate.CONDITIONS.some((c) => /search|typesense/i.test(`${c.save} ${c.belt("X")} ${c.undo("X")}`)), "no condition speaks of search");
+  const spy = spyClient();
+  TS.setSearchAdminClientForTest(spy);
+  // _default (the env collection, "products") on the pc-ts database, and pc-ts itself
+  const defaultTenant = { ...ownTs.tenant, id: "_default", config: {} };
   const inDefault = (fn) => withTenant(defaultTenant, fn);
-  eq(inDefault(() => Gate.titleGate()).cause, "typesense", "_default with the env collection:");
-  eq(ownTs.run(() => Gate.titleGate()).cause, "typesense", "own collection:");
-  // a platform tenant with no own collection: no Typesense, but the readers aren't ready
-  eq(docs.run(() => Gate.titleGate()).cause, "readers", "no own collection:");
-  for (const [label, run] of [["_default", inDefault], ["own collection", (fn) => ownTs.run(fn)]]) {
-    const o = await run(() => Docs.openEntityContent({ type: "product_content", entityId: P(1), actor: ACTOR }));
-    eq([o.titleEditable, o.titleBlockedReason], [false, Gate.TITLE_GATE_MESSAGE], `${label} openEntityContent:`);
-    for (const field of ["title", "display_type", "display_vendor"]) {
-      const d = await run(() => Docs.getDocument(o.document.id));
-      const e = await refused(run(() => Docs.saveDraft({ id: d.id, revision: d.revision, body: { ...d.body, settings: { ...d.body.settings, [field]: v(`New ${field}`) } }, actor: ACTOR })));
-      eq([e.status, e.code, e.message], [409, "TITLE_NOT_EDITABLE", "Search on your store still shows Shopify's product names, so a new name can't be saved yet."], `${label} ${field}:`);
-    }
-    const d = await run(() => Docs.getDocument(o.document.id));
-    const s = await run(() => Docs.saveDraft({ id: d.id, revision: d.revision, body: { ...d.body, settings: { ...d.body.settings, badge: "Gated?" }, sections: [sec("rich_text", "sec_gate", { title: "Care", html: "<p>Rinse.</p>" })] }, actor: ACTOR }));
-    eq(s.document.body.settings.badge, "Gated?", `${label} badge saved:`);
-    const p = await run(() => Pub.publish({ ids: [{ id: d.id, revision: s.document.revision, draftHash: s.document.draftHash }], actor: ACTOR }));
-    eq(p.published.length, 1, `${label} badge and modules publish:`);
+  for (const [label, run] of [["_default", inDefault], ["own collection", (fn) => ownTs.run(fn)], ["no Typesense namespace", (fn) => docs.run(fn)]]) {
+    eq(run(() => Gate.titleGate()), { blocked: false, cause: null, reason: null }, `${label} gate:`);
   }
-  // Typesense off, TITLE_READERS_READY false: the same refusal
-  for (const k of ["TYPESENSE_HOST", "TYPESENSE_ADMIN_API_KEY"]) delete process.env[k];
-  eq(Gate.TITLE_READERS_READY, false, "readers flag:");
-  const o = await open(docs, 4);
-  eq([o.titleEditable, o.titleBlockedReason], [false, Gate.TITLE_GATE_MESSAGE], "readers openEntityContent:");
-  const d = await get(docs, o.document.id);
-  const r = await api(docs, { saveDraft: { id: d.id, body: { ...d.body, settings: { ...d.body.settings, title: v("Readers not ready") } } }, revision: d.revision });
-  eq([r.status, r.body.code, r.body.error], [409, "TITLE_NOT_EDITABLE", Gate.TITLE_GATE_MESSAGE], "readers save:");
-  // the seam opens it
+  const imported = (name) => spy.calls.filter((c) => c.op === "import" && c.name === name).flatMap((c) => c.docs);
+  // _default: saved and published through the service, then the fast path
+  await inDefault(async () => {
+    const o = await Docs.openEntityContent({ type: "product_content", entityId: P(1), actor: ACTOR });
+    eq([o.titleEditable, o.titleBlockedReason], [true, null], "_default openEntityContent:");
+    const d = await Docs.saveDraft({ id: o.document.id, revision: o.document.revision, body: { ...o.document.body, settings: { ...o.document.body.settings, title: v("Default New Name"), display_type: v("Default Type"), display_vendor: v("Default Brand") } }, actor: ACTOR });
+    eq(d.document.body.settings.title.value, "Default New Name", "_default saved:");
+    const p = await Pub.publish({ ids: [{ id: o.document.id, revision: d.document.revision, draftHash: d.document.draftHash }], actor: ACTOR });
+    eq(p.published.length, 1, "_default published:");
+    await SR.kickSearchReindex();
+  });
+  eq(imported("products").map((x) => [x.id, x.title, x.product_type, x.vendor]), [["fixture-product-1", "Default New Name", "Default Type", "Default Brand"]], "_default indexed into the env collection:");
+  // the store with its own collection, through the console API (the fast path runs after the 200)
+  const o = await open(ownTs, 2);
+  eq([o.titleEditable, o.titleBlockedReason], [true, null], "own collection openEntityContent:");
+  const s = await api(ownTs, { saveDraft: { id: o.document.id, body: { ...o.document.body, settings: { ...o.document.body.settings, title: v("Own New Name"), display_vendor: v("Own Brand") } } }, revision: o.document.revision });
+  eq(s.status, 200, `own collection save: ${JSON.stringify(s.body).slice(0, 200)}`);
+  const pub = await api(ownTs, { publish: { id: o.document.id, draftHash: s.body.document.draftHash }, revision: s.body.document.revision });
+  eq(pub.status, 200, `own collection publish: ${JSON.stringify(pub.body).slice(0, 200)}`);
+  eq(imported("pcts_products").map((x) => [x.id, x.title, x.vendor]), [["fixture-product-2", "Own New Name", "Own Brand"]], "indexed into its own collection:");
+  ok(!spy.calls.some((c) => c.op === "dropCollection" || c.op === "create"), "the reindex never drops or makes a collection");
+  eq((await sql(ownTs, "SELECT count(*) AS n FROM search_outbox WHERE done_at IS NULL"))[0].n, 0, "nothing left pending:");
+});
+
+await t("title gate forced closed (setTitleGateForTest): the save-time refusal and openEntityContent still answer, each in the words of the condition that blocked; a non-search condition never speaks of search", async () => {
+  for (const [state, words] of [
+    [{ blocked: true, cause: "readers" }, Gate.CONDITIONS.find((c) => c.cause === "readers").save],
+    [true, Gate.TITLE_GATE_MESSAGE],
+  ]) {
+    Gate.setTitleGateForTest(state);
+    const o = await open(docs, 4);
+    eq([o.titleEditable, o.titleBlockedReason], [false, words], `openEntityContent (${JSON.stringify(state)}):`);
+    for (const field of ["title", "display_type", "display_vendor"]) {
+      const d = await get(docs, o.document.id);
+      const e = await refused(docs.run(() => Docs.saveDraft({ id: d.id, revision: d.revision, body: { ...d.body, settings: { ...d.body.settings, [field]: v(`New ${field}`) } }, actor: ACTOR })));
+      eq([e.status, e.code, e.message], [409, "TITLE_NOT_EDITABLE", words], `${field}:`);
+      ok(!/search|typesense/i.test(e.message), `no search words: ${e.message}`);
+    }
+    const d = await get(docs, o.document.id);
+    const r = await api(docs, { saveDraft: { id: d.id, body: { ...d.body, settings: { ...d.body.settings, title: v("Through the API") } } }, revision: d.revision });
+    eq([r.status, r.body.code, r.body.error], [409, "TITLE_NOT_EDITABLE", words], "API:");
+    // badge and modules still save while it is closed
+    const b = await docs.run(() => Docs.saveDraft({ id: d.id, revision: d.revision, body: { ...d.body, settings: { ...d.body.settings, badge: "Still fine" } }, actor: ACTOR }));
+    eq(b.document.body.settings.badge, "Still fine", "badge:");
+  }
   Gate.setTitleGateForTest(false);
   eq((await open(docs, 4)).titleEditable, true, "forced open:");
 });
@@ -490,7 +545,8 @@ await t("discardOrphanEdits removes the live row only for an orphan (one 'discar
   eq(r.status, 200, `discard: ${JSON.stringify(r.body).slice(0, 300)}`);
   eq(await liveRow(docs, 11), null, "the live row went:");
   const added = (await outbox(docs)).slice(n0);
-  eq(added, [{ product_id: P(11), handle: null, reason: "discard", done_at: null }], "one discard row, handle null:");
+  eq(added.map((x) => [x.product_id, x.handle, x.reason]), [[P(11), null, "discard"]], "one discard row, handle null:");
+  ok(added[0].done_at, "the fast path after the API's 200 marked it done (no Typesense here)");
   eq([r.body.document.publishedVersionId, r.body.document.body.settings.title, r.body.document.revision], [null, null, d2.revision + 1], "the draft reset:");
   ok((await sql(docs, "SELECT note FROM document_versions WHERE document_id = ? AND kind = 'checkpoint' ORDER BY rowid DESC LIMIT 1", [id]))[0].note === Docs.DISCARD_NOTE, "the old draft is kept as a checkpoint");
   eq((await sql(docs, "SELECT action, release_id FROM publish_log WHERE document_id = ? ORDER BY rowid DESC LIMIT 1", [id]))[0], { action: "discard", release_id: null }, "log:");
@@ -745,11 +801,174 @@ await t("the title belt: a mixed set (doc_home plus a product whose draft name w
   const before = await liveDump(docs);
   const e = await refused(publish(docs, ["doc_home", o.document.id]));
   eq([e.status, e.code], [409, "TITLE_NOT_PUBLISHABLE"], "refused:");
-  eq(e.message, "The new name for “Fixture product 6” can't go live yet, because search on your store still shows Shopify's names. Reset the name or leave this product out of this publish.", "words:");
+  eq(e.message, "The new name for “Fixture product 6” can't go live right now. Reset the name or leave this product out of this publish.", "words (a forced gate, no condition):");
+  // a closed condition names itself, never search
+  Gate.setTitleGateForTest({ blocked: true, cause: "readers" });
+  const e2 = await refused(publish(docs, ["doc_home", o.document.id]));
+  eq(e2.message, "The new name for “Fixture product 6” can't go live yet, because some screens of your store's admin still show Shopify's product names. Reset the name or leave this product out of this publish.", "words (readers):");
+  ok(!/search/i.test(e2.message), "never search's words");
+  Gate.setTitleGateForTest(true);
   eq(e.extra.documents, [{ id: o.document.id, label: "Fixture product 6" }], "named:");
   eq(await liveDump(docs), before, "nothing written:");
   const p = await publish(docs, ["doc_home"]);
   eq(p.published.map((x) => x.id), ["doc_home"], "without it:");
+});
+
+// =============================================================================
+console.log("— 7. P4-SEARCH: the LIVEROW review");
+// =============================================================================
+
+await t("a description saved back in its cleaned form (Shopify's markup cleaned the same way) follows Shopify: stored null", async () => {
+  Gate.setTitleGateForTest(false);
+  await docs.run(() => Sync.writeProduct(F.fixtureProduct(13, { descriptionHtml: '<p style="color:red">Soft <span>cotton</span></p>' })));
+  const o = await open(docs, 13);
+  const d = (await save(docs, o.document.id, { description_html: v("<p>Soft <span>cotton</span></p>") })).document;
+  eq(d.body.settings.description_html, null, "cleaned-equal:");
+  const mine = (await save(docs, o.document.id, { description_html: v("<p>Soft <span>linen</span></p>") })).document;
+  eq([mine.body.settings.description_html.value, mine.body.settings.description_html.base_value], ["<p>Soft <span>linen</span></p>", '<p style="color:red">Soft <span>cotton</span></p>'], "a real change is the founder's, based on Shopify's raw value:");
+  await save(docs, o.document.id, { description_html: null });
+});
+
+await t("a rich text or text module with no title is incomplete in a draft and an error at publish, in words naming the module; with a title it publishes and shows", async () => {
+  Gate.setTitleGateForTest(false);
+  const o = await open(docs, 14);
+  for (const [kind, settings, what] of [["rich_text", { title: "", html: "<p>Care: wash cold.</p>" }, "rich text"], ["text", { title: "  ", body: ["Care: wash cold."] }, "text"]]) {
+    const r = await save(docs, o.document.id, {}, [sec(kind, "sec_untitled", settings)]);
+    const i = r.issues.find((x) => x.code === "MODULE_TITLE_MISSING");
+    ok(i && i.severity === "incomplete" && i.sectionId === "sec_untitled" && i.field === "title", `${kind} draft: ${JSON.stringify(r.issues)}`);
+    eq(i.message, `This ${what} module has no title, so shoppers won't see it: on the product page a module shows as a title they tap to open. Add a title.`, `${kind} words:`);
+    const before = await liveDump(docs);
+    const e = await refused(publish(docs, [o.document.id]));
+    eq([e.status, e.code], [422, "VALIDATION_FAILED"], `${kind} publish:`);
+    ok(e.extra.issues.some((x) => x.code === "MODULE_TITLE_MISSING" && x.severity === "error"), `${kind}: the error`);
+    eq(await liveDump(docs), before, `${kind}: nothing written:`);
+  }
+  await save(docs, o.document.id, {}, [sec("rich_text", "sec_titled", { title: "Care", html: "<p>Care: wash cold.</p>" })]);
+  await publish(docs, [o.document.id]);
+  eq(JSON.parse((await liveRow(docs, 14)).modules), [{ title: "Care", html: "<p>Care: wash cold.</p>" }], "a titled module goes live:");
+});
+
+await t("an image-with-text module's image from another website warns in a draft and is refused at publish (the gallery's allowlist); Shopify's host and the library go live", async () => {
+  Gate.setTitleGateForTest(false);
+  const o = await open(docs, 15);
+  const bad = await save(docs, o.document.id, {}, [sec("image_with_text", "sec_iwtbad", { image: { media: "https://evil.example.com/a.png", alt: "A" }, title: "Look" })]);
+  ok(bad.issues.some((i) => i.code === "IMAGE_HOST_NOT_ALLOWED" && i.severity === "warning" && i.sectionId === "sec_iwtbad"), `draft warns: ${JSON.stringify(bad.issues)}`);
+  const before = await liveDump(docs);
+  const e = await refused(publish(docs, [o.document.id]));
+  eq([e.status, e.code], [422, "VALIDATION_FAILED"], "refused:");
+  ok(e.extra.issues.some((i) => i.code === "IMAGE_HOST_NOT_ALLOWED" && i.severity === "error" && i.sectionId === "sec_iwtbad"), "the allowlist error");
+  eq(await liveDump(docs), before, "nothing written:");
+  ok(!JSON.stringify(await liveRow(docs, 15)).includes("evil.example.com"), "the image never went live");
+  for (const media of ["https://cdn.shopify.com/s/files/look.png", "/api/media/med_iwt1"]) {
+    await save(docs, o.document.id, {}, [sec("image_with_text", "sec_iwtok", { image: { media, alt: "A" }, title: "Look" })]);
+    const p = await publish(docs, [o.document.id]);
+    eq(p.published.length, 1, `${media} publishes:`);
+    ok((await liveRow(docs, 15)).modules.includes(media), `${media} is live`);
+  }
+});
+
+await t("a product that is no longer in Shopify can't be published: 409 in plain words pointing to Discard edits, nothing written", async () => {
+  Gate.setTitleGateForTest(false);
+  const o = await open(docs, 16);
+  await save(docs, o.document.id, { badge: "Gone soon" });
+  await docs.run(() => Sync.deleteProductByGid(P(16)));
+  const before = await liveDump(docs);
+  const e = await refused(publish(docs, [o.document.id]));
+  eq([e.status, e.code], [409, "PRODUCT_NOT_IN_SHOPIFY"], "refused:");
+  eq(e.message, "“Fixture product 16” is no longer in Shopify, so its edits can't go live. Open it and choose Discard edits, or leave it out of this publish.", "words:");
+  eq(e.extra.documents, [{ id: o.document.id, label: "Fixture product 16" }], "named:");
+  eq(await liveDump(docs), before, "no live row, no outbox row:");
+  // in a mixed set too
+  await homeId(docs);
+  const e2 = await refused(publish(docs, ["doc_home", o.document.id]));
+  eq(e2.code, "PRODUCT_NOT_IN_SHOPIFY", "mixed set:");
+  eq(await liveDump(docs), before, "mixed set: nothing written:");
+  await docs.run(() => Sync.writeProduct(F.fixtureProduct(16)));
+});
+
+await t("Undo and undoSet can't put a name live while the gate is closed (the belt, in the blocking condition's words); Undo of a first publish (Shopify's names) still works", async () => {
+  Gate.setTitleGateForTest(false);
+  const o = await open(docs, 17);
+  await save(docs, o.document.id, { title: v("Secret name") });
+  await publish(docs, [o.document.id]);
+  await save(docs, o.document.id, { title: null });
+  const p2 = await publish(docs, [o.document.id]);
+  eq((await liveRow(docs, 17)).title, null, "Shopify's name is live:");
+  Gate.setTitleGateForTest({ blocked: true, cause: "readers" });
+  const before = await liveDump(docs);
+  const e = await refused(undo(docs, o.document.id, p2.published[0].undo.logId));
+  eq([e.status, e.code], [409, "TITLE_NOT_PUBLISHABLE"], "Undo refused:");
+  eq(e.message, "The earlier name for “Fixture product 17” can't go live again yet, because some screens of your store's admin still show Shopify's product names. Nothing was changed.", "words:");
+  ok(!/search/i.test(e.message), "never search's words");
+  const dry = await refused(undo(docs, o.document.id, p2.published[0].undo.logId, true));
+  eq(dry.code, "TITLE_NOT_PUBLISHABLE", "the dry run says so too:");
+  const es = await refused(docs.run(() => U.undoSet({ kind: "undoSet", setId: p2.setId, members: [{ id: o.document.id, logId: p2.published[0].undo.logId }] }, { actor: ACTOR })));
+  eq(es.code, "TITLE_NOT_PUBLISHABLE", "undoSet refused:");
+  eq(await liveDump(docs), before, "nothing changed:");
+  eq((await liveRow(docs, 17)).title, null, "the secret name never went live:");
+  // a first publish's Undo (back to Shopify's names) is not a new name
+  const o2 = await open(docs, 18);
+  Gate.setTitleGateForTest(false);
+  await save(docs, o2.document.id, { title: v("Eighteen") });
+  const first = await publish(docs, [o2.document.id]);
+  Gate.setTitleGateForTest({ blocked: true, cause: "readers" });
+  const u = await undo(docs, o2.document.id, first.published[0].undo.logId);
+  eq([u.status, await liveRow(docs, 18)], [200, null], "Undo of a first publish:");
+});
+
+await t("two people publishing the same product in a products-only set: the second to commit gets 409 PUBLISHED_ELSEWHERE naming the person who published, never 503 busy", async () => {
+  Gate.setTitleGateForTest(false);
+  const o = await open(docs, 19);
+  await save(docs, o.document.id, { badge: "Race" });
+  const d = await get(docs, o.document.id);
+  let raced = false;
+  Pub.setPublishHooks({
+    beforeCommit: async () => {
+      if (raced) return;
+      raced = true;
+      // Meera publishes the same draft first
+      await docs.run(() => Pub.publish({ ids: [{ id: d.id, revision: d.revision, draftHash: d.draftHash }], actor: ADMIN_ACTOR }));
+    },
+  });
+  const e = await refused(docs.run(() => Pub.publish({ ids: [{ id: d.id, revision: d.revision, draftHash: d.draftHash }], actor: ACTOR })));
+  Pub.setPublishHooks({});
+  eq([e.status, e.code], [409, "PUBLISHED_ELSEWHERE"], `refused: ${e.message}`);
+  eq(e.extra.current.updatedByName, "Meera Iyer", "names who published:");
+  eq((await liveRow(docs, 19)).badge, "Race", "Meera's publish is live:");
+  eq((await sql(docs, "SELECT count(*) AS n FROM publish_log WHERE document_id = ? AND action = 'publish'", [d.id]))[0].n, 1, "one publish:");
+});
+
+await t("discardOrphanEdits of a product that only had a draft writes no outbox row", async () => {
+  Gate.setTitleGateForTest(false);
+  const o = await open(docs, 20);
+  await save(docs, o.document.id, { badge: "Draft only" });
+  eq(await liveRow(docs, 20), null, "never published:");
+  await docs.run(() => Sync.deleteProductByGid(P(20)));
+  const before = (await outbox(docs)).length;
+  const d = await get(docs, o.document.id);
+  const r = await docs.run(() => Docs.discardOrphanEdits({ id: d.id, revision: d.revision, actor: ACTOR }));
+  eq(r.removedLive, false, "no live row:");
+  eq((await outbox(docs)).length, before, "no outbox row:");
+  await docs.run(() => Sync.writeProduct(F.fixtureProduct(20)));
+});
+
+await t("openEntityContent's un-archive checks the mode in its own batch: a store that leaves documents mode meanwhile gets the plain mode words and the document stays archived", async () => {
+  Gate.setTitleGateForTest(false);
+  const o = await open(docs, 12);
+  const d = await get(docs, o.document.id);
+  if (!d.archivedAt) await docs.run(() => Docs.archive({ id: d.id, revision: d.revision, actor: ACTOR }));
+  ok((await get(docs, o.document.id)).archivedAt, "archived");
+  for (const mode of ["migrating", "legacy"]) {
+    Docs.openEntityHooks.beforeUnarchive = async () => setMode(docs, mode);
+    const e = await refused(open(docs, 12));
+    Docs.openEntityHooks.beforeUnarchive = null;
+    await setMode(docs, "documents");
+    eq(e.status, 409, `${mode}:`);
+    ok(mode === "migrating" ? e.message === Mode.MIGRATING_MESSAGE : /still uses the current Storefront editor/.test(e.message), `${mode} words: ${e.message}`);
+    ok((await get(docs, o.document.id)).archivedAt, `${mode}: still archived`);
+  }
+  const back = await open(docs, 12);
+  eq([back.unarchived, back.document.archivedAt], [true, null], "in documents mode it comes back:");
 });
 
 // =============================================================================

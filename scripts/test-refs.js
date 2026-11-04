@@ -190,6 +190,84 @@ await t("bad inputs: unknown type, bad cursor, variant without product → 400",
   eq((await get("type=variant")).status, 400);
 });
 
+// --- P4-SEARCH (OVL-05, OVL-06): the published name ----------------------------
+// rf3: a store with the live table (every tenant migration), 61 products, a
+// third of them renamed by a published live row (some to the same name, some
+// to names that sort before or after Shopify's), one with a draft-only name.
+const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+const t3file = ".test-refs-t3.db";
+dbs.push(t3file);
+await rm(join(here, "..", t3file), { force: true });
+const t3db = createClient({ url: `file:${t3file}` });
+await runMigrations(t3db, await loadMigrations("tenant"));
+await t3db.executeMultiple(schema);
+await C.upsertTenant({ id: "rf3", name: "rf3", domains: [], dbUrl: `file:${t3file}`, config: {}, secrets: {} });
+const T3 = await C.getTenant("rf3");
+await I.addMembership(staffU.id, "rf3", "staff");
+const shopifyName = (i) => `Item ${String(i).padStart(3, "0")}`;
+const liveName = (i) => (i % 9 === 0 ? "Same Name" : i % 3 === 0 ? `Aaa renamed ${String(i).padStart(3, "0")}` : i % 3 === 1 && i % 6 === 1 ? null : i % 5 === 0 ? `Zzz renamed ${String(i).padStart(3, "0")}` : null);
+for (let i = 1; i <= 61; i++) {
+  const n = String(i).padStart(3, "0");
+  await t3db.execute({ sql: "INSERT INTO products (id, handle, title, available, currency, price_min, featured_image, synced_at) VALUES (?,?,?,?,?,?,?,?)", args: [`gid://p3/${n}`, `item-${n}`, shopifyName(i), 1, "INR", 10 + i, `https://img/${n}.jpg`, "2026-10-29T00:00:00Z"] });
+  if (liveName(i)) await t3db.execute({ sql: "INSERT INTO product_content_live (product_id, document_id, version_id, title, published_at) VALUES (?, ?, ?, ?, ?)", args: [`gid://p3/${n}`, `doc_prod_${n}`, `ver_${n}`, liveName(i), "2026-11-01T00:00:00Z"] });
+}
+// a draft-only name: a document whose draft names product 2 "Secret draft name"
+await t3db.execute({
+  sql: "INSERT INTO documents (id, type, slug, entity_id, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES ('doc_prod_draft', 'product_content', NULL, 'gid://p3/002', 'Item 002', ?, 'h', 1, 1, '2026-11-01', '2026-11-01')",
+  args: [JSON.stringify({ schema: 1, type: "product_content", settings: { title: { value: "Secret draft name", base_hash: "x", base_value: "Item 002" } }, sections: [] })],
+});
+const get3 = (qs) => withTenant(T3, () => handleRefsGet(req(staffTok, qs)));
+const effective3 = (i) => liveName(i) || shopifyName(i);
+
+await t("P4-SEARCH: the product picker finds a renamed product by its published name, shows Shopify's name as secondary text, and never a draft name", async () => {
+  const r = await get3(`type=product&q=${encodeURIComponent("Aaa renamed 012")}`);
+  eq(r.status, 200);
+  eq(r.body.items.length, 1, "found by the new name");
+  eq(r.body.items[0].title, "Aaa renamed 012", "the published name");
+  eq(r.body.items[0].shopify_title, "Item 012", "Shopify's name beside it");
+  const byOld = await get3(`type=product&q=${encodeURIComponent("Item 012")}`);
+  eq(byOld.body.items[0]?.title, "Aaa renamed 012", "Shopify's name finds it too, shown by its published name");
+  eq((await get3(`type=product&q=${encodeURIComponent("Secret draft")}`)).body.items.length, 0, "a draft name finds nothing");
+  const two = (await get3(`type=product&ids=${encodeURIComponent("gid://p3/002,gid://p3/012")}`)).body.items;
+  eq(two[0].title, "Item 002", "the draft is never shown");
+  eq("shopify_title" in two[0], false, "no secondary name when they agree");
+  eq(two[1].shopify_title, "Item 012", "hydrated with Shopify's name");
+});
+
+await t("P4-SEARCH: cursor paging over 61 products with mixed overrides has no duplicates or gaps, in the order of the published name (then id)", async () => {
+  for (const limit of [7, 25, 50]) {
+    const seen = [];
+    let cursor = null;
+    let pages = 0;
+    do {
+      const r = await get3(`type=product&limit=${limit}${cursor ? `&cursor=${cursor}` : ""}`);
+      eq(r.status, 200, "page");
+      seen.push(...r.body.items.map((i) => [i.id, i.title]));
+      cursor = r.body.nextCursor;
+      if (++pages > 20) throw new Error("cursor loop");
+    } while (cursor);
+    const want = Array.from({ length: 61 }, (_, k) => [`gid://p3/${String(k + 1).padStart(3, "0")}`, effective3(k + 1)]).sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[0] < b[0] ? -1 : 1));
+    eq(JSON.stringify(seen), JSON.stringify(want), `limit ${limit}: every product once, in order`);
+  }
+  // paging a search too: "renamed" matches only published names
+  const hits = [];
+  let cursor = null;
+  do {
+    const r = await get3(`type=product&limit=4&q=renamed${cursor ? `&cursor=${cursor}` : ""}`);
+    hits.push(...r.body.items.map((i) => i.id));
+    cursor = r.body.nextCursor;
+  } while (cursor);
+  const wantHits = Array.from({ length: 61 }, (_, k) => k + 1).filter((i) => /renamed/.test(liveName(i) || ""));
+  eq(hits.length, wantHits.length, "every renamed product once");
+  eq(new Set(hits).size, hits.length, "no duplicates");
+});
+
+await t("P4-SEARCH: a store with no live rows answers exactly as before (no secondary name key)", async () => {
+  const r = await get("type=product&limit=3");
+  eq(JSON.stringify(Object.keys(r.body.items[0]).sort()), JSON.stringify(["currency", "handle", "id", "price_min", "status", "thumb", "title"]), "keys");
+  eq(r.body.items[0].title, "Product 001", "Shopify's name");
+});
+
 // ----------------------------------------------------------------------------
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(here, "..", f), { force: true });

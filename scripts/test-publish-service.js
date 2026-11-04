@@ -1074,6 +1074,8 @@ await t("API: staff without storefront.publish get 403 with storage unchanged; a
   // P4-LIVEROW (OVL-02): product content publishes now, as a live row: no
   // release, the release pointer untouched (scripts/test-product-content.js
   // covers the rest)
+  // P4-SEARCH: a product's content publishes only while the product is in the catalog
+  await sql("INSERT INTO products (id, handle, title, available) VALUES ('gid://shopify/Product/9', 'ps-nine', 'Product nine', 1) ON CONFLICT(id) DO NOTHING");
   const content = await create("docs", "product_content", { entityId: "gid://shopify/Product/9" });
   const releasesBefore = await sql("SELECT id FROM releases ORDER BY rowid");
   const stateBefore = await sql("SELECT live_release_id FROM release_state");

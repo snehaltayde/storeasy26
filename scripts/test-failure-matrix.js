@@ -731,7 +731,11 @@ row("publish", "documents: a section whose button goes to another site (saved as
 // P4-LIVEROW (OVL-02): product content publishes as a live row (no release);
 // what still refuses is a field Shopify owns
 row("publish", "documents: product content publishes as a live row, with no release", () =>
-  withTenant(T.docs, async () => publishDoc({}, (await DocsService.createDocument({ type: "product_content", entityId: "gid://shopify/Product/77", actor: { kind: "merchant", id: owner.id } })).document)),
+  withTenant(T.docs, async () => {
+    // P4-SEARCH: a product's content publishes only while the product is in the catalog
+    await (await import("../lib/db.js")).libsql.execute("INSERT INTO products (id, handle, title, available) VALUES ('gid://shopify/Product/77', 'fm-seventy-seven', 'Product 77', 1) ON CONFLICT(id) DO NOTHING");
+    return publishDoc({}, (await DocsService.createDocument({ type: "product_content", entityId: "gid://shopify/Product/77", actor: { kind: "merchant", id: owner.id } })).document);
+  }),
   { status: 200 },
   (r) => eq([r.body.release, r.body.published.length], [null, 1], "a live row, no release:"),
 );

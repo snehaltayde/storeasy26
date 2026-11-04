@@ -1,0 +1,51 @@
+{
+  "id": "P4-SEARCH",
+  "part": "order-contrast",
+  "title": "P4-SEARCH — order page Shopify-title line contrast",
+  "ranAt": "2026-11-04T15:23:20.421Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 3,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the line shows Shopify's title and the SKU",
+      "detail": "Shopify title: Whey Gold Isolate, SKU: WGI-1KG"
+    },
+    {
+      "ok": true,
+      "label": "the line uses the muted text token",
+      "detail": "text-xs text-fg-muted"
+    },
+    {
+      "ok": true,
+      "label": "computed contrast is at least 4.5:1 (7.73:1, rgb(82, 82, 91) on rgb(255, 255, 255))",
+      "detail": {
+        "color": "rgb(82, 82, 91)",
+        "background": "rgb(255, 255, 255)",
+        "from": "SECTION",
+        "className": "text-xs text-fg-muted",
+        "fontSize": "12px",
+        "ratio": 7.729820868495424,
+        "text": "Shopify title: Whey Gold Isolate, SKU: WGI-1KG"
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_28faa42d94225070, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s",
+    "measured: {\"color\":\"rgb(82, 82, 91)\",\"background\":\"rgb(255, 255, 255)\",\"from\":\"SECTION\",\"className\":\"text-xs text-fg-muted\",\"fontSize\":\"12px\",\"ratio\":7.729820868495424,\"text\":\"Shopify title: Whey Gold Isolate, SKU: WGI-1KG\"}"
+  ],
+  "screenshots": [
+    {
+      "name": "order-shopify-line",
+      "file": "docs/cms-reviews/drills/P4-SEARCH/order-shopify-line.png",
+      "bytes": 25078,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/orders/DRILL-OVL06"
+    }
+  ]
+}
