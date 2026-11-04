@@ -482,6 +482,17 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] Still open from P3-DESIGN: should a never-published design that matches the platform default list nothing to publish?
 - [ ] CI: the owner still needs to approve the source and checksum of the sqld download. Nothing under `.github` was touched.
 
+## Phase 3, batch 6
+
+### Design preview label, rte drill, theme pin hardening (P3-FIX5)
+- [ ] Ruling: which tags the refusal words name. As built: a known, web-page (hyphenated) or Word element, or any name with an attribute that has a value, and only with real attributes. `<founder>` and `<sale-ends soon>` now get the "< or > signs" words.
+- [ ] Ruling: the local-backup version note reads "Edits this browser kept".
+- [ ] Review the three files outside the plan list needed for the backup note: `components/admin/editor/store.js`, `lib/admin/documents-api.js`, `lib/documents/versions.js`.
+- [ ] Desktop Chrome on a staging test tenant: with two editor tabs, open Brand in tab A after tab B opened Home and change the accent. A's preview should show the new colour, and say Up to date only once it does.
+- [ ] Hosted Turso staging: a design publish writes `theme_pin` and `theme_pin_at`; a tenant with config that is not valid JSON is left unchanged and `documents_after_commit_failed` is logged.
+- [ ] Production build: the editor opens one preview session per editor open.
+- [ ] CI: approve the sqld download's source and checksum (nothing under `.github/` was touched).
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
