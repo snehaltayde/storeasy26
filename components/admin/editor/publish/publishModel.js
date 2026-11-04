@@ -424,6 +424,8 @@ export const hasChanges = (lists, ids) => ids.some((id) => lists[id]?.firstPubli
 //   call(op, args, extra)        documentsApi.call or the store's wrapper
 //   loadChanges(id)              listChanges for one document (default: call)
 //   checkLive()                  the live release id now, or undefined (optional)
+//   readDocument(id)             P4-EDITOR: getDocument straight from the server,
+//                                for a lost answer's check (default: call)
 //   documentOf(id)               { body, revision } of a draft the host holds
 //                                (optional; otherwise it is read with getDocument)
 //   keepLiveSection(id, sectionId)  the store's server-replace keepLiveSection
@@ -443,6 +445,11 @@ export const hasChanges = (lists, ids) => ids.some((id) => lists[id]?.firstPubli
 export function createPublishFlow(deps = {}) {
   const call = deps.call;
   const loadChanges = deps.loadChanges || ((id) => call("listChanges", { id }));
+  // P4-EDITOR (P4-LIVEROW review): a lost answer is checked against what the
+  // SERVER holds now. The editor's store call answers getDocument with the
+  // store's own copy, which still holds what was live before, so the editor
+  // passes readDocument (straight to the documents API).
+  const readDocument = deps.readDocument || ((id) => call("getDocument", id));
   let state = { phase: "closed", items: [], order: [], lists: {}, outcome: null, offerItems: [], busy: false, notice: null, firstPublish: {}, types: {} };
   const subs = new Set();
   let seq = 0; // a newer open wins over an older answer
@@ -558,9 +565,13 @@ export function createPublishFlow(deps = {}) {
       live = undefined;
     }
     let documents = null;
+    // P4-EDITOR (P4-LIVEROW review): a set of only products and collections
+    // has no release (release: null). It is settled by reading each
+    // document again: it went live when its published version's hash is the
+    // draft hash that was sent (the live row is written in the same batch).
     if (!(outcome.release?.id && live === outcome.release.id)) {
       try {
-        const got = await Promise.all(items.map((it) => call("getDocument", it.id)));
+        const got = await Promise.all(items.map((it) => readDocument(it.id)));
         documents = got.every((g) => g?.ok) ? got.map((g) => g.data.document) : null;
       } catch {
         documents = null;

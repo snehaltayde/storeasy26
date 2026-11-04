@@ -10,9 +10,11 @@ import { Field, Input, Textarea } from "@/components/console/fields";
 import { EmptyState } from "@/components/console/bits";
 import { useToast } from "@/components/console/Toast";
 import { CollectionPicker, ProductPicker } from "@/components/admin/cms/RefPicker";
+import { PRODUCT_WORDS } from "@/components/admin/editor/editorModel";
 
 // Catalog browser (S39 / MC05 + MC06, redesigned S50). Shopify-owned values
-// are READ-ONLY here, labeled and linked to Shopify admin; what the console
+// are READ-ONLY here, labeled and linked to Shopify admin (P4-EDITOR: in the
+// same plain words as the new editor's product form, PRODUCT_WORDS); what the console
 // edits is per-tenant PRESENTATION: per-product PDP modules + badge, and
 // per-collection pinned ordering. Overrides whose product vanished from the
 // catalog are flagged ORPHANED (deleted-product guard), never hidden.
@@ -166,7 +168,7 @@ export default function CatalogAdmin({ initial }) {
 
           {/* Shopify-owned values: labeled, read-only */}
           <div className="rounded-ctl bg-surface-sunken px-3.5 py-2.5 text-xs text-fg-muted">
-            <p className="font-medium text-fg">Shopify owns these — edit them in Shopify admin; they sync here.</p>
+            <p className="font-medium text-fg" data-shopify-owned="">{PRODUCT_WORDS.catalogShopify}</p>
             <p className="mt-0.5">
               Type: {editing.product.product_type || "—"} · Vendor: {editing.product.vendor || "—"} · Price: {editing.product.price_min}
               {editing.product.price_max !== editing.product.price_min ? `–${editing.product.price_max}` : ""} {editing.product.currency} ·{" "}

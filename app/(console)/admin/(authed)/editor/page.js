@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { getCmsMode } from "@/lib/cms-mode";
 import { listDocuments } from "@/lib/documents/service";
-import { editorEntry } from "@/lib/admin/editor-entry";
+import { editorEntry, parseEditorTarget } from "@/lib/admin/editor-entry";
+import { entityEntry, entityForDocument, canEdit, ENTRY_WORDS } from "@/lib/admin/entity-entry";
 import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
 import { Banner } from "@/components/console/Banner";
@@ -15,8 +16,19 @@ import DocumentEditor from "@/components/admin/editor/DocumentEditor";
 //   /admin/editor?doc=<id>      that document
 //   /admin/editor?path=<path>   the document at that store address
 //                               ("Edit this page", PUB-11)
+// P4-EDITOR (OVL-04, ED-12; plan section 4, the URL contract):
+//   /admin/editor?product=<gid>     that product's content
+//   /admin/editor?collection=<gid>  that collection's content
+//   parseEditorTarget (lib/admin/editor-entry.js) reads the address. A person
+//   who can edit opens the content through openEntityContent (found, made with
+//   its deterministic id, or brought back); anyone else only READS it
+//   (lib/admin/entity-entry.js readEntityContent), never a write. What Shopify
+//   sends now (the gallery's Shopify side, the price, variants and stock) is
+//   read here and handed to the editor, so the browser never asks for it.
+//   A product or collection that isn't in the catalog opens the home page
+//   with a note in plain words.
 // The store's mode is read fresh on every request (getCmsMode never caches):
-//   documents  the editor (a placeholder until P3-EDITOR)
+//   documents  the editor
 //   legacy     a note pointing at today's Designer; nothing else changes
 //   migrating  a read-only note: old writes are paused, the new editor isn't
 //              open yet
@@ -25,19 +37,34 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Editor · Admin", robots: { index: false } };
 
+const ENTITY_TYPES = new Set(["product_content", "collection_content"]);
+
 export default async function EditorPage({ searchParams }) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
 
   const query = (await searchParams) || {};
-  const { mode, entry } = await tfetch(async () => {
+  const target = parseEditorTarget(query);
+  const editable = canEdit(actor);
+  const { mode, entry, entity, readOnly } = await tfetch(async () => {
     const mode = await getCmsMode();
     if (mode !== "documents") return { mode, entry: null };
-    return { mode, entry: editorEntry(query, await listDocuments()) };
+    if (target.product || target.collection) {
+      const type = target.product ? "product_content" : "collection_content";
+      const out = await entityEntry({ type, entityId: target.product || target.collection, actor });
+      if (out.document) return { mode, entry: { document: out.document, note: null }, entity: out.entity, readOnly: out.readOnly };
+      return { mode, entry: { ...editorEntry({}, await listDocuments()), note: out.error || ENTRY_WORDS.failed }, entity: null, readOnly: null };
+    }
+    const docs = await listDocuments();
+    const e = editorEntry(query, docs);
+    if (!ENTITY_TYPES.has(e.document?.type)) return { mode, entry: e, entity: null, readOnly: null };
+    // ?doc= of a product's or collection's content: read what Shopify sends now
+    const row = docs.find((d) => d.id === e.document.id);
+    return { mode, entry: e, entity: await entityForDocument(row), readOnly: editable ? null : ENTRY_WORDS.readOnly };
   });
 
-  if (mode === "documents") return <DocumentEditor document={entry.document} note={entry.note} />;
+  if (mode === "documents") return <DocumentEditor document={entry.document} note={entry.note} entity={entity ?? null} readOnly={readOnly ?? null} />;
 
   if (mode === "legacy") {
     return (
