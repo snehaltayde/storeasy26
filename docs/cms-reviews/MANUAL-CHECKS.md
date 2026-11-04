@@ -292,6 +292,48 @@ No owner checks for this item.
 - [ ] Add scripts/test-api-shapes.js to P3-SCAFFOLD's files in docs/cms-reviews/P3-BATCHES.json, so the ownership check does not flag it.
 - [ ] Staging: NOT DONE and not needed for this item; nothing touches the database or hosted Turso.
 
+## Phase 3, batch 1
+
+### One commit core, document refs and migration 0023 (P3-COMMIT)
+- [ ] CI sqld download: approve the source and checksum of the sqld binary for CI (.github/ was not touched).
+- [ ] Hosted Turso on a staging tenant: an undo-shaped batch (draft rewrite, undo_saved, refs, log) commits all or nothing, and one that loses a pointer race writes nothing. Proven only on a local file database and local sqld.
+- [ ] Deploy order: run tenant:migrate --all --check (0023) before batch 2's Undo relies on linkersStatement, then re-seed the design harness. Publishing works without 0023.
+- [ ] Ruling: liveEntryOf treats an entry as offline only when its row is enabled:false AND the document no longer points at that version, so a page hidden by its own meta.enabled keeps the inherited rule (the brief's wording is broader).
+- [ ] Ruling: the support role's access reason wording ('Only the store owner or an admin can publish.').
+- [ ] Orchestrator: merge the two out-of-list test edits, scripts/test-preview-overlay.js (owned by P3-CLOSED) and scripts/test-documents.js (owned by P3-VALIDATE).
+- [ ] Orchestrator: P3-UNDO's whole-set query must say `WHERE set_id = ? AND set_id IS NOT NULL` to use the publish_log_set index as the brief defines it.
+
+### Change rows between two versions (P3-DIFF)
+- [ ] Wording ruling: read the row words listed in docs/cms-reviews/P3-DIFF.md Design ('Old addresses that lead here', 'Showing dates', 'Look: applied again', 'Banner 2', and 'Fonts' standing for text size) and say whether they suit a founder.
+- [ ] firstPublishRows quotes the page title, as the brief asks. It is the only founder text any row carries. Confirm that is wanted.
+- [ ] Phones drill (375 px) of the change rows in the Publish panel and the Undo confirm. This waits for P3-PUBLISHUI and P3-EDITOR, because no screen shows these rows yet.
+- [ ] Staging NOT DONE: nothing here touches a database. P3-CHANGES and P3-UNDO wire this module into the API in batch 2.
+
+### A store that has never published shows "Opening soon" (P3-CLOSED)
+- [ ] Local production build: run docs/cms-reviews/drills/P3-CLOSED/rsc-probe.mjs against next build && next start on a closed copy of the harness and confirm 0 leaks.
+- [ ] Ruling: catalog data (product, collection and search routes, and product page metadata) still answers on a closed store.
+- [ ] Ruling: the spec's 'verified console session' is read as 'a valid preview session minted from the console'.
+- [ ] Ruling: finding 3 gives the error page (built here) rather than neutral chrome; the /journal listing stays unguarded until test-perf-docs's statement count is updated by its owner.
+- [ ] Phones: look at the closed 'Opening soon' page on a real phone (only checked at 375 in desktop Chrome).
+- [ ] Staging: from a preview session on a closed store, place a COD test order with snehal@mediastic.in, confirm it reaches Shopify, then cancel it. The order carries no test mark because the orders table has no notes or tags column.
+- [ ] Maintenance curtain: look at a maintenance store at 1440 to see whether its dark background shows; globals.css's unlayered body rule likely overrides bg-hero and text-hero-fg on body, as it did on the first closed-page screenshot.
+- [ ] Follow-up (not owned here): add the two STORE_CLOSED messages to SHOPPER_CHECKOUT_ERRORS in lib/shopper-errors.js so a founder in preview sees the COD-only words instead of the generic line.
+- [ ] CI sqld download: not touched (no .github change); its source and checksum still need the owner's approval.
+
+### Logout ends that person's previews (P3-SESSION)
+- [ ] Real browser logout (desktop Chrome) on a documents-mode test tenant: open the preview, log out, reload the preview tab. It should show the live store with no preview bar. On a legacy test tenant, the Designer preview should come back after logging in again.
+- [ ] Rule on the known changes: logout ends that person's previews on every device; on a legacy store logout also ends the Designer's preview (logging in again re-mints it); bootstrap is one shared actor, so a bootstrap logout ends every bootstrap preview on that store.
+- [ ] Accept the known limit that platform logout clears _preview but does not revoke operator-opened preview sessions (they expire within the hour).
+- [ ] Hosted Turso staging run of the logout revoke: NOT DONE.
+- [ ] CI sqld download (standing): .github/ was not touched; approving the sqld binary's source and checksum is the owner's call.
+
+### Drafts keep unfinished values, and a broken section shows a note (P3-VALIDATE)
+- [ ] Rule on plan decision 9: drafts now store in-section broken values, too-long page titles and descriptions, and menu items' bad links as incomplete (200). Phase 2 refused them with 422. Publish still refuses them.
+- [ ] On phones and desktop, in a documents-mode preview: a banner with an off-store button, a hero with an off-store button, and a section that fails to render each show their note, and the live page shows neither the note nor the section.
+- [ ] In the founder's preview, a header or footer menu item with an off-store link shows that link as typed. Accept this, or ask for a menu-level note.
+- [ ] Hosted: force a failure on a staging tenant and check that section_render_failed and section_binding_failed lines show up in the Vercel log search.
+- [ ] No desktop Chrome drill ran. The browser check of these notes waits for P3-EDITOR's drill.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
