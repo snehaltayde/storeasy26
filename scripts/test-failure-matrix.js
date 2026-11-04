@@ -728,9 +728,19 @@ row("publish", "documents: a section whose button goes to another site (saved as
   { status: 422, code: "VALIDATION_FAILED", cls: "validation" },
   (r) => eq(r.body.issues.filter((i) => i.severity === "error").map((i) => [i.sectionId, i.field, i.code]), [["sec_fmo1", "button.link.href", "LINK_NOT_STOREFRONT"]], "names the section:"),
 );
-row("publish", "documents: product content can't be published yet", () =>
+// P4-LIVEROW (OVL-02): product content publishes as a live row (no release);
+// what still refuses is a field Shopify owns
+row("publish", "documents: product content publishes as a live row, with no release", () =>
   withTenant(T.docs, async () => publishDoc({}, (await DocsService.createDocument({ type: "product_content", entityId: "gid://shopify/Product/77", actor: { kind: "merchant", id: owner.id } })).document)),
-  { status: 409, code: "PUBLISH_NOT_AVAILABLE", cls: "refusal" },
+  { status: 200 },
+  (r) => eq([r.body.release, r.body.published.length], [null, 1], "a live row, no release:"),
+);
+row("save", "documents: a product content field Shopify owns", () =>
+  withTenant(T.docs, async () => {
+    const d = (await DocsService.createDocument({ type: "product_content", entityId: "gid://shopify/Product/78", actor: { kind: "merchant", id: owner.id } })).document;
+    return documents("docs", { saveDraft: { id: d.id, body: { ...d.body, settings: { ...d.body.settings, price: 10 } } }, revision: d.revision });
+  }),
+  { status: 422, code: "SHOPIFY_OWNED", cls: "validation" },
 );
 row("publish", "documents: a store still on the current editor", () => documents("ok", { publish: { id: "doc_home", draftHash: "x" }, revision: 1 }), { status: 409, code: "STORE_USES_LEGACY", cls: "refusal" });
 row("publish", "documents: staff can't publish", () => publishDoc({ admin: STAFF }), { status: 403, cls: "refusal" });

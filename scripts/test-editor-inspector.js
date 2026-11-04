@@ -279,11 +279,25 @@ const CATALOG = {
 // ============================== 1. coverage =======================================
 console.log("1. every kind has a control, every kind and type a form");
 
+// P4-LIVEROW: the product and collection content shape (OVL-01, ED-12) is
+// registered, but its controls are P4-EDITOR's (batch 4): the editor UI
+// stays read-only for these until then. These kinds and their two types are
+// the only coverage gaps allowed, and exactly these.
+const WAITING_KINDS = ["overlay", "gallery", "pairs", "product_ids"];
+const WAITING_TYPES = ["product_content", "collection_content"];
+const WAITING_PROBLEMS = [
+  ...WAITING_KINDS.map((k) => `setting kind "${k}" has no control`),
+  ...["title", "description_html", "gallery", "display_vendor", "display_type", "pairs"].map((k) => `document type "product_content": setting "${k}" has no control`),
+  'document type "collection_content": setting "pinned" has no control',
+];
+const waitingField = (field) => WAITING_KINDS.includes(field?.setting?.kind);
+
 await t("unit: every registered setting kind maps to a control, and every control name to a component", () => {
-  eq(M.inspectorCoverage(), [], "inspectorCoverage()");
-  for (const kind of Object.keys(SETTING_KINDS)) ok(M.controlKindOf(kind), `setting kind ${kind} has no control`);
+  eq([...M.inspectorCoverage()].sort(), [...WAITING_PROBLEMS].sort(), "inspectorCoverage() (only P4-EDITOR's kinds wait)");
+  for (const kind of Object.keys(SETTING_KINDS)) if (!WAITING_KINDS.includes(kind)) ok(M.controlKindOf(kind), `setting kind ${kind} has no control`);
   eq([...Object.keys(SF.CONTROL_COMPONENTS)].sort(), [...M.CONTROL_NAMES].sort(), "the components are exactly the control names");
   for (const [name, C] of Object.entries(SF.CONTROL_COMPONENTS)) ok(typeof C === "function", `control ${name} is not a component`);
+  ok(WAITING_TYPES.every((t) => Reg.documentType(t)), "the waiting types are registered");
 });
 
 await t("unit: an unknown setting kind is a coverage failure, and has no control", () => {
@@ -313,7 +327,9 @@ await t("unit: every section kind and every document type (every singleton) has 
     campaign: "page",
     journal: "page",
     journal_index: "system",
-    product_content: "sections",
+    // P4-LIVEROW: product and collection content have settings now
+    product_content: "settings",
+    collection_content: "settings",
   };
   for (const type of Reg.documentTypeNames()) {
     const f = M.formOf({ type });
@@ -350,6 +366,7 @@ function renderAll(type, body, label) {
   const f = M.formOf({ type });
   const known = new Set(fieldIds(tags(html)));
   for (const field of [...f.meta, ...f.fields]) {
+    if (waitingField(field)) continue; // P4-LIVEROW: P4-EDITOR's controls
     const v = field.path.startsWith("meta.") ? M.getAt(body, field.path) : body.settings?.[field.key];
     for (const a of M.anchorsOf(field, v ?? null, null)) ok(known.has(a), `${label}: ${field.path} should render ${a}`);
     controlsRendered.add(field.control);

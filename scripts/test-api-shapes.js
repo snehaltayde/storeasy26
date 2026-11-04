@@ -98,6 +98,9 @@ const { SHAPES, COMMON, SHAPES_VERSION } = Sh;
 
 
 const read = (p) => readFile(join(ROOT, p), "utf8");
+// P4-LIVEROW: two more sources the new outcomes' words come from
+const extraSources = { "lib/catalog/title-gate.js": await read("lib/catalog/title-gate.js"), "lib/cms-mode.js": await read("lib/cms-mode.js") };
+const readFileSyncText = (p) => extraSources[p] ?? "";
 const apiSource = await read("lib/admin/documents-api.js");
 const authSource = await read("lib/admin-auth.js");
 const issuesSource = await read("lib/cms/issues.js");
@@ -121,7 +124,10 @@ const EMITTERS = { "lib/admin/documents-api.js": apiSource, "lib/cms/issues.js":
 // built yet: emitted or not, a status must match.
 // P3-UNDO: CANNOT_TAKE_OFFLINE is emitted now (lib/documents/undo.js), so it
 // is built. P3-CHANGES: TOO_MANY_KEPT likewise (lib/documents/changes.js).
-const BUILT_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "CANNOT_TAKE_OFFLINE", "TOO_MANY_KEPT"]);
+// P4-LIVEROW: the codes phase 4 adds ("p4" outcomes), each emitted now, with
+// its outcome's status.
+const P4_CODES = ["SHOPIFY_OWNED", "TITLE_NOT_EDITABLE", "TITLE_NOT_PUBLISHABLE", "STORE_MIGRATING", "CANNOT_TAKE_OFFLINE_CONTENT", "NOT_PRODUCT_CONTENT", "PRODUCT_NOT_IN_SHOPIFY", "PRODUCT_IN_SHOPIFY"];
+const BUILT_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "CANNOT_TAKE_OFFLINE", "TOO_MANY_KEPT", ...P4_CODES]);
 const NEW_CODES = new Set([...BUILT_CODES]);
 
 // ---- walking the shapes ------------------------------------------------------------
@@ -179,6 +185,8 @@ check("every operation of today and of phase 3 has its entry", () => {
   const want = [
     "getDocument", "listDocuments", "listHistory", "createDocument", "saveDraft", "discardDraft", "restoreVersion", "archive", "publish", "publishSet",
     "unpublish", "undo", "undoSet", "listRecentlyPublished", "listChanges", "keepLiveSection", "keepAsEarlierDraft",
+    // P4-LIVEROW
+    "openEntityContent", "resolveShopifyChange", "discardOrphanEdits",
   ];
   sameList(Object.keys(SHAPES), want, "operations");
 });
@@ -188,7 +196,7 @@ check("every operation of today and of phase 3 has its entry", () => {
 check("every outcome has a status, since, a body, and paths that exist", () => {
   for (const { where, o } of allOutcomes) {
     if (!Number.isInteger(o.status) || o.status < 200 || o.status > 599) fail(`${where}: status ${o.status}`);
-    if (o.since !== "p2" && o.since !== "p3") fail(`${where}: since is ${o.since}`);
+    if (o.since !== "p2" && o.since !== "p3" && o.since !== "p4") fail(`${where}: since is ${o.since}`);
     if (!o.body || typeof o.body !== "object" || Array.isArray(o.body)) fail(`${where}: no body`);
     if (o.status === 200) {
       if (o.body.ok !== true) fail(`${where}: a 200 without ok: true`);
@@ -199,7 +207,7 @@ check("every outcome has a status, since, a body, and paths that exist", () => {
       if (o.status !== 401 && o.status !== 403 && !/^[A-Z][A-Z_]+$/.test(o.body.code || "")) fail(`${where}: code ${o.body.code}`);
     }
     for (const p of [...(o.optional || []), ...(o.addedInPhase3 || [])]) if (!hasPath(o.body, p)) fail(`${where}: ${p} is listed but the example has no such key`);
-    if (o.since === "p3" && o.addedInPhase3) fail(`${where}: a p3 outcome lists addedInPhase3 (it is new as a whole)`);
+    if ((o.since === "p3" || o.since === "p4") && o.addedInPhase3) fail(`${where}: a ${o.since} outcome lists addedInPhase3 (it is new as a whole)`);
   }
 });
 
@@ -277,8 +285,8 @@ check("every DocumentError code of today has an outcome", () => {
     for (const m of src.matchAll(/code:\s*"([A-Z_]+)"\s*,\s*\n?\s*error:/g)) emitted.add(m[1]); // publish conflicts
     for (const m of src.matchAll(/error:\s*UNREADABLE,\s*code:\s*"([A-Z_]+)"/g)) emitted.add(m[1]);
   }
-  const ce = /CART_LOCKED_CODE = "([A-Z_]+)"/.exec(serviceSource);
-  if (ce) emitted.add(ce[1]);
+  // P4-LIVEROW: the cart's CART_NOT_AVAILABLE refusal is gone (plan OQ-6)
+  if (/CART_NOT_AVAILABLE"/.test([apiSource, ...Object.values(docSources)].join("\n").replace(/\/\/.*$/gm, ""))) fail("CART_NOT_AVAILABLE is still emitted");
   for (const m of issuesSource.matchAll(/\{ status: \d{3}, code: "([A-Z_]+)" \}/g)) emitted.add(m[1]);
   if (emitted.size < 20) fail(`only ${emitted.size} codes found in the sources: the scan is broken`);
   const missing = [...emitted].filter((c) => !used.has(c));
@@ -535,7 +543,10 @@ check("slug refusals carry slug and other (and document on publish)", () => {
 check("constant words are copied exactly", () => {
   const constant = [
     ["saveDraft", "legacy"], ["publish", "legacy"], ["saveDraft", "revisionRequired"], ["publish", "revisionRequired"], ["publish", "reviewRequired"],
-    ["publish", "nothingToPublish"], ["saveDraft", "cartLocked"], ["publish", "busy"], ["publish", "unknown"], ["publish", "deleted"], ["publish", "storeUsesReleases"],
+    ["publish", "nothingToPublish"], ["publish", "busy"], ["publish", "unknown"], ["publish", "deleted"], ["publish", "storeUsesReleases"],
+    // P4-LIVEROW
+    ["unpublish", "cannotTakeOfflineContent"], ["discardOrphanEdits", "inShopify"], ["resolveShopifyChange", "productGone"],
+    ["resolveShopifyChange", "notProductContent"], ["discardOrphanEdits", "notProductContent"], ["openEntityContent", "notFound"],
   ];
   const all = Object.values(EMITTERS).join("\n");
   for (const [op, name] of constant) {
@@ -592,6 +603,55 @@ check("the request of every operation parses, and dryRun, logId and confirmRepub
     const r = parseDocumentsOperation(bad);
     if (r.code !== "MALFORMED") fail(`not refused: ${JSON.stringify(bad)}`);
   }
+});
+
+// ---- P4-LIVEROW: the new operations -------------------------------------------------------
+
+check("P4-LIVEROW: the new operations parse with their access, and bad ones are refused", () => {
+  const p = (b) => parseDocumentsOperation(b);
+  const o = p(SHAPES.openEntityContent.request).op;
+  if (o.type !== "product_content" || o.entityId !== "gid://shopify/Product/101") fail(`openEntityContent: ${JSON.stringify(o)}`);
+  const r = p(SHAPES.resolveShopifyChange.request).op;
+  if (r.field !== "title" || r.choice !== "keep" || r.revision !== 3) fail(`resolveShopifyChange: ${JSON.stringify(r)}`);
+  const d = p(SHAPES.discardOrphanEdits.request).op;
+  if (d.id !== "doc_prod_0123456789abcdef" || d.revision !== 3) fail(`discardOrphanEdits: ${JSON.stringify(d)}`);
+  for (const bad of [
+    { openEntityContent: { type: "page", entityId: "x" } },
+    { openEntityContent: { type: "product_content" } },
+    { openEntityContent: { type: "product_content", entityId: "gid://shopify/Product/1" }, revision: 2 },
+    { resolveShopifyChange: { id: "doc_x", field: "title", choice: "maybe" }, revision: 1 },
+    { resolveShopifyChange: { id: "doc_x", choice: "keep" }, revision: 1 },
+    { discardOrphanEdits: { nope: 1 }, revision: 1 },
+  ]) {
+    const x = p(bad);
+    if (x.code !== "MALFORMED") fail(`not refused: ${JSON.stringify(bad)}`);
+  }
+  if (SHAPES.openEntityContent.access !== "storefront.write" || SHAPES.resolveShopifyChange.access !== "storefront.write" || SHAPES.discardOrphanEdits.access !== "storefront.publish") fail("access");
+  // the dispatcher's lists say the same
+  if (!/const PUBLISHES = new Set\(\[[^\]]*"discardOrphanEdits"/.test(apiSource)) fail("discardOrphanEdits is not a publish operation in documents-api.js");
+  if (!/const NEEDS_REVISION = new Set\(\[[^\]]*"resolveShopifyChange"/.test(apiSource)) fail("resolveShopifyChange needs no revision in documents-api.js");
+  if (!/const PUBLISH_NEEDS_REVISION = new Set\(\[[^\]]*"discardOrphanEdits"/.test(apiSource)) fail("discardOrphanEdits needs no revision in documents-api.js");
+});
+
+check("P4-LIVEROW: openEntityContent's 200 is the service's answer; the words of the new refusals are the code's", () => {
+  const ok = SHAPES.openEntityContent.outcomes.ok.body;
+  const at = serviceSource.indexOf("function entityAnswer(");
+  if (at < 0) fail("can't find entityAnswer() in service.js");
+  const ret = serviceSource.indexOf("return {", at);
+  const lit = literalParts(balanced(serviceSource, ret + "return ".length));
+  // created and unarchived come in through ...extra
+  keysBetween(Object.keys(ok).filter((k) => k !== "ok"), [...lit.keys, "created", "unarchived"], [], "openEntityContent 200");
+  if (!/return \{ status: 200, body: \{ ok: true, \.\.\.o \} \};/.test(apiSource)) fail("the dispatcher no longer answers { ok, ...openEntityContent }");
+  sameList(Object.keys(SHAPES.publish.outcomes.titleNotPublishable.body), ["error", "code", "documents"], "TITLE_NOT_PUBLISHABLE");
+  if (!/"TITLE_NOT_PUBLISHABLE", message, \{ documents: blocked\.map/.test(publishSource)) fail("TITLE_NOT_PUBLISHABLE extra changed");
+  sameList(Object.keys(SHAPES.saveDraft.outcomes.titleNotEditable.body), ["error", "code", "field"], "TITLE_NOT_EDITABLE");
+  sameList(Object.keys(SHAPES.saveDraft.outcomes.shopifyOwned.body), ["error", "code", "issues"], "SHOPIFY_OWNED");
+  if (!/"SHOPIFY_OWNED", owned\[0\]\.message, \{ issues: r\.issues \}/.test(serviceSource)) fail("SHOPIFY_OWNED extra changed");
+  const all = Object.values(EMITTERS).join("\n");
+  const gate = readFileSyncText("lib/catalog/title-gate.js");
+  if (!gate.includes(JSON.stringify(SHAPES.saveDraft.outcomes.titleNotEditable.body.error))) fail("the title gate's words are not title-gate.js's");
+  if (!readFileSyncText("lib/cms-mode.js").includes(JSON.stringify(SHAPES.publish.outcomes.storeMigrating.body.error))) fail("the migrating words are not lib/cms-mode.js's");
+  if (!all.includes("Product content can't be taken offline. To go back to what Shopify sends, choose Use Shopify's on each field and publish.")) fail("the take-offline words are not in the code");
 });
 
 console.log(`${passed} passed, ${failures.length} failed (${((Date.now() - started) / 1000).toFixed(1)}s)`);

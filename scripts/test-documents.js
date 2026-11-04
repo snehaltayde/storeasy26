@@ -147,7 +147,9 @@ await t("a home, a campaign, a journal post, the product layout and one product'
   const content = await create({ type: "product_content", entityId: "gid://shopify/Product/1" });
   for (const [name, r] of Object.entries({ camp, post, layout, content })) eq(r.status, 200, `${name} create:`);
   eq(layout.body.document.id, "doc_product_layout", "product layout is a singleton:");
-  for (const r of [camp, post, content]) ok(/^doc_[a-z2-7]{16}$/.test(r.body.document.id), `random route id, got ${r.body.document.id}:`);
+  for (const r of [camp, post]) ok(/^doc_[a-z2-7]{16}$/.test(r.body.document.id), `random route id, got ${r.body.document.id}:`);
+  // P4-LIVEROW: product content has its deterministic id (productDocumentId)
+  ok(/^doc_prod_[0-9a-f]{16}$/.test(content.body.document.id), `product content id, got ${content.body.document.id}:`);
   Object.assign(made, { home: home.body.document, camp: camp.body.document, post: post.body.document, layout: layout.body.document, content: content.body.document });
 
   // ...and saved through the same saveDraft
@@ -904,26 +906,19 @@ await t("restoring page A from page B's version id is refused (404), storage unc
   await unchanged(before, "restore from another page's version");
 });
 
-// (4) doc_cart waits for the owner's capability ruling
-await t("API: create or save of doc_cart answers 409 with a plain message until the owner rules on its capability, storage unchanged", async () => {
-  const before = await dump();
+// (4) doc_cart: P4-LIVEROW applies the owner ruling's default (plan OQ-6):
+// it is an ordinary document, saved with storefront.write
+await t("API: doc_cart is created, saved and restored like any document (P4-LIVEROW, the OQ-6 default; it used to answer 409 CART_NOT_AVAILABLE)", async () => {
   const c = await create({ type: "cart" });
-  eq([c.status, c.body.code], [409, "CART_NOT_AVAILABLE"], "create:");
-  eq(c.body.error, "Cart suggestions can't be changed here yet, so nothing was saved. Change them on the Upsells screen for now.", "plain words:");
-  await unchanged(before, "cart create");
-  // a doc_cart row made some other way (a later backfill): saves and restores are refused too
-  const at = new Date().toISOString();
-  const cartBody = R.emptyBody("cart");
-  await raw.docs.execute({ sql: "INSERT INTO documents (id, type, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES ('doc_cart', 'cart', 'Cart', ?, 'dh_cart', 1, 1, ?, ?)", args: [JSON.stringify(cartBody), at, at] });
-  const cp = await V.versionRow({ documentId: "doc_cart", kind: "checkpoint", body: cartBody, schemaVersion: 1, createdAt: at });
-  await raw.docs.execute(V.versionStatement(cp));
-  const before2 = await dump();
+  eq(c.status, 200, `create: ${JSON.stringify(c.body).slice(0, 200)}`);
+  eq(c.body.document.id, "doc_cart", "id:");
+  const cartBody = c.body.document.body;
   const s = await save("doc_cart", 1, { ...cartBody, settings: { ...cartBody.settings, title: "Changed" } });
-  eq([s.status, s.body.code], [409, "CART_NOT_AVAILABLE"], "save:");
-  const r = await api({ restoreVersion: { id: "doc_cart", versionId: cp.id }, revision: 1 });
-  eq([r.status, r.body.code], [409, "CART_NOT_AVAILABLE"], "restore:");
-  await unchanged(before2, "cart save and restore");
-  // reads still work
+  eq(s.status, 200, "save:");
+  eq((await docRow("doc_cart")).revision, 2, "saved:");
+  const cp = (await sql("SELECT id FROM document_versions WHERE document_id = 'doc_cart' AND kind = 'checkpoint' ORDER BY rowid LIMIT 1"))[0].id;
+  const r = await api({ restoreVersion: { id: "doc_cart", versionId: cp }, revision: 2 });
+  eq(r.status, 200, "restore:");
   eq((await api({ getDocument: "doc_cart" })).status, 200, "read:");
 });
 

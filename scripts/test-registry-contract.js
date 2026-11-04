@@ -59,6 +59,7 @@ const deq = (got, want, label = "") => {
 // Every issue any check in this file produces, for the shape and wording checks
 // at the end.
 const ALL = [];
+const DT = await import("../lib/registry/document-types.js");
 const validate = (body, opts) => {
   const r = R.validateDocument(body, opts);
   ALL.push(...r.issues);
@@ -548,14 +549,16 @@ await t("upgradeBody runs pure per-section migrate steps", async () => {
 
 // ---- document types -------------------------------------------------------------------
 
-await t("document types: singletons feed emptyList, design checks brand readability, product_content can't publish, unknown types are refused", async () => {
+await t("document types: singletons feed emptyList, design checks brand readability, product_content publishes (P4-LIVEROW), unknown types are refused", async () => {
   const singles = R.singletonTypes();
   deq(singles, ["announcement", "header", "footer", "design", "home", "collections_index", "product_layout", "collection_layout", "cart"]);
   const list = emptyList(1, singles);
   for (const type of singles) eq(list.documents[`doc_${type}`], null, type);
   ok(!singles.includes("journal_index") && !singles.includes("page"), "routes and the journal index aren't singletons");
   eq(R.documentType("journal_index").editable, false);
-  eq(R.documentType("product_content").publishable, false);
+  // P4-LIVEROW (OVL-02): product and collection content publish as live rows
+  eq(R.documentType("product_content").publishable, true);
+  eq(R.documentType("collection_content").publishable, true);
   deq(R.allowedKinds("journal_index"), []);
   ok(R.allowedKinds("campaign").includes("product_rail") && R.allowedKinds("campaign").includes("collections"), "DOC-06: a campaign takes a rail and a collections grid");
 
@@ -571,7 +574,22 @@ await t("document types: singletons feed emptyList, design checks brand readabil
 
   const pc = { schema: 1, type: "product_content", meta: {}, sections: [sec("text", "sec_t1", { title: "Care" })] };
   ok(validate(pc, { mode: "draft" }).ok, "product content saves");
-  one(validate(pc, { mode: "publish" }), "PUBLISH_NOT_AVAILABLE");
+  ok(validate(pc, { mode: "publish" }).ok, "product content publishes");
+  // the new shape: overlays, Shopify-owned fields, the gallery allowlist at publish
+  const pcBody = (settings) => ({ ...R.emptyBody("product_content"), settings: { ...R.emptyBody("product_content").settings, ...settings } });
+  ok(validate(pcBody({ title: { value: "Name", base_hash: "h", base_value: "Old" }, badge: "New" }), { mode: "publish" }).ok, "an overlay name and a badge publish");
+  one(validate({ ...pcBody({}), settings: { ...pcBody({}).settings, price: 5 } }, { mode: "draft" }), "SHOPIFY_OWNED", { field: "price" });
+  one(validate(pcBody({ title: { value: " ", base_hash: null, base_value: null } }), { mode: "draft" }), "TITLE_EMPTY");
+  const offHost = pcBody({ gallery: { value: [{ media: "https://images.example.com/a.png", alt: "A" }], base_hash: null, base_value: null } });
+  eq(find(validate(offHost, { mode: "draft" }), "IMAGE_HOST_NOT_ALLOWED")[0]?.severity, "warning", "a draft holds an off-host image");
+  eq(find(validate(offHost, { mode: "publish" }), "IMAGE_HOST_NOT_ALLOWED")[0]?.severity, "error", "publish refuses it");
+  // a type declared publishable: false is still refused at publish
+  const unpub = R.defineDocumentType({ type: "test_unpublishable", label: "Test", publishable: false });
+  try {
+    one(validate({ schema: 1, type: unpub.type, meta: {} }, { mode: "publish" }), "PUBLISH_NOT_AVAILABLE");
+  } finally {
+    R.__forgetDocumentTypeForTest?.(unpub.type);
+  }
 
   one(validate({ schema: 1, type: "blog_roll", sections: [] }, { mode: "draft" }), "UNKNOWN_TYPE");
   one(validate({ schema: 2, type: "home", meta: {}, sections: [] }, { mode: "draft" }), "SCHEMA_UNSUPPORTED");
@@ -1010,6 +1028,15 @@ function badValues(s) {
       return [5, { kit: "nope", version: 1 }, { kit: "pulse", version: 1, z: 1 }];
     case "entries":
       return [5];
+    // P4-LIVEROW
+    case "overlay":
+      return [5, { value: null, z: 1 }, { value: "x", base_hash: 5 }, ...(s.nonEmpty ? [{ value: "  " }] : []), ...badValues({ ...s, kind: s.of }).map((x) => ({ value: x, base_hash: null, base_value: null }))];
+    case "gallery":
+      return [5, [], [5], [{ media: 5 }], [{ media: "http://x.example/a.jpg" }], [{ media: `/${long(1001)}` }], [{ media: "/a.jpg", alt: long(513) }], [{ media: "/a.jpg", z: 1 }], Array.from({ length: (s.max ?? 1) + 1 }, () => ({ media: "/a.jpg", alt: "a" }))];
+    case "pairs":
+      return [5, { title: long(81), products: [] }, { products: [5] }, { products: ["gid://shopify/Product/1", "gid://shopify/Product/1"] }, { products: [], z: 1 }, { products: Array.from({ length: (s.max ?? 1) + 1 }, (_, j) => `gid://shopify/Product/${j}`) }];
+    case "product_ids":
+      return [5, [5], ["a", "a"], Array.from({ length: (s.max ?? 1) + 1 }, (_, j) => `gid://shopify/Product/${j}`)];
     default:
       throw new Error(`no bad values for the setting kind "${s.kind}": add them here`);
   }
@@ -1033,6 +1060,7 @@ await t("crafted bad values for every setting kind of every section and document
     const t = R.documentType(type);
     for (const s of t.settings) {
       kinds.add(s.kind);
+      if (s.of) kinds.add(s.of); // P4-LIVEROW: an overlay's own kind (gallery)
       for (const bad of badValues(s)) for (const mode of ["draft", "publish"]) validate({ ...R.emptyBody(type), settings: { ...R.emptyBody(type).settings, [s.key]: bad } }, { mode });
     }
   }
@@ -1054,6 +1082,16 @@ await t("crafted bad values for every setting kind of every section and document
   validate({ schema: 1, type: "page", meta: { slug: "", title: "", enabled: "yes", effective_at: "never", window_start: "2026-12-01", window_end: "2026-11-01", redirect_from: "x" }, sections: [] }, { mode: "publish" });
   validate({ schema: 1, type: "page", meta: { slug: "a", title: "A", redirect_from: ["Bad Old"] }, sections: [{ ...sec("text", "sec_t1"), v: 0 }, { ...sec("text", "sec_t2"), v: 2 }, { ...sec("text", "sec_t3"), enabled: "x", show: "x", bindings: "x", blocks: "x", mobile: "x" }] }, { mode: "draft" });
   validate({ schema: 1, type: "product_content", meta: {}, sections: [sec("text", "sec_t1", { title: "Care" })] }, { mode: "publish" });
+  // P4-LIVEROW: product content's rules and notes, and Shopify-owned fields
+  validate({ ...R.emptyBody("product_content"), settings: { ...R.emptyBody("product_content").settings, gallery: { value: [{ media: "https://images.example.com/a.png", alt: "A" }] } } }, { mode: "publish" });
+  validate({ ...R.emptyBody("product_content"), handle: "x", meta: { tags: [] } }, { mode: "draft" });
+  const notes = DT.productModuleNotes({
+    ...R.emptyBody("product_content"),
+    sections: [sec("image_with_text", "sec_iw", { image: { media: "/a.jpg", alt: "a" } }), ...Array.from({ length: 6 }, (_, j) => sec("rich_text", `sec_n${j}`, { title: "x".repeat(81), html: "<p>a</p>" }))],
+  });
+  const { issue: mkIssue } = await import("../lib/cms/issues.js");
+  // as lib/documents/service.js and publish.js add them to a save's or a publish's issues
+  ALL.push(...notes.map((n) => mkIssue({ documentId: "doc_prod_x", sectionId: n.sectionId ?? null, field: n.field ?? null, code: n.code, severity: "warning", message: n.message })));
   validate(home([sec("collections", "sec_c1", {}, { bindings: { collections: { source: "every_product" } }, blocks: [{ id: "blk_a1", kind: "x" }] })]), { mode: "draft" });
 });
 

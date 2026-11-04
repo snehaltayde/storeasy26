@@ -647,10 +647,13 @@ await t("unit (negative): staff calling undo, undoSet or unpublish get 403 with 
   eq(floor.body.message, "There's nothing earlier to undo.", "words:");
   eq((await undoApi("docs", m.id, "log_0000000000000000")).body.message, "There's nothing earlier to undo.", "no row:");
   await unchanged(mb, "migrated floor");
-  // product content stays refused (OVL-02)
+  // P4-LIVEROW (OVL-02): product content is undone like any document now: a
+  // log row that isn't there is the "nothing earlier" floor, and nothing is written
   const pc = await create("docs", "product_content", { entityId: "gid://shopify/Product/9" });
+  const pb = await dump();
   const pr = await undoApi("docs", pc.id, "log_0000000000000000");
-  eq([pr.status, pr.body.code, pr.body.document], [409, "PUBLISH_NOT_AVAILABLE", pc.id], "product content:");
+  eq([pr.status, pr.body.nothing, pr.body.message], [200, true, "There's nothing earlier to undo."], "product content:");
+  await unchanged(pb, "product content floor");
 });
 
 console.log("— Undo of a whole set (PUB-05)");

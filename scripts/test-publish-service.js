@@ -1050,7 +1050,7 @@ await t("FIX4 DOC-10: meta.redirect_from publishes a redirect from the old addre
 // =========================================================================================
 console.log("— the API (storefront.publish, modes, product content)");
 
-await t("API: staff without storefront.publish get 403 with storage unchanged; a legacy-mode tenant gets 409; product_content gives a plain refusal", async () => {
+await t("API: staff without storefront.publish get 403 with storage unchanged; a legacy-mode tenant gets 409; product_content publishes as a live row with no release (P4-LIVEROW)", async () => {
   const d = await create("docs", "page", { body: page("staff-try", "Staff try", "x") });
   const before = await dump();
   const staff = await publishApi("docs", d.id, { as: STAFF });
@@ -1071,15 +1071,20 @@ await t("API: staff without storefront.publish get 403 with storage unchanged; a
   eq(lgSvc, "STORE_USES_LEGACY", "the service refuses too:");
   await unchanged(legacyBefore, "legacy", "legacy");
 
+  // P4-LIVEROW (OVL-02): product content publishes now, as a live row: no
+  // release, the release pointer untouched (scripts/test-product-content.js
+  // covers the rest)
   const content = await create("docs", "product_content", { entityId: "gid://shopify/Product/9" });
-  const before2 = await dump();
+  const releasesBefore = await sql("SELECT id FROM releases ORDER BY rowid");
+  const stateBefore = await sql("SELECT live_release_id FROM release_state");
   const pc = await publishApi("docs", content.id);
-  eq([pc.status, pc.body.code], [409, "PUBLISH_NOT_AVAILABLE"], "product content:");
-  ok(!("issues" in pc.body), "a plain refusal, no issue list");
-  ok(/isn't available yet/.test(pc.body.error), pc.body.error);
-  await unchanged(before2, "product content");
+  eq([pc.status, pc.body.release, pc.body.published.map((x) => x.id)], [200, null, [content.id]], "product content:");
+  eq(await sql("SELECT id FROM releases ORDER BY rowid"), releasesBefore, "no release row:");
+  eq(await sql("SELECT live_release_id FROM release_state"), stateBefore, "the pointer:");
+  eq((await sql("SELECT document_id FROM product_content_live WHERE product_id = ?", ["gid://shopify/Product/9"]))[0]?.document_id, content.id, "the live row:");
 
   // missing revision or draft hash: 428, after authorization
+  const before2 = await dump();
   eq((await api({ publish: { id: d.id, draftHash: "x" } })).status, 428, "no revision:");
   eq((await api({ publish: { id: d.id }, revision: 1 })).body.code, "REVIEW_REQUIRED", "no draft hash:");
   eq((await api({ publish: { id: d.id }, revision: 1 }, { as: STAFF })).status, 403, "staff hear 403 first:");
@@ -1426,8 +1431,14 @@ await t("P3-COMMIT: archive is terminal: no code sets archived_at back to NULL (
     if (/archived_at\s*=\s*NULL/i.test(src.replace(/archived_at\s*=\s*NULL\b[^\n]*grep/gi, ""))) writers.push(`${f}: archived_at = NULL`);
     if (/\bSET\b[^;"`]*\barchived_at\s*=/i.test(src)) writers.push(f);
   }
-  // the one writer: service.js archive(), which sets it to the time
-  eq(writers.filter((w) => !w.startsWith("scripts/test-")), ["lib/documents/service.js"], "files that set archived_at:");
+  // the one writer: service.js archive(), which sets it to the time, and
+  // (P4-LIVEROW) openEntityContent, which brings back the content of a
+  // product or collection that is in Shopify again (its one statement is
+  // checked below; no other line may set it to null)
+  eq(writers.filter((w) => !w.startsWith("scripts/test-")), ["lib/documents/service.js: archived_at = NULL", "lib/documents/service.js"], "files that set archived_at:");
+  const nulls = (await readFile(join(ROOT, "lib/documents/service.js"), "utf8")).split("\n").filter((l) => /archived_at\s*=\s*NULL/i.test(l));
+  eq(nulls.length, 1, "one un-archive statement:");
+  ok(/UPDATE documents SET archived_at = NULL, revision = revision \+ 1, updated_at = \?, updated_by = \? WHERE id = \? AND archived_at IS NOT NULL AND EXISTS/.test(nulls[0]), `only openEntityContent, only while the entity exists: ${nulls[0]}`);
   const svc = await readFile(join(ROOT, "lib/documents/service.js"), "utf8");
   ok(/SET archived_at = \?, revision = revision \+ 1, updated_at = \?, updated_by = \? WHERE[^"]*",\s*args: \[at, at, by,/.test(svc), "archive() sets archived_at to the time, never null");
 });
