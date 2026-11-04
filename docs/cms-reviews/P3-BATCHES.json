@@ -786,19 +786,63 @@
      "AU-04",
      "TOK-03"
     ],
-    "brief": "scripts/drills/p3/run.mjs runs the per-item drills (smoke, routes, editor, design, rte) and adds the cross-item matrix in desktop Chrome on the harness, re-seeding between state-changing drills, with screenshots and click counts:\n- timed founder tasks 1, 4 and 5;\n- closed store, first open (FIRST_PUBLISH_NEEDS_HOME then home publish), and a COD test order on the closed store with a preview session (then cancelled at once per the test-order rule; Razorpay refused);\n- RSC probe on every route listed in P3-CLOSED;\n- checks, 'publish both' with the target's changes shown before confirm;\n- take offline (linkers shown), the offline banner line, then 'publish again';\n- PUB-09 keep the live version;\n- two-tab conflict, both choices;\n- tab close within the pause (keepalive) and the backup recovery offer;\n- the PV-01 failure matrix (revoked, expired, exit, network);\n- See the live store then reconnect;\n- logout ends preview;\n- the Designer redirect;\n- staff Publish disabled;\n- design publish and Undo;\n- error page for corrupted chrome;\n- legacy smoke and edge drills unchanged.\nFlip the four P2-DRILLS 'known' checks (and the preview --drafts-only check) in scripts/drills/p2/run.mjs to plain passes. Write docs/cms-reviews/P3-DRILLS.md and add owner checks to docs/cms-reviews/MANUAL-CHECKS.md.\n\nAfter batch 2 review (read the From review list in the named packets):\n- (P3-HARNESS) The P2 and P3 drills need different seeds (the --p3 store refuses the shared password); run each on its own seed and say which. One clickCounter per context. Set DRILL_HTTPS_PORT, DRILL_TMP and DRILL_SCRATCH inside your port range.\n- Ports on this Mac: 5000 and 7000 are taken by ControlCenter (AirPlay), 5037 and 5500 are in use, and Node's fetch refuses 5060 and 5061. Use only the ports you are given; if one is busy, say so instead of reporting a code failure.\n\nAfter batch 3 review (read the From review list in the named packets):\n- (P3-ROUTES) Retire the P2 preview drill's 'finding 2' check: it now fails because the Designer redirects in documents mode. Replace it with the editor preview check.",
+    "brief": "scripts/drills/p3/run.mjs runs the per-item drills (smoke, routes, editor, design, rte) and adds the cross-item matrix in desktop Chrome on the harness, re-seeding between state-changing drills, with screenshots and click counts:\n- timed founder tasks 1, 4 and 5;\n- closed store, first open (FIRST_PUBLISH_NEEDS_HOME then home publish), and a COD test order on the closed store with a preview session (then cancelled at once per the test-order rule; Razorpay refused);\n- RSC probe on every route listed in P3-CLOSED;\n- checks, 'publish both' with the target's changes shown before confirm;\n- take offline (linkers shown), the offline banner line, then 'publish again';\n- PUB-09 keep the live version;\n- two-tab conflict, both choices;\n- tab close within the pause (keepalive) and the backup recovery offer;\n- the PV-01 failure matrix (revoked, expired, exit, network);\n- See the live store then reconnect;\n- logout ends preview;\n- the Designer redirect;\n- staff Publish disabled;\n- design publish and Undo;\n- error page for corrupted chrome;\n- legacy smoke and edge drills unchanged.\nFlip the four P2-DRILLS 'known' checks (and the preview --drafts-only check) in scripts/drills/p2/run.mjs to plain passes. Write docs/cms-reviews/P3-DRILLS.md and add owner checks to docs/cms-reviews/MANUAL-CHECKS.md.\n\nAfter batch 2 review (read the From review list in the named packets):\n- (P3-HARNESS) The P2 and P3 drills need different seeds (the --p3 store refuses the shared password); run each on its own seed and say which. One clickCounter per context. Set DRILL_HTTPS_PORT, DRILL_TMP and DRILL_SCRATCH inside your port range.\n- Ports on this Mac: 5000 and 7000 are taken by ControlCenter (AirPlay), 5037 and 5500 are in use, and Node's fetch refuses 5060 and 5061. Use only the ports you are given; if one is busy, say so instead of reporting a code failure.\n\nAfter batch 3 review (read the From review list in the named packets):\n- (P3-ROUTES) Retire the P2 preview drill's 'finding 2' check: it now fails because the Designer redirects in documents mode. Replace it with the editor preview check.\n\nAfter batch 4 review (read the From review list in P3-EDITOR.md, P3-DESIGN.md, P3-RTE.md):\n- (P3-EDITOR) Narrow scripts/drills/p3/routes.mjs's 'no legacy preview frame' check to the documents-mode screens it is about; you own routes.mjs for this.\n- (P3-DESIGN) Drill that a documents-mode founder reaches Design from the editor switcher and a design publish changes the live store's look.\n- (P3-RTE) Drill a web-page paste with custom elements after P3-FIX4's clean-on-save lands if it is merged first; otherwise drill the 'Edit as HTML' way out and say which.\n- Ports on this Mac: 5000 and 7000 are taken by ControlCenter (AirPlay), 5037 and 5500 are in use, and Node's fetch refuses 5060 and 5061. Use only the ports you are given. If a drill stops at '#login-email' with /admin/login 500 (next/font Fraunces error), delete the worktree's .next and retry.",
     "migrations": [],
     "files": [
      "scripts/drills/p3/run.mjs",
      "scripts/drills/p3/matrix.mjs",
      "scripts/drills/p2/run.mjs",
      "docs/cms-reviews/P3-DRILLS.md",
-     "docs/cms-reviews/MANUAL-CHECKS.md"
+     "docs/cms-reviews/MANUAL-CHECKS.md",
+     "scripts/drills/p3/routes.mjs"
     ],
     "acceptance": [
      "drill: every listed step passes and is recorded with screenshots and click counts; the test order is cancelled.",
      "drill: P2 drills run with the former known checks as passes; drill:smoke and drill:edge unchanged.",
-     "unit: pnpm test green."
+     "unit: pnpm test green.",
+     "drill: Design is reachable from the editor switcher in documents mode and a design publish shows on the live store"
+    ]
+   },
+   {
+    "id": "P3-FIX4",
+    "branch": "cms/p3-fix4",
+    "reqs": [
+     "TOK-03",
+     "AU-01",
+     "PUB-02",
+     "PUB-05"
+    ],
+    "brief": "Fix the batch 4 review findings no other batch 5 item owns. Read the From review lists in docs/cms-reviews/P3-DESIGN.md, P3-RTE.md and P3-FIX3.md.\nShopper- or data-facing (treat as blockers for this item):\n(1) Rich text paste, owner default option (b): lib/sanitize.js visibleText (and the cleaner path it feeds) must clean, not refuse, a web-page paste: unwrap unknown custom elements (any tag with a hyphen, with or without attributes) keeping their children, and drop <noscript> with its contents. Keep every existing refusal for real text loss. Fix the refusal words in lib/registry/text.js and lib/cms/store.js so they do not tell the founder about '< or > signs' when the cause is a hidden element; name the tag and say 'Edit as HTML' can remove it. Tests in scripts/test-rich-text.js using the reviewer's <product-info>, <relative-time datetime> and <noscript> pastes: saved, cleaned, visible text kept. Pin the surviving mutation: rescue must be off in html mode (components/admin/editor/fields/RichTextField.js). Legacy tenants must render unchanged (prove with the existing sanitize tests).\n(2) theme_pin write (lib/documents/after-commit.js): replace the whole-row patchTenant with a targeted UPDATE of config.theme_pin (json_set / json_remove) so a concurrent settings or secrets save is never overwritten, and put a short timeout around the handler so a slow platform database cannot fail a publish that is already live (log it, answer success). Tests in scripts/test-design-doc.js: a design published with settings.theme null writes theme_pin null (the reviewer's '!pin' mutation must fail it); a concurrent config write survives; a hanging handler times out without failing the publish.\nFounder-facing:\n(3) lib/documents/changes.js liveParts: pin with tests that offline pages and a turned-off announcement bar are never named in the design panel's 'affects' rows.\n(4) lib/admin/brand-readability.js liveDesign: test that a corrupt live design version throws (never a silent platform default).\n(5) app/api/admin/theme/route.js: when the doc_design draft saved but the hero preset write failed, say the design was saved and the hero look was not, never 'nothing was saved'. Test it in scripts/test-design-doc.js.\n(6) First design publish: a never-published doc_design must not offer an Undo that only answers FIRST_VERSION_MESSAGE. Make listRecentlyPublished/outcomeOf give canUndo false for it (lib/documents/undo.js or components/admin/editor/publish/publishModel.js), and test it in scripts/test-publish-ui.js.\n(7) lib/ai/insights.js apply and lib/experiments.js adopt: when the result leaves the draft unpublishable, the answer says so in plain words and names what to fix (the P3-VALIDATE direction). Tests in scripts/test-writers.js.\n(8) scripts/test-publish-undo.js: add a short real-handler case for a set dry-run undo through createDocumentsApi and handleDocumentsPut (the FIX3 reviewer's probe), so a future change to what a dry-run undo needs is caught end to end.\nDo not edit files P3-DRILLS owns (scripts/drills/**, docs/cms-reviews/P3-DRILLS.md, MANUAL-CHECKS.md) or package.json. If a code or shape changes, you own lib/admin/documents-api-shapes.js and scripts/test-api-shapes.js this batch.\n- Ports on this Mac: 5000 and 7000 are taken by ControlCenter (AirPlay), 5037 and 5500 are in use, and Node's fetch refuses 5060 and 5061. Use only the ports you are given. If a drill stops at '#login-email' with /admin/login 500 (next/font Fraunces error), delete the worktree's .next and retry.",
+    "migrations": [],
+    "files": [
+     "lib/sanitize.js",
+     "lib/registry/text.js",
+     "lib/cms/store.js",
+     "components/admin/editor/fields/RichTextField.js",
+     "scripts/test-rich-text.js",
+     "lib/documents/after-commit.js",
+     "scripts/test-design-doc.js",
+     "lib/documents/changes.js",
+     "lib/admin/brand-readability.js",
+     "app/api/admin/theme/route.js",
+     "lib/documents/undo.js",
+     "components/admin/editor/publish/publishModel.js",
+     "scripts/test-publish-ui.js",
+     "lib/ai/insights.js",
+     "lib/experiments.js",
+     "scripts/test-writers.js",
+     "scripts/test-publish-undo.js",
+     "lib/admin/documents-api-shapes.js",
+     "scripts/test-api-shapes.js",
+     "docs/cms-reviews/P3-FIX4.md"
+    ],
+    "acceptance": [
+     "unit: the reviewer's custom-element and noscript pastes save cleaned with their visible text; refusal words name the tag; legacy sanitize tests unchanged",
+     "unit: theme_pin is written with a targeted update (null for a design with no theme), a concurrent config write survives, a hanging handler does not fail the publish",
+     "unit: liveParts never names offline pages or a hidden bar; a corrupt live design throws; the theme route's partial failure says the design was saved",
+     "unit: a first design publish offers no Undo; insight apply and experiment adopt name what makes the draft unpublishable",
+     "unit: a set dry-run undo passes through the real handler",
+     "unit: pnpm test passes"
     ]
    }
   ]
