@@ -163,6 +163,17 @@ From review:
 
 See "From review" at the end of Known limits.
 
+**Answered by P4-FIX1** (`docs/cms-reviews/P4-FIX1.md`):
+- The six surviving mutations now each fail a case.
+- The ids.js rules are proven with sha256 worked out in the test, and the id-less live sections fixture exists.
+- An unchecked data check says "Not checked: fix the things above first.".
+- Generated section ids skip taken ones (home, page and product page extras).
+- The cart handle is kept, because the reader, the `product_list` check and MED-03 refs need it. It is recorded for P4-CUTOVER: rehearsal and cutover ids may differ when source hashes match.
+- The `{store_name}` cost is recorded, and the token is an owner check.
+- `PLATFORM_DB_URL` gets the local/hosted check.
+- The dry run lists the routes its data check covered.
+- Product-page extras stored with an id still show as a (safe-direction) difference: that is `check.js` work.
+
 ## Owner checks
 
 - **A real dry run per store, before its rehearsal:** `pnpm migrate:documents -- --tenant <id> --dry-run --hosted --confirm <id>` (add `--store-open` or `--not-launched` for a store that never published). Read the plain report with the founder; keep the digest for CUTOVER.
