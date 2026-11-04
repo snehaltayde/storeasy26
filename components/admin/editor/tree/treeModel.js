@@ -61,6 +61,9 @@
 //                                       section) and problem (an "error")
 //   groupIssues(issues)                 { [sectionId]: issues } from a flat list
 import { sectionType, documentType, allowedKinds, newSection, emptyBody, validateDocument, mintSectionId, mintBlockId, starterSection, isBlank } from "../../../../lib/registry/index.js";
+// P4-ED05 (D2): kinds still allowed on a type (old ones load and save) but
+// no longer offered there for new ones (a banner on a page, campaign or post)
+import { isOffered, NOT_SHOWN_MESSAGE } from "../../../../lib/registry/sections.js";
 import { issueClass, STRUCTURE, INCOMPLETE, DRAFT_MAX_BYTES } from "../../../../lib/registry/validate.js";
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -201,6 +204,7 @@ export function add(sections, kind, index, { type, collections = null, body = nu
   const d = sectionType(kind);
   if (!d) return refuse("UNKNOWN_KIND", "That kind of section isn't one we know.");
   if (!allowedKinds(type).includes(kind)) return refuse("KIND_NOT_ALLOWED", `A ${lower(d.label)} section can't go on ${nounOf(type)}.`);
+  if (!isOffered(kind, type)) return refuse("KIND_NOT_OFFERED", `${NOT_SHOWN_MESSAGE} Add a text section instead.`);
   const id = freshId(mintSectionId, idsInUse(before));
   const section = starterSection(kind, { collections, id });
   let first = null;
@@ -264,6 +268,7 @@ export function duplicate(sections, id, { type, body = null } = {}) {
   const original = before[i];
   const d = sectionType(original.kind);
   if (d?.protected) return refuse("PROTECTED_COPY", `The ${lower(d.label)} can't be copied: a page has only one.`);
+  if (!isOffered(original.kind, type)) return refuse("KIND_NOT_OFFERED", `${NOT_SHOWN_MESSAGE} Add a text section instead.`);
   const used = idsInUse(before);
   const copy = clone(original);
   copy.id = freshId(mintSectionId, used);
@@ -288,7 +293,7 @@ export { remove as delete };
 // ---- what the tree shows -----------------------------------------------------
 
 export function addOptions(type, sections, index, { body = null } = {}) {
-  return allowedKinds(type).map((kind) => {
+  return allowedKinds(type).filter((kind) => isOffered(kind, type)).map((kind) => {
     const d = sectionType(kind);
     const r = add(sections, kind, index, { type, body });
     return { kind, label: d.label, placeholder: d.placeholder, ok: r.ok, reason: r.ok ? null : r.message, index: r.ok ? r.index : null };

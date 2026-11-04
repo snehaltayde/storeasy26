@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { getBlockRow } from "@/lib/cms/store";
 import { tfetch } from "@/lib/console-request";
+import { getCmsMode } from "@/lib/cms-mode";
+import { editorHref, LEGACY_ROUTE_DOCS } from "@/lib/admin/editor-entry";
 import SurfaceDesigner from "@/components/admin/cms/SurfaceDesigner";
 
 // S59 (audit slice 3): the PRODUCT-PAGE designer — real-product context,
@@ -14,6 +16,10 @@ export default async function ProductDesignerPage() {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
+
+  // P4-ED05 (ED-05): a documents store edits the product page layout in the editor
+  const cmsMode = await tfetch(() => getCmsMode()).catch(() => null);
+  if (cmsMode === "documents") redirect(editorHref(LEGACY_ROUTE_DOCS["/admin/storefront/designer/product"]));
 
   const row = await tfetch(() => getBlockRow("surface_templates"));
   return <SurfaceDesigner surface="pdp" initial={{ surfaceTemplates: { value: row?.value || null, revision: row ? row.revision : null } }} />;

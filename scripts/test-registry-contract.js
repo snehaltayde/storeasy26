@@ -1092,6 +1092,9 @@ await t("crafted bad values for every setting kind of every section and document
   const { issue: mkIssue } = await import("../lib/cms/issues.js");
   // as lib/documents/service.js and publish.js add them to a save's or a publish's issues
   ALL.push(...notes.map((n) => mkIssue({ documentId: "doc_prod_x", sectionId: n.sectionId ?? null, field: n.field ?? null, code: n.code, severity: "warning", message: n.message })));
+  // P4-ED05 (D2): a banner on a page, campaign or journal post, as service.js and checks.js add it
+  const { notShownNotes } = await import("../lib/registry/sections.js");
+  ALL.push(...notShownNotes({ ...R.emptyBody("page"), sections: [sec("banner", "sec_bn", { title: "Old" })] }).map((n) => mkIssue({ documentId: "doc_p_x", sectionId: n.sectionId, field: null, code: n.code, severity: "warning", message: n.message })));
   validate(home([sec("collections", "sec_c1", {}, { bindings: { collections: { source: "every_product" } }, blocks: [{ id: "blk_a1", kind: "x" }] })]), { mode: "draft" });
 });
 

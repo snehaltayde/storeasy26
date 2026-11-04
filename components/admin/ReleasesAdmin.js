@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CircleCheck, ExternalLink } from "lucide-react";
 import { localInputToIso } from "@/lib/admin/schedule";
 import { diffItemInfo } from "@/components/admin/cms/labels";
+import { editorDestination } from "@/lib/admin/editor-entry";
 import { startPreview, NETWORK_ERROR } from "@/components/admin/cms/api";
 // DOC-04: publish issues are the same structured shape as save issues. The
 // server sends no positions; "Section 2 (Banner / CTA)" is worked out here
@@ -40,7 +41,11 @@ const HISTORY_COLUMNS = [
   { key: "state", header: "State", align: "right" },
 ];
 
-export default function ReleasesAdmin({ initial, canPublish = true }) {
+// P4-ED05 (ED-05): with cmsMode "documents" each diff chip links to its editor
+// destination (editorDestination), never an old screen. The Publishing page
+// shows this panel only on legacy stores today; the prop keeps the links
+// right wherever it is shown. Every other mode is unchanged.
+export default function ReleasesAdmin({ initial, canPublish = true, cmsMode = null }) {
   const toast = useToast();
   const [data, setData] = useState(initial);
   const [note, setNote] = useState("");
@@ -178,7 +183,7 @@ export default function ReleasesAdmin({ initial, canPublish = true }) {
               return (
                 <li key={`${item.type}:${item.key}`}>
                   <Link
-                    href={info.href}
+                    href={cmsMode === "documents" ? editorDestination(info.href) : info.href}
                     className="inline-flex items-center gap-2 rounded-ctl border border-edge bg-surface px-2.5 py-1.5 text-xs font-medium text-fg focus-ring hover:border-edge-strong hover:bg-surface-muted motion-safe:transition-colors"
                   >
                     {info.label}

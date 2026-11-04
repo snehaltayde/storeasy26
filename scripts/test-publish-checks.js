@@ -552,7 +552,8 @@ await t("a typo publish on a migrated-shape fixture whose untouched sections car
   const before = await dump();
   const off = await publishApi("ck", d.id, { confirmRepublish: true });
   eq([off.status, off.body.code], [422, "VALIDATION_FAILED"], "offline: they block:");
-  const blocks = off.body.issues.filter((i) => i.sectionId === "sec_gap" || i.sectionId === "sec_oldlink");
+  // P4-ED05: the old banner's "doesn't show on this kind of page" note is a warning, never a block
+  const blocks = off.body.issues.filter((i) => (i.sectionId === "sec_gap" || i.sectionId === "sec_oldlink") && i.code !== "SECTION_NOT_SHOWN");
   ok(blocks.length >= 2 && blocks.every((i) => i.level === "blocks"), `blocks: ${JSON.stringify(blocks.map((i) => [i.code, i.level]))}`);
   await unchanged(before, "offline refusal");
 });

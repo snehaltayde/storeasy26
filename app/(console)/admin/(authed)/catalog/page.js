@@ -9,6 +9,8 @@ import { listBundles } from "@/lib/bundles";
 import { listQuizzes } from "@/lib/quiz";
 import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
+import { getCmsMode } from "@/lib/cms-mode";
+import { catalogHref, PRODUCTS_LIST_HREF } from "@/lib/admin/editor-entry";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Catalog · Admin", robots: { index: false } };
@@ -16,10 +18,41 @@ export const metadata = { title: "Catalog · Admin", robots: { index: false } };
 // Catalog browser (S39 / MC05 + MC06, redesigned S50): Shopify-owned values
 // labeled + linked, per-product presentation overrides, per-collection
 // pinned ordering. Bundles + quiz panels live below.
-export default async function AdminCatalogPage() {
+//
+// P4-ED05 (ED-05): on a documents store product pages are edited in the
+// editor. ?product=<gid> (or ?collection=<gid>) redirects to that product
+// (collection) there. The page itself stays, because Bundles and Quiz live
+// only here until ED-06 gives them their own screens: it shows a link to the
+// editor's Products list in place of the old product editor (whose saves
+// refuse on a documents store), then the Bundles and Quiz panels. Legacy and
+// migrating stores (and a mode that can't be read) render as before.
+export default async function AdminCatalogPage({ searchParams } = {}) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
+
+  const cmsMode = await tfetch(() => getCmsMode()).catch(() => null);
+  if (cmsMode === "documents") {
+    const to = catalogHref((await searchParams) || {});
+    if (to !== PRODUCTS_LIST_HREF) redirect(to);
+    const [bundles, quizzes] = await tfetch(async () => [await listBundles(), await listQuizzes()]);
+    return (
+      <>
+        <PageHeader title="Catalog" description="Your products, synced from Shopify. Their pages are edited in the editor; bundles and quizzes stay here." />
+        <div data-documents-mode="" className="rounded-card border border-edge bg-surface p-4 shadow-card">
+          <p className="text-sm font-semibold text-fg">Product pages</p>
+          <p className="mt-0.5 text-sm text-fg-muted">Names, descriptions, photos, badges, modules and pairs are edited in the editor now.</p>
+          <a href={PRODUCTS_LIST_HREF} className="mt-2 inline-flex rounded-ctl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-fg focus-ring hover:bg-primary-hover">
+            Open products in the editor
+          </a>
+        </div>
+        <div className="mt-4 space-y-4">
+          <BundlesPanel initial={bundles} />
+          <QuizPanel initial={quizzes} />
+        </div>
+      </>
+    );
+  }
 
   const [initial, bundles, quizzes] = await tfetch(async () => {
     const [products, overrides, collections] = await Promise.all([

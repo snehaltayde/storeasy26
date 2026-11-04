@@ -48,6 +48,10 @@ const Reg = await import("../lib/registry/index.js");
 const { issueClass, STRUCTURE } = await import("../lib/registry/validate.js");
 const T = await import("../components/admin/editor/tree/treeModel.js");
 const { emptyBody, validateDocument, documentType, documentTypeNames, allowedKinds, sectionType, SECTION_ID_RE, BLOCK_ID_RE, defineSection, removeSection } = Reg;
+// P4-ED05 (D2): the kinds the editor OFFERS: allowed, less the ones no longer
+// offered on that type (a banner on a page, campaign or journal post)
+const { isOffered } = await import("../lib/registry/sections.js");
+const offeredKinds = (type) => allowedKinds(type).filter((k) => isOffered(k, type));
 
 const SECTION_TYPES = documentTypeNames().filter((ty) => documentType(ty).sections);
 
@@ -262,7 +266,7 @@ await t("a minted id that is already in the document is never used: add and dupl
   Object.defineProperty(crypto, "getRandomValues", { value: fake, configurable: true, writable: true });
   try {
     const s = deepFreeze([sec("text", "sec_aaaaaaaa", { title: "Taken" }), sec("faq", "sec_faq1", { items: [{ q: "Q?", a: "A." }] })]);
-    const a = T.add(s, "banner", 2, { type: "page" });
+    const a = T.add(s, "rich_text", 2, { type: "page" }); // P4-ED05: a banner is no longer offered on a page
     ok(a.ok && a.id !== "sec_aaaaaaaa" && SECTION_ID_RE.test(a.id), `add took ${a.id}`);
     forced = 0;
     const d = T.duplicate(s, "sec_faq1", { type: "page" });
@@ -302,7 +306,7 @@ console.log("— add, every kind, every type");
 await t("add of every registered kind for each type that holds sections works: a client-minted id, selected, and a clean draft", () => {
   let n = 0;
   for (const type of SECTION_TYPES) {
-    for (const kind of allowedKinds(type)) {
+    for (const kind of offeredKinds(type)) {
       const d = sectionType(kind);
       // the empty body, less a protected module when that is the kind added
       const base = deepFreeze(emptyBody(type).sections.filter((x) => !(d.protected && x.kind === kind)));
@@ -330,7 +334,7 @@ await t("the picker lists every registered kind for the document type, with its 
     const opts = T.addOptions(type, sample(type), 1);
     eq(
       opts.map((o) => o.kind),
-      allowedKinds(type),
+      offeredKinds(type),
       `${type} kinds`,
     );
     for (const o of opts) {
@@ -398,7 +402,7 @@ await t("rowActions for a 30-section home stays fast enough to run on every rend
 await t("edge-safe: treeModel imports only the registry and no node: API", async () => {
   const src = await readFile(join(ROOT, "components/admin/editor/tree/treeModel.js"), "utf8");
   const imports = [...src.matchAll(/^import .* from "([^"]+)";$/gm)].map((m) => m[1]);
-  eq(imports, ["../../../../lib/registry/index.js", "../../../../lib/registry/validate.js"], "imports");
+  eq(imports, ["../../../../lib/registry/index.js", "../../../../lib/registry/sections.js", "../../../../lib/registry/validate.js"], "imports");
   const code = src.replace(/^\s*\/\/.*$/gm, "");
   ok(!/["']node:|require\(|process\.|Buffer/.test(code), "no node: API");
   // and the registry it imports is edge-safe all the way down
@@ -512,11 +516,11 @@ await t("the protected product details row offers no hide, copy or delete", () =
 await t("the open picker lists every registered kind for the type with its label; a refused one is disabled with its reason", () => {
   for (const type of SECTION_TYPES) {
     const html = renderToStaticMarkup(React.createElement(AddSection, { type, sections: sample(type), index: 1, open: true }));
-    for (const kind of allowedKinds(type)) {
+    for (const kind of offeredKinds(type)) {
       const m = html.match(new RegExp(`<button[^>]*data-kind="${kind}"[^>]*>(.*?)</button>`));
       ok(m && m[1].includes(`>${sectionType(kind).label}</span>`), `${type}: ${kind} with its label`);
     }
-    eq((html.match(/data-kind="/g) || []).length, allowedKinds(type).length, `${type}: only its kinds`);
+    eq((html.match(/data-kind="/g) || []).length, offeredKinds(type).length, `${type}: only its kinds`);
   }
   const home = renderToStaticMarkup(React.createElement(AddSection, { type: "home", sections: sample("home"), index: 1, open: true, afterLabel: "hero" }));
   ok(/<button[^>]*disabled=""[^>]*data-kind="hero"/.test(home) || /<button[^>]*data-kind="hero"[^>]*disabled=""/.test(home), "a second hero is disabled");
