@@ -228,10 +228,14 @@ try {
     const { ALLOWED_DIFFERENCES } = await import("../lib/migrate/allowed-differences.js");
     MR.assertLocalBase(base);
     const routes = MR.readRoutes(routesFile);
+    // P4-REVERSE: the running hero test's slug from --make-routes (P4-FIX4), so
+    // the comparison sets that hero aside; without it a store with a running
+    // hero test could never pass its rehearsal
+    const heroExperiments = MR.readHeroExperiments(routesFile);
     const capture = async (label) => {
       const dir = join(resolve(out), label);
       console.log(`Capturing ${routes.length} pages ${label} the move…`);
-      const index = await MR.captureRoutes(base, routes, dir, { log: () => {} });
+      const index = await MR.captureRoutes(base, routes, dir, { log: () => {}, heroExperiments });
       return { pages: MR.loadCapture(dir), index: index.routes };
     };
     const { report, cutover } = await inStore(() =>
