@@ -766,6 +766,35 @@ Packet: [P4-FIX6.md](P4-FIX6.md), section "Owner checks".
 - [ ] CI: the sqld download in .github/ still needs the owner's approval of its source and checksum (nothing under .github/ changed).
 - [ ] Phone and Safari: not run.
 
+## Phase 5, batch 0
+
+### Where section data comes from (P5-SOURCES)
+Packet: [P5-SOURCES.md](P5-SOURCES.md), "Owner checks" and "Known limits" (From review).
+- [ ] Staging is not done: phase 5 needs a deploy to staging with a documents-mode tenant (plan section 4 prerequisite).
+- [ ] No desktop Chrome drill was run. Every acceptance item is proved by a test. The design harness smoke on port 6100 gave GET / 200, with the collections and new sections rendering data and no section_binding_failed lines.
+- [ ] CI sqld download: nothing was added under .github/. The source and checksum still need the owner's approval.
+- [ ] P5-HIDDEN must read data.bindingFailedCause directly from the data object it is handed, because the field is non-enumerable. If it should become a normal field later, the JSON-exact assertion in test-sections-render (about line 672) has to change too.
+
+### The bundle and bundle list settings (P5-SETTING)
+Packet: [P5-SETTING.md](P5-SETTING.md), "Owner checks" and "Known limits" (From review).
+- [ ] Sign off the wording of the bundle publish-diff rows. They are verb first ('Bundle grid: added a bundle'), while other lists are noun first ('FAQ: a question added').
+- [ ] Known limit to accept: a bundle is indexed in document_refs by id when chosen in a section, but by slug when reached through a /bundles/<slug> link. Nothing joins the two (plan deviation 3.11).
+- [ ] Not browser verified: nothing renders yet. The controls come with P5-EDITOR and the sections with P5-BLOCKS.
+- [ ] Staging not done.
+
+### Reading bundles for sections (P5-BUNDLEREAD)
+Packet: [P5-BUNDLEREAD.md](P5-BUNDLEREAD.md), "Owner checks" and "Known limits" (From review).
+- [ ] Sign-off: turning on a turned-off draft (setBundleEnabled) now writes its offer in full from the bundle row instead of only flagging an existing offer row on.
+- [ ] Known limit: a turned-off draft can still be saved with a quantity of 1.5 (it gets no offer), and listBundles reports it as passing the check. Turning it on is refused in plain words.
+
+### Hidden-section notes in preview (P5-HIDDEN)
+Packet: [P5-HIDDEN.md](P5-HIDDEN.md), "Owner checks" and "Known limits" (From review).
+- [ ] Browser check, in P5-DRILLS once the bundle kinds exist: in desktop Chrome, a documents preview of a turned-off bundle card shows the 'hidden from shoppers' note with its reason, clicking the note selects the section in the editor, and the live page shows nothing there. A grid with a dropped cell shows the per-cell FounderNote in preview only.
+- [ ] Check both notes at phone widths 375 and 768 and in Safari.
+- [ ] Wording sign-off: the title '<Label>: hidden from shoppers', and the source_unknown words, which include the section's label ('This newest products section is set up in a way the editor can't fix. Remove it and add it again.').
+- [ ] Staging: preview a hidden bundle section on one documents-mode tenant after phase 5 deploys.
+- [ ] Carried over: the CI sqld download in .github still needs the owner's approval of its source and checksum. This item did not touch .github.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
