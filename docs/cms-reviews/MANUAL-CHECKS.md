@@ -284,6 +284,14 @@ No owner checks for this item.
 - [ ] On a real phone (Safari) and on staging: the hero with an image, the preview bar and colours toggle, a policy page
 - [ ] DR-1, DR-2 and DR-3 stand; no real store is in documents mode
 
+## Phase 3, batch 0
+
+### Phase 3 suites and the documents API contract (P3-SCAFFOLD)
+- [ ] CI sqld download: approving the source and checksum of the sqld binary for CI is still the owner's call; nothing under .github/ was changed.
+- [ ] Rule on the contract choices in docs/cms-reviews/P3-SCAFFOLD.md (Design table) before batch 1 is cut: top-level revision on undo, unpublish and keepLiveSection; ok: true on every 200; the new code CANNOT_TAKE_OFFLINE; other.title kept beside other.label on SLUG_TAKEN; access on every listDocuments row; liveUrl null after a page is taken offline.
+- [ ] Add scripts/test-api-shapes.js to P3-SCAFFOLD's files in docs/cms-reviews/P3-BATCHES.json, so the ownership check does not flag it.
+- [ ] Staging: NOT DONE and not needed for this item; nothing touches the database or hosted Turso.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
