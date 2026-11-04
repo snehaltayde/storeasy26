@@ -560,6 +560,93 @@ await t("two kicks for the same pending rows enqueue one job; a kick after a lat
   eq([none.queued, none.job], [false, null], "nothing pending, nothing enqueued:");
 });
 
+// ---- overlapping writers (fix round 1) ---------------------------------------------
+// A stand-in search index whose writes land only when import returns, shared
+// by several clients; `holdWhen(docs)` holds that import until released.
+function indexedSpy(index, { holdWhen = null } = {}) {
+  let release;
+  const gate = new Promise((r) => (release = r));
+  let held;
+  const heldNow = new Promise((r) => (held = r));
+  const s = spy({
+    onImport: async (call) => {
+      if (holdWhen && holdWhen(call.docs)) {
+        holdWhen = null;
+        held();
+        await gate;
+      }
+      for (const d of call.docs) index.set(d.id, d);
+    },
+  });
+  return { s, release, heldNow };
+}
+
+await t("two drains that overlap leave the newest published name in search: drain A holds the old name inside its import while drain B writes the new one and marks both rows done; A re-reads before it marks anything done", async () => {
+  const index = new Map();
+  await rename(docs, 50, "Name V1");
+  const A = indexedSpy(index, { holdWhen: (ds) => ds.some((d) => d.id === H(50) && d.title === "Name V1") });
+  const drainA = docs.run(() => SR.drainSearchOutbox({ client: A.s }));
+  await A.heldNow;
+  await rename(docs, 50, "Name V2");
+  const B = indexedSpy(index);
+  const rb = await docs.run(() => SR.drainSearchOutbox({ client: B.s }));
+  ok(rb.read >= 1, "drain B read rows");
+  eq(index.get(H(50)).title, "Name V2", "after drain B:");
+  A.release();
+  await drainA;
+  eq(index.get(H(50)).title, "Name V2", "after drain A finishes, search holds the live name:");
+  eq((await docFor(docs, 50)).title, "Name V2", "the live name:");
+  eq(await pending(docs), [], "nothing pending:");
+});
+
+await t("a full sync whose page import holds an old name while a fast drain writes the new one and marks its row done still ends with the new name in search", async () => {
+  const index = new Map();
+  await rename(docs, 51, "Sync Name V1");
+  const FS = indexedSpy(index, { holdWhen: (ds) => ds.some((d) => d.id === H(51) && d.title === "Sync Name V1") });
+  TS.setSearchAdminClientForTest(FS.s);
+  const sync = docs.run(() => Sync.indexTypesense());
+  await FS.heldNow;
+  await rename(docs, 51, "Sync Name V2");
+  const fast = indexedSpy(index);
+  await docs.run(() => SR.drainSearchOutbox({ client: fast.s }));
+  eq(index.get(H(51)).title, "Sync Name V2", "after the fast drain:");
+  FS.release();
+  await sync;
+  eq(index.get(H(51)).title, "Sync Name V2", "after the full sync, search holds the live name:");
+  eq(await pending(docs), [], "nothing pending:");
+});
+
+await t("a product that keeps changing during every write makes the drain give up after a few re-reads: it throws and every row it read stays pending", async () => {
+  await rename(docs, 53, "Busy Fifty Three");
+  const s = spy({
+    onImport: async () => {
+      await raw(docs).execute({ sql: "INSERT INTO search_outbox (product_id, handle, reason, created_at, done_at) VALUES (?, ?, 'publish', ?, ?)", args: [P(53), H(53), new Date().toISOString(), new Date().toISOString()] });
+    },
+  });
+  let err = null;
+  try {
+    await docs.run(() => SR.drainSearchOutbox({ client: s }));
+  } catch (e) {
+    err = e;
+  }
+  ok(/kept changing/.test(String(err?.message)), `threw: ${err?.message}`);
+  eq(s.imports().length, 5, "five writes, then it stops:");
+  eq((await pending(docs)).map((r) => r.product_id), [P(53)], "the row it read stays pending:");
+  TS.setSearchAdminClientForTest(spy());
+  await docs.run(() => SR.drainSearchOutbox({ client: spy() }));
+  eq(await pending(docs), [], "the next drain takes it:");
+});
+
+await t("pruning never removes the newest outbox row, so a rowid is never handed out twice", async () => {
+  const old = new Date(Date.now() - 40 * 86_400_000).toISOString();
+  await raw(docs).execute({ sql: "INSERT INTO search_outbox (product_id, handle, reason, created_at, done_at) VALUES (?, ?, 'publish', ?, ?)", args: [P(52), H(52), old, old] });
+  const top = (await outbox(docs)).at(-1).rid;
+  await docs.run(() => SR.pruneOutbox());
+  const rows = await outbox(docs);
+  eq(rows.at(-1)?.rid, top, "the newest row stays:");
+  ok(rows.filter((r) => r.done_at != null).every((r) => r.rid === top || Date.parse(r.done_at) > Date.now() - 31 * 86_400_000), "older done rows are pruned");
+});
+
 // =============================================================================
 realLog("— 4. stores without Typesense or a namespace; only the store's own collection");
 // =============================================================================
