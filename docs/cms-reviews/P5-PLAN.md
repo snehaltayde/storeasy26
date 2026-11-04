@@ -110,7 +110,7 @@ None. The highest tenant migration is `0025_media_archived.sql`. The `bundles` t
    |---|---|---|---|
    | available | shown, add on | shown | - |
    | sold_out | shown, "Currently unavailable", add off, component marked | same | BUNDLE_UNAVAILABLE |
-   | no_saving | as sold_out (OQ-B) | same | BUNDLE_UNAVAILABLE (names the sum) |
+   | no_saving | hidden (card) / cell dropped (grid) (OQ-B, owner) | note with reason | BUNDLE_UNAVAILABLE (names the sum) |
    | not_ready | as sold_out | same | BUNDLE_UNAVAILABLE |
    | disabled | hidden (card) / cell dropped (grid) | note with reason (section or per cell) | BUNDLE_DISABLED |
    | missing | hidden / cell dropped | note with reason | BUNDLE_MISSING |
@@ -123,7 +123,7 @@ None. The highest tenant migration is `0025_media_archived.sql`. The `bundles` t
 9. **Words (final text, all in `lib/commerce/bundle-words.js`).**
    - available: "Showing to shoppers."
    - sold_out: "A product in this bundle is sold out: shoppers see Currently unavailable and can't add it."
-   - no_saving: "The price no longer saves anything (the products add up to <sum>): shoppers can't add it. Lower the price in Catalog > Bundles."
+   - no_saving: "The price no longer saves anything (the products add up to <sum>), so shoppers don't see it. Lower the price in Catalog > Bundles."
    - not_ready: "This bundle isn't ready for the cart yet: shoppers can't add it. Open it in Catalog > Bundles and save it again."
    - disabled: "This bundle is turned off, so shoppers don't see it. Turn it on in Catalog > Bundles, or remove it."
    - missing: "This bundle was deleted, so shoppers don't see it. Pick another or remove it."
@@ -181,7 +181,7 @@ None. The highest tenant migration is `0025_media_archived.sql`. The `bundles` t
 ## 6. Open questions (each with the default the build uses)
 
 - **OQ-A:** who may list and create bundles in the editor. Default: listing needs `storefront.read`; inline create needs `offers.write`.
-- **OQ-B:** a bundle whose price no longer saves. Default: shown as "Currently unavailable", add off (not hidden).
+- **OQ-B:** a bundle whose price no longer saves. OWNER ANSWER (2026-11-05): hide it for shoppers (card hidden, grid cell dropped); the founder sees the reason. OQ-C: inline create turns the bundle on at once (default kept). Deviation 3.10: accepted.
 - **OQ-C:** inline create turns the bundle on at once when it passes. Default: yes, with the live-now sentence; the alternative is saved off with a "Turn it on" action.
 - **OQ-D:** engine changes outside the blocks: count bundle sets per merged variant (fixes the duplicate-entry double discount for old rows) and a deterministic BUNDLE offer order (for example `ORDER BY id`). Default: not in phase 5; phase 5 prevents new duplicates, flags old ones as `not_ready`, and warns on overlap.
 - **OQ-E:** home only for P0 bundle kinds. Default: yes.
