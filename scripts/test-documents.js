@@ -976,7 +976,10 @@ await t("a scan finds no INSERT, UPDATE or DELETE on documents, document_version
   for (const d of ["lib", "app", "components", "scripts", "migrations"]) await walk(d);
   ok(files.length > 100, `files scanned: ${files.length}`);
   ok(files.some((f) => f.path === "lib/documents/service.js"), "the service is in the scan:");
-  const allowed = (p) => /^scripts\/test-[\w.-]+\.js$/.test(p);
+  // P4-FIXTURES: the legacy tenant builders write leftover document rows on
+  // purpose (re-run fixtures for CUTOVER and REVERSE), on local file databases
+  // only; that one support file is test code like the suites
+  const allowed = (p) => /^scripts\/test-[\w.-]+\.js$/.test(p) || p === "scripts/support/legacy-tenants.js";
   const found = writesOutsideService(files).filter((p) => !allowed(p));
   eq(found, [], "writers outside lib/documents/:");
   // the scan itself bites: each of these shapes is caught
