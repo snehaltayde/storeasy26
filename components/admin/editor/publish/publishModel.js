@@ -409,7 +409,9 @@ export function changeListOf(result, label) {
   if (result?.ok && isObj(result.data)) {
     const d = result.data;
     if (d.firstPublish) return { status: "loaded", label, firstPublish: true, sections: (d.sections || []).map((s) => s.words), rows: [] };
-    return { status: "loaded", label, firstPublish: false, sections: [], rows: (d.rows || []).map((r) => ({ kind: r.kind, sectionId: r.sectionId ?? null, words: r.words, affects: (r.affects || []).map((a) => a.words) })) };
+    // P3-FIX4: a design never published lists rows against the platform
+    // default, yet its publish is still a first version (neverPublished)
+    return { status: "loaded", label, firstPublish: false, ...(d.neverPublished === true ? { neverPublished: true } : {}), sections: [], rows: (d.rows || []).map((r) => ({ kind: r.kind, sectionId: r.sectionId ?? null, words: r.words, affects: (r.affects || []).map((a) => a.words) })) };
   }
   return { status: "failed", label, message: result?.message || WORDS.changesFailed, rows: [], sections: [] };
 }
@@ -468,7 +470,8 @@ export function createPublishFlow(deps = {}) {
         }
         if (mine !== seq) return;
         const list = changeListOf(res, labels[id] || "This page");
-        const firstPublish = { ...state.firstPublish, [id]: list.firstPublish === true };
+        // a first version: nothing earlier to Undo to (outcomeOf)
+        const firstPublish = { ...state.firstPublish, [id]: list.firstPublish === true || list.neverPublished === true };
         set({ lists: { ...state.lists, [id]: list }, firstPublish });
       }),
     );

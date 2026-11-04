@@ -250,6 +250,28 @@ await t("unit: applyKit on a documents store writes the doc_design draft only: l
   eq([d2.settings.theme.kit, d2.settings.brand.accent], ["pulse", K.KITS.glow.brand.accent], "look changed, brand kept:");
 });
 
+// P3-FIX4: the design draft saved, then the hero preset failed with something
+// other than a race (a database error): the answer says the design was saved
+// and the hero look was not, never "nothing was saved".
+await t("P3-FIX4 unit: a kit apply whose design saved but whose hero write failed says the design was saved and the hero look was not", async () => {
+  const before = await designRow();
+  const homeBefore = (await sql("docs", "SELECT revision, draft FROM documents WHERE id = 'doc_home'"))[0];
+  await raw.docs.execute("CREATE TRIGGER fix4_home_fails BEFORE UPDATE ON documents WHEN NEW.id = 'doc_home' BEGIN SELECT RAISE(ABORT, 'simulated disk failure'); END");
+  let r;
+  try {
+    r = await route("docs", "admin/theme", "POST", { action: "apply", kit: "pulse", withBrand: false });
+  } finally {
+    await raw.docs.execute("DROP TRIGGER fix4_home_fails");
+  }
+  const after = await designRow();
+  ok(Number(after.revision) === Number(before.revision) + 1 && JSON.parse(String(after.draft)).settings.theme.kit === "pulse", "setup: the design draft was saved");
+  eq((await sql("docs", "SELECT revision, draft FROM documents WHERE id = 'doc_home'"))[0], homeBefore, "the hero was not written:");
+  const words = String(r.body.note || r.body.error || "");
+  ok(!/nothing was saved/i.test(JSON.stringify(r.body)), `says nothing was saved: ${JSON.stringify(r.body).slice(0, 300)}`);
+  ok(/saved/i.test(words) && /hero/i.test(words) && /wasn't|couldn't|not/i.test(words), `says the design was saved and the hero was not: ${words}`);
+  eq([r.status, r.body.ok, r.body.applied?.presets, r.body.applied?.document?.revision, r.body.design?.revision], [200, true, [], Number(after.revision), Number(after.revision)], `the answer: ${JSON.stringify(r.body).slice(0, 300)}`);
+});
+
 await t("unit: applyKit on legacy behaves as before (config pin and brand, the hero as a legacy draft); a migrating store refuses and writes nothing", async () => {
   const r = await route("legacy", "admin/theme", "POST", { action: "apply", kit: "glow" });
   eq([r.status, r.body.theme.kit, r.body.applied.presets], [200, "glow", ["hero"]], `legacy apply: ${JSON.stringify(r.body).slice(0, 200)}`);
@@ -338,6 +360,45 @@ await t("unit: every registered section kind has a token-usage entry; groupsOfRo
   eq(TU.affectsWords([], live), [], "no group, no rows:");
 });
 
+// P3-FIX4: the design panel's 'affects' rows never name an offline page or a
+// turned-off announcement bar (the DESIGN reviewer's two surviving edits).
+await t("P3-FIX4 unit: liveParts and the affects rows never name an offline page or a turned-off announcement bar", async () => {
+  const [about] = await sql("docs", "SELECT id FROM documents WHERE type = 'page' AND slug = 'about'");
+  const before = await inD(() => Ch.liveParts());
+  const brand0 = structuredClone((await doc("doc_design")).body.settings.brand);
+  ok(before.chrome.includes("announcement") && before.pages.some((p) => p.label === "About us"), `setup: ${JSON.stringify(before)}`);
+  // take About offline, and turn the bar off and publish it
+  const a = await doc(about.id);
+  const off = await api({ unpublish: { id: about.id }, revision: a.revision });
+  eq(off.status, 200, `take offline: ${JSON.stringify(off.body).slice(0, 200)}`);
+  const bar = await doc("doc_announcement");
+  eq((await api({ saveDraft: { id: "doc_announcement", body: { ...bar.body, settings: { ...bar.body.settings, enabled: false } } }, revision: bar.revision })).status, 200, "bar off:");
+  eq((await publishOne("doc_announcement")).status, 200, "publish the bar off:");
+  try {
+    const live = await inD(() => Ch.liveParts());
+    eq(live.chrome, ["header", "footer"], "the hidden bar is not chrome:");
+    ok(!live.pages.some((p) => p.label === "About us"), `the offline page is listed: ${JSON.stringify(live.pages.map((p) => p.label))}`);
+    ok(live.pages.some((p) => p.label === "Home page"), "the live home page is");
+    // and through the design panel's rows: a colours change touches every part
+    eq((await saveDesign((b) => (b.settings.brand = { ...b.settings.brand, accent: "#9333ea" }))).status, 200, "save colours:");
+    const rows = (await api({ listChanges: "doc_design" })).body.rows;
+    const colours = rows.find((r) => r.words.startsWith("Colours:"));
+    eq(colours?.affects, [{ words: "Every page: header and footer" }, { words: "Home page: Hero, Banner and Text" }], `the colours row: ${JSON.stringify(rows)}`);
+  } finally {
+    // put everything back: the design draft, the bar and About
+    await saveDesign((b) => (b.settings.brand = brand0));
+    const bar2 = await doc("doc_announcement");
+    await api({ saveDraft: { id: "doc_announcement", body: { ...bar2.body, settings: { ...bar2.body.settings, enabled: true } } }, revision: bar2.revision });
+    eq((await publishOne("doc_announcement")).status, 200, "bar on again:");
+    const a2 = await doc(about.id);
+    const back = await api({ publish: { id: about.id, draftHash: a2.draftHash, confirmRepublish: true }, revision: a2.revision });
+    eq(back.status, 200, `About back online: ${JSON.stringify(back.body).slice(0, 200)}`);
+  }
+  const after = await inD(() => Ch.liveParts());
+  eq(after, before, "restored:");
+  eq((await doc("doc_design")).body.settings.brand, brand0, "the design draft is as it was:");
+});
+
 await t("unit: listChanges for doc_design lists the changed token rows and, under each, the live sections that use that group, in plain words (hidden sections and drafts left out)", async () => {
   // a design never published is compared with the platform default
   const first = await api({ listChanges: "doc_design" });
@@ -348,9 +409,18 @@ await t("unit: listChanges for doc_design lists the changed token rows and, unde
   ok(colours, `a colours row: ${JSON.stringify(first.body.rows)}`);
   eq(colours.affects, [{ words: "Every page: header, footer and announcement bar" }, { words: "Home page: Hero, Banner and Text" }, { words: "About us: Text" }], "the colours row:");
   // publish it, then change only the spacing: one row, and the hero is not in it
+  eq(first.body.neverPublished, true, "never published says so (P3-FIX4):");
   const p = await publishOne("doc_design");
   eq(p.status, 200, `publish design: ${JSON.stringify(p.body).slice(0, 200)}`);
   eq((await api({ listChanges: "doc_design" })).body.rows, [], "nothing changed:");
+  // P3-FIX4: Recently published offers no Undo of the first design publish
+  // (there is nothing earlier), and the editor sees neverPublished no more
+  const recent = await api({ listRecentlyPublished: {} });
+  const firstRow = (recent.body.groups || recent.body.rows || []).flatMap((g) => g.rows || [g]).find((r) => r.documentId === "doc_design");
+  eq([recent.status, firstRow?.action, firstRow?.canUndo, firstRow?.undo], [200, "publish", false, null], `the first design publish row: ${JSON.stringify(recent.body).slice(0, 400)}`);
+  await saveDesign((b) => (b.settings.brand = { ...b.settings.brand, section_spacing: "airy" }));
+  ok(!Object.hasOwn((await api({ listChanges: "doc_design" })).body, "neverPublished"), "a published design has no neverPublished");
+  await saveDesign((b) => delete b.settings.brand.section_spacing);
   // a draft-only section on home must not count: it isn't live
   await inD(async () => {
     const h = await Docs.getDocument("doc_home");
@@ -435,6 +505,94 @@ await t("unit: a failing pin write does not change the publish result (logged, t
   await saveDesign((b) => (b.settings.brand = { ...b.settings.brand, accent: "#0f766e" }));
   eq((await publishOne("doc_design")).status, 200, "publish again:");
   eq((await cfgOf("dd")).theme_pin.kit, "pulse", "written by the next publish:");
+});
+
+// P3-FIX4: a design with no look of its own writes theme_pin null (the DESIGN
+// reviewer's `if (!pin) return;` edit must fail this).
+await t("P3-FIX4 unit: a design published with settings.theme null writes theme_pin null; the next look writes it again", async () => {
+  ok((await cfgOf("dd")).theme_pin?.kit, "setup: a look is pinned");
+  const saved = await saveDesign((b) => (b.settings.theme = null));
+  eq(saved.status, 200, `save: ${JSON.stringify(saved.body).slice(0, 200)}`);
+  eq((await publishOne("doc_design")).status, 200, "publish the default look:");
+  const cfg = await cfgOf("dd");
+  ok(Object.hasOwn(cfg, "theme_pin") && cfg.theme_pin === null, `theme_pin is null: ${JSON.stringify(cfg.theme_pin)}`);
+  eq(K.themePinOf(cfg), null, "the operator screens read the platform default, not the legacy pin:");
+  eq((await C.getTenant("dd")).config.theme_pin, null, "this instance's cached tenant is refreshed:");
+  // back to pulse for the tests below
+  eq((await route("docs", "admin/theme", "POST", { action: "apply", kit: "pulse", withPresets: false, withBrand: false })).status, 200, "apply pulse:");
+  eq((await publishOne("doc_design")).status, 200, "publish pulse:");
+  eq((await cfgOf("dd")).theme_pin.kit, "pulse", "pinned again:");
+});
+
+// P3-FIX4: the pin is one targeted UPDATE. A settings or secrets save that lands
+// between any two control-plane statements of the publish survives. A whole-row
+// read-then-write (the old patchTenant) loses the one that lands in between.
+await t("P3-FIX4 unit: the theme_pin write is a targeted json_set; a settings and secrets save landing during the publish survives", async () => {
+  await saveDesign((b) => (b.settings.brand = { ...b.settings.brand, accent: "#1d4ed8" }));
+  const db = C.platformDb();
+  const orig = db.execute;
+  const seen = [];
+  let n = 0;
+  let busy = false;
+  db.execute = async function (q) {
+    const text = typeof q === "string" ? q : q.sql;
+    if (!busy && /\btenants\b/.test(text)) {
+      busy = true;
+      try {
+        n++;
+        // another admin's save of other settings and a secret, done the way the console does it
+        await C.patchTenant("dd", { config: { fix4_setting: n }, secrets: { fix4_secret: `s${n}` } });
+      } finally {
+        busy = false;
+      }
+      seen.push(text);
+    }
+    return orig.call(this, q);
+  };
+  let r;
+  try {
+    r = await publishOne("doc_design");
+  } finally {
+    db.execute = orig;
+  }
+  eq(r.status, 200, `publish: ${JSON.stringify(r.body).slice(0, 200)}`);
+  const writes = seen.filter((q) => /^\s*(UPDATE|INSERT)/i.test(q));
+  ok(writes.length === 1 && /json_set\(/.test(writes[0]) && /\$\.theme_pin/.test(writes[0]) && !/secrets_enc/.test(writes[0]), `one targeted write: ${JSON.stringify(writes)}`);
+  ok(n >= 2, `a save landed before and after the pin write (${n})`);
+  const cfg = await cfgOf("dd");
+  eq([cfg.fix4_setting, cfg.theme_pin?.kit], [n, "pulse"], "the last concurrent setting and the pin are both kept:");
+  const fresh = await C.getTenant("dd", { fresh: true });
+  ok(fresh.secrets.fix4_secret === `s${n}`, "the last concurrent secret is kept");
+});
+
+// P3-FIX4: a slow control plane can't fail a publish that is already live.
+await t("P3-FIX4 unit: a hanging after-commit handler times out; the publish answers success and the timeout is logged", async () => {
+  eq(After.AFTER_COMMIT_TIMEOUT_MS <= 5000 && After.AFTER_COMMIT_TIMEOUT_MS > 0, true, "a short default wait:");
+  await saveDesign((b) => (b.settings.brand = { ...b.settings.brand, accent: "#be123c" }));
+  let release;
+  After.setAfterCommitTimeout(100);
+  After.setThemePinWriter(() => new Promise((resolve) => (release = setTimeout(resolve, 4000))));
+  let r;
+  let lines;
+  const t0 = Date.now();
+  try {
+    ({ result: r, lines } = await logsOf(() => publishOne("doc_design")));
+  } finally {
+    After.setThemePinWriter(null);
+    After.setAfterCommitTimeout(null);
+  }
+  const took = Date.now() - t0;
+  clearTimeout(release);
+  eq(r.status, 200, `publish: ${JSON.stringify(r.body).slice(0, 300)}`);
+  ok(r.body.ok === true && !r.body.code, `a plain success: ${JSON.stringify(r.body).slice(0, 200)}`);
+  ok(took < 3000, `the answer waited for the handler (${took} ms)`);
+  const item = (r.body.items || r.body.published || [])[0];
+  ok((await doc("doc_design")).publishedVersionId === item?.versionId, "the design is live");
+  ok(lines.some((l) => l.evt === "documents_after_commit_timeout" && l.handler === "themePin" && l.ms === 100), `logged: ${JSON.stringify(lines.map((l) => l.evt))}`);
+  // the next publish pins again
+  await saveDesign((b) => (b.settings.brand = { ...b.settings.brand, accent: "#0f766e" }));
+  eq((await publishOne("doc_design")).status, 200, "publish again:");
+  eq((await cfgOf("dd")).theme_pin.kit, "pulse", "pinned by the next publish:");
 });
 
 await t("unit: themePinOf reads a build's design version; a design with no look of its own pins null; kits.themePinOf falls back to the legacy pin only when no theme_pin was ever written", async () => {
@@ -524,6 +682,39 @@ await t("unit: onboarding on a documents store with no published design is not d
   const step = ob.items.find((i) => i.id === "brand");
   eq([step.done, step.href], [false, "/admin/editor?doc=doc_design"], "not done on the old config:");
   c.close();
+});
+
+// P3-FIX4: a live design version that can't be read is an error, never a quiet
+// "platform default" (onboarding would mark the step not done, and brand
+// readability would check against the wrong look).
+await t("P3-FIX4 unit: a corrupt or missing live design version makes liveDesign and storeDesign throw, never answer the platform default", async () => {
+  const good = await inD(() => BR.liveDesign());
+  ok(good.versionId && good.theme?.kit, `setup: a published design: ${JSON.stringify(good).slice(0, 200)}`);
+  // versions are frozen, so the live list is pointed at a broken one instead
+  const [live0] = await sql("docs", "SELECT r.id AS id, r.content AS content FROM release_state s JOIN releases r ON r.id = s.live_release_id WHERE s.id = 1");
+  const pointAt = async (version) => {
+    const list = JSON.parse(live0.content);
+    list.documents.doc_design = { ...list.documents.doc_design, version };
+    await raw.docs.execute({ sql: "UPDATE releases SET content = ? WHERE id = ?", args: [JSON.stringify(list), live0.id] });
+  };
+  const failsWith = async (fn) => fn().then((v) => `no error: ${JSON.stringify(v).slice(0, 200)}`, (e) => String(e?.message || e));
+  const broken = { ver_fix4badjson0: "not json", ver_fix4nullbody0: "null" };
+  try {
+    for (const [id, text] of Object.entries(broken)) {
+      await raw.docs.execute({ sql: "INSERT INTO document_versions (id, document_id, kind, body, body_hash, schema_version, created_at) VALUES (?, 'doc_design', 'checkpoint', ?, 'x', 1, ?)", args: [id, text, new Date().toISOString()] });
+    }
+    for (const id of [...Object.keys(broken), "ver_fix4missing00"]) {
+      await pointAt(id);
+      const said = await failsWith(() => inD(() => BR.liveDesign()));
+      ok(said.includes(`the live design version ${id} couldn't be read`), `liveDesign at ${id}: ${said}`);
+      const viaStore = await failsWith(() => inD(() => BR.storeDesign()));
+      ok(viaStore.includes("couldn't be read"), `storeDesign at ${id}: ${viaStore}`);
+    }
+  } finally {
+    await raw.docs.execute({ sql: "UPDATE releases SET content = ? WHERE id = ?", args: [live0.content, live0.id] });
+    for (const id of Object.keys(broken)) await raw.docs.execute({ sql: "DELETE FROM document_versions WHERE id = ?", args: [id] });
+  }
+  eq(await inD(() => BR.liveDesign()), good, "restored:");
 });
 
 await t("unit: the operator screens read theme_pin (overview, themes, tenant detail); a store with no pin yet shows its legacy pin", async () => {

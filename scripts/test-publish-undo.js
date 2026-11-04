@@ -932,6 +932,72 @@ await t("unit: the whole-set read uses 'WHERE set_id = ? AND set_id IS NOT NULL'
   eq(importers, ["lib/admin/documents-api.js"], "importers:");
 });
 
+// P3-FIX4 (the FIX3 reviewer's probe, kept): the editor's whole-set Undo,
+// end to end. createUndoFlow runs through the real client (createDocumentsApi)
+// into the real handler (handleDocumentsPut: parser, revision rule, session,
+// undo.js); only the HTTP hop between them is a plain JSON copy. Page X is published alone, then edited, then X and a new page Y go
+// out as one set (Y's first publish). Both ways the editor builds the set
+// target (the publish answer through outcomeOf, Recently published through
+// recentGroupsOf) must give the confirm that names Y, each member's dry run
+// must pass the real handler (no 428), and Confirm runs the real undoSet. A
+// later change to what a dry-run undo needs fails here.
+await t("P3-FIX4 unit (real handler): a set dry-run Undo from the editor passes createDocumentsApi and handleDocumentsPut; the confirm names the page that goes offline, and Confirm undoes the set", async () => {
+  const M = await import("../components/admin/editor/publish/publishModel.js");
+  const { createDocumentsApi } = await import("../components/admin/editor/documentsApi.js");
+  const st = "sets";
+  const sent = [];
+  const fetch = async (_url, init) => {
+    const reqBody = JSON.parse(init.body);
+    // the handler answers { status, body }; the route sends that as JSON
+    const res = await api(reqBody, { store: st });
+    const data = JSON.parse(JSON.stringify(res.body));
+    sent.push({ op: Object.keys(reqBody).find((k) => k !== "revision"), body: reqBody, status: res.status, data });
+    return { status: res.status, json: async () => data };
+  };
+  const { call } = createDocumentsApi({ fetch });
+  const x = await create(st, "page", { body: page("fix4-x", "Fix4 X", "X one.") });
+  published(await publishApi(st, x.id), "X alone");
+  await save(st, x.id, page("fix4-x", "Fix4 X", "X two."));
+  const y = await create(st, "page", { body: page("fix4-y", "Fix4 Y", "Y one.") });
+  const setAnswer = published(await publishSetApi(st, [x.id, y.id]), "X and Y as a set");
+  const labels = { [x.id]: "Fix4 X", [y.id]: "Fix4 Y" };
+  const items = [x.id, y.id].map((id) => ({ id, label: labels[id], type: "page" }));
+  const fromPublish = M.outcomeOf({ ok: true, data: setAnswer }, { items, labels }).undoSet;
+  ok(fromPublish?.revisions?.length === 2, `the publish answer's set target: ${JSON.stringify(fromPublish)}`);
+  const rows = await recent(st);
+  const groups = M.recentGroupsOf(rows, { timeZone: "UTC" });
+  const fromRecent = groups.find((g) => g.undoSet?.setId === setAnswer.setId)?.undoSet;
+  ok(fromRecent?.revisions?.length === 2, `Recently published's set target: ${JSON.stringify(fromRecent)}`);
+  const title = "Undo all 2 pages of this publish? “Fix4 Y” goes offline.";
+  for (const [name, target] of [
+    ["the publish answer", { kind: "set", ...fromPublish }],
+    ["Recently published", fromRecent],
+  ]) {
+    const before = await dump(st);
+    sent.length = 0;
+    const flow = M.createUndoFlow({ call });
+    await flow.start(target);
+    const v = flow.getState().view;
+    eq([v?.title, v?.offline], [title, ["Fix4 Y"]], `${name}: the confirm: ${JSON.stringify(sent.map((r) => [r.op, r.status, r.data])).slice(0, 600)}`);
+    eq(sent.map((r) => [r.op, r.status]), [["undoSet", 200], ["undo", 200], ["undo", 200]], `${name}: every dry run passes the real handler:`);
+    ok(sent.every((r) => (r.body.undoSet || r.body.undo).dryRun === true), `${name}: dry runs only`);
+    ok(sent.filter((r) => r.op === "undo").every((r) => Number.isInteger(r.body.revision)), `${name}: each member's dry run carries its revision`);
+    await unchanged(before, `${name}: a dry run`, st);
+  }
+  // an autosave moves X's revision: a dry run still names Y (it doesn't compare revisions)
+  await save(st, x.id, page("fix4-x", "Fix4 X", "X two, typed again."));
+  const flow = M.createUndoFlow({ call });
+  await flow.start(fromRecent);
+  eq(flow.getState().view?.title, title, "after an autosave:");
+  // Confirm: the real undoSet
+  sent.length = 0;
+  const done = await flow.confirm();
+  eq(sent.map((r) => [r.op, r.status, r.body.undoSet?.dryRun ?? null]), [["undoSet", 200, null]], "Confirm sends the real undoSet:");
+  ok(/Fix4 X/.test(done?.words) && /Fix4 Y/.test(done?.words) && /offline/.test(done?.words), `the server's words: ${done?.words}`);
+  eq(await liveText(st, "fix4-x"), ["X one."], "X is back to its first version:");
+  eq(await liveText(st, "fix4-y"), null, "Y is offline:");
+});
+
 // =========================================================================================
 // A real sqld, through HEAD's lib/db.js.
 const freePort = () =>

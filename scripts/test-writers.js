@@ -350,6 +350,48 @@ await t("documents insight apply: hero → doc_home draft only, announcement →
   eq(await liveDump(), live, "cms_blocks and the live list:");
 });
 
+// P3-FIX4 (the P3-VALIDATE direction): an insight apply or an experiment adopt
+// whose draft a publish would refuse says so in plain words, naming what to fix.
+await t("P3-FIX4 documents: insight apply and experiment adopt that leave an unpublishable draft say so and name what to fix; a publishable one says nothing of it", async () => {
+  await insight("docs", "ins-fix4", [
+    { component: "hero", draft: LEGACY_HERO_FIXTURES.ai_proposal },
+    { component: "hero", draft: { title: "", highlight: "", subtitle: "Only a subtitle" } },
+    { component: "announcement", draft: { text: "" } },
+    { component: "announcement", draft: { text: "Back in stock", href: "/collections/all" } },
+  ]);
+  // a draft that publishes (the bar): the plain saved words, no list
+  const fine = await route("docs", "admin/insights", { apply: { id: "ins-fix4", index: 3 } });
+  eq(fine.status, 200, `fine: ${JSON.stringify(fine.body).slice(0, 300)}`);
+  ok(!/can't be published/.test(fine.body.note) && !fine.body.unpublishable && /editor/.test(fine.body.note), `a publishable draft: ${fine.body.note}`);
+  // (this suite's home draft has an empty rich text section from the tests above, so it is already unpublishable; the hero's own problem must be named too)
+  // an empty hero title: saved, and the answer says it can't be published yet and what to fix
+  const before = await docRow("doc_home");
+  const hero = await route("docs", "admin/insights", { apply: { id: "ins-fix4", index: 1 } });
+  eq(hero.status, 200, `hero: ${JSON.stringify(hero.body).slice(0, 300)}`);
+  eq((await docRow("doc_home")).revision, before.revision + 1, "saved as a draft:");
+  ok(/^The home page was saved as a draft but can't be published yet\. Fix this in the editor first: /.test(hero.body.note) && hero.body.note.includes("Hero · Title"), `the hero note: ${hero.body.note}`);
+  eq(hero.body.unpublishable?.map((b) => [b.documentId, b.label]), [["doc_home", "The home page"]], "the list:");
+  ok(hero.body.unpublishable[0].problems.every((w) => !/sec_|doc_|[A-Z]{4,}_/.test(w)), `plain words: ${hero.body.unpublishable[0].problems}`);
+  // a bar turned on with no words
+  const bar = await route("docs", "admin/insights", { apply: { id: "ins-fix4", index: 2 } });
+  eq(bar.status, 200, `bar: ${JSON.stringify(bar.body).slice(0, 300)}`);
+  ok(/^The announcement bar was saved as a draft but can't be published yet\. Fix this in the editor first: /.test(bar.body.note) && bar.body.unpublishable?.[0]?.documentId === "doc_announcement", `the bar note: ${bar.body.note}`);
+  // experiment adopt of a variant with no title
+  await experiment("docs", "doc-fix4-adopt", { title: "", highlight: "", subtitle: "Only a subtitle" });
+  const adopt = await route("docs", "admin/experiments", { adopt: { slug: "doc-fix4-adopt", variant: "b" } });
+  eq(adopt.status, 200, `adopt: ${JSON.stringify(adopt.body).slice(0, 300)}`);
+  ok(/^The home page was saved as a draft but can't be published yet\. Fix this in the editor first: /.test(adopt.body.note) && adopt.body.note.includes("Hero · Title"), `the adopt note: ${adopt.body.note}`);
+  eq(adopt.body.unpublishable?.map((b) => b.documentId), ["doc_home"], "the adopt list:");
+  // put the hero and the bar back for the tests below
+  const back = await route("docs", "admin/insights", { apply: { id: "ins-fix4", index: 0 } });
+  ok(!back.body.note.includes("Hero · Title"), `the hero has its title again: ${back.body.note}`);
+  eq((await route("docs", "admin/insights", { apply: { id: "ins-fix4", index: 3 } })).body.unpublishable, undefined, "bar publishable again:");
+  // legacy says nothing new
+  await insight("legacy", "ins-fix4l", [{ component: "hero", draft: { title: "", highlight: "", subtitle: "Only a subtitle" } }]);
+  const leg = await route("legacy", "admin/insights", { apply: { id: "ins-fix4l", index: 0 } });
+  ok(leg.status !== 200 || (!leg.body.unpublishable && !/can't be published/.test(leg.body.note || "")), `legacy: ${JSON.stringify(leg.body).slice(0, 200)}`);
+});
+
 await t("documents agency kit apply: one doc_home draft (hero copy + the kit's sections) and one doc_announcement draft; never cms_blocks or the live list", async () => {
   const live = await liveDump();
   const home = await docRow("doc_home");

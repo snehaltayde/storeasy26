@@ -453,20 +453,87 @@ await t("rendered+driven: editing the table as HTML sends what was typed, and sa
   ok(back.includes('data-rich-text="view"') && bodyOf(srcdocOf(back)) === stored, "the stored value is shown read-only");
 });
 
-// Fix round 1: a paste from a web page with its own elements (every Shopify
-// theme has them) or a <noscript> is refused by the cleaner (WORDS_LOST). The
-// surface shows only normal text, so the field must offer Edit as HTML, where
-// the hidden markup can be seen and removed.
+// P3-FIX4 (owner default, option b): a paste from a web page with its own
+// elements (every Shopify theme has them, with or without attributes) or a
+// <noscript> is cleaned on save, not refused: the elements are unwrapped and
+// their children kept, and a <noscript> goes with its content (no browser that
+// opens the store shows it). These are the RTE reviewer's pastes.
 const WEB_PASTES = [
-  `<p>Our story.</p><div class="product__description rte"><p>Made from <strong>organic cotton</strong>.</p></div><product-info id="ProductInfo-1" data-section="main"><p>Ships in 2 days.</p></product-info>`,
-  `<p>Our story.</p><p>Updated <relative-time datetime="2026-10-01T10:00:00Z">last month</relative-time>.</p>`,
-  `<p>Our story.</p><p>Hello</p><noscript><p>Turn on JavaScript.</p></noscript>`,
+  [
+    `<p>Our story.</p><div class="product__description rte"><p>Made from <strong>organic cotton</strong>.</p></div><product-info id="ProductInfo-1" data-section="main"><p>Ships in 2 days.</p></product-info>`,
+    `<p>Our story.</p><div><p>Made from <strong>organic cotton</strong>.</p></div><p>Ships in 2 days.</p>`,
+    ["Made from", "organic cotton", "Ships in 2 days."],
+  ],
+  [`<p>Our story.</p><p>Updated <relative-time datetime="2026-10-01T10:00:00Z">last month</relative-time>.</p>`, `<p>Our story.</p><p>Updated last month.</p>`, ["Updated last month."]],
+  [`<p>Our story.</p><p>Hello</p><noscript><p>Turn on JavaScript.</p></noscript>`, `<p>Our story.</p><p>Hello</p>`, ["Hello"]],
+  // the RTE reviewer's probe: no attributes; and each tag left alone after the other was removed
+  [`<p>Our story.</p><product-info><p>Ships</p></product-info>`, `<p>Our story.</p><p>Ships</p>`, ["Ships"]],
+  [`<p>Our story.</p><p>Ships</p></product-info>`, `<p>Our story.</p><p>Ships</p>`, ["Ships"]],
+  [`<p>Our story.</p><product-info id="x"><p>Ships</p>`, `<p>Our story.</p><p>Ships</p>`, ["Ships"]],
+  [`<p>Our story.</p><cart-drawer class="drawer" defer-hydration hidden><p>Your cart</p></cart-drawer>`, `<p>Our story.</p><p>Your cart</p>`, ["Your cart"]],
 ];
+
+await t("P3-FIX4 unit: the reviewer's custom-element and <noscript> web pastes are saved cleaned, with their visible text", async () => {
+  for (const [pasted, cleaned, words] of WEB_PASTES) {
+    eq(R.lostBySanitizing(pasted, R.sanitize(pasted)), null, `the cleaner refuses ${pasted}`);
+    const p = await freshPage("<p>Our story.</p>");
+    const saved = await saveHtml(p, pasted);
+    ok(saved.document.revision > p.revision, `not saved: ${pasted}`);
+    const stored = await storedHtml(p.id);
+    eq(stored, cleaned, `stored cleaned (${pasted})`);
+    eq(stored, sanitizeHtml(pasted), "stored as the sanitizer cleans it");
+    for (const w of words) ok(stored.includes(w), `the visible words "${w}" are kept: ${stored}`);
+    ok(!/product-info|relative-time|cart-drawer|noscript|JavaScript|datetime|data-section/.test(stored), `hidden markup stored: ${stored}`);
+  }
+});
+
+// Real text loss is still refused (AU-05), and the words name the tag instead
+// of blaming < or > signs; stray signs still get the old words.
+const STILL_REFUSED = [
+  // a name with no hyphen is somebody's word, not a web page's element
+  [`<p>Our story.</p><shop class="x"><p>Ships in 2 days.</p></shop>`, "shop"],
+  ["Ask for the <founder> today.", "founder"],
+  ["Click the <link> below.", "link"],
+  // a lone opening tag with nothing closing it, and no attributes, is still words
+  [`<p>Our story.</p><product-info><p>Ships</p>`, "product-info"],
+  // an attribute with no value that reads as a word
+  ["<sale-ends soon>Friday</sale-ends>", "sale-ends"],
+  // the noscript rule is for a whole element: a lone one is words
+  ["<p>Hi</p><noscript>Our founder's note", "noscript"],
+];
+
+await t("P3-FIX4 unit: real text loss is still refused, and the refusal words name the tag and Edit as HTML", async () => {
+  for (const [typed, tag] of STILL_REFUSED) {
+    const lost = R.lostBySanitizing(typed, R.sanitize(typed));
+    eq(lost?.code, "WORDS_LOST", `refused: ${typed}`);
+    ok(lost.message.includes(`<${tag}> tag`) && lost.message.includes("Edit as HTML"), `names <${tag}> and Edit as HTML: ${lost.message}`);
+    ok(!lost.message.includes("< or > signs"), `blames < or > signs: ${lost.message}`);
+  }
+  for (const typed of ["Free on orders <500 and >100 rupees.", "Write to Priya <priya@store.com> any day.", "Call <tel:9876543210> now."]) {
+    const lost = R.lostBySanitizing(typed, R.sanitize(typed));
+    eq(lost?.code, "WORDS_LOST", `refused: ${typed}`);
+    ok(lost.message.includes("This usually comes from < or > signs.") && !lost.message.includes("Edit as HTML"), `stray signs keep their words: ${lost.message}`);
+  }
+  // the legacy editors keep the strict reading and their words (test-page-editor pins them)
+  const { wordsLostBySanitizing } = await import("../lib/sanitize.js");
+  for (const [pasted] of WEB_PASTES) ok(wordsLostBySanitizing(pasted, sanitizeHtml(pasted)), `the legacy reading cleans ${pasted}`);
+  for (const [pasted] of WEB_PASTES) ok(!wordsLostBySanitizing(pasted, sanitizeHtml(pasted), { webPaste: true }), `the web paste reading refuses ${pasted}`);
+  // the legacy editor's words (lib/cms/store.js): its box already shows the HTML, so they name the tag without Edit as HTML
+  const { checkPageSections } = await import("../lib/cms/store.js");
+  const said = (html) => checkPageSections([{ kind: "rich", heading: "", html }]).issues.map((i) => i.message);
+  const [legacyTag] = said(WEB_PASTES[0][0]);
+  ok(legacyTag?.includes("<product-info> tag") && !legacyTag.includes("< or > signs") && !legacyTag.includes("Edit as HTML"), `legacy names the tag: ${legacyTag}`);
+  eq(said("Free on orders <500 and >100 rupees."), ['saving would lose these words: "<500 and >". This usually comes from < or > signs. Reword them or remove them, then save again.'], "legacy stray signs, word for word:");
+});
+
+// Text that is still refused offers Edit as HTML in the editable field, where
+// the hidden markup can be seen and removed (P3-RTE fix round 1).
+const REFUSED_PASTE = `<p>Our story.</p><shop class="x"><p>Ships in 2 days.</p></shop>`;
 
 await t("rendered+driven: a refused web-page paste offers Edit as HTML in the editable field, and the edit there saves", async () => {
   ok(M.refusedByCleaner([{ code: "WORDS_LOST" }]) && M.refusedByCleaner([{ code: "ADDRESS_LOST" }]) && M.refusedByCleaner([{ code: "MEDIA_LOST" }]) && M.refusedByCleaner([{ code: "PICTURE_LOST" }]), "every cleaner refusal counts");
   ok(!M.refusedByCleaner([{ code: "REQUIRED" }, { code: "TOO_LONG" }]) && !M.refusedByCleaner(null), "other issues don't");
-  for (const pasted of WEB_PASTES) {
+  for (const pasted of [REFUSED_PASTE, `<p>Our story.</p><product-info><p>Ships in 2 days.</p>`]) {
     const p = await freshPage("<p>Our story.</p>");
     const refused = await saveHtml(p, pasted).then(
       () => null,
@@ -474,6 +541,7 @@ await t("rendered+driven: a refused web-page paste offers Edit as HTML in the ed
     );
     const issue = refused?.issues?.find((i) => M.CLEANER_REFUSALS.includes(i.code));
     ok(issue, `the server refuses ${pasted}: ${refused?.message}`);
+    ok(/<(shop|product-info)> tag/.test(issue.message) && issue.message.includes("Edit as HTML"), `the server's words name the tag: ${issue.message}`);
     eq(await storedHtml(p.id), "<p>Our story.</p>", "nothing stored");
     // the field as the inspector shows it: the unsaved value and the server's issue
     const markup = render(h(RichTextField, { id: "f-sec_rte1-html", label: "Content", value: pasted, onChange: () => {}, issues: [issue] }));
@@ -487,7 +555,7 @@ await t("rendered+driven: a refused web-page paste offers Edit as HTML in the ed
     let tree = null;
     const Host = () => (tree = RTF.HtmlSource({ id: "f-sec_rte1-html", value: pasted, label: "Content", onChange: (v) => sent.push(v), onDone: () => {} }));
     ok(unescape(render(h(Host))).includes(pasted), "the text box shows the paste as it is");
-    const fixed = pasted.replace(/<\/?(product-info|relative-time)[^>]*>/g, "").replace(/<noscript>.*<\/noscript>/, "");
+    const fixed = pasted.replace(/<\/?(shop|product-info)[^>]*>/g, "");
     findProps(tree, (n) => n.type === "textarea").onChange({ target: { value: fixed } });
     const saved = await saveHtml(p, sent[0]);
     eq(await storedHtml(p.id), sanitizeHtml(fixed), "the edited text is stored cleaned");
@@ -497,8 +565,21 @@ await t("rendered+driven: a refused web-page paste offers Edit as HTML in the ed
   const other = render(h(RichTextField, { id: "f-x", label: "Content", value: "<p>Hi</p>", onChange: () => {}, issues: [{ code: "REQUIRED", severity: "incomplete", message: "Add the content." }] }));
   ok(!other.includes("Edit as HTML"), "no Edit as HTML for other issues");
   // and a founder without permission gets none, refusal or not
-  const locked = render(h(RichTextField, { id: "f-y", label: "Content", value: WEB_PASTES[0], onChange: () => {}, issues: [{ code: "WORDS_LOST", severity: "error", message: "x" }], readOnlyReason: "Only the store owner can change this." }));
+  const locked = render(h(RichTextField, { id: "f-y", label: "Content", value: REFUSED_PASTE, onChange: () => {}, issues: [{ code: "WORDS_LOST", severity: "error", message: "x" }], readOnlyReason: "Only the store owner can change this." }));
   ok(!locked.includes("Edit as HTML"), "locked stays locked");
+});
+
+await t("P3-FIX4 rendered: in Edit as HTML a refusal shows no rescue words and no second Edit as HTML button", async () => {
+  const issue = { code: "WORDS_LOST", severity: "error", message: "saving would lose these words" };
+  const markup = render(h(RichTextField, { id: "f-h", label: "Content", value: REFUSED_PASTE, onChange: () => {}, issues: [issue], sourceOpen: true }));
+  ok(markup.includes('data-rich-text="html"') && markup.includes("<textarea"), `Edit as HTML is open: ${markup.slice(0, 200)}`);
+  ok(!markup.includes("data-rte-edit-html"), "a do-nothing Edit as HTML button inside the text box");
+  ok(!markup.includes("Pasted text can hold hidden code"), "the rescue words inside the text box");
+  ok(!markup.includes("f-h--readonly"), "a read-only reason inside the text box");
+  ok(markup.includes("saving would lose these words"), "the server's own note still shows");
+  // the same issue in the surface does get the rescue (the pair pins the mode check)
+  const surface = render(h(RichTextField, { id: "f-h", label: "Content", value: REFUSED_PASTE, onChange: () => {}, issues: [issue] }));
+  ok(surface.includes("data-rte-edit-html") && surface.includes("Pasted text can hold hidden code"), "the surface offers the rescue");
 });
 
 await t("rendered: the editor and the storefront's rich text both use the .rte stylesheet", async () => {

@@ -124,12 +124,13 @@ function Surface({ frameRef, html, label, placeholder, editable, onReady, onGone
   return <iframe ref={frameRef} title={label} sandbox="allow-same-origin" srcDoc={srcDoc} data-rich-text-surface={editable ? "edit" : "view"} className="block w-full border-0 bg-transparent" style={{ height: MIN_HEIGHT }} />;
 }
 
-export default function RichTextField({ value, onChange, issues = [], focusRequest = null, readOnlyReason = null, id, label, placeholder = "", required = false }) {
+// `sourceOpen` sets how Edit as HTML first renders (tests; hosts leave it off).
+export default function RichTextField({ value, onChange, issues = [], focusRequest = null, readOnlyReason = null, id, label, placeholder = "", required = false, sourceOpen = false }) {
   const html = typeof value === "string" ? value : "";
   const notes = Array.isArray(issues) ? issues : [];
   const locked = typeof readOnlyReason === "string" && readOnlyReason.length > 0;
   const tags = uneditableTags(html);
-  const [source, setSource] = useState(false);
+  const [source, setSource] = useState(sourceOpen === true);
   const mode = locked ? "locked" : source ? "html" : tags.length ? "view" : "edit";
   const editable = mode === "edit";
 
@@ -412,7 +413,8 @@ export default function RichTextField({ value, onChange, issues = [], focusReque
   };
 
   const readonlyId = `${id}--readonly`;
-  // a save the cleaner refused: Edit as HTML is the way to find what it named
+  // a save the cleaner refused: Edit as HTML is the way to find what it named.
+  // Only in the editable surface: in Edit as HTML the founder already sees it.
   const rescue = mode === "edit" && refusedByCleaner(notes);
   const why = locked ? readOnlyReason : mode === "view" ? readOnlyWords(tags) : rescue ? REFUSED_WORDS : null;
   const describedBy = [notes.length ? notesId(id) : null, why ? readonlyId : null].filter(Boolean).join(" ") || undefined;

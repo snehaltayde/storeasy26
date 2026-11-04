@@ -8,6 +8,7 @@ import { getCmsMode, legacyWritesRefusal } from "@/lib/cms-mode";
 import { writeRefusalBody } from "@/lib/content-writes";
 import { validationBody } from "@/lib/cms/issues";
 import { editorHref } from "@/lib/admin/editor-entry";
+import { slog } from "@/lib/log";
 
 // Theme library API (S37 / MC07).
 //   GET → kit catalog + the tenant's pin (+ upgrade availability)
@@ -20,7 +21,9 @@ import { editorHref } from "@/lib/admin/editor-entry";
 // saves the kit into the doc_design DRAFT through the documents service
 // (lib/themes/kits.js applyKit), never publishes, and never writes the
 // control-plane config. A design save that landed since `revision` is a 409
-// DOCUMENT_CHANGED with the current document. A 'migrating' store refuses
+// DOCUMENT_CHANGED with the current document. When the design saved and the
+// hero preset then failed (not a race), the answer is ok with a note saying
+// the look was saved and the hero wasn't (P3-FIX4). A 'migrating' store refuses
 // (409 STORE_USES_DOCUMENTS). The legacy path is unchanged.
 //
 // This file is on the TOK-03 guard's allowlist: the legacy branch reads the
@@ -99,12 +102,40 @@ export const POST = tenantHandler(async (request) => {
   }
 });
 
+// P3-FIX4: the design draft saved, then the hero preset failed for another
+// reason than a race (a database error). The design stays saved, so the
+// answer says so: never "nothing was saved".
+const HERO_FAILED_NOTE = "Your new look was saved as a draft. The hero look wasn't added, because something went wrong on our side. Apply the look again in a minute to add it, or change the hero in the editor.";
+
+// The documents service, watching for the doc_design save (applyKit saves the
+// design first, then the hero).
+function watchDesignSave(Docs, seen) {
+  return {
+    ...Docs,
+    async saveDraft(args) {
+      const r = await Docs.saveDraft(args);
+      if (args?.id === DESIGN_ID) seen.design = r?.document ?? null;
+      return r;
+    },
+    async createDocument(args) {
+      const r = await Docs.createDocument(args);
+      if (args?.type === "design") seen.design = r?.document ?? null;
+      return r;
+    },
+  };
+}
+
 async function applyDocuments(body, auth) {
   const kit = String(body.kit || "");
   if (!KITS[kit]) return NextResponse.json({ error: `There is no look called "${kit.slice(0, 40)}". Choose one from the list.`, code: "UNKNOWN_KIT" }, { status: 422 });
+  const seen = { design: null };
+  let Docs = null;
   try {
-    const Docs = await import("@/lib/documents/service");
-    const r = await applyKit(kit, { actor: auth.actor, withPresets: body.withPresets !== false, withBrand: body.withBrand !== false, documents: Docs, revision: body.revision });
+    Docs = await import("@/lib/documents/service");
+    // a failure after the design saved is the hero's, answered below; one
+    // before it goes to the catch, where nothing was saved
+    const r = await applyKit(kit, { actor: auth.actor, withPresets: body.withPresets !== false, withBrand: body.withBrand !== false, documents: watchDesignSave(Docs, seen), revision: body.revision }).catch((e) => (seen.design ? { heroFailed: e } : Promise.reject(e)));
+    if (r.heroFailed) return designSavedAnswer(Docs, seen.design, r.heroFailed);
     return NextResponse.json({ ok: true, applied: r, ...(r.note ? { note: r.note } : {}), ...(await documentsView(Docs)), theme: r.theme, upgradeAvailable: false });
   } catch (e) {
     // a broken design is 422 with every issue; a deliberate refusal (409
@@ -116,4 +147,19 @@ async function applyDocuments(body, auth) {
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: "The look couldn't be applied, so nothing was saved. Try again in a minute." }, { status: 500 });
   }
+}
+
+async function designSavedAnswer(Docs, design, e) {
+  slog("theme_hero_failed", { mode: "documents", revision: design.revision ?? null, error: String(e?.message || e).slice(0, 200) });
+  const theme = isObj(design.body?.settings?.theme) ? design.body.settings.theme : null;
+  const applied = {
+    theme,
+    brand: isObj(design.body?.settings?.brand) ? design.body.settings.brand : null,
+    presets: [],
+    document: { id: design.id, revision: design.revision, draftHash: design.draftHash },
+    note: HERO_FAILED_NOTE,
+  };
+  // the view is read again when it can be; the saved design is answered either way
+  const view = await documentsView(Docs).catch(() => ({ kits: catalog(), theme, upgradeAvailable: false, design: { id: DESIGN_ID, revision: design.revision ?? null, draftHash: design.draftHash ?? null, editor: editorHref(DESIGN_ID) } }));
+  return NextResponse.json({ ok: true, applied, note: HERO_FAILED_NOTE, heroApplied: false, ...view, theme, upgradeAvailable: false });
 }
