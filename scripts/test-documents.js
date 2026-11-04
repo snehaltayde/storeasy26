@@ -235,9 +235,52 @@ await t("API: a stale saveDraft returns 409 with the current body and revision, 
   eq(mine.body.code, "DOCUMENT_CHANGED", "code:");
   eq(mine.body.current.revision, d.revision + 1, "the current revision rides along:");
   eq(mine.body.current.body.meta.title, "Theirs", "the current body rides along:");
-  ok(!JSON.stringify(mine.body).includes("merchant:"), "no raw actor ids:");
+  // P3-CHANGES: the only raw actor id is current.updatedBy, for the editor
+  const { updatedBy, updatedByName, ...rest } = mine.body.current;
+  ok(!JSON.stringify({ ...mine.body, current: rest }).includes("merchant:"), "no raw actor ids anywhere else:");
+  eq([updatedBy, updatedByName], [`merchant:${staffU.id}`, "ravi@zd.test"], "who saved it (staff has no name, so the email):");
   await unchanged(before, "stale save");
   made.camp = theirs.body.document;
+});
+
+await t("P3-CHANGES (ED-03): a stale saveDraft 409 names who saved it: a team member by plain name, 'another tab' for the same person, Storeasy for a system write; getDocument and the saved document carry no updatedBy", async () => {
+  let d = (await create({ type: "page", meta: { slug: "who-saved", title: "Who saved" } })).body.document;
+  const byOwner = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "Owner's tab 1" } });
+  eq(byOwner.status, 200, "owner saves:");
+  ok(!("updatedBy" in byOwner.body.document) && !("updatedByName" in byOwner.body.document), "a save answer has no updatedBy:");
+  const g = await api({ getDocument: d.id });
+  ok(!("updatedBy" in g.body.document) && !JSON.stringify(g.body).includes("merchant:"), "getDocument has no updatedBy:");
+  // the same owner, from a second tab still at the old revision
+  const sameTab = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "Owner's tab 2" } });
+  eq([sameTab.status, sameTab.body.code], [409, "DOCUMENT_CHANGED"], "stale:");
+  eq([sameTab.body.current.updatedBy, sameTab.body.current.updatedByName], [`merchant:${ownerU.id}`, "another tab"], "the same person:");
+  // a team member with a name
+  d = byOwner.body.document;
+  const byLeft = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "By Gone Person" } }, { as: LEFT });
+  eq(byLeft.status, 200, "the other member saves:");
+  const other = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "Mine" } });
+  eq(other.body.current.updatedByName, "Gone Person", "a team member's plain name:");
+  // a write with no actor (a system writer)
+  d = byLeft.body.document;
+  await inT(() => Docs.saveDraft({ id: d.id, revision: d.revision, body: { ...d.body, meta: { ...d.body.meta, title: "System" } }, actor: null }));
+  const sys = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "Mine again" } });
+  eq([sys.body.current.updatedBy, sys.body.current.updatedByName], [null, "Storeasy"], "a system write:");
+  // the same holds when the stale write slips past the first read (settle)
+  d = (await api({ getDocument: d.id })).body.document;
+  const inst = await inT(() => currentDatabase());
+  const send = inst.libsql.batch;
+  inst.libsql.batch = async (stmts, mode) => {
+    delete inst.libsql.batch;
+    await raw.docs.execute({ sql: "UPDATE documents SET revision = revision + 1, updated_by = ? WHERE id = ?", args: [`merchant:${ownerU.id}`, d.id] });
+    return send.call(inst.libsql, stmts, mode);
+  };
+  let late;
+  try {
+    late = await save(d.id, d.revision, { ...d.body, meta: { ...d.body.meta, title: "Late" } }, { as: STAFF });
+  } finally {
+    delete inst.libsql.batch;
+  }
+  eq([late.status, late.body.current.updatedByName], [409, "Asha Rao"], "inside the batch too:");
 });
 
 await t("a stale write that slips past the first read still loses inside the batch (the guarded UPDATE and its abort), storage unchanged", async () => {
@@ -758,6 +801,15 @@ await t("the checkpoint prune's query plan uses the indexes: no SCAN of publish_
   eq(scans, [], `no table scans in:\n      ${plan.join("\n      ")}\n     `);
   ok(plan.filter((d) => /^SEARCH p USING INDEX publish_log_doc \(document_id=\?\)/.test(d)).length === 3, `publish_log by document, in all three subqueries: ${plan.join(" | ")}`);
   ok(plan.filter((d) => /^SEARCH d USING (?:INDEX sqlite_autoindex_documents_1|INTEGER PRIMARY KEY|PRIMARY KEY) \(id=\?\)/.test(d)).length === 3, `documents by id, in all three subqueries: ${plan.join(" | ")}`);
+});
+
+await t("P3-CHANGES: the prune binds the document id in every check (p.document_id = ?, d.id = ?), never the outer row's, and every argument is that id or the cap", async () => {
+  const st = V.pruneStatement("doc_bound");
+  ok(!/p\.document_id = v\.document_id|d\.id = v\.document_id/.test(st.sql), `no correlated document term: ${st.sql}`);
+  eq((st.sql.match(/p\.document_id = \?/g) || []).length, 3, "publish_log by the bound id, three times:");
+  eq((st.sql.match(/d\.id = \?/g) || []).length, 3, "documents by the bound id, three times:");
+  eq((st.sql.match(/\?/g) || []).length, st.args.length, "one argument per placeholder:");
+  eq(st.args, ["doc_bound", "doc_bound", "doc_bound", "doc_bound", "doc_bound", "doc_bound", V.CHECKPOINT_CAP, "doc_bound", "doc_bound", "doc_bound"], "args:");
 });
 
 await t("pruning still never removes a checkpoint a document row points at (published or undone), nor one another document's log row would name only by version id", async () => {

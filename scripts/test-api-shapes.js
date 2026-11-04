@@ -244,7 +244,9 @@ check("every code the API gives today is copied exactly, with its status", () =>
     } else if (!statuses && !NEW_CODES.has(code)) {
       fail(`${where}: ${code} is neither a code of today nor one of phase 3's new codes`);
     } else if (statuses && NEW_CODES.has(code)) {
-      fail(`${where}: ${code} is listed as new but the code already emits it`);
+      // P3-CHANGES: a phase 3 code its owner has built is emitted now; it
+      // must keep the status the contract gives it
+      if (statuses.size && !statuses.has(o.status)) fail(`${where}: ${code} is ${o.status} here, the code says ${[...statuses].join(" or ")}`);
     } else if (statuses && statuses.size && !statuses.has(o.status)) {
       // a p3 outcome reusing a code of today keeps its status
       fail(`${where}: ${code} is ${o.status} here, the code says ${[...statuses].join(" or ")}`);
@@ -260,7 +262,8 @@ check("the new phase 3 codes are each used by an outcome", () => {
 // The codes today's documents API can answer, from its sources, each have an
 // outcome here (nothing missing from the contract).
 check("every DocumentError code of today has an outcome", () => {
-  const used = new Set(allOutcomes.filter(({ o }) => o.since === "p2").map(({ o }) => o.body.code));
+  // P3-CHANGES: a phase 3 code, once built, has its p3 outcome
+  const used = new Set(allOutcomes.filter(({ o }) => o.since === "p2" || NEW_CODES.has(o.body.code)).map(({ o }) => o.body.code));
   const emitted = new Set();
   for (const src of [apiSource, ...Object.values(docSources)]) {
     for (const m of src.matchAll(/DocumentError\(\s*\d{3}\s*,\s*"([A-Z_]+)"/g)) emitted.add(m[1]);
