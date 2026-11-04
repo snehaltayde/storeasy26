@@ -116,7 +116,10 @@ const EMITTERS = { "lib/admin/documents-api.js": apiSource, "lib/cms/issues.js":
 // Codes phase 3 adds (plan section 2 and the P3 briefs). Every other code a
 // "p3" outcome uses must already exist.
 // NOT_BUILT is no longer new: P3-COMMIT's NotBuiltError emits it.
-const NEW_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "TOO_MANY_KEPT", "CANNOT_TAKE_OFFLINE"]);
+// P3-UNDO: CANNOT_TAKE_OFFLINE is emitted now (lib/documents/undo.js), so it
+// is no longer new; its only outcome is the p3 one (NOW_EMITTED).
+const NEW_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "TOO_MANY_KEPT"]);
+const NOW_EMITTED = new Set(["CANNOT_TAKE_OFFLINE"]);
 
 // ---- walking the shapes ------------------------------------------------------------
 
@@ -260,7 +263,7 @@ check("the new phase 3 codes are each used by an outcome", () => {
 // The codes today's documents API can answer, from its sources, each have an
 // outcome here (nothing missing from the contract).
 check("every DocumentError code of today has an outcome", () => {
-  const used = new Set(allOutcomes.filter(({ o }) => o.since === "p2").map(({ o }) => o.body.code));
+  const used = new Set(allOutcomes.filter(({ o }) => o.since === "p2" || NOW_EMITTED.has(o.body.code)).map(({ o }) => o.body.code));
   const emitted = new Set();
   for (const src of [apiSource, ...Object.values(docSources)]) {
     for (const m of src.matchAll(/DocumentError\(\s*\d{3}\s*,\s*"([A-Z_]+)"/g)) emitted.add(m[1]);
