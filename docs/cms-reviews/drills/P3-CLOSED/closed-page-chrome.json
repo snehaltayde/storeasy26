@@ -1,0 +1,38 @@
+[
+  {
+    "width": 1440,
+    "cookies": "anonymous",
+    "status": 200,
+    "title": "Design Demo Co · Opening soon",
+    "text": "Design Demo Co Opening soon We're getting the shop ready. Check back soon.",
+    "sideways": false,
+    "errors": []
+  },
+  {
+    "width": 1440,
+    "cookies": "forged-cookies",
+    "status": 200,
+    "title": "Design Demo Co · Opening soon",
+    "text": "Design Demo Co Opening soon We're getting the shop ready. Check back soon.",
+    "sideways": false,
+    "errors": []
+  },
+  {
+    "width": 375,
+    "cookies": "anonymous",
+    "status": 200,
+    "title": "Design Demo Co · Opening soon",
+    "text": "Design Demo Co Opening soon We're getting the shop ready. Check back soon.",
+    "sideways": false,
+    "errors": []
+  },
+  {
+    "width": 375,
+    "cookies": "forged-cookies",
+    "status": 200,
+    "title": "Design Demo Co · Opening soon",
+    "text": "Design Demo Co Opening soon We're getting the shop ready. Check back soon.",
+    "sideways": false,
+    "errors": []
+  }
+]

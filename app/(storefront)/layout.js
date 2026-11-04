@@ -24,6 +24,7 @@ import SiteNav from "@/components/site/SiteNav";
 import Link from "next/link";
 import PreviewBridgeMount from "@/components/preview/PreviewBridge";
 import PreviewBanner from "@/components/PreviewBanner";
+import StoreClosed from "@/components/StoreClosed";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -48,6 +49,12 @@ export async function generateMetadata() {
   }
   if (isGated(await requestResolution())) {
     return { title: "Store", robots: { index: false } };
+  }
+  // PUB-06: a closed store's metadata says nothing about it beyond its name:
+  // no tagline, no manifest, not indexed.
+  if (await closedNow()) {
+    const name = await tfetch(async () => siteName()).catch(() => "Store");
+    return { title: { absolute: `${name} · Opening soon` }, description: "Opening soon.", robots: { index: false, follow: false } };
   }
   const [name, title, tagline, url] = await tfetch(async () => [siteName(), siteTitle(), siteTagline(), siteUrl()]);
   return {
@@ -160,6 +167,19 @@ async function chromeData() {
   }
 }
 
+// PUB-06: the store is closed to this request: documents mode, never
+// published, and no valid preview session (a founder's preview gets the
+// "live" preview source instead, never "closed"). Console cookies (_admin,
+// _platform, _mx) play no part. A source that can't be read is not "closed":
+// the page's own read then shows the error surface, as before.
+async function closedNow() {
+  try {
+    return (await tfetch(() => contentSource())).mode === "closed";
+  } catch {
+    return false;
+  }
+}
+
 // The maintenance curtain's name, brand and theme when they can't be read.
 const NEUTRAL_CURTAIN = ["Store", null, null];
 
@@ -209,6 +229,22 @@ export default async function RootLayout({ children }) {
       <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
         <body className="flex min-h-full flex-col bg-white text-zinc-900 antialiased">
           <main className="flex-1">{children}</main>
+        </body>
+      </html>
+    );
+  }
+
+  // PUB-06: a store that has never published shows "Opening soon" instead of
+  // any page, with neutral brand values. It wins over maintenance: the
+  // maintenance check and its cookie bypass are not consulted, so a console
+  // cookie never opens a closed store (only a preview session does, above,
+  // through the content source).
+  if (await closedNow()) {
+    const name = await tfetch(async () => siteName()).catch(() => "Store");
+    return (
+      <html lang="en" data-kit="pulse-1" className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
+        <body className="flex min-h-full flex-col antialiased">
+          <StoreClosed name={name} />
         </body>
       </html>
     );

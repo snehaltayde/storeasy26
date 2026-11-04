@@ -5,6 +5,7 @@ import { tenantCfg } from "@/lib/tenant-context";
 import { siteName } from "@/lib/site";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
+import { closedStoreGate, STORE_CLOSED_CODE, STORE_CLOSED_MESSAGE } from "@/lib/content/resolve";
 
 // Contact form endpoint (S39 / SF15). Rate-limited per IP, honeypot-guarded,
 // server-validated. The message is STORED first (console inbox), the merchant
@@ -16,6 +17,10 @@ export const dynamic = "force-dynamic";
 export const POST = tenantHandler(async (request) => {
   const limited = rateLimit(request, { name: "contact", limit: 5, windowMs: 60 * 60 * 1000 });
   if (limited) return limited;
+  // PUB-06: a store that has never published takes no messages, except from
+  // a founder's valid preview session (a test from the console).
+  const closed = await closedStoreGate();
+  if (closed && !closed.preview) return NextResponse.json({ error: STORE_CLOSED_MESSAGE, code: STORE_CLOSED_CODE }, { status: 403 });
 
   const body = await request.json().catch(() => ({}));
   // honeypot: real shoppers never fill "website" — bots do; answer 200 so the

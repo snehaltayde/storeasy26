@@ -8,8 +8,11 @@
 //      body from newer code, a required singleton missing from the list.
 //   4. The manifest: a later singleton reads as the code default on an older
 //      list; emptyList plus one policy page renders every getter at its default.
-//   5. No release: legacy serves drafts, documents mode is DOCUMENTS_UNPUBLISHED,
-//      no cms_state table is legacy, a cms_state read error fails closed.
+//   5. No release: legacy and migrating serve drafts (as before 0021, and after
+//      running 0021 onwards); documents mode is the closed store (PUB-06):
+//      every resolved* getter neutral, the closed layout, sitemap, manifest
+//      and offline page; no cms_state table is legacy, a cms_state read
+//      error fails closed.
 //   6. Statement counts (request-cache stub): the real layout plus the real
 //      home page, checkout, a policy page, the sitemap and /journal.
 //   7. Edge safety: no node: import in lib/content/* or lib/cms-mode.js.
@@ -62,7 +65,7 @@ process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 process.env.PLATFORM_SITE_HOSTS = "";
 
-const TENANTS = ["dv", "dz", "lg", "pre", "brk", "dm", "p0", "p1k", "sm", "lag", "bg"];
+const TENANTS = ["dv", "dz", "lg", "pre", "brk", "dm", "p0", "p1k", "sm", "lag", "bg", "beastlife", "lgx", "mgx", "prex", "prey", "mt", "ml", "bg2", "fc"];
 const dbs = [".test-rr-default.db", ".test-rr-platform.db", ".test-rr-legacy-outputs.json", ".test-rr-journal-outputs.json", ...TENANTS.map((t) => `.test-rr-${t}.db`)];
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
@@ -457,7 +460,8 @@ const STUBS = {
   "@/components/preview/ExperimentNote": nothing,
   "@/components/checkout/CheckoutFlow": { __esModule: true, default: ({ policies }) => React.createElement("ul", { id: "policies" }, (policies || []).map((p) => React.createElement("li", { key: p.href }, p.href))) },
 };
-const Layout = (await loadJsx(join(ROOT, "app/(storefront)/layout.js"), STUBS)).default;
+const LayoutModule = await loadJsx(join(ROOT, "app/(storefront)/layout.js"), STUBS);
+const Layout = LayoutModule.default;
 const Home = (await loadJsx(join(ROOT, "app/(storefront)/page.js"), STUBS)).default;
 const Checkout = (await loadJsx(join(ROOT, "app/(storefront)/checkout/page.js"), STUBS)).default;
 const Journal = (await loadJsx(join(ROOT, "app/(storefront)/journal/page.js"), STUBS)).default;
@@ -896,17 +900,285 @@ await t("a required singleton (sinceManifest <= m) missing from the list is an e
 });
 
 // =====================================================================================
-console.log("— 5. no release yet: legacy drafts, documents unpublished, no table, a broken table");
+console.log("— 5. no release yet: legacy drafts, a closed documents store (PUB-06), no table, a broken table");
 // =====================================================================================
-await t("documents mode with no release throws DOCUMENTS_UNPUBLISHED (drafts never serve)", async () => {
-  const DM = await tenant("dm");
-  await setMode(DM, "documents");
-  await withTenant(DM, () => S.setBlock("hero", { title: "DRAFT HERO" }));
-  await unavailable(withTenant(DM, () => Res.contentSource()), "DOCUMENTS_UNPUBLISHED", "contentSource:");
-  await unavailable(withTenant(DM, () => Res.resolvedHero()), "DOCUMENTS_UNPUBLISHED", "hero:");
-  // 'migrating' with no release keeps today's draft path (spec 8.7)
-  await setMode(DM, "migrating");
-  eq((await withTenant(DM, () => Res.resolvedHero())).title, "DRAFT HERO", "migrating:");
+
+// Every exported resolved* getter of resolve.js, enumerated from the module,
+// so a getter added later is walked too. The arguments each one is called with
+// (a getter not named here is called with none).
+const RESOLVED_ALL = Object.keys(Res).filter((k) => /^resolved[A-Z]/.test(k) && typeof Res[k] === "function").sort();
+const CLOSED_ARGS = {
+  resolvedNav: [["header"], ["footer"]],
+  resolvedContentPage: [["about"], ["contact"], ["shipping"], ["privacy"], ["spring"], ["first-post"], ["no-such-page"]],
+  resolvedSurfaceTemplateFor: [["pdp", P(1)], ["collection", COL(2)], ["header"], ["footer"]],
+  resolvedProductOverride: [[P(1)]],
+  resolvedCollectionPins: [["serums"]],
+  resolvedPdpPairs: [[P(1)]],
+  resolvedCartUpsell: [[[]]],
+  resolvedSlugRedirect: [["old-about"], ["about"]],
+};
+const callsOf = () => RESOLVED_ALL.flatMap((fn) => (CLOSED_ARGS[fn] || [[]]).map((args) => [fn, args]));
+// The neutral value of each call on a closed store. A getter missing here
+// fails the walk until its neutral value is written down.
+const CLOSED_NEUTRAL = {
+  "resolvedAnnouncement()": { enabled: false, text: "", href: "" },
+  "resolvedHero()": null,
+  "resolvedHomeSections()": [],
+  "resolvedHomePage()": [],
+  'resolvedNav("header")': [],
+  'resolvedNav("footer")': [],
+  "resolvedCollectionsIndex()": { featured: [], order: [], hide: [] },
+  "resolvedPdpExtras()": [],
+  'resolvedContentPage("about")': null,
+  'resolvedContentPage("contact")': null,
+  'resolvedContentPage("shipping")': null,
+  'resolvedContentPage("privacy")': null,
+  'resolvedContentPage("spring")': null,
+  'resolvedContentPage("first-post")': null,
+  'resolvedContentPage("no-such-page")': null,
+  "resolvedContentPageList()": [],
+  "resolvedJournalEntries()": [],
+  "resolvedBrand()": null,
+  "resolvedTheme()": null,
+  "resolvedSurfaceTemplates()": { header: "standard", footer: "columns" },
+  [`resolvedSurfaceTemplateFor("pdp","${P(1)}")`]: { template: "classic", source: "platform" },
+  [`resolvedSurfaceTemplateFor("collection","${COL(2)}")`]: { template: "standard", source: "platform" },
+  'resolvedSurfaceTemplateFor("header")': { template: "standard", source: "platform" },
+  'resolvedSurfaceTemplateFor("footer")': { template: "columns", source: "platform" },
+  [`resolvedProductOverride("${P(1)}")`]: { modules: [], badge: "" },
+  'resolvedCollectionPins("serums")': [],
+  // catalog data (owner interpretation): the automatic same-collection strip
+  [`resolvedPdpPairs("${P(1)}")`]: (v) => v.source === "auto" && v.products.every((p) => p.handle === "night-cream"),
+  "resolvedCartUpsell([])": { title: null, products: [] },
+  'resolvedSlugRedirect("old-about")': null,
+  'resolvedSlugRedirect("about")': null,
+};
+
+// Words that must never reach a shopper of a closed store: every seeded
+// draft (legacy tables and documents), the config brand, and the code
+// defaults' copy (the default hero, DEFAULT_HOME_SECTIONS, the default pages).
+const { PAGES: DEFAULT_PAGES } = await import("../lib/content/pages.js");
+const { DEFAULT_HERO_SUBTITLE, EMPTY_STORE_HERO_SUBTITLE } = await import("../lib/cms/defaults.js");
+const DRAFT_WORDS = ["DRAFT HERO", "DRAFT RAIL", "DRAFT BAR", "DRAFT NAV", "DRAFT ABOUT", "DRAFT CAMPAIGN", "DOCDRAFT HOME", "DOCDRAFT HEADER", "DOCDRAFT PAGE", "DOCDRAFT POST", "#e11d48", "#7c3aed"];
+const codeDefaultWords = (name) => [
+  defaultHero(name).title,
+  DEFAULT_HERO_SUBTITLE,
+  EMPTY_STORE_HERO_SUBTITLE,
+  ...DEFAULT_HOME_SECTIONS.map((s) => s.title),
+  ...Object.values(DEFAULT_PAGES).flatMap((p) => [p.title, ...(p.sections || []).map((s) => s.heading).filter(Boolean)]),
+];
+
+// A draft in the documents table (never published), as the editor saves one.
+async function docDraft(T, id, b) {
+  await withTenant(T, () =>
+    libsql.execute({
+      sql: "INSERT INTO documents (id, type, slug, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, ?)",
+      args: [id, b.type, b.meta?.slug || null, id, R.stableStringify(b), `dh_${id}`, NOW, NOW],
+    }),
+  );
+}
+// Drafts of every kind a store can hold before its first publish.
+async function seedDrafts(T, { documents = true } = {}) {
+  await withTenant(T, async () => {
+    await S.setBlock("hero", { title: "DRAFT HERO", subtitle: "DRAFT HERO words" });
+    await S.setBlock("home_sections", [{ id: "sec_dr1", kind: "product_rail", title: "DRAFT RAIL", collection: "serums", collection_id: COL(2), limit: 4 }]);
+    await S.setBlock("announcement", { enabled: true, text: "DRAFT BAR", href: "/collections" });
+    await S.setBlock("nav_header", [{ label: "DRAFT NAV", href: "/collections/serums" }]);
+    await S.upsertContentPage({ slug: "about", title: "DRAFT ABOUT", sections: [{ id: "sec_dra", kind: "text", heading: "DRAFT ABOUT story", body: ["DRAFT ABOUT words"] }] });
+    await S.upsertContentPage({ slug: "spring", title: "DRAFT CAMPAIGN", family: "campaign", sections: [{ id: "sec_drc", kind: "text", heading: "DRAFT CAMPAIGN", body: ["x"] }] });
+  });
+  if (!documents) return;
+  await docDraft(T, "doc_home", body("home", { sections: [sec("hero", "sec_hero", { title: "DOCDRAFT HOME" }), sec("rich_text", "sec_rt", { title: "DOCDRAFT HOME words", html: "<p>DOCDRAFT HOME</p>" })] }));
+  await docDraft(T, "doc_header", body("header", { settings: { mode: "custom", items: [{ label: "DOCDRAFT HEADER", link: { type: "url", href: "/about" } }] } }));
+  await docDraft(T, "doc_design", body("design", { settings: { brand: { accent: "#7c3aed" }, theme: { kit: "glow", version: 1 } } }));
+  await docDraft(T, "doc_pgabout", body("page", { meta: { slug: "about", title: "DOCDRAFT PAGE" }, sections: [sec("text", "sec_pa", { title: "DOCDRAFT PAGE", body: ["DOCDRAFT PAGE words"] })] }));
+  await docDraft(T, "doc_jfirst", body("journal", { meta: { slug: "first-post", title: "DOCDRAFT POST" }, sections: [sec("text", "sec_jp", { title: "DOCDRAFT POST", body: ["x"] })] }));
+}
+const leakIn = (text, words) => words.filter((w) => w && text.includes(w));
+
+// Every call's answer on one store, as canonical JSON (one simulated request
+// per call, so nothing is shared between them).
+async function walk(T, host = `${T.id}.test`, cookies = {}) {
+  const out = {};
+  for (const [fn, args] of callsOf()) {
+    const r = await asRequest(host, () => withTenant(T, () => settle(Res[fn](...args))), cookies);
+    out[keyOf(fn, args)] = r.e ? { threw: `${r.e.message} ${JSON.stringify(r.e.detail || null)}` } : r.v;
+  }
+  return out;
+}
+
+const DM = await tenant("dm", { config: { brand: { accent: "#e11d48" }, theme: { kit: "glow", version: 1 } } });
+await setMode(DM, "documents");
+await seedDrafts(DM);
+
+await t("PUB-06: a documents store with no release is closed: contentSource is mode 'closed', v4-shaped over the empty list (no documents, pages, redirects or journal index)", async () => {
+  const src = await asRequest("dm.test", () => withTenant(DM, () => Res.contentSource()));
+  eq(src.mode, "closed", "mode:");
+  eq(src.v, 4, "v:");
+  eq(src.preview, false, "preview:");
+  eq(src.content, null, "content:");
+  eq(src.releaseId, null, "releaseId:");
+  same(src.list.documents, {}, "documents:");
+  same([src.list.pages, src.list.redirects, src.list.indexes.journal], [[], [], null], "pages, redirects, journal index:");
+  same(Docs.emptyList(), { ...src.list }, "the list is Docs.emptyList():");
+  eq(await asRequest("dm.test", () => withTenant(DM, () => Res.isStoreClosed())), true, "isStoreClosed:");
+  same(await asRequest("dm.test", () => withTenant(DM, () => Res.closedStoreGate())), { preview: false }, "closedStoreGate:");
+});
+
+await t("PUB-06: every exported resolved* getter (enumerated from resolve.js) returns its neutral value on a closed store; no seeded draft and no code-default copy appears; no documents, versions or legacy tables are read", async () => {
+  ok(RESOLVED_ALL.length >= 19, `resolved* getters found: ${RESOLVED_ALL.length}`);
+  const name = "RR dm Store";
+  const words = [...DRAFT_WORDS, ...codeDefaultWords(name)];
+  const out = await walk(DM);
+  for (const [k, v] of Object.entries(out)) {
+    if (v && v.threw) throw new Error(`${k} threw: ${v.threw}`);
+    ok(Object.hasOwn(CLOSED_NEUTRAL, k), `${k}: a getter with no neutral value written down (add it to CLOSED_NEUTRAL): ${JSON.stringify(v).slice(0, 200)}`);
+    const want = CLOSED_NEUTRAL[k];
+    if (typeof want === "function") ok(want(v), `${k}: ${JSON.stringify(v).slice(0, 200)}`);
+    else same(v, want, `${k}:`);
+    const hits = leakIn(JSON.stringify(v), words);
+    same(hits, [], `${k} shows draft or code-default words:`);
+  }
+  // what a closed store reads: the release pointer and the store's mode only
+  const { statements } = await asRequest("dm.test", () => withTenant(DM, () => watch(async () => {
+    for (const [fn, args] of callsOf()) await Res[fn](...args);
+  })));
+  const content = contentOnly(statements).map((s) => s.sql);
+  ok(content.length >= 2 && content.every((sql) => /release_state|cms_state/i.test(sql)), `content statements on a closed store: ${content.map((s) => s.slice(0, 80)).join(" | ")}`);
+});
+
+await t("PUB-06: a closed brand store (lib/content/pages.js defaults apply) shows no default policy page either", async () => {
+  const BL = await tenant("beastlife");
+  await setMode(BL, "documents");
+  await seedDrafts(BL, { documents: false });
+  const legacyHasDefaults = await withTenant(BL, () => S.defaultPage("shipping"));
+  ok(legacyHasDefaults?.title, "the brand's default shipping page does not exist (the test needs it)");
+  const out = await walk(BL);
+  const words = [...DRAFT_WORDS, ...codeDefaultWords("RR beastlife Store")];
+  for (const [k, v] of Object.entries(out)) {
+    if (v && v.threw) throw new Error(`${k} threw: ${v.threw}`);
+    same(leakIn(JSON.stringify(v), words), [], `${k}:`);
+  }
+  eq(out['resolvedContentPage("shipping")'], null, "the default shipping page:");
+  same(out["resolvedContentPageList()"], [], "the page list (no default pages):");
+});
+
+await t("PUB-06: a valid preview session on a closed store still previews the drafts (over emptyList(m)); isStoreClosed stays true and the gate says preview", async () => {
+  const PS = await import("../lib/preview-sessions.js");
+  const s = await withTenant(DM, () => PS.createPreviewSession({ actor: { kind: "merchant", id: "u_rr" } }));
+  const cookies = { [Res.PREVIEW_COOKIE]: s.token };
+  const src = await asRequest("dm.test", () => withTenant(DM, () => Res.contentSource()), cookies);
+  eq(src.mode, "live", "a preview is not the closed source:");
+  eq(src.preview, true, "preview:");
+  eq(src.releaseId, null, "no release:");
+  eq((await asRequest("dm.test", () => withTenant(DM, () => Res.resolvedHero()), cookies)).title, "DOCDRAFT HOME", "the home draft:");
+  eq(await asRequest("dm.test", () => withTenant(DM, () => Res.isStoreClosed()), cookies), true, "isStoreClosed in a preview:");
+  same(await asRequest("dm.test", () => withTenant(DM, () => Res.closedStoreGate()), cookies), { preview: true }, "closedStoreGate in a preview:");
+  // a revoked session, a tampered token, and a bare console cookie are no proof
+  for (const [label, c] of [
+    ["tampered", { [Res.PREVIEW_COOKIE]: s.token.slice(0, -1) + (s.token.endsWith("0") ? "1" : "0") }],
+    ["_admin", { _admin: "x" }],
+    ["_platform", { _platform: "x" }],
+    ["_mx", { _mx: "x" }],
+  ]) {
+    eq((await asRequest("dm.test", () => withTenant(DM, () => Res.contentSource()), c)).mode, "closed", `${label}:`);
+    same(await asRequest("dm.test", () => withTenant(DM, () => Res.closedStoreGate()), c), { preview: false }, `${label} gate:`);
+  }
+  await withTenant(DM, () => PS.revokePreviewSession({ sid: s.sid }));
+  eq((await asRequest("dm.test", () => withTenant(DM, () => Res.contentSource()), cookies)).mode, "closed", "revoked:");
+});
+
+await t("PUB-06 legacy: a legacy and a migrating store with no release keep today's draft path; every getter's output equals the same drafts on a store from before 0021 (the a6d028e path)", async () => {
+  const LGX = await tenant("lgx");
+  const MGX = await tenant("mgx");
+  await setMode(MGX, "migrating");
+  const PREX = await tenant("prex", { upTo: BEFORE_DOCUMENTS });
+  for (const T of [LGX, MGX, PREX]) await seedDrafts(T, { documents: false });
+  const strip = (o) => JSON.parse(JSON.stringify(o, (k, v) => (k === "updated_at" || k === "created_at" || k === "revision" ? undefined : v)).replaceAll(/RR (lgx|mgx|prex) Store/g, "RR X Store"));
+  const want = strip(await walk(PREX));
+  ok(JSON.stringify(want).includes("DRAFT HERO") && JSON.stringify(want).includes("DRAFT ABOUT"), "the fixture does not show the drafts");
+  for (const T of [LGX, MGX]) {
+    eq((await asRequest(`${T.id}.test`, () => withTenant(T, () => Res.contentSource()))).mode, "draft", `${T.id} mode:`);
+    eq(await asRequest(`${T.id}.test`, () => withTenant(T, () => Res.isStoreClosed())), false, `${T.id} isStoreClosed:`);
+    eq(await asRequest(`${T.id}.test`, () => withTenant(T, () => Res.closedStoreGate())), null, `${T.id} gate:`);
+    const got = strip(await walk(T));
+    for (const k of Object.keys(want)) same(got[k], want[k], `${T.id} ${k}:`);
+  }
+});
+
+await t("PUB-06 legacy: running every migration after 0020 (0021 onwards) on a live legacy store with no release does not close it", async () => {
+  const PREY = await tenant("prey", { upTo: BEFORE_DOCUMENTS });
+  await seedDrafts(PREY, { documents: false });
+  const before = await walk(PREY);
+  const later = MIGRATIONS.filter((m) => m.id > BEFORE_DOCUMENTS);
+  ok(later.some((m) => m.id.startsWith("0021")) && later.some((m) => m.id.startsWith("0022")), `migrations after 0020: ${later.map((m) => m.id)}`);
+  await withTenant(PREY, () => runMigrations(libsql, MIGRATIONS));
+  eq((await withTenant(PREY, () => libsql.execute("SELECT mode FROM cms_state WHERE id = 1"))).rows[0]?.mode, "legacy", "mode after the migrations:");
+  eq((await asRequest("prey.test", () => withTenant(PREY, () => Res.contentSource()))).mode, "draft", "content source:");
+  same(await walk(PREY), before, "every getter, before and after the migrations:");
+});
+
+await t("rendered: the closed layout shows the store name and 'Opening soon', no maintenance words, no draft and no page; forged _admin, _platform and _mx cookies give the same page; with maintenance on, the closed page still shows", async () => {
+  const words = [...DRAFT_WORDS, ...codeDefaultWords("RR dm Store"), "page body"];
+  const html = await asRequest("dm.test", () => withTenant(DM, () => renderLayout()));
+  ok(html.includes(">Opening soon</h1>"), `no 'Opening soon': ${html.slice(0, 400)}`);
+  ok(html.includes("We&#x27;re getting the shop ready. Check back soon."), "the line under it");
+  ok(html.includes(">RR dm Store</p>"), "the store name");
+  same(leakIn(html, words), [], "drafts, code defaults or the page in the closed layout:");
+  for (const w of ["aintenance", "right back", "Scheduled", "maintenance-pass", "sign-in"]) ok(!html.includes(w), `maintenance words: ${w}`);
+  ok(/data-kit="pulse-1"/.test(html) && !html.includes("brand-vars"), "neutral brand values (default kit, no brand CSS)");
+  for (const c of [{ _admin: "x" }, { _platform: "x" }, { _mx: "x" }, { _admin: "x", _platform: "x", _mx: "x" }]) {
+    eq(await asRequest("dm.test", () => withTenant(DM, () => renderLayout()), c), html, `with ${Object.keys(c).join(", ")}:`);
+  }
+  // maintenance on: closed wins, and the bypass cookies change nothing
+  const MT = await tenant("mt", { config: { maintenance: { enabled: true, message: "MAINT MESSAGE" } } });
+  await setMode(MT, "documents");
+  await seedDrafts(MT);
+  const mt = await asRequest("mt.test", () => withTenant(MT, () => renderLayout()));
+  ok(mt.includes(">Opening soon</h1>") && !mt.includes("MAINT MESSAGE") && !mt.includes("right back"), `maintenance shows instead: ${mt.slice(0, 300)}`);
+  eq(await asRequest("mt.test", () => withTenant(MT, () => renderLayout()), { _admin: "x" }), mt, "maintenance + _admin:");
+  // and a legacy store in maintenance keeps today's curtain
+  const ML = await tenant("ml", { config: { maintenance: { enabled: true, message: "MAINT MESSAGE" } } });
+  const ml = await asRequest("ml.test", () => withTenant(ML, () => renderLayout()));
+  ok(ml.includes("MAINT MESSAGE") && ml.includes("will be right back") && !ml.includes("Opening soon"), "the legacy maintenance curtain changed");
+  // the metadata is neutral
+  const meta = await asRequest("dm.test", () => withTenant(DM, () => LayoutModule.generateMetadata()));
+  same(meta, { title: { absolute: "RR dm Store · Opening soon" }, description: "Opening soon.", robots: { index: false, follow: false } }, "metadata:");
+  const metaLegacy = await asRequest("ml.test", () => withTenant(ML, () => LayoutModule.generateMetadata()));
+  ok(metaLegacy.manifest === "/manifest.webmanifest", "legacy metadata changed");
+});
+
+await t("rendered: a valid preview session on a closed store gets the normal layout with the preview bar and the drafts, not the closed page", async () => {
+  const PS = await import("../lib/preview-sessions.js");
+  const s = await withTenant(DM, () => PS.createPreviewSession({ actor: { kind: "merchant", id: "u_rr2" } }));
+  const html = await asRequest("dm.test", () => withTenant(DM, () => renderLayout()), { [Res.PREVIEW_COOKIE]: s.token });
+  ok(!html.includes("Opening soon") && html.includes("page body") && html.includes("DOCDRAFT HEADER"), `preview: ${html.slice(0, 300)}`);
+});
+
+await t("the sitemap of a closed store is only '/'; the manifest and the offline page use neutral brand values (no config brand, no draft design)", async () => {
+  const map = await asRequest("dm.test", () => withTenant(DM, () => sitemap()));
+  same(map.map((e) => e.url), ["https://dm.test/"], "sitemap:");
+  const { resolveBrand, accentShades } = await import("../lib/brand.js");
+  const neutral = resolveBrand(null);
+  const req = (url) => ({ headers: { get: (k) => (k.toLowerCase() === "host" ? "dm.test" : null) }, nextUrl: new URL(url), url });
+  const man = await asRequest("dm.test", async () => (await import("../app/manifest.webmanifest/route.js")).GET(req("https://dm.test/manifest.webmanifest")));
+  eq(man.status, 200, "manifest status:");
+  const mj = await man.json();
+  eq(mj.theme_color, accentShades(neutral.accent)[900], "manifest theme colour:");
+  eq(mj.background_color, neutral.background, "manifest background:");
+  same(leakIn(JSON.stringify(mj), DRAFT_WORDS), [], "manifest:");
+  const off = await asRequest("dm.test", async () => (await import("../app/(storefront)/offline/route.js")).GET(req("https://dm.test/offline")));
+  eq(off.status, 200, "offline status:");
+  const oh = await off.text();
+  ok(oh.includes(accentShades(neutral.accent)[400]), "the offline page is not the neutral accent");
+  same(leakIn(oh, [...DRAFT_WORDS, accentShades(resolveBrand({ accent: "#e11d48" }).accent)[400], accentShades(resolveBrand({ accent: "#7c3aed" }).accent)[400]]), [], "offline page:");
+});
+
+await t("cms_state.mode 'bogus' or an unreadable mode with no release still fails closed: closedStoreGate treats it as closed, isStoreClosed throws", async () => {
+  const BG2 = await tenant("bg2");
+  await setMode(BG2, "bogus");
+  await unavailable(asRequest("bg2.test", () => withTenant(BG2, () => Res.isStoreClosed())), "UNKNOWN_CMS_MODE", "isStoreClosed:");
+  same(await asRequest("bg2.test", () => withTenant(BG2, () => Res.closedStoreGate())), { preview: false }, "gate:");
 });
 
 await t("legacy with no release serves drafts as today; a tenant at 0020 (no cms_state table) behaves as legacy", async () => {
@@ -1002,12 +1274,20 @@ await t("chromeData (the real layout) and the real checkout policyLinks read no 
   ok(![...lay.statements, ...co.statements].some((s) => s.args.includes(indexVersion)), "the journal index was read");
 });
 
-await t("a policy page reads only its own version", async () => {
+await t("a policy page reads only its own version besides the chrome set (finding 3's guard): with the layout in the same request the chrome set is read once, so a full render costs what it did", async () => {
   const list = await versionsOf(P1K);
+  const chromeSet = Docs.CHROME_DOCUMENTS.map((d) => list.documents[d].version).sort();
+  // the page getter alone (an RSC navigation that skips the layout): the
+  // guard's chrome read is the one extra statement (recorded in P3-CLOSED.md)
   const r = await asRequest("p1k.test", () => withTenant(P1K, () => watch(() => Res.resolvedContentPage("shipping"))));
   eq(r.result.title, "Shipping", "page:");
-  same(versionReads(r.statements).map((s) => s.args), [[list.documents.doc_shipping.version]], "version reads:");
-  eq(contentOnly(r.statements).length, 2, "content statements (pointer, its version):");
+  same(versionReads(r.statements).map((s) => [...s.args].sort()).sort(), [chromeSet, [list.documents.doc_shipping.version]].sort(), "version reads (the chrome set, then the page's own):");
+  eq(contentOnly(r.statements).length, 3, "content statements (pointer, chrome set, its version):");
+  // a full render: the layout plus the page, one request
+  const full = await asRequest("p1k.test", () => withTenant(P1K, () => watch(async () => [await renderLayout(), await Res.resolvedContentPage("shipping")])));
+  const layoutOnly = await asRequest("p1k.test", () => withTenant(P1K, () => watch(() => renderLayout())));
+  eq(contentOnly(full.statements).length, contentOnly(layoutOnly.statements).length + 1, "a full render: the layout's statements plus the page's own version, nothing more:");
+  eq(versionReads(full.statements).filter((s) => [...s.args].sort().join() === chromeSet.join()).length, 1, "the chrome set is read once:");
 });
 
 await t("the sitemap with 200 published posts reads the journal index once and issues no per-post read; /journal likewise", async () => {
@@ -1025,6 +1305,37 @@ await t("the sitemap with 200 published posts reads the journal index once and i
   const j = await asRequest("sm.test", () => withTenant(SM, () => watch(async () => renderToStaticMarkup(await Journal()))));
   eq((j.result.match(/href="\/journal\//g) || []).length, 199, "/journal posts:");
   same(versionReads(j.statements).map((s) => s.args), [[list.indexes.journal.version]], "/journal version reads:");
+});
+
+await t("finding 3: only doc_header's version missing gives ContentUnavailableError from the home, policy, campaign, journal post and product page getters, while the layout still renders its neutral chrome", async () => {
+  const list = await versionsOf(P1K);
+  const gone = list.documents.doc_header.version;
+  const hide = (sql, args, r) => (/document_versions/i.test(sql) ? { ...r, rows: r.rows.filter((row) => String(row.id) !== gone) } : r);
+  const getters = [
+    ["home page", () => Res.resolvedHomePage()],
+    ["policy page", () => Res.resolvedContentPage("shipping")],
+    ["campaign page", () => Res.resolvedContentPage("spring")],
+    ["journal post page", () => Res.resolvedContentPage("post-0001")],
+    ["product accordions", () => Res.resolvedPdpExtras()],
+    ["product template", () => Res.resolvedSurfaceTemplateFor("pdp", P(1))],
+    ["collection template", () => Res.resolvedSurfaceTemplateFor("collection", COL(2))],
+  ];
+  for (const [label, fn] of getters) {
+    const r = await asRequest("p1k.test", () => withTenant(P1K, () => watch(() => settle(fn()), { filter: hide })));
+    ok(r.result.e && Res.isContentUnavailable(r.result.e), `${label} answered with doc_header's version missing: ${r.result.e ? r.result.e.message : JSON.stringify(r.result.v).slice(0, 160)}`);
+    eq(r.result.e.detail?.code, "MISSING_VERSION", `${label} code:`);
+    same(r.result.e.detail?.versions, [gone], `${label} names the missing version:`);
+    // and with nothing missing it answers
+    const fine = await asRequest("p1k.test", () => withTenant(P1K, () => settle(fn())));
+    ok(!fine.e, `${label} with every version present: ${fine.e?.message}`);
+  }
+  // the layout and the page in one request: the layout keeps its neutral chrome
+  // (P2-VGATE) and the page throws, so error.js renders inside that chrome
+  const both = await asRequest("p1k.test", () =>
+    withTenant(P1K, () => watch(async () => ({ layout: await renderLayout(), page: await settle(Home()) }), { filter: hide })),
+  );
+  ok(!both.result.layout.includes("Docs bar") && /data-kit="pulse-1"/.test(both.result.layout) && both.result.layout.includes("page body"), "the layout did not render its neutral chrome");
+  ok(both.result.page.e && Res.isContentUnavailable(both.result.page.e), "the home page rendered with doc_header's version missing");
 });
 
 // =====================================================================================

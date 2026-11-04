@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
 import { tfetch } from "@/lib/tenant-request";
-import { resolvedContentPageList, resolvedJournalEntries } from "@/lib/content/resolve";
+import { resolvedContentPageList, resolvedJournalEntries, isStoreClosed } from "@/lib/content/resolve";
 
 // Full-catalog sitemap (Session 16): every product + collection from Turso,
 // plus the content pages. Regenerated per request (catalog syncs mutate it).
@@ -14,6 +14,9 @@ export default function sitemap() {
 }
 
 async function buildSitemap() {
+  // PUB-06: a store that has never published lists only its front door (the
+  // "Opening soon" page): no catalog, no pages, no posts.
+  if (await isStoreClosed()) return [{ url: `${siteUrl()}/`, changeFrequency: "daily", priority: 1 }];
   const [products, collections] = await Promise.all([
     db.selectFrom("products").select(["handle", "updated_at"]).execute(),
     db.selectFrom("collections").select(["handle", "updated_at"]).execute(),
