@@ -272,6 +272,18 @@ No owner checks for this item.
 - [ ] OC-F6: hosted Turso staging documents store: a publish whose response is dropped after commit answers success with single rows.
 - [ ] DR-1, DR-2, DR-3 stand; no real store is in documents mode.
 
+## Phase 2, batch 6
+
+### Phase 2 browser drills on the design harness (P2-DRILLS)
+- [ ] Finding 1: decide whether signing out of the console must end the preview (suggested: logout clears the _preview cookie and revokes the person's preview sessions); today drafts stay visible in that browser for up to an hour after sign-out
+- [ ] Finding 2: once ED-02's editor previews documents stores, check in a browser that clicking an unfinished note selects that section in the Designer
+- [ ] Finding 3: decide whether a missing chrome-document version alone must give the error page (PUB-01 as written) or neutral chrome is enough
+- [ ] Look at docs/cms-reviews/drills/P2-DRILLS/sections-* screenshots: are the clamped product names and collection titles the look you want
+- [ ] P2-FIX4 OC-F1 is covered on the harness by the redirect part; repeat three hostile links by hand on staging
+- [ ] CI sqld download (source and checksum) still needs your approval; .github/ was not touched
+- [ ] On a real phone (Safari) and on staging: the hero with an image, the preview bar and colours toggle, a policy page
+- [ ] DR-1, DR-2 and DR-3 stand; no real store is in documents mode
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
