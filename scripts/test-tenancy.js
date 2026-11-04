@@ -15,7 +15,7 @@ process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const dbs = [".test-tenancy-default.db", ".test-tenancy-platform.db", ".test-tenancy-t1.db", ".test-tenancy-t2.db"];
+const dbs = [".test-tenancy-default.db", ".test-tenancy-platform.db", ".test-tenancy-t1.db", ".test-tenancy-t2.db", ".test-tenancy-t3.db"];
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 
 const { db, libsql } = await import("../lib/db.js");
@@ -187,6 +187,28 @@ await t("getCart computes per-tenant (offers table isolation)", async () => {
   eq(c1.subtotal, 1000, "t1 subtotal");
   const c2 = await withTenant(T2, () => getCart("cart-t1"));
   eq(c2.items.length, 0, "same cart id in t2 is EMPTY — full isolation");
+});
+
+// --- P4-PROVISION (MIG-03): only the provisioning step moves a NEW store to
+// documents; the schema alone, the env store (_default) and the fixture
+// tenants built with it stay on the old editor ---------------------------------
+await t("P4-PROVISION: applyTenantSchema alone leaves cms_state 'legacy'; the env store (_default) and schema-built tenants read as legacy", async () => {
+  const { createClient } = await import("@libsql/client");
+  const { applyTenantSchema } = await import("../lib/platform/provision.js");
+  const { getCmsMode } = await import("../lib/cms-mode.js");
+  const c = createClient({ url: "file:.test-tenancy-t3.db" });
+  await applyTenantSchema(c);
+  const row = (await c.execute("SELECT mode FROM cms_state WHERE id = 1")).rows[0];
+  eq(row?.mode, "legacy", "a database given only the schema:");
+  const live = (await c.execute("SELECT live_release_id FROM release_state WHERE id = 1")).rows[0];
+  eq(live?.live_release_id ?? null, null, "no live release:");
+  c.close();
+  eq(tenantId(), "_default", "outside a tenant the store is _default:");
+  eq(await getCmsMode(), "legacy", "the env store (_default):");
+  eq(await withTenant(T1, () => getCmsMode()), "legacy", "t1:");
+  eq(await withTenant(T2, () => getCmsMode()), "legacy", "t2:");
+  const T3 = { ...T2, id: "t3", dbUrl: "file:.test-tenancy-t3.db" };
+  eq(await withTenant(T3, () => getCmsMode()), "legacy", "a tenant on the schema-only database:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

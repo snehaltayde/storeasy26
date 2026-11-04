@@ -41,6 +41,28 @@ fixes domains/app credentials/order-id prefix after the fact, **More → Share
 access** creates the merchant's single-use owner invite or rotates the
 console password, and **View store** opens the storefront.)
 
+**Which editor the store starts on (phase 4, owner answer OQ-4).** A new,
+empty store starts on the **new editor** (documents mode). It stays
+**private** until its first publish: shoppers see an "Opening soon" page, the
+sitemap lists only the front door, and checkout refuses shoppers. The founder
+can still walk the store and place a cash-on-delivery test order from the
+editor's preview. The first publish from the editor opens the store; nothing
+else does. Nothing is made for the store in advance: no pages, no release, no
+saved look. The editor makes the home page and the other parts when they are
+first opened.
+
+- The closing summary of `pnpm tenant:provision` says which editor the store
+  starts on. The run records it too (`/platform` → the provisioning run).
+- A database that already holds store content (an existing one given with
+  `--db-url`, or a `--force` re-provision of a store that has content) keeps
+  the **old editor**, and the run says why in plain words. Such a store moves
+  to the new editor only by the owner's cutover
+  (`docs/cms-reviews/P4-CUTOVER-RUNBOOK.md`).
+- `--legacy-content` starts a new store on the old editor instead (an
+  operator escape, recorded in the run). Use it only when the owner asks.
+- Existing stores are never moved by provisioning. They move only by the
+  owner's cutover runbook.
+
 ## 3. Connect Shopify
 
 Open `https://<platform>/api/connect/shopify/start?tenant=<slug>` (as a
@@ -76,7 +98,15 @@ Give the merchant `https://<their-domain>/admin` + the generated password:
 
 - **Settings** → rotate the console password (first thing), add Razorpay keys
   (checkout is COD-only until then), GA4/Meta creds, shipping rules, identity.
-- **Storefront** → announcement, hero, nav, content pages.
+- **Setup** → the checklist. On a new-editor store every step opens the
+  editor or the console screen where the work happens: Design for the look
+  and brand, the editor's Pages for the privacy and terms (or refund) pages,
+  the editor's preview for the draft walk-through and the test order, and
+  Publish for the launch. "Launch" ticks itself the moment the first publish
+  opens the store.
+- **Editor** (new-editor stores) → home page, pages, announcement, header and
+  footer, design; publish to open the store.
+- **Storefront** (old-editor stores) → announcement, hero, nav, content pages.
 - **Offers / Upsells** → merchandising.
 
 ## 6. Verify (operator checklist)
@@ -87,10 +117,14 @@ curl https://<their-domain>/api/health   # status ok/degraded, right DB
 # /platform row: products count · synced · Shopify ✓
 ```
 
-- [ ] Storefront renders THEIR brand on their domain (title, logo, footer).
+- [ ] New-editor store, before its first publish: the domain shows "Opening
+      soon" and the Setup checklist's links all open working screens.
+- [ ] Storefront renders THEIR brand on their domain (title, logo, footer)
+      (a new-editor store: after its first publish).
 - [ ] Mutate a product in their Shopify admin → row updates within seconds
       (webhook), `shopify_webhook_applied` in logs with `tenant: <slug>`.
-- [ ] Test COD order end-to-end → appears in /admin orders → draft order in
+- [ ] Test COD order end-to-end (a new-editor store before its first publish:
+      from the editor's preview) → appears in /admin orders → draft order in
       THEIR Shopify → `pnpm order:cancel <id> --tenant <slug>` cleans up.
 - [ ] `/api/health?all=1&secret=…` includes the new tenant, status ok.
 - [ ] Payments: after they add Razorpay keys, a ₹1 live-mode capture+refund
