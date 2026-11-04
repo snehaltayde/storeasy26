@@ -358,7 +358,10 @@ function check(res, { status, code, cls, label, doing }) {
     eq(res.status, 422, `${label} validation is 422:`);
     ok(Array.isArray(body.issues) && body.issues.length > 0, `${label} carries the issue list:`);
     for (const i of body.issues) {
-      eq(Object.keys(i), KEYS, `${label} issue shape:`);
+      // P3-CHECKS: a publish issue also carries level, anchor, where and actions
+      const keys = Object.keys(i);
+      eq(keys.length === KEYS.length ? keys : keys.slice(0, KEYS.length), KEYS, `${label} issue shape:`);
+      if (keys.length !== KEYS.length) eq(keys.slice(KEYS.length), ["level", "anchor", "where", "actions"], `${label} publish issue shape:`);
       readable(i.message, `${label} issue message`);
       ok(!POSITION.test(i.message), `${label} issue has no position, got "${i.message}":`);
       readable(issuesModule.issueText(i), `${label} issue as the editor words it`);
@@ -666,6 +669,14 @@ const DOCS_PUB = await withTenant(T.docs, async () => {
   return (await DocsService.createDocument({ type: "page", body, actor: { kind: "merchant", id: owner.id } })).document;
 });
 const pubNow = () => withTenant(T.docs, () => DocsService.getDocument(DOCS_PUB.id));
+// P3-CHECKS (PUB-06): a closed store must open with its home page
+// (FIRST_PUBLISH_NEEDS_HOME). The rows below are about an open store, so it
+// opens here with a home page.
+{
+  const home = await withTenant(T.docs, async () => (await DocsService.createDocument({ type: "home", body: { schema: 1, type: "home", meta: {}, sections: [{ id: "sec_fmhero", kind: "hero", v: 1, enabled: true, settings: { title: "Matrix home" }, blocks: [] }] }, actor: { kind: "merchant", id: owner.id } })).document);
+  const opened = await documents("docs", { publish: { id: home.id, draftHash: home.draftHash }, revision: home.revision });
+  if (opened.status !== 200) throw new Error(`the docs store didn't open: ${JSON.stringify(opened.body).slice(0, 300)}`);
+}
 const publishDoc = async (opts = {}, d = null) => {
   const cur = d || (await pubNow());
   return documents("docs", { publish: { id: cur.id, draftHash: cur.draftHash }, revision: cur.revision }, opts);
@@ -697,7 +708,9 @@ row("publish", "documents: someone saved after the founder reviewed", async () =
 }, { status: 409, code: "DOCUMENT_CHANGED", cls: "refusal" }, async (r) => eq(r.body.current?.revision, (await pubNow()).revision, "the current version rides along:"));
 row("publish", "documents: an empty home page", () =>
   withTenant(T.docs, async () => {
-    const home = (await DocsService.createDocument({ type: "home", body: { schema: 1, type: "home", meta: {}, sections: [] }, actor: { kind: "merchant", id: owner.id } })).document;
+    // P3-CHECKS: the home page exists (the store opened with it); its draft is emptied
+    const cur = await DocsService.getDocument("doc_home");
+    const home = (await DocsService.saveDraft({ id: cur.id, revision: cur.revision, body: { schema: 1, type: "home", meta: {}, sections: [] }, actor: { kind: "merchant", id: owner.id } })).document;
     return publishDoc({}, home);
   }),
   { status: 422, code: "VALIDATION_FAILED", cls: "validation" },
