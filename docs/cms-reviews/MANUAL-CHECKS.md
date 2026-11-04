@@ -642,6 +642,25 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] Staging and production are NOT DONE: nothing ran against hosted Turso or a real Typesense, and nothing was pushed or deployed.
 - [ ] CI sqld download in .github/ still needs the owner's approval of its source and checksum (not touched here).
 
+## Phase 4, batch 6
+
+### Moving a store back to the old editor (P4-REVERSE)
+- [ ] Staging, before the first real reversal: move a staging store, rename a product, then run runbook section 9. The product should show Shopify's name on its page, in collections and in search; the old editors should save; the platform console should show the old kit.
+- [ ] Typesense stores (_default included): after a reversal, search shows Shopify's names within a few minutes, with the reindex job and the tick running. After the next move it shows the restored names.
+- [ ] Read the reversal report's 'A message you can pass on' with the founder and confirm the wording.
+- [ ] OQ-9 default: product names, descriptions, photos and the brand and type shown come back at the next move; everything else published in the new editor stays as older versions. Confirm this is OK.
+- [ ] The reversal uses a dry-run digest but no rehearsal (plan section 0 asks for both). Accept this, or ask for a rehearsal step.
+- [ ] After a move that follows a reversal, check the restored products by hand: the rehearsal leaves those edits out of its page comparison.
+- [ ] PITR: record --backup-ref just before each real reversal.
+- [ ] Hosted Turso batch atomicity check on staging (runbook step 0.3).
+- [ ] Approve the source and checksum of the CI sqld download under .github/ (not touched here).
+- [ ] Phone and Safari: not run (desktop Chrome only).
+
+### Review fixes from batch 5 (P4-FIX5)
+- [ ] Desktop Chrome on the design harness, with DevTools throttling: open product A, then click B and quickly C. The editor should end on C's form and never stay on 'Opening C…'. While 'Opening…' shows, there should be no Publish, Discard or Earlier versions controls. (This browser drill was not run: browser verification is NOT DONE.)
+- [ ] Staging: provision a throwaway tenant whose database name is a prefix of an existing one (for example shop beside shop2), check the summary says its database was created, then offboard the tenant.
+- [ ] CI: the sqld download in .github/ still needs the owner's approval of its source and checksum. Nothing under .github/ was changed.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
