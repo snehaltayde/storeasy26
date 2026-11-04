@@ -11,7 +11,7 @@ Migrations owned: none. No file under `lib/`, `app/` or `components/` changed, s
 | Stage | Status |
 |---|---|
 | Implemented | Yes, on this branch |
-| Locally tested | Yes. `pnpm test`: 96 of 96 suites passed in 146.9 s. `test:legacy-fixtures` 30 passed, `test:writers` 23 passed. `pnpm build` passes |
+| Locally tested | Yes. `pnpm test`: 96 of 96 suites passed in 143.5 s (fix round 1). `test:legacy-fixtures` 33 passed, `test:writers` 23 passed. `pnpm build` passes |
 | Browser verified | Yes, desktop Chrome 156 (headless, `playwright-core`), at 1440 px, on the design harness on this Mac (`DESIGN_PORT=6160`, `DESIGN_SQLD_PORT=7160`, `next dev`). `run.mjs seed` 35 passed, `run.mjs smoke` 16 passed, 0 failed. Not Safari, not a phone |
 | Staging verified | **NOT DONE.** The harness and the local copies are local tools |
 | Production enabled | **NOT DONE.** Nothing pushed, merged or deployed. No real or hosted tenant touched, no store moved to documents mode, `--hosted` never passed |
@@ -68,7 +68,9 @@ Builds five file databases with the P4-FIXTURES builders (`openWorld`, `makeLega
 | `open.db` | `no_release_open` | no release, flag `--store-open` |
 | `closed.db` | `no_release_not_launched` | no release, flag `--not-launched` |
 
-Plus `platform.db` (a control plane whose tenant rows point at those files) and `manifest.json` (id, `file:` URL, state, flag, live release, and the env a CLI needs). The working files at the checkout root are removed. Default folder `.design-data/p4-local`, or `--out <dir>`. `--check` verifies an earlier build.
+Plus `platform.db` (a control plane whose tenant rows point at those files) and `manifest.json` (id, `file:` URL, state, flag, live release, the env a CLI needs, and `tool: "p4-local-tenants"`). The working files at the checkout root are removed. Default folder `.design-data/p4-local`, or `--out <dir>`. `--check` verifies an earlier build.
+
+**The output folder is never wiped** (fix round 1). Before anything is built, `prepareOutDir` takes a folder that does not exist (it makes it), an empty folder, or an earlier build of this tool: a `manifest.json` with `tool: "p4-local-tenants"` and nothing but the files this tool writes (`v1`, `v2`, `v3`, `open`, `closed` and `platform` `.db`, their `-wal` and `-shm` files, `manifest.json`; all plain files). An earlier build is cleared file by file, by name; the folder stays. Anything else is refused with exit 1 before a single file is deleted or a store is built: "Refused to build in <folder>: it holds files this tool did not write (founder-notes.txt). Nothing was deleted. Pick a new or empty folder with --out." So `--out .`, `--out ~` or `--out .design-data` are refused.
 
 Verified by SQL with a plain client: each copy is legacy, has the right live release and version (or none), one release or none, no documents, the catalog, drafts and entity rows; v2 and v3 froze the entity rows; the flag is right; the copied control plane points each tenant at its file. Results: `docs/cms-reviews/drills/P4-HARNESS/results-local-tenants.json`.
 
@@ -151,13 +153,13 @@ In `legacy-tenants.js` (each reverted): no store check on the code-default redir
 
 | What | Result |
 |---|---|
-| `node scripts/test-legacy-fixtures.js` | 30 passed, 0 failed (was 28; 2 new cases, 3 changed) |
+| `node scripts/test-legacy-fixtures.js` | 33 passed, 0 failed (was 28; 2 new cases, 3 changed; fix round 1 adds 3 in part 8b) |
 | `node scripts/drills/p4/run.mjs seed` | 35 passed, 0 failed |
 | `node scripts/drills/p4/run.mjs smoke` | 16 passed, 0 failed |
-| `node scripts/drills/p4/local-tenants.mjs` | 22 passed, 0 failed |
+| `node scripts/drills/p4/local-tenants.mjs` | 22 passed, 0 failed (fix round 1: a fresh build into a folder with a space, a rebuild over it, then `--check`, each 22 passed; with a `notes.txt` added, and with `--out .`, refused, exit 1, nothing deleted) |
 | `node scripts/drills/p4/lib.mjs --check` | 3 passed |
 | P3 item drills (each reseeds `--p3`) | routes 31/0, editor 22/0, design 26/0, rte 46/0, smoke 25/1 (the refs check, same on the base) |
-| `pnpm test` | 96 of 96 suites passed in 146.9 s (the first full run failed `test:writers`; see Known limits, `seed-p4.mjs`) |
+| `pnpm test` | 96 of 96 suites passed in 146.9 s (the first full run failed `test:writers`; see Known limits, `seed-p4.mjs`). Fix round 1: 96 of 96 in 143.5 s |
 | `pnpm build` | passes; its two warnings are the old `next.config.mjs` NFT trace (nothing in `app/`, `lib/` or `components/` changed) |
 
 ## Known limits
@@ -172,6 +174,7 @@ In `legacy-tenants.js` (each reverted): no store check on the code-default redir
 - **The switched-off pairs are not checked in the browser.** The product with the switched-off placement shows the automatic same-collection pairs under the same default title, so a title check can't tell them apart. The seed and the frozen release are checked by SQL.
 - **local-tenants: the `vgate` content set only, no mapping traps.** Each state holds the same entity fixtures; MAPPER's and CUTOVER's suites build the traps themselves. How each CLI is pointed at a copy (`--db`, `--tenant` with `manifest.env`) is MAPPER's and CUTOVER's to define; the manifest gives both.
 - **local-tenants' default folder is `.design-data/p4-local`**, which a fresh harness seed wipes. Build after seeding, or pass `--out`.
+- **local-tenants refuses a build made before fix round 1.** Those manifests have no `tool` field, so a rebuild into such a folder is refused ("not an earlier build of this tool"). Delete that folder by hand once, or pick another `--out`. It also refuses a folder holding anything it did not write, even a stray `.DS_Store`.
 - **The stale-backfill fixture, what stays live-row-only:** the product's badge and pairs (product_content has no field for them at this base) and, until P4-LIVEROW registers `collection_content`, the collection's pins. Until then the collection document holds the smallest body of that type (`{ schema: 1, type: "collection_content", meta: {}, sections: [] }`, not validated); once the type is registered, the fixture builds it from the registry by itself (`collectionBody: "registry"`) and the test validates it. LIVEROW or CUTOVER should put the older pins into that body when the type has a field for them.
 - **One new file beyond the plan's list: `scripts/drills/p4/seed-p4.mjs`** (the `--p4` writes). The writer guard in `scripts/test-writers.js` (GUARD's file) allows the old block and page writers (`setBlock`, `upsertContentPage`, `deleteContentPage`) only in fixture and drill code (`scripts/support/`, `scripts/drills/`, `scripts/test-*`) and a short list of seed files, which `seed-design-documents.js` is not on. With the writes in `seed-design-documents.js`, `test:writers` failed ("block/page writer"); moved under `scripts/drills/p4/`, it passes, and no guard was loosened. `seed-design-documents.js` keeps the plan, the constants, `check --p4` and the CLI; the writes get the plan and constants as arguments (importing the seed script back from there would wait on its own top-level await).
 - **Three files outside this item's list changed, comment only:** `scripts/support/legacy-release-outputs.js`, `home-render-outputs.js` and `legacy-journal-outputs.js` (the header line the brief asks for). Their output is unchanged (the suite still checks it byte for byte).
@@ -180,7 +183,7 @@ In `legacy-tenants.js` (each reverted): no store check on the code-default redir
 
 ## From review
 
-(Empty until review.)
+- **Fix round 1 (blocker, founder data loss reported as success):** `buildLocalTenants()` ran `rmSync(outDir, { recursive: true, force: true })` on whatever `--out` named, then reported "22 passed". A folder `precious dir` holding `founder-notes.txt` lost the file; `--out .` would have wiped the checkout, `.git` included. **Fixed:** `prepareOutDir` (see section 2) refuses any folder that holds a file this tool did not write, or that is not empty and lacks this tool's `manifest.json`, and deletes only its own file names, one by one. Tests in `test-legacy-fixtures` part 8b: the CLI on a folder holding `founder-notes.txt` exits 1, says so in plain words, prints no result, and the folder and file are unchanged; `prepareOutDir` refuses (and deletes nothing from) an earlier build plus a foreign file, a `manifest.json` of another kind, database files with no manifest, the checkout root, and a plain file; it makes a new folder, accepts an empty one, and clears an earlier build of its own file by file. On the old `local-tenants.mjs` all three fail ("the founder's file was deleted", "no prepareOutDir", "prepareOutDir is not a function"): 30 passed, 3 failed.
 
 ## Owner checks
 
@@ -193,7 +196,7 @@ In `legacy-tenants.js` (each reverted): no store check on the code-default redir
 
 - `scripts/seed-design-documents.js`: `--p4`, `check --p4`, the P4-HARNESS section (plan, constants, seed list, state)
 - `scripts/drills/p4/lib.mjs` (new), `scripts/drills/p4/run.mjs` (replaces the stub), `scripts/drills/p4/local-tenants.mjs` (new), `scripts/drills/p4/seed-p4.mjs` (new, the `--p4` writes)
-- `scripts/support/legacy-tenants.js`, `scripts/test-legacy-fixtures.js`: the review fixes and their tests
+- `scripts/support/legacy-tenants.js`, `scripts/test-legacy-fixtures.js`: the review fixes and their tests (part 8b: the local-tenants output-folder guard)
 - `scripts/support/legacy-release-outputs.js`, `home-render-outputs.js`, `legacy-journal-outputs.js`: header comment only
 - `docs/cms-reviews/P4-HARNESS.md`, `docs/cms-reviews/drills/P4-HARNESS/` (results and screenshots)
 

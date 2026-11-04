@@ -1,8 +1,8 @@
 {
   "id": "P4-HARNESS",
   "part": "local-tenants",
-  "ranAt": "2026-11-04T12:18:57.453Z",
-  "outDir": "/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/p4 local",
+  "ranAt": "2026-11-04T14:28:52.503Z",
+  "outDir": "/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt out",
   "passed": 22,
   "failed": 0,
   "checks": [
@@ -53,7 +53,7 @@
     {
       "ok": true,
       "label": "v1: the copied control plane points tenant p4-local-v1 at this file",
-      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/p4%20local/v1.db"
+      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt%20out/v1.db"
     },
     {
       "ok": true,
@@ -112,7 +112,7 @@
     {
       "ok": true,
       "label": "v2: the copied control plane points tenant p4-local-v2 at this file",
-      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/p4%20local/v2.db"
+      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt%20out/v2.db"
     },
     {
       "ok": true,
@@ -171,7 +171,7 @@
     {
       "ok": true,
       "label": "v3: the copied control plane points tenant p4-local-v3 at this file",
-      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/p4%20local/v3.db"
+      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt%20out/v3.db"
     },
     {
       "ok": true,
@@ -220,7 +220,7 @@
     {
       "ok": true,
       "label": "open: the copied control plane points tenant p4-local-open at this file",
-      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/p4%20local/open.db"
+      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt%20out/open.db"
     },
     {
       "ok": true,
@@ -269,7 +269,7 @@
     {
       "ok": true,
       "label": "closed: the copied control plane points tenant p4-local-closed at this file",
-      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/p4%20local/closed.db"
+      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt%20out/closed.db"
     }
   ],
   "tenants": [

@@ -28,7 +28,13 @@
 // its rows; the control plane names each copy. Results:
 // docs/cms-reviews/drills/P4-HARNESS/results-local-tenants.json.
 // File databases only: anything else is refused before it is opened.
-import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+//
+// The output folder is never wiped. A rebuild deletes only the files this tool
+// writes (OWN_FILES), and only in a folder that is new, empty, or an earlier
+// build of this tool (its manifest.json says so) holding nothing else. Any
+// other folder (one with a file this tool did not write, or a manifest.json of
+// some other kind) is refused before anything is deleted or built.
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync, lstatSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -65,6 +71,47 @@ const ENTITIES = [
   "cms_templates_two_families",
 ];
 
+// what this tool writes, and the only files it ever deletes
+export const MANIFEST_TOOL = "p4-local-tenants";
+const DB_NAMES = [...LOCAL_STATES.map((s) => s.name), "platform"];
+export const OWN_FILES = Object.freeze([...DB_NAMES.flatMap((n) => [`${n}.db`, `${n}.db-wal`, `${n}.db-shm`]), "manifest.json"]);
+
+// Make outDir ready for a build: create it, or clear an earlier build of this
+// tool file by file. Refuses (throws, deleting nothing) when the folder holds
+// anything this tool did not write, or is not this tool's earlier build.
+export function prepareOutDir(outDir) {
+  const refuse = (why) => {
+    throw new Error(`Refused to build in ${outDir}: ${why} Nothing was deleted. Pick a new or empty folder with --out.`);
+  };
+  let st = null;
+  try {
+    st = lstatSync(outDir);
+  } catch (e) {
+    if (e?.code !== "ENOENT") throw e;
+  }
+  if (!st) {
+    mkdirSync(outDir, { recursive: true });
+    return { created: true, removed: [] };
+  }
+  if (!st.isDirectory() || st.isSymbolicLink()) refuse("it is not a folder.");
+  const entries = readdirSync(outDir);
+  if (!entries.length) return { created: false, removed: [] };
+  const foreign = entries.filter((n) => !OWN_FILES.includes(n));
+  if (foreign.length) refuse(`it holds files this tool did not write (${foreign.slice(0, 5).join(", ")}${foreign.length > 5 ? ", …" : ""}).`);
+  let manifest = null;
+  try {
+    manifest = JSON.parse(readFileSync(join(outDir, "manifest.json"), "utf8"));
+  } catch {
+    manifest = null;
+  }
+  if (manifest?.tool !== MANIFEST_TOOL) refuse("it is not an earlier build of this tool (no manifest.json written by it).");
+  for (const n of entries) {
+    if (!lstatSync(join(outDir, n)).isFile()) refuse(`${n} is not a plain file.`);
+  }
+  for (const n of entries) rmSync(join(outDir, n));
+  return { created: false, removed: entries };
+}
+
 // a file: URL for an absolute path on this machine (spaces and all)
 const fileUrl = (path) => pathToFileURL(path).href.replace(/^file:\/\//, "file:");
 const sqlString = (s) => `'${String(s).replace(/'/g, "''")}'`;
@@ -86,9 +133,8 @@ function parseArgs(argv) {
 export async function buildLocalTenants(outDir = DEFAULT_OUT) {
   const L = await import("../../support/legacy-tenants.js");
   const { assertLocalDbUrl } = await import("../../support/tenant-fixture.js");
+  prepareOutDir(outDir);
   L.installHooks({ headers: "real" });
-  rmSync(outDir, { recursive: true, force: true });
-  mkdirSync(outDir, { recursive: true });
   const world = await L.openWorld({ prefix: PREFIX });
   const tenants = [];
   try {
@@ -110,6 +156,7 @@ export async function buildLocalTenants(outDir = DEFAULT_OUT) {
       pc.close();
     }
     const manifest = {
+      tool: MANIFEST_TOOL,
       builtAt: new Date().toISOString(),
       outDir,
       platform: { file: platformFile, url: fileUrl(platformFile) },

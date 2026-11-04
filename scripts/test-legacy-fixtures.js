@@ -12,10 +12,14 @@
 // P4-HARNESS adds: redirect_to_code_default_page needs BeastLife or the env
 // store (and its target renders there), a second build on one database is
 // refused, and the stale backfill's versions hold what its live rows say.
+// P4-HARNESS fix round 1: scripts/drills/p4/local-tenants.mjs never wipes its
+// --out folder; it refuses one holding anything it did not write, and clears
+// an earlier build of its own file by file.
 // File databases only (.test-lfx-*.db at the checkout's root, removed at the
 // end). Nothing reaches the network or Shopify.
 //   pnpm test:legacy-fixtures
 import { readFile, readdir, rm } from "node:fs/promises";
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -666,6 +670,79 @@ try {
     eq((await db.run(() => Res.resolvedHero())).title, "Live hero v3", "shoppers:");
     mark("stale_backfill");
   });
+
+  // ====================================================================================
+  console.log("— 8b. local-tenants.mjs never deletes what it did not write");
+  // ====================================================================================
+  const LT = join(ROOT, "scripts", "drills", "p4", "local-tenants.mjs");
+  const ltDir = (name) => {
+    const d = join(ROOT, `.test-lfx-outdir-${process.pid}`, name);
+    mkdirSync(d, { recursive: true });
+    return d;
+  };
+  const listing = (d) => readdirSync(d).sort();
+  try {
+    await t("local-tenants.mjs --out <a folder holding an unknown file> is refused, exits 1, and leaves the folder as it was", () => {
+      const d = ltDir("precious dir");
+      writeFileSync(join(d, "founder-notes.txt"), "do not lose me\n");
+      const r = spawnSync(process.execPath, [LT, "--out", d], { cwd: ROOT, encoding: "utf8", timeout: 120_000 });
+      ok(existsSync(join(d, "founder-notes.txt")), "the founder's file was deleted");
+      eq(readFileSync(join(d, "founder-notes.txt"), "utf8"), "do not lose me\n", "the founder's file changed:");
+      same(listing(d), ["founder-notes.txt"], "the folder changed:");
+      eq(r.status, 1, `exit code (stdout ${String(r.stdout).slice(-300)}):`);
+      ok(/Refused to build in .*files this tool did not write \(founder-notes\.txt\)\. Nothing was deleted/.test(r.stderr), `stderr: ${r.stderr}`);
+      ok(!/passed/.test(r.stdout), `it reported a result: ${r.stdout}`);
+    });
+
+    await t("prepareOutDir refuses, deleting nothing: an unknown file beside an earlier build, a manifest.json not written by this tool, the checkout root, a file", async () => {
+      const { prepareOutDir, OWN_FILES, MANIFEST_TOOL } = await import(LT);
+      ok(typeof prepareOutDir === "function", "no prepareOutDir");
+      // an earlier build of this tool plus one foreign file
+      const a = ltDir("build-plus-notes");
+      writeFileSync(join(a, "manifest.json"), JSON.stringify({ tool: MANIFEST_TOOL }));
+      writeFileSync(join(a, "v1.db"), "x");
+      writeFileSync(join(a, "notes.md"), "keep");
+      await rejects(() => prepareOutDir(a), /files this tool did not write \(notes\.md\)\. Nothing was deleted/, "build plus a foreign file");
+      same(listing(a), ["manifest.json", "notes.md", "v1.db"], "build plus a foreign file changed:");
+      // a manifest.json of another kind, with only file names this tool uses
+      const b = ltDir("other-manifest");
+      writeFileSync(join(b, "manifest.json"), JSON.stringify({ name: "someone else's" }));
+      writeFileSync(join(b, "platform.db"), "y");
+      await rejects(() => prepareOutDir(b), /not an earlier build of this tool/, "another manifest");
+      same(listing(b), ["manifest.json", "platform.db"], "another manifest changed:");
+      // database files with no manifest at all
+      const c = ltDir("no-manifest");
+      writeFileSync(join(c, "v2.db"), "z");
+      await rejects(() => prepareOutDir(c), /not an earlier build of this tool/, "no manifest");
+      same(listing(c), ["v2.db"], "no manifest changed:");
+      // the checkout root (a typo such as --out .)
+      const rootBefore = listing(ROOT);
+      await rejects(() => prepareOutDir(ROOT), /files this tool did not write .*Nothing was deleted/, "the checkout root");
+      same(listing(ROOT), rootBefore, "the checkout root changed:");
+      // a plain file
+      const f = join(ltDir("file-parent"), "a-file");
+      writeFileSync(f, "q");
+      await rejects(() => prepareOutDir(f), /not a folder/, "a file");
+      eq(readFileSync(f, "utf8"), "q", "the file changed:");
+      ok(OWN_FILES.includes("manifest.json") && OWN_FILES.includes("closed.db-wal") && OWN_FILES.length === 19, `OWN_FILES ${OWN_FILES}`);
+    });
+
+    await t("prepareOutDir makes a new folder, accepts an empty one, and clears an earlier build of its own file by file (the folder stays)", async () => {
+      const { prepareOutDir, OWN_FILES, MANIFEST_TOOL } = await import(LT);
+      const fresh = join(ROOT, `.test-lfx-outdir-${process.pid}`, "new", "deeper");
+      same(prepareOutDir(fresh), { created: true, removed: [] }, "new folder:");
+      ok(existsSync(fresh), "not created");
+      same(prepareOutDir(fresh), { created: false, removed: [] }, "empty folder:");
+      const d = ltDir("earlier-build");
+      for (const n of OWN_FILES) writeFileSync(join(d, n), n === "manifest.json" ? JSON.stringify({ tool: MANIFEST_TOOL }) : "db");
+      const r = prepareOutDir(d);
+      same(r.removed.sort(), [...OWN_FILES].sort(), "removed:");
+      same(listing(d), [], "left:");
+      ok(existsSync(d), "the folder itself was removed");
+    });
+  } finally {
+    rmSync(join(ROOT, `.test-lfx-outdir-${process.pid}`), { recursive: true, force: true });
+  }
 
   // ====================================================================================
   console.log("— 9. every required builder was checked");
