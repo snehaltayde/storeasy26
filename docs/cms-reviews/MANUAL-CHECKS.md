@@ -722,23 +722,6 @@ Packet: [P4-FIX5.md](P4-FIX5.md), section "Owner checks".
 - [ ] An adopted `--db-url`: on staging, provision a throwaway tenant with `--db-url` pointing at another registered store's database (written differently, for example its `https://` form). It must be refused and the other store must stay open and on its editor. Until P4-FIX6's `sameDbAddress` change merges, two spellings of one database are not seen as the same (P4-FIX5 Known limits).
 - [ ] CI: the sqld download in .github/ still needs the owner's approval of its source and checksum. Nothing under .github/ was changed.
 
-## Bug-fix branches (not yet merged to main)
-- [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
-  - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
-  - In Razorpay test mode, stop the database during verify. Pass: the checkout page waits about 30 seconds, then shows "Confirming your payment", with a sensible message when no status link comes back.
-  - After the pending message, press Pay again. Pass: Razorpay refuses a second payment for the same order.
-  - On staging, once the duplicate-push fix lands: a browser callback and a webhook arriving together still produce one Shopify order.
-  - A second, different payment on an already-paid order is now refused and, through the webhook, logged as NEEDS ATTENTION. Decide who watches for that line and refunds the second payment in Razorpay. Through the background retry queue it is only flagged after 5 attempts, as a plain job failure; say if that should be faster or louder.
-- [ ] **Closed store sends nothing** (`claude/musing-williamson-4c86b3`). Only local `next start` on the edge runtime was tested.
-  - On a staging tenant with maintenance on: a signed-out product page shows the closed page, view-source has no product title or description, and the tab reads "<Store> will be right back". A signed-in founder sees the real site.
-  - On a phone and an installed PWA, with a tab open when maintenance starts, tap a product. Decide whether what it shows until reload is acceptable.
-  - During a real maintenance window, watch Google Search Console and Merchant Center. Pages answer 200 with the closed page, and the sitemap answers 404.
-  - Agency members signed in only with the `_agency` cookie still see the closed page. Is that intended?
-  - Decision: closed pages answer HTTP 200 with no Retry-After and no noindex (as before this branch). During a long closure Google may index the "will be right back" page in place of products. Should the curtain answer 503 with Retry-After, or at least send noindex? (The shopper APIs already answer 503 with Retry-After.)
-  - The re-review checked the closed-store title ("<Store> will be right back") and curtain contrast on light and dark brands, and both passed.
-  - On a real https staging host, click "Store team sign-in" on the closed page with a verified staff session. Pass: the `_mx` pass cookie is stored (it is Secure, so local http can't show this) and the real site shows.
-  - Check the curtain in Safari and on a phone. Only headless desktop Chrome was used.
-
 ## Phase 4, batch 7
 
 ### Every owner step for phase 4, in one list (P4-DRILLS)
@@ -764,6 +747,38 @@ Packet: [P4-DRILLS.md](P4-DRILLS.md), section "Owner checks".
 - [ ] Finding F3 (wording): the dry run's "Not ready" line for an agency says "Settings > Team"; the panel is "Agency access" on the Settings page. The runbook now says where; the report's words are `lib/migrate/report.js`'s owner's.
 - [ ] Runbook 3.2 on a real store: serving the restore-drill copy needs the store's control-plane row (id and config) in your local harness. Until there is a tool for it, a developer copies it.
 - [ ] Not drilled, staging only: the catalog sync pausing while a store is being updated (a sync needs Shopify), and Typesense (the drills use the SQL search and a spy client).
-- [ ] P4-FIX6 ran beside this item; its owner checks are added when it merges.
+- [ ] P4-FIX6 ran beside this item; its owner checks are in "Reversal and provisioning review fixes (P4-FIX6)" below.
 - [ ] Optional: run `DESIGN_PORT=<port> DESIGN_SQLD_PORT=<port> COPY_SQLD_PORT=<port> node scripts/drills/p4/run.mjs` on your Mac (about 25 minutes) and look at the screenshots in `docs/cms-reviews/drills/P4-DRILLS/`.
 
+### The P4-DRILLS review (P4-DRILLS)
+Packet: [P4-DRILLS.md](P4-DRILLS.md), "Known limits" (From review).
+- [ ] Owner and orchestrator: decide how hosted Turso batch atomicity (runbook 0.3) is proved before any real move: (a) a staging-only script that sends one guarded old-editor batch straight to a staging store while it is 'migrating', or (b) accept the file-database and sqld proof and record hosted Turso as untested.
+- [ ] Orchestrator: consider adding `node scripts/drills/p4/runbook.mjs --check` to pnpm test (package.json is SCAFFOLD's file).
+- [ ] Re-run the runbook stage (with the FIX6 re-run) so results-runbook.json carries the new label and the 0.3 wording checks.
+
+### Reversal and provisioning review fixes (P4-FIX6)
+Packet: [P4-FIX6.md](P4-FIX6.md), section "Owner checks".
+- [ ] Owner: sign off, or reject, the orchestrator ruling in P4-REVERSE.md: the reversal needs a matching dry-run digest and no rehearsal, which differs from plan section 0's wording. This is needed before the first real reversal.
+- [ ] Staging: move a store, publish a new page in the new editor, reverse, then check the next move's dry run. It should name the page with 'Shoppers won't see it after the move…'. After the move the editor should show the page as not published, and publishing it should put it live.
+- [ ] Read the reversal dry run's new draft wording ('…kept there only as an older version') with a founder and confirm it.
+- [ ] Desktop Chrome on the design harness, on a slow connection: while product B is opening, pick a section of another page in the preview. That page should open with the section selected and its field focused, and stay that way (browser drill not done).
+- [ ] Staging provisioning: provision a throwaway tenant with --db-url set to an existing store's database in its https:// form. It should stop with the plain words and register nothing.
+- [ ] CI: the sqld download in .github/ still needs the owner's approval of its source and checksum (nothing under .github/ changed).
+- [ ] Phone and Safari: not run.
+
+## Bug-fix branches (not yet merged to main)
+- [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
+  - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
+  - In Razorpay test mode, stop the database during verify. Pass: the checkout page waits about 30 seconds, then shows "Confirming your payment", with a sensible message when no status link comes back.
+  - After the pending message, press Pay again. Pass: Razorpay refuses a second payment for the same order.
+  - On staging, once the duplicate-push fix lands: a browser callback and a webhook arriving together still produce one Shopify order.
+  - A second, different payment on an already-paid order is now refused and, through the webhook, logged as NEEDS ATTENTION. Decide who watches for that line and refunds the second payment in Razorpay. Through the background retry queue it is only flagged after 5 attempts, as a plain job failure; say if that should be faster or louder.
+- [ ] **Closed store sends nothing** (`claude/musing-williamson-4c86b3`). Only local `next start` on the edge runtime was tested.
+  - On a staging tenant with maintenance on: a signed-out product page shows the closed page, view-source has no product title or description, and the tab reads "<Store> will be right back". A signed-in founder sees the real site.
+  - On a phone and an installed PWA, with a tab open when maintenance starts, tap a product. Decide whether what it shows until reload is acceptable.
+  - During a real maintenance window, watch Google Search Console and Merchant Center. Pages answer 200 with the closed page, and the sitemap answers 404.
+  - Agency members signed in only with the `_agency` cookie still see the closed page. Is that intended?
+  - Decision: closed pages answer HTTP 200 with no Retry-After and no noindex (as before this branch). During a long closure Google may index the "will be right back" page in place of products. Should the curtain answer 503 with Retry-After, or at least send noindex? (The shopper APIs already answer 503 with Retry-After.)
+  - The re-review checked the closed-store title ("<Store> will be right back") and curtain contrast on light and dark brands, and both passed.
+  - On a real https staging host, click "Store team sign-in" on the closed page with a verified staff session. Pass: the `_mx` pass cookie is stored (it is Secure, so local http can't show this) and the real site shows.
+  - Check the curtain in Safari and on a phone. Only headless desktop Chrome was used.
