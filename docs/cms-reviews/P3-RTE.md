@@ -9,10 +9,26 @@ This is the author's own report. Reviewers should re-read the code.
 | Stage | Status |
 |---|---|
 | Implemented | Yes, on this branch |
-| Locally tested | Yes. `pnpm test`: 81 of 81 suites passed in 141.0 s (`TEST_PUBLISH_PORTS=7143,7144 TEST_PUBLISH_SERVICE_PORTS=7145,7146 TEST_PUBLISH_UNDO_PORTS=7147`). `pnpm test:rich-text`: 14 passed in 0.7 s. `pnpm test:editor-inspector`: 34 passed, unchanged. `pnpm build`: passes; its one warning is the old `next.config.mjs` NFT trace warning, which was there before this item |
-| Browser verified | Yes, in desktop Chrome 156 (headless, `playwright-core`) on the design harness on this Mac (`DESIGN_PORT=6140`, `DESIGN_SQLD_PORT=7140`, `next dev`). `scripts/drills/p3/rte.mjs`: **35 passed, 0 failed**. The field is the real component, but it runs on a host page the drill serves, not on the editor page (see "The drill's host"). Not Safari, not Firefox, not a phone |
+| Locally tested | Yes (after fix round 1). `pnpm test`: 81 of 81 suites passed in 129.6 s (`TEST_PUBLISH_PORTS=7143,7144 TEST_PUBLISH_SERVICE_PORTS=7145,7146 TEST_PUBLISH_UNDO_PORTS=7147`). `pnpm test:rich-text`: 15 passed in 0.5 s. `pnpm test:editor-inspector`: 34 passed, unchanged. `pnpm build` passed before fix round 1 (its one warning is the old `next.config.mjs` NFT trace warning); fix round 1 changed only the field, its model, the suite and the drill, and was not rebuilt |
+| Browser verified | Yes, in desktop Chrome 156 (headless, `playwright-core`) on the design harness on this Mac (`DESIGN_PORT=6140`, `DESIGN_SQLD_PORT=7140`, `next dev`). `scripts/drills/p3/rte.mjs`: **43 passed, 0 failed** (after fix round 1). The field is the real component, but it runs on a host page the drill serves, not on the editor page (see "The drill's host"). Not Safari, not Firefox, not a phone |
 | Staging verified | **NOT DONE** |
 | Production enabled | **NOT DONE.** Nothing pushed, merged or deployed. No tenant changed mode |
+
+## Fix round 1 (review of batch 4)
+
+**The blocker.** A paste from a web page that uses its own elements (`<product-info …>`, `<relative-time …>`, as every Shopify theme and many sites have) or a `<noscript>` was refused by the server with WORDS_LOST. The surface shows only normal text, the field stayed editable with no Edit as HTML, so the founder could not find or remove the hidden markup, and every later save of the page was refused until the pasted text was deleted.
+
+**The cause** is on the server: `lib/sanitize.js` `visibleText` counts a tag whose name is not an HTML name, and that has attributes, as the founder's words (`<founder>` is a word by design, AU-05). `sanitizeHtml` strips it, so `lostBySanitizing` refuses the save. A `<noscript>`'s text is counted as words a reader sees, and the sanitizer drops it.
+
+**What this round changed (option a, in files RTE owns).**
+- `richTextModel.js`: `CLEANER_REFUSALS` (`WORDS_LOST`, `ADDRESS_LOST`, `MEDIA_LOST`, `PICTURE_LOST`, the codes `lib/registry/text.js` `lostBySanitizing` gives), `refusedByCleaner(issues)` and `REFUSED_WORDS`.
+- `RichTextField.js`: when the editable field has one of those issues, it shows "Pasted text can hold hidden code that doesn't show here. Use Edit as HTML to see it, and remove the part named below." and the **Edit as HTML** button, named in the field's `aria-describedby`. The toolbar stays. The text box shows the unsaved paste as it is, so `<product-info …>` is in plain sight. After a good save, "Show formatted" goes back to the editor, and the button goes away with the issue. A field locked by `readOnlyReason` still gets no Edit as HTML.
+
+**What it does not change.** The server still refuses such a paste: the founder has to remove the element's tags in Edit as HTML. So the brief's "a paste from a web page is cleaned on the server" is met only for web pages without their own elements or `<noscript>`. Option (b), counting a valid custom element name (lowercase, with a hyphen, and a closing tag or attributes) as markup in `visibleText`, is in `lib/sanitize.js`, which RTE does not own. **That part is NOT DONE here and needs an owner or plan ruling** (Owner checks). The server's message also still says "This usually comes from < or > signs", which is `lib/registry/text.js`, not RTE's.
+
+**Tests that fail before the fix.**
+- `test-rich-text`, new test "a refused web-page paste offers Edit as HTML in the editable field, and the edit there saves". For three pastes (the reviewer's `<product-info>` paste, a `<relative-time datetime=…>` and a `<noscript>`) it saves through the real `saveDraft` and gets the cleaner's refusal with nothing stored. It renders the field with the unsaved value and that issue, and checks that the field is still editable and has the Edit as HTML button, the plain words and the `aria-describedby`. It drives the real `HtmlSource`, removes the hidden markup, and checks that `saveDraft` stores the cleaned text. It also checks that other issues and a locked field show no Edit as HTML. With `RichTextField.js` from the item's first commit it fails with "no Edit as HTML for WORDS_LOST".
+- Drill step 7 (`rte.mjs`), in Chrome: it pastes a browser-style clipboard (`<!--StartFragment-->` with the reviewer's fragment). The field sends it as copied. The save is refused with WORDS_LOST, and nothing is stored. The field stays editable and offers Edit as HTML with its words. Clicking the button shows the `<product-info …>` tag in the text box. Removing it and saving stores `<p>Our story.</p>`, the bold "organic cotton" and "Ships in 2 days." with no class or data attribute. "Show formatted" returns to the editor with the stored text, and the button is gone. Screenshots: `web-paste-refused-1440.png`, `web-paste-saved-1440.png`. With the first commit's field the drill gives 38 passed and 3 failed ("the field stays editable and offers Edit as HTML" `{"mode":"edit","buttons":0}`, "it says why, in plain words", and the steps after it).
 
 ## What and why
 
@@ -100,9 +116,9 @@ The surface grows with its content, from 112 px to 560 px, then scrolls. It is m
 | 2 | rendered: content with a table opens read-only with 'Edit as HTML'; editing it as HTML stores the sanitized result | **DONE** | Rendered: a table value gives `data-rich-text="view"`, the Edit as HTML button, the plain-words reason named in `aria-describedby`, no toolbar, a surface with `aria-readonly` and no contenteditable, and no `allow-scripts`. Driven: the real `HtmlSource`'s `onChange` sends the typed table with `onmouseover`, `style` and a script exactly as typed. `saveDraft` stores `sanitizeHtml` of it (the edit kept, the rest gone). Re-rendered with the stored value, the field is the read-only view of it. A pasted video in the same box is refused with AU-05's words, and the row is unchanged. Drill step 6: the button is clicked in Chrome, the text box shows the stored HTML, the save stores the cleaned table, the text box shows the stored value, and "Show formatted" shows it read-only | M6 (no read-only view) fails 2 tests. M8 (`allow-scripts` added) fails the rendered test. M11 (the text box trims what was typed) fails the driven test |
 | 3 | rendered: editor and storefront rich text both use the .rte stylesheet | **DONE** | Rendered: the surface body is `class="rte"`, the field copies the page's style sheets, `RichTextSection` renders `<div class="rte …">` on both surfaces, the `.rte` rules exist in exactly one stylesheet (`app/globals.css`), and both route layouts import it. Drill: the editor's computed line height 1.7 and block gap 0.85rem equal the storefront preview's for the same text | M7 (the surface body loses `rte`) fails it |
 | 4 | unit: focusRequest offset 2 targets the third block child | **DONE** | `blockChildAt(root, 2)` is the `<ul>` in a body with whitespace text and a comment between blocks. The `<br>` inside a block doesn't count. Past the end and negative or missing offsets are handled. Drill step 2: `focusRequest {offset: 2}` puts Chrome's caret at offset 0 of "Third paragraph.", block 2, with the surface focused | M2 (text nodes counted as blocks) fails it |
-| 5 | drill (harness): rte.mjs passes. package.json and pnpm-lock.yaml change only if Option A was approved | **DONE** | `docs/cms-reviews/drills/P3-RTE/results-rte.json`: 35 passed, 0 failed (14 s with Next already compiled). Seven screenshots are next to it. `git diff 0b81097 -- package.json pnpm-lock.yaml next.config.mjs` is empty | D1 (no block split on paste) fails "the stored value keeps the bold and the link", and since then the nesting check too (see below). D2 is above |
+| 5 | drill (harness): rte.mjs passes. package.json and pnpm-lock.yaml change only if Option A was approved | **DONE** | `docs/cms-reviews/drills/P3-RTE/results-rte.json`: 43 passed, 0 failed after fix round 1 (35 before it; step 7, the web-page paste, added 8). Nine screenshots are next to it. `git diff 0b81097 -- package.json pnpm-lock.yaml next.config.mjs` is empty | D1 (no block split on paste) fails "the stored value keeps the bold and the link", and since then the nesting check too (see below). D2 is above |
 
-Every acceptance item is met with Option B. Nothing is marked NOT DONE for want of Tiptap. What Tiptap (Option A) would change is listed under Known limits.
+Every acceptance item is met with Option B. Nothing is marked NOT DONE for want of Tiptap. One part of the brief (not an acceptance line) is NOT DONE: a web page's paste with its own elements or a `<noscript>` is refused and must be fixed in Edit as HTML, not cleaned on save; see "Fix round 1". What Tiptap (Option A) would change is listed under Known limits.
 
 ### Do the tests bite?
 
@@ -128,11 +144,11 @@ Drill run with D1 and D2 applied together: 33 passed, 2 failed. D2 failed "click
 
 | What | Result | Time |
 |---|---|---|
-| `pnpm test:rich-text` (`scripts/test-rich-text.js`, replaces SCAFFOLD's placeholder) | 14 passed | 0.7 s |
+| `pnpm test:rich-text` (`scripts/test-rich-text.js`, replaces SCAFFOLD's placeholder) | 15 passed | 0.5 s |
 | `pnpm test:editor-inspector` (not edited) | 34 passed | 0.8 s |
-| `pnpm test` | 81 of 81 suites | 141.0 s |
-| `pnpm build` | passes (the old NFT warning only) | |
-| `scripts/drills/p3/rte.mjs` | 35 passed, 0 failed | 14 s warm |
+| `pnpm test` | 81 of 81 suites | 129.6 s |
+| `pnpm build` | passed before fix round 1 (the old NFT warning only); not rerun after it | |
+| `scripts/drills/p3/rte.mjs` | 43 passed, 0 failed | |
 
 ## The drill's host
 
@@ -146,6 +162,8 @@ P3-EDITOR builds the editor page in this same batch, so no page in this branch m
 The drill doesn't prove the field inside P3-EDITOR's layout, with the real store's autosave timing. That is for P3-EDITOR's and P3-DRILLS' drills once both are merged.
 
 ## Known limits
+
+- **A web page's own elements and `<noscript>` are refused, not cleaned** (fix round 1). The server's AU-05 check counts `<product-info id=…>` and the text in a `<noscript>` as words the sanitizer would lose, so the save is refused. The field now offers Edit as HTML for any such refusal, and the founder removes the tags there. Cleaning them without a refusal needs the `lib/sanitize.js` change in "Fix round 1", which RTE does not own. The refusal's words ("This usually comes from < or > signs") don't fit this case; they are `lib/registry/text.js`'s.
 
 - **The paste in the drill is a dispatched `paste` event** carrying a `DataTransfer` with Word's clipboard HTML. It is not the OS clipboard. Chrome's async clipboard API cleans `text/html` when a page writes it, so a script can't be put on the real clipboard that way. The field's handler is the same code either way. A real Word-to-Chrome paste is an owner check.
 - **Undo (⌘Z).** The browser's own undo history doesn't know about a paste (the field inserts it) or about the stored value replacing the shown one. After either, ⌘Z may do nothing or skip back past it. Tiptap (Option A) would keep its own undo history across both.
@@ -165,6 +183,7 @@ The drill doesn't prove the field inside P3-EDITOR's layout, with the real store
 - **Safari and Firefox:** Bold, the lists, Link and paste.
 - **Phones at 375 wide** (after P3-EDITOR mounts the field): the toolbar wraps, and the surface is usable.
 - **VoiceOver:** the field is announced with its label as a text box, the toolbar as "Formatting for Content", and a read-only reason is read.
+- **Ruling: web-page pastes with their own elements** (fix round 1). Should `lib/sanitize.js` `visibleText` count a valid custom element name (lowercase, with a hyphen, closed or with attributes, such as `<product-info id=…>…</product-info>`) as markup, so such a paste is cleaned on save instead of refused? And should a `<noscript>`'s text count as lost words? Until then the founder removes them in Edit as HTML. Whoever owns `lib/sanitize.js` would make the change; the AU-05 suites must keep refusing `<founder>` and "the <link> below".
 - **Rulings:** Word bullets kept as "·" paragraphs (Known limits); ⌘Z after a paste (Known limits).
 - **CI:** the sqld download in CI still needs the owner's approval of its source and checksum. Nothing under `.github/` was changed.
 
@@ -174,7 +193,7 @@ The drill doesn't prove the field inside P3-EDITOR's layout, with the real store
 - `components/admin/editor/fields/richTextModel.js` (new)
 - `scripts/test-rich-text.js` (replaces the placeholder)
 - `scripts/drills/p3/rte.mjs` (new)
-- `docs/cms-reviews/drills/P3-RTE/`: `results-rte.json` and 7 screenshots
+- `docs/cms-reviews/drills/P3-RTE/`: `results-rte.json` and 9 screenshots (2 added in fix round 1)
 - this packet
 
 Not changed: `lib/documents/service.js` (it already cleans; proved by the suite), `app/rte.css` (not created; see "One `.rte` stylesheet"), `package.json`, `pnpm-lock.yaml`, `next.config.mjs`, `.github/`.

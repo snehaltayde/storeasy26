@@ -2,10 +2,10 @@
   "id": "P3-RTE",
   "part": "rte",
   "title": "P3-RTE — the rich text field",
-  "ranAt": "2026-11-04T05:34:01.552Z",
+  "ranAt": "2026-11-04T05:50:58.926Z",
   "harness": "http://localhost:6140",
   "chrome": "156.0.8078.80",
-  "passed": 35,
+  "passed": 43,
   "failed": 0,
   "knownFailures": 0,
   "checks": [
@@ -224,14 +224,75 @@
       "ok": true,
       "label": "Show formatted shows the stored table read-only again",
       "detail": "<p>Sizes:</p><table><tbody><tr><th>Size</th><td>Chest</td></tr><tr><th>M</th><td>98 cm</td></tr><tr><th>L</th><td>104 cm</td></tr></tbody></table>"
+    },
+    {
+      "ok": true,
+      "label": "the web page's paste is sent as copied",
+      "detail": "<p>Our story.</p><div class=\"product__description rte\"><p>Made from <strong>organic cotton</strong>.</p></div><product-info id=\"ProductInfo-1\" data-section=\"main\"><p>Ships in 2 days.</p></product-info>"
+    },
+    {
+      "ok": true,
+      "label": "the server refuses it (WORDS_LOST: lib/sanitize.js counts a web page's own element as words)",
+      "detail": [
+        {
+          "documentId": "doc_mujc5ui5fdfvyrvu",
+          "sectionId": "sec_rte1",
+          "blockId": null,
+          "field": "html",
+          "code": "WORDS_LOST",
+          "severity": "error",
+          "message": "Saving would lose these words: \"<product-info id=\"ProductInfo-1\" data-section=\"main\">Ships i…\". This usually comes from < or > signs. Reword them or remove them, then save again.",
+          "autoFix": null
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "nothing was stored"
+    },
+    {
+      "ok": true,
+      "label": "the field stays editable and offers Edit as HTML",
+      "detail": {
+        "mode": "edit",
+        "buttons": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "it says why, in plain words"
+    },
+    {
+      "ok": true,
+      "label": "the text box shows the hidden markup",
+      "detail": "<p>Our story.</p><div class=\"product__description rte\"><p>Made from <strong>organic cotton</strong>.</p></div><product-info id=\"ProductInfo-1\" data-section=\"main\"><p>Ships in 2 days.</p></product-info>"
+    },
+    {
+      "ok": true,
+      "label": "after removing it, the save goes through and is stored cleaned",
+      "detail": {
+        "wstored": "<p>Our story.</p><div><p>Made from <strong>organic cotton</strong>.</p></div><p>Ships in 2 days.</p>"
+      }
+    },
+    {
+      "ok": true,
+      "label": "Show formatted goes back to the editor with the stored text, and Edit as HTML goes away",
+      "detail": {
+        "mode": "edit",
+        "editable": true,
+        "html": "<p>Our story.</p><div><p>Made from <strong>organic cotton</strong>.</p></div><p>Ships in 2 days.</p>",
+        "cls": "rte",
+        "srcdoc": "about:srcdoc"
+      }
     }
   ],
   "notes": [
-    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_36195b93d0c0f7c1, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.0s",
-    "host bundle: 2064 KB",
-    "made page rte-drill (doc_w552cy47oa24jknq)",
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_ab843ad911d1487e, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.7s",
+    "host bundle: 2065 KB",
+    "made page rte-drill (doc_ouwxo7nhuu3pujkk)",
     "stored after the paste: <p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p><p><a href=\"/collections/new\">Fourth</a> paragraph with <b>bold words</b></p><p><b><span>Spring sizes</span></b><span> </span>run small.</p>\n<p><span>·<span>&nbsp;&nbsp; </span></span>Order one size up</p>\n\n<p><span>Free returns</span> within 30 days.Ask us anything.</p>",
-    "made page rte-table (doc_4wrcgknr5h62azse)"
+    "made page rte-table (doc_zlcznt4qsjvu65pw)",
+    "made page rte-web (doc_mujc5ui5fdfvyrvu)"
   ],
   "screenshots": [
     {
@@ -292,6 +353,24 @@
       "name": "table-saved-1440",
       "file": "docs/cms-reviews/drills/P3-RTE/table-saved-1440.png",
       "bytes": 7351,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    },
+    {
+      "name": "web-paste-refused-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/web-paste-refused-1440.png",
+      "bytes": 13596,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/__p3-rte-drill/host.html"
+    },
+    {
+      "name": "web-paste-saved-1440",
+      "file": "docs/cms-reviews/drills/P3-RTE/web-paste-saved-1440.png",
+      "bytes": 7627,
       "width": 720,
       "height": 450,
       "viewport": 1440,

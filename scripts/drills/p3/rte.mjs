@@ -25,7 +25,11 @@
 //   5. preview: the storefront shows the saved text, with the same .rte rules
 //      as the editor's surface;
 //   6. a table opens read-only with Edit as HTML; editing it as HTML stores
-//      the cleaned result.
+//      the cleaned result;
+//   7. a paste from a web page with its own elements (<product-info â€¦>, as
+//      every Shopify theme has): the server refuses the save in plain words,
+//      the field offers Edit as HTML, the founder removes the hidden markup
+//      there, and the save goes through.
 // Results: docs/cms-reviews/drills/P3-RTE/results-rte.json, with screenshots.
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
@@ -51,6 +55,8 @@ const WORD_CLIPBOARD = `<html xmlns:o="urn:schemas-microsoft-com:office:office" 
 <p class=MsoNormal><span style='color:red' onclick="window.parent.__pwned='onclick'">Free returns</span> within 30 days.<details open ontoggle="window.parent.__pwned='ontoggle'">Ask us anything.</details><o:p></o:p></p><!--EndFragment-->
 </body></html>`;
 const WORD_TEXT = "Spring sizes run small.\nOrder one size up\nFree returns within 30 days.";
+const WEB_PART = `<div class="product__description rte"><p>Made from <strong>organic cotton</strong>.</p></div><product-info id="ProductInfo-1" data-section="main"><p>Ships in 2 days.</p></product-info>`;
+const WEB_CLIPBOARD = `<html><body>\n<!--StartFragment-->${WEB_PART}<!--EndFragment-->\n</body></html>`;
 const START = "<p>First paragraph.</p><p>Second paragraph.</p><p>Third paragraph.</p>";
 const TABLE = "<p>Sizes:</p><table><tbody><tr><th>Size</th><td>Chest</td></tr><tr><th>M</th><td>96 cm</td></tr></tbody></table>";
 
@@ -401,4 +407,53 @@ process.exitCode = await runDrill({ id: "P3-RTE", part: "rte", title: "P3-RTE â€
   s = await surface(page);
   drill.check(s.html === tstored && (await state(page)).pwned === null, "Show formatted shows the stored table read-only again", s.html);
   await drill.screenshot(page, "table-saved-1440");
+
+  // ---- 7. a paste from a web page: refused, then Edit as HTML is the way out ----
+  const wdoc = await makePage(drill, page, "rte-web", "<p>Our story.</p>");
+  await openHost(page, wdoc.id);
+  await waitEditable(page);
+  await frameOf(page).locator("body").click();
+  await frameOf(page).locator("body").press("ControlOrMeta+End");
+  await page.evaluate(
+    ({ id, html }) => {
+      const d = document.querySelector(`[id="${id}"] iframe`).contentDocument;
+      const dt = new DataTransfer();
+      dt.setData("text/html", html);
+      dt.setData("text/plain", "Made from organic cotton.\nShips in 2 days.");
+      d.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    },
+    { id: FIELD_ID, html: WEB_CLIPBOARD },
+  );
+  await page.waitForTimeout(300);
+  st = await state(page);
+  drill.check(st.changes[st.changes.length - 1]?.includes("<product-info"), "the web page's paste is sent as copied", st.changes[st.changes.length - 1]);
+  await page.locator("#host-save").click();
+  await page.waitForFunction(() => window.__rte.saves.length === 1);
+  const wrefused = await page.evaluate(() => window.__rte.saves[0].answer);
+  const wissue = (wrefused.issues || []).find((i) => i.code === "WORDS_LOST");
+  drill.check(wrefused.ok !== true && wrefused.code === "VALIDATION_FAILED" && Boolean(wissue), "the server refuses it (WORDS_LOST: lib/sanitize.js counts a web page's own element as words)", wrefused.issues);
+  drill.check(storedHtmlOf(await docRow(wdoc.id)) === "<p>Our story.</p>", "nothing was stored");
+  await page.waitForTimeout(300);
+  s = await surface(page);
+  const wbtn = page.getByRole("button", { name: "Edit as HTML", exact: true });
+  drill.check(s.mode === "edit" && s.editable && (await wbtn.count()) === 1, "the field stays editable and offers Edit as HTML", { mode: s.mode, buttons: await wbtn.count() });
+  drill.check((await page.getByText("Pasted text can hold hidden code that doesn't show here. Use Edit as HTML to see it, and remove the part named below.").count()) === 1, "it says why, in plain words");
+  await drill.screenshot(page, "web-paste-refused-1440");
+  await wbtn.click();
+  const wbox = page.locator(`textarea[id="${FIELD_ID}"]`);
+  const wshown = await wbox.inputValue();
+  drill.check(wshown.includes('<product-info id="ProductInfo-1" data-section="main">'), "the text box shows the hidden markup", wshown);
+  const wfixed = wshown.replace(/<\/?product-info[^>]*>/g, "");
+  await wbox.fill(wfixed);
+  await page.locator("#host-save").click();
+  await page.waitForFunction(() => window.__rte.saves.length === 2);
+  const wsaved = await page.evaluate(() => window.__rte.saves[1].answer);
+  const wstored = storedHtmlOf(await docRow(wdoc.id));
+  drill.check(wsaved.ok === true && wstored.includes("<p>Our story.</p>") && wstored.includes("<strong>organic cotton</strong>") && wstored.includes("Ships in 2 days.") && !/product-info|class=|data-section/.test(wstored), "after removing it, the save goes through and is stored cleaned", { answer: wsaved.message || wsaved.code, wstored });
+  await page.getByRole("button", { name: "Show formatted", exact: true }).click();
+  await waitEditable(page);
+  await page.waitForTimeout(300);
+  s = await surface(page);
+  drill.check(s.mode === "edit" && s.html === wstored && (await wbtn.count()) === 0, "Show formatted goes back to the editor with the stored text, and Edit as HTML goes away", s);
+  await drill.screenshot(page, "web-paste-saved-1440");
 });

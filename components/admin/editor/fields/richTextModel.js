@@ -16,6 +16,12 @@
 //   TOOLBAR                 the buttons, each with the tag it makes
 //   uneditableTags(html)    the NOT_EDITABLE tags in a value, in order
 //   readOnlyWords(tags)     the plain words for why a value opens read-only
+//   refusedByCleaner(issues) true when the server refused the save because
+//                           cleaning would lose something (WORDS_LOST,
+//                           ADDRESS_LOST, MEDIA_LOST, PICTURE_LOST): the field
+//                           then offers Edit as HTML, so markup the surface
+//                           doesn't show can be found and removed
+//   REFUSED_WORDS           the plain words shown with that offer
 //   pastedPart(html)        the copied part of clipboard HTML (between Word's
 //                           and the browsers' StartFragment/EndFragment
 //                           comments, or the body), unchanged otherwise
@@ -94,6 +100,14 @@ const THING = {
   img: "a picture",
 };
 const listWords = (xs) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+
+// The server's cleaner refuses a save that would lose something the founder
+// would miss (lib/registry/text.js lostBySanitizing). The cause can be markup
+// the surface shows as ordinary text, such as a web page's own elements
+// (<product-info …>) or a <noscript>, so the field offers Edit as HTML.
+export const CLEANER_REFUSALS = Object.freeze(["WORDS_LOST", "ADDRESS_LOST", "MEDIA_LOST", "PICTURE_LOST"]);
+export const refusedByCleaner = (issues) => (Array.isArray(issues) ? issues : []).some((i) => i && CLEANER_REFUSALS.includes(i.code));
+export const REFUSED_WORDS = "Pasted text can hold hidden code that doesn't show here. Use Edit as HTML to see it, and remove the part named below.";
 
 // Why a value opens read-only, in plain words, or null when it doesn't.
 export function readOnlyWords(tags) {

@@ -52,11 +52,15 @@
 //   - A value with tags this editor can't edit (a table, a picture, a caption,
 //     preformatted text) opens read-only with "Edit as HTML": a plain text box
 //     whose text is sent as typed.
+//   - When the server refuses a save because cleaning would lose something
+//     (WORDS_LOST and the other lostBySanitizing codes), the editable field
+//     offers Edit as HTML too: a web page's paste can hold markup the surface
+//     shows as ordinary text, and the text box is where it can be removed.
 //   - The surface carries the page's own style sheets, so the text looks as
 //     the store's shared .rte rules make it look on the storefront.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { applyFocus, blockStart, notesId, noteTone, blocks } from "./inspectorModel.js";
-import { TOOLBAR, uneditableTags, readOnlyWords, pastedPart, plainToHtml, hasBlocks, splicePaste, linkHtml, newMarker, blockChildAt, textOffset, pointAt, syncAction, frameDocument, looksEmpty } from "./richTextModel.js";
+import { TOOLBAR, uneditableTags, readOnlyWords, refusedByCleaner, REFUSED_WORDS, pastedPart, plainToHtml, hasBlocks, splicePaste, linkHtml, newMarker, blockChildAt, textOffset, pointAt, syncAction, frameDocument, looksEmpty } from "./richTextModel.js";
 
 const TONE = { danger: "text-danger", warning: "text-warning", muted: "text-fg-muted" };
 const MIN_HEIGHT = 112;
@@ -408,7 +412,9 @@ export default function RichTextField({ value, onChange, issues = [], focusReque
   };
 
   const readonlyId = `${id}--readonly`;
-  const why = locked ? readOnlyReason : mode === "view" ? readOnlyWords(tags) : null;
+  // a save the cleaner refused: Edit as HTML is the way to find what it named
+  const rescue = mode === "edit" && refusedByCleaner(notes);
+  const why = locked ? readOnlyReason : mode === "view" ? readOnlyWords(tags) : rescue ? REFUSED_WORDS : null;
   const describedBy = [notes.length ? notesId(id) : null, why ? readonlyId : null].filter(Boolean).join(" ") || undefined;
   const invalid = blocks(notes);
   const labelId = `${id}--label`;
@@ -489,7 +495,7 @@ export default function RichTextField({ value, onChange, issues = [], focusReque
       {why && (
         <div id={readonlyId} className="mt-1 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-fg-muted">{why}</p>
-          {mode === "view" && (
+          {(mode === "view" || rescue) && (
             <button type="button" data-rte-edit-html onClick={() => setSource(true)} className="rounded-ctl border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-fg hover:bg-surface-muted focus-ring">
               Edit as HTML
             </button>

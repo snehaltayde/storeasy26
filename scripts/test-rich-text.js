@@ -453,6 +453,54 @@ await t("rendered+driven: editing the table as HTML sends what was typed, and sa
   ok(back.includes('data-rich-text="view"') && bodyOf(srcdocOf(back)) === stored, "the stored value is shown read-only");
 });
 
+// Fix round 1: a paste from a web page with its own elements (every Shopify
+// theme has them) or a <noscript> is refused by the cleaner (WORDS_LOST). The
+// surface shows only normal text, so the field must offer Edit as HTML, where
+// the hidden markup can be seen and removed.
+const WEB_PASTES = [
+  `<p>Our story.</p><div class="product__description rte"><p>Made from <strong>organic cotton</strong>.</p></div><product-info id="ProductInfo-1" data-section="main"><p>Ships in 2 days.</p></product-info>`,
+  `<p>Our story.</p><p>Updated <relative-time datetime="2026-10-01T10:00:00Z">last month</relative-time>.</p>`,
+  `<p>Our story.</p><p>Hello</p><noscript><p>Turn on JavaScript.</p></noscript>`,
+];
+
+await t("rendered+driven: a refused web-page paste offers Edit as HTML in the editable field, and the edit there saves", async () => {
+  ok(M.refusedByCleaner([{ code: "WORDS_LOST" }]) && M.refusedByCleaner([{ code: "ADDRESS_LOST" }]) && M.refusedByCleaner([{ code: "MEDIA_LOST" }]) && M.refusedByCleaner([{ code: "PICTURE_LOST" }]), "every cleaner refusal counts");
+  ok(!M.refusedByCleaner([{ code: "REQUIRED" }, { code: "TOO_LONG" }]) && !M.refusedByCleaner(null), "other issues don't");
+  for (const pasted of WEB_PASTES) {
+    const p = await freshPage("<p>Our story.</p>");
+    const refused = await saveHtml(p, pasted).then(
+      () => null,
+      (e) => e,
+    );
+    const issue = refused?.issues?.find((i) => M.CLEANER_REFUSALS.includes(i.code));
+    ok(issue, `the server refuses ${pasted}: ${refused?.message}`);
+    eq(await storedHtml(p.id), "<p>Our story.</p>", "nothing stored");
+    // the field as the inspector shows it: the unsaved value and the server's issue
+    const markup = render(h(RichTextField, { id: "f-sec_rte1-html", label: "Content", value: pasted, onChange: () => {}, issues: [issue] }));
+    ok(markup.includes('data-rich-text="edit"') && markup.includes('role="toolbar"'), "still editable");
+    ok(/<button[^>]*data-rte-edit-html[^>]*>Edit as HTML<\/button>/.test(markup), `no Edit as HTML for ${issue.code}`);
+    ok(markup.includes("Pasted text can hold hidden code that doesn&#x27;t show here. Use Edit as HTML to see it, and remove the part named below."), "the way out, in plain words");
+    const box = /<div[^>]*id="f-sec_rte1-html"[^>]*>/.exec(markup)[0];
+    ok(new RegExp(`aria-describedby="[^"]*f-sec_rte1-html--readonly`).test(box), "the field names the way out");
+    // in Edit as HTML the hidden markup is in plain sight; the founder removes it
+    const sent = [];
+    let tree = null;
+    const Host = () => (tree = RTF.HtmlSource({ id: "f-sec_rte1-html", value: pasted, label: "Content", onChange: (v) => sent.push(v), onDone: () => {} }));
+    ok(unescape(render(h(Host))).includes(pasted), "the text box shows the paste as it is");
+    const fixed = pasted.replace(/<\/?(product-info|relative-time)[^>]*>/g, "").replace(/<noscript>.*<\/noscript>/, "");
+    findProps(tree, (n) => n.type === "textarea").onChange({ target: { value: fixed } });
+    const saved = await saveHtml(p, sent[0]);
+    eq(await storedHtml(p.id), sanitizeHtml(fixed), "the edited text is stored cleaned");
+    ok(saved.document.revision > p.revision, "saved");
+  }
+  // without a cleaner refusal, an editable field still has no Edit as HTML
+  const other = render(h(RichTextField, { id: "f-x", label: "Content", value: "<p>Hi</p>", onChange: () => {}, issues: [{ code: "REQUIRED", severity: "incomplete", message: "Add the content." }] }));
+  ok(!other.includes("Edit as HTML"), "no Edit as HTML for other issues");
+  // and a founder without permission gets none, refusal or not
+  const locked = render(h(RichTextField, { id: "f-y", label: "Content", value: WEB_PASTES[0], onChange: () => {}, issues: [{ code: "WORDS_LOST", severity: "error", message: "x" }], readOnlyReason: "Only the store owner can change this." }));
+  ok(!locked.includes("Edit as HTML"), "locked stays locked");
+});
+
 await t("rendered: the editor and the storefront's rich text both use the .rte stylesheet", async () => {
   // the editor's surface is a .rte body that carries the page's own style sheets
   const markup = render(h(RichTextField, { id: "f-z", label: "Content", value: "<p>Hi</p>", onChange: () => {}, issues: [] }));
