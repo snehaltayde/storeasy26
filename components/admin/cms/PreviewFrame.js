@@ -6,6 +6,7 @@ import { Card, CardHeader } from "@/components/console/Card";
 import { Banner } from "@/components/console/Banner";
 import { Button, IconButton } from "@/components/console/Button";
 import { startPreview } from "./api";
+import { editorPathHref } from "@/lib/admin/editor-entry";
 
 // Draft preview (S37, generalized S52): mints a preview session and iframes
 // the REAL storefront — now deep-linked at the page being edited (`to`),
@@ -16,7 +17,33 @@ const DEVICES = [
   { key: "desktop", label: "Desktop", width: "100%" },
 ];
 
-export default function PreviewFrame({ to = "/", title = "Draft preview", description = "Your browser only — shoppers keep seeing the live release." }) {
+//
+// P4-ED05 (ED-05): on a documents store (cmsMode "documents") the old draft
+// preview can't open (its session is refused there), so the card links to the
+// editor at the same page instead: the editor's own preview shows its drafts.
+// Every other mode is today's card.
+export default function PreviewFrame(props) {
+  if (props?.cmsMode === "documents") return <EditorPreviewLink {...props} />;
+  return <DraftPreviewFrame {...props} />;
+}
+
+function EditorPreviewLink({ to = "/", title = "Draft preview" }) {
+  return (
+    <Card>
+      <CardHeader
+        title={title}
+        description="Preview your drafts in the editor. Shoppers keep seeing what is published."
+        actions={
+          <a href={editorPathHref(to)} data-editor-preview-link="" className="inline-flex items-center rounded-ctl border border-edge px-3 py-1.5 text-xs font-semibold text-fg focus-ring hover:bg-surface-sunken">
+            Open in the editor
+          </a>
+        }
+      />
+    </Card>
+  );
+}
+
+function DraftPreviewFrame({ to = "/", title = "Draft preview", description = "Your browser only — shoppers keep seeing the live release." }) {
   const [open, setOpen] = useState(false);
   const [device, setDevice] = useState("desktop");
   const [nonce, setNonce] = useState(0);

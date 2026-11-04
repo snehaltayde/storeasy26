@@ -4,13 +4,14 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { audit } from "@/lib/platform/audit";
 import { db } from "@/lib/db";
 import { getProductOverride, setProductOverride, listProductOverrides, getCollectionPins, setCollectionPins } from "@/lib/catalog-overrides";
-import { tenantOwnCfg } from "@/lib/tenant-context";
 import { getBlock } from "@/lib/cms/store";
 import { effectiveSurfaceTemplate } from "@/lib/cms/defaults";
 import { numericId } from "@/lib/ids";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
-import { legacyWritesRefusal } from "@/lib/cms-mode";
+import { legacyWritesRefusal, getCmsMode } from "@/lib/cms-mode";
+import { shopifyAdminBase } from "@/lib/admin/shopify-admin-url";
+import { publishedGetters } from "@/lib/cms/view";
 
 // Catalog browser API (S39 / MC05 + MC06). Shopify owns catalog VALUES —
 // this surface is read-only on them (the console labels + links to Shopify
@@ -19,14 +20,25 @@ import { legacyWritesRefusal } from "@/lib/cms-mode";
 //   GET ?product=gid   → one product's Shopify-owned fields + its override
 //   POST {product:{handle, modules, badge}}         → set per-product override
 //   POST {collection:{handle, pinnedHandles:[…]}}   → set pinned order
+//
+// P4-ED05 (ED-05, spec 8.13): the GET keeps answering on a documents store,
+// where the old tables are frozen. There a product's template, modules and
+// badge, and each collection's pins, are what is PUBLISHED (the live rows and
+// the layout documents, through the storefront's getters over the live
+// release: lib/cms/view.js publishedGetters), never the frozen
+// surface_templates block, product_overrides or collection_overrides, and
+// `overrides` is empty (nothing there is a draft). Legacy and migrating
+// stores answer as before. The POST's mode refusal, before or inside the
+// write's own batch, answers 409 with its plain words (never the catch-all).
+// shopifyAdminBase is the shared one (lib/admin/shopify-admin-url.js).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const shopifyAdminBase = () => {
-  const d = tenantOwnCfg("shopify_store_domain", "SHOPIFY_STORE_DOMAIN", "") || "";
-  const store = d.replace(/\.myshopify\.com$/, "");
-  return store ? `https://admin.shopify.com/store/${store}` : null;
-};
+// The published presentation of a documents store, or null on any other.
+async function publishedPresentation() {
+  if ((await getCmsMode()) !== "documents") return null;
+  return publishedGetters();
+}
 
 export const GET = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.read");
@@ -34,25 +46,23 @@ export const GET = tenantHandler(async (request) => {
   const url = new URL(request.url);
 
   const productGid = url.searchParams.get("product");
+  const live = await publishedPresentation();
   if (productGid) {
     const p = await db.selectFrom("products").selectAll().where("id", "=", productGid).executeTakeFirst();
     if (!p) return NextResponse.json({ error: "product not found" }, { status: 404 });
     const base = shopifyAdminBase();
+    if (live) {
+      const o = await live.resolvedProductOverride(p.id);
+      return NextResponse.json({
+        ok: true,
+        product: productView(p, base),
+        override: { modules: o?.modules ?? [], badge: o?.badge ?? "" },
+        surface: await live.resolvedSurfaceTemplateFor("pdp", p.id),
+      });
+    }
     return NextResponse.json({
       ok: true,
-      product: {
-        id: p.id,
-        handle: p.handle,
-        title: p.title,
-        product_type: p.product_type,
-        vendor: p.vendor,
-        price_min: p.price_min,
-        price_max: p.price_max,
-        currency: p.currency,
-        available: !!p.available,
-        featured_image: p.featured_image,
-        shopify_url: base ? `${base}/products/${numericId(p.id)}` : null,
-      },
+      product: productView(p, base),
       override: (await getProductOverride(p.id)) || { modules: [], badge: "" },
       // S57: which PDP template THIS product renders with, and why — the
       // editor explains the selected template (audit requirement). Draft view:
@@ -71,13 +81,19 @@ export const GET = tenantHandler(async (request) => {
   }
   const [products, overrides, collections] = await Promise.all([
     query.orderBy("title", "asc").limit(30).execute(),
-    listProductOverrides(),
+    live ? [] : listProductOverrides(),
     db.selectFrom("collections").select(["id", "handle", "title"]).orderBy("handle").execute(),
   ]);
   const overridden = new Set(overrides.map((o) => o.product_id));
+  if (live) {
+    for (const p of products) {
+      const o = await live.resolvedProductOverride(p.id);
+      if (o?.modules?.length || o?.badge) overridden.add(p.id);
+    }
+  }
   const pins = {};
   for (const c of collections) {
-    const pinned = await getCollectionPins(c.id);
+    const pinned = live ? await live.resolvedCollectionPins(c.handle) : await getCollectionPins(c.id);
     if (pinned.length) pins[c.handle] = pinned.length;
   }
   return NextResponse.json({
@@ -88,6 +104,25 @@ export const GET = tenantHandler(async (request) => {
     shopify_admin: shopifyAdminBase(),
   });
 });
+
+const productView = (p, base) => ({
+  id: p.id,
+  handle: p.handle,
+  title: p.title,
+  product_type: p.product_type,
+  vendor: p.vendor,
+  price_min: p.price_min,
+  price_max: p.price_max,
+  currency: p.currency,
+  available: !!p.available,
+  featured_image: p.featured_image,
+  shopify_url: base ? `${base}/products/${numericId(p.id)}` : null,
+});
+
+// A deliberate refusal raised inside the write (the mode guard in its own
+// batch, P4-GUARD): its own 4xx status and plain words, before the catch-all.
+const refusalBody = (e) => ({ error: String(e.message).slice(0, 300), ...(e.code ? { code: e.code } : {}) });
+const refusalStatus = (e) => (Number.isInteger(e.status) && e.status >= 400 && e.status < 500 ? e.status : 409);
 
 export const POST = tenantHandler(async (request) => {
   const auth = await requireAdmin(request, "storefront.write");
@@ -124,6 +159,7 @@ export const POST = tenantHandler(async (request) => {
     }
     return NextResponse.json({ error: "Nothing to do" }, { status: 400 });
   } catch (e) {
+    if (e?.expose) return NextResponse.json(refusalBody(e), { status: refusalStatus(e) });
     if (e?.errors) return NextResponse.json({ error: String(e.message).slice(0, 300), errors: e.errors }, { status: 422 }); // the edit's own problems
     const infra = infraResponse(e, { route: "admin/catalog" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });

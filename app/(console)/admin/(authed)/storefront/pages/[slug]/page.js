@@ -7,6 +7,9 @@ import { notMigratedYet } from "@/lib/schema-shape";
 import { db } from "@/lib/db";
 import { PageEditor } from "@/components/admin/cms/PageEditor";
 import { tfetch } from "@/lib/console-request";
+import { getCmsMode } from "@/lib/cms-mode";
+import { legacyPageHref } from "@/lib/admin/editor-entry";
+import { listDocuments } from "@/lib/documents/service";
 
 // S52: the page editor route. /admin/storefront/pages/new creates (optionally
 // duplicating ?from=<slug>); any other slug edits that page. The editor itself
@@ -59,6 +62,13 @@ export default async function StorefrontPageEditorPage({ params, searchParams })
   if (!actor) redirect("/admin/login");
 
   const { slug } = await params;
+
+  // P4-ED05 (ED-05): a documents store edits this page in the editor, at its
+  // document (or home, with a note, when there is none). "new" opens the
+  // editor, where new pages are made. Legacy and migrating stores (and a mode
+  // that can't be read, whose writes still refuse) render as before.
+  const cmsMode = await tfetch(() => getCmsMode()).catch(() => null);
+  if (cmsMode === "documents") redirect(await legacyPageHref(slug, await tfetch(() => listDocuments())));
 
   if (slug === "new") {
     const sp = await searchParams;

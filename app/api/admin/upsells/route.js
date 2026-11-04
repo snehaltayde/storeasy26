@@ -13,6 +13,11 @@ import { legacyWritesRefusal } from "@/lib/cms-mode";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// P4-ED05 (after P4-GUARD): a deliberate refusal raised inside the write (the
+// mode guard in the write's own batch) answers its own 4xx status and plain
+// words, before the catch-all 422.
+const refusalBody = (e) => ({ error: String(e.message).slice(0, 300), ...(e.code ? { code: e.code } : {}) });
+const refusalStatus = (e) => (Number.isInteger(e.status) && e.status >= 400 && e.status < 500 ? e.status : 409);
 
 // Console speaks HANDLES; storage speaks gids — translate both ways here.
 // S39 (MC15): targets carry availability so the console PREVIEWS what will
@@ -95,6 +100,7 @@ export const POST = tenantHandler(async (request) => {
     await audit({ actor: auth.actor, action: "upsells.write", resource: `placement:${id}`, diff: { kind: body.kind } });
     return NextResponse.json({ ok: true, id, placements: await listWithHandles() });
   } catch (e) {
+    if (e?.expose) return NextResponse.json(refusalBody(e), { status: refusalStatus(e) });
     const infra = infraResponse(e, { route: "admin/upsells" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });
     return NextResponse.json({ error: String(e?.message || e) }, { status: 422 });

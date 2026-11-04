@@ -5,16 +5,25 @@ import { listPlacements } from "@/lib/cms/placements";
 import { db } from "@/lib/db";
 import UpsellsAdmin from "@/components/admin/UpsellsAdmin";
 import { tfetch } from "@/lib/console-request";
+import { getCmsMode } from "@/lib/cms-mode";
+import { upsellsHref } from "@/lib/admin/editor-entry";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Upsells · Admin", robots: { index: false } };
 
-export default async function AdminUpsellsPage() {
+// P4-ED05 (ED-05): a documents store edits upsells in the editor: a
+// product's pairs on that product (?product=<gid>), the cart's offer in the
+// cart document. Legacy and migrating stores (and a mode that can't be read,
+// whose writes still refuse) render as before.
+export default async function AdminUpsellsPage({ searchParams } = {}) {
   const jar = await cookies();
   // S34 (OP10): merchants sign in normally; an OPERATOR passes only under an
   // active support grant (support role — read-only, PII-redacted).
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
+
+  const cmsMode = await tfetch(() => getCmsMode()).catch(() => null);
+  if (cmsMode === "documents") redirect(upsellsHref((await searchParams) || {}));
 
   const placements = await tfetch(async () => {
     const rows = await listPlacements();

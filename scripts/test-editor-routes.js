@@ -153,7 +153,12 @@ await t("unit: ?doc= opens that id; a singleton opens before its row exists; an 
 });
 
 await t("unit: every old screen sends a documents store to a real editor address", () => {
-  eq(Object.keys(E.LEGACY_ROUTE_DOCS).sort(), ["/admin/brand", "/admin/storefront", "/admin/storefront/designer", "/admin/storefront/home", "/admin/storefront/navigation", "/admin/storefront/pages", "/admin/storefront/product-pages", "/admin/theme"].sort(), "routes:");
+  // P4-ED05 adds the product and collection designers and the upsells screen
+  eq(
+    Object.keys(E.LEGACY_ROUTE_DOCS).sort(),
+    ["/admin/brand", "/admin/storefront", "/admin/storefront/designer", "/admin/storefront/home", "/admin/storefront/navigation", "/admin/storefront/pages", "/admin/storefront/product-pages", "/admin/theme", "/admin/storefront/designer/product", "/admin/storefront/designer/collection", "/admin/upsells"].sort(),
+    "routes:",
+  );
   eq(E.LEGACY_ROUTE_DOCS["/admin/brand"], "doc_design", "brand:");
   eq(E.LEGACY_ROUTE_DOCS["/admin/theme"], "doc_design", "theme:");
   for (const [route, id] of Object.entries(E.LEGACY_ROUTE_DOCS)) {
@@ -881,8 +886,8 @@ await t("P4-SCAFFOLD unit: one key wins (doc, then product, then collection); ju
   for (const junk of [undefined, null, {}, [], "x", { product: "1" }, { product: Cn }, { collection: P }, { product: P, collection: Cn }, { product: "gid://shopify/Product/a b" }]) {
     eq(E.entityEditorHref(junk), "/admin/editor", `href ${JSON.stringify(junk)}:`);
   }
-  // LEGACY_ROUTE_DOCS is ED05's, unchanged here
-  eq(Object.keys(E.LEGACY_ROUTE_DOCS).length, 8, "LEGACY_ROUTE_DOCS entries:");
+  // LEGACY_ROUTE_DOCS is ED05's: the 8 P3-ROUTES screens plus its 3 (scripts/test-legacy-routes.js)
+  eq(Object.keys(E.LEGACY_ROUTE_DOCS).length, 11, "LEGACY_ROUTE_DOCS entries:");
 });
 
 await t("P4-SCAFFOLD unit: productDocumentId and collectionDocumentId are async, deterministic, shaped and differ per id", async () => {
