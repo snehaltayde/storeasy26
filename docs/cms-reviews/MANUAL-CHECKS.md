@@ -583,6 +583,42 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] P4-CUTOVER note: rehearsal and cutover version and release ids may differ while source hashes match (a Shopify handle change of a cart product); compare source hashes only.
 - [ ] The CI sqld download in `.github/` still needs the owner's approval of its source and checksum (unchanged here).
 
+## Phase 4, batch 4
+
+### The new product and collection editor (P4-EDITOR)
+- [ ] Desktop Chrome on a staging test tenant: open a product from the editor's product list, rename it, publish, then check the product page, a card, search and the cart. Then Reset and publish.
+- [ ] Typesense stores: after a rename, search shows the new name within a few seconds (P4-SEARCH reindex). The local drill had no Typesense.
+- [ ] Design editor: with the design open, the frame's bar no longer offers 'Hide them'; on the home page it still does.
+- [ ] Phone and Safari: check the product form and the switcher at phone width.
+- [ ] CI: the sqld download in .github/ still needs your approval of its source and checksum. Nothing under .github/ was changed.
+- [ ] Orchestrator: add these files outside the plan's list to P4-EDITOR's files: lib/admin/entity-entry.js, components/admin/editor/PreviewPane.js, scripts/drills/p4/editor.mjs, docs/cms-reviews/drills/P4-EDITOR/.
+- [ ] Per-tab overlay: the rule that the Home tab must not show another tab's unpublished colours waits until the per-tab overlay lands.
+
+### Old admin addresses lead to the editor (P4-ED05)
+- [ ] Desktop Chrome drill on the design harness (P4-DRILLS routes stage), on a documents store. Old addresses land in the editor: catalog ?product=, upsells, both designers, an existing page slug and a missing one. The bare /admin/catalog shows the Products link plus Bundles and Quiz. The setup links open the editor. /admin/editor/templates lists templates and 'Make a page from this' opens a new draft. A page with an old banner shows the note and publishes. Legacy stores are unchanged.
+- [ ] Owner decision: keep the bare /admin/catalog for Bundles and Quiz until ED-06 (current build), or move them first and then redirect.
+- [ ] OQ-8 saved templates default: not converted, read-only with 'Make a page from this'. Confirm.
+- [ ] Orchestrator or P4-EDITOR: make the editor read ?list=products and ?list=pages, and link /admin/editor/templates from its pages section.
+- [ ] Orchestrator: add the files beyond the plan's list to P4-ED05's files: treeModel.js, lib/documents/service.js, app/api/admin/upsells/[id]/route.js, lib/admin/saved-templates.js, components/admin/SavedTemplates.js, and the test-editor-tree, test-registry-contract and test-publish-checks updates.
+- [ ] Known limit for a later item: the agency kit export (lib/platform/agency.js) still reads the old hero, announcement and home sections on documents stores.
+- [ ] CI: the sqld download in .github still needs the owner's approval of its source and checksum (nothing under .github was changed).
+
+### The before-and-after page comparison (P4-EQUIV)
+- [ ] CI sqld download: no .github/ change was made. Its source and checksum still need the owner's approval (carried over from P4-SCAFFOLD).
+- [ ] Before the first real cutover, the owner reads the rendered comparison in CUTOVER's rehearsal report and approves the two allowed differences in lib/migrate/allowed-differences.js (section-ids, hero-test-variant), or says which to drop.
+- [ ] The owner decides whether to pause a running hero test during the rehearsal so the hero is also compared as a page, or to accept the data-only comparison of the hero (hero-test-variant).
+- [ ] Old module HTML that today's sanitizer rewrites (MANUAL-CHECKS.md line 568): the owner decides per store whether CUTOVER adds it to ALLOWED_DIFFERENCES or it is fixed before the move.
+- [ ] Orchestrator: P4-CUTOVER's scripts/test-migrate-documents.js must import ALLOWED_DIFFERENCES from lib/migrate/allowed-differences.js and assert the same list. Add a pnpm migrate:render script only if the runbook needs one (package.json is SCAFFOLD-only). Add docs/cms-reviews/drills/P4-EQUIV/results-harness.json to the plan's file list.
+- [ ] Optional: the owner reruns the harness check on their own Mac: capture twice with node scripts/migrate-render.mjs --base http://localhost:<port> --routes <file> --out <dir>, then --compare (expect exit 0).
+
+### Batch 3 review fixes (P4-FIX2)
+- [ ] Browser NOT DONE: on a legacy store's media screen, delete a file used by an old home section and by a page draft. Expect no 'Delete anyway', the fixed words, and the places in plain words.
+- [ ] Browser NOT DONE: upload a file whose bytes match an archived file. Expect '<file> was archived. It's back in your library now.' and the file back in the picker.
+- [ ] Browser NOT DONE: open a product with an unpublished draft in the editor and save. The frame should report up to date once the product page shows the draft. This depends on P4-EDITOR's wiring.
+- [ ] Typesense tenants: after a search outage that overlaps a full sync, check that a search_reindex job with a ':sync:' key runs and that search then shows the published names.
+- [ ] test:migrate-map now starts a sqld, as test:publish does. CI's sqld download still needs the owner's approval of its source and checksum; nothing under .github/ was changed.
+- [ ] Owner/CUTOVER decisions: when a live-row read fails, the product page still shows the error page (modules and badge read the same row and fail closed), and collection pins still fail closed. Decide whether pins should degrade too.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
