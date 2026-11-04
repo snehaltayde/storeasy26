@@ -58,9 +58,16 @@ export default async function CollectionPage({ params, searchParams }) {
   const { products, total, facets, template } = await tfetch(async () => {
     // S53 (0B-2): pin order is release-gated — the resolver supplies the
     // frozen pins in live mode, the draft table in preview/pre-publish.
-    const { resolvedCollectionPins, resolvedSurfaceTemplateFor } = await import("@/lib/content/resolve");
+    const { resolvedCollectionPins, resolvedSurfaceTemplateFor, previewEntityRow, collectionPreviewView } = await import("@/lib/content/resolve");
     // S57: this collection's explicit assignment wins over the family default
-    const [pins, surface] = await Promise.all([resolvedCollectionPins(handle), resolvedSurfaceTemplateFor("collection", collection.id)]);
+    // P4-OVL07 (PV-03, plan decision 14): on a documents store both come from
+    // the collection's live row; in a founder's documents preview, from this
+    // collection's saved draft instead (this page only; previewEntityRow is
+    // null for everyone else).
+    const draft = await previewEntityRow("collection_content", collection.id);
+    const [pins, surface] = draft
+      ? await collectionPreviewView(handle, collection.id, draft).then((v) => [v.pins, v.surface])
+      : await Promise.all([resolvedCollectionPins(handle), resolvedSurfaceTemplateFor("collection", collection.id)]);
     const [{ products, total }, facets] = await Promise.all([
       getProductsInCollection(handle, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, ...filters, pins }),
       getCollectionTypeFacets(handle),

@@ -571,7 +571,11 @@ await t("candidateSource builds the documented shape, checks the list, and freez
     "shape:",
   );
   ok(src.bodies instanceof Map && src.bodies.size === DV_BUILT.versions.length, "bodies carried");
-  ok(src.entityRows.product instanceof Map && src.entityRows.collection instanceof Map, "empty entity rows by default");
+  // P4-OVL07: no rows of its own by default, so the entity getters read the
+  // live tables (the data check after a backfill); rows passed in are kept
+  eq(src.entityRows, null, "no entity rows by default:");
+  const rows = { product: new Map(), collection: new Map() };
+  eq(Res.candidateSource({ list: DV_BUILT.list, entityRows: rows }).entityRows, rows, "entity rows passed in:");
   ok(Object.isFrozen(src), "frozen");
   same(src.list.documents.doc_home, DV_BUILT.list.documents.doc_home, "list entry:");
   let code = null;
@@ -652,6 +656,40 @@ await t("a held body is checked like a stored one: wrong document, newer schema,
   // and a version neither held nor stored is MISSING_VERSION, as on a live list
   eq(await tryWith({ document_id: "doc_announcement", body: JSON.parse(v.body) }), null, "the right body reads:");
   eq(await tryWith({ document_id: "doc_announcement", body: JSON.parse(v.body) }, { alone: true }), "MISSING_VERSION", "the other chrome versions are not on vgl:");
+});
+
+// P4-OVL07 (from the P4-SEAM review, survived mutation M16): a candidate whose
+// list has no doc_home (null: the code default) builds the home page from the
+// code default sections. It must never read the live store's home: vgl has a
+// v3 release live with its own hero and sections.
+await t("a candidate with no doc_home (null) gives the code-default home page and never reads the live store's home", async () => {
+  await putLive(VGL, "rel_fixture_v3c", LEGACY.v3);
+  const noHome = await buildList(fullStore("Docs").filter((it) => it.id !== "doc_home"), []);
+  eq(noHome.list.documents.doc_home, null, "the list's doc_home:");
+  const r = await asRequest(VGL, async () => {
+    const G = Res.contentGettersFor(Res.candidateSource({ list: noHome.list, releaseId: "rel_nohome", bodies: bodiesOf(noHome.versions) }));
+    return { page: await G.resolvedHomePage(), sections: await G.resolvedHomeSections(), live: await Res.resolvedHomePage() };
+  });
+  const { defaultHero, DEFAULT_HOME_SECTIONS } = await import("../lib/cms/defaults.js");
+  eq(r.page[0].kind, "hero", "the hero first:");
+  eq(r.page[0].settings.title, defaultHero("Legacy Outputs").title, "the code-default hero:");
+  same(r.page.slice(1).map((s) => [s.id, s.kind]), DEFAULT_HOME_SECTIONS.map((s) => [s.id, s.kind]), "the code-default sections:");
+  same(r.sections.map((s) => s.id), DEFAULT_HOME_SECTIONS.map((s) => s.id), "resolvedHomeSections too:");
+  // the live store's home, read in the same request, is v3's: what a leak would show
+  eq(r.live[0].settings.title, "Live hero v3", "the live home (control):");
+  ok(!r.page.some((s) => ["sec_aa11", "sec_bb22"].includes(s.id)), "a live v3 section leaked into the candidate");
+});
+
+// P4-OVL07 (from the P4-SEAM review, survived mutation M11): a pairs limit
+// smaller than the number of pairs is honoured through contentGettersFor.
+await t("resolvedPdpPairs through contentGettersFor honours a limit smaller than the number of pairs", async () => {
+  const rows = { product: new Map([[P(1), { product_id: P(1), pairs: JSON.stringify([P(2), P(3)]), pairs_title: "Pick two" }]]), collection: new Map() };
+  const r = await asRequest(VGL, async () => {
+    const G = Res.contentGettersFor(Res.candidateSource({ list: DV_BUILT.list, releaseId: "rel_pairs", bodies: bodiesOf(DV_BUILT.versions), entityRows: rows }));
+    return { one: await G.resolvedPdpPairs(P(1), { limit: 1 }), all: await G.resolvedPdpPairs(P(1)) };
+  });
+  same([r.all.source, r.all.title, r.all.products.map((p) => p.handle)], ["manual", "Pick two", ["night-cream", "whey-gold"]], "both pairs at the default limit:");
+  same([r.one.source, r.one.products.map((p) => p.handle)], ["manual", ["night-cream"]], "limit 1:");
 });
 
 // =====================================================================================

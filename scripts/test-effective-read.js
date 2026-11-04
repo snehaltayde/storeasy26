@@ -235,7 +235,13 @@ async function productPageModule(tn) {
       resolvedPdpExtras: async () => [],
       resolvedProductOverride: async () => null,
       resolvedSurfaceTemplateFor: async () => ({ template }),
+      // P4-OVL07: no documents preview here (shoppers)
+      previewEntityRow: async () => null,
+      productPreviewView: async () => {
+        throw new Error("no preview view without a draft");
+      },
     },
+    "@/lib/catalog/effective": E,
     "@/lib/ids": ids,
     "@/lib/site": { abs: (p) => `https://${tn.id}.test${p}`, siteName: () => "Fixture Store" },
     "@/lib/tenant-request": { tfetch: (fn) => tn.run(fn) },
@@ -365,12 +371,32 @@ const NOISE = new Set(["products", "product_images", "variants", "collections", 
 const SQL_WORDS = /\b(select|from|join|where|order\s+by)\b/i;
 const LIT = /^\s*(?:([A-Za-z_]\w*)\.)?([A-Za-z_]\w*)(?:\s+as\s+\w+)?\s*$/i;
 
+// P4-OVL07 (from the P4-EFFECTIVE review): a table name held in a variable
+// in the same file, `const TB = "products"` (or "products as p"), then
+// db.selectFrom(TB), .innerJoin(TB, ...), or `FROM ${TB}` in SQL text, reads
+// the table as if it were written there. Each such use is replaced by the
+// quoted name before the scan, so the statement is seen. A name that comes
+// from another module, a function argument or an expression is not followed
+// (see the packet's Known limits).
+const TABLE_VAR = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(["'`])((?:products|product_images)(?:\s+as\s+[A-Za-z_]\w*)?)\2/g;
+function tableNamesInline(src) {
+  const vars = new Map();
+  for (const m of src.matchAll(TABLE_VAR)) vars.set(m[1], m[3]);
+  let out = src;
+  for (const [name, table] of vars) {
+    const id = name.replace(/\$/g, "\\$");
+    out = out.replace(new RegExp(`\\b(selectFrom|innerJoin|leftJoin|rightJoin|fullJoin)\\(\\s*${id}(?![\\w$])`, "g"), (_, fn) => `${fn}("${table}"`);
+    out = out.replace(new RegExp(`\\$\\{\\s*${id}\\s*\\}`, "g"), table);
+  }
+  return out;
+}
+
 // Every statement in a file that reads products or product_images: the columns
 // it names, and why it reads content (selectAll, a content column, or a column
 // list this scan cannot read). Column-aware: a read of id and handle is not
 // content; a select of everything or of a list it cannot see is.
 function scanSource(file, rawSrc) {
-  const src = stripComments(rawSrc);
+  const src = tableNamesInline(stripComments(rawSrc));
   const consts = constants(src);
   const found = [];
   const seenStart = new Set();
@@ -641,6 +667,18 @@ await t("a spread column constant, an unreadable column list and raw SQL are cau
   ok(imgs.violations.some((v) => v.includes("product_images.url")), imgs.violations.join(" | ") || "images: no violation");
 });
 
+await t("a table name held in a variable is caught: selectFrom(TB) with selectAll, a join, and FROM ${TB} in SQL text", async () => {
+  const held = await guard({ read: plant("lib/wishlist.js", replaceOnce("const rows = await cardRows({ handles });", 'const TB = "products";\n  const rows = await db.selectFrom(TB).selectAll().where("handle", "in", handles).execute();')) });
+  ok(held.violations.some((v) => v.startsWith("lib/wishlist.js") && v.includes("products.* (selectAll)")), held.violations.join(" | ") || "selectFrom(TB): no violation");
+  const aliased = await guard({ read: plant("lib/wishlist.js", replaceOnce("const rows = await cardRows({ handles });", 'const PRODUCTS = "products as p";\n  const rows = await db.selectFrom("variants as v").innerJoin(PRODUCTS, "p.id", "v.product_id").select(["v.id", "p.title"]).execute();')) });
+  ok(aliased.violations.some((v) => v.includes("products.title")), aliased.violations.join(" | ") || "innerJoin(PRODUCTS): no violation");
+  const text = await guard({ read: plant("lib/wishlist.js", replaceOnce("const rows = await cardRows({ handles });", 'const T_IMG = "product_images";\n  const rows = (await libsql.execute(`SELECT url, alt FROM ${T_IMG}`)).rows;')) });
+  ok(text.violations.some((v) => v.includes("product_images.url")), text.violations.join(" | ") || "FROM ${T_IMG}: no violation");
+  // the same names, held in a variable that names another table, are no read of products
+  const other = await guard({ read: plant("lib/wishlist.js", replaceOnce("const rows = await cardRows({ handles });", 'const TB = "variants";\n  const extra = await db.selectFrom(TB).selectAll().execute();\n  const rows = await cardRows({ handles });')) });
+  eq(other.violations.length, 0, `another table flagged: ${other.violations}`);
+});
+
 await t("the allowlist is narrow: a content column added to an allowed statement, or a content read elsewhere in that file, fails", async () => {
   const facets = await guard({ read: plant("lib/repo.js", replaceOnce('.select(["p.product_type"])', '.select(["p.product_type", "p.title"])')) });
   ok(facets.violations.some((v) => v.includes("getCollectionTypeFacets") && v.includes("products.title")), facets.violations.join(" | ") || "facets: no violation");
@@ -897,6 +935,58 @@ await t("wishlist, quiz results and the quiz email show 'New'; quiz scoring stil
   same(q.map((x) => x.title), ["Alpha Creatine", "New", "Zeta Bar"], "quiz picks (tag-scored, sorted by the title shown)");
   const email = await quizEmail(T, "New");
   ok(email.body.includes("· New — /products/whey") && !email.body.includes("Old Whey"), email.body);
+});
+
+// P4-OVL07 (from the P4-EFFECTIVE review): a display type that collides with
+// a quiz tag. Quiz scoring reads Shopify's tags (logic_tags), never the type
+// shown: a product whose shown type is "gear" (and has no gear tag) never
+// matches the "gear" answer, and a product shown as "protein" whose tags say
+// gear still does.
+await t("quiz scoring ignores a display type that collides with a quiz tag (it scores on Shopify's tags only)", async () => {
+  await setLive(T, 4, { display_type: "gear" }); // creatine: tags protein, shop
+  await setLive(T, 2, { display_type: "protein" }); // shaker: tags gear, shop
+  try {
+    const gear = await inT(() => Quiz.recommendProducts(["gear"]));
+    same(gear.map((x) => [x.handle, x.display_type, x.matches]), [["shaker", "protein", 1]], "the gear answer (tag-scored):");
+    const protein = await inT(() => Quiz.recommendProducts(["protein"]));
+    ok(!protein.some((x) => x.handle === "shaker"), `a shaker shown as protein matched the protein answer: ${JSON.stringify(protein)}`);
+    ok(protein.some((x) => x.handle === "creatine" && x.display_type === "gear"), "creatine still matches protein by its tags, shown as gear");
+  } finally {
+    await clearLiveFor(4);
+    await clearLiveFor(2);
+  }
+});
+
+// P4-OVL07 (from the P4-EFFECTIVE review): the header search box, rendered
+// with the hits the search route answers. Its hooks are stubbed to the state
+// it holds after the shopper typed and the answer came back (no browser).
+async function renderSearchBox(hits, typed) {
+  const states = [typed, hits, [], false, true, -1]; // q, results, recent, loading, open, active (in the order the component asks)
+  let i = 0;
+  const hooks = { __esModule: true, ...React, useState: (init) => [i < states.length ? states[i++] : init, () => {}], useEffect: () => {}, useRef: (v) => ({ current: v ?? null }) };
+  const Box = await loadComponent("components/SearchBox.js", {
+    react: hooks,
+    "next/navigation": { useRouter: () => ({ push: () => {} }) },
+    "next/link": Link,
+    "@/components/StoreImage": { __esModule: true, default: ({ src, alt }) => h("img", { src, alt }) },
+    "@/lib/format": format,
+  });
+  return renderToStaticMarkup(h(Box.default));
+}
+
+await t("the rendered header search box shows each hit's display_type (the type shown), never Shopify's product type", async () => {
+  await setLive(T, 1, { title: "New", display_type: "Shakes" });
+  const res = await inT(() => repo.searchProductsInDb("New", 8));
+  const hit = res.hits.find((x) => x.handle === "whey");
+  same([hit.display_type, hit.product_type], ["Shakes", undefined], "the hit:");
+  const html = await renderSearchBox(res.hits, "New");
+  ok(html.includes('href="/products/whey"') && html.includes(">New<"), `the hit is in the box: ${html.slice(0, 400)}`);
+  ok(text(html).includes("Shakes"), `the type shown: ${text(html)}`);
+  ok(!text(html).includes("Protein"), "Shopify's product type shows in the box");
+  // a Typesense-shaped hit (product_type) shows the same once displayHits maps it
+  const mapped = E.displayHits({ hits: [{ handle: "bar", title: "Zeta Bar", product_type: "Snacks", price: 100, currency: "INR" }] }).hits;
+  ok(text(await renderSearchBox(mapped, "Zeta")).includes("Snacks"), "a mapped Typesense hit's type");
+  await setLive(T, 1, { title: "New" });
 });
 
 async function quizEmail(tn, marker) {

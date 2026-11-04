@@ -459,6 +459,12 @@ try {
     await exec(db, "DELETE FROM cms_pages");
     await exec(db, "DELETE FROM page_redirects");
     await exec(db, "DELETE FROM placements WHERE kind = 'cart_upsell'");
+    // P4-OVL07: the entity part is mapped now, so the product and collection
+    // extras in the live tables (which the v3 release froze as empty) are
+    // unpublished drafts too; an unchanged store holds none
+    await exec(db, "DELETE FROM placements");
+    await exec(db, "DELETE FROM product_overrides");
+    await exec(db, "DELETE FROM collection_overrides");
     for (const [k, v] of Object.entries(rel.blocks)) await exec(db, "INSERT INTO cms_blocks (key, value, updated_at) VALUES (?, ?, 'x')", [k, JSON.stringify(v)]);
     for (const p of rel.pages)
       await exec(db, "INSERT INTO cms_pages (slug, title, description, sections, enabled, effective_at, family, window_start, window_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [
