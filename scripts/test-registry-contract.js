@@ -840,6 +840,110 @@ await t("AU-04: starterSection binds a new product rail to the first collection 
   ok(threw, "an unknown kind is a bug");
 });
 
+// ---- P3-FIX1: the P3-VALIDATE review findings ----------------------------------------------
+
+await t("P3-FIX1: pickRailCollection never counts product_count as available; a known available count is preferred", async () => {
+  const { pickRailCollection } = await import("../lib/registry/starter.js");
+  const min = R.sectionType("product_rail").minItems;
+  const big = { handle: "big", product_count: 20 }; // no available count: unknown
+  const known = { handle: "known", available_count: min, product_count: min };
+  const small = { handle: "small", available_count: 1, product_count: 9 };
+  const soldOut = { handle: "sold-out", available_count: 0, product_count: 5 };
+  eq(pickRailCollection([big, known], min)?.handle, "known", "a known count of enough beats a big unknown one:");
+  eq(pickRailCollection([big, small], min)?.handle, "small", "a known count above 0 beats an unknown one:");
+  eq(pickRailCollection([soldOut, big], min)?.handle, "big", "an unknown count with products beats a known 0:");
+  eq(pickRailCollection([big], min)?.handle, "big", "alone, an unknown one with products is still taken:");
+  eq(pickRailCollection([soldOut], min)?.handle, "sold-out", "alone, a sold-out one that holds products (today's fallback):");
+  eq(pickRailCollection([big, { handle: "ap", availableProducts: min }], min)?.handle, "ap", "availableProducts counts as known:");
+  eq(pickRailCollection([{ handle: "none", product_count: 0 }], min), null, "an empty one is never taken:");
+  deq(R.starterSection("product_rail", { collections: [big, known], id: "sec_r1" }).settings.collection, { handle: "known" }, "starterSection follows it:");
+});
+
+await t("P3-FIX1: a draft has a hard cap: over 512 KB, a text over 20,000 characters, or a list over 4x its publish maximum is an error (not incomplete)", async () => {
+  // a text over 20,000 characters: one error for the field, no incomplete note beside it
+  const longTitle = home([sec("text", "sec_t1", { title: "x".repeat(20_001) })]);
+  const r1 = validate(longTitle, { mode: "draft" });
+  eq(r1.ok, false, "refused:");
+  const e1 = one(r1, "TOO_LONG_TO_SAVE", { sectionId: "sec_t1" });
+  eq(e1.severity, "error", "severity:");
+  eq(e1.field, "title", "field:");
+  eq(find(r1, "TOO_LONG", { sectionId: "sec_t1", field: "title" }).length, 0, "the incomplete note is replaced:");
+  // just under: still a tolerated incomplete draft
+  const r1b = validate(home([sec("text", "sec_t1", { title: "x".repeat(20_000) })]), { mode: "draft" });
+  eq(r1b.ok, true, "20,000 characters is a draft:");
+  eq(one(r1b, "TOO_LONG", { sectionId: "sec_t1" }).severity, "incomplete", "and stays incomplete:");
+  // the largest publish limit (the custom section's 20,000) still publishes
+  const custom = R.sectionType("custom_html") ? "custom_html" : R.sectionKinds().find((k) => R.sectionType(k).settings.some((s) => s.kind === "rich_text" && s.max === 20_000));
+  ok(custom, "a section with a 20,000 limit");
+  const key = R.sectionType(custom).settings.find((s) => s.max === 20_000).key;
+  const fullHtml = `<p>${"y".repeat(20_000 - 7)}</p>`;
+  eq(fullHtml.length, 20_000, "fixture length:");
+  const typeFor = R.sectionType(custom).documentTypes[0];
+  const atLimit = R.fixtureDocument(typeFor, [sec(custom, "sec_c1", { [key]: fullHtml })]);
+  eq(find(validate(atLimit, { mode: "draft" }), "TOO_LONG_TO_SAVE").length, 0, "a publishable rich text is never capped:");
+  eq(find(validate(atLimit, { mode: "publish" }), "TOO_LONG").length, 0, "and publishes:");
+  // FAQ answers and menu labels deep in lists
+  const faq = home([sec("faq", "sec_f1", { items: [{ q: "Q", a: `<p>${"z".repeat(20_001)}</p>` }] })]);
+  eq(one(validate(faq, { mode: "draft" }), "TOO_LONG_TO_SAVE", { sectionId: "sec_f1" }).field, "items.0.a", "an answer's path:");
+  // a list over 4x its publish maximum
+  const paras = (n) => home([sec("text", "sec_t2", { body: Array.from({ length: n }, (_, i) => `p${i}`) })]);
+  const max = R.sectionType("text").settings.find((s) => s.key === "body").max;
+  const r2 = validate(paras(max * 4 + 1), { mode: "draft" });
+  eq(r2.ok, false, "over 4x refused:");
+  eq(one(r2, "TOO_MANY_TO_SAVE", { sectionId: "sec_t2" }).field, "body", "field:");
+  eq(find(r2, "TOO_MANY", { sectionId: "sec_t2" }).length, 0, "the incomplete note is replaced:");
+  const r2b = validate(paras(max * 4), { mode: "draft" });
+  eq(r2b.ok, true, "exactly 4x is a draft:");
+  eq(one(r2b, "TOO_MANY", { sectionId: "sec_t2" }).severity, "incomplete", "and stays incomplete:");
+  const qa = home([sec("faq", "sec_f2", { items: Array.from({ length: 5000 }, () => ({ q: "Q", a: "<p>A</p>" })) })]);
+  eq(validate(qa, { mode: "draft" }).ok, false, "the review's 5,000-question FAQ:");
+  // a menu item's sub-items (publish limit 8)
+  const header = (n) => ({ ...R.emptyBody("header"), settings: { ...R.emptyBody("header").settings, mode: "custom", items: [{ label: "Shop", link: { type: "url", href: "/collections" }, children: Array.from({ length: n }, (_, i) => ({ label: `c${i}`, link: { type: "url", href: "/collections" } })) }] } });
+  eq(one(validate(header(33), { mode: "draft" }), "TOO_MANY_TO_SAVE").field, "items.0.children", "33 sub-items:");
+  eq(find(validate(header(32), { mode: "draft" }), "TOO_MANY_TO_SAVE").length, 0, "32 sub-items:");
+  // a body over 512 KB, every field within its own cap
+  const bulky = (sections) => home(Array.from({ length: sections }, (_, i) => sec("text", `sec_b${i}`, { body: Array.from({ length: 100 }, () => "w".repeat(3000)) })));
+  const r3 = validate(bulky(2), { mode: "draft" });
+  eq(r3.ok, false, "over 512 KB refused:");
+  eq(one(r3, "DRAFT_TOO_LARGE").severity, "error", "one body-level error:");
+  eq(validate(bulky(1), { mode: "draft" }).ok, true, "300 KB is a draft:");
+  // publish mode is unchanged: the usual limits, no cap codes (publish has no
+  // body size limit of its own: see the packet's known limits)
+  for (const [b, refused] of [[longTitle, true], [paras(max * 4 + 1), true], [bulky(2), false]]) {
+    const p = validate(b, { mode: "publish" });
+    eq(p.ok, !refused, "publish as before:");
+    ok(!p.issues.some((i) => ["TOO_LONG_TO_SAVE", "TOO_MANY_TO_SAVE", "DRAFT_TOO_LARGE"].includes(i.code)), "no cap code in publish");
+  }
+});
+
+await t("P3-FIX1: an oversized draft is refused on save (saveDraft answers 422 and stores nothing)", async () => {
+  const { libsql } = await import("../lib/db.js");
+  const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+  await libsql.executeMultiple(await readFile(join(root, "lib/schema.sql"), "utf8"));
+  await runMigrations(libsql, await loadMigrations("tenant"), {});
+  await libsql.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+  const Svc = await import("../lib/documents/service.js");
+  const actor = { kind: "merchant", id: "u_reg" };
+  const { document: d } = await Svc.createDocument({ type: "home", body: home([sec("text", "sec_s1", { title: "Small" })]), actor });
+  for (const big of [home([sec("text", "sec_s1", { title: "x".repeat(20_001) })]), home([sec("faq", "sec_s2", { items: Array.from({ length: 5000 }, () => ({ q: "Q", a: "<p>A</p>" })) })])]) {
+    let err = null;
+    try {
+      await Svc.saveDraft({ id: d.id, revision: d.revision, body: big, actor });
+    } catch (e) {
+      err = e;
+    }
+    ok(err, "saveDraft refused it");
+    eq(err.status, 422, "status:");
+    ok(JSON.stringify(err.extra ?? err.issues ?? err.message).match(/TOO_LONG_TO_SAVE|TOO_MANY_TO_SAVE/) || /too long to save|too many to save/.test(JSON.stringify(err)), `the cap's code: ${String(err.message).slice(0, 200)}`);
+    const now = await Svc.getDocument(d.id);
+    eq(now.revision, d.revision, "nothing stored:");
+    eq(now.body.sections[0].settings.title, "Small", "the draft is as it was:");
+  }
+  // a draft over a publish limit (but under the cap) still saves, as PV-02 says
+  const saved = await Svc.saveDraft({ id: d.id, revision: d.revision, body: home([sec("text", "sec_s1", { title: "x".repeat(121) })]), actor });
+  ok(saved.document.revision > d.revision, "an over-limit title under the cap saves");
+});
+
 // ---- AU-02: every message is a plain sentence --------------------------------------------
 
 // Bad values for each setting kind, so every check of lib/registry/settings.js

@@ -178,13 +178,14 @@ const sessionToken = async (u) => (await SS.createSession({ userId: u.id, kind: 
 const bootToken = (T) => inT(T, () => adminSessionToken());
 
 // A route request: host, optional Origin, cookies, JSON body or query.
-function req(T, { cookies = {}, body, path = "/api/admin/logout", origin = null } = {}) {
+function req(T, { cookies = {}, body, path = "/api/admin/logout", origin = null, headers = {} } = {}) {
   const url = new URL(path, `http://${HOST(T)}`);
+  const lower = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
   return {
     url: url.href,
     nextUrl: url,
     cookies: { get: (n) => (Object.hasOwn(cookies, n) && cookies[n] != null ? { name: n, value: cookies[n] } : undefined) },
-    headers: { get: (k) => ({ host: HOST(T), ...(origin ? { origin } : {}) })[String(k).toLowerCase()] ?? null },
+    headers: { get: (k) => ({ ...lower, host: HOST(T), ...(origin ? { origin } : {}) })[String(k).toLowerCase()] ?? null },
     json: async () => body,
   };
 }
@@ -349,9 +350,21 @@ await t("no actor (no cookie, or a cookie that names no one): nothing is revoked
 });
 
 await t("unit: revokePreviewSessionsFor never sweeps rows with no known author", async () => {
+  // P3-FIX1: a row written with no known author (created_by 'unknown') is
+  // there to be swept, so the guard is really exercised
+  const sid = "ps_00000000000a0b0c";
+  const exp = new Date(Date.now() + 3600_000).toISOString();
+  await inT(LD, () => libsql.execute({ sql: "INSERT INTO preview_sessions (id, tenant_id, created_by, created_at, expires_at, revoked_at, show_design) VALUES (?, ?, 'unknown', ?, ?, NULL, 0)", args: [sid, LD.id, NOW, exp] }));
   const n = await inT(LD, () => PS.revokePreviewSessionsFor({ actor: null }));
   eq(n, 0, "rows:");
   eq(await inT(LD, () => PS.revokePreviewSessionsFor({ actor: { kind: "merchant" } })), 0, "rows for an actor with no id:");
+  eq(await inT(LD, () => PS.revokePreviewSessionsFor({ actor: {} })), 0, "rows for an empty actor:");
+  // a real person's logout leaves it too
+  await inT(LD, () => PS.revokePreviewSessionsFor({ actor: { kind: "merchant", id: asha.id } }));
+  const row = (await rowsOf(LD)).find((r) => r.id === sid);
+  ok(row && row.by === "unknown", "the 'unknown' row is there");
+  eq(row.revoked, false, "the 'unknown' row is never revoked:");
+  await inT(LD, () => libsql.execute({ sql: "DELETE FROM preview_sessions WHERE id = ?", args: [sid] }));
 });
 
 await t("a cross-origin logout is refused before anything is revoked", async () => {
@@ -590,7 +603,15 @@ await t(`call() maps every example outcome of every operation (${ALL_OPS.length}
       const want = expected(o);
       const kind = Object.keys(ALLOWED).find((k) => r[k] !== undefined && (k !== "issues" || Array.isArray(r.issues)) && (k !== "error" || r.error === true));
       eq(kind, want.kind, `${where} kind`);
-      for (const k of Object.keys(r)) ok(ALLOWED[kind].includes(k), `${where} unexpected key ${k}`);
+      // P3-FIX1: a key is the result's own, or a field of the body kept as sent
+      for (const k of Object.keys(r)) ok(ALLOWED[kind].includes(k) || (kind !== "ok" && k !== "error" && Object.hasOwn(o.body, k)), `${where} unexpected key ${k}`);
+      if (kind !== "ok") {
+        for (const k of Object.keys(o.body)) {
+          if (k === "error") continue;
+          ok(Object.hasOwn(r, k), `${where} the body's ${k} was dropped`);
+          same(r[k], o.body[k], `${where} ${k}`);
+        }
+      }
       if (kind === "ok") {
         same(r.data, want.data, `${where} data`);
         eq(r.ok, true, `${where} ok`);
@@ -697,6 +718,35 @@ await t("the module imports the shapes file (no restated shapes) and stays plain
   same(Api.OPERATIONS, Object.keys(Shapes.SHAPES), "operations come from SHAPES:");
 });
 
+await t("P3-FIX1: error and refusal bodies keep retryable, release, reason, missing, slug and document (and today's code, message, other, offer, current)", async () => {
+  const C0 = Shapes.COMMON.outcomes;
+  const P0 = Shapes.SHAPES.publish.outcomes;
+  const cases = [
+    ["503 DATABASE_UNAVAILABLE", C0.databaseUnavailable, "error", { retryable: true }],
+    ["503 DATABASE_NOT_READY", C0.databaseNotReady, "error", { retryable: false }],
+    ["409 SAVE_CONFLICT", C0.saveConflict, "refused", { retryable: true }],
+    ["500 INTERNAL_ERROR", C0.internalError, "error", { retryable: true }],
+    ["503 PUBLISH_UNKNOWN", { status: 503, body: { error: "Your publish may have gone live. Reload to check.", code: "PUBLISH_UNKNOWN", release: { id: "rel_1" } } }, "error", { release: { id: "rel_1" } }],
+    ["500 PUBLISH_FAILED", { status: 500, body: { error: "Something went wrong on our side, so nothing was published.", code: "PUBLISH_FAILED", reason: "THREW" } }, "error", { reason: "THREW" }],
+    ["404 DOCUMENT_DELETED", { status: 404, body: { error: "This page was deleted while you were publishing. Reload to see the current pages.", code: "DOCUMENT_DELETED", missing: ["doc_home"] } }, "error", { missing: ["doc_home"] }],
+    ["409 SLUG_TAKEN", { status: 409, body: { error: "Another page already uses this web address.", code: "SLUG_TAKEN", slug: "about-us", other: { id: "doc_x", label: "About" } } }, "refused", { slug: "about-us", other: { id: "doc_x", label: "About" } }],
+    ["409 NOT_PUBLISHABLE", { status: 409, body: { error: "The menu is published with the pages that use it.", code: "NOT_PUBLISHABLE", document: "doc_header" } }, "refused", { document: "doc_header" }],
+  ];
+  // the contract's own examples carry these fields too
+  ok(Object.values(P0).some((o) => o.body?.release) || JSON.stringify(Shapes.SHAPES).includes('"release"'), "the contract has a release example");
+  for (const [name, o, kind, fields] of cases) {
+    const r = await Api.createDocumentsApi({ fetch: stubFetch(o) }).call("publish", {});
+    eq(r[kind], true, `${name} kind:`);
+    eq(r.code, o.body.code, `${name} code:`);
+    eq(r.message, o.body.error, `${name} message:`);
+    for (const [k, v] of Object.entries(fields)) same(r[k], v, `${name} ${k}:`);
+    eq(r.error === true ? kind : r.error, kind === "error" ? "error" : undefined, `${name} the body's words are never copied over the error flag:`);
+  }
+  // a body field never overwrites the result's own keys
+  const r = await Api.createDocumentsApi({ fetch: stubFetch({ status: 503, body: { error: "Try again.", code: "DATABASE_ERROR", ok: true, refused: true, message: "x" } }) }).call("publish", {});
+  same([r.error, r.ok, r.refused, r.message], [true, undefined, undefined, "Try again."], "reserved keys:");
+});
+
 console.log("— 6b. sendKeepalive");
 await t("sendKeepalive: sent with keepalive at 60,000 bytes; false above it (bytes, not characters) and nothing sent", async () => {
   const f = stubFetch({ status: 200, body: { ok: true } });
@@ -743,10 +793,13 @@ function browser(T, admin) {
       return { status: r.status, json: async () => r.body };
     }
     if (url.startsWith("/api/preview?")) {
-      const res = await PreviewRoute.GET(req(T, { path: url }));
+      const res = await PreviewRoute.GET(req(T, { path: url, headers: init.headers || {} }));
       const c = setCookies(res)._preview;
       if (c) jar._preview = c.value;
-      return { status: res.status, json: async () => null };
+      // as a browser does: redirect "manual" gives an opaque redirect (status 0)
+      if (res.status >= 300 && res.status < 400 && init.redirect === "manual") return { type: "opaqueredirect", status: 0, json: async () => Promise.reject(new SyntaxError("opaque")) };
+      const text = await res.text();
+      return { type: "basic", status: res.status, json: async () => JSON.parse(text) };
     }
     throw new TypeError(`unexpected fetch ${url}`);
   };
@@ -763,6 +816,8 @@ await t("documents store: {sid, expiresAt}; the cookie it set previews the draft
   same(b.calls.map((c) => [c.url.split("?")[0], c.init.method]), [["/api/admin/preview-session", "POST"], ["/api/preview", "GET"]], "requests:");
   same(JSON.parse(b.calls[0].init.body), { create: true }, "posts {create:true}:");
   eq(b.calls[1].init.credentials, "same-origin", "same-origin:");
+  eq(b.calls[1].init.redirect, "manual", "P3-FIX1: the cookie fetch never follows the redirect to the home page:");
+  eq(b.calls[1].init.headers?.[Api.PREVIEW_CONFIRM_HEADER], "1", "P3-FIX1: it asks /api/preview to confirm:");
   ok(b.jar._preview && b.jar._preview.includes(r.sid), "the httpOnly cookie holds this session");
   same(await heroOf(LD, b.jar._preview), { hero: "Draft hero", preview: true }, "preview:");
   eq((await rowsOf(LD)).find((x) => x.id === r.sid).by, `merchant:${asha.id}`, "created_by:");
@@ -810,6 +865,72 @@ await t("startDocumentsPreview: signed out, offline, and a previewUrl that isn't
   const r2 = await Api.createDocumentsApi({ fetch: f2 }).startDocumentsPreview();
   eq(r2.code, "NETWORK_ERROR", "cookie fetch failed:");
   ok(/preview/.test(r2.message), "says the preview didn't open");
+});
+
+await t("P3-FIX1: a showDesign step that answers 404 or 5xx makes startDocumentsPreview return that error, and no cookie is fetched", async () => {
+  const made = { status: 200, body: { ok: true, sid: "ps_0123456789abcdef", token: "p.1.x", expiresAt: NOW, showDesign: false, previewUrl: "/api/preview?token=t&to=/" } };
+  for (const answer of [
+    { status: 404, body: { error: "This preview has ended. Open the preview again.", code: "PREVIEW_SESSION_NOT_FOUND" } },
+    { status: 503, body: Shapes.COMMON.outcomes.databaseUnavailable.body },
+    { status: 500, body: Shapes.COMMON.outcomes.internalError.body },
+    { status: 502, raw: "Bad gateway" },
+  ]) {
+    const f = stubFetch((url, init) => (url === "/api/admin/preview-session" && JSON.parse(init.body).create ? made : answer));
+    const r = await Api.createDocumentsApi({ fetch: f }).startDocumentsPreview({ showDesign: true });
+    eq(r.error, true, `${answer.status}: ${JSON.stringify(r)}`);
+    eq(r.ok, undefined, `${answer.status} is not ok:`);
+    eq(r.showDesign, undefined, `${answer.status} never claims the design is shown:`);
+    eq(r.code, answer.body?.code ?? "INTERNAL_ERROR", `${answer.status} code:`);
+    ok(!f.calls.some((c) => c.url.startsWith("/api/preview?")), `${answer.status}: no cookie fetched`);
+  }
+});
+
+await t("P3-FIX1: a refused preview token is an error, not {ok:true}; so is an answer that only redirects, or a 5xx", async () => {
+  // the real routes, with the token in previewUrl spoilt on the way
+  const A = await sessionToken(asha);
+  const b = browser(LD, A);
+  const spoil = async (url, init) => {
+    const res = await b.f(url, init);
+    if (url !== "/api/admin/preview-session") return res;
+    const data = await res.json();
+    if (data?.previewUrl) data.previewUrl = data.previewUrl.replace(/token=([^&]+)/, (m, t) => `token=${t.slice(0, -1)}${t.endsWith("0") ? "1" : "0"}`);
+    return { status: res.status, json: async () => data };
+  };
+  const refused = await Api.createDocumentsApi({ fetch: spoil }).startDocumentsPreview();
+  eq(refused.error, true, `refused: ${JSON.stringify(refused)}`);
+  eq(refused.code, "PREVIEW_TOKEN_REFUSED", "code:");
+  ok(/didn't open/.test(refused.message), "plain words");
+  eq(b.jar._preview, undefined, "no cookie was set");
+  // a server that answers the cookie fetch with a redirect has not confirmed it
+  const made = { status: 200, body: { ok: true, sid: "ps_0123456789abcdef", expiresAt: NOW, previewUrl: "/api/preview?token=t&to=/" } };
+  for (const [label, cookieAnswer, code] of [
+    ["opaque redirect", { type: "opaqueredirect", status: 0 }, "PREVIEW_NOT_CONFIRMED"],
+    ["302", { status: 302 }, "PREVIEW_NOT_CONFIRMED"],
+    ["200 that is not a confirmation", { status: 200, body: { hello: 1 } }, "PREVIEW_NOT_CONFIRMED"],
+    ["503 suspended store", { status: 503, body: { error: "This store is temporarily unavailable", code: "TENANT_SUSPENDED" } }, "TENANT_SUSPENDED"],
+    ["500", { status: 500, raw: "oops" }, "INTERNAL_ERROR"],
+  ]) {
+    const f = async (url) => (url === "/api/admin/preview-session" ? { status: 200, json: async () => made.body } : { type: cookieAnswer.type || "basic", status: cookieAnswer.status, json: async () => (cookieAnswer.raw !== undefined ? JSON.parse(cookieAnswer.raw) : cookieAnswer.body) });
+    const r = await Api.createDocumentsApi({ fetch: f }).startDocumentsPreview();
+    eq(r.error, true, `${label}: ${JSON.stringify(r)}`);
+    eq(r.code, code, `${label} code:`);
+  }
+});
+
+await t("P3-FIX1: /api/preview without the confirm header answers as before (302 with the cookie, or 302 with none for a bad token)", async () => {
+  const A = await sessionToken(asha);
+  const made = await previewAdmin(LD, A, { create: true });
+  const url = made.body.previewUrl;
+  const good = await PreviewRoute.GET(req(LD, { path: url }));
+  eq(good.status, 302, "a good token:");
+  ok(setCookies(good)._preview?.value, "sets the cookie");
+  const bad = await PreviewRoute.GET(req(LD, { path: url.replace(/token=([^&]+)/, "token=p.1.bad") }));
+  eq(bad.status, 302, "a bad token:");
+  eq(setCookies(bad)._preview, undefined, "no cookie");
+  const confirmed = await PreviewRoute.GET(req(LD, { path: url, headers: { [Api.PREVIEW_CONFIRM_HEADER]: "1" } }));
+  eq(confirmed.status, 200, "with the header:");
+  same(await confirmed.json(), { ok: true }, "the confirmation:");
+  ok(setCookies(confirmed)._preview?.value, "and the same cookie");
 });
 
 // ---- done ------------------------------------------------------------------------------

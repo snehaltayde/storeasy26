@@ -32,6 +32,11 @@
 //                                status when the body can't be read
 //   { error: true, code: "NETWORK_ERROR", message }      fetch rejected
 // `message` is always founder-facing plain words.
+// P3-FIX1: every other field of an error or refusal body is kept on the
+// result as the server sent it (retryable, release, reason, missing, slug,
+// document, …), so the store can decide on a retry and the publish panel can
+// check a publish whose result is unknown. Only the body's `error` (it
+// becomes `message`) and the result's own keys above are not copied.
 import { SHAPES, COMMON } from "../../../lib/admin/documents-api-shapes.js"; // relative, so plain node loads it
 
 export const DOCUMENTS_URL = "/api/admin/documents";
@@ -70,6 +75,14 @@ const words = (body, status) => {
 };
 const codeOf = (body, status) => (isObj(body) && typeof body.code === "string" && body.code ? body.code : codeForStatus(status));
 
+// The result's own keys: a body field with one of these names never
+// overwrites them. `error` is the body's words, which become `message`.
+const RESULT_KEYS = new Set(["ok", "data", "conflict", "refused", "issues", "needsRevision", "notBuilt", "error", "code", "message", "current", "offer", "other", "documents"]);
+const withBodyFields = (out, b) => {
+  for (const [k, v] of Object.entries(b)) if (!RESULT_KEYS.has(k) && v !== undefined) out[k] = v;
+  return out;
+};
+
 // One HTTP answer to one result. Pure: status is a number, body the parsed
 // JSON (or null when it could not be read).
 export function mapResponse(status, body) {
@@ -85,26 +98,35 @@ export function mapResponse(status, body) {
     if (CONFLICT_CODES.has(code)) {
       const out = { conflict: true, code, current: isObj(b.current) ? b.current : null, message };
       if (Array.isArray(b.conflicts)) out.conflicts = b.conflicts;
-      return out;
+      return withBodyFields(out, b);
     }
     const out = { refused: true, code, message };
     if ("other" in b) out.other = b.other;
     if (isObj(b.offer)) out.offer = b.offer;
     if (isObj(b.current)) out.current = b.current;
-    return out;
+    if (Array.isArray(b.documents)) out.documents = b.documents;
+    return withBodyFields(out, b);
   }
   if (s === 422) {
     const out = { issues: Array.isArray(b.issues) ? b.issues : [], code, message };
     if (isObj(b.offer)) out.offer = b.offer;
     if (Array.isArray(b.documents)) out.documents = b.documents;
-    return out;
+    return withBodyFields(out, b);
   }
-  if (s === 428) return { needsRevision: true, code, message };
-  if (s === 501) return { notBuilt: true, code, message };
-  return { error: true, code, message };
+  if (s === 428) return withBodyFields({ needsRevision: true, code, message }, b);
+  if (s === 501) return withBodyFields({ notBuilt: true, code, message }, b);
+  const out = { error: true, code, message };
+  if (isObj(b.current)) out.current = b.current;
+  if (Array.isArray(b.documents)) out.documents = b.documents;
+  return withBodyFields(out, b);
 }
 
 const networkError = (message = NETWORK_ERROR_WORDS) => ({ error: true, code: "NETWORK_ERROR", message });
+
+// Sent on the cookie fetch: /api/preview then answers JSON (200 with the
+// cookie, or 403 PREVIEW_TOKEN_REFUSED) instead of a redirect.
+export const PREVIEW_CONFIRM_HEADER = "x-storeasy-preview-confirm";
+const PREVIEW_NOT_OPENED_WORDS = "We couldn't open the preview, so it shows nothing new yet. Check your internet connection, then try again. Your changes are still here.";
 
 // The bytes a JSON body takes on the wire (UTF-8).
 export const byteLength = (s) => new TextEncoder().encode(String(s)).length;
@@ -179,7 +201,16 @@ export function createDocumentsApi({ fetch: fetchImpl } = {}) {
   // A documents-mode preview: a session, the design draft when asked, then
   // the token URL fetched same-origin so the server sets the httpOnly cookie
   // in this browser. { ok: true, sid, expiresAt, showDesign } or a mapped
-  // error (a legacy store answers 409 STORE_USES_LEGACY with its words).
+  // error (a legacy store answers 409 STORE_USES_LEGACY with its words). A
+  // failed showDesign step is returned as it is: the preview is not reported
+  // as showing the design when it does not.
+  //
+  // The cookie fetch (P3-FIX1) asks /api/preview to confirm in JSON
+  // (PREVIEW_CONFIRM_HEADER) instead of redirecting, and never follows a
+  // redirect (redirect: "manual"), so it does not render the home page just to
+  // set a cookie. Only a 2xx { ok: true } counts. A refused token (403
+  // PREVIEW_TOKEN_REFUSED), any other status, or a redirect (an answer that
+  // did not confirm) is an error, never { ok: true }.
   async function startDocumentsPreview({ showDesign = false } = {}) {
     const made = await previewPost({ create: true });
     if (!made.ok) return made;
@@ -192,11 +223,25 @@ export function createDocumentsApi({ fetch: fetchImpl } = {}) {
       const shown = await setShowDesign(sid, true);
       if (!shown.ok) return shown;
     }
+    let res;
     try {
-      await doFetch(previewUrl, { method: "GET", credentials: "same-origin", redirect: "follow" });
+      res = await doFetch(previewUrl, { method: "GET", credentials: "same-origin", redirect: "manual", headers: { [PREVIEW_CONFIRM_HEADER]: "1" } });
     } catch {
-      return networkError("We couldn't open the preview, so it shows nothing new yet. Check your internet connection, then try again. Your changes are still here.");
+      return networkError(PREVIEW_NOT_OPENED_WORDS);
     }
+    const status = Number(res?.status) || 0;
+    if (res?.type === "opaqueredirect" || (status >= 300 && status < 400) || status === 0) {
+      return { error: true, code: "PREVIEW_NOT_CONFIRMED", message: PREVIEW_NOT_OPENED_WORDS };
+    }
+    let body = null;
+    try {
+      body = await res.json();
+    } catch {
+      body = null;
+    }
+    const answer = mapResponse(status, body);
+    if (answer.ok && answer.data.ok !== true) return { error: true, code: "PREVIEW_NOT_CONFIRMED", message: PREVIEW_NOT_OPENED_WORDS };
+    if (!answer.ok) return answer;
     return { ok: true, sid, expiresAt: expiresAt ?? null, showDesign: Boolean(showDesign) };
   }
 

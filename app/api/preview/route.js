@@ -6,6 +6,9 @@ import { requestOrigin, sameOrigin } from "@/lib/origin-check";
 import { setShowDesign } from "@/lib/preview-sessions";
 import { slog } from "@/lib/log";
 
+// The header the console's cookie fetch sends (documentsApi.js PREVIEW_CONFIRM_HEADER).
+const PREVIEW_CONFIRM_HEADER = "x-storeasy-preview-confirm";
+
 // Draft preview switch (S36 / BE09).
 //   GET ?token=p.<exp>.<hmac>[&to=/path] → verify, set the preview cookie
 //     (httpOnly, lifetime = the token's remaining life), redirect to `to`.
@@ -67,13 +70,24 @@ export const GET = tenantHandler(async (request) => {
     return res;
   }
 
+  // P3-FIX1: the new editor's cookie fetch (components/admin/editor/
+  // documentsApi.js) sends this header and gets a JSON answer it can check,
+  // instead of a redirect it would have to follow to the home page. Without
+  // the header (a link, the legacy Designer) the answers are unchanged.
+  const confirm = request.headers.get(PREVIEW_CONFIRM_HEADER) === "1";
   const token = params.get("token") || "";
   if (!(await verifyPreviewToken(token))) {
+    if (confirm) {
+      return NextResponse.json(
+        { error: "This preview link has expired or isn't valid, so the preview didn't open. Close it and open the preview again.", code: "PREVIEW_TOKEN_REFUSED" },
+        { status: 403, headers: { "Cache-Control": "no-store" } },
+      );
+    }
     // expired or forged → live site, no cookie, no hint
     return NextResponse.redirect(dest, 302);
   }
   const exp = Number(token.split(".")[1]) * 1000;
-  const res = NextResponse.redirect(dest, 302);
+  const res = confirm ? NextResponse.json({ ok: true }, { status: 200, headers: { "Cache-Control": "no-store" } }) : NextResponse.redirect(dest, 302);
   res.cookies.set(PREVIEW_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",

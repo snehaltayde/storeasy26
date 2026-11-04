@@ -56,7 +56,7 @@ process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 delete process.env.CHECKOUT_MODE;
 
-const dbs = [".test-com-default.db", ".test-com-platform.db", ".test-com-t1.db", ".test-com-cc.db", ".test-com-cl.db"];
+const dbs = [".test-com-default.db", ".test-com-platform.db", ".test-com-t1.db", ".test-com-cc.db", ".test-com-cl.db", ".test-com-cp.db", ".test-com-cs.db"];
 for (const f of dbs) await rm(join(here, "..", f), { force: true });
 
 const C = await import("../lib/platform/control.js");
@@ -430,6 +430,74 @@ await t("PUB-06 forms: contact, leads and quiz POST on a closed store are 403 ST
   const msgs = await withTenant(CC, () => libsql.execute("SELECT count(*) AS n FROM contact_messages"));
   eq(Number(msgs.rows[0].n), 1, "contact messages on the closed store (the preview one only):");
   globalThis.__comAfter.length = 0;
+});
+
+// --- P3-FIX1: the P3-CLOSED review's test gaps --------------------------------------------
+console.log("— P3-FIX1: a published documents store, and leads on store hosts");
+const Svc = await import("../lib/documents/service.js");
+const Pub = await import("../lib/documents/publish.js");
+// documents mode with a real first publish (the home page) through the service
+const CP = await store("cp", "documents");
+await withTenant(CP, async () => {
+  const actor = { kind: "merchant", id: "u_com" };
+  const Reg = await import("../lib/registry/index.js");
+  const { document: d } = await Svc.createDocument({ type: "home", body: { ...Reg.emptyBody("home"), sections: [Reg.newSection("hero")] }, actor });
+  await Pub.publish({ ids: [{ id: d.id, revision: d.revision, draftHash: d.draftHash }], actor });
+});
+
+await t("P3-FIX1: a published documents store with a valid preview session is open: card checkout is not refused as STORE_CLOSED (closedStoreGate needs no release)", async () => {
+  const pointer = await withTenant(CP, () => libsql.execute("SELECT live_release_id AS live FROM release_state WHERE id = 1"));
+  ok(pointer.rows[0]?.live, "the store has a live release");
+  const { sid, ...pv } = await previewCookie(CP);
+  for (const cookies of [{}, pv]) {
+    const rz = await checkout(CP, await cartOn(CP), "razorpay_create", cookies);
+    ok(rz.body?.code !== "STORE_CLOSED", `card refused as closed (${JSON.stringify(cookies)}): ${rz.status} ${JSON.stringify(rz.body)}`);
+    const cart = await cartOn(CP);
+    const cod = await checkout(CP, cart, "cod", cookies);
+    eq(cod.status, 200, `COD (${JSON.stringify(cookies)}) ${JSON.stringify(cod.body)}:`);
+  }
+  for (const [name, route, url, body] of [
+    ["contact", contactRoute.POST, "https://cp.test/api/contact", { name: "Open Test", email: "snehal@mediastic.in", message: "A test message from the open store suite." }],
+    ["quiz", quizRoute.POST, "https://cp.test/api/quiz/fit", { answers: {} }],
+  ]) {
+    const r = await call(route, url, { body, cookies: pv });
+    eq(r.status, 200, `${name} in a preview of an open store (${JSON.stringify(r.body)}):`);
+  }
+  await withTenant(CP, () => PS.revokePreviewSession({ sid }));
+  globalThis.__comAfter.length = 0;
+});
+
+await t("P3-FIX1: /api/leads on an unknown and a suspended store host answers today's plain 404, never tenantHandler's 404 TENANT_UNKNOWN or 503 TENANT_SUSPENDED body (only a 403 is passed on)", async () => {
+  await C.upsertTenant({ id: "cs", name: "Suspended", domains: ["cs.test"], dbUrl: "file:.test-com-cs.db", config: {}, secrets: {}, status: "suspended" });
+  const cs = await C.getTenant("cs");
+  ok(cs?.status === "suspended", `the fixture store is suspended: ${JSON.stringify(cs?.status)}`);
+  for (const host of ["nobody-here.test", "cs.test"]) {
+    const r = await call(leadsRoute.POST, `https://${host}/api/leads`, { body: { name: "x", email: "snehal@mediastic.in" } });
+    eq(r.status, 404, `${host} status:`);
+    eq(JSON.stringify(r.body), JSON.stringify({ error: "Not found" }), `${host} body:`);
+  }
+});
+
+await t("P3-FIX1: /api/leads runs the rate limit before the closed-store gate (a store host reads nothing once limited)", async () => {
+  const src = await readFile(join(ROOT, "app/api/leads/route.js"), "utf8");
+  const post = src.slice(src.indexOf("export async function POST"));
+  ok(post.indexOf("rateLimit(") >= 0 && post.indexOf("storeHostAnswer(") >= 0, "both steps are in POST");
+  ok(post.indexOf("rateLimit(") < post.indexOf("storeHostAnswer("), "the rate limit comes first");
+  // and for real: with the limiter on, a closed store host is answered 429 without the gate
+  const prev = process.env.RATE_LIMIT_DISABLED;
+  delete process.env.RATE_LIMIT_DISABLED;
+  try {
+    const statuses = [];
+    for (let i = 0; i < 7; i++) {
+      const r = await call(leadsRoute.POST, "https://cc.test/api/leads", { body: { name: "x", email: "snehal@mediastic.in" }, host: "cc.test" });
+      statuses.push(r.status);
+    }
+    ok(statuses.slice(0, 5).every((s) => s === 403), `the first five reach the gate: ${statuses}`);
+    ok(statuses.slice(5).every((s) => s === 429), `then the limit answers: ${statuses}`);
+  } finally {
+    if (prev === undefined) delete process.env.RATE_LIMIT_DISABLED;
+    else process.env.RATE_LIMIT_DISABLED = prev;
+  }
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
