@@ -91,9 +91,22 @@ No getter's output changed, nor the closed, draft, live or preview paths. `previ
 - Outside a request (scripts), `resolvedHomePage` and `resolvedJournalEntries` on a legacy store now read the source once instead of once per inner getter. The output is the same, with fewer statements. No suite pins a statement count outside a request scope.
 - `lib/tenant-context.js` imports `node:async_hooks` (pre-existing, edge-provided). It is reachable from `resolve.js` and is allowed by name in the scan.
 
+From review:
+
+- Reproduced the report on a fresh detached worktree at 4814c3d. pnpm test passed 96 of 96 suites. test-content-seam passed 18 of 18. pnpm build passed with only the existing edge-runtime warnings. The diff touches only resolve.js, documents-reader.js, test-content-seam.js and the packet, so test-release-readers, test-sections-render and test-perf-docs ran with no edits and are green. No server or sqld was started, ports 6360 and 7360 to 7369 were not used, and the worktree has been removed.
+- Read the code. contentSource() is byte-identical to before. Every exported resolved* getter is a thin wrapper. No module-level source exists, no AsyncLocalStorage was added and no node: import was added. No dependency of the getters (store.js, placements.js, catalog-overrides.js, repo.js, registry/legacy.js) calls contentSource or resolve.js, so a candidate source cannot fall back to the live source by an indirect path. Held bodies go through parseVersion and never enter the per-request fetchVersionSet cache. The non-held key is the same as before, so the shopper path keeps its cache hits and statement counts.
+- I ran 17 hand mutations against test-content-seam. Thirteen were caught: nav ignoring its argument; dropping bodies from the journal index, a journal post, the cart, PDP extras, surface templates, content pages or the home helper; candidateSource skipping parseList; candidateSource set to preview true; slugRedirect reading contentSource(); the cartUpsell wrapper dropping its arguments; held bodies skipping parseVersion. Four survived, listed below. None is a production defect.
+- Test gap (survived mutation M16). When the candidate list has no doc_home (null, meaning the code default), homePageFrom falls back to homeSectionsFrom(src). Replacing that call with resolvedHomeSections(), which reads the live source, is not caught: section 2 always has a doc_home. Today's code is correct. Suggest that OVL07 or CUTOVER add a candidate case with doc_home set to null, because the MIG-02 comparison would quietly read the live store there.
+- Test gap (survived mutation M11). In contentGettersFor, if resolvedPdpPairs drops its opts (the {limit} option), no test fails. The fixture has too few pairs for limit 2 and limit 4 to give different answers. resolvedPdpPairs is an entity getter that OVL07 rewrites, so OVL07's tests should use a limit smaller than the number of pairs.
+- Survived mutation M2, harmless. On the legacy path, homePageFrom calling resolvedHero() instead of heroFrom(src) is not caught. A candidate source is always v4, and inside a request both reads give the same source, so no output can differ. Noted only for completeness.
+- Survived mutation M14, copying held entries into the cached database Map. The builder already disclosed it. I confirmed held ids are never part of the cache key, so a shopper cannot observe it.
+- Acceptance item 3 says no node: import is reachable from resolve.js. Strictly, one is: lib/tenant-context.js imports node:async_hooks. It existed before this item, the edge runtime provides it, and test-release-readers already allows it. The builder disclosed it in Known limits, and the build passes. The accurate wording would be that no new node: import was added.
+- A minor behaviour to be aware of: if the bodies map holds an id with a null or undefined value, heldVersion treats it as not held and reads that version from the database instead of failing. CUTOVER should never put null values in the map.
+- The resolvedNav, resolvedContentPage, resolvedSurfaceTemplateFor and entity wrappers now take (...args). Their arity (.length) changes, but default arguments are kept in the From functions and no caller depends on .length. No output changes.
+
 ## From review
 
-None yet.
+See "From review" at the end of Known limits.
 
 ## Owner checks
 
