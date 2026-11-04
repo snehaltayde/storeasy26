@@ -1,0 +1,127 @@
+# P3-PUBLISHUI: the publish panel, Undo, take offline, Earlier versions, Recently published
+
+**Branch:** `cms/p3-publishui`, cut from `64d3d07`.
+**Requirements:** PUB-02 (one Publish button, staff see it disabled with the reason), PUB-03 (problems in plain words, each with a fix), PUB-04 (Undo with a confirm that says what changes, take offline, Earlier versions, Recently published), PUB-05 (publish both, publish all changes, whole-set Undo), PUB-09 (what will ship, keep the live version of a section).
+**Migrations:** none.
+
+| Stage | State |
+|---|---|
+| Implemented | Yes |
+| Locally tested | Yes: `pnpm test:publish-ui` 31 of 31 (0.4 s in the gate); `pnpm test` passed 81 of 81 suites (137.7 s, with `TEST_PUBLISH_PORTS=7160,7161 TEST_PUBLISH_SERVICE_PORTS=7162,7163 TEST_PUBLISH_UNDO_PORTS=7164 PORT=6160`); `pnpm build` passed (see Tests for one retry) |
+| Browser verified | NOT DONE. No page mounts these components until P3-EDITOR (batch 4), which wires them into the editor and `/admin/releases` and runs `editor.mjs`. Every acceptance item here is a unit or rendered item. |
+| Staging | NOT DONE (owner check below) |
+
+## What changed and why
+
+Seven files, all new except the suite, which replaces P3-SCAFFOLD's placeholder. Nothing else changed: no server code, no shapes, no `package.json`, nothing under `.github/`.
+
+### `components/admin/editor/publish/publishModel.js` (pure, no React, no DOM)
+
+All the logic lives here, so node drives every interaction (plan B5). It reads documentsApi results in the shapes of `lib/admin/documents-api-shapes.js` and takes the client as an injected `call(op, args, extra)`.
+
+- **`applyAction(body, action)`** edits a copy of a draft body for the three edit actions:
+  - `hideSection` sets `enabled: false`;
+  - `removeSection` removes the section;
+  - `removeItem` removes one entry of a list. A field path is read the way `lib/registry/validate.js` writes it: inside a section, from `settings` unless the path starts with the section's own keys (`mobile`, `show`, `bindings`, `blocks`); at document level, from `settings` unless it starts with `meta` (so `meta.redirect_from` and a header's `items` both work).
+  - A section or entry that is gone gives `{ok:false}` with plain words, and nothing is sent.
+- **`stepsFor(action, ctx)`** turns an issue action into client steps:
+  - `hideSection`, `removeSection`, `removeItem`: `getDocument` (only when the host doesn't hold the draft), then `saveDraft` of the edited body with its revision, then the same publish again with the saved revision and draft hash;
+  - `publishBoth`: review every offered document, then `publishSet` with exactly the offer;
+  - `openField`: focus the field at its anchor (the issue's `anchor`, else `fieldAnchor`). Nothing is sent.
+- **`publishRequest(items)`**: one document is `publish {id, draftHash}` with `{revision}` at the top level; more are `publishSet [{id, revision, draftHash}]`. `confirmRepublish` goes only on an item the founder confirmed. An offer is always sent as a set, and its `label` is not sent.
+- **`outcomeOf(result, ctx)`** maps every publish answer to one panel state, in plain words:
+
+  | Answer | Panel |
+  |---|---|
+  | 200 | "Published …", each page with "See it live", the warnings that rode along with their fixes, and Undo |
+  | 422 `VALIDATION_FAILED` | the issues grouped by document; each row has its level ("Must fix", "Check", "Already live like this"), where, the message, the actions, and "Go to this field". An `offer` beside other blocks is kept and opened by "Publish both" |
+  | 422 `LINKS_TO_UNPUBLISHED` | the offer review straight away |
+  | 409 `FIRST_PUBLISH_NEEDS_HOME` with an offer | the offer review ("Your store opens with its home page, so it goes live with this:") |
+  | 409 `FIRST_PUBLISH_NEEDS_HOME`, offer null | "Make your home page first", the server's words, and "Make your home page" (the host's `onCreateHome`, else a link to `/admin/editor?path=%2F`) |
+  | 409 `REPUBLISH_CONFIRM_NEEDED` | "You took “Diwali sale” offline. Publish the same content again?" with "Publish it again" and Cancel |
+  | 409 `SLUG_TAKEN` | names both pages from `document`, `other` and `slug`: "“About (new)” wants the address /about, but “About us” already uses it on your live store." Next step: change this page's address (a button to its address field) or open the other page |
+  | 409 `NOT_PUBLISHABLE`, `PUBLISH_NOT_AVAILABLE` | names the document from `document` and says what to do instead |
+  | 409 conflicts | the server's words, "Last saved by Asha.", each document's words for a set, and "See the current version" (the host's `onConflict`) |
+  | 503 `PUBLISH_UNKNOWN` | "We couldn't confirm the publish. Checking…", then resolved (below) |
+  | anything else | the client's plain `message`, with "Try again" when it is retryable, busy, a failed publish or a network error |
+
+- **`resolveUnknown`** settles `PUBLISH_UNKNOWN`. It went live when the release the answer names is the live one (`deps.checkLive(release)`, which the host answers from `GET /api/admin/releases`'s `live`). Otherwise every sent document is read again, and it went live when each one's `publishedHash` is the draft hash that was sent. If neither can be read, it says so: "We still couldn't confirm it. Reload the page to see what is live." "Not live" offers "Try again".
+- **`createPublishFlow(deps)`** is the panel's controller: open, confirm, act, keepLive, retry and close, with a subscribe for React.
+  - **Review first.** Open pins each document's revision and draft hash (reading `getDocument` when the host didn't give them, for "Publish all changes") **before** reading its `listChanges`. What is sent is then never newer than what was shown: a newer draft gives `DRAFT_CHANGED`, never an unseen publish (plan A6).
+  - **Confirm is disabled until every list has loaded** and something changed. A list that failed keeps it disabled. The same holds for an offer, for every offered document.
+  - **Keep the live version** calls `keepLiveSection({id, sectionId}, {revision})` (or the host's server-replace), hands the document to the host, re-pins the new revision and hash, and reloads the list.
+  - **The republish confirm is chained.** When a set (an offer, say) comes back 409 `REPUBLISH_CONFIRM_NEEDED` for one page, the panel asks one question naming that page and sends nothing until the founder answers. "Publish it again" resends the same set with `confirmRepublish` on that page only. If another page needs it, the next answer asks again. Cancel sends nothing.
+  - A newer open wins over an older list answer.
+- **`createUndoFlow(deps)`**: Undo, whole-set Undo and take offline. It always runs the dry run first (`dryRun: true`), shows its change words, where it goes back to and, when it takes a page offline, the pages that link to it. Then it sends the same request without `dryRun`. A dry run with nothing in it (no change, no target, not offline) says "There's nothing earlier to undo." and offers no confirm.
+- **`undoOutcomeOf`**: for whole-set Undo, the panel builds its own lines from each returned document's `live`: "Live now: “Home page”." and "Offline now: “Diwali sale”. To bring it back, open it in the editor and publish again." It does not show the server's "2 pages are back to how they were…", which reads as if both are live (P3-UNDO review). "Newer changes are kept in Earlier versions." is added when the server kept any. A single Undo shows the server's message, with "Open Earlier versions" when `savedVersion` is there.
+- **`historyRowsOf`**: an `undo_saved` version shows its own note as its title ("Saved before Undo", "Kept from another tab"); published is "Published", a checkpoint "Saved while you edited", migrated "Moved to the new editor". It shows when, by whom (already a plain name) and "Live now".
+- **`recentGroupsOf`**: Recently published rows grouped by `setId`, each with its Undo target only when `canUndo` is true. A group whose rows include two or more that can be undone offers whole-set Undo for those rows (`undoSet` accepts a subset, P3-UNDO).
+- **A singleton's first publish offers no Undo** in the message after Publish. When the change list said first publish and the type has no route (home, header, design, …), the panel shows "This is the first published version. Edit it, or go back to your starting design." instead (spec PUB-04). A page, campaign or post's first publish keeps Undo, which takes it offline. On Recently published, P3-FIX2 sets `canUndo` false for those rows, and Undo is shown only where `canUndo` is true.
+
+### The components (all props, no store import)
+
+Each one is a View that renders the model's state (what the tests render), plus a default export that holds a flow with `useSyncExternalStore`.
+
+- **`PublishPanel.js`**: the Publish button and the panel.
+  - Staff (`access.canPublish === false`) see Publish disabled with `access.reason` under it, and nothing opens.
+  - The review lists the change rows per document, with "Keep the live version" on each row that has a `sectionId` (never inside an offer review), and the first-publish sections.
+  - The offer review lists every offered document's changes, says why ("Shoppers would reach a page that isn't live…" or "Your store opens with its home page…"), and keeps Confirm disabled with "You can publish once every list below has loaded." When the 422 had other blocks too, it says those still stop the publish.
+  - The issue rows, "Go to this field" (a link to `#<anchor>` that calls `onFocus`), every action type including `openField`, and every outcome in the table above.
+  - `mode="all"` labels it "Publish all changes".
+- **`UndoNotice.js`**: Undo after a publish (one document, or "Undo all N" for a set), with the dry run's change words in an inline confirm. When the dry run says it takes the page offline, it shows TakeOfflineConfirm instead.
+- **`TakeOfflineConfirm.js`**: the console `Dialog` (destructive means a dialog: `components/console/README.md`). It shows "Take “X” offline?", what shoppers lose, the linking pages (or "No live page links to it."), the change words, and "Take it offline".
+- **`EarlierVersions.js`**: listHistory rows with "Restore to draft" on each, the note that restoring doesn't publish, and the result in words. Restore goes through the host's `onRestore` (the store's server-replace `restoreVersion`).
+- **`RecentlyPublished.js`**: each row shows the action words, the name, who and when, the summary, the offline note ("Publish it again from the editor to bring it back."), Undo only when `canUndo`, and an optional "Open in the editor" link. A set is boxed with "Undo all N". One Undo flow serves the whole list. P3-EDITOR mounts it on `/admin/releases`.
+
+## Design notes
+
+- **Why a controller and not hooks.** The rules that matter (pin before list, Confirm gating, the chained confirm, what is sent) are all in `createPublishFlow` and `createUndoFlow`, which node runs with a stub `call`. The components only map state to markup and clicks to methods, so SSR of the state is a faithful picture of what the founder sees.
+- **The host routes the writes.** `saveDraft`, `keepLiveSection`, `restoreVersion` and `undo` go through the `call` the host passes, or its `keepLiveSection` and `onRestore`. P3-EDITOR passes the store's wrapper, so autosave is flushed and held around a server rewrite (plan A5), and adopts the documents handed to `onDocument`.
+- **`label` is not sent with an offer.** The server's parser ignores it. "Exactly the offer" means the same documents, revisions and hashes, with nothing added: in particular no `confirmRepublish`.
+- **No code ever reaches the markup.** The panel's words are the client's `message` (plain by P3-SESSION's contract), labels, and this model's words. Ids are used only in state and in `href` anchors (`#f-sec_hero-title`), never in text.
+
+## Acceptance
+
+Before this item, `scripts/test-publish-ui.js` was the placeholder ("pending") and none of these files existed, so every test below fails without this change (the suite can't import the model or the components). On top of that, 31 targeted mutations of the new code were each caught by at least one test (listed under Tests).
+
+| # | Item | Status | Evidence |
+|---|---|---|---|
+| 1 | unit: each action maps to the right client steps; publishBoth sends exactly the offer | Pass (unit) | "hideSection, removeSection and removeItem are a saveDraft…" gives the step kinds for each, with and without a known body. "applyAction hides, removes…" covers a section list, a rail's product, a header menu item, `meta.redirect_from`, and three gone cases in plain words. "a fix runs getDocument, saveDraft…" checks the exact calls `listChanges, publish, getDocument, saveDraft, publish`: the saved body has the hero hidden, it is saved with revision 3, and it publishes `{id, draftHash: "h_after_fix"}` with `{revision: 4}`. "removeItem on a warning after a publish…" checks the warning's fix from the host's draft (no getDocument). "publishBoth sends exactly the offer…": the `publishSet` args equal `OFFER.publishSet` as `{id, revision, draftHash}`, with no `confirmRepublish` and no top-level revision. "openField focuses the field and sends nothing". "every action type of the contract…": the model's action types equal `PUBLISH_ACTION_TYPES`, and each has words and steps. |
+| 2 | unit: for an offer the model requests listChanges for each target and Confirm is disabled until all have loaded; the rendered panel lists the target's changes (or its first-publish sections) | Pass (unit + rendered) | "LINKS_TO_UNPUBLISHED: listChanges for each offered document…" uses deferred answers. listChanges is asked for `doc_home` and the target. Confirm stays off (`canConfirm` false, and the rendered button `disabled`) while none, then one, has loaded, and a confirm then sends nothing. Once both have loaded it is on, and the render lists "Text: links changed" and the target's "This goes live for the first time, with: Hero, Text". "a list that failed to load keeps Confirm disabled". "FIRST_PUBLISH_NEEDS_HOME with an offer…" shows the home page's first-publish sections. "Publish all changes: …" checks that each `getDocument` comes before its `listChanges`, that Confirm stays off while one list is loading (though the other has changes), and that one `publishSet` goes with the pinned hashes. |
+| 3 | rendered (SSR, from documents-api-shapes.js examples): every outcome renders plain words with no code, hash or id; staff see Publish disabled with access.reason; RecentlyPublished hides Undo when canUndo is false | Pass (rendered) | "every publish outcome renders plain words…" runs all 37 outcomes of `publish` plus `COMMON` through the real client mapper and the flow, and renders the panel. The checks: no upper-case code such as `VALIDATION_FAILED` anywhere in the markup, attributes included; no `doc_`/`ver_`/`log_`/`rel_`/`set_`/`sec_`/`blk_`/`usr_` id, `h_draft`/`h_live` hash or `merchant:` actor in the text; and some words. The same check covers every `undo`, `unpublish` and `undoSet` outcome after its dry-run confirm, every `listChanges` outcome, TakeOfflineConfirm, EarlierVersions and RecentlyPublished. "staff see Publish disabled with access.reason…" renders the real `PublishPanel` with the shapes' `ACCESS`: `<button disabled>Publish</button>` and the reason, `open()` makes no call, and an owner's button is enabled. "RecentlyPublished hides Undo when canUndo is false…": the rows with `canUndo` false (an Undid row with the offline note, and a header row) have no Undo, the two that can be undone do, and the real component renders exactly two Undo buttons. |
+| 4 | unit: openField, offer on VALIDATION_FAILED, offer null on FIRST_PUBLISH_NEEDS_HOME and the chained republish confirm each render and act as specified | Pass (unit + rendered) | "openField renders 'Go to this field'…": one link, `href="#f-sec_hero-title"`, with level, where and message. Acting on it calls `onFocus` and sends nothing (item 1). "VALIDATION_FAILED with an offer beside other blocks…": blocked first with "Publish both", "Hide this section and publish" and "Remove it and publish". Publish both opens the review of every offered document, says the other blocks still stop it, sends nothing before Confirm, then sends exactly the offer, and the remaining block comes back in words. "FIRST_PUBLISH_NEEDS_HOME with offer null…": "doesn't have one yet", a link to `/admin/editor?path=%2F` (or a button with `onCreateHome`), and no set sent. "an offered target that was taken offline…": the offer's `publishSet` gets 409 for the target; the panel asks "You took “Diwali sale” offline. Publish the same content again?"; nothing is resent by itself; then the set is resent with `confirmRepublish` on the target only. The same holds for a single document, and Cancel sends nothing. |
+
+From the review lists the brief names, also proved:
+- PUBLISH_UNKNOWN: "PUBLISH_UNKNOWN shows 'Checking…' and is resolved from the release it names" covers four cases: live by the release (no document read), live by hash, not live ("Try again"), and can't tell.
+- SLUG_TAKEN and NOT_PUBLISHABLE: "…name the other page and give the next step".
+- The set Undo message: "whole-set Undo says which pages are live and which went offline".
+- canUndo: "a singleton's first publish offers no Undo…", and the RecentlyPublished test.
+
+## Tests
+
+- `scripts/test-publish-ui.js` (`pnpm test:publish-ui`): 31 tests, 0.4 s, with no database, server or port. The model is driven with a stub `call` that answers with shapes examples passed through `documentsApi.mapResponse`. The components are compiled with Next's own SWC and rendered with `react-dom/server`, sharing the suite's model instance.
+- **Mutations** (each one applied alone, then the suite run): 31 of 31 caught.
+  - In the model: Confirm gating in review and in offer; `confirmRepublish` on every item; confirm on every item instead of the named one; `canUndo` forced; offer-null treated as an offer; openField making a call; set lines replaced by the server message; the singleton first-version rule; the offer's items not sent; hideSection not hiding; the release check; the hash check; the dry run skipped; pin after list; keep-live not re-pinning; save not re-pinning; staff open; unknown not checked; the set Undo target after a publish; set grouping; SLUG_TAKEN words.
+  - In the components: Publish not disabled for staff, the reason missing, Confirm not disabled, keep-live on rows without a section, Undo shown regardless of `canUndo`, the offline note dropped, the kept-version titles, linkers not listed, and "goes back to" dropped.
+  - Before two test fixes, three mutations survived: review gating with one list still loading, keep-live on a document-level row, and linkers that the title happened to contain. The suite now pins all three.
+- `pnpm test`: 81 of 81 in 137.7 s, on ports 7160 to 7164 and 6160. No port was busy.
+- `pnpm build`: the first run failed inside `next/font/google` (Fraunces: "next/font/google queries have exactly one entry", a font download during the build, in a file this item doesn't touch). A second run with no change passed. No page imports these components yet, so the build doesn't compile them; the suite compiles them with the same SWC.
+
+## Known limits
+
+- **Not browser-verified.** No page mounts these components until P3-EDITOR. Layout, focus, the native `<dialog>` and the click paths are only rendered (SSR), not clicked. P3-EDITOR's drill covers publish and Undo; take offline, Earlier versions, Recently published, the offer review and the republish question need steps there too (owner check).
+- **The host must route the writes through the store.** If P3-EDITOR passes `documentsApi.call` itself, a fix's `saveDraft`, keep-live, restore and Undo move the revision under the store, and its next autosave gets a 409. The props are there for this (`call`, `keepLiveSection`, `onRestore`, `onDocument`, `documentOf`), but the wiring is EDITOR's.
+- **Undo after a publish uses the publish's `undo.revision`.** If the founder typed after publishing, that revision is stale, and Undo answers 409 "This page was changed since you opened it…". The store's wrapper should send the current revision after its flush, as P3-STORE does for server-replace operations.
+- **PUBLISH_UNKNOWN needs `checkLive` for the release check.** The documents API has no read by release. Without `checkLive`, the panel decides from each document's live hash, which can't tell "it went live and someone published that page again since" from "it didn't go live". An unknown Undo only says to reload; it isn't checked.
+- **Whole-set Undo words come from each document's `live` flag.** A member that "stayed" (nothing earlier) is listed under "Live now", which is true. The server's "kept in Earlier versions" is detected by its words.
+- **Recently published can cut a set at the limit** (P3-UNDO's limit). The visible rows of a set are grouped, and whole-set Undo covers only those rows.
+- **Times use the browser's time zone** (`Intl`, `en-GB` "2 Nov, 10:00"). The server's text and the client's may differ by zone. `timeZone` is a prop.
+- **"Make your home page" defaults to `/admin/editor?path=%2F`**, which P3-ROUTES maps to the home page (with a note when there is none). A host that can create the home page passes `onCreateHome`.
+- **An issue fix in another document of the set** reads that document with `getDocument`, unless the host gives `documentOf`.
+
+## Owner checks
+
+- **P3-EDITOR desktop Chrome drill** on the design harness, for this item's parts: Publish with a review and Keep the live version; a 422 fix (hide, remove); Publish both with each list loading before Confirm; the republish question for an offline target; a first publish with and without a home page; Undo with its change words; take offline with linkers; whole-set Undo with one page going offline; Earlier versions restore; Recently published with no Undo on rows that can't be undone. NOT DONE here.
+- **Staging (hosted Turso):** a publish whose answer is lost (PUBLISH_UNKNOWN) is resolved correctly by the check. NOT DONE.
+- **Words:** the level names ("Must fix", "Check", "Already live like this"), the offer reasons, "Make your home page first", the republish question, and the whole-set Undo lines.
+- **CI sqld download:** source and checksum approval (nothing under `.github/` was touched).
