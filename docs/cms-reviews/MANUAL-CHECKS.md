@@ -429,6 +429,33 @@ No owner checks for this item.
 - [ ] Owner: on a hosted staging tenant, publish the header together with the page its menu item links to, while hiding or renaming that page, and confirm it is refused (NOT DONE).
 - [ ] Owner: the CI sqld download source and checksum under .github still need approval. Nothing under .github was touched.
 
+## Phase 3, batch 4
+
+### The new editor, put together (P3-EDITOR)
+- [ ] On a documents test tenant on staging (not a real tenant), open /admin/editor, click 'See the live store' in the preview bar and come back. The preview label should say 'Updating' with 'Reconnecting…' the whole time until it says 'Up to date'.
+- [ ] CI sqld download: still not touched (no .github/ change). Its source and checksum still need the owner's approval.
+
+### The design document in documents mode (P3-DESIGN)
+- [ ] On a documents test tenant on staging: apply a look, change a colour, preview with show-design on, publish, then Undo. After each step, check the operator overview, themes and tenant detail show the live kit.
+- [ ] Rule on whether a never-published design should list token rows against the platform default (it does now) rather than showing first publish.
+- [ ] P3-EDITOR: the switcher must list doc_design (Brand). Also decide where 'Apply this look with its starter brand' lives in the editor (POST /api/admin/theme with revision), or change DesignForm's help text, which still points to the theme screen.
+- [ ] MIG-01: write config.theme_pin from the live design at cutover. Until then, a documents store that never published its design shows its legacy config.theme on the operator screens.
+- [ ] Insight apply (lib/ai/insights.js) and experiment adopt (lib/experiments.js) should also say when they leave a draft that can't be published (later item; not my files).
+- [ ] Merge the disclosed test edits in scripts/test-writers.js and scripts/test-cms-api.js with their owners.
+- [ ] P3-DRILLS: repeat the design drill through the editor's Design form once P3-EDITOR lands.
+- [ ] Approve the CI sqld download's source and checksum (.github was not touched).
+
+### The rich text field (P3-RTE)
+- [ ] Ruling: should lib/sanitize.js visibleText count a valid custom element name (lowercase, with a hyphen, closed or with attributes, such as <product-info id=...>) as markup, so a Shopify-theme or GitHub paste is cleaned on save instead of refused? And should a <noscript>'s text count as lost words? Until then the founder removes these in Edit as HTML. The change belongs to whoever owns lib/sanitize.js, and the AU-05 suites must still refuse <founder> and 'the <link> below'.
+- [ ] The WORDS_LOST message in lib/registry/text.js ('This usually comes from < or > signs') does not fit a hidden-markup paste. Its owner could reword it.
+- [ ] A real paste from a Shopify product page and from Word into the field in Chrome, once P3-EDITOR mounts it: check that the refusal note and Edit as HTML appear, and that removing the named tag lets the save through.
+- [ ] pnpm build was not rerun after fix round 1. Only the field, its model, the suite and the drill changed.
+
+### The batch 3 review findings (P3-FIX3)
+- [ ] Desktop Chrome at P3-EDITOR's drill: a whole-set Undo where one page was new in that publish shows 'Undo all N pages of this publish? “<page>” goes offline.'
+- [ ] Optional: a later item that owns scripts/test-publish-undo.js could commit the real-handler probe (createUndoFlow on a Recently published set with a new page, on both stores)
+- [ ] Server design question: the dispatcher refuses an undo dry run without a revision even though undo.js ignores the revision on a dry run; the owner may decide whether dry runs should skip that check (service/documents-api are not this item's files)
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
