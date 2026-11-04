@@ -908,6 +908,9 @@ await t("P3-FIX1: a refused preview token is an error, not {ok:true}; so is an a
     ["opaque redirect", { type: "opaqueredirect", status: 0 }, "PREVIEW_NOT_CONFIRMED"],
     ["302", { status: 302 }, "PREVIEW_NOT_CONFIRMED"],
     ["200 that is not a confirmation", { status: 200, body: { hello: 1 } }, "PREVIEW_NOT_CONFIRMED"],
+    // P3-FIX2: a 2xx whose body can't be read didn't confirm the preview either
+    ["200 with no readable body", { status: 200, raw: "not json" }, "PREVIEW_NOT_CONFIRMED"],
+    ["204 with no body", { status: 204, body: null }, "PREVIEW_NOT_CONFIRMED"],
     ["503 suspended store", { status: 503, body: { error: "This store is temporarily unavailable", code: "TENANT_SUSPENDED" } }, "TENANT_SUSPENDED"],
     ["500", { status: 500, raw: "oops" }, "INTERNAL_ERROR"],
   ]) {
@@ -915,6 +918,8 @@ await t("P3-FIX1: a refused preview token is an error, not {ok:true}; so is an a
     const r = await Api.createDocumentsApi({ fetch: f }).startDocumentsPreview();
     eq(r.error, true, `${label}: ${JSON.stringify(r)}`);
     eq(r.code, code, `${label} code:`);
+    // P3-FIX2: the preview's own words, never a save's ("nothing was saved")
+    if (code === "PREVIEW_NOT_CONFIRMED") ok(/couldn't open the preview/.test(r.message) && !/saved/.test(r.message), `${label} words: ${r.message}`);
   }
 });
 

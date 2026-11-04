@@ -227,9 +227,14 @@ function standIn(bodyChildren, { storage = "memory", embedded = true, path = "/"
   };
   win.parent = embedded ? parent : win;
   const message = (data, origin = "https://fv.test") => listeners.win.filter((l) => l.type === "message").forEach((l) => l.fn({ data, origin }));
+  // P3-FIX2: the two phases, as a browser runs them at the document: every
+  // capture listener first, then, unless one stopped propagation, the bubble
+  // listeners (the page's own handlers). stopPropagation in the capture phase
+  // keeps the bubble phase from running; listeners of the same phase all run.
   const fire = (type, target) => {
     const e = { type, target, defaultPrevented: false, stopped: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; } };
-    for (const l of listeners.doc.filter((x) => x.type === type)) l.fn(e);
+    for (const l of listeners.doc.filter((x) => x.type === type && x.capture)) l.fn(e);
+    if (!e.stopped) for (const l of listeners.doc.filter((x) => x.type === type && !x.capture)) l.fn(e);
     return e;
   };
   return { window: win, document, sent, store, message, click: (el) => fire("click", el), submit: (el) => fire("submit", el), reloads: () => reloads, scrolls, listeners };
@@ -326,6 +331,27 @@ await t("v2 ready carries the layout's state (docs = the overlay's draft hashes,
     same(s2.sent.at(-1).msg, { type: "storeasy:ready", v: 2, state: null, ok: false, reason, unfinished: ["sec_bn"] }, `${reason}:`);
     stop2();
   }
+});
+
+await t("P3-FIX2: the bridge listens in the capture phase: with the page's own bubble-phase click and submit handlers added first, a v2 link click and a form submit never reach them; a plain button click still does", () => {
+  const page = samplePage();
+  const s = standIn(page.nodes);
+  const ran = [];
+  // the page's own handlers (React's root listeners, a site script), added before the bridge mounts
+  s.document.addEventListener("click", (e) => ran.push(["click", e.target]), false);
+  s.document.addEventListener("submit", (e) => ran.push(["submit", e.target]), false);
+  const mine = s.listeners.doc.length;
+  const stop = Bridge.createBridge({ window: s.window, document: s.document, state: docState, ok: true });
+  same(s.listeners.doc.slice(mine).map((l) => [l.type, l.capture]), [["click", true], ["submit", true]], "the bridge's listeners:");
+  s.message({ type: "storeasy:editor:hello", v: 2 });
+  const link = s.click(page.heroButton);
+  ok(link.defaultPrevented && link.stopped, "the link click is stopped:");
+  const sub = s.submit(page.form);
+  ok(sub.defaultPrevented && sub.stopped, "the submit is stopped:");
+  eq(ran.length, 0, "the page's own handlers never ran:");
+  s.click(page.typeButton);
+  same(ran.map(([type, el]) => [type, el === page.typeButton]), [["click", true]], "a plain button is the page's own:");
+  stop();
 });
 
 await t("v2: a click on a link inside a section and outside any section is prevented and posts pick {doc, sectionId, kind, field, offset}; a form submit and a submit button are prevented; a plain button is not", () => {

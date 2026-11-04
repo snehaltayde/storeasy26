@@ -433,6 +433,26 @@ export async function seedClosedStore({ urls, adminPassword }) {
   });
 }
 
+// P3-FIX2: the closed store's tenant row records the env default database's
+// address at seed time. A harness started later on other ports would leave it
+// pointing at the old port (another checkout's sqld, perhaps), so the P3 drill
+// helpers point it at this run's third server when they start the harness
+// (scripts/drills/p3/lib.mjs startOwned). Local addresses only. Returns the
+// rows changed (0 when the store isn't seeded or already points there).
+export async function pointClosedStoreAt({ platform, default: defaultUrl }) {
+  const H = await import("./design-harness.js");
+  H.assertLocalDbUrl("the platform database", platform);
+  H.assertLocalDbUrl("the closed store's database", defaultUrl);
+  const { createClient } = await import("@libsql/client");
+  const client = createClient({ url: platform });
+  try {
+    const r = await client.execute({ sql: "UPDATE tenants SET db_url = ? WHERE id = ? AND db_url <> ?", args: [defaultUrl, CLOSED_STORE.id, defaultUrl] });
+    return r.rowsAffected;
+  } finally {
+    client.close();
+  }
+}
+
 // The harness seed config: logins (with their passwords), stores and drill
 // content. Owner-only file mode; never printed.
 export function writeP3Seed(dataDir, config) {

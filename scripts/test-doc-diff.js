@@ -455,6 +455,30 @@ await t("P3-FIX1: a section hidden on both phones and computers reads as hidden,
   eq(diffBodies("home", live, computers), [{ kind: "edited", sectionId: "sec_txt", words: "Text: now hidden on phones" }]);
 });
 
+await t("P3-FIX2: a section hidden on both screens, then switched off with its show flags cleared, gives one 'hidden' row and no 'now shown' rows; switched back on while still hidden on both reads as that", async () => {
+  const both = home([sec("hero", "sec_hero"), sec("text", "sec_txt", { title: "Hi" })]);
+  both.sections[1].show = { mobile: false, desktop: false };
+  const off = clone(both);
+  off.sections[1].enabled = false;
+  delete off.sections[1].show;
+  const rows = diffBodies("home", both, off);
+  eq(rows, [{ kind: "hidden", sectionId: "sec_txt", words: "Text: hidden" }]);
+  ok(!rows.some((r) => /now shown/.test(r.words)), "no 'now shown' row");
+  // off, then on again but hidden on both screens: still hidden, said once
+  eq(diffBodies("home", off, both), [{ kind: "edited", sectionId: "sec_txt", words: "Text: switched on, still hidden on phones and computers" }]);
+  // switched off with the flags kept: the hidden row only
+  const offKept = clone(both);
+  offKept.sections[1].enabled = false;
+  eq(diffBodies("home", both, offKept), [{ kind: "hidden", sectionId: "sec_txt", words: "Text: hidden" }]);
+});
+
+await t("P3-FIX2 pin: diffBodies('product_layout', null, emptyBody) names the empty body's own section as added (the missing side has no sections)", async () => {
+  const e = R.emptyBody("product_layout");
+  ok(Array.isArray(e.sections) && e.sections.length >= 1, "product_layout's empty body has a section");
+  const rows = diffBodies("product_layout", null, e);
+  eq(rows.map((r) => [r.kind, r.words]), [["added", "Product details and buy button: added"]]);
+});
+
 await t("P3-FIX1: reversing three sections names only the two that moved; the middle one stayed", async () => {
   const live = home([sec("text", "sec_aaaa", { title: "A" }), sec("text", "sec_bbbb", { title: "B" }), sec("text", "sec_cccc", { title: "C" })]);
   const turned = clone(live);

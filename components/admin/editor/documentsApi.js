@@ -241,6 +241,9 @@ export function createDocumentsApi({ fetch: fetchImpl } = {}) {
     } catch {
       body = null;
     }
+    // P3-FIX2: a 2xx with no readable body didn't confirm the preview: the
+    // preview's words, not a save's
+    if (status >= 200 && status < 300 && !isObj(body)) return { error: true, code: "PREVIEW_NOT_CONFIRMED", message: PREVIEW_NOT_OPENED_WORDS };
     const answer = mapResponse(status, body);
     if (answer.ok && answer.data.ok !== true) return { error: true, code: "PREVIEW_NOT_CONFIRMED", message: PREVIEW_NOT_OPENED_WORDS };
     if (!answer.ok) return answer;
