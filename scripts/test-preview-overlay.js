@@ -2,7 +2,8 @@
 // a store in documents mode is the live list with every saved draft laid over.
 //   1. A documents store with a live release: a valid session shows each dirty
 //      document's draft (every type but product_content), everything else live.
-//   2. A documents store that has never published: drafts over emptyList(m).
+//   2. A documents store that has never published: drafts over emptyList(m);
+//      without a session it is the closed store (P3-CLOSED, PUB-06).
 //   3. Tolerant drafts: an unfinished section shows its placeholder.
 //   4. The design draft only after "Show them" (admin route, and the bar's form).
 //   5. Refusals: no cookie, a tampered hmac, an expired or revoked session, a
@@ -460,14 +461,19 @@ await t("the preview changes nothing stored, and a shopper request right after s
 // =====================================================================================
 console.log("— 2. a documents store that has never published");
 // =====================================================================================
-await t("drafts render over emptyList(m); every other singleton is its code default; no cookie still fails closed", async () => {
+await t("drafts render over emptyList(m); every other singleton is its code default; no cookie gets the closed store's neutral live content (PUB-06), never a draft", async () => {
   await createDraft(PN, "home", body("home", { sections: [sec("hero", "sec_hero", { title: "First hero" }), sec("rich_text", "sec_rt", { title: "First words", html: "<p>Hello</p>" })] }));
   await createDraft(PN, "page", body("page", { meta: { slug: "about", title: "First about" }, sections: [sec("text", "sec_a", { title: "Us", body: ["We began."] })] }));
-  const live = await asRequest(PN, () => Res.contentSource()).then(
-    () => null,
-    (e) => e,
-  );
-  ok(Res.isContentUnavailable(live) && live.detail?.code === "DOCUMENTS_UNPUBLISHED", `no cookie: ${live?.message}`);
+  // P3-CLOSED: before the first publish a shopper's request is the closed
+  // store (it was DOCUMENTS_UNPUBLISHED, an error page, in phase 2)
+  const live = await asRequest(PN, () => Res.contentSource());
+  eq(live.mode, "closed", "no cookie: mode:");
+  eq(live.preview, false, "no cookie: preview:");
+  const shopper = await asRequest(PN, view);
+  eq(shopper.hero, null, "no cookie: no hero:");
+  same(shopper.homeSections, [], "no cookie: no home sections:");
+  eq(shopper.about, null, "no cookie: no about page:");
+  ok(!JSON.stringify(shopper).includes("First"), `no cookie: a draft shows: ${JSON.stringify(shopper).slice(0, 300)}`);
   const s = await newSession(PN);
   const src = await asRequest(PN, () => Res.contentSource(), withToken(s.token));
   eq(src.preview, true, "preview:");

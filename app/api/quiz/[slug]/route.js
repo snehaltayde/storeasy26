@@ -3,6 +3,7 @@ import { getQuiz, scoreQuiz, recommendProducts } from "@/lib/quiz";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
+import { closedStoreGate, STORE_CLOSED_CODE, STORE_CLOSED_MESSAGE } from "@/lib/content/resolve";
 
 // Quiz results (S46 / SF19). Deterministic scoring + catalog recommendation.
 // Optional, EXPLICITLY CONSENTED contact capture: one email with the picks —
@@ -14,6 +15,10 @@ export const dynamic = "force-dynamic";
 export const POST = tenantHandler(async (request, { params }) => {
   const limited = rateLimit(request, { name: "quiz", limit: 30 });
   if (limited) return limited;
+  // PUB-06: a store that has never published takes no quiz answers (they can
+  // capture an email), except from a founder's valid preview session.
+  const closed = await closedStoreGate();
+  if (closed && !closed.preview) return NextResponse.json({ error: STORE_CLOSED_MESSAGE, code: STORE_CLOSED_CODE }, { status: 403 });
   const { slug } = await params;
   const quiz = await getQuiz(slug);
   if (!quiz) return NextResponse.json({ error: "quiz not found" }, { status: 404 });

@@ -1,0 +1,4 @@
+open store (control) / content strings found: 2 ["Shop bestsellers","What's new"]
+open store (control) /policies/shipping content strings found: 2 ["Orders dispatch within 24 hours on business days.","Shipping policy"]
+open store (control) /contact content strings found: 0 []
+closed again

@@ -1,0 +1,647 @@
+{
+  "previousLiveRelease": null,
+  "contentStrings": 22,
+  "catalogExcluded": 11,
+  "results": [
+    {
+      "path": "/",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 86638,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 33673,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 86634,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 33673,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/",
+      "kind": "html",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 86644,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 33671,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/",
+      "kind": "html",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 86626,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 33672,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/contact",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 90952,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/contact",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 40594,
+      "openingSoon": false,
+      "leaks": []
+    },
+    {
+      "path": "/contact",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 90961,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/contact",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 40592,
+      "openingSoon": false,
+      "leaks": []
+    },
+    {
+      "path": "/contact",
+      "kind": "html",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 90958,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/contact",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 40592,
+      "openingSoon": false,
+      "leaks": []
+    },
+    {
+      "path": "/contact",
+      "kind": "html",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 90955,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/contact",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 40593,
+      "openingSoon": false,
+      "leaks": []
+    },
+    {
+      "path": "/about",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 88543,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/about",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 38551,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/about",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 88548,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/about",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 38554,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/about",
+      "kind": "html",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 88539,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/about",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 38552,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/about",
+      "kind": "html",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 88551,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/about",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 38555,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 94515,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 43644,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 94518,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 43644,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "html",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 94523,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 43646,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "html",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 94521,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 43647,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 96470,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 45516,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 96473,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 45510,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "html",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 96477,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 45513,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "html",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 96473,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 45512,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 85926,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 35424,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 85933,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 35423,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal",
+      "kind": "html",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 85929,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 35426,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal",
+      "kind": "html",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 85923,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 35423,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 94506,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 43641,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 94516,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 43646,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "html",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 94507,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 43645,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "html",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 94509,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 43641,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/collections",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 119413,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/collections",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 85,
+      "openingSoon": false,
+      "leaks": []
+    },
+    {
+      "path": "/collections",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 119419,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/collections",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 85,
+      "openingSoon": false,
+      "leaks": []
+    },
+    {
+      "path": "/collections",
+      "kind": "html",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 119426,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/collections",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 85,
+      "openingSoon": false,
+      "leaks": []
+    },
+    {
+      "path": "/collections",
+      "kind": "html",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/html; charset=utf-8",
+      "bytes": 119423,
+      "openingSoon": true,
+      "leaks": []
+    },
+    {
+      "path": "/collections",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "bytes": 85,
+      "openingSoon": false,
+      "leaks": []
+    }
+  ]
+}

@@ -21,6 +21,7 @@ import { priceMismatch, PRICE_CHANGED } from "@/lib/checkout-price";
 import { checkoutCapability } from "@/lib/commerce/adapter";
 import { tenantHandler } from "@/lib/tenant-request";
 import { conversionUnit } from "@/lib/experiments";
+import { closedStoreGate, STORE_CLOSED_CODE, STORE_CLOSED_MESSAGE, STORE_CLOSED_COD_ONLY_MESSAGE } from "@/lib/content/resolve";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -152,6 +153,18 @@ export const POST = tenantHandler(async (request) => {
   const cartId = cartIdFrom(request);
   const body = await request.json().catch(() => ({}));
   const { action, contact, address, idempotencyKey } = body;
+
+  // PUB-06: a store that has never published takes no orders from shoppers.
+  // A founder's valid preview session may place a cash on delivery test
+  // order (it then goes through the normal order flow, Shopify push
+  // included); card and UPI wait for the store to open. The orders table has
+  // no notes or tags column, so the order is not marked as a test here.
+  const closed = await closedStoreGate();
+  if (closed) {
+    if (!closed.preview) return NextResponse.json({ error: STORE_CLOSED_MESSAGE, code: STORE_CLOSED_CODE }, { status: 403 });
+    if (action !== "cod") return NextResponse.json({ error: STORE_CLOSED_COD_ONLY_MESSAGE, code: STORE_CLOSED_CODE }, { status: 403 });
+    slog("closed_store_test_order", { action });
+  }
 
   try {
     if (action === "cod") {

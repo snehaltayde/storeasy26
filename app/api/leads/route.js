@@ -3,6 +3,8 @@ import { isPlatformSiteHost } from "@/lib/platform-site";
 import { platformDb, platformConfigured } from "@/lib/platform/control";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
+import { tenantHandler } from "@/lib/tenant-request";
+import { closedStoreGate, STORE_CLOSED_CODE, STORE_CLOSED_MESSAGE } from "@/lib/content/resolve";
 
 // Marketing lead capture (S44 / MK08). Marketing-host only, rate-limited,
 // honeypot-guarded, CONSENT-AWARE: submitting the form is consent to be
@@ -13,11 +15,22 @@ import { slog } from "@/lib/log";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const NOT_FOUND = () => NextResponse.json({ error: "Not found" }, { status: 404 });
+
+// PUB-06: a store host never takes leads (marketing hosts only, as before).
+// A closed store says so in its own words; every other store host, and any
+// host that doesn't resolve to a store, gets the same 404 as before.
+const storeHostAnswer = tenantHandler(async () => {
+  const closed = await closedStoreGate();
+  return closed && !closed.preview ? NextResponse.json({ error: STORE_CLOSED_MESSAGE, code: STORE_CLOSED_CODE }, { status: 403 }) : NOT_FOUND();
+});
+
 const ldId = () => "ld_" + Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(16).padStart(2, "0")).join("");
 
 export async function POST(request) {
   if (!isPlatformSiteHost(request.headers.get("host"))) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const res = await storeHostAnswer(request).catch(() => null);
+    return res?.status === 403 ? res : NOT_FOUND();
   }
   const limited = rateLimit(request, { name: "leads", limit: 5, windowMs: 60 * 60 * 1000 });
   if (limited) return limited;
