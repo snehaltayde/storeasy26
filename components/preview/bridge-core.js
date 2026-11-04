@@ -20,9 +20,12 @@
 //            ok false with reason "revoked" | "expired" | "not_found" (the
 //            preview ended), "live" (no preview: the live store) or "legacy";
 //            unfinished: the section ids marked [data-unfinished].
-//   while v2 is on, every click on a link, every form submit and every submit
-//   button is stopped in the capture phase (the founder is choosing, not
-//   shopping), and every click inside the page posts a pick. The preview's own
+//   while v2 is on, every click on a link or a control (any button, add to
+//   cart and wishlist included, inputs, selects, summaries, labels and
+//   role=button elements) and every form submit is stopped in the capture
+//   phase (the founder is choosing, not shopping), and every click inside the
+//   page posts a pick, so a click on "Add to cart" selects its section and
+//   adds nothing (P3-EDITOR, from the P3-FRAME review). The preview's own
 //   bar ([data-preview-bar]: "See the live store", Exit, the colours toggle)
 //   is the founder's, not the store's: it works as a bar, never picked.
 //   child  → {type:"storeasy:pick", doc, sectionId, kind, field, offset}
@@ -80,6 +83,12 @@ function submitButtonOf(target) {
   const type = String(attrOf(b, "type") || (tag === "button" ? "submit" : "text")).toLowerCase();
   return type === "submit" || (tag === "input" && type === "image") ? b : null;
 }
+
+// A control the store would act on: links, every kind of button (a
+// type="button" too: add to cart, wishlist, the cart drawer), form fields,
+// <summary> and <label> (they toggle), and elements that act as buttons.
+export const CONTROL_SELECTOR = 'a[href], button, input, select, textarea, summary, label, [role="button"], [role="link"], [role="switch"], [role="checkbox"], [role="tab"], [role="menuitem"]';
+export const controlOf = (target) => closest(target, CONTROL_SELECTOR);
 
 // What a click picked: the document, the section, the field and the block.
 export function pickOf(target) {
@@ -174,7 +183,7 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
     const target = e.target;
     if (v2) {
       if (inBar(target)) return;
-      if (closest(target, "a[href]") || submitButtonOf(target)) {
+      if (controlOf(target) || submitButtonOf(target)) {
         e.preventDefault();
         e.stopPropagation();
       }

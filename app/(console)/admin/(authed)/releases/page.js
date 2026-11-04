@@ -28,6 +28,24 @@ export default async function AdminReleasesPage() {
     const [mode, live] = await Promise.all([getCmsMode(), getLiveRelease()]);
     return mode !== "legacy" || live?.documents ? { mode, live } : null;
   });
+  // P3-EDITOR (PUB-04): a documents store's Publishing page is Recently
+  // published, with Undo where a row can be undone. The rows come from the
+  // documents API (listRecentlyPublished: its own mode check and access), read
+  // by the client part, which is loaded only here, so this file stays
+  // loadable with plain require() in the legacy suites
+  // (scripts/test-console-fresh.js).
+  if (documents?.mode === "documents") {
+    const { PublishingHistory } = await import("@/components/admin/editor/DocumentEditor");
+    const access = { canPublish, reason: canPublish ? null : "Only the store owner or an admin can publish or undo. You can edit and preview." };
+    return (
+      <>
+        <PageHeader title="Publishing" description="What went live recently, and Undo. Publish each page from the editor." />
+        <div data-documents-mode="" data-recently-published-page="">
+          <PublishingHistory access={access} />
+        </div>
+      </>
+    );
+  }
   if (documents) {
     return (
       <>

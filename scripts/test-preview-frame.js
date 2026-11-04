@@ -333,7 +333,7 @@ await t("v2 ready carries the layout's state (docs = the overlay's draft hashes,
   }
 });
 
-await t("P3-FIX2: the bridge listens in the capture phase: with the page's own bubble-phase click and submit handlers added first, a v2 link click and a form submit never reach them; a plain button click still does", () => {
+await t("P3-FIX2: the bridge listens in the capture phase: with the page's own bubble-phase click and submit handlers added first, a v2 link click, a type=button click (P3-EDITOR) and a form submit never reach them; a click on plain text still does", () => {
   const page = samplePage();
   const s = standIn(page.nodes);
   const ran = [];
@@ -348,13 +348,16 @@ await t("P3-FIX2: the bridge listens in the capture phase: with the page's own b
   ok(link.defaultPrevented && link.stopped, "the link click is stopped:");
   const sub = s.submit(page.form);
   ok(sub.defaultPrevented && sub.stopped, "the submit is stopped:");
+  const typeBtn = s.click(page.typeButton);
+  ok(typeBtn.defaultPrevented && typeBtn.stopped, "a type=button click is stopped (P3-EDITOR):");
   eq(ran.length, 0, "the page's own handlers never ran:");
-  s.click(page.typeButton);
-  same(ran.map(([type, el]) => [type, el === page.typeButton]), [["click", true]], "a plain button is the page's own:");
+  const word = page.heroTitle.children[0];
+  s.click(word);
+  same(ran.map(([type, el]) => [type, el === word]), [["click", true]], "a click on plain text still reaches the page:");
   stop();
 });
 
-await t("v2: a click on a link inside a section and outside any section is prevented and posts pick {doc, sectionId, kind, field, offset}; a form submit and a submit button are prevented; a plain button is not", () => {
+await t("v2: a click on a link inside a section and outside any section is prevented and posts pick {doc, sectionId, kind, field, offset}; a form submit, a submit button and (P3-EDITOR) a type=button are prevented", () => {
   const page = samplePage();
   const s = standIn(page.nodes);
   const stop = Bridge.createBridge({ window: s.window, document: s.document, state: docState, ok: true });
@@ -385,8 +388,10 @@ await t("v2: a click on a link inside a section and outside any section is preve
   ok(sub.defaultPrevented && sub.stopped, "a form submit is prevented:");
   const btn = s.click(page.submitBtn);
   ok(btn.defaultPrevented, "a submit button (no type) is prevented:");
+  // P3-EDITOR (from the P3-FRAME review): a type=button is stopped too, so a
+  // founder picking a section never adds to their cart or wishlist
   const plain = s.click(page.typeButton);
-  eq(plain.defaultPrevented, false, "a type=button is the page's own:");
+  ok(plain.defaultPrevented && plain.stopped, "a type=button is stopped as well:");
   // the preview's own bar keeps working: See the live store, Exit, the colours toggle
   const picks = pickMsgs(s).length;
   const live = s.click(page.liveLink);
@@ -395,6 +400,41 @@ await t("v2: a click on a link inside a section and outside any section is preve
   eq(s.click(page.toggle.children[0]).defaultPrevented, false, "and its button too:");
   eq(pickMsgs(s).length, picks, "the bar is never picked:");
   stop();
+});
+
+await t("P3-EDITOR: in the editor frame, a click on Add to cart, the wishlist heart, the cart drawer button, a quantity input, a summary and a role=button selects the section and runs none of the page's own handlers; v1 and no hello leave them alone", () => {
+  const icon = h("svg", {});
+  const addToCart = h("button", { type: "button", "aria-label": "Add to cart" }, h("span", {}, icon));
+  const wish = h("button", { type: "button", "aria-label": "Add to wishlist" });
+  const qty = h("input", { type: "number", name: "qty" });
+  const sum = h("summary", {}, h("span", {}));
+  const roleBtn = h("div", { role: "button" });
+  const cartDrawer = h("button", { type: "button", "aria-label": "Open cart" });
+  const product = h("section", { "data-section-id": "sec_pmain", "data-section-kind": "product_main" }, h("h1", {}), addToCart, wish, qty, h("details", {}, sum), roleBtn);
+  const main = h("main", { "data-doc": "doc_product_layout" }, product);
+  const header = h("header", { "data-doc": "doc_header" }, cartDrawer);
+  const run = (hello) => {
+    const s = standIn([header, main], { path: "/products/serum" });
+    const ran = [];
+    s.document.addEventListener("click", (e) => ran.push(e.target), false); // React's own handlers
+    const stop = Bridge.createBridge({ window: s.window, document: s.document, state: docState, ok: true });
+    if (hello) s.message(hello);
+    const out = [addToCart.children[0].children[0], wish, qty, sum.children[0], roleBtn, cartDrawer].map((el) => s.click(el));
+    stop();
+    return { s, ran, out };
+  };
+  const v2 = run({ type: "storeasy:editor:hello", v: 2 });
+  ok(v2.out.every((e) => e.defaultPrevented && e.stopped), `every control click is stopped: ${JSON.stringify(v2.out.map((e) => [e.defaultPrevented, e.stopped]))}`);
+  eq(v2.ran.length, 0, "the page's add-to-cart handler never ran:");
+  const picks = pickMsgs(v2.s);
+  same(picks[0], { type: "storeasy:pick", doc: "doc_product_layout", sectionId: "sec_pmain", kind: "product_main", field: null, offset: null }, "Add to cart picks the product section:");
+  eq(picks.at(-1).doc, "doc_header", "the cart drawer button picks the header:");
+  ok(product.classList.contains("storeasy-selected"), "the product section was outlined");
+  for (const hello of [null, "storeasy:designer:hello"]) {
+    const r = run(hello);
+    ok(r.out.every((e) => !e.defaultPrevented), `${hello || "no hello"}: the page's own controls work`);
+    eq(r.ran.length, 6, `${hello || "no hello"}: the page's handlers ran:`);
+  }
 });
 
 await t("v2 select outlines the section and scrolls to it; refresh keeps the scroll and the selection in sessionStorage and the next mount restores them; a throwing storage still reloads and mounts", () => {
