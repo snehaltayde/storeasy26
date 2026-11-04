@@ -49,6 +49,30 @@ const readReport = (file) => {
 const STEPS_FILE = join(ROOT, "docs", "cms-reviews", "drills", "P4-DRILLS", "runbook-steps.json");
 const NEW_NAME = "Runbook Drill Renamed";
 
+// Runbook 0.3 (the staging check of hosted batch atomicity) must ask for the
+// IN-BATCH refusal only. An ordinary old-editor save reads the mode first
+// (assertLegacyContentWrites) and refuses before any batch is sent, with
+// refusalMessage's "moving to the new editor right now" words; those words
+// never reach Turso, so a 0.3 that accepts them proves nothing. The batch
+// guard's words are MIGRATING_MESSAGE (lib/cms-mode.js), read from the file
+// so this check follows them. Returns [{ ok, label }].
+//   node scripts/drills/p4/runbook.mjs --check     (offline, no harness)
+const RUNBOOK_FILE = join(ROOT, "docs", "cms-reviews", "P4-CUTOVER-RUNBOOK.md");
+export function checkAtomicityStep(runbookText = readFileSync(RUNBOOK_FILE, "utf8"), cmsModeText = readFileSync(join(ROOT, "lib", "cms-mode.js"), "utf8")) {
+  const inBatch = /export const MIGRATING_MESSAGE = "([^"]+)"/.exec(cmsModeText)?.[1] ?? null;
+  const preCheck = /if \(mode === "migrating"\) return `(This store is moving to the new editor right now), so/.exec(cmsModeText)?.[1] ?? null;
+  const step = /^3\. \*\*Staging check of hosted batch atomicity[\s\S]*?(?=^4\. )/m.exec(runbookText)?.[0] ?? "";
+  const expects = (words) => new RegExp(`must (?:answer|say|give)[^"]{0,40}"${words.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(step);
+  return [
+    { ok: Boolean(inBatch && preCheck), label: "lib/cms-mode.js still has the batch guard's words (MIGRATING_MESSAGE) and the pre-check's migrating words", detail: { inBatch, preCheck } },
+    { ok: step.length > 0, label: "the runbook has section 0.3, the staging check of hosted batch atomicity" },
+    { ok: Boolean(inBatch) && expects(inBatch), label: `0.3 expects the batch guard's own words: "${inBatch}"` },
+    { ok: Boolean(preCheck) && !expects(preCheck), label: `0.3 does not accept the pre-check's words ("${preCheck}…") as the pass: they are said before any batch is sent` },
+    { ok: /before any batch/i.test(step), label: "0.3 says an ordinary old-editor save is refused before any batch is sent" },
+    { ok: /\bopen\b/i.test(step) && /decision/i.test(step) && /no real store moves/i.test(step), label: "0.3 is marked as an open owner/orchestrator decision until a way to reach the batch guard on staging exists, and no real store moves before it" },
+  ];
+}
+
 // runbook 3.2 as the owner runs it: serve-copy in its own process, ready when
 // it prints its address; stop() is the owner's Ctrl-C.
 async function serveCopyChild(ctx, file) {
@@ -170,6 +194,7 @@ export async function runbookStage(drill) {
 }
 
 async function runbookSteps(drill, { seed, ctx, scratch, X, file, steps, record }) {
+  for (const c of checkAtomicityStep()) drill.check(c.ok, `runbook 0.3 as written: ${c.label}`, c.detail ?? null);
   const node = (file, args) => runNode([join(ROOT, file), ...args], { env: ctx.env, timeoutMs: 600_000 });
   const plainOf = (out) => out.split("\nDetails")[0];
   const noCodes = (text) => !/\b(cms_|document_refs|product_content_live|search_outbox|rel_[0-9a-f]|doc_[a-z]|ver_[0-9a-f]|gid:\/\/)/.test(text);
@@ -217,8 +242,9 @@ async function runbookSteps(drill, { seed, ctx, scratch, X, file, steps, record 
     return { status: r.status, body: await r.json().catch(() => null) };
   }, view?.revisions?.announcement ?? null);
   const annNow = rowsOf((await sqlAt(ctx.urls.tenant, ["SELECT value FROM cms_blocks WHERE key = 'announcement'"]))[0])[0];
-  drill.check(save.status === 409 && /moving to the new editor right now, so nothing was saved/.test(String(save.body?.error || "")) && noCodes(String(save.body?.error || "")) && !String(annNow?.value || "").includes("Saved while the store moves"), "runbook 8 (and 0.3): while the store is being updated an old editor's save is refused in plain words and saves nothing", { status: save.status, words: save.body?.error });
-  record({ section: "0.3 and 8", what: "an old editor's save while the store is being updated", as: "it must answer \"Your store is being updated. Try again in a few minutes.\"", ran: "the same save on the harness", dev: `the runbook quoted words the store no longer says; it answers: "${save.body?.error}"`, fix: "section 0.3 quotes the words the store says now" });
+  drill.check(save.status === 409 && /moving to the new editor right now, so nothing was saved/.test(String(save.body?.error || "")) && noCodes(String(save.body?.error || "")) && !String(annNow?.value || "").includes("Saved while the store moves"), "runbook 8: while the store is being updated an old editor's save is refused in plain words (the first read, before any batch) and saves nothing; this is not runbook 0.3's proof", { status: save.status, words: save.body?.error });
+  record({ section: "0.3", what: "the staging check of hosted batch atomicity: an old editor's save while the store is being updated", as: "it must answer \"Your store is being updated. Try again in a few minutes.\" (the batch guard's words)", ran: "the same save on the harness", dev: `an ordinary save reads the mode first and is refused before any batch is sent (${save.status}, "${save.body?.error}"), so it never reaches the batch guard 0.3 is meant to test on Turso; no runbook step reaches it`, fix: "0.3 keeps the batch guard's words as its only proof, says an ordinary save is refused before any batch and that those words prove nothing, and is marked open (an owner and orchestrator decision: a staging-only script, or accept the local proof) with no real move before it; checked by runbook.mjs --check" });
+  record({ section: "8", what: "an old editor's save while the store is being updated", as: "every old editor refuses (\"This store is moving to the new editor right now, so nothing was saved…\")", ran: "the same save on the harness", dev: null });
   const sctx = await shopperContext(drill, ctx.base, "p4-drills-runbook");
   const sp = await sctx.newPage();
   const home = await sp.goto(`${ctx.base}/`, { waitUntil: "load", timeout: 120_000 });
@@ -408,6 +434,11 @@ async function crashAfter(argv) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const [cmd, ...argv] = process.argv.slice(2);
+  if (cmd === "--check") {
+    const res = checkAtomicityStep();
+    for (const c of res) console.log(`${c.ok ? "✓" : "✗"} ${c.label}`);
+    process.exit(res.every((c) => c.ok) ? 0 : 1);
+  }
   const go = cmd === "--crash-after" ? crashAfter(argv) : cmd === "serve-copy" ? serveCopy(argv) : Promise.reject(new Error("Use: node scripts/drills/p4/runbook.mjs serve-copy --copy restore-drill-X.db --tenant X (or run the 'runbook' stage through run.mjs)"));
   go.catch((e) => {
     console.error(`✗ ${e.message || e}`);

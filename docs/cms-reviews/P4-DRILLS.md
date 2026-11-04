@@ -66,7 +66,8 @@ Order: 0.1 the updates and the check; 3.1 `restore-drill.js --keep`; 3.2 `serve-
 | Section | What a non-developer could not have known | Runbook fix |
 |---|---|---|
 | 0.1 | The code block lists `--all` and `--check --include-env` only; `pnpm migrate` (the env store) was only in the sentence above it, and the check fails with "the env store (_default): behind" without it | `pnpm migrate` added to the code block between them, with the failure it prevents |
-| 0.3 and 8 | The runbook quoted "Your store is being updated. Try again in a few minutes."; an old editor's save now answers "This store is moving to the new editor right now, so nothing was saved. Make this change in the new editor once the move is done." | 0.3 and 8 quote the words the store says now |
+| 0.3 | The staging check of hosted batch atomicity asks for the batch guard's words, "Your store is being updated. Try again in a few minutes." An ordinary old-editor save on the harness got "This store is moving to the new editor right now, so nothing was saved…" (409): it reads the mode first and is refused before any batch is sent, so it never reaches the guard. No runbook step reaches the guard on staging | **Fix round 1:** 0.3 keeps the batch guard's words as its only proof, says an ordinary save is refused before any batch and that those words prove nothing (do not tick on them), and is marked an **open owner and orchestrator decision** (a staging-only script that sends one guarded batch, or accept the file-database and sqld proof), with no real move before it. (The first version of this branch changed 0.3 to quote the pre-check's words, which made the check prove nothing; reverted.) |
+| 8 | Nothing: section 8's "every old editor refuses" quotes the pre-check's words, which is what a save in 'migrating' answers | none needed |
 | 3.2 | "Load the copy into a local sqld database, and point a local control-plane row at that sqld" had no command; a developer wrote both | New `node scripts/drills/p4/runbook.mjs serve-copy --copy restore-drill-X.db --tenant X`: loads the copy into its own local sqld (`COPY_SQLD_PORT`), points the harness's row for X at it, prints the `--db` address, and on Ctrl-C points the row back and stops. The runbook gives the command and when to press Ctrl-C. It still needs the store's row in the harness, which only a developer can copy today (said plainly in 3.2; owner check) |
 | 4 | The dry run said "Settings > Team: remove the agency's access", but the agency is its own panel, "Agency access", further down the Settings page | Section 4 says where (Settings, Agency access, Revoke). The report's words are finding F3 |
 | 8 → 6 | After `--abort`, the rehearsal made before the stop is refused (the stopped move left copied content in the new editor's tables); the runbook only said the next move takes the old editor's content again | Section 8: after `--abort`, start again from section 3 (a fresh copy, the dry run, the rehearsal), quoting the refusal |
@@ -81,7 +82,7 @@ Literal and fine, with no developer knowledge: 3.1 (restore-drill), 3.3 (the rou
 | 1 | Drill: every stage passes on the harness in desktop Chrome with screenshots under the size limits of P1-DRILLS-C | **DONE** (one known failure, finding F1) | "The run" below: every stage 0 failed. Screenshots go through `scripts/drill.js` `shoot` (palette PNG, at most 300 KB and 6000 px tall, P1-DRILLS-C); the largest is listed under "The run". The one KNOWN check (media: the refusal names the product) is finding F1, recorded as known so it can't pass silently; it is not this item's code |
 | 2 | Drill: the p3 stages still pass after reseeding with --p3 | **DONE, with the P3 smoke's refs check as on the base** | the `p3` stage (`scripts/drills/p3/run.mjs items`, each drill reseeding `--p3`): see "The run". The one failing check is the P3 smoke's document refs check, failing the same way on the base (P4-HARNESS acceptance 3); the cause is confirmed below (Known limits) and `scripts/drills/p3/*` and `seed-design-documents.js` are not this item's to change |
 | 3 | MANUAL-CHECKS.md lists every Owner check from every P4 packet, each with its packet link | **DONE** | Every phase 4 section has a `Packet: [P4-X.md](P4-X.md)` line (23 packets plus this one); the checks each packet listed that were missing were added (MEDIA, LIVEROW caps, HARNESS, SEARCH, OVL07, EDITOR, EQUIV, CUTOVER's full list in place of "no new checks", PROVISION, FIX4, FIX5, REVERSE), plus the batch-review items the brief named; "Phase 4, batch 7" has the one-list owner steps (each line linking its packets) and this item's own. Checked with a scratch script (each packet's Owner-checks lines against the file); FIX6's are to be added when it merges |
-| 4 | Drill (runbook): the runbook is followed literally end to end on the harness, including a stop in 'migrating' recovered with --status and --abort; P4-DRILLS.md lists each step that needed developer knowledge and the runbook fix made for it | **DONE** | `results-runbook.json` and `runbook-steps.json`; the table above |
+| 4 | Drill (runbook): the runbook is followed literally end to end on the harness, including a stop in 'migrating' recovered with --status and --abort; P4-DRILLS.md lists each step that needed developer knowledge and the runbook fix made for it | **DONE**, except 0.3, which stays an open decision (it has no harness equivalent and no staging tool yet; see Fix round 1) | `results-runbook.json` and `runbook-steps.json`; the table above; `node scripts/drills/p4/runbook.mjs --check` for 0.3's wording |
 
 These are drills, not unit tests: what fails without this change is that the stages don't exist (`run.mjs` before this branch knows only `seed` and `smoke`).
 
@@ -126,6 +127,20 @@ The P3 results folders were put back to their committed state after the run (not
 
 **The test order**: one per `product` run, cash on delivery, `snehal@mediastic.in`, cancelled at once (each run's notes give its id and the cancelled row). Nothing reaches Shopify: the stage checks the store's row and the harness env hold no Shopify domain, token or secret first.
 
+## Fix round 1
+
+Review blocker: the branch had changed runbook 0.3 (the staging check of hosted batch atomicity, a precondition of every real move) to expect "This store is moving to the new editor right now, so nothing was saved…". Those are the pre-check's words (`assertLegacyContentWrites`, `refusalMessage`, `lib/cms-mode.js`): the mode is read with no cache and the save is refused before any batch is sent, so the batch guard never runs and Turso's batch rollback is never tested. The runbook drill's own save showed it (409, the pre-check's words). An owner following the changed 0.3 would have ticked a check that proves nothing.
+
+Fixed:
+
+- `P4-CUTOVER-RUNBOOK.md` 0.3: the batch guard's words, "Your store is being updated. Try again in a few minutes." (`MIGRATING_MESSAGE`), are again the only proof. It now says an ordinary old-editor save is refused before any batch is sent, that those words prove nothing and must not be ticked on, and that no one can time the race by hand and there is no staging tool. It is marked **open: an owner and orchestrator decision** between (a) a staging-only script that sends one guarded old-editor batch straight to the staging store, skipping the first read, and (b) accepting the file-database and sqld proof with hosted Turso recorded as untested. No real store moves until it is settled. Section 8 is unchanged (it rightly quotes the pre-check's words for what a save in 'migrating' answers).
+- The test: `node scripts/drills/p4/runbook.mjs --check` (offline, no harness) reads 0.3 and `lib/cms-mode.js` and checks that 0.3 expects `MIGRATING_MESSAGE`, does not accept the pre-check's words as a pass, says the save is refused before any batch, and is marked open with no real move before it. On the branch before this fix it failed 4 of 6 checks; after it, 6 of 6 pass. The `runbook` stage runs the same checks first.
+- `runbook.mjs`: the drill's check is relabelled "runbook 8: … (the first read, before any batch) …; this is not runbook 0.3's proof", and it records 0.3 and 8 as separate steps.
+- `runbook-steps.json`: the "0.3 and 8" entry was corrected **by hand** to the two entries the code now records (marked `correctedBy`); the measured save (409, the pre-check's words, nothing saved) is the one from the run on `dbc27f2`. `results-runbook.json` was **not** re-run and still carries the old label "runbook 8 (and 0.3)" and note; read it with this section. The `runbook` stage should be run again with the FIX6 re-run (Known limits).
+- `MANUAL-CHECKS.md`: the P4-GUARD line ("the plain refusal") has a note naming the only passing words, and the batch 7 one-list line says the decision comes first.
+
+No staging tool was written: it would send writes to a hosted store, which builders never run, and the choice between (a) and (b) is the owner's and the orchestrator's.
+
 ## Findings (not this item's files; for the orchestrator)
 
 - **F1 (founder-facing words, not a blocker by the rule: no data loss, nothing a shopper sees).** After a move every product and collection content document is labelled with its type ("Product content", "Collection content"): `lib/migrate/map-entities.js:296` sets `label: documentType(k.type).label`, and `lib/documents/service.js` `labelOf` keeps a live-row document's label forever. So on a moved store the media screen's "Where it's used" and its delete refusal say "Product content (draft)", "Product content (live)" without the product's name (the `media` stage's KNOWN check), and Publishing lists "Moved to the new editor Collection content" for each. A store made after the move (openEntityContent) gets the product's name. Fix: label by the product's or collection's name in the mapper, and relabel moved stores once.
@@ -137,14 +152,17 @@ The P3 results folders were put back to their committed state after the run (not
 
 | What | Result |
 |---|---|
-| `pnpm test` | 96 of 96 suites passed in 180.2 s (after the drills' last change). An earlier run failed `test:shopify-boundary` (SHOP-01: the drills built console addresses as `${base}/admin/…`, which the scan reads as an Admin REST call); they now use `consoleUrl(base, "/admin/…")` (`new URL`, `assertLocal`), the suite passes, and every stage was run again after that change |
+| `pnpm test` | 96 of 96 suites passed in 180.2 s (after the drills' last change); again 96 of 96 in 184.2 s after fix round 1. An earlier run failed `test:shopify-boundary` (SHOP-01: the drills built console addresses as `${base}/admin/…`, which the scan reads as an Admin REST call); they now use `consoleUrl(base, "/admin/…")` (`new URL`, `assertLocal`), the suite passes, and every stage was run again after that change |
 | `pnpm build` | passes; its two warnings are the old ones (nothing in `app/`, `lib/` or `components/` changed) |
 | `node scripts/drills/p4/lib.mjs --check` | 3 passed |
+| `node scripts/drills/p4/runbook.mjs --check` (fix round 1) | before the 0.3 fix: 2 passed, 4 failed; after: 6 passed |
 | `node scripts/drills/p4/local-tenants.mjs --out "<scratch>/lt test"`, then again with a `.DS_Store` in the folder | 22 passed both times; the `.DS_Store` stays; `results-local-tenants.json` untouched (git status clean for it). `prepareOutDir` on a folder holding only `.DS_Store`: accepted, nothing removed; on `.DS_Store` plus `notes.txt`: refused, both kept |
 
 ## Known limits
 
 - **Drills ran on this branch, not with P4-FIX6** (see the top). Run `reverse`, `reverse-drill` and `runbook` again after FIX6 merges.
+- **Runbook 0.3 is open** (fix round 1): no step reaches the batch guard on staging; the owner and orchestrator choose a staging-only script or accept the local proof. `runbook.mjs --check` is not in `pnpm test` (`package.json` and the test suites are not this item's files); the orchestrator may want it there.
+- **`results-runbook.json` predates fix round 1** (old label for the save check); `runbook-steps.json`'s 0.3 entry was corrected by hand.
 - **The P3 smoke's refs check** (22 "orphan" refs, P4-HARNESS acceptance 3) fails on the base too. Cause, confirmed: `seed-design-documents.js` `p3State` counts as orphans the refs of every version that is not `kind = 'published'`, and P4-MEDIA now writes refs for checkpoints and Undo-saved versions too (decision 6: every version kind is indexed); on a `--p3` store after the drills, a read of `document_refs` joined to `document_versions` found every non-published ref on `checkpoint` versions (22 versions, 56 refs) and none without a version row, so none is a real orphan. The fix is one line in `p3State` (count refs whose version is missing from `document_versions`, and compare every kind); `seed-design-documents.js` and `scripts/drills/p3/*` are not this item's. Owner check.
 - **The stop in 'migrating' is a crash, not a real power cut**: the wrapper (`runbook.mjs --crash-after`) sets the move's own test hook (`__cutoverTestHooks.afterStep`) and kills its process after the backfill step. The command and its recovery are the real ones.
 - **The sync pause is not drilled** (a catalog sync needs Shopify): staging only.
@@ -160,6 +178,7 @@ The P3 results folders were put back to their committed state after the run (not
 All are in `MANUAL-CHECKS.md`, "Phase 4, batch 7":
 
 - The one-list owner steps for phase 4 (migrations and the check; per tenant: dry run, rehearsal, move; hosted batch atomicity; OQ-14; Typesense tenants including `_default`; phone and Safari; theme_pin on hosted; webhook allowed differences; PITR; the quiet window and the founder warning; staff cart-offer publishing (OQ-6); a throwaway tenant on staging (OQ-4); CI sqld).
+- **Runbook 0.3: decide how hosted batch atomicity is proved** (a staging-only script, or accept the file-database and sqld proof) before any real move.
 - Findings F1, F2 and F3: decide or assign.
 - Runbook 3.2 on a real store: the store's row must be copied into the harness by a developer for now.
 - The sync pause and Typesense: staging only.
@@ -174,6 +193,7 @@ DESIGN_PORT=6100 DESIGN_SQLD_PORT=7100 COPY_SQLD_PORT=7103 node scripts/drills/p
 DESIGN_PORT=6100 DESIGN_SQLD_PORT=7100 node scripts/drills/p4/run.mjs picker,editor,fix3,reverse-drill,p3
 node scripts/drills/p4/runbook.mjs serve-copy --copy restore-drill-X.db --tenant X
 node scripts/drills/p4/lib.mjs --check
+node scripts/drills/p4/runbook.mjs --check
 pnpm test
 pnpm build
 ```

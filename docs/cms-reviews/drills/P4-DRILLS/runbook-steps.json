@@ -76,12 +76,20 @@
       "fix": "the harness section says the printed commands are for the real store; on the harness run them without --env-file"
     },
     {
-      "section": "0.3 and 8",
-      "what": "an old editor's save while the store is being updated",
-      "as": "it must answer \"Your store is being updated. Try again in a few minutes.\"",
+      "section": "0.3",
+      "what": "the staging check of hosted batch atomicity: an old editor's save while the store is being updated",
+      "as": "it must answer \"Your store is being updated. Try again in a few minutes.\" (the batch guard's words)",
       "ran": "the same save on the harness",
-      "dev": "the runbook quoted words the store no longer says; it answers: \"This store is moving to the new editor right now, so nothing was saved. Make this change in the new editor once the move is done.\"",
-      "fix": "section 0.3 quotes the words the store says now"
+      "dev": "an ordinary save reads the mode first and is refused before any batch is sent (409, \"This store is moving to the new editor right now, so nothing was saved. Make this change in the new editor once the move is done.\"), so it never reaches the batch guard 0.3 is meant to test on Turso; no runbook step reaches it",
+      "fix": "0.3 keeps the batch guard's words as its only proof, says an ordinary save is refused before any batch and that those words prove nothing, and is marked open (an owner and orchestrator decision: a staging-only script, or accept the local proof) with no real move before it; checked by runbook.mjs --check",
+      "correctedBy": "P4-DRILLS fix round 1, by hand: the run on dbc27f2 recorded this as '0.3 and 8' with the fix 'section 0.3 quotes the words the store says now', which was wrong; the measured save (409, the words above, nothing saved) is unchanged"
+    },
+    {
+      "section": "8",
+      "what": "an old editor's save while the store is being updated",
+      "as": "every old editor refuses (\"This store is moving to the new editor right now, so nothing was saved…\")",
+      "ran": "the same save on the harness",
+      "dev": null
     },
     {
       "section": "8",
