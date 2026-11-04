@@ -388,6 +388,47 @@ No owner checks for this item.
 - [ ] Known limit to accept: /api/leads on a store host now answers 429 after 5 calls an hour from one address, instead of 404.
 - [ ] CI sqld download: unchanged (no .github/ change). Its source and checksum still need the owner's approval.
 
+## Phase 3, batch 3
+
+### The editor's store and the preview label (P3-STORE)
+- [ ] Desktop Chrome at P3-EDITOR's drill: close a tab mid-save, reopen it, reload twice without answering the 'We found edits that weren't saved' offer, and confirm it is still offered and that leaving warns.
+- [ ] Desktop Chrome: during a 409, click 'Use the newer version' and keep typing while it runs; Earlier versions should show the version with the extra text ('Kept from another tab').
+- [ ] Ruling: each extra keep during 'Use the newer version' adds one more kept draft, so TOO_MANY_KEPT is reached sooner.
+- [ ] Ruling: when two tabs type on one document at the same revision they still share one backup key (Known limits).
+- [ ] Standing: the CI sqld download needs the owner's approval of its source and checksum (nothing under .github/ was touched).
+
+### The inspector's forms and the ED-12 checklist (P3-INSPECTOR)
+- [ ] After P3-EDITOR mounts the forms: in a menu or bar link, type the web name of an existing page, change 'Kind of page' to Campaign, and confirm that publishing is blocked with a missing-page note instead of going live to a 404.
+- [ ] Decide whether lib/documents/checks.js referenceChecks should also compare the found page's web name and kind with the link, so that links saved before this fix with a stale document id are caught. That file is not owned by P3-INSPECTOR.
+- [ ] CI: the sqld download needs the owner's approval of its source and checksum. Nothing under .github/ was changed.
+
+### The section tree: add, move, hide, copy, delete (P3-TREE)
+- [ ] Desktop Chrome, once P3-EDITOR mounts the tree on the design harness: add each kind to the home page and to a page; move, hide, show, copy and delete sections; check each new section is selected in the preview at once (ED-04) and the disabled buttons' tooltips read well. Browser verification is NOT DONE in this item (no host page).
+- [ ] Wording ruling: the refusal sentences (for example 'The home page already has a hero. It can have only one.', 'Only one section can sit above the product details and buy button.') and the row badges 'Unfinished', 'Needs a fix' and 'Hidden'.
+- [ ] Phones: the tree inside the editor's drawer below 1280 px, once mounted (ED-01).
+- [ ] Product rail pick: P3-EDITOR or INSPECTOR must pass a real available_count with each collection; no repo function returns one today (carried from P3-VALIDATE and P3-FIX1).
+- [ ] Staging: NOT DONE (nothing here touches a database).
+
+### The publish panel, Undo, take offline, Earlier versions, Recently published (P3-PUBLISHUI)
+- [ ] P3-EDITOR desktop Chrome drill on the design harness for these components, which are not browser-verified here. Cover: Publish with its review and Keep the live version; a 422 fix (hide or remove); Publish both, with Confirm off until every list loads; the republish question for an offline target; a first publish with and without a home page; Undo showing its change words; take offline with the linking pages; whole-set Undo with one page going offline; Earlier versions restore; Recently published with no Undo on rows that can't be undone.
+- [ ] P3-EDITOR must pass the store's wrapper as `call` (plus keepLiveSection, onRestore, onDocument, and documentOf when it holds the draft), so a fix's saveDraft, keep-live, restore and Undo flush and hold autosave (plan A5). It must also pass checkLive, answered from GET /api/admin/releases `live`, for the PUBLISH_UNKNOWN release check.
+- [ ] Staging on hosted Turso: a publish whose answer is lost (PUBLISH_UNKNOWN) is settled correctly by the check. NOT DONE.
+- [ ] Owner ruling on the words: the level names 'Must fix', 'Check' and 'Already live like this'; the two offer reasons; 'Make your home page first'; the republish question; the whole-set Undo lines 'Live now' and 'Offline now'.
+- [ ] Approve the source and checksum of the CI sqld download. Nothing under .github/ was touched.
+- [ ] pnpm build failed once inside next/font/google (Fraunces font download) and passed on a plain rerun. If it happens again on CI, look at the font download, not this item.
+
+### The editor's address, the old screens' redirects, the console nav, and the Designer's failed push (P3-ROUTES)
+- [ ] Ruling: on the 8 redirected old screens, a cms_state read that fails keeps the old screen (its writes still refuse), while /admin/editor shows the error page. Accept this, or ask for the old screens to fail closed too.
+- [ ] Ruling: in documents mode the sidebar's Storefront group is Editor, Media and Publishing only, and /admin/storefront/pages opens the home page.
+- [ ] On a documents test tenant on staging (not a real tenant): open each of the 8 old addresses (storefront overview, designer, home, navigation, pages, product-pages, brand, theme) and confirm each lands in /admin/editor at the right document. On a legacy tenant, confirm the sidebar and those screens look as before. Staging is NOT DONE.
+- [ ] CI sqld download: untouched (no .github/ change). Its source and checksum still need the owner's approval.
+- [ ] Optional: run DESIGN_PORT=<port> DESIGN_SQLD_PORT=<port> node scripts/drills/p3/routes.mjs on your Mac and look at legacy-designer-push-failed-1440.png.
+
+### The batch 2 review findings no other batch 3 item owns (P3-FIX2)
+- [ ] Orchestrator: classify() in lib/documents/publish.js still treats an unchanged section's link as already live when the same set hides or renames its target. This is older than P3-FIX2 and publish.js is outside this item's list, so it needs an owner.
+- [ ] Owner: on a hosted staging tenant, publish the header together with the page its menu item links to, while hiding or renaming that page, and confirm it is refused (NOT DONE).
+- [ ] Owner: the CI sqld download source and checksum under .github still need approval. Nothing under .github was touched.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
