@@ -335,6 +335,68 @@ await t("unit: Undo three times steps back through three publishes; a fourth on 
   eq(rows[0].summary, [{ words: "Taken offline" }], "and its summary:");
 });
 
+// A publish made while the page was offline replaced nothing live: its Undo
+// takes the page offline again and never puts the offline copy live (fix
+// round 1). Path 1: taken offline by unpublish. Path 2: taken offline by an
+// Undo of the first publish.
+const republishApi = async (store, id) => {
+  const d = await current(store, id);
+  return api({ publish: { id, draftHash: d.draftHash, confirmRepublish: true }, revision: d.revision }, { store });
+};
+async function offlineRepublishCase(slug, takeOffline) {
+  const d = await create("docs", "page", { body: page(slug, "Offline again", "One.", "page", { redirect_from: [`${slug}-old`] }) });
+  published(await publishApi("docs", d.id), "v1");
+  await takeOffline(d);
+  eq(await liveText("docs", slug), null, "offline first:");
+  await save("docs", d.id, page(slug, "Offline again", "Two.", "page", { redirect_from: [`${slug}-old`] }));
+  published(await republishApi("docs", d.id), "publish while offline");
+  eq(await liveText("docs", slug), ["Two."], "Two. live:");
+  const off = await offered("docs", d.id);
+  ok(off, "Recently published offers an Undo of that publish");
+  eq(off.logId, (await lastLog("docs", d.id, "publish")).id, "the offered row is that publish:");
+  const beforeDry = await dump();
+  const dry = await undoApi("docs", d.id, off.undo.logId, { dryRun: true });
+  likeShape(dry, SHAPES.undo.outcomes.dryRun, "dry run");
+  eq([dry.body.willTakeOffline, dry.body.target, dry.body.changes], [true, null, [{ words: "Taken offline" }]], "the dry run says it goes offline:");
+  await unchanged(beforeDry, "dry run");
+  const before = await current("docs", d.id);
+  const r = await undoApi("docs", d.id, off.undo.logId, { revision: off.undo.revision });
+  likeShape(r, SHAPES.undo.outcomes.ok, "undo");
+  eq([r.body.message, r.body.liveUrl], [U.OFFLINE_MESSAGE, null], "words:");
+  ok(!/back to the version/.test(r.body.message), "never says it's back to a version");
+  eq(await liveText("docs", slug), null, "the reader 404s it, never One. again:");
+  eq(await inT(() => Res.resolvedSlugRedirect(`${slug}-old`)), null, "no redirect to it:");
+  const live = await pointerOf();
+  eq(live.list.pages.filter((p) => p.document === d.id).map((p) => p.enabled), [false], "its row is switched off:");
+  const now = await current("docs", d.id);
+  eq([now.publishedVersionId, now.publishedHash, now.undoneVersionId, now.revision, now.draftHash], [null, null, before.publishedVersionId, before.revision, before.draftHash], "documents row (draft kept):");
+  eq(stripped(now.body.sections), stripped(page(slug, "Offline again", "Two.").sections), "the draft still says Two.:");
+  ok(!(await offered("docs", d.id)), "no Undo offered once offline");
+  const rows = (await recent("docs")).filter((x) => x.documentId === d.id);
+  eq([rows[0].action, rows[0].summary, rows[0].note], ["undo", [{ words: "Taken offline" }], U.OFFLINE_NOTE], "the Undid row:");
+  // and it can go on: publish again, Undo again, offline again
+  published(await republishApi("docs", d.id), "publish again");
+  const off2 = await offered("docs", d.id);
+  const r2 = await undoApi("docs", d.id, off2.undo.logId, { revision: off2.undo.revision });
+  eq([r2.status, r2.body.message], [200, U.OFFLINE_MESSAGE], "second round:");
+  eq(await liveText("docs", slug), null, "offline again:");
+}
+
+await t("unit (negative): Undo of a publish made after unpublish takes the page offline again, keeps the draft, and never puts the old version back", async () => {
+  await offlineRepublishCase("off-again-1", async (d) => {
+    const r = await api({ unpublish: { id: d.id }, revision: (await current("docs", d.id)).revision });
+    eq(r.status, 200, `unpublish: ${JSON.stringify(r.body).slice(0, 300)}`);
+  });
+});
+
+await t("unit (negative): Undo of a publish made after an Undo took the page offline takes it offline again, never back to the first version", async () => {
+  await offlineRepublishCase("off-again-2", async (d) => {
+    const off = await offered("docs", d.id);
+    const r = await undoApi("docs", d.id, off.undo.logId, { revision: off.undo.revision });
+    eq([r.status, r.body.message], [200, U.OFFLINE_MESSAGE], `undo of the first publish: ${JSON.stringify(r.body).slice(0, 300)}`);
+  });
+});
+
 await t("unit (negative): tab A publishes v2 while tab B's Undo of v1 is in flight: B answers 409 PUBLISHED_ELSEWHERE and v2 stays live; an Undo of a row that is not the latest undoable row is 409", async () => {
   const d = await create("docs", "page", { body: page("race-undo", "Race", "Zero.") });
   published(await publishApi("docs", d.id), "v0");
@@ -792,6 +854,21 @@ await t("unit: the target rule follows Undo's copies, and never counts an offlin
   a = U.analyse([{ id: "l1", action: "publish", from: null, to: "v1" }, { id: "p", action: "unpublish", from: "v1", to: "voff" }], doc(null, "v1"));
   ok(a.isCurrent(a.byId.get("p")), "an unpublish row is current while it is offline with that version undone");
   ok(!U.analyse([{ id: "p", action: "unpublish", from: "v1", to: "voff" }], doc(null, "v9")).isCurrent({ id: "p", action: "unpublish", from: "v1" }), "not when another version is undone");
+  // a publish made while offline (from = an offline copy) plans as take offline
+  const page_ = { type: "page" };
+  const viaUnpublish = [{ id: "l1", action: "publish", from: null, to: "v1" }, { id: "p", action: "unpublish", from: "v1", to: "voff" }, { id: "l2", action: "publish", from: "voff", to: "v2" }];
+  a = U.analyse(viaUnpublish, doc("v2", "v1"));
+  ok(a.isCurrent(a.byId.get("l2")), "the publish made while offline is current");
+  eq(U.__undoInternals.planOf(page_, a.byId.get("l2"), a), { mode: "offline" }, "its Undo takes the page offline (via unpublish):");
+  const viaUndo = [{ id: "l1", action: "publish", from: null, to: "v1" }, { id: "u1", action: "undo", undoes: "l1", from: "v1", to: "voff" }, { id: "l2", action: "publish", from: "voff", to: "v2" }];
+  a = U.analyse(viaUndo, doc("v2", "v1"));
+  eq(U.__undoInternals.planOf(page_, a.byId.get("l2"), a), { mode: "offline" }, "its Undo takes the page offline (via an offline Undo):");
+  const twice = [...viaUndo, { id: "u2", action: "undo", undoes: "l2", from: "v2", to: "voff2" }, { id: "l3", action: "publish", from: "voff2", to: "v3" }];
+  a = U.analyse(twice, doc("v3", "v2"));
+  ok(a.tookOffline(a.byId.get("u2")), "an Undo of a publish made while offline took it offline");
+  eq(U.__undoInternals.planOf(page_, a.byId.get("l3"), a), { mode: "offline" }, "and the next publish's Undo goes offline too:");
+  a = U.analyse([{ id: "l1", action: "publish", from: null, to: "v1" }, { id: "l2", action: "publish", from: "v1", to: "v2" }], doc("v2"));
+  eq(U.__undoInternals.planOf(page_, a.byId.get("l2"), a), { mode: "restore", targetId: "v1" }, "a publish over a live version still steps back:");
 });
 
 await t("unit: the whole-set read uses 'WHERE set_id = ? AND set_id IS NOT NULL', so the publish_log_set index serves it; nothing but the console API imports undo.js (node only)", async () => {
