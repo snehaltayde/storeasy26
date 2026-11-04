@@ -2,7 +2,9 @@
 
 // P3-TREE (ED-02, AU-04): the add-section picker. Prop-driven, no store.
 //
-//   <AddSection type sections index collections onChange onSelect afterLabel open? />
+//   <AddSection type sections index collections body? onChange onSelect afterLabel open? />
+// `body` (the whole draft, optional): a kind whose add would make it too big
+// to save is shown refused (P3-FIX3).
 //
 // Lists every registered kind the document type takes (allowedKinds), with its
 // label and its hint. A kind that can't be added (a second hero, …) is shown
@@ -16,13 +18,13 @@ import { cx } from "@/components/console/cx";
 import { Button, IconButton } from "@/components/console/Button";
 import { add, addOptions } from "./treeModel";
 
-export default function AddSection({ type, sections, index, collections = null, onChange, onSelect, afterLabel = "", open: openAtFirst = false }) {
+export default function AddSection({ type, sections, index, collections = null, body = null, onChange, onSelect, afterLabel = "", open: openAtFirst = false }) {
   const [open, setOpen] = useState(!!openAtFirst);
-  const options = open ? addOptions(type, sections, index) : [];
+  const options = open ? addOptions(type, sections, index, { body }) : [];
   const where = afterLabel ? `Adds below the ${afterLabel}` : "Adds at the end";
 
   const pick = (kind) => {
-    const r = add(sections, kind, index, { type, collections });
+    const r = add(sections, kind, index, { type, collections, body });
     if (!r.ok) return;
     setOpen(false);
     onChange?.(r.sections, { op: "add", id: r.id, selectedId: r.selectedId });

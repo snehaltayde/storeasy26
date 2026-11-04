@@ -188,12 +188,10 @@ function HistoryDialog({ blockKey, onClose, onLoad }) {
   );
 }
 
-// PV-01 (legacy slice, P3-ROUTES): a live-preview push that failed, in plain
-// words. It used to be dropped, which left the frame on older content while
-// the label still said it showed the edits. `res` is the api.js result of
-// saveCandidate (never ok here). -> { message, issues, reopen }:
-//   issues   the 422's issues (an incomplete section, a bad link), worded and
-//            linked to their section by the Designer, or null
+// PV-01 (legacy slice, P3-ROUTES): a live-preview push that failed, in plain words (it used to be dropped,
+// which left the frame on older content while the label still said it showed the edits). `res` is the
+// api.js result of saveCandidate (never ok here). -> { message, issues, reopen }:
+//   issues   the 422's issues (an incomplete section, a bad link), worded and linked to their section, or null
 //   reopen   true when the preview session is gone and must be reopened
 export function candidateFailure(res) {
   const r = res && typeof res === "object" ? res : {};
@@ -206,6 +204,8 @@ export function candidateFailure(res) {
   }
   if (r.code === "NETWORK") return { message: `We couldn't reach Storeasy, so the preview didn't update. Check your internet connection. ${older}`, issues: null, reopen: false };
   if (r.code === "NO_PREVIEW") return { message: `${r.error || "The preview isn't open any more."} ${older}`, issues: null, reopen: true };
+  const own = ownFailure(r, older); // P3-FIX3 (at the end of this file, so the ED-12 checklist's line numbers hold)
+  if (own) return own;
   if (r.code === "UNREADABLE_RESPONSE" || !(Number(r.status) < 500) || !r.error) {
     const code = Number(r.status) >= 400 ? ` (error ${r.status})` : "";
     return { message: `Something went wrong on our side${code}, so the preview didn't update. Try again in a minute. ${older}`, issues: null, reopen: false };
@@ -1119,4 +1119,27 @@ export default function Designer({ initial, tests = {} }) {
       <CollectionPicker open={picker?.kind === "collection"} onClose={() => setPicker(null)} multi={false} onConfirm={onCollectionPick} />
     </>
   );
+}
+
+// P3-FIX3: the failures whose own words are kept, for candidateFailure().
+//   STORE_USES_DOCUMENTS  a store moving to the new editor (or using it)
+//                         refuses Save too, so the words don't promise Save
+//   a 5xx answer          its own plain message (CMS_MODE_UNAVAILABLE's
+//                         "We couldn't check which editor this store uses…"),
+//                         worded for a preview
+// -> { message, issues, reopen } or null (candidateFailure goes on)
+function plainError(e) {
+  if (typeof e !== "string" || !e.trim() || e.length > 400) return null;
+  if (/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/.test(e) || /\(error \d+\)/.test(e)) return null;
+  return e.trim();
+}
+function ownFailure(r, older) {
+  if (r.code === "STORE_USES_DOCUMENTS") {
+    const why = plainError(r.error) || "This store is moving to the new editor right now, so the preview didn't change.";
+    return { message: `${why} The preview still shows an earlier version. Your changes are still on this screen, but they can't be saved here either.`, issues: null, reopen: false };
+  }
+  const own = Number(r.status) >= 500 && r.code !== "UNREADABLE_RESPONSE" ? plainError(r.error) : null;
+  if (!own) return null;
+  const worded = own.replace(/,?\s*(?:so\s+)?nothing (?:was|is) saved\b/, ", so the preview didn't update");
+  return { message: `${worded}${/preview didn't update/.test(worded) ? "" : " The preview didn't update."} ${older}`, issues: null, reopen: false };
 }

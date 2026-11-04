@@ -114,12 +114,14 @@ function SidebarBody({ storeName, host, role, actorKind, badges, cmsMode, collap
 
 // cmsMode (P3-ROUTES): the store's content mode from the (authed) layout;
 // "documents" points the storefront links at the new editor. Anything else
-// (legacy, migrating, unknown, missing) renders exactly as before.
-export function ConsoleShell({ storeName, host, role, actorKind, badges, cmsMode = null, children }) {
+// (legacy, migrating, unknown, missing) renders exactly as before. The
+// phone drawer gets the same cmsMode as the desktop sidebar (P3-FIX3).
+// drawerOpen: how the drawer first renders (tests; the layout never sets it).
+export function ConsoleShell({ storeName, host, role, actorKind, badges, cmsMode = null, drawerOpen = false, children }) {
   const pathname = usePathname();
   const editor = isEditorRoute(pathname);
   const [collapsed, setCollapsed] = useState(false);
-  const [drawer, setDrawer] = useState(false);
+  const [drawer, setDrawer] = useState(drawerOpen === true);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     try {

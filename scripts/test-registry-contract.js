@@ -339,6 +339,20 @@ await t("a second hero, a hero out of place, a kind not allowed, and too many se
   ok(validate(layout([sec("banner", "sec_b1", { title: "Hi" }), R.newSection("product_main", { id: "sec_main" }), sec("faq", "sec_f1", { items: [{ q: "Q", a: "<p>A</p>" }] })]), { mode: "publish" }).ok, "one above is fine");
   one(validate(layout([sec("banner", "sec_b1", { title: "Hi" })]), { mode: "draft" }), "PROTECTED_MISSING");
   one(validate(layout([{ ...R.newSection("product_main", { id: "sec_main" }), enabled: false }]), { mode: "draft" }), "PROTECTED_HIDDEN");
+  // P3-FIX3 (TREE-05): hidden on both screens is an error at publish and incomplete in a draft
+  for (const kind of R.sectionKinds().filter((k) => R.sectionType(k).protected)) {
+    const host = R.documentTypeNames().find((ty) => R.allowedKinds(ty).includes(kind));
+    ok(host, `a document type takes ${kind}`);
+    const both = { ...R.newSection(kind, { id: "sec_main" }), show: { mobile: false, desktop: false } };
+    const bodyOf = (s) => (host === "product_layout" ? layout([s]) : { ...R.emptyBody(host), sections: [s] });
+    const pub = one(validate(bodyOf(both), { mode: "publish" }), "PROTECTED_HIDDEN", { sectionId: "sec_main", field: "show" });
+    eq(pub.severity, "error", `${kind} hidden on both screens at publish:`);
+    ok(!/_/.test(pub.message) && /both phones and computers/.test(pub.message), `plain words: ${pub.message}`);
+    const draft = validate(bodyOf(both), { mode: "draft" });
+    deq([draft.ok, one(draft, "PROTECTED_HIDDEN", { sectionId: "sec_main" }).severity], [true, "incomplete"], `${kind} in a draft:`);
+    for (const show of [{ mobile: false }, { desktop: false }, { mobile: false, desktop: true }, { mobile: true, desktop: true }])
+      eq(find(validate(bodyOf({ ...both, show }), { mode: "publish" }), "PROTECTED_HIDDEN").length, 0, `${kind} shown on one screen (${JSON.stringify(show)}) is fine:`);
+  }
 
   for (const r of [two, moved, page, crowded]) {
     for (const i of r.issues) {

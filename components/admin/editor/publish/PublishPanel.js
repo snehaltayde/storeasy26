@@ -225,6 +225,11 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
             {o.message}
           </Banner>
           <IssueList issues={o.issues} labelOf={labelOf} offerSize={offerSize} busy={s.busy} onAct={h.act} onFocus={h.focus} />
+          {s.busy && (
+            <p className="text-[13px] text-fg-muted" role="status" data-keeps-running="">
+              {WORDS.keepsRunning}
+            </p>
+          )}
           {closeOnly}
         </>
       );
@@ -256,7 +261,7 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
           </ul>
           {o.skipped?.length > 0 && <p className="text-[13px] text-fg-muted">{`${WORDS.alreadyLive} ${o.skipped.join(", ")}`}</p>}
           {o.warnings?.length > 0 && <IssueList issues={o.warnings} labelOf={labelOf} offerSize={offerSize} busy={s.busy} onAct={h.act} onFocus={h.focus} />}
-          <UndoNotice target={undoTarget} note={note} call={call} onDocument={h.document} onOpenEarlierVersions={h.openEarlierVersions} />
+          <UndoNotice target={undoTarget} note={note} call={call} access={access} onDocument={h.document} onOpenEarlierVersions={h.openEarlierVersions} />
           {closeOnly}
         </>
       );
