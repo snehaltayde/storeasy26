@@ -17,6 +17,12 @@
 //      switch only, nothing else published in the new editor goes live again
 //   7. the P4-CUTOVER review: a failed agency read after the pause and a
 //      missing editor record each stop with their own words
+//   8. P4-FIX6 (the batch 6 review): a page left out of the next move shows as
+//      not published; the draft line; the in-batch stop when the release goes
+//      inside step 2's window; the three guards against a concurrent --abort
+//      or second run; restore from the published version, not the draft; the
+//      restore abort, the 'migrated' skip, photos named, the rehearsal never
+//      restoring
 //   pnpm test:migrate-reverse
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -427,7 +433,7 @@ await t("the report counts what was published in the new editor, the product edi
   ok(text.includes("The announcement bar: what was published in the new editor."), text);
   ok(text.includes("3 parts of your store were published in the new editor since the move (3 publishes)."), text);
   ok(text.includes("3 product edits (names, descriptions, photos, brand or type shown) on 2 products follow Shopify again."), text);
-  ok(text.includes("1 unpublished draft stays in the new editor."), text);
+  ok(text.includes("1 unpublished draft stays in the new editor for now."), text);
   ok(text.includes("The old editors work again at once"), text);
   plainWords(abovedetails(text, Rep), "the reversal dry run");
   const r = await reverse(S, { digest: dry.digest });
@@ -728,6 +734,281 @@ await t("the runbook has the reversal section: the commands, the dry run and its
   ok(/does not cover brand or theme edits/.test(text), "the source-hash limit");
   const packet = await readFile(join(ROOT, "docs/cms-reviews/P4-CUTOVER.md"), "utf8");
   ok(/does not cover brand or theme edits/.test(packet), "said in P4-CUTOVER.md too");
+});
+
+// =======================================================================================
+console.log("— 8. P4-FIX6: the batch 6 review");
+
+await t("P4-FIX6 (1): a page made and published in the new editor, then reversed, then moved again, is shown as not published in the editor (shoppers can't see it) and the dry run names it; publishing it again puts it live", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  const made = await inS(S, () => Docs.createDocument({ type: "page", meta: { slug: "fix6-new-page", title: "Made In The New Editor" }, actor: ACTOR }));
+  const id = made.document.id;
+  eq((await publishDocs(S, [id])).published?.length, 1, "the new page published");
+  ok((await q(S, "SELECT published_version_id AS p FROM documents WHERE id = ?", [id]))[0].p, "published before the reversal");
+  const r = await reverse(S);
+  ok(r.ok, JSON.stringify(r.refused || r.stopped));
+  const pr = await proofs(S);
+  // the dry run names it, in plain words
+  same(pr.dry.mapped.notLive.map((d) => d.id), [id], "planned as not live:");
+  const text = Rep.renderText(pr.dry.report, pr.dry.digest);
+  const lines = text.split(`\n${Rep.DETAILS_LINE}\n`)[0].split("\n");
+  ok(lines.includes("  - The page “Made In The New Editor” (/policies/fix6-new-page): what was published in the new editor. Shoppers won't see it after the move, so the new editor shows it as not published. Publish it there again to show it to shoppers."), lines.filter((l) => /New Editor/.test(l)).join(" | "));
+  ok(!text.includes(Rep.RECUT_TITLES[2]), "named once, under the kept section");
+  plainWords(abovedetails(text, Rep), "the dry run");
+  await moved(S, { proofs: pr });
+  // the editor: not published (no published version, nothing claims it's live)
+  const row = (await q(S, "SELECT published_version_id AS p, published_hash AS h, undone_version_id AS u, draft_hash AS d FROM documents WHERE id = ?", [id]))[0];
+  same([row.p, row.h, row.u], [null, null, null], "no published version any more:");
+  const doc = await inS(S, () => Docs.getDocument(id));
+  ok(doc.publishedVersionId == null && doc.publishedHash == null, `the editor reads it as not published: ${JSON.stringify({ v: doc.publishedVersionId, h: doc.publishedHash })}`);
+  ok(doc.draftHash !== doc.publishedHash, "so it has something to publish");
+  // its content is still there as a version, and publishing it again puts it live
+  ok((await count(S, "document_versions", `document_id = '${id}'`)) > 0, "its versions stay");
+  eq((await publishDocs(S, [id])).published?.length, 1, "published again");
+  ok((await q(S, "SELECT published_version_id AS p FROM documents WHERE id = ?", [id]))[0].p, "live again");
+  // a page the move does put live keeps its published version
+  ok((await q(S, "SELECT published_version_id AS p FROM documents WHERE id = 'doc_announcement'"))[0].p, "the announcement stays published");
+});
+
+await t("P4-FIX6 (1b): a page the first move carried, deleted in the old editor after the reversal, is not live after the next move: it shows as not published and the dry run names it under its own heading", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  const r = await reverse(S);
+  ok(r.ok, JSON.stringify(r.refused || r.stopped));
+  const targets = new Set((await q(S, "SELECT to_slug FROM page_redirects")).map((x) => String(x.to_slug)));
+  const page = (await q(S, "SELECT d.id, d.slug, d.label FROM documents d WHERE d.type = 'page' AND d.published_version_id IS NOT NULL ORDER BY d.id")).find((d) => !targets.has(String(d.slug)));
+  ok(page, "a carried page no old address points at");
+  await inS(S, () => Store.deleteContentPage(String(page.slug)));
+  const R = await import("../lib/releases.js");
+  await inS(S, () => R.createRelease({ note: "page deleted on the old editor" }));
+  const pr = await proofs(S);
+  ok(pr.dry.report.verdict.ready, JSON.stringify(pr.dry.report.verdict));
+  ok(pr.dry.mapped.notLive.some((d) => d.id === page.id), `planned as not live: ${JSON.stringify(pr.dry.mapped.notLive.map((d) => d.id))}`);
+  // whatever the move leaves out is truly not in the new live list
+  const list = JSON.stringify(pr.dry.mapped.list ?? null);
+  for (const d of pr.dry.mapped.notLive) ok(!list.includes(`"${d.versionId}"`), `${d.id} is not in the new live list`);
+  same(pr.dry.mapped.keptPublished.map((d) => d.id), [], "not counted as a new-editor publish:");
+  const text = Rep.renderText(pr.dry.report, pr.dry.digest);
+  const plain = text.split(`\n${Rep.DETAILS_LINE}\n`)[0];
+  ok(plain.includes(`${Rep.RECUT_TITLES[2]}\n  - The page “${page.label}”`) && plain.includes(Rep.NOT_LIVE_WORDS), plain.split("\n").slice(-8).join(" | "));
+  plainWords(plain, "the dry run");
+  await moved(S, { proofs: pr });
+  same(Object.values((await q(S, "SELECT published_version_id AS p, published_hash AS h FROM documents WHERE id = ?", [page.id]))[0]), [null, null], "not published in the editor:");
+});
+
+await t("P4-FIX6 (2): the reversal dry run's draft line says plainly that after a later move the draft is kept only as an older version (and the founder message too)", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  await saveSettings(S, "doc_announcement", { text: "A draft only (fix6)" });
+  const dry = await reverseDry(S);
+  eq(dry.plan.counts.drafts, 1, "one draft:");
+  const text = Rep.renderReversePlanText({ ...dry.plan, refused: dry.refused }, dry.digest);
+  ok(text.includes("1 unpublished draft stays in the new editor for now. If the store moves to the new editor again later, the old editor's version wins and this draft is kept there only as an older version."), text);
+  plainWords(abovedetails(text, Rep), "the reversal dry run");
+  const msg = Rep.founderMessage(dry.plan);
+  ok(msg.includes("If your store moves to the new editor again later, the old editor's version wins and that draft is kept only as an older version."), msg);
+  plainWords(msg, "the founder message");
+});
+
+await t("P4-FIX6 (3): the release removed inside step 2's window (after the recheck) stops with TARGET_MISSING in the batch itself and the store stays whole on the new editor", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  const { a } = await pickProducts(S);
+  await editProduct(S, a, { title: v("Window Name") });
+  const live = await q(S, "SELECT * FROM product_content_live ORDER BY product_id");
+  const ptr = await pointerOf(S);
+  Rev.__reverseTestHooks.beforeReverse = async () => {
+    await q(S, "UPDATE releases SET id = 'rel_gone_in_window' WHERE id = 'rel_fixture_v3'");
+  };
+  let r;
+  try {
+    r = await reverse(S);
+  } finally {
+    Rev.resetReverseTestHooks();
+  }
+  eq(r.stopped?.code, "TARGET_MISSING", JSON.stringify(r));
+  ok(r.stopped.unlocked, "unlocked");
+  plainWords(r.stopped.words, "stop words");
+  eq((await modeOf(S)).mode, "documents", "still on the new editor:");
+  eq(await pointerOf(S), ptr, "the pointer didn't move:");
+  same(await q(S, "SELECT * FROM product_content_live ORDER BY product_id"), live, "live rows untouched:");
+  eq(await count(S, "content_live_reversed"), 0, "nothing copied aside:");
+  eq(await count(S, "search_outbox", "reason = 'reverse'"), 0, "no outbox row:");
+  eq(await seenTitle(S, a), "Window Name", "shoppers still see the new editor's store:");
+  eq((await q(S, "SELECT outcome FROM cms_migration_runs WHERE kind = 'reverse'"))[0].outcome, "stopped", "the run:");
+});
+
+await t("P4-FIX6 (4a): an --abort that lands between the recheck and step 2 makes step 2 refuse in its own batch (migratingGuardStatement): the store stays whole on the new editor", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  const { a } = await pickProducts(S);
+  await editProduct(S, a, { title: v("Abort Race Name") });
+  const live = await q(S, "SELECT * FROM product_content_live ORDER BY product_id");
+  const ptr = await pointerOf(S);
+  let aborted = null;
+  Rev.__reverseTestHooks.beforeReverse = async () => {
+    aborted = await inS(S, () => Rev.abortReversal({ now: movingClock }));
+  };
+  let r;
+  try {
+    r = await reverse(S);
+  } finally {
+    Rev.resetReverseTestHooks();
+  }
+  ok(aborted?.ok, `the --abort went through: ${JSON.stringify(aborted)}`);
+  eq(r.ok, false, `the reversal didn't finish: ${JSON.stringify(r)}`);
+  eq(r.stopped?.code, "LOST_RUN", JSON.stringify(r));
+  plainWords(r.stopped.words, "stop words");
+  eq((await modeOf(S)).mode, "documents", "on the new editor:");
+  eq(await pointerOf(S), ptr, "the pointer didn't move:");
+  same(await q(S, "SELECT * FROM product_content_live ORDER BY product_id"), live, "live rows untouched:");
+  eq(await count(S, "content_live_reversed"), 0, "nothing copied aside:");
+  eq(await seenTitle(S, a), "Abort Race Name", "shoppers still see the new editor's store:");
+  eq((await q(S, "SELECT outcome FROM cms_migration_runs WHERE kind = 'reverse'"))[0].outcome, "aborted", "the run stays aborted:");
+});
+
+await t("P4-FIX6 (4b): an --abort whose batch lands after step 2 finished is refused in its own batch (migratingGuardStatement) and the store stays on the old editor", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  Rev.__reverseTestHooks.afterLock = crash;
+  await reverse(S).catch(() => null);
+  Rev.resetReverseTestHooks();
+  eq((await modeOf(S)).mode, "migrating", "paused after step 1:");
+  let finishedFirst = null;
+  Rev.__reverseTestHooks.beforeAbort = async () => {
+    Rev.__reverseTestHooks.beforeAbort = null;
+    finishedFirst = await resumeReverse(S);
+  };
+  let ab;
+  try {
+    ab = await inS(S, () => Rev.abortReversal({ now: movingClock }));
+  } finally {
+    Rev.resetReverseTestHooks();
+  }
+  ok(finishedFirst?.ok, `the resume finished the reversal first: ${JSON.stringify(finishedFirst?.refused || finishedFirst?.stopped)}`);
+  eq(ab.ok, false, `the abort must not claim the store stays on the new editor: ${JSON.stringify(ab)}`);
+  eq(ab.refused?.code, "NOT_PAUSED", JSON.stringify(ab));
+  plainWords(ab.refused.message, "abort words");
+  eq((await modeOf(S)).mode, "legacy", "the store is on the old editor:");
+  eq((await q(S, "SELECT outcome FROM cms_migration_runs WHERE kind = 'reverse'"))[0].outcome, "done", "the run stays done:");
+});
+
+await t("P4-FIX6 (4c): a second reversal whose lock lands while another holds the store is refused by the lock batch's own guard (documentsGuardStatement): one run, never two", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  const digest = (await reverseDry(S)).digest;
+  let inner = null;
+  Rev.__reverseTestHooks.beforeLock = async () => {
+    Rev.__reverseTestHooks.beforeLock = null;
+    // the other run takes the lock first and stops right after it
+    Rev.__reverseTestHooks.afterLock = crash;
+    inner = await inS(S, () => Rev.reverseDocuments({ dryRunDigest: digest, platform, now: movingClock })).then(() => null, (x) => x);
+    Rev.__reverseTestHooks.afterLock = null;
+  };
+  let r;
+  try {
+    r = await inS(S, () => Rev.reverseDocuments({ dryRunDigest: digest, platform, now: movingClock }));
+  } finally {
+    Rev.resetReverseTestHooks();
+  }
+  ok(inner instanceof Crash, `the other run locked first: ${inner}`);
+  eq(r.ok, false, JSON.stringify(r));
+  ok(["OPEN_RUN", "LOST_LOCK"].includes(r.refused?.code), JSON.stringify(r));
+  plainWords(r.refused.message.replace("--status", "").replace("--resume", "").replace("--abort", ""), "refusal words");
+  eq(await count(S, "cms_migration_runs", "kind = 'reverse'"), 1, "one reversal run:");
+  eq(await count(S, "cms_migration_runs", "kind = 'reverse' AND finished_at IS NULL"), 1, "the other's, still open:");
+  eq((await modeOf(S)).mode, "migrating", "paused by the other run only:");
+  ok((await count(S, "product_content_live")) > 0, "nothing reversed");
+  const ab = await inS(S, () => Rev.abortReversal({ now: movingClock }));
+  ok(ab.ok, JSON.stringify(ab));
+  eq((await modeOf(S)).mode, "documents", "back on the new editor:");
+});
+
+await t("P4-FIX6 (5): a move after a reversal restores the latest PUBLISHED version's edits, never a newer unpublished draft (kept as an older version)", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  const { a } = await pickProducts(S);
+  const docId = await editProduct(S, a, { title: v("Pub Name") });
+  await saveSettings(S, docId, { title: v("Draft Only Name") });
+  const r = await reverse(S);
+  ok(r.ok, JSON.stringify(r.refused || r.stopped));
+  const pr = await proofs(S);
+  const back = pr.dry.mapped.restored.find((x) => x.productId === a);
+  eq(back?.columns?.title, "Pub Name", "planned from the published version:");
+  await moved(S, { proofs: pr });
+  eq(await seenTitle(S, a), "Pub Name", "shoppers see the published name:");
+  eq((await q(S, "SELECT title FROM product_content_live WHERE product_id = ?", [a]))[0].title, "Pub Name", "the live row:");
+  const o = await openProduct(S, a);
+  eq(o.document.body.settings.title?.value, "Pub Name", "the editor's draft carries the published name:");
+  ok((await count(S, "document_versions", `document_id = '${docId}' AND body LIKE '%Draft Only Name%'`)) > 0, "the unpublished draft is kept as an older version");
+  eq(await count(S, "product_content_live", "title = 'Draft Only Name'"), 0, "never live:");
+});
+
+await t("P4-FIX6 (6a): flip.js restoreStatements aborts the whole batch when a restore matches no live row (another version), and writes the columns when it does", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  const row = (await q(S, "SELECT product_id, version_id, title FROM product_content_live ORDER BY product_id LIMIT 1"))[0];
+  ok(row, "a live row");
+  const a = String(row.product_id);
+  const Flip = await import("../lib/migrate/flip.js");
+  const cols = { title: "Restored Here" };
+  const wrong = Flip.restoreStatements([{ productId: a, versionId: "ver_not_this_one", columns: cols }]);
+  const e = await inS(S, () => libsql.batch([{ sql: "UPDATE cms_state SET updated_at = 'fix6-marker' WHERE id = 1", args: [] }, ...wrong], "write")).then(() => null, (x) => x);
+  ok(e && M.isGuardAbort(e), `refused in the batch: ${e}`);
+  eq((await q(S, "SELECT title FROM product_content_live WHERE product_id = ?", [a]))[0].title, row.title, "nothing written:");
+  eq(await count(S, "cms_state", "updated_at = 'fix6-marker'"), 0, "the whole batch rolled back:");
+  const right = Flip.restoreStatements([{ productId: a, versionId: String(row.version_id), columns: cols }]);
+  await inS(S, () => libsql.batch(right, "write"));
+  eq((await q(S, "SELECT title FROM product_content_live WHERE product_id = ?", [a]))[0].title, "Restored Here", "written on the matching row:");
+});
+
+await t("P4-FIX6 (6b): content the old editor published after a reversal is not counted as 'published in the new editor before' at the next move (only new-editor publishes are)", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  const r = await reverse(S);
+  ok(r.ok, JSON.stringify(r.refused || r.stopped));
+  await inS(S, () => Store.setBlock("announcement", { enabled: true, text: "Published on the old editor after going back", href: "/" }));
+  const R = await import("../lib/releases.js");
+  await inS(S, () => R.createRelease({ note: "old editor after the reversal" }));
+  const pr = await proofs(S);
+  ok(pr.dry.report.verdict.ready, JSON.stringify(pr.dry.report.verdict));
+  same(pr.dry.mapped.keptPublished, [], "nothing counted as kept:");
+  ok(!pr.dry.report.publishedKept, `no 'kept' section: ${JSON.stringify(pr.dry.report.publishedKept)}`);
+  const m = await moved(S, { proofs: pr });
+  ok(!m.report.keptPublished?.length, JSON.stringify(m.report.keptPublished));
+  const ann = JSON.parse((await q(S, "SELECT v.body FROM documents d JOIN document_versions v ON v.id = d.published_version_id WHERE d.id = 'doc_announcement'"))[0].body);
+  eq(ann.settings.text, "Published on the old editor after going back", "the old editor's announcement goes live:");
+});
+
+await t("P4-FIX6 (6c): a product whose only new-editor edit is its photos is named in the reversal's dry run ('photos')", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  const { b } = await pickProducts(S);
+  await editProduct(S, b, { gallery: v([{ media: "https://cdn.shopify.com/s/files/fix6-photo.jpg", alt: "Only a photo" }]) });
+  const dry = await reverseDry(S);
+  const p = dry.plan.products.find((x) => x.id === b);
+  ok(p, `listed: ${JSON.stringify(dry.plan.products)}`);
+  same(p.overlay, ["gallery"], "the edit:");
+  const text = Rep.renderReversePlanText({ ...dry.plan, refused: dry.refused }, dry.digest);
+  ok(text.includes(`“${await shopifyTitle(S, b)}”: photos.`), text);
+  eq(dry.plan.counts.overlayProducts, 1, "counted:");
+});
+
+await t("P4-FIX6 (6d): a rehearsal of a move after a reversal never restores the returning edits (its page comparison stays exact); it says so", async () => {
+  const S = await store("live_v3");
+  await moved(S);
+  const { a } = await pickProducts(S);
+  await editProduct(S, a, { title: v("Not In The Rehearsal") });
+  const r = await reverse(S);
+  ok(r.ok, JSON.stringify(r.refused || r.stopped));
+  const reh = await inS(S, () => Cut.runCutover({ storeOpen: S.storeOpen, platform, rehearsal: true, now: fixedClock }));
+  ok(reh.ok, JSON.stringify(reh.refused || reh.stopped));
+  eq((await modeOf(S)).mode, "documents", "the copy moved:");
+  eq(await seenTitle(S, a), await shopifyTitle(S, a), "Shopify's name on the rehearsal copy:");
+  eq(await count(S, "product_content_live", "title IS NOT NULL"), 0, "no restored column written:");
+  ok(reh.report.restoreSkipped === true && reh.report.restored?.length === 1, JSON.stringify({ skipped: reh.report.restoreSkipped, restored: reh.report.restored }));
+  ok(Rep.renderCutoverText(reh.report).includes("Left out of this rehearsal"), "said in plain words");
 });
 
 // =======================================================================================

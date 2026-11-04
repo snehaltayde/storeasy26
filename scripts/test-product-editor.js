@@ -1137,6 +1137,88 @@ await t("unit (P4-FIX5): A to B to C with B's document answering after C's never
   });
 });
 
+// P4-FIX6 (P4-FIX5 review): the SECOND openSeq guard (after `await adopt`).
+// B's document has answered and B's store is still opening (its open() is
+// hashing an earlier visit's backup) when the founder picks a section of C in
+// the preview: C opens with that section selected, its field focused and the
+// switch note. B's open then finishes; it must not set the editor ready again
+// and clear C's selection, focus and note.
+await t("unit (P4-FIX6): B's store still opening when the founder picks C's section: C keeps its selected section, focus and switch note after B's open finishes", async () => {
+  const A = prodDoc("doc_prod_aaaaaaaaaaaaaaac", "gid://shopify/Product/21", "Alpha", {});
+  const B = prodDoc("doc_prod_bbbbbbbbbbbbbbbd", "gid://shopify/Product/22", "Beta", {});
+  const C = {
+    id: "doc_home",
+    type: "home",
+    label: "Home page",
+    slug: null,
+    entityId: null,
+    body: { type: "home", settings: {}, sections: [{ id: "sec_cfix6", kind: "hero", v: 1, settings: { title: "Gamma hero", subtitle: "", highlight: "", badge: "", primary: null, secondary: null, image: null } }] },
+    revision: 2,
+    draftHash: "h-home",
+    publishedVersionId: null,
+    publishedHash: null,
+    access: { canPublish: true, reason: null },
+  };
+  const MARK = "Beta backup fix6 marker";
+  // an earlier visit's backup of B: B's store hashes it while it opens
+  const store = new Map([[`storeasy:unsaved:pedocs.test:${B.id}:old`, JSON.stringify({ v: 1, baseRevision: 1, savedAt: 1, body: { ...clone(B.body), settings: { ...clone(B.body.settings), title: { value: MARK, base_hash: "z", base_value: "Beta" } } } })]]);
+  const ls = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k), key: (i) => [...store.keys()][i] ?? null, get length() { return store.size; } };
+  let releaseB;
+  let heldB = false;
+  const gate = new Promise((r) => (releaseB = r));
+  const subtle = globalThis.crypto.subtle;
+  const realDigest = subtle.digest.bind(subtle);
+  subtle.digest = async (alg, data) => {
+    if (new TextDecoder().decode(data).includes(MARK)) {
+      heldB = true;
+      await gate;
+    }
+    return realDigest(alg, data);
+  };
+  const calls = [];
+  const api = editorApi({ docsById: { [A.id]: A, [B.id]: B, [C.id]: C }, calls });
+  try {
+    await withBrowser(async () => {
+      globalThis.window.localStorage = ls;
+      const focused = [];
+      globalThis.document.getElementById = (id) => ({ focus: () => focused.push(id), scrollIntoView() {} });
+      const props = { document: { id: A.id, type: A.type, label: A.label, slug: null }, entity: shopEntity("Alpha"), readOnly: null, api };
+      const v = await mount("components/admin/editor/DocumentEditor.js", "default", () => props);
+      await v.flush();
+      // to B: its document answers at once, its store's open is held
+      props.document = { id: B.id, type: B.type, label: B.label, slug: null };
+      props.entity = shopEntity("Beta");
+      await v.flush();
+      for (let i = 0; i < 5 && !heldB; i++) await v.flush();
+      ok(heldB, "B's store is still opening (its backup is being checked)");
+      // the founder picks C's hero title in the preview
+      const pane = () => v.find((n) => n.type?.name === "PreviewPane");
+      ok(pane(), "the preview is there");
+      pane().props.onPick({ type: "storeasy:pick", doc: C.id, sectionId: "sec_cfix6", kind: "hero", field: "title", offset: null });
+      // the page goes to C (the router), C opens at once
+      props.document = { id: C.id, type: C.type, label: C.label, slug: null };
+      props.entity = null;
+      await v.flush();
+      const note = () => v.find((n) => n.props?.["data-switch-note"] === "");
+      for (let i = 0; i < 5 && !(pane()?.props.select === "sec_cfix6"); i++) await v.flush();
+      eq(pane()?.props.select, "sec_cfix6", "C's section is selected:");
+      ok(note(), "the switch note shows");
+      ok(focused.some((id) => String(id).includes("sec_cfix6")), `C's field was focused: ${JSON.stringify(focused)}`);
+      // B's open finishes now
+      releaseB();
+      for (let i = 0; i < 5; i++) await v.flush();
+      eq(calls.filter((c) => c[0] === "getDocument").map((c) => c[1]), [A.id, B.id, C.id], "each document asked for once:");
+      eq(pane()?.props.select, "sec_cfix6", "still C's section after B's open finished:");
+      ok(note(), "the switch note is still there");
+      ok(!v.find((n) => n.props?.["data-entity-switching"] === ""), "not stuck on a switching line");
+      ok(!v.all((n) => n.type === "input").some((n) => n.props.value === MARK), "B's backup is not on screen");
+    });
+  } finally {
+    delete subtle.digest;
+    releaseB();
+  }
+});
+
 await t("unit: the shell re-reads the product counts after 'Keep mine' and after 'Use Shopify's'", async () => {
   const A = prodDoc("doc_prod_cccccccccccccccc", "gid://shopify/Product/3", "Mine", { title: { value: "Mine", base_hash: "b", base_value: "Old" } });
   const calls = [];

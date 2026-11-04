@@ -26,9 +26,12 @@
 //  14. the P4-GUARD review: a sync request with no earlier run, publish jobs
 //      cancelled at the lock
 //  15. the dry run's digest is the precondition's; dropped modules are named
+//  16. P4-FIX6: the rehearsal command passes the running hero test on to its
+//      captures (a child process against a tiny local page server)
 //   pnpm test:migrate-documents
 // Ports (part 2's sqld and proxy): MIGRATE_DOCUMENTS_TEST_PORTS="<sqld>,<proxy>",
-// else free ports the system picks.
+// else free ports the system picks. Part 16's page server:
+// MIGRATE_DOCUMENTS_TEST_WEB_PORT, else a free port the system picks.
 import { copyFile, readFile, mkdtemp, rm, readdir } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
@@ -1381,6 +1384,57 @@ await t("legacy modules with no title or no text, and a badge of only spaces, ar
   eq(dry.report.verdict.ready, false, "not ready:");
   const r = await move(S, { proofs: { digest: dry.digest, rehearsal: syntheticRehearsal(S, dry.mapped.sourceHash) } });
   eq(r.refused?.code, "NOT_READY", "the move refuses:");
+});
+
+// =======================================================================================
+console.log("— 16. P4-FIX6: the rehearsal command passes the running hero test on");
+
+// The command's --rehearsal-run, as a child process, against a tiny page
+// server on this machine (127.0.0.1; MIGRATE_DOCUMENTS_TEST_WEB_PORT, else a
+// port the system picks) that answers every route with the same page, on a
+// file copy of a store. The route list carries a running hero test's slug
+// (as --make-routes writes it): both captures must record it, so the
+// comparison sets that hero aside (P4-REVERSE's fix to the command).
+await t("P4-FIX6: the rehearsal command passes the route list's running hero test (heroExperiments) to both captures", async () => {
+  const S = await store("live_v3");
+  const tmp = await mkdtemp(join(tmpdir(), "storeasy-mdoc-hero-"));
+  const http = await import("node:http");
+  const { spawn } = await import("node:child_process");
+  const { writeFile } = await import("node:fs/promises");
+  const seen = [];
+  const server = http.createServer((req, res) => {
+    seen.push(req.url);
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.end("<!doctype html><html><body><main><h1>The same page</h1></main></body></html>");
+  });
+  await new Promise((ok2, bad) => server.listen(Number(process.env.MIGRATE_DOCUMENTS_TEST_WEB_PORT || 0), "127.0.0.1", ok2).on("error", bad));
+  const port = server.address().port;
+  const copy = `${world.prefix}-${S.id}herocopy.db`;
+  world.files.add(copy);
+  try {
+    await copyFile(join(ROOT, S.db.file), join(ROOT, copy));
+    const routes = join(tmp, "routes.json");
+    await writeFile(routes, JSON.stringify({ routes: [{ path: "/", kind: "canary" }, { path: "/collections", kind: "canary" }], heroExperiments: ["fix6-hero-test"] }));
+    const out = join(tmp, "out");
+    const child = spawn(process.execPath, [join(ROOT, "scripts/migrate-documents.js"), "--tenant", S.id, "--rehearsal-run", "--db", `file:${copy}`, "--base", `http://127.0.0.1:${port}`, "--routes", routes, "--out", out], { cwd: ROOT, env: { ...process.env } });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d) => (stdout += d));
+    child.stderr.on("data", (d) => (stderr += d));
+    const code = await new Promise((ok2) => child.on("close", ok2));
+    eq(code, 0, `the rehearsal command: ${stderr.slice(-600)} ${stdout.slice(-600)}`);
+    ok(seen.length >= 4, `both captures read the pages: ${seen.join(" ")}`);
+    for (const label of ["before", "after"]) {
+      const index = JSON.parse(await readFile(join(out, label, "index.json"), "utf8"));
+      same(index.heroExperiments, ["fix6-hero-test"], `the ${label} capture records the running hero test:`);
+    }
+    const rep = JSON.parse(await readFile(join(out, "rehearsal.json"), "utf8"));
+    eq(rep.passed, true, `passed: ${JSON.stringify(rep.render)}`);
+    eq((await modeOf(S)).mode, "legacy", "the store itself is untouched (only its copy moved):");
+  } finally {
+    await new Promise((r) => server.close(r));
+    await rm(tmp, { recursive: true, force: true });
+  }
 });
 
 // =======================================================================================
