@@ -885,7 +885,9 @@ await t("P3-COMMIT: 0023 is additive (IF NOT EXISTS only) and applies twice clea
   ok(!/\b(DROP|ALTER|UPDATE|DELETE|INSERT)\b/i.test(sql), "a statement that is not CREATE … IF NOT EXISTS");
   const c = createClient({ url: "file:.test-pub-x23.db" });
   await migrate(c, MIGRATIONS.filter((m) => m.id < "0023"));
-  eq((await checkLedger(c, MIGRATIONS)).missing, ["0023_document_refs"], "a 0022 store misses exactly 0023:");
+  // P4-SCAFFOLD: later migrations (0024) follow 0023, so a 0022 store misses 0023 and those
+  eq((await checkLedger(c, MIGRATIONS)).missing, MIGRATIONS.filter((m) => m.id >= "0023").map((m) => m.id), "a 0022 store misses 0023 and later:");
+  eq((await checkLedger(c, MIGRATIONS)).missing[0], "0023_document_refs", "first missing:");
   await runMigrations(c, MIGRATIONS);
   await c.executeMultiple(M23.sql); // a second run changes nothing
   await c.executeMultiple(M23.sql);

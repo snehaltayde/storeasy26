@@ -14,8 +14,13 @@
 //   6. P3-COMMIT: a documents-mode tenant at BEFORE_REFS (no document_refs)
 //      creates, saves and publishes through the real console handler, with no
 //      refs; once REFS runs, its next publish writes them.
+//   7. P4-SCAFFOLD: migration 0024 (content live tables) on a tenant at
+//      BEFORE_CONTENT_LIVE, column for column, and re-run; the phase 4 tenant
+//      fixture (scripts/support/tenant-fixture.js) at each stage; and
+//      `--check --include-env`, which also checks the env store's ledger.
 //   pnpm test:schema-compat
 import { readFile, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -42,6 +47,10 @@ const READ_BEFORE_DOCUMENTS = "0020_sync_runs_resumable";
 // documents mode here still publishes; it just gets no refs rows.
 const BEFORE_REFS = "0022_preview_sessions";
 const REFS = "0023_document_refs";
+
+// P4-SCAFFOLD's pin: the last migration before 0024 (the content live tables).
+const BEFORE_CONTENT_LIVE = "0023_document_refs";
+const CONTENT_LIVE = "0024_content_live";
 
 process.env.TURSO_DB_URL = "";
 process.env.TURSO_DB_AUTH_TOKEN = "";
@@ -71,6 +80,7 @@ const dbs = [
   ".test-compat-read20.db",
   ".test-compat-readcur.db",
   ".test-compat-pre23.db",
+  ".test-compat-env.db",
 ];
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
@@ -133,7 +143,7 @@ async function usePlatform(file) {
 // =============================================================================
 console.log("— the deploy gate (--check), local file databases only");
 
-function cli(args, platformFile = GATE_PLATFORM) {
+function cli(args, platformFile = GATE_PLATFORM, env = {}) {
   const r = spawnSync(process.execPath, ["scripts/tenant-migrate.js", ...args], {
     cwd: ROOT,
     encoding: "utf8",
@@ -145,6 +155,7 @@ function cli(args, platformFile = GATE_PLATFORM) {
       PLATFORM_SECRET: process.env.PLATFORM_SECRET,
       TURSO_DB_URL: "",
       DATABASE_URL: "file:.test-compat-default.db",
+      ...env,
     },
   });
   return { status: r.status, out: `${r.stdout || ""}${r.stderr || ""}`, stdout: r.stdout || "", stderr: r.stderr || "" };
@@ -893,6 +904,309 @@ console.log(`— a documents tenant at ${BEFORE_REFS} (no document_refs) publish
     eq(p2.status, 200, `publish after ${REFS}: ${JSON.stringify(p2.body).slice(0, 300)}`);
     const rows = await inT("pre23", async () => (await libsql.execute({ sql: "SELECT ref_type, ref_id FROM document_refs WHERE version_id = ?", args: [p2.body.published[0].versionId] })).rows.map((r) => ({ ref_type: String(r.ref_type), ref_id: String(r.ref_id) })));
     same(rows, [{ ref_type: "collection", ref_id: "shirts" }], "refs:");
+  });
+}
+
+// =============================================================================
+// 7. P4-SCAFFOLD: 0024 content live tables, the tenant fixture, --include-env
+// =============================================================================
+console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LIVE}, the tenant fixture, --check --include-env`);
+{
+  const F = await import("./support/tenant-fixture.js");
+  const M24 = MIGRATIONS.find((m) => m.id === CONTENT_LIVE);
+  // [name, type, notnull, pk] for every column, in order: the pinned DDL
+  const PINNED = {
+    product_content_live: [
+      ["product_id", "TEXT", 0, 1],
+      ["document_id", "TEXT", 1, 0],
+      ["version_id", "TEXT", 1, 0],
+      ["title", "TEXT", 0, 0],
+      ["description", "TEXT", 0, 0],
+      ["description_html", "TEXT", 0, 0],
+      ["featured_image", "TEXT", 0, 0],
+      ["featured_image_alt", "TEXT", 0, 0],
+      ["gallery", "TEXT", 0, 0],
+      ["seo_title", "TEXT", 0, 0],
+      ["seo_description", "TEXT", 0, 0],
+      ["og_image", "TEXT", 0, 0],
+      ["display_vendor", "TEXT", 0, 0],
+      ["display_type", "TEXT", 0, 0],
+      ["badge", "TEXT", 0, 0],
+      ["modules", "TEXT", 0, 0],
+      ["layout_document_id", "TEXT", 0, 0],
+      ["pairs", "TEXT", 0, 0],
+      ["keep_variant_images", "INTEGER", 0, 0],
+      ["published_at", "TEXT", 1, 0],
+      ["pairs_title", "TEXT", 0, 0],
+      ["layout_template", "TEXT", 0, 0],
+    ],
+    collection_content_live: [
+      ["collection_id", "TEXT", 0, 1],
+      ["document_id", "TEXT", 1, 0],
+      ["version_id", "TEXT", 1, 0],
+      ["pinned", "TEXT", 0, 0],
+      ["layout_document_id", "TEXT", 0, 0],
+      ["published_at", "TEXT", 1, 0],
+      ["layout_template", "TEXT", 0, 0],
+    ],
+    search_outbox: [
+      ["product_id", "TEXT", 1, 0],
+      ["handle", "TEXT", 0, 0],
+      ["reason", "TEXT", 1, 0],
+      ["created_at", "TEXT", 1, 0],
+      ["done_at", "TEXT", 0, 0],
+    ],
+    cms_migration_runs: [
+      ["id", "TEXT", 0, 1],
+      ["kind", "TEXT", 1, 0],
+      ["step", "TEXT", 1, 0],
+      ["source_hash", "TEXT", 0, 0],
+      ["dry_run_digest", "TEXT", 0, 0],
+      ["backup_ref", "TEXT", 0, 0],
+      ["report", "TEXT", 0, 0],
+      ["started_at", "TEXT", 1, 0],
+      ["finished_at", "TEXT", 0, 0],
+      ["outcome", "TEXT", 0, 0],
+    ],
+    content_live_reversed: [
+      ["run_id", "TEXT", 1, 1],
+      ["kind", "TEXT", 1, 2],
+      ["entity_id", "TEXT", 1, 3],
+      ["row_json", "TEXT", 1, 0],
+      ["reversed_at", "TEXT", 1, 0],
+    ],
+  };
+  // The spec 8.2 product_content_live column list, verbatim: every one is pinned.
+  const SPEC_PRODUCT_COLUMNS = "product_id document_id version_id title description description_html featured_image featured_image_alt gallery seo_title seo_description og_image display_vendor display_type badge modules layout_document_id pairs keep_variant_images published_at".split(" ");
+  const NEW_TABLES = Object.keys(PINNED);
+  const columnsOf = async (c, table) => (await c.execute(`PRAGMA table_info(${table})`)).rows.map((r) => [String(r.name), String(r.type), Number(r.notnull), Number(r.pk)]);
+  const objectsOf = async (c) => (await c.execute(`SELECT type, name FROM sqlite_master WHERE name IN (${[...NEW_TABLES, "product_content_live_document", "search_outbox_pending"].map((n) => `'${n}'`).join(", ")}) ORDER BY name`)).rows.map((r) => `${r.type}:${r.name}`);
+
+  let at23 = null;
+  await t(`the fixture builds a tenant at ${BEFORE_CONTENT_LIVE} with no content live tables, its products written by writeProduct inside withTenant`, async () => {
+    ok(M24, `${CONTENT_LIVE} is not in migrations/tenant`);
+    eq(MIGRATIONS.filter((m) => m.id > BEFORE_CONTENT_LIVE)[0]?.id, CONTENT_LIVE, "the next migration:");
+    at23 = await F.makeTenant({ name: "compat-p4-23", stage: "0023", products: 2 });
+    eq(at23.migrations[at23.migrations.length - 1], BEFORE_CONTENT_LIVE, "newest migration in the stage:");
+    const c = at23.client();
+    try {
+      eq((await c.execute("SELECT id FROM schema_migrations ORDER BY id DESC LIMIT 1")).rows[0].id, BEFORE_CONTENT_LIVE, "newest in its ledger:");
+      same(await objectsOf(c), [], "content live objects before 0024:");
+      same((await c.execute("SELECT id, handle, title FROM products ORDER BY id")).rows.map((r) => ({ ...r })), at23.products.map((p) => ({ id: p.id, handle: p.handle, title: p.title })), "products:");
+    } finally {
+      c.close();
+    }
+  });
+
+  await t(`a tenant migrated to ${BEFORE_CONTENT_LIVE} then ${CONTENT_LIVE} has every pinned table, column and index; running 0024 again succeeds`, async () => {
+    ok(at23, "no 0023 tenant");
+    const sql = M24.sql.replace(/--.*$/gm, "");
+    for (const m of sql.matchAll(/\b(CREATE\s+(?:UNIQUE\s+)?(?:TABLE|INDEX|TRIGGER|VIEW))\s+(\w+)/gi)) ok(/^IF$/i.test(m[2]), `${m[1]} without IF NOT EXISTS`);
+    ok(!/\b(DROP|ALTER|UPDATE|DELETE|INSERT|REPLACE)\b/i.test(sql), "a statement that is not CREATE … IF NOT EXISTS");
+    const r = await at23.migrateTo("0024");
+    same(r.applied, [CONTENT_LIVE], "applied:");
+    const c = at23.client();
+    try {
+      for (const table of NEW_TABLES) same(await columnsOf(c, table), PINNED[table], `${table} columns:`);
+      const productCols = PINNED.product_content_live.map((x) => x[0]);
+      same(productCols.slice(0, SPEC_PRODUCT_COLUMNS.length), SPEC_PRODUCT_COLUMNS, "spec 8.2 columns first, in spec order:");
+      same(productCols.slice(SPEC_PRODUCT_COLUMNS.length), ["pairs_title", "layout_template"], "plus:");
+      same(
+        await objectsOf(c),
+        ["table:cms_migration_runs", "table:collection_content_live", "table:content_live_reversed", "table:product_content_live", "index:product_content_live_document", "table:search_outbox", "index:search_outbox_pending"],
+        "objects:",
+      );
+      same((await c.execute("PRAGMA index_info(product_content_live_document)")).rows.map((x) => String(x.name)), ["document_id"], "product_content_live_document on:");
+      same((await c.execute("PRAGMA index_info(search_outbox_pending)")).rows.map((x) => String(x.name)), ["created_at"], "search_outbox_pending on:");
+      const pend = String((await c.execute("SELECT sql FROM sqlite_master WHERE name = 'search_outbox_pending'")).rows[0].sql);
+      ok(/WHERE\s+done_at\s+IS\s+NULL\s*$/i.test(pend), `search_outbox_pending is not partial on done_at IS NULL: ${pend}`);
+      const plan = (await c.execute("EXPLAIN QUERY PLAN SELECT rowid FROM search_outbox WHERE done_at IS NULL ORDER BY created_at")).rows.map((x) => String(x.detail)).join(" ");
+      ok(/search_outbox_pending/.test(plan), `the pending read does not use the index: ${plan}`);
+      // the kind CHECK: cutover and reverse only
+      await c.execute("INSERT INTO cms_migration_runs (id, kind, step, started_at) VALUES ('run_a', 'cutover', 'lock', 'x'), ('run_b', 'reverse', 'lock', 'x')");
+      let e = null;
+      try {
+        await c.execute("INSERT INTO cms_migration_runs (id, kind, step, started_at) VALUES ('run_c', 'other', 'lock', 'x')");
+      } catch (err) {
+        e = err;
+      }
+      ok(e && /CHECK/i.test(e.message), `kind 'other' was accepted: ${e?.message}`);
+      // the copy-aside key
+      await c.execute("INSERT INTO content_live_reversed (run_id, kind, entity_id, row_json, reversed_at) VALUES ('run_b', 'product', 'p1', '{}', 'x')");
+      e = null;
+      try {
+        await c.execute("INSERT INTO content_live_reversed (run_id, kind, entity_id, row_json, reversed_at) VALUES ('run_b', 'product', 'p1', '{}', 'y')");
+      } catch (err) {
+        e = err;
+      }
+      ok(e && /UNIQUE|PRIMARY/i.test(e.message), "a second copy of one row was accepted");
+      // re-running 0024 (the file twice, then the runner) changes nothing
+      const before = await tables(at23.file);
+      await c.executeMultiple(M24.sql);
+      await c.executeMultiple(M24.sql);
+      same((await runMigrations(c, MIGRATIONS)).applied, [], "runner re-run applied:");
+      same(await tables(at23.file), before, "schema after re-running 0024:");
+      eq(Number((await c.execute("SELECT count(*) AS n FROM cms_migration_runs")).rows[0].n), 2, "rows kept:");
+      ok((await checkLedger(c, MIGRATIONS)).current, "ledger current after 0024");
+    } finally {
+      c.close();
+      await at23.cleanup();
+    }
+  });
+
+  await t("the tenant fixture refuses non-file URLs and builds tenants at every stage, products written inside withTenant (never the env store)", async () => {
+    for (const bad of ["libsql://shop-org.turso.io", "https://shop.turso.io", "ws://127.0.0.1:7100", "http://127.0.0.1:7100", "file://remote-host/x.db", ".test-x.db", "", null]) {
+      let e = null;
+      try {
+        F.assertLocalDbUrl(bad);
+      } catch (err) {
+        e = err;
+      }
+      ok(e && /only local file: databases/.test(e.message), `accepted ${JSON.stringify(bad)}`);
+    }
+    eq(F.assertLocalDbUrl("file:.test-x.db"), "file:.test-x.db", "file: accepted:");
+    let e = null;
+    try {
+      await F.makeTenant({ name: "compat-p4-bad", stage: "0099" });
+    } catch (err) {
+      e = err;
+    }
+    ok(e && /unknown stage/.test(e.message), "an unknown stage was accepted");
+    ok(!existsSync(join(ROOT, ".test-compat-p4-bad-tenant.db")), "an unknown stage left a database file");
+    // the env store must not gain these products: writeProduct ran in the tenant's context
+    const envHas = async () => {
+      const c = clientFor(".test-compat-default.db");
+      try {
+        return (await c.execute("SELECT count(*) AS n FROM products WHERE handle LIKE 'fixture-product-%'")).rows[0].n;
+      } catch {
+        return 0; // no products table: nothing there either
+      } finally {
+        c.close();
+      }
+    };
+    const newestOf = { "0017": "0017_cms_approvals", "0020": "0020_sync_runs_resumable", "0022": "0022_preview_sessions", "0023": "0023_document_refs", "0024": "0024_content_live", latest: NEWEST };
+    for (const stage of F.STAGES) {
+      const fx = await F.makeTenant({ name: `compat-p4-s${stage}`, stage, products: [{ title: `Stage ${stage} shirt` }, {}] });
+      try {
+        ok(fx.url.startsWith("file:") && fx.file.startsWith(`.test-compat-p4-s${stage}-`), `file: ${fx.file}`);
+        const c = fx.client();
+        try {
+          eq((await c.execute("SELECT id FROM schema_migrations ORDER BY id DESC LIMIT 1")).rows[0].id, newestOf[stage], `${stage} newest:`);
+          eq(Number((await c.execute("SELECT count(*) AS n FROM schema_migrations")).rows[0].n), F.stageMigrations(stage, MIGRATIONS).length, `${stage} ledger size:`);
+          const live = (await c.execute("SELECT name FROM sqlite_master WHERE name = 'product_content_live'")).rows.length;
+          eq(live, stage >= "0024" ? 1 : 0, `${stage} product_content_live:`);
+          // exactly what lib/sync.js writeProduct writes: the product, its images and variants
+          same(
+            (await c.execute("SELECT p.title, p.handle, p.vendor, (SELECT count(*) FROM product_images i WHERE i.product_id = p.id) AS imgs, (SELECT sku FROM variants v WHERE v.product_id = p.id) AS sku FROM products p ORDER BY p.id")).rows.map((r) => ({ ...r, imgs: Number(r.imgs) })),
+            [
+              { title: `Stage ${stage} shirt`, handle: "fixture-product-1", vendor: "Fixture Labs", imgs: 1, sku: "FX-1" },
+              { title: "Fixture product 2", handle: "fixture-product-2", vendor: "Fixture Labs", imgs: 1, sku: "FX-2" },
+            ],
+            `${stage} products:`,
+          );
+        } finally {
+          c.close();
+        }
+        // and the tenant's own context reads them through lib/db.js
+        eq(Number(await fx.run(async () => (await libsql.execute("SELECT count(*) AS n FROM products")).rows[0].n)), 2, `${stage} through withTenant:`);
+      } finally {
+        await fx.cleanup();
+      }
+    }
+    eq(Number(await envHas()), 0, "fixture products in the env store:");
+  });
+
+  // --check --include-env, through the real CLI, on file databases only. "ca"
+  // on the gate's control plane holds every migration (part 1).
+  const ENV_FILE = ".test-compat-env.db";
+  const envOpts = { DATABASE_URL: `file:${ENV_FILE}` };
+  await rm(join(ROOT, ENV_FILE), { force: true });
+
+  await t("--check without --include-env never opens the env store and prints what it always did", async () => {
+    const r = cli(["--check", "--tenant", "ca"], GATE_PLATFORM, envOpts);
+    eq(r.status, 0, `exit (output: ${r.out.trim()}):`);
+    eq(r.out, `✓ ca: current, all ${MIGRATIONS.length} migrations up to ${NEWEST}\n✓ all 1 tenant(s) hold every migration up to ${NEWEST}. Safe to deploy.\n`, "output:");
+    ok(!existsSync(join(ROOT, ENV_FILE)), "the env store file was created");
+  });
+
+  await t(`--check --include-env fails when the env file database lacks ${CONTENT_LIVE}, and passes after pnpm migrate; without the flag the output is the same both times`, async () => {
+    await migrateFile(ENV_FILE, F.stageMigrations("0023", MIGRATIONS));
+    const plainBefore = cli(["--check", "--tenant", "ca"], GATE_PLATFORM, envOpts);
+    const r = cli(["--check", "--tenant", "ca", "--include-env"], GATE_PLATFORM, envOpts);
+    eq(r.status, 1, `exit (output: ${r.out.trim()}):`);
+    ok(r.stderr.includes(`✗ the env store (_default): behind, missing ${CONTENT_LIVE}`), r.out);
+    ok(r.stdout.includes(`✓ ca: current`), r.out);
+    ok(r.stderr.includes("1 of 2 store(s) (1 tenant(s) and the env store) not ready") && r.stderr.includes("Do not deploy") && r.stderr.includes("pnpm migrate"), r.out);
+    ok(!/Safe to deploy/.test(r.out), "said safe to deploy");
+    eq((await ledger(ENV_FILE)).length, F.stageMigrations("0023", MIGRATIONS).length, "the check wrote to the env ledger:");
+    // the owner step: pnpm migrate (scripts/migrate.js) on the env store
+    const m = spawnSync(process.execPath, ["scripts/migrate.js"], { cwd: ROOT, encoding: "utf8", timeout: 60_000, env: { PATH: process.env.PATH, TURSO_DB_URL: "", DATABASE_URL: `file:${ENV_FILE}` } });
+    eq(m.status, 0, `pnpm migrate (output: ${`${m.stdout}${m.stderr}`.trim().slice(0, 400)}):`);
+    const r2 = cli(["--check", "--tenant", "ca", "--include-env"], GATE_PLATFORM, envOpts);
+    eq(r2.status, 0, `exit after migrating (output: ${r2.out.trim()}):`);
+    ok(r2.stdout.includes(`✓ the env store (_default): current, all ${MIGRATIONS.length} migrations up to ${NEWEST}`), r2.out);
+    ok(r2.stdout.includes(`✓ all 1 tenant(s) and the env store hold every migration up to ${NEWEST}. Safe to deploy.`), r2.out);
+    const plainAfter = cli(["--check", "--tenant", "ca"], GATE_PLATFORM, envOpts);
+    same([plainAfter.status, plainAfter.out], [plainBefore.status, plainBefore.out], "--check without the flag:");
+    // a behind tenant still fails with the flag, even with the env store current
+    const all = cli(["--check", "--include-env"], GATE_PLATFORM, envOpts);
+    eq(all.status, 1, "cc is still behind:");
+    ok(all.stderr.includes("✗ cc: behind") && all.stdout.includes("✓ the env store (_default): current"), all.out);
+  });
+
+  await t("--include-env only goes with --check, and an env store that can't be read fails the check", async () => {
+    const r = cli(["--all", "--include-env"], GATE_PLATFORM, envOpts);
+    eq(r.status, 1, "exit:");
+    ok(r.stderr.includes("--include-env only goes with --check"), r.out);
+    ok(!r.out.includes("applied"), "it migrated something");
+    const bad = cli(["--check", "--tenant", "ca", "--include-env"], GATE_PLATFORM, { DATABASE_URL: "file:.test-compat-no-such-dir/env.db" });
+    eq(bad.status, 1, `unreadable env store (output: ${bad.out.trim()}):`);
+    ok(bad.stderr.includes("✗ the env store (_default): could not read its ledger"), bad.out);
+  });
+
+  // The runbook's operator commands and the 15 phase 4 suites are registered
+  // once, here (package.json is SCAFFOLD's only). A stub is checked only while
+  // it is still SCAFFOLD's stub: its owner replaces the file and its tests.
+  await t("P4-SCAFFOLD: the operator commands are registered; each one still a stub exits 1 with its 'not built yet' line; the 15 suites are registered", async () => {
+    const { scripts } = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
+    const OPS = [
+      ["migrate:documents", "scripts/migrate-documents.js", "P4-MAPPER"],
+      ["reverse:documents", "scripts/reverse-documents.js", "P4-REVERSE"],
+      ["media:reindex", "scripts/reindex-document-refs.js", "P4-MEDIA"],
+      ["drill:p4", "scripts/drills/p4/run.mjs", "P4-HARNESS"],
+    ];
+    let stubs = 0;
+    for (const [name, file, owner] of OPS) {
+      eq(scripts[name], `node ${file}`, `${name}:`);
+      const src = await readFile(join(ROOT, file), "utf8");
+      if (!src.includes("P4-SCAFFOLD: stub")) continue;
+      stubs++;
+      const r = spawnSync(process.execPath, [file, "--tenant", "x"], { cwd: ROOT, encoding: "utf8", timeout: 30_000, env: { PATH: process.env.PATH } });
+      eq(r.status, 1, `${name} exit:`);
+      eq(`${r.stdout}${r.stderr}`, `not built yet (${owner})\n`, `${name} output:`);
+    }
+    console.log(`    (${stubs} of ${OPS.length} still stubs)`);
+    const SUITES = ["legacy-write-guard", "media-refs", "legacy-fixtures", "content-seam", "effective-read", "product-content", "migrate-map", "search-effective", "entity-content", "media-picker", "product-editor", "legacy-routes", "migrate-render", "migrate-documents", "migrate-reverse"];
+    for (const s of SUITES) eq(scripts[`test:${s}`], `node scripts/test-${s}.js`, `test:${s}:`);
+  });
+
+  // Last in this suite: makePlatform moves this process's control plane.
+  await t("the tenant fixture's makePlatform registers a fixture tenant with its file URL; tenant-migrate --check reads it", async () => {
+    const plat = await F.makePlatform({ name: "compat-p4" });
+    const fx = await F.makeTenant({ name: "compat-p4-reg", stage: "latest", products: 1 });
+    try {
+      eq(plat.url, "file:.test-compat-p4-platform.db", "platform url:");
+      const got = await C.getTenant("compat-p4-reg", { fresh: true });
+      eq(got?.dbUrl, "file:.test-compat-p4-reg-tenant.db", "registered url:");
+      eq(Number(await fx.run(async () => (await libsql.execute("SELECT count(*) AS n FROM products")).rows[0].n)), 1, "products:");
+      const r = cli(["--check"], ".test-compat-p4-platform.db", envOpts);
+      eq(r.status, 0, `--check on the fixture platform (output: ${r.out.trim()}):`);
+      ok(r.stdout.includes(`✓ compat-p4-reg: current, all ${MIGRATIONS.length} migrations up to ${NEWEST}`), r.out);
+    } finally {
+      await fx.cleanup();
+      await plat.cleanup();
+    }
+    ok(!existsSync(join(ROOT, ".test-compat-p4-platform.db")) && !existsSync(join(ROOT, ".test-compat-p4-reg-tenant.db")), "cleanup left files");
   });
 }
 
