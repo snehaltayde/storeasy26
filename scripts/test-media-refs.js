@@ -370,6 +370,58 @@ await t("documents store: the brand and site settings count (read live); an unus
   eq((await docs.run(() => M.deleteMedia(b.id))).deleted, b.id, "unused (without that setting) deletes:");
 });
 
+await t("documents store not reindexed yet: refs stored by address before this code ('/api/media/<id>', or a full address with a query) still count; a plain or forced delete is refused and the live image stays", async () => {
+  // publish a page with image A, then put its ref back in the pre-branch form
+  const a = await upload(docs);
+  let d = (await docs.run(() => Docs.createDocument({ type: "page", meta: { slug: "oldform", title: "Old form" }, body: pageBody("oldform", [imageText("sec_o1", M.mediaUrl(a.id))]), actor: ACTOR }))).document;
+  const pub = await docs.run(() => Pub.publish({ ids: [{ id: d.id, revision: d.revision, draftHash: d.draftHash }], actor: ACTOR }));
+  const live = pub.published[0].versionId;
+  await raw(docs).execute({ sql: "DELETE FROM document_refs WHERE ref_type = 'media' AND ref_id = ?", args: [a.id] });
+  await raw(docs).execute({ sql: "INSERT INTO document_refs (version_id, ref_type, ref_id) VALUES (?, 'media', ?)", args: [live, M.mediaUrl(a.id)] });
+  // the draft moves on without the image
+  d = await docs.run(() => Docs.getDocument(d.id));
+  d = (await docs.run(() => Docs.saveDraft({ id: d.id, revision: d.revision, body: pageBody("oldform", [sec("text", "sec_o2", { title: "T", body: ["no image"] })]), actor: ACTOR }))).document;
+  eq(await usage(docs, a.id), [["live", d.id]], "the live version still uses it:");
+  for (const force of [false, true]) {
+    const e = await docs.run(() => M.deleteMedia(a.id, { force }).then(() => null, (x) => x));
+    eq(e?.code, "MEDIA_IN_USE", `force ${force}, refused:`);
+    ok(/oldform \(live\)/.test(e.message), e.message);
+  }
+  eq(await stored(docs, a.id), 1, "still stored:");
+  // a full address with a query string, on an older version
+  const b = await upload(docs);
+  await raw(docs).execute({ sql: "INSERT INTO document_refs (version_id, ref_type, ref_id) VALUES (?, 'media', ?)", args: [live, `https://mr.test${M.mediaUrl(b.id)}?w=640`] });
+  eq(await usage(docs, b.id), [["live", d.id]], "full address counts:");
+  eq(await docs.run(() => codeOf(M.deleteMedia(b.id))), "MEDIA_IN_USE", "full address refuses:");
+  // a variant's address counts for its original
+  const o = await upload(docs);
+  const th = await upload(docs, { variant: "thumb", parentId: o.id });
+  await raw(docs).execute({ sql: "INSERT INTO document_refs (version_id, ref_type, ref_id) VALUES (?, 'media', ?)", args: [live, M.mediaUrl(th.id)] });
+  eq(await docs.run(() => codeOf(M.deleteMedia(o.id, { force: true }))), "MEDIA_IN_USE", "variant address refuses the original:");
+  eq(await stored(docs, o.id), 1, "original kept:");
+});
+
+await t("the DELETE's own guard also counts an address-form ref that lands between the check and the DELETE", async () => {
+  const g = await upload(docs);
+  const db = await docs.run(() => currentDatabase());
+  const send = db.libsql.execute;
+  let injected = 0;
+  db.libsql.execute = async (stmt, ...rest) => {
+    if (/^DELETE FROM media/.test(typeof stmt === "string" ? stmt : stmt?.sql || "") && !injected++) {
+      await raw(docs).execute({ sql: "INSERT INTO document_refs (version_id, ref_type, ref_id) VALUES (?, 'media', ?) ON CONFLICT DO NOTHING", args: [homeState.v1, M.mediaUrl(g.id)] });
+    }
+    return send.call(db.libsql, stmt, ...rest);
+  };
+  let out;
+  try {
+    out = await docs.run(() => codeOf(M.deleteMedia(g.id, { force: true })));
+  } finally {
+    delete db.libsql.execute;
+  }
+  eq(out, "MEDIA_IN_USE", "refused by the guard:");
+  eq(await stored(docs, g.id), 1, "kept:");
+});
+
 await t("a store being moved: every delete is refused, forced or not, used or not, with 'Your store is being updated…'; the files stay", async () => {
   const unused = await upload(moving);
   for (const force of [false, true]) {
