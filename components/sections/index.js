@@ -9,6 +9,10 @@ import TextSection from "./TextSection";
 import FaqListSection from "./FaqListSection";
 import ProductMainSection from "./ProductMainSection";
 import { unfinishedMark, unfinishedTitle, unfinishedHtml } from "@/lib/content/unfinished";
+import { isPreviewRequest } from "@/lib/cms/section-data";
+import { sectionType, validateDocument } from "@/lib/registry/index";
+import { issueClass } from "@/lib/registry/validate";
+import { slog } from "@/lib/log";
 
 // The renderer map (P2-SECTIONS, DOC-03; spec 8.5). One component per
 // registered section kind (lib/registry/sections.js), found by kind. The home
@@ -76,18 +80,91 @@ export function checkSectionComponents(kinds) {
 
 export const sectionAttrs = (section) => ({ "data-section-id": section?.id ?? "", "data-section-kind": section?.kind ?? "" });
 
-// An unfinished section's note (see above), or null.
-function unfinishedNote(section) {
-  const u = section?.kind === "hero" ? null : unfinishedMark(section);
-  return u ? { id: section.id, kind: "rich_text", settings: { title: unfinishedTitle(u), html: unfinishedHtml(u) } } : null;
+// P3-VALIDATE (PV-02): since a draft may now hold a broken value inside a
+// section (a link that isn't a page of the store, an image link that isn't
+// secure, a title over its limit: "incomplete" in a draft), the hero's
+// exception holds only while everything the hero lacks is missing words. A
+// hero holding a broken value previews as its note too, so a stored draft's
+// bad link or image never renders in the preview.
+function heroOnlyMissingWords(section) {
+  const { unfinished, ...stored } = section;
+  const { issues } = validateDocument({ schema: 1, type: "home", meta: {}, sections: [stored] }, { mode: "draft" });
+  return issues.every((i) => i.severity === "warning" || issueClass(i) === "incomplete");
 }
 
-// Whether a section renders anything for this data.
+// An unfinished section's note (see above), or null.
+function unfinishedNote(section) {
+  const u = unfinishedMark(section);
+  if (!u || (section.kind === "hero" && heroOnlyMissingWords(section))) return null;
+  return { id: section.id, kind: "rich_text", settings: { title: unfinishedTitle(u), html: unfinishedHtml(u) } };
+}
+
+// ---- one failing section never takes the page down (PV-02) ---------------------
+//
+// SectionView calls a section's own component as a plain function inside a
+// try (and awaits it when it is async), so a throw in that section's own
+// render, or a failed catalog read for it (lib/cms/section-data.js marks the
+// section's data with bindingFailed), is caught here:
+//   preview   the section renders as a note, "This section couldn't be
+//             shown", in the founder's preview only;
+//   live      the section is left out, the other sections render exactly as
+//             before, and a log line (section_render_failed) says which one.
+// What this can't catch (React server rendering gives no error boundary): a
+// throw inside a child component the section renders (ProductGrid,
+// ProductCard, StoreImage, next/image, ExperimentNote, ctx.productMain), or
+// inside a "use client" component. Those still fail the page as before.
+//
+// Whether this is a preview: ctx.preview when the caller says so; otherwise
+// the request's content source, read only when a section has failed
+// (isPreviewRequest in lib/cms/section-data.js).
+export const FAILED_TITLE = "This section couldn't be shown";
+export const failedText = (label) => `Something went wrong while showing this ${label ? `${label.toLowerCase()} ` : ""}section. Only you can see this note in your preview: shoppers don't see the section until it works again. Reload the preview to try again.`;
+const escapeHtml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function failedNote(section, ctx) {
+  const label = sectionType(section?.kind)?.label || "";
+  const note = { id: section.id, kind: "rich_text", settings: { title: FAILED_TITLE, html: `<p>${escapeHtml(failedText(label))}</p>` } };
+  return <RichTextSection section={note} ctx={ctx} attrs={{ ...sectionAttrs(section), "data-unfinished": "", "data-section-failed": "" }} />;
+}
+
+function logFailed(section, error, cause) {
+  slog("section_render_failed", { sectionId: section?.id ?? null, kind: section?.kind ?? null, cause, error: String(error?.message ?? error ?? "").slice(0, 200) });
+}
+
+async function FailedSectionAsync({ section, ctx }) {
+  return (await isPreviewRequest()) ? failedNote(section, ctx) : null;
+}
+
+function failed(section, ctx, error, cause) {
+  logFailed(section, error, cause);
+  if (typeof ctx?.preview === "boolean") return ctx.preview ? failedNote(section, ctx) : null;
+  return <FailedSectionAsync section={section} ctx={ctx} />;
+}
+
+async function SettledSection({ pending, section, ctx }) {
+  try {
+    return await pending;
+  } catch (e) {
+    logFailed(section, e, "render");
+    if (typeof ctx?.preview === "boolean") return ctx.preview ? failedNote(section, ctx) : null;
+    return (await isPreviewRequest()) ? failedNote(section, ctx) : null;
+  }
+}
+
+const isThenable = (v) => v !== null && (typeof v === "object" || typeof v === "function") && typeof v.then === "function";
+
+// Whether a section renders anything for this data. A shows() that throws
+// counts as showing: SectionView then catches the failure and decides.
 export function sectionShows(section, data = {}, ctx = {}) {
   const C = sectionComponent(section?.kind);
   if (!C) return false;
   if (unfinishedNote(section)) return true;
-  return typeof C.shows === "function" ? Boolean(C.shows(section, data, ctx)) : true;
+  if (Array.isArray(data?.bindingFailed) && data.bindingFailed.length) return true;
+  try {
+    return typeof C.shows === "function" ? Boolean(C.shows(section, data, ctx)) : true;
+  } catch {
+    return true;
+  }
 }
 
 // One section, through the map. Unknown kinds render nothing.
@@ -96,5 +173,21 @@ export function SectionView({ section, data = {}, ctx = {} }) {
   if (!C) return null;
   const note = unfinishedNote(section);
   if (note) return <RichTextSection section={note} ctx={ctx} attrs={{ ...sectionAttrs(section), "data-unfinished": "" }} />;
-  return <C section={section} data={data} ctx={ctx} attrs={sectionAttrs(section)} />;
+  if (Array.isArray(data?.bindingFailed) && data.bindingFailed.length) return failed(section, ctx, `catalog data: ${data.bindingFailed.join(", ")}`, "data");
+  // a "use client" section (a client reference) or a memo/forwardRef wrapper
+  // can't be called: it renders as an element, as before, uncaught
+  if (typeof C !== "function" || C.$$typeof) return <C section={section} data={data} ctx={ctx} attrs={sectionAttrs(section)} />;
+  let out;
+  try {
+    out = C({ section, data, ctx, attrs: sectionAttrs(section) });
+  } catch (e) {
+    return failed(section, ctx, e, "render");
+  }
+  if (isThenable(out)) {
+    // handled here at once, so a quick rejection is never reported as
+    // unhandled; SettledSection awaits the same promise and catches it
+    Promise.resolve(out).catch(() => {});
+    return <SettledSection pending={out} section={section} ctx={ctx} />;
+  }
+  return out;
 }

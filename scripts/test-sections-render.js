@@ -13,6 +13,10 @@
 //   4. The DOC-03 shopper state table, rendered: sold out, below minItems, an
 //      empty collection, a missing image, a hero button to a sold-out product,
 //      a page with no sections.
+//   3b. P3-VALIDATE (PV-02, AU-04): a section whose own render or data
+//      binding fails is left out live and shown as a note in the preview; a
+//      hero holding a broken draft value previews as its note; every kind's
+//      starter section saves, previews and renders.
 //   5. Edge safety of the files this item touches.
 // Everything is rendered with Next's own SWC and react-dom/server; no browser.
 //   pnpm test:sections-render
@@ -255,6 +259,8 @@ async function publishHome(sections) {
       d = (await Svc.createDocument({ type: "home", body: homeBody(sections) })).document;
     }
     const r = await Pub.publish({ ids: [{ id: d.id, revision: d.revision, draftHash: d.draftHash }] });
+    // the same content as live is skipped: nothing to publish, live is already it
+    if (r.skipped?.includes(d.id) && d.draftHash === d.publishedHash) return r;
     ok(r.release?.id, `the home page did not publish: ${JSON.stringify(r).slice(0, 300)}`);
     return r;
   });
@@ -566,6 +572,197 @@ await t("DOC-05 through page.js: in the founder's preview an unfinished banner a
   // the renderer itself: an unfinished banner is the note, not an empty box
   const one = view(sec("banner", "sec_bn", { title: "", text: "" }, { unfinished: { label: "Banner", placeholder: "Write a short message, with an optional button" } }));
   ok(one.includes("Banner: not finished yet") && !/bg-sf-accent-soft/.test(one), `banner: ${one}`);
+});
+
+// =====================================================================================
+console.log("— 3b. P3-VALIDATE: one broken section never blocks the rest (PV-02), added sections start good (AU-04)");
+// =====================================================================================
+// react-dom/server's prerender waits for async components (a section that
+// failed asks the request whether it is a preview), where renderToStaticMarkup
+// can't. Both are compared only with themselves.
+const { prerenderToNodeStream } = require("react-dom/static");
+const htmlAsync = async (el) => {
+  const { prelude } = await prerenderToNodeStream(React.createElement(ImageConfigContext.Provider, { value: imageConfig }, el));
+  let out = "";
+  for await (const chunk of prelude) out += chunk;
+  return out;
+};
+const renderHomeAsync = (host, cookies = { _unit: "unit-sections-plain" }) => asRequest(host, cookies, async () => htmlAsync(await Home()));
+// console.log lines a function writes (slog), parsed
+async function logsOf(fn) {
+  const lines = [];
+  const log = console.log;
+  console.log = (...a) => {
+    lines.push(a.join(" "));
+  };
+  try {
+    return { result: await fn(), lines: lines.map((l) => { try { return JSON.parse(l); } catch { return { raw: l }; } }) };
+  } finally {
+    console.log = log;
+  }
+}
+const sectionHtml = (h, id) => h.match(new RegExp(`<section[^>]*data-section-id="${id}"[^>]*>[\\s\\S]*?</section>`))?.[0] || "";
+const NOTE = "This section couldn&#x27;t be shown";
+const previewToken = () => inV4(async () => (await createPreviewSession({ actor: { kind: "merchant", id: 1 } })).token);
+
+await t("a server section whose own render throws: in the founder's preview it shows 'This section couldn't be shown' while the others render; live, the healthy sections render exactly as without it, with no note, and a log line names it", async () => {
+  Reg.defineSection({ kind: "fake_boom", version: 1, label: "Countdown", documentTypes: ["home"], settings: [{ key: "title", kind: "text", label: "Title", max: 80, default: "Ends soon" }] });
+  Reg.defineSection({ kind: "fake_boom_async", version: 1, label: "Reviews", documentTypes: ["home"], settings: [{ key: "title", kind: "text", label: "Title", max: 80, default: "Reviews" }] });
+  const dropA = registerSectionComponent("fake_boom", () => {
+    throw new Error("render exploded");
+  });
+  const dropB = registerSectionComponent("fake_boom_async", async () => {
+    await new Promise((r) => setTimeout(r, 2));
+    throw new Error("async render exploded");
+  });
+  try {
+    const healthy = [sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 }), sec("banner", "sec_bn1", { title: "Hello there", text: "x" })];
+    await publishHome(healthy);
+    const without = await renderHomeAsync("srv.test");
+    ok(/data-section-id="sec_bn1"/.test(without) && /data-section-id="sec_new1"/.test(without), "the healthy page renders");
+    // the same page, through renderToStaticMarkup, still renders: healthy sections stay synchronous
+    eq(normalize(await renderHome("srv.test")).length > 0, true);
+
+    await publishHome([healthy[0], healthy[1], sec("fake_boom", "sec_boom1"), healthy[2], sec("fake_boom_async", "sec_boom2")]);
+    const live = await logsOf(() => renderHomeAsync("srv.test"));
+    eq(live.result, without, "live output with a failing section equals the page without it:");
+    ok(!/couldn.t be shown|data-section-failed|sec_boom/.test(live.result), "a shopper sees a note or a trace");
+    const failedLines = live.lines.filter((l) => l.evt === "section_render_failed");
+    same(failedLines.map((l) => [l.sectionId, l.kind, l.cause]).sort(), [["sec_boom1", "fake_boom", "render"], ["sec_boom2", "fake_boom_async", "render"]], "log lines:");
+    ok(failedLines.every((l) => /exploded/.test(l.error)), "the log line carries the error");
+
+    const token = await previewToken();
+    const pv = await renderHomeAsync("srv.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: token });
+    for (const [id, label] of [["sec_boom1", "countdown"], ["sec_boom2", "reviews"]]) {
+      const root = sectionHtml(pv, id);
+      ok(root, `${id}: no note in the preview: ${pv.slice(pv.indexOf("sec_new1") - 100)}`);
+      ok(root.includes(NOTE), `${id}: the note's title: ${root}`);
+      ok(root.includes(`Something went wrong while showing this ${label} section. Only you can see this note in your preview`), `${id}: the note's words: ${root}`);
+      ok(/data-unfinished=""/.test(root) && /data-section-failed=""/.test(root), `${id}: marked`);
+    }
+    ok(/data-section-id="sec_bn1"/.test(pv) && pv.includes("Hello there") && /data-section-id="sec_new1"/.test(pv) && heroOf(pv), "the other sections render in the preview");
+
+    // the renderer alone, with ctx.preview given (no request needed)
+    const boom = sec("fake_boom", "sec_boom1");
+    ok(view(boom, {}, { surface: "home", preview: true }).includes(NOTE), "ctx.preview true: the note");
+    eq(view(boom, {}, { surface: "home", preview: false }), "", "ctx.preview false: nothing");
+    eq(await htmlAsync(React.createElement(SectionView, { section: sec("fake_boom_async", "sec_boom2"), ctx: { surface: "page", preview: false } })), "", "async, live: nothing");
+    ok((await htmlAsync(React.createElement(SectionView, { section: sec("fake_boom_async", "sec_boom2"), ctx: { surface: "page", preview: true } }))).includes(NOTE), "async, preview: the note");
+  } finally {
+    dropA();
+    dropB();
+    Reg.removeSection("fake_boom");
+    Reg.removeSection("fake_boom_async");
+  }
+  await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+});
+
+await t("one failing data binding does not blank the page: the resolver settles per binding, the failing section is left out live and shows the note in the preview", async () => {
+  const p3 = [1, 2, 3].map((n) => ({ handle: `p${n}`, title: `P${n}`, price_min: 1, price_max: 1, currency: "INR", available: true }));
+  const repo = {
+    getNewestProducts: async () => {
+      throw new Error("SQLITE_BUSY: database is locked");
+    },
+    getFeaturedCollections: async () => [{ handle: "serums", title: "Serums", product_count: 3 }],
+    getCollectionsByHandles: async () => [],
+    getProductsInCollection: async () => ({ products: p3 }),
+  };
+  const sections = [sec("new", "sec_new1", { title: "New in", limit: 3 }), sec("product_rail", "sec_rail1", { title: "Serums rail", collection: { handle: "serums" }, limit: 3 }), sec("collections", "sec_c1", { title: "Shop by collection" })];
+  const { result: data, lines } = await logsOf(() => resolveHomeSectionData(sections, { repo, documents: true }));
+  same(data.get("sec_new1"), { bindingFailed: ["products"] }, "the failing section's data:");
+  eq(data.get("sec_rail1").products.length, 3, "the rail still has its products:");
+  eq(data.get("sec_c1").collections.length, 1, "the grid still has its collections:");
+  same(lines.filter((l) => l.evt === "section_binding_failed").map((l) => [l.sectionId, l.field, l.source]), [["sec_new1", "products", "newest_products"]], "log line:");
+  // a curated read and a pins read that fail are never replaced by a guess
+  const pinsDown = { ...repo, getNewestProducts: async () => p3, collectionPinsByHandles: async () => { throw new Error("pins down"); } };
+  const legacy = await logsOf(() => resolveHomeSectionData(sections, { repo: pinsDown, index: { featured: ["serums"] } }));
+  same(legacy.result.get("sec_rail1"), { bindingFailed: ["products"] }, "a rail whose pins can't be read fails, never shows the unpinned order:");
+  eq(legacy.result.get("sec_new1").products.length, 3, "the newest products are fine");
+  const curatedDown = { ...repo, getNewestProducts: async () => p3, getCollectionsByHandles: async () => { throw new Error("curated down"); } };
+  same((await logsOf(() => resolveHomeSectionData(sections, { repo: curatedDown, index: { featured: ["serums"] }, documents: true }))).result.get("sec_c1"), { bindingFailed: ["collections"] }, "a grid whose curated list can't be read fails, never shows the uncurated list:");
+
+  // rendered: live leaves the section out and keeps the rest; the preview shows the note
+  const live = await inV4(() => asRequest("srv.test", {}, () => htmlAsync(React.createElement(HomeSections, { sections, dataById: data }))));
+  ok(!/sec_new1|couldn.t be shown/.test(live), "a shopper sees the failing section or a note");
+  ok(/data-section-id="sec_rail1"/.test(live) && /Serums rail/.test(live) && /data-section-id="sec_c1"/.test(live), `the rest of the page is there: ${live.slice(0, 300)}`);
+  const token = await previewToken();
+  const pv = await inV4(() => asRequest("srv.test", { [PREVIEW_COOKIE]: token }, () => htmlAsync(React.createElement(HomeSections, { sections, dataById: data }))));
+  ok(sectionHtml(pv, "sec_new1").includes(NOTE) && sectionHtml(pv, "sec_new1").includes("newest products section"), `the preview note: ${pv.slice(0, 400)}`);
+  ok(/data-section-id="sec_rail1"/.test(pv), "the preview keeps the rest");
+  // before P3-VALIDATE the whole resolver rejected
+  let rejected = false;
+  await resolveHomeSectionData(sections, { repo, documents: true }).catch(() => (rejected = true));
+  eq(rejected, false, "the resolver itself never rejects for one binding:");
+});
+
+await t("PV-02: a hero draft holding a broken value (a link that isn't a page of the store) previews as its note, never with the link; a hero only missing words still shows its placeholder", async () => {
+  await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+  const save = (sections) =>
+    inV4(async () => {
+      const cur = await Svc.getDocument("doc_home");
+      return Svc.saveDraft({ id: cur.id, revision: cur.revision, body: homeBody(sections) });
+    });
+  const r = await save([sec("hero", "sec_hero", { ...HERO_SETTINGS, title: "Draft hero", primary: { label: "Go", link: { type: "url", href: "https://evil.example/x" } } }), sec("new", "sec_new1", { title: "Draft new", limit: 3 })]);
+  ok(r.issues.some((i) => i.sectionId === "sec_hero" && i.code === "LINK_NOT_STOREFRONT" && i.severity === "incomplete"), `saved as incomplete: ${JSON.stringify(r.issues)}`);
+  const token = await previewToken();
+  const pv = await renderHome("srv.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: token });
+  ok(pv.includes("Draft new"), "the preview shows the draft");
+  ok(!pv.includes("evil.example"), "the broken link reached the preview");
+  ok(/data-section-id="sec_hero"[^>]*data-unfinished=""/.test(pv) && pv.includes("Hero: not finished yet"), `the hero's note: ${pv.slice(0, 600)}`);
+  const live = await renderHome("srv.test");
+  ok(!/evil\.example|not finished yet|Draft/.test(live), "a shopper sees the draft");
+  // the net under a draft link the preview still shows as typed (a menu item's
+  // link, which has no section note): React blocks a script address outright
+  ok(/React has blocked a javascript: URL/.test(html(React.createElement("a", { href: "javascript:alert(1)" }, "x"))), "react-dom renders a javascript: link as typed");
+  // a hero with no title only: the placeholder where the title goes, as before
+  await save([sec("hero", "sec_hero", { ...HERO_SETTINGS, title: "", highlight: "" }), sec("new", "sec_new1", { title: "Draft new", limit: 3 })]);
+  const pv2 = await renderHome("srv.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: token });
+  ok(heroOf(pv2).includes("Write the first thing shoppers read"), `the hero placeholder: ${heroOf(pv2).slice(0, 400)}`);
+  ok(!pv2.includes("Hero: not finished yet"), "a hero only missing words is not the note");
+  await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
+});
+
+await t("AU-04: every registered kind's starterSection, saved by saveDraft in draft mode, is 200, and previewDraftBody plus a render does not throw; a starter rail on a store with collections publishes clean", async () => {
+  const { previewDraftBody } = await import("../lib/content/documents-reader.js");
+  const collections = await inV4(async () =>
+    (await libsql.execute("SELECT c.id, c.handle, count(cp.product_id) AS product_count, sum(p.available) AS available_count FROM collections c LEFT JOIN collection_products cp ON cp.collection_id = c.id LEFT JOIN products p ON p.id = cp.product_id GROUP BY c.id ORDER BY c.handle")).rows.map((r) => ({ id: String(r.id), handle: String(r.handle), product_count: Number(r.product_count), available_count: Number(r.available_count || 0) })),
+  );
+  eq(collections.length, 3, "the fixture's collections:");
+  const rail = Reg.starterSection("product_rail", { collections, id: "sec_strail" });
+  ok(rail.settings.collection?.handle === "serums" || rail.settings.collection?.handle === "whey", `the rail picked a real collection: ${JSON.stringify(rail.settings.collection)}`);
+  same(Reg.validateDocument(homeBody([rail]), { mode: "publish" }).issues, [], "the starter rail publishes clean:");
+  same({ ...Reg.starterSection("product_rail", { collections: [], id: "sec_x1" }) }, Reg.newSection("product_rail", { id: "sec_x1" }), "no collections:");
+
+  for (const kind of Reg.sectionKinds()) {
+    const d = Reg.sectionType(kind);
+    const type = d.documentTypes[0];
+    const starter = Reg.starterSection(kind, { collections, id: `sec_st${kind.replace(/_/g, "").slice(0, 10)}` });
+    const body = Reg.fixtureDocument(type, [starter]);
+    const row = await inV4(async () => {
+      let doc;
+      if (Reg.documentType(type).singleton) {
+        try {
+          doc = await Svc.getDocument(`doc_${type}`);
+        } catch {
+          doc = (await Svc.createDocument({ type })).document;
+        }
+      } else doc = (await Svc.createDocument({ type, meta: { slug: `starter-${kind.replace(/_/g, "-")}`, title: `Starter ${d.label}` } })).document;
+      const r = await Svc.saveDraft({ id: doc.id, revision: doc.revision, body: { ...body, meta: doc.body.meta ?? body.meta } });
+      ok(r.document, `${kind}: saveDraft refused`);
+      return (await libsql.execute({ sql: "SELECT id, type, draft FROM documents WHERE id = ?", args: [doc.id] })).rows[0];
+    });
+    const preview = previewDraftBody({ id: String(row.id), type: String(row.type), draft: String(row.draft) });
+    ok(preview && Array.isArray(preview.sections), `${kind}: previewDraftBody`);
+    const shown = preview.sections.find((s) => s.id === starter.id);
+    ok(shown, `${kind}: the starter is in the preview body`);
+    if (d.startsIncomplete && kind !== "product_rail") ok(shown.unfinished, `${kind}: a starter that starts incomplete previews as its note`);
+    const data = await inV4(() => resolveHomeSectionData([shown], { documents: true }));
+    const out = view(shown, data.get(shown.id) || {}, { surface: type === "home" ? "home" : "page", secKey: shown.id, preview: true, ...(kind === "product_main" ? { productMain: React.createElement("p", null, "buy") } : {}) });
+    ok(!out.includes("couldn&#x27;t be shown"), `${kind}: the starter failed to render`);
+    if (kind === "product_rail") ok(/href="\/products\//.test(out), `the starter rail shows real products: ${out.slice(0, 300)}`);
+    else if (shown.unfinished && kind !== "hero") ok(out.includes("not finished yet"), `${kind}: the note: ${out.slice(0, 200)}`);
+  }
+  await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("new", "sec_new1", { title: "New in", limit: 3 })]);
 });
 
 // =====================================================================================

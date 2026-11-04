@@ -395,6 +395,75 @@ await t("a founder can add an image to the hero through the API (DOC-07)", async
   made.home = r.body.document;
 });
 
+// --- P3-VALIDATE (PV-02): one half-typed field never blocks saving the rest ----------------
+console.log("— one broken section never blocks the rest (PV-02)");
+await t("saveDraft of a home body with a banner link that isn't a store page and a hero title edit is 200: the hero edit is stored, the banner's issue is 'incomplete', and publishing that body is 422 naming the banner", async () => {
+  const before = made.home;
+  const hero = { ...R.newSection("hero", { id: "sec_hero1" }), settings: { ...R.newSection("hero").settings, title: "A brand new hero title" } };
+  const banner = { ...R.newSection("banner", { id: "sec_bnbad" }), settings: { title: "Summer sale", text: "", button: { label: "Shop now", link: { type: "url", href: "https://evil.example/sale" } } } };
+  const body = { ...made.home.body, sections: [hero, banner] };
+  const r = await save("doc_home", made.home.revision, body);
+  eq(r.status, 200, `status: ${JSON.stringify(r.body).slice(0, 300)}`);
+  const stored = JSON.parse((await docRow("doc_home")).draft);
+  eq(stored.sections[0].settings.title, "A brand new hero title", "the hero edit is stored:");
+  eq(stored.sections[1].settings.button.link.href, "https://evil.example/sale", "the banner is stored as typed:");
+  const link = r.body.issues.filter((i) => i.code === "LINK_NOT_STOREFRONT");
+  eq(link.map((i) => [i.sectionId, i.field, i.severity]), [["sec_bnbad", "button.link.href", "incomplete"]], "the banner's issue:");
+  eq(R.where(link[0], stored), "Banner · Button", "where:");
+  made.home = r.body.document;
+
+  // publishing exactly that body is refused, naming the banner; nothing changes
+  const snap = await dump();
+  const pub = await api({ publish: { id: "doc_home", draftHash: made.home.draftHash }, revision: made.home.revision });
+  eq(pub.status, 422, `publish: ${JSON.stringify(pub.body).slice(0, 300)}`);
+  const blocking = pub.body.issues.filter((i) => i.severity === "error");
+  ok(blocking.length > 0, "an error blocks");
+  ok(blocking.every((i) => i.sectionId === "sec_bnbad"), `only the banner blocks: ${JSON.stringify(blocking.map((i) => [i.sectionId, i.code]))}`);
+  ok(blocking.some((i) => i.code === "LINK_NOT_STOREFRONT" && R.where(i, stored) === "Banner · Button" && /isn't a page of your store/.test(i.message)), "the banner is named");
+  await unchanged(snap, "a refused publish");
+  ok(before.revision < made.home.revision, "revision moved on");
+});
+
+await t("saveDraft of a page with a too-long title, or a menu item with a bad link, is 200 with an 'incomplete' issue; SLUG_INVALID or a structure issue is 422 with nothing stored", async () => {
+  // a page title over its limit
+  const p = (await create({ type: "page", meta: { slug: "pv-long", title: "Short" } })).body.document;
+  const longTitle = "T".repeat(130);
+  const r1 = await save(p.id, p.revision, { ...p.body, meta: { ...p.body.meta, title: longTitle } });
+  eq(r1.status, 200, `long title: ${JSON.stringify(r1.body).slice(0, 300)}`);
+  eq(r1.body.issues.filter((i) => i.code === "TOO_LONG").map((i) => [i.field, i.severity]), [["meta.title", "incomplete"]], "the title issue:");
+  eq(JSON.parse((await docRow(p.id)).draft).meta.title, longTitle, "stored as typed:");
+  let cur = r1.body.document;
+
+  // a header menu item with a link that isn't a page of the store
+  const hdr = (await create({ type: "header" })).body.document;
+  const items = [{ label: "Admin", link: { type: "url", href: "/admin" } }, { label: "Shop", link: { type: "collection", handle: "all" } }];
+  const r2 = await save(hdr.id, hdr.revision, { ...hdr.body, settings: { ...hdr.body.settings, mode: "custom", items } });
+  eq(r2.status, 200, `menu link: ${JSON.stringify(r2.body).slice(0, 300)}`);
+  eq(r2.body.issues.filter((i) => i.code === "LINK_NOT_STOREFRONT").map((i) => [i.documentId, i.field, i.severity]), [["doc_header", "items.0.link.href", "incomplete"]], "the menu issue:");
+  eq(JSON.parse((await docRow(hdr.id)).draft).settings.items, items, "stored as typed:");
+
+  // still refused, nothing stored: an invalid web address, and structure
+  for (const [label, body, code] of [
+    ["an invalid web address", { ...cur.body, meta: { ...cur.body.meta, slug: "Big Sale!" } }, "SLUG_INVALID"],
+    ["a title that isn't text", { ...cur.body, meta: { ...cur.body.meta, title: 42 } }, "INVALID_VALUE"],
+    ["an unknown section kind", { ...cur.body, sections: [{ id: "sec_zz2", kind: "carousel", v: 1, enabled: true, settings: {}, blocks: [] }] }, "UNKNOWN_KIND"],
+    ["an unknown setting", { ...cur.body, sections: [{ ...textSection("sec_t9"), settings: { title: "T", body: [], colour: "red" } }] }, "UNKNOWN_FIELD"],
+  ]) {
+    const snap = await dump();
+    const r = await save(cur.id, cur.revision, body);
+    eq(r.status, 422, `${label}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    ok(r.body.issues.some((i) => i.code === code && i.severity === "error"), `${label}: ${code} is an error`);
+    await unchanged(snap, label);
+  }
+  // and createDocument the same way
+  const snap = await dump();
+  const c = await create({ type: "page", meta: { slug: "Not Valid", title: "x" } });
+  eq(c.status, 422, "create with an invalid web address:");
+  await unchanged(snap, "create");
+  const c2 = await create({ type: "page", meta: { slug: "pv-long-2", title: "D".repeat(130) } });
+  eq([c2.status, c2.body.issues?.find((i) => i.field === "meta.title")?.severity], [200, "incomplete"], "create with a too-long title:");
+});
+
 // --- DOC-08: versions ---------------------------------------------------------------------
 console.log("— earlier versions (DOC-08)");
 await t("restoreVersion puts the version into the draft, bumps the revision and leaves release_state (and releases) untouched", async () => {

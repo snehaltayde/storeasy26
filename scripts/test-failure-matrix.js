@@ -639,6 +639,15 @@ row("save", "documents: no revision sent", () => documents("docs", { archive: DO
 row("save", "documents: a store still on the current editor", () => documents("ok", { createDocument: { type: "home" } }), { status: 409, code: "STORE_USES_LEGACY", cls: "refusal" });
 row("save", "documents: two operations in one request", () => documents("docs", { getDocument: DOCS_PAGE.id, archive: DOCS_PAGE.id, revision: 1 }), { status: 400, code: "AMBIGUOUS_OPERATION", cls: "refusal" });
 row("save", "documents: read-only role (support)", () => documents("docs", { archive: DOCS_PAGE.id, revision: 1 }, { admin: SUPPORT }), { status: 403, cls: "refusal" });
+// P3-VALIDATE (PV-02): the web address is the one page detail a draft can't
+// hold broken (it is the page's unique key): still 422, nothing stored
+row("save", "documents: a web address that isn't valid", () => withDocsDump(async () => {
+  const d = await docsNow();
+  return documents("docs", { saveDraft: { id: d.id, body: { ...d.body, meta: { ...d.body.meta, slug: "Big Sale!" } } }, revision: d.revision });
+}), { status: 422, code: "VALIDATION_FAILED", cls: "validation" }, async (r) => {
+  eq(r.body.issues.map((i) => [i.field, i.code, i.severity]), [["meta.slug", "SLUG_INVALID", "error"]], "the address issue:");
+  await unchangedDocs(r.__before, "an invalid address");
+});
 
 // --- publishing documents (P2-PUBLISH) -------------------------------------------------
 // The publish batch is the one carrying the pointer flip. Only that batch is
@@ -693,6 +702,18 @@ row("publish", "documents: an empty home page", () =>
   }),
   { status: 422, code: "VALIDATION_FAILED", cls: "validation" },
   (r) => eq(r.body.issues.find((i) => i.code === "HOME_EMPTY")?.message, "Your home page is empty. Add a section or restore the last published version.", "exact words:"),
+);
+// P3-VALIDATE (PV-02): a section whose button goes to another site saves as
+// an incomplete draft; publishing it is refused, naming that section
+row("publish", "documents: a section whose button goes to another site (saved as an incomplete draft)", () =>
+  withTenant(T.docs, async () => {
+    const body = { schema: 1, type: "page", meta: { slug: "fm-offsite", title: "Offsite", description: "", enabled: true, effective_at: null, window_start: null, window_end: null, redirect_from: [] }, sections: [{ id: "sec_fmo1", kind: "banner", v: 1, enabled: true, settings: { title: "Sale", text: "", button: { label: "Shop", link: { type: "url", href: "https://evil.example/sale" } } }, blocks: [] }] };
+    const made = await DocsService.createDocument({ type: "page", body, actor: { kind: "merchant", id: owner.id } });
+    eq(made.issues.filter((i) => i.code === "LINK_NOT_STOREFRONT").map((i) => i.severity), ["incomplete"], "saved as incomplete:");
+    return publishDoc({}, made.document);
+  }),
+  { status: 422, code: "VALIDATION_FAILED", cls: "validation" },
+  (r) => eq(r.body.issues.filter((i) => i.severity === "error").map((i) => [i.sectionId, i.field, i.code]), [["sec_fmo1", "button.link.href", "LINK_NOT_STOREFRONT"]], "names the section:"),
 );
 row("publish", "documents: product content can't be published yet", () =>
   withTenant(T.docs, async () => publishDoc({}, (await DocsService.createDocument({ type: "product_content", entityId: "gid://shopify/Product/77", actor: { kind: "merchant", id: owner.id } })).document)),
