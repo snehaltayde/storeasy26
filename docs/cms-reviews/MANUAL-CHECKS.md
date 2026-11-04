@@ -526,6 +526,38 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] None new from this item. Nothing calls the seam on a real tenant until P4-CUTOVER, whose runbook and rehearsal cover the MIG-02 data check.
 - [ ] Staging NOT DONE: nothing ran against hosted Turso; this item is local and unit-tested only.
 
+## Phase 4, batch 2
+
+### One effective read of product content (P4-EFFECTIVE)
+- [ ] OQ-7: confirm nothing in the browser needs `catalog_title` or `sku` in the cart. They are now removed from every cart a browser receives.
+- [ ] Gift line titles: confirm "the founder's published title, else the title the offer stored". The alternative is Shopify's title, which would visibly change gift names on stores that have no published content today.
+- [ ] Hosted speed (after OQ-19): measure the cart API and a product page on a staging tenant and confirm the database reads stay at 3 and 10 as in PERF-04.
+- [ ] CI: the sqld download under `.github/` still needs the owner's approval of its source and checksum. This item changed nothing under `.github/`.
+- [ ] Phone and Safari check of a renamed product's page, card and cart once P4-LIVEROW can publish. The drill here only used the app's narrow built-in browser pane.
+
+### Product and collection content publish as live rows (P4-LIVEROW)
+- [ ] OQ-6 cart ruling (default applied): staff can now edit `doc_cart` but need an owner or admin to publish it. Confirm.
+- [ ] OVL-13 gallery allowlist pulled forward: only `cdn.shopify.com` and `/api/media/<id>` images go live. Confirm no store uses images from other hosts in product galleries.
+- [ ] OQ-14 on a dev store: do Shopify image addresses differ only by their query string? The "same as Shopify" rule strips the query before comparing.
+- [ ] Check that hosted Turso batches are atomic for the new live-row batch (no release row; guarded UPDATE plus abort) on staging, before the first real cutover.
+- [ ] CI: the sqld download in `.github/` still needs the owner's approval of its source and checksum. `test-product-content` needs sqld and fails, never skips, without it.
+- [ ] Orchestrator: add `scripts/test-documents.js` and `scripts/test-doc-changes.js` to this item's file list (changed for the cart ruling and the fixed ids).
+- [ ] Desktop Chrome drill: NOT DONE (nothing visible yet); left for P4-DRILLS after P4-EDITOR.
+
+### The legacy store as documents, and a read-only dry run (P4-MAPPER)
+- [ ] Owner: run a real dry run per store before its rehearsal: `pnpm migrate:documents -- --tenant <id> --dry-run --hosted --confirm <id>`, adding `--store-open` or `--not-launched` for a store that never published. Read the plain report with the founder and keep the digest for CUTOVER. Builders never ran this.
+- [ ] Owner (OQ-6): confirm with the team the staff line under "Team access that changes": staff can change the cart offer but an owner or admin must publish it.
+- [ ] Owner (OQ-8): confirm that saved templates being counted, and kept readable on ED05's saved templates page, is enough.
+- [ ] Owner: after a real cutover of a store whose home was half customized, open the new editor's home page and check that the hero title note reads sensibly. The title follows the store name by being left out, which the editor flags as missing.
+- [ ] Orchestrator: no reader owner fills a literal `{store_name}` token. If a real token is wanted, name an owner for `resolve.js` and `documents-reader.js` (OVL07 or later).
+- [ ] Orchestrator: P4-OVL07 must fill `lib/migrate/map-entities.js` (contract at the top of the file). Until then every store holding product or collection content is refused.
+- [ ] Orchestrator: the six comparison rules for differences shoppers can't see live in `lib/migrate/check.js`. CUTOVER may move them into `allowed-differences.js`.
+- [ ] Owner: the CI sqld download in `.github/` still needs approval of its source and checksum (carried from P4-SCAFFOLD; nothing under `.github/` changed).
+
+### The phase 4 drill harness and local tenants (P4-HARNESS)
+- [ ] If you already have a local-tenants build from before this fix (for example in `.design-data/p4-local`), delete that folder by hand once. Its manifest has no tool field, so a rebuild into it is now refused.
+- [ ] CI sqld download (carried over): its source and checksum still need your approval; nothing under `.github/` was touched.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
