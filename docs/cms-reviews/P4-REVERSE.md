@@ -144,6 +144,11 @@ From review:
 - A product deleted from Shopify while reversed gets its live row back with the new-editor title at the next move (the old LIVEROW change refuses to publish such products). Shoppers never see it, as the Known limits say. Noted only.
 - No unit test covers the fix to scripts/migrate-documents.js (heroExperiments passed to captureRoutes); only the drill exercises it. The builder said so in the report.
 
+## Orchestrator ruling (batch 7), awaiting the owner
+
+- **The reversal needs a matching dry-run digest and no rehearsal.** Plan section 0 asks cutover and reversal for "a matching dry-run digest and a passing rehearsal report". The orchestrator rules that the reversal keeps needing only the digest of a reversal dry run the owner read (plus `--hosted --confirm --backup-ref` on a hosted store): it returns the store to the exact release that was live before the move, which the old editor could not change while the store was on the new editor, so there is nothing new for a rehearsal to compare. No rehearsal step is added. This is a change to the plan's wording and **awaits the owner's sign-off** before the first real reversal (owner check in `P4-FIX6.md`).
+- The other batch 6 review findings above were fixed and tested by P4-FIX6 (see `docs/cms-reviews/P4-FIX6.md`).
+
 ## From review
 
 - **Batch 5 (P4-CUTOVER), assigned here:** the agency read failing after the lock now has its own words; the missing `cms_state` row is refused with its own words before anything is written; the source-hash limit for control-plane brand and theme edits is in P4-CUTOVER.md and the runbook. Tested in part 7 (R9, R10).

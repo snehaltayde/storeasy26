@@ -61,8 +61,8 @@ process.env.PLATFORM_DB_TOKEN = "";
 process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
-const P4_DBS = ["fresh", "keep", "live", "liveorders", "liveprod", "adoptrel", "adoptblk", "adoptdoc", "earlier", "badmode", "sharea", "sharec", ...Array.from({ length: 8 }, (_, i) => `fa${i}`)].map((n) => `.test-prov-${n}.db`);
-const dbs = [".test-prov-default.db", ".test-prov-platform.db", ".test-prov-t1.db", ...P4_DBS];
+const P4_DBS = ["fresh", "keep", "live", "liveorders", "liveprod", "adoptrel", "adoptblk", "adoptdoc", "earlier", "badmode", "sharea", "sharec", "shared", ...Array.from({ length: 8 }, (_, i) => `fa${i}`)].map((n) => `.test-prov-${n}.db`);
+const dbs = [".test-prov-default.db", ".test-prov-platform.db", ".test-prov-t1.db", ".test-prov-beta.db", ...P4_DBS];
 const removeDbs = async () => {
   for (const f of dbs) for (const ext of ["", "-wal", "-shm", "-journal"]) await rm(join(here, "..", f + ext), { force: true });
 };
@@ -154,7 +154,9 @@ await t("re-provisioning an existing tenant without force is refused", async () 
 });
 
 await t("compensation: deregisters what the run created, never deletes the database", async () => {
-  const p2 = { id: "beta", name: "Beta", shopDomain: "beta.myshopify.com", dbUrl: "file:.test-prov-t1.db", contentMode: "legacy" };
+  // P4-FIX6: on a database of its own (acme's would now stop the run at
+  // create_db: another registered store uses it)
+  const p2 = { id: "beta", name: "Beta", shopDomain: "beta.myshopify.com", dbUrl: "file:.test-prov-beta.db", contentMode: "legacy" };
   const r = await P.runProvision(p2, { failAt: "record_onboarding" });
   eq(r.run.status, "failed");
   ok(await C.getTenant("beta"), "beta registered");
@@ -164,7 +166,8 @@ await t("compensation: deregisters what the run created, never deletes the datab
   eq(await C.getTenant("beta"), null, "tenant row deregistered:");
   eq(await B.subscriptionFor("beta"), null, "free subscription removed:");
   ok(!comp.notes.some((n) => /deleted/.test(n) && /database/.test(n)), "no database deletion");
-  // the adopted db file itself is untouched (acme still works on it)
+  // the adopted db file itself is left in place, and other tenants are untouched
+  ok(await access(join(here, "..", ".test-prov-beta.db")).then(() => true, () => false), "the database is left in place");
   ok(await C.getTenant("acme"), "other tenants untouched");
 });
 
@@ -825,54 +828,93 @@ await t("unit: a legacy tenant's checklist output is unchanged (every step's lab
 });
 
 // ---- P4-FIX5: the P4-PROVISION review findings -------------------------------------
-console.log("— P4-FIX5: a database another store uses, and the turso CLI's database list");
+console.log("— P4-FIX5 / P4-FIX6: a database another store uses, and the turso CLI's database list");
 
-await t("unit (P4-FIX5): provisioning never moves a database another registered store already uses to the new editor (same address, or another spelling of it); the other store's editor and cms_state stay as they were", async () => {
+await t("unit (P4-FIX5, P4-FIX6): provisioning on a database another registered store already uses stops with plain words before anything touches it (same address, another spelling, a relative or absolute file path, another ?authToken): no second store is registered, and the other store's editor and cms_state stay as they were", async () => {
   // store A on its own database, kept on the old editor by the operator; its database holds nothing yet
   const a = await P.runProvision(params("sharea", { contentMode: "legacy" }));
   eq(a.run.status, "done", `A (${a.error}):`);
   const row = (await rawSql(".test-prov-sharea.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0];
   eq(row.mode, "legacy", "A is legacy:");
   const before = await storeState(".test-prov-sharea.db");
-  for (const [id, dbUrl] of [["shareb", "file:.test-prov-sharea.db"], ["sharebb", "file:./.test-prov-sharea.db"]]) {
+  const ledger = await rawSql(".test-prov-sharea.db", "SELECT id, applied_at FROM schema_migrations ORDER BY id");
+  const abs = join(process.cwd(), ".test-prov-sharea.db");
+  for (const [id, dbUrl] of [
+    ["shareb", "file:.test-prov-sharea.db"],
+    ["sharebb", "file:./.test-prov-sharea.db"],
+    ["sharebc", `file:${abs}`],
+    ["sharebd", `file://${abs}`],
+    ["sharebe", "file:.test-prov-sharea.db?authToken=another-dummy-token"],
+  ]) {
     const r = await P.runProvision(params(id, { dbUrl }));
-    eq(r.run.status, "done", `${id} (${r.error}):`);
-    same([r.run.refs.contentMode, r.run.refs.contentModeReason], ["legacy", P.CONTENT_MODE_REASONS.sharedDb], `${id} kept legacy:`);
-    eq(r.run.refs.contentModeReason, "Another registered store already uses this database, so this store keeps the old editor and the other store is left as it is.", `${id} words:`);
+    eq(r.run.status, "failed", `${id} stops (${dbUrl}):`);
+    eq(r.failedStep, "create_db", `${id} stops before the schema step:`);
+    eq(r.error, 'Another registered store ("sharea") already uses this database, so this store was not set up on it and the other store was left as it is. Give this store a database of its own.', `${id} words:`);
+    ok(!/[a-z]+_[a-z_]+\b|SQLITE/.test(r.error), `plain words: ${r.error}`);
+    eq(await C.getTenant(id), null, `${id}: no second store registered:`);
     same((await rawSql(".test-prov-sharea.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], row, `${id}: cms_state untouched:`);
     same(await storeState(".test-prov-sharea.db"), before, `${id}: A's store:`);
-    ok(/old editor/.test(P.editorSummary(r.run.refs)), P.editorSummary(r.run.refs));
   }
+  same(await rawSql(".test-prov-sharea.db", "SELECT id, applied_at FROM schema_migrations ORDER BY id"), ledger, "A's schema ledger untouched:");
+  // the wrapper the CLI and the wizard use throws the same words
+  const thrown = await P.provisionTenant({ id: "sharebf", name: "B", shopDomain: "sharebf.myshopify.com", dbUrl: "file:./.test-prov-sharea.db" }).then(() => null, (e) => e);
+  ok(thrown && /Another registered store \("sharea"\) already uses this database/.test(thrown.message), String(thrown?.message));
+  eq(await C.getTenant("sharebf"), null, "the wrapper registered nothing either:");
   // a database no other store uses still starts on the new editor (the check is not blanket)
   const c = await P.runProvision(params("sharec"));
   same([c.run.status, c.run.refs.contentMode], ["done", "documents"], `a database of its own (${c.error}):`);
-  // the comparison: spellings of one address match, other databases don't
+  // the comparison: addresses of one database match, other databases don't
   for (const [x, y, want] of [
     ["file:.test-prov-sharea.db", "file:./.test-prov-sharea.db", true],
+    ["file:.test-prov-sharea.db", `file:${abs}`, true],
+    ["file:./.test-prov-sharea.db", `file://${abs}`, true],
     ["libsql://Storeasy-T-Shop-org.turso.io/", "libsql://storeasy-t-shop-org.turso.io", true],
     [" libsql://storeasy-t-shop-org.turso.io ", "libsql://storeasy-t-shop-org.turso.io", true],
+    ["libsql://storeasy-t-shop-org.turso.io", "https://storeasy-t-shop-org.turso.io", true],
+    ["https://storeasy-t-shop-org.turso.io:443/", "libsql://storeasy-t-shop-org.turso.io", true],
+    ["libsql://storeasy-t-shop-org.turso.io?authToken=one", "libsql://storeasy-t-shop-org.turso.io?authToken=two", true],
+    ["libsql://storeasy-t-shop-org.turso.io?authToken=one", "https://storeasy-t-shop-org.turso.io", true],
+    ["http://127.0.0.1:7120", "libsql://127.0.0.1:7120", true],
+    ["http://127.0.0.1:7120", "http://127.0.0.1:7121", false],
     ["libsql://storeasy-t-shop-org.turso.io", "libsql://storeasy-t-shop2-org.turso.io", false],
     ["file:.test-prov-sharea.db", "file:.test-prov-sharec.db", false],
+    ["file:.test-prov-sharea.db", "file:sub/.test-prov-sharea.db", false],
     ["", "", false],
     [null, null, false],
   ]) eq(P.sameDbAddress(x, y), want, `${JSON.stringify(x)} vs ${JSON.stringify(y)}:`);
 });
 
+await t("unit (P4-FIX6): a run that resumes after another store was registered on its database stops at content_mode with the same words, leaves the database's editor as it was and registers nothing", async () => {
+  const first = await P.runProvision(params("shared", { dbUrl: "file:.test-prov-shared.db" }), { failAt: "content_mode" });
+  eq(first.failedStep, "content_mode", `stopped by the test hook (${first.error}):`);
+  const row = (await rawSql(".test-prov-shared.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0];
+  eq(row.mode, "legacy", "not moved yet:");
+  // meanwhile another store is registered on that database (another spelling)
+  await C.upsertTenant({ id: "sharedother", name: "Other", domains: ["sharedother.test"], dbUrl: "file:./.test-prov-shared.db", config: {}, secrets: {} });
+  const again = await P.runProvision({}, { resumeRunId: first.run.id });
+  eq(again.failedStep, "content_mode", `the resume stops (${again.error}):`);
+  eq(again.error, 'Another registered store ("sharedother") already uses this database, so this store was not set up on it and the other store was left as it is. Give this store a database of its own.', "words:");
+  same((await rawSql(".test-prov-shared.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], row, "the editor setting untouched:");
+  eq(await C.getTenant("shared"), null, "nothing registered:");
+});
+
 await t("unit (P4-FIX5): createTenantDatabase through a stubbed turso CLI matches the database name exactly: 'shop' is created when only 'shop2' is listed, and an existing 'shop' is adopted, never created again", async () => {
-  ok(typeof P.setTursoRunnerForTest === "function", "the turso seam is there (never run the real CLI)");
+  // P4-FIX6: the seam is test-only: no setter is exported from the shipped module
+  eq(typeof P.setTursoRunnerForTest, "undefined", "no exported setter:");
+  ok(typeof P.TURSO_TEST_RUNNER === "symbol", "the seam's symbol");
   const saved = { token: process.env.TURSO_API_TOKEN, org: process.env.TURSO_ORG };
   delete process.env.TURSO_API_TOKEN;
   delete process.env.TURSO_ORG;
   const calls = [];
   let listed = "";
-  P.setTursoRunnerForTest(async (args) => {
+  globalThis[P.TURSO_TEST_RUNNER] = async (args) => {
     calls.push(args.join(" "));
     if (args[0] === "db" && args[1] === "list") return listed;
     if (args[0] === "db" && args[1] === "show") return `libsql://${args[2]}-org.turso.io`;
     if (args[0] === "db" && args[1] === "tokens") return "stub-token-not-a-secret";
     if (args[0] === "db" && args[1] === "create") return `Created database ${args[2]}`;
     throw new Error(`unexpected turso call: ${args.join(" ")}`);
-  });
+  };
   try {
     const HEADER = "NAME                 GROUP      URL";
     listed = `${HEADER}\nstoreasy-t-shop2     default    libsql://storeasy-t-shop2-org.turso.io\nstoreasy-t-myshop   default    libsql://storeasy-t-myshop-org.turso.io\n`;
@@ -889,7 +931,7 @@ await t("unit (P4-FIX5): createTenantDatabase through a stubbed turso CLI matche
     eq(P.listedDbNames(`${HEADER}\nstoreasy-t-shop2  default  x`).has("storeasy-t-shop"), false, "'shop' is not in a list with only 'shop2':");
     eq(P.listedDbNames("").size, 0, "an empty list:");
   } finally {
-    P.setTursoRunnerForTest(null);
+    delete globalThis[P.TURSO_TEST_RUNNER];
     if (saved.token !== undefined) process.env.TURSO_API_TOKEN = saved.token;
     if (saved.org !== undefined) process.env.TURSO_ORG = saved.org;
   }
