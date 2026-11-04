@@ -95,6 +95,23 @@ Do the tests bite: each new test was run with the matching file put back to `407
 - `scripts/drills/p2/results-policy-typo.json` (a recorded drill result) still shows the highlight warning on `highlight`. It is a record of that run, not a test.
 - `lib/content/documents-reader.js` `heroFromSection` (the legacy-shaped hero reader) still shows the placeholder for any unfinished hero. No page renders the hero through it today; the home page uses `SectionView`.
 
+From review:
+
+- Wrong store name in the render-failure log. section_render_failed is logged when the section renders, which happens outside tfetch, so it carries tenant "_default" and not the real store. I saw this on the real Next dev server (design harness, ports 3780/4780): after I made CollectionsSection throw, the line read {"evt":"section_render_failed","tenant":"_default","sectionId":"sec_defcollect",...}. For the same section, section_binding_failed (logged inside tfetch) read "tenant":"design". On a hosted multi-store setup, the Vercel log search the owner check relies on can't tell which store a failed section belongs to. Fix: wrap logFailed in tfetch, or pass the tenant in through ctx. Then correct the owner check in the packet.
+- Drafts no longer have a size limit. Before, TOO_LONG on every text field and TOO_MANY on every list kept a saved draft small. Now both are 'incomplete' inside a section, so saveDraft stores any size. In my probe, validateDocument in draft mode returned ok:true for an FAQ with 5000 items and a text title of 3,000,000 characters. Only the hosting request limit now bounds what is saved, and every preview request re-validates the whole stored draft. Only signed-in editors and agency kits can do this, and publish still refuses it, so it is not a security hole. Suggest a hard cap in draft mode (for example 10x the field limit, or a total body byte cap in prepare()).
+- Agency kits, insight apply and experiment adopt now succeed with broken content. All three go through saveDraft, so a kit or AI suggestion holding an off-store link now saves into the founder's home draft (test-writers pins this for kits), where phase 2 answered 422. The founder sees a note and can't publish until it is fixed. This is within plan decision 9, but add these writers to the decision-9 owner check so the founder knows a partner or an insight can now leave them an unpublishable draft.
+- pickRailCollection falls back from available_count to product_count. When the caller gives no available_count (no repo function returns one today; the test builds it with its own SQL), a collection whose products are all sold out counts as having 'enough available products'. P3-EDITOR or INSPECTOR must pass a real available count. Put this in the packet's Known limits.
+- Failure note wording: failedText lowercases the section label, so the FAQ section reads 'this faq section'. Only the founder sees it in preview.
+- Things I checked that hold up (no action needed):
+  - pnpm test passed 81 of 81 suites (127.4 s) and pnpm build passed.
+  - Reverting validate.js to 407b88a fails both new test-documents cases. Reverting index.js and section-data.js fails the three new render cases (throwing section, failing binding, hero with a broken value).
+  - Of 30+ mutations across validate draftTolerates, SectionView, section-data, issue-words, starter, message wording and the code-coverage scan, all were caught except two that change no behaviour: the SLUG_INVALID guard and code===TOO_LONG on meta. Breaking slug tolerance for real is caught.
+  - test-publish-service.js and .github are unchanged; the failure-matrix diff only adds rows.
+  - On the real Next server, a legacy tenant's live home answers 200 with the healthy sections, and a throwing section or failing binding is dropped with no note. isPreviewRequest's dynamic import works there and returned preview:false from contentSource. No preview session was driven in a browser; the founder-preview note is proved only by the SSR test through page.js.
+  - Draft probes: page meta title or description too long gives incomplete; meta.slug, redirect_from, WINDOW_INVALID, an announcement link and a long nav label stay errors; header and footer nav links, including child items, give incomplete.
+  - Edge safety: no node: imports in the new files; build passes.
+  - The worktree was removed and ports 3780 and 4780-4789 are free.
+
 ## Owner checks
 
 - **Decision 9 ruling:** a draft now stores in-section broken values, over-long page titles and descriptions, and menu items' bad links as incomplete (200), where phase 2 refused them (422). Publish still refuses them.
