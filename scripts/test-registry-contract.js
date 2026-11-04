@@ -1,4 +1,6 @@
 // P2-REG: the document registry contract (DOC-01..05, DOC-07).
+// P3-VALIDATE: draft tolerance (PV-02), plain words and field anchors (AU-02),
+// starter sections (AU-04).
 //   node scripts/test-registry-contract.js      (pnpm test:registry-contract)
 //
 // lib/registry/ is pure, so almost everything here runs with no database.
@@ -211,12 +213,13 @@ await t("an undeclared field gives UNKNOWN_FIELD naming the section id and field
   eq(top.body.extra, 1);
 });
 
-await t("a 200-character title against max 80 gives TOO_LONG and is not truncated", async () => {
+await t("a 200-character title against max 80 gives TOO_LONG and is not truncated (P3-VALIDATE: incomplete in a draft, an error at publish)", async () => {
   const title = "T".repeat(200);
   for (const mode of ["draft", "publish"]) {
     const r = validate(home([sec("collections", "sec_c1", { title })]), { mode });
     const i = one(r, "TOO_LONG", { sectionId: "sec_c1", field: "title" });
-    eq(i.severity, "error");
+    eq(i.severity, mode === "draft" ? "incomplete" : "error", `${mode}:`);
+    eq(r.ok, mode === "draft", `${mode} ok:`);
     ok(i.message.includes("200") && i.message.includes("80"), i.message);
     eq(r.body.sections[0].settings.title, title, "kept whole");
     eq(r.body.sections[0].settings.title.length, 200);
@@ -229,13 +232,13 @@ await t("a 200-character title against max 80 gives TOO_LONG and is not truncate
 
 // ---- typed links ------------------------------------------------------------------
 
-await t("a hero link to https://evil.example or /admin gives LINK_NOT_STOREFRONT; /collections/x passes", async () => {
+await t("a hero link to https://evil.example or /admin gives LINK_NOT_STOREFRONT (incomplete in a draft, an error at publish); /collections/x passes", async () => {
   const withHref = (href, where = "primary") => home([sec("hero", "sec_hero1", { [where]: { label: "Go", link: { type: "url", href } } })]);
   for (const href of ["https://evil.example", "/admin", "//evil.example", "javascript:alert(1)", "/collections/../admin", "/collections/%2e%2e/admin", "/api/admin/releases", "mailto:a@b.c", "/products/"]) {
     for (const mode of ["draft", "publish"]) {
       const r = validate(withHref(href), { mode });
       const i = one(r, "LINK_NOT_STOREFRONT", { sectionId: "sec_hero1", field: "primary.link.href" });
-      eq(i.severity, "error", href);
+      eq(i.severity, mode === "draft" ? "incomplete" : "error", `${mode} ${href}`);
       eq(r.body.sections[0].settings.primary.link.href, href, "the link value is kept");
     }
   }
@@ -656,6 +659,337 @@ await t("P2-FIX4: each issue carries its class (issueClass), without changing th
     ok(!("cls" in JSON.parse(JSON.stringify(i))), "not in the JSON");
   }
   eq(V.issueClass({ code: "X" }), null, "an issue made elsewhere:");
+});
+
+// ---- P3-VALIDATE (PV-02, AU-02, AU-04) ----------------------------------------------------
+
+const V = await import("../lib/registry/validate.js");
+const header = (items) => ({ schema: 1, type: "header", meta: {}, settings: { mode: "custom", items, template: "standard" } });
+const page = (meta, sections = []) => ({ schema: 1, type: "page", meta: { slug: "about", title: "About", ...meta }, sections });
+const codes = (r) => r.issues.map((i) => [i.code, i.field, i.severity]);
+
+await t("PV-02: in a draft, a broken limit or rule inside a section is 'incomplete' (stored), and the same issue is an error at publish; its class is unchanged", async () => {
+  const body = home([
+    sec("hero", "sec_hero1", { title: "Edited title" }),
+    sec("banner", "sec_bn1", { title: "Sale", button: { label: "Go", link: { type: "url", href: "https://evil.example" } } }),
+    sec("product_rail", "sec_r1", { collection: { handle: "Not A Handle" } }),
+    sec("image_with_text", "sec_i1", { image: { media: "http://insecure.example/a.jpg", alt: "A" } }),
+    sec("new", "sec_n1", { limit: 99 }),
+    sec("faq", "sec_f1", { items: [{ q: "Q".repeat(301), a: "<p>A</p>" }] }),
+  ]);
+  const draft = validate(body, { mode: "draft" });
+  ok(draft.ok, `the draft saves: ${JSON.stringify(codes(draft))}`);
+  const want = [
+    ["sec_bn1", "button.link.href", "LINK_NOT_STOREFRONT"],
+    ["sec_r1", "collection.handle", "INVALID_VALUE"],
+    ["sec_i1", "image.media", "IMAGE_INVALID"],
+    ["sec_n1", "limit", "OUT_OF_RANGE"],
+    ["sec_f1", "items.0.q", "TOO_LONG"],
+  ];
+  for (const [sectionId, field, code] of want) {
+    const i = one(draft, code, { sectionId, field });
+    eq(i.severity, "incomplete", `${sectionId} ${code} in a draft:`);
+    eq(V.issueClass(i), "invalid", `${sectionId} ${code} keeps its class:`);
+  }
+  const pub = validate(body, { mode: "publish" });
+  ok(!pub.ok, "publish refuses");
+  for (const [sectionId, field, code] of want) eq(one(pub, code, { sectionId, field }).severity, "error", `${sectionId} ${code} at publish:`);
+  // the stored body keeps every value exactly as typed
+  eq(draft.body.sections[1].settings.button.link.href, "https://evil.example");
+  eq(draft.body.sections[0].settings.title, "Edited title");
+});
+
+await t("PV-02: in a draft, a page title or description over its limit and a menu item's bad link are 'incomplete'; SLUG_INVALID and structure stay errors", async () => {
+  const long = validate(page({ title: "T".repeat(121), description: "D".repeat(301) }), { mode: "draft" });
+  ok(long.ok, `saves: ${JSON.stringify(codes(long))}`);
+  eq(one(long, "TOO_LONG", { field: "meta.title" }).severity, "incomplete", "title:");
+  eq(one(long, "TOO_LONG", { field: "meta.description" }).severity, "incomplete", "description:");
+  for (const f of ["meta.title", "meta.description"]) eq(one(validate(page({ title: "T".repeat(121), description: "D".repeat(301) }), { mode: "publish" }), "TOO_LONG", { field: f }).severity, "error", `${f} at publish:`);
+
+  const nav = header([
+    { label: "Admin", link: { type: "url", href: "/admin" } },
+    { label: "Shop", link: { type: "collection", handle: "Bad Handle" }, children: [{ label: "Evil", link: { type: "url", href: "https://evil.example" } }] },
+  ]);
+  const navDraft = validate(nav, { mode: "draft" });
+  ok(navDraft.ok, `a menu with bad links saves: ${JSON.stringify(codes(navDraft))}`);
+  for (const [code, field] of [["LINK_NOT_STOREFRONT", "items.0.link.href"], ["LINK_INVALID", "items.1.link.handle"], ["LINK_NOT_STOREFRONT", "items.1.children.0.link.href"]]) {
+    eq(one(navDraft, code, { field, documentId: "doc_header" }).severity, "incomplete", `${field}:`);
+    eq(one(validate(nav, { mode: "publish" }), code, { field }).severity, "error", `${field} at publish:`);
+  }
+  // still errors in a draft
+  const stays = [
+    [page({ slug: "Big Sale!" }), "SLUG_INVALID", "meta.slug"],
+    [page({ redirect_from: ["Not A Slug"] }), "SLUG_INVALID", "meta.redirect_from.0"],
+    [page({ title: 42 }), "INVALID_VALUE", "meta.title"],
+    [header([{ label: "Odd", link: { type: "ftp" } }]), "LINK_INVALID", "items.0.link"],
+    [header([{ label: "x".repeat(41), link: { type: "url", href: "/" } }]), "TOO_LONG", "items.0.label"],
+    [home([sec("hero", "sec_h1"), sec("hero", "sec_h2")]), "TOO_MANY_OF_KIND", "kind"],
+    [home([sec("banner", "sec_b1", { title: "Hi", colour: "red" })]), "UNKNOWN_FIELD", "colour"],
+    [{ schema: 1, type: "announcement", meta: {}, settings: { enabled: true, text: "Hi", link: { type: "url", href: "https://evil.example" } } }, "LINK_NOT_STOREFRONT", "link.href"],
+    [{ schema: 1, type: "collections_index", meta: {}, settings: { featured: [{ handle: "mugs" }], order: [], hide: [{ handle: "mugs" }] } }, "SHOWN_AND_HIDDEN", "hide"],
+  ];
+  for (const [body, code, field] of stays) {
+    const r = validate(body, { mode: "draft" });
+    eq(one(r, code, { field }).severity, "error", `${code} on ${field} in a draft:`);
+    ok(!r.ok, `${code} on ${field}: the draft is refused`);
+  }
+});
+
+await t("AU-02: HIGHLIGHT_NOT_IN_TITLE stays a warning, on the hero's title field, in plain words", async () => {
+  for (const mode of ["draft", "publish"]) {
+    const r = validate(home([sec("hero", "sec_h1", { title: "Made for every day", highlight: "old words" })]), { mode });
+    const i = one(r, "HIGHLIGHT_NOT_IN_TITLE", { sectionId: "sec_h1" });
+    eq(i.severity, "warning", `${mode}:`);
+    eq(i.field, "title", `${mode} field:`);
+    eq(i.message, "The highlighted words aren't in the title any more, so nothing will be highlighted. Pick words from the title to highlight.");
+    ok(r.ok, "a warning never blocks");
+    eq(R.where(i, home([sec("hero", "sec_h1")])), "Hero · Title");
+    eq(R.fieldAnchor(i), "f-sec_h1-title");
+  }
+  none(validate(home([sec("hero", "sec_h1", { title: "Made for every day", highlight: "every" })]), { mode: "publish" }), "a matching highlight");
+});
+
+await t("AU-02: fieldAnchor is f-<section|doc>-<path>, stable and unique per (section, field), and falls back to the top-level setting key", async () => {
+  eq(R.fieldAnchor({ sectionId: "sec_hero", field: "title" }), "f-sec_hero-title");
+  eq(R.fieldAnchor({ sectionId: "sec_t1", field: "body.2" }), "f-sec_t1-body-2");
+  eq(R.fieldAnchor({ sectionId: "sec_f1", field: "items.1.q" }), "f-sec_f1-items-1-q");
+  eq(R.fieldAnchor({ sectionId: null, documentId: "doc_x", field: "meta.title" }), "f-doc-meta-title");
+  eq(R.fieldAnchor({ sectionId: null, documentId: "doc_header", field: "items.0.children.2.link.href" }), "f-doc-items-0-children-2-link-href");
+  eq(R.fieldAnchor({ sectionId: "sec_b1", field: null }), "f-sec_b1");
+  // the fallback: the closest field the form renders, down to the setting key
+  eq(R.fieldAnchor({ sectionId: "sec_hero", field: "primary.link.href" }, { known: new Set() }), "f-sec_hero-primary");
+  eq(R.fieldAnchor({ sectionId: "sec_hero", field: "primary.link.href" }, { known: new Set(["f-sec_hero-primary-link"]) }), "f-sec_hero-primary-link");
+  eq(R.fieldAnchor({ sectionId: "sec_t1", field: "body.2" }, { known: (a) => a === "f-sec_t1-body-2" }), "f-sec_t1-body-2");
+  eq(R.fieldAnchor({ sectionId: null, field: "meta.title" }, { known: new Set() }), "f-doc-meta-title");
+  // unique and stable over every (section, field) of every kind, two sections each
+  const seen = new Map();
+  for (const kind of R.sectionKinds()) {
+    for (const id of ["sec_one1", "sec_two2"]) {
+      for (const s of R.sectionType(kind).settings) {
+        for (const field of [s.key, `${s.key}.0`, `${s.key}.label`, `${s.key}.link.href`]) {
+          const a = R.fieldAnchor({ sectionId: id, field });
+          eq(R.fieldAnchor({ sectionId: id, field }), a, "stable:");
+          const key = `${id}|${field}`;
+          if (seen.has(a)) eq(seen.get(a), key, `anchor ${a} is shared by`);
+          seen.set(a, key);
+          ok(/^f-sec_[a-z0-9]+-[a-z0-9_-]+$/.test(a), `an id-safe anchor: ${a}`);
+        }
+      }
+    }
+  }
+  ok(seen.size > 100, `anchors checked: ${seen.size}`);
+});
+
+await t("AU-02: where() names the section and the field by their labels for every registered kind and document type; a text section's paragraphs are body.N", async () => {
+  for (const kind of R.sectionKinds()) {
+    const d = R.sectionType(kind);
+    const s = R.newSection(kind, { id: "sec_w1" });
+    const body = R.fixtureDocument(d.documentTypes[0], [s]);
+    eq(R.where({ sectionId: "sec_w1", field: null }, body), d.label, `${kind} with no field:`);
+    for (const setting of d.settings) eq(R.where({ sectionId: "sec_w1", field: setting.key }, body), `${d.label} · ${setting.label}`, `${kind}.${setting.key}:`);
+  }
+  eq(R.where({ sectionId: "sec_bn", field: "button.link.href" }, home([sec("banner", "sec_bn")])), "Banner · Button", "the spec's example:");
+  const text = home([sec("text", "sec_t1", { title: "", body: ["One", "Two", "x".repeat(4001)] })]);
+  const para = one(validate(text, { mode: "draft" }), "TOO_LONG", { sectionId: "sec_t1" });
+  eq(para.field, "body.2", "the third paragraph's path:");
+  eq(R.where(para, text), "Text · Paragraphs · paragraph 3");
+  eq(R.fieldAnchor(para), "f-sec_t1-body-2");
+  eq(R.where({ sectionId: "sec_f1", field: "items.1.a" }, home([sec("faq", "sec_f1")])), "FAQ · Questions · question 2 · answer");
+  eq(R.where({ sectionId: null, documentId: "doc_header", field: "items.0.children.1.link.href" }), "Header menu · Menu items · item 1 · sub-item 2");
+  eq(R.where({ sectionId: null, documentId: "doc_x", field: "meta.title" }, page({})), "Page · Title");
+  eq(R.where({ sectionId: null, documentId: "doc_x", field: "meta.slug" }, page({})), "Page · Web address");
+  for (const type of R.documentTypeNames()) {
+    const t = R.documentType(type);
+    for (const setting of t.settings) eq(R.where({ sectionId: null, field: setting.key }, R.emptyBody(type)), `${t.label} · ${setting.label}`, `${type}.${setting.key}:`);
+  }
+  eq(R.where({ sectionId: "sec_gone", field: "title" }, home([])), "Section", "a section the body doesn't hold:");
+});
+
+// AU-04
+const COLLECTIONS = [
+  { handle: "empty-shelf", id: "gid://shopify/Collection/3", product_count: 0, available_count: 0 },
+  { handle: "nearly", id: "gid://shopify/Collection/4", product_count: 5, available_count: 2 },
+  { handle: "serums", id: "gid://shopify/Collection/1", product_count: 3, available_count: 3 },
+];
+await t("AU-04: starterSection binds a new product rail to the first collection with enough available products, else the first non-empty one; with none it is newSection", async () => {
+  const rail = R.starterSection("product_rail", { collections: COLLECTIONS, id: "sec_r1" });
+  deq(rail.settings.collection, { handle: "serums", id: "gid://shopify/Collection/1" });
+  none(validate(home([rail]), { mode: "publish" }), "a rail with a real collection publishes clean");
+  deq(R.starterSection("product_rail", { collections: COLLECTIONS.slice(0, 2), id: "sec_r1" }).settings.collection, { handle: "nearly", id: "gid://shopify/Collection/4" }, "none has enough: the first non-empty");
+  for (const collections of [undefined, null, [], [COLLECTIONS[0]], [{ handle: "Bad Handle", product_count: 9 }]]) {
+    deq(R.starterSection("product_rail", { collections, id: "sec_r1" }), R.newSection("product_rail", { id: "sec_r1" }), `collections ${JSON.stringify(collections)}:`);
+  }
+  // every other kind is its newSection: text kinds stay incomplete with their placeholder
+  for (const kind of R.sectionKinds()) {
+    if (kind === "product_rail") continue;
+    const s = R.starterSection(kind, { collections: COLLECTIONS, id: "sec_k1" });
+    deq(s, R.newSection(kind, { id: "sec_k1" }), `${kind}:`);
+    const d = R.sectionType(kind);
+    if (d.startsIncomplete) {
+      ok(d.placeholder, `${kind} has a placeholder`);
+      const r = validate(R.fixtureDocument(d.documentTypes[0], [s]), { mode: "publish" });
+      ok(!r.ok || kind === "product_rail", `${kind}: a starter that starts incomplete must not publish as it is`);
+    }
+  }
+  let threw = false;
+  try {
+    R.starterSection("carousel");
+  } catch {
+    threw = true;
+  }
+  ok(threw, "an unknown kind is a bug");
+});
+
+// ---- AU-02: every message is a plain sentence --------------------------------------------
+
+// Bad values for each setting kind, so every check of lib/registry/settings.js
+// speaks at least once.
+const ok1 = { type: "url", href: "/" };
+function badValues(s) {
+  const long = (n) => "x".repeat(n);
+  switch (s.kind) {
+    case "text":
+      return [42, ...(s.max != null ? [long(s.max + 5)] : []), ...(s.softMax != null ? [long(s.softMax + 1)] : [])];
+    case "number":
+      return ["5", 1.5, (s.min ?? 0) - 1, (s.max ?? 10) + 1];
+    case "boolean":
+      return ["yes"];
+    case "choice":
+      return ["nope"];
+    case "rich_text":
+      return [5, "<p>Buy 2 < 3 and save > 10%</p>", '<p><a href="ftp://x.example/a">l</a></p>', '<p>Hi</p><video src="https://x.example/v.mp4"></video>', '<p>Hi</p><img srcset="https://x.example/a.avif 1x" alt="a">', ...(s.max != null ? [`<p>${long(s.max)}</p>`] : [])];
+    case "paragraphs":
+      return ["x", [5], [long((s.maxEach ?? 10) + 1)], Array.from({ length: (s.max ?? 1) + 1 }, () => "p")];
+    case "qa_list":
+      return ["x", [5], [{ q: "", a: "", z: 1 }], [{ q: long(301), a: "<p>a</p>" }], [{ q: "Q", a: 5 }], [{ q: "Q", a: "<p>2 < 3 and > 1</p>" }], Array.from({ length: (s.max ?? 1) + 1 }, () => ({ q: "Q", a: "<p>A</p>" }))];
+    case "link":
+      return [5, { type: "ftp" }, { type: 5 }, { type: "url" }, { type: "url", href: "https://evil.example" }, { type: "collection", handle: "Bad Handle" }, { type: "product", handle: "x", id: 5 }, { type: "page", slug: "Bad!", family: "nope", document: 5 }, { type: "url", href: "/", extra: 1 }];
+    case "cta":
+      return [5, { label: long(41), link: null }, { label: "Go" }, { link: ok1 }, { label: "Go", link: { type: "url", href: "https://evil.example" } }, { label: "Go", link: ok1, z: 1 }];
+    case "image":
+      return [5, { media: 5, alt: "a" }, { media: "http://x.example/a.jpg", alt: "a" }, { media: `/${long(600)}`, alt: "a" }, { media: "/a.jpg" }, { media: "/a.jpg", alt: long(301) }, { media: "/a.jpg", alt: "a", z: 1 }];
+    case "collection":
+    case "product":
+      return [5, { handle: "Bad" }, { handle: "x", id: 5 }, { handle: "x", z: 1 }];
+    case "collection_list":
+    case "product_list":
+      return [5, [5], [{ handle: "Bad" }], Array.from({ length: (s.max ?? 1) + 1 }, (_, j) => ({ handle: `h${j}` }))];
+    case "nav_items":
+      return [
+        5,
+        [5],
+        [{ label: "", link: null }],
+        [{ label: long(41), link: { type: "url", href: "/admin" } }],
+        [{ label: "a", link: ok1, children: 5 }],
+        [{ label: "a", link: ok1, children: Array.from({ length: 9 }, () => ({ label: "b", link: ok1 })) }],
+        [{ label: "a", link: ok1, children: [{ label: "b", link: ok1, children: [] }] }],
+        [{ label: "a", link: ok1, z: 1 }],
+        Array.from({ length: (s.max ?? 1) + 1 }, () => ({ label: "a", link: ok1 })),
+      ];
+    case "brand":
+      return [5, { accent: "lime" }, { background: "nope", foreground: "nope" }, { radius: "huge" }, { type_scale: "x" }, { button_shape: "x" }, { section_spacing: "x" }, { z: 1 }];
+    case "theme":
+      return [5, { kit: "nope", version: 1 }, { kit: "pulse", version: 1, z: 1 }];
+    case "entries":
+      return [5];
+    default:
+      throw new Error(`no bad values for the setting kind "${s.kind}": add them here`);
+  }
+}
+
+await t("crafted bad values for every setting kind of every section and document type, and every rules() function, are each reported", async () => {
+  const kinds = new Set();
+  for (const kind of R.sectionKinds()) {
+    const d = R.sectionType(kind);
+    for (const s of d.settings) {
+      kinds.add(s.kind);
+      for (const bad of badValues(s)) {
+        const section = sec(kind, "sec_bad1", { [s.key]: bad });
+        for (const mode of ["draft", "publish"]) validate(R.fixtureDocument(d.documentTypes[0], [section]), { mode });
+      }
+      // empty: a required setting says so
+      for (const mode of ["draft", "publish"]) validate(R.fixtureDocument(d.documentTypes[0], [sec(kind, "sec_bad1", { [s.key]: null })]), { mode });
+    }
+  }
+  for (const type of R.documentTypeNames()) {
+    const t = R.documentType(type);
+    for (const s of t.settings) {
+      kinds.add(s.kind);
+      for (const bad of badValues(s)) for (const mode of ["draft", "publish"]) validate({ ...R.emptyBody(type), settings: { ...R.emptyBody(type).settings, [s.key]: bad } }, { mode });
+    }
+  }
+  for (const k of Object.keys(R.SETTING_KINDS)) ok(kinds.has(k) || k === "number" || k === "product", `setting kind ${k} is declared somewhere`);
+  // each section rules() and document rules() function, made to speak
+  validate(home([sec("hero", "sec_h1", { title: "T", highlight: "X" })]), { mode: "draft" });
+  validate(home([sec("banner", "sec_b1", { title: "", text: "" })]), { mode: "publish" });
+  validate(home([sec("text", "sec_t1", { title: "", body: [] })]), { mode: "publish" });
+  validate(home([sec("product_rail", "sec_r1", { collection: { handle: "x" }, limit: 2 })]), { mode: "publish" });
+  validate({ schema: 1, type: "announcement", meta: {}, settings: { enabled: true, text: "", link: null } }, { mode: "publish" });
+  validate({ schema: 1, type: "footer", meta: {}, settings: { mode: "auto", items: [{ label: "a", link: ok1 }], template: "columns" } }, { mode: "publish" });
+  validate({ schema: 1, type: "design", meta: {}, settings: { brand: { accent: "#ffff00", background: "#ffffff", foreground: "#fefefe" }, theme: { kit: "pulse", version: 1 } } }, { mode: "publish" });
+  validate({ schema: 1, type: "design", meta: {}, settings: { brand: { accent: "#9ca3af", background: "#ffffff", foreground: "#0a0a0b" }, theme: { kit: "pulse", version: 1 } } }, { mode: "publish" });
+  validate(home([]), { mode: "publish" });
+  validate({ schema: 1, type: "collections_index", meta: {}, settings: { featured: [{ handle: "mugs" }], order: [], hide: [{ handle: "mugs" }] } }, { mode: "draft" });
+  // and the structure checks of validate.js that need a whole body
+  validate({ schema: 1, type: "page", meta: "x", sections: [] }, { mode: "draft" });
+  validate({ schema: 1, type: "header", meta: { x: 1 }, settings: "x" }, { mode: "draft" });
+  validate({ schema: 1, type: "page", meta: { slug: "", title: "", enabled: "yes", effective_at: "never", window_start: "2026-12-01", window_end: "2026-11-01", redirect_from: "x" }, sections: [] }, { mode: "publish" });
+  validate({ schema: 1, type: "page", meta: { slug: "a", title: "A", redirect_from: ["Bad Old"] }, sections: [{ ...sec("text", "sec_t1"), v: 0 }, { ...sec("text", "sec_t2"), v: 2 }, { ...sec("text", "sec_t3"), enabled: "x", show: "x", bindings: "x", blocks: "x", mobile: "x" }] }, { mode: "draft" });
+  validate({ schema: 1, type: "product_content", meta: {}, sections: [sec("text", "sec_t1", { title: "Care" })] }, { mode: "publish" });
+  validate(home([sec("collections", "sec_c1", {}, { bindings: { collections: { source: "every_product" } }, blocks: [{ id: "blk_a1", kind: "x" }] })]), { mode: "draft" });
+});
+
+// The codes lib/registry reports: every upper-case string literal in its files
+// (labels taken out). A code here that no check in this suite produced is a
+// message nobody has read.
+async function registryCodes() {
+  const out = new Map();
+  for (const f of (await readdir(join(root, "lib/registry"))).filter((x) => x.endsWith(".js"))) {
+    const src = (await readFile(join(root, "lib/registry", f), "utf8")).replace(/\blabel:\s*"[^"]*"/g, "").replace(/\/\/.*$/gm, "");
+    for (const m of src.matchAll(/"([A-Z][A-Z0-9_]{2,})"/g)) out.set(m[1], f);
+  }
+  return out;
+}
+export function missingCodes(codesFound, corpus) {
+  const seen = new Set(corpus.map((i) => i.code));
+  return [...codesFound.keys()].filter((c) => !seen.has(c));
+}
+
+await t("coverage: every code lib/registry/*.js can report is in this suite's corpus of issues (and the scan bites)", async () => {
+  const found = await registryCodes();
+  ok(found.size >= 40, `codes found: ${found.size}`);
+  for (const c of ["LINK_NOT_STOREFRONT", "HIGHLIGHT_NOT_IN_TITLE", "WORDS_LOST", "BRAND_HARD_TO_READ", "SLUG_INVALID", "TOO_MANY_BEFORE_PROTECTED"]) ok(found.has(c), `the scan sees ${c}`);
+  ok(!found.has("FAQ"), "labels are not codes");
+  deq(missingCodes(found, ALL), [], "codes no check here produced:");
+  // a code added to the registry with no case here is caught
+  deq(missingCodes(new Map([...found, ["NEW_CHECK_NOBODY_READ", "x.js"]]), ALL), ["NEW_CHECK_NOBODY_READ"], "the scan bites:");
+});
+
+// What a message may not say (AU-02): CTA, href, handle or slug, outside the
+// founder's own words (quoted values are taken out first).
+export const FORBIDDEN_WORDS = /\b(CTA|href|handle|slug)\b/i;
+export const withoutQuoted = (m) => m.replace(/"[^"]*"/g, '""').replace(/“[^”]*”/g, "“”");
+export const isSentence = (m) => /^["“A-Z0-9]/.test(m) && /[.!?]$/.test(m.trim()) && !/\s{2,}/.test(m);
+export const POSITIONAL = /\b(?:section|position|row|block)\s+\d+\b|Section \d+ \(/i;
+
+await t("AU-02: every message seen (worstCase, the crafted bad values, every rules() function) is a plain sentence: non-empty, no position, no CTA/href/handle/slug", async () => {
+  for (const kind of R.sectionKinds()) for (const c of R.worstCase(kind).cases) for (const mode of ["draft", "publish"]) validate(R.fixtureDocument(R.sectionType(kind).documentTypes[0], [c.section]), { mode });
+  const messages = new Map();
+  for (const i of ALL) messages.set(i.message, i.code);
+  ok(messages.size > 150, `distinct messages: ${messages.size}`);
+  const bad = [];
+  for (const [m, code] of messages) {
+    if (typeof m !== "string" || !m.trim()) bad.push(`${code}: empty`);
+    else if (!isSentence(m)) bad.push(`${code}: not a sentence: ${m}`);
+    else if (POSITIONAL.test(withoutQuoted(m))) bad.push(`${code}: names a position: ${m}`);
+    else if (FORBIDDEN_WORDS.test(withoutQuoted(m))) bad.push(`${code}: uses a code word: ${m}`);
+    else if (/\bundefined\b|\bnull\b|\[object Object\]|NaN/.test(m)) bad.push(`${code}: leaks a value: ${m}`);
+  }
+  deq(bad, [], "messages that aren't plain:");
+  // the checks bite
+  ok(!isSentence("accent must be a 6-digit hex color (e.g. #84cc16)"), "no full stop");
+  ok(FORBIDDEN_WORDS.test(withoutQuoted("The CTA has no href.")), "code words");
+  ok(!FORBIDDEN_WORDS.test(withoutQuoted('The link goes to "/collections?handle=x", which is fine.')), "a founder's quoted value is theirs");
 });
 
 await t("every issue has the DOC-04 shape and no message matches /Section \\d+ \\(/", async () => {

@@ -419,7 +419,7 @@ await t("documents: a concurrent save between the read and the write is a 409 wi
   eq((await sql("docs", "SELECT adopted_variant FROM experiments WHERE slug = 'doc-race'"))[0].adopted_variant, null, "not marked adopted:");
 });
 
-await t("documents: a draft that breaks structure is 422 with every issue and nothing stored (DOC-05: incomplete is not refused)", async () => {
+await t("documents: a draft that breaks structure is 422 with every issue and nothing stored (DOC-05: incomplete is not refused; PV-02: nor is a broken value inside a section)", async () => {
   const before = await docRow("doc_home");
   // an unknown section kind in a kit is structure: refused
   await kit("akit_bad", { home_sections: [{ kind: "carousel", title: "Spin" }] });
@@ -432,6 +432,18 @@ await t("documents: a draft that breaks structure is 422 with every issue and no
   const inc = await route("docs", "admin/experiments", { adopt: { slug: "doc-incomplete", variant: "b" } });
   eq(inc.status, 200, `incomplete draft saves: ${JSON.stringify(inc.body).slice(0, 300)}`);
   eq(heroOf(await docRow("doc_home")).settings.title, "", "stored as typed:");
+  // P3-VALIDATE (PV-02): a broken value inside a section (a banner button to
+  // another site) is "incomplete" in a draft too: the kit saves, the value is
+  // kept as sent, and publishing it is refused
+  await kit("akit_offsite", { home_sections: [{ kind: "banner", title: "Sale", text: "", label: "Shop", href: "https://evil.example/sale" }] });
+  const off = await route("docs", "partners", { kit_apply: { kit: "akit_offsite", tenant: "wd" } }, { cookies: { _agency: agentTok } });
+  eq(off.status, 200, `a kit with an off-store banner link saves: ${JSON.stringify(off.body).slice(0, 300)}`);
+  const stored = JSON.parse((await docRow("doc_home")).draft);
+  const banner = stored.sections.find((x) => x.kind === "banner");
+  eq(banner?.settings.button.link.href, "https://evil.example/sale", "kept as sent:");
+  const draftIssue = R.validateDocument(stored, { mode: "draft" }).issues.find((i) => i.code === "LINK_NOT_STOREFRONT");
+  eq([draftIssue?.sectionId, draftIssue?.severity], [banner.id, "incomplete"], "incomplete in the draft:");
+  eq(R.validateDocument(stored, { mode: "publish" }).issues.find((i) => i.code === "LINK_NOT_STOREFRONT")?.severity, "error", "an error at publish:");
 });
 
 await t("'migrating': adopt, insight apply and agency kit apply refuse with 409 STORE_USES_DOCUMENTS and write nothing", async () => {
