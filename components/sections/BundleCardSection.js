@@ -16,7 +16,9 @@ import { settingsOf, MediaFallback } from "./parts";
 //                        "No longer available" (as the bundle page marks
 //                        them), the button says "Currently unavailable" and
 //                        is off
-//   no_saving            hidden (OQ-B, the owner's answer of 2026-11-05)
+//   no_saving            hidden (OQ-B, the owner's answer of 2026-11-05), and
+//                        so is any bundle whose reasons include no_saving,
+//                        even when its state is sold_out or not_ready
 //   disabled, missing    hidden (no entry at all counts as missing)
 // When it is hidden, hiddenReason gives the founder the bundle-words sentence
 // (components/sections/index.js hiddenNote shows it in a documents preview
@@ -26,15 +28,24 @@ import { settingsOf, MediaFallback } from "./parts";
 // The add button is components/BundleAddButton.js with the props the bundle
 // page gives it: per product only variantId, quantity and available.
 
-// The states a shopper sees a bundle in.
+// The states a shopper may see a bundle in. A bundle that saves nothing is
+// hidden whatever its state says: bundle-compat ranks sold_out and not_ready
+// above no_saving, so a bundle with a sold-out product AND no saving has state
+// sold_out, and its reasons are what tell (OQ-B, fix round 1).
 export const SHOWN_STATES = Object.freeze(["available", "sold_out", "not_ready"]);
-export const isShown = (b) => b !== null && typeof b === "object" && SHOWN_STATES.includes(b.state);
+const reasonsOf = (b) => (Array.isArray(b?.reasons) ? b.reasons : []);
+export const savesNothing = (b) => reasonsOf(b).some((r) => r?.kind === "no_saving");
+export const isShown = (b) => b !== null && typeof b === "object" && SHOWN_STATES.includes(b.state) && !savesNothing(b);
 
 // Why a bundle is not shown (or "" when it is), in bundle-words' sentences.
+// Turned off and deleted keep their own words; any other hidden bundle that
+// saves nothing gets the no-saving words.
 export function bundleReason(b) {
   if (isShown(b)) return "";
   if (b === null || typeof b !== "object" || typeof b.state !== "string") return stateLine("missing");
-  return stateLine(b.state, Array.isArray(b.reasons) ? b.reasons : [], { currency: b.currency ?? undefined }) || stateLine("missing");
+  const opts = { currency: b.currency ?? undefined };
+  if (b.state !== "disabled" && b.state !== "missing" && savesNothing(b)) return stateLine("no_saving", reasonsOf(b), opts);
+  return stateLine(b.state, reasonsOf(b), opts) || stateLine("missing");
 }
 
 // What BundleAddButton gets for each product: the bundle page's props, no more.

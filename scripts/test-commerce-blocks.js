@@ -210,6 +210,10 @@ await inT(async () => {
   // the overlap pair (plan C1-2): A = {v7, v8} at 180, B = {v7, v8, v9} at 200, both on
   K.ovA = (await B.upsertBundle({ slug: "pair-a", title: "Pair A", items: items(7, 8), bundle_price: 180, enable: true })).id;
   K.ovB = (await B.upsertBundle({ slug: "pair-b", title: "Pair B", items: items(7, 8, 9), bundle_price: 200, enable: true })).id;
+  // fix round 1: a bundle that saves nothing AND has a sold-out product, and one
+  // that saves nothing AND is not ready (OQ-B: both hidden from shoppers)
+  K.soldNosave = (await B.upsertBundle({ slug: "dear-sold", title: "Dear sold", items: items(10, 11), bundle_price: 2000, enable: true })).id; // 2100 -> 2000
+  K.notreadyNosave = (await B.upsertBundle({ slug: "dear-half", title: "Dear half", items: items(12, 13), bundle_price: 2400, enable: true })).id; // 2500 -> 2400
 });
 K.missing = "bun-deleted0";
 // the catalog moves under them: every price in USD; v3 sells out; v5 gets
@@ -219,6 +223,12 @@ await raw("UPDATE products SET currency = 'USD'");
 await raw("UPDATE variants SET available = 0 WHERE id = ?", [V(3)]);
 await raw("UPDATE variants SET price = 100 WHERE id = ?", [V(5)]);
 await raw("DELETE FROM offers WHERE id = ?", [`bundle-${K.notready}`]);
+// dear-sold: v10 sells out and v11 gets cheap (1000 + 100 = 1100 < 2000);
+// dear-half: its offer row disappears and v13 gets cheap (1200 + 100 = 1300 < 2400)
+await raw("UPDATE variants SET available = 0 WHERE id = ?", [V(10)]);
+await raw("UPDATE variants SET price = 100 WHERE id = ?", [V(11)]);
+await raw("UPDATE variants SET price = 100 WHERE id = ?", [V(13)]);
+await raw("DELETE FROM offers WHERE id = ?", [`bundle-${K.notreadyNosave}`]);
 
 const card = (id, bundleId, title = "") => ({ id, kind: "bundle_card", v: 1, enabled: true, settings: { title, bundle: bundleId ? { id: bundleId } : null }, blocks: [] });
 const grid = (id, ids, title = "Our bundles") => ({ id, kind: "bundle_grid", v: 1, enabled: true, settings: { title, bundles: ids.map((x) => ({ id: x })) }, blocks: [] });
@@ -350,6 +360,50 @@ await t("a mixed grid (available, sold out, turned off, deleted, no saving) show
   // the order in preview: note, sold, note, available, note
   const order = [...pv.matchAll(/data-bundle="([^"]+)"|data-bundle-cell="(\d+)"/g)].map((m) => m[1] || `note${m[2]}`);
   same(order, ["note0", K.sold, "note2", K.avail, "note4"], "preview order:");
+});
+
+await t("fix round 1 (OQ-B): a bundle that saves nothing is hidden even when it is also sold out or not ready, as a card and as a grid cell, live and in preview, with the no-saving words", async () => {
+  const data0 = await dataOf([grid("sec_x0", [K.soldNosave, K.notreadyNosave])]);
+  const [so, nr] = data0.get("sec_x0").bundles;
+  eq(so.state, "sold_out", "dear-sold state:");
+  same(so.reasons.map((r) => r.kind), ["sold_out", "no_saving"], "dear-sold reasons:");
+  eq(nr.state, "not_ready", "dear-half state:");
+  ok(nr.reasons.some((r) => r.kind === "not_synced") && nr.reasons.some((r) => r.kind === "no_saving"), `dear-half reasons: ${JSON.stringify(nr.reasons)}`);
+  const cases = [
+    ["sec_x1", K.soldNosave, "Dear sold", USD(1100)],
+    ["sec_x2", K.notreadyNosave, "Dear half", USD(1300)],
+  ];
+  for (const [id, bundle, title, sum] of cases) {
+    const s = card(id, bundle);
+    const data = await dataOf([s]);
+    const r = await both([s], data);
+    eq(r.live, "", `${title} card live:`);
+    const why = `The price no longer saves anything (the products add up to ${sum}), so shoppers don't see it. Lower the price in Catalog > Bundles.`;
+    eq(BW.stateLine("no_saving", data.get(id).bundle.reasons, { currency: "USD" }), why, `${title} words:`);
+    const p = words(r.preview);
+    ok(p.includes(why) && p.includes("Bundle card: hidden from shoppers") && p.includes('data-hidden-reason=""'), `${title} card preview: ${p.slice(0, 800)}`);
+    ok(!/Currently unavailable|Add the set to cart|data-bundle-state/.test(r.preview), `${title} card preview shows the card`);
+  }
+  // as grid cells, beside an available bundle (so the grid shows)
+  const s = grid("sec_x3", [K.soldNosave, K.avail, K.notreadyNosave]);
+  const data = await dataOf([s]);
+  const r = await both([s], data);
+  const live = sectionOf(r.live, "sec_x3");
+  ok(live, "live: the grid shows (its available cell)");
+  same([...live.matchAll(/data-bundle="([^"]+)" data-bundle-state="([^"]+)"/g)].map((m) => [m[1], m[2]]), [[K.avail, "available"]], "live cells:");
+  ok(!/Dear sold|Dear half|Currently unavailable|data-founder-note|no longer saves/.test(live), `live: a hidden cell left a trace: ${live}`);
+  const pv = words(sectionOf(r.preview, "sec_x3"));
+  const notes = [...pv.matchAll(/<div data-founder-note="" data-bundle-cell="(\d+)" data-hidden-reason=""[^>]*>([\s\S]*?)<\/div>/g)].map((m) => [Number(m[1]), m[2]]);
+  same(notes.map((n) => n[0]), [0, 2], "preview: a note for each no-saving cell:");
+  ok(notes[0][1].includes("Dear sold: hidden from shoppers") && notes[0][1].includes(`(the products add up to ${USD(1100)}), so shoppers don't see it`), `dear-sold note: ${notes[0][1]}`);
+  ok(notes[1][1].includes("Dear half: hidden from shoppers") && notes[1][1].includes(`(the products add up to ${USD(1300)}), so shoppers don't see it`), `dear-half note: ${notes[1][1]}`);
+  ok(!/Currently unavailable/.test(pv.replace(/<div data-bundle="[^"]*" data-bundle-state="available"[\s\S]*/, "")), "preview: a no-saving cell rendered as a card");
+  // a grid of only these two is hidden, with the no-results words
+  const s2 = grid("sec_x4", [K.soldNosave, K.notreadyNosave]);
+  const r2 = await both([s2], await dataOf([s2]));
+  eq(r2.live, "", "all-hidden grid live:");
+  const p2 = words(r2.preview);
+  ok(p2.includes(BW.gridEmptyLine()) && p2.includes("Dear sold: The price no longer saves anything") && p2.includes("Dear half: The price no longer saves anything"), `all-hidden grid preview: ${p2.slice(0, 900)}`);
 });
 
 // =====================================================================================

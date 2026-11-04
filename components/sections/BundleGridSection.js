@@ -10,9 +10,9 @@ import { BundleBox, isShown, bundleReason } from "./BundleCardSection";
 // Each cell follows the bundle card's rule (BundleCardSection.js):
 //   available, sold_out, not_ready   a cell (sold-out and not-ready ones say
 //                                    "Currently unavailable", add off)
-//   no_saving, disabled, missing     no cell for shoppers; in a documents
-//                                    preview only, a founder note in its place
-//                                    with that bundle's reason
+//   no_saving, disabled, missing,    no cell for shoppers; in a documents
+//   or any whose reasons hold        preview only, a founder note in its place
+//   no_saving (isShown)              with that bundle's reason
 // The grid shows when at least one cell does. When none does, it is hidden,
 // and hiddenReason tells the founder "None of the bundles in this grid can be
 // shown, so shoppers don't see it." followed by each bundle's reason.
