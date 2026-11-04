@@ -173,6 +173,16 @@ No staging tool was written: it would send writes to a hosted store, which build
 - **`serve-copy` lives in `runbook.mjs`** (this item's file) rather than a `scripts/` command with a package script: `package.json` is SCAFFOLD's. If the orchestrator wants `pnpm serve:copy`, that is a SCAFFOLD-owned change.
 - **Run time**: the full run is about 12 (in-process stages) plus 9 (item drills) minutes; each moved-store stage does its own rehearsal and move (about a minute).
 
+From review:
+
+- The earlier blocker is fixed at 5b16fb5. Runbook 0.3 (docs/cms-reviews/P4-CUTOVER-RUNBOOK.md lines 23-27) again treats only the in-batch words, MIGRATING_MESSAGE "Your store is being updated. Try again in a few minutes." (lib/cms-mode.js:166), as proof. It says an ordinary save is refused before any batch with the pre-check's words (lib/cms-mode.js:61) and must not be ticked on those. It marks 0.3 as an open owner/orchestrator decision: (a) a staging-only script or (b) accept the file-DB/sqld proof. No real move happens before the decision. MANUAL-CHECKS.md (P4-GUARD note at line 511 and the batch 7 line at 748) says the same.
+- I checked the new `runbook.mjs --check` against two changes to the runbook. Putting back the dbc27f2 runbook makes 4 of its 6 checks fail. Accepting either set of words in 0.3 makes 2 checks fail. Both changes were caught, and the check passes 6 of 6 on 5b16fb5.
+- pnpm test passed 96 of 96 suites in 187.6 s on 5b16fb5 in a fresh worktree. The fix round touched no app, lib or component code, and only one drill script (scripts/drills/p4/runbook.mjs).
+- results-runbook.json was not run again after the fix round, so it still has the old check label "runbook 8 (and 0.3)". The 0.3 entry in runbook-steps.json was corrected by hand and marked correctedBy. Both are disclosed in Known limits, and the measured result is unchanged: a 409 with the pre-check's words and nothing saved. Run the runbook stage again together with the FIX6 re-run.
+- `runbook.mjs --check` is not part of pnpm test, because package.json is owned by P4-SCAFFOLD. The orchestrator may want to add it so the 0.3 wording stays guarded.
+- MANUAL-CHECKS.md lines 664 and 714 (the CUTOVER and REVERSE sections) still just say "hosted Turso batch atomicity (runbook step 0.3)". That is fine, since 0.3 itself now carries the open decision, but anyone reading only those lines will not see that 0.3 is blocked on a decision.
+- Acceptance 4 is now marked "DONE, except 0.3 (open decision)". 0.3 is a staging step with no harness equivalent, so the exception is stated honestly and is not a false acceptance claim.
+
 ## Owner checks
 
 All are in `MANUAL-CHECKS.md`, "Phase 4, batch 7":
