@@ -1,0 +1,222 @@
+{
+  "item": "P4-EQUIV",
+  "harness": {
+    "web": "http://localhost:6140",
+    "sqld": "7140-7142",
+    "seed": "seed-design-documents.js --p4 (legacy store, live v3 release)",
+    "server": "next dev"
+  },
+  "routeList": {
+    "made": "node scripts/migrate-render.mjs --make-routes <file> --tenant design",
+    "count": 75,
+    "canaries": [
+      {
+        "path": "/",
+        "why": "home"
+      },
+      {
+        "path": "/policies/affiliate-program",
+        "why": "a page"
+      },
+      {
+        "path": "/journal/creatine-guide-14",
+        "why": "a journal post"
+      },
+      {
+        "path": "/journal",
+        "why": "the journal list"
+      },
+      {
+        "path": "/campaigns/festive-gifting",
+        "why": "a campaign"
+      },
+      {
+        "path": "/journal/protein-myths-1",
+        "why": "an old address that moved"
+      },
+      {
+        "path": "/products/micronised-creatine-12",
+        "why": "a product with modules, pairs or a template"
+      },
+      {
+        "path": "/collections/protein",
+        "why": "a collection with pinned products"
+      },
+      {
+        "path": "/collections",
+        "why": "the collections list"
+      },
+      {
+        "path": "/checkout",
+        "why": "the cart (empty: no cart cookie is sent)"
+      },
+      {
+        "path": "/api/upsell",
+        "why": "the cart offer the cart drawer shows"
+      },
+      {
+        "path": "/search?q=micronised",
+        "why": "search"
+      }
+    ],
+    "products": 59,
+    "collections": 4
+  },
+  "runs": [
+    {
+      "label": "unchanged store, two captures",
+      "what": "75 routes captured twice, no change",
+      "before": "capA",
+      "after": "capB",
+      "compared": 75,
+      "same": true,
+      "exit": 0,
+      "differences": [],
+      "allowedApplied": []
+    },
+    {
+      "label": "unchanged store after the drills were undone",
+      "what": "75 routes, after every drill change was restored",
+      "before": "capA",
+      "after": "capE",
+      "compared": 75,
+      "same": true,
+      "exit": 0,
+      "differences": [],
+      "allowedApplied": []
+    },
+    {
+      "label": "changed product title",
+      "what": "products.title of the chosen product set to 'Micronised Creatine Plus' (restored after)",
+      "before": "capA2",
+      "after": "capC",
+      "compared": 2,
+      "same": false,
+      "exit": 1,
+      "differences": [
+        {
+          "route": "/products/micronised-creatine-12",
+          "selector": "html > head > meta:nth-of-type(9)",
+          "before": "content=\"Micronised Creatine\"",
+          "after": "content=\"Micronised Creatine Plus\""
+        },
+        {
+          "route": "/products/micronised-creatine-12",
+          "selector": "html > head > meta:nth-of-type(10)",
+          "before": "content=\"Micronised Creatine\"",
+          "after": "content=\"Micronised Creatine Plus\""
+        },
+        {
+          "route": "/products/micronised-creatine-12",
+          "selector": "html > head > title > text()",
+          "before": "Micronised Creatine · Design Demo Co",
+          "after": "Micronised Creatine Plus · Design Demo Co"
+        },
+        {
+          "route": "/products/micronised-creatine-12",
+          "selector": "html > body > main > div > nav > span:nth-of-type(2) > text()",
+          "before": "Micronised Creatine",
+          "after": "Micronised Creatine Plus"
+        },
+        {
+          "route": "/products/micronised-creatine-12",
+          "selector": "html > body > main > div > div[data-pdp-template=\"editorial\"] > div:nth-of-type(1) > h1 > text()",
+          "before": "Micronised Creatine",
+          "after": "Micronised Creatine Plus"
+        }
+      ],
+      "allowedApplied": []
+    },
+    {
+      "label": "missing module",
+      "what": "the live release's override for the chosen product without its 2nd module (restored after)",
+      "before": "capA2",
+      "after": "cap-modules",
+      "compared": 2,
+      "same": false,
+      "exit": 1,
+      "differences": [
+        {
+          "route": "/products/micronised-creatine-12",
+          "selector": "html > body > main > div > div[data-pdp-template=\"editorial\"] > div:nth-of-type(2) > div > div[data-sec=\"pdp-modules\"] > details:nth-of-type(2)",
+          "before": "<details class=\"group py-3\"> <summary class=\"flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-sf-text-soft [&amp;::-webkit-details-marker]:hidden\"> Ingredients <span class=\"text-sf-text-faint transition group-open:rotate-45\"> + </span> </summary> <div class=\"rte …",
+          "after": null
+        }
+      ],
+      "allowedApplied": []
+    },
+    {
+      "label": "reordered pair",
+      "what": "the chosen product's first two pairs swapped in the live release (restored after)",
+      "before": "capA2",
+      "after": "cap-pairs",
+      "compared": 2,
+      "same": false,
+      "exit": 1,
+      "differences": [
+        {
+          "route": "/products/micronised-creatine-12",
+          "selector": "html > body > main > div > div[data-pdp-template=\"editorial\"] > section[data-sec=\"pdp-pairs\"] > div",
+          "before": "in this order: Vegan Omega ₹979 | -20% Muesli ₹619 ₹774 | Protein Coffee ₹3,919",
+          "after": "in this order: -20% Muesli ₹619 ₹774 | Vegan Omega ₹979 | Protein Coffee ₹3,919"
+        }
+      ],
+      "allowedApplied": []
+    },
+    {
+      "label": "different template",
+      "what": "the chosen product's template exception editorial -> classic in the live release (restored after)",
+      "before": "capA2",
+      "after": "cap-template",
+      "compared": 2,
+      "same": false,
+      "exit": 1,
+      "differences": [
+        {
+          "route": "/products/micronised-creatine-12",
+          "selector": "html > head > link:nth-of-type(1)",
+          "before": "fetchpriority=\"high\"",
+          "after": "(no such attribute)"
+        },
+        {
+          "route": "/products/micronised-creatine-12",
+          "selector": "html > body > main > div > div[data-pdp-template=\"editorial\"]",
+          "before": "<div data-pdp-template=\"editorial\"> <img alt=\"Micronised Creatine, photo 1\" class=\"aspect-[16/7] w-full rounded-brand object-cover\" fetchpriority=\"high\" src=\"/api/media/med_ae5f4af4b10aec0b01\"> <div class=\"mx-auto mt-8 max-w-2xl text-center\"> <p class=\"flex items-center gap-2 text-sm font-semibold u…",
+          "after": "<div data-pdp-template=\"classic\"> <div class=\"grid gap-8 lg:grid-cols-2 lg:gap-12\"> <div class=\"lg:sticky lg:top-28\"> <div class=\"relative aspect-square w-full overflow-hidden rounded-sf-card bg-sf-surface-sunken\"> <img alt=\"Micronised Creatine, photo 1\" class=\"object-cover transition duration-500 o…"
+        }
+      ],
+      "allowedApplied": []
+    }
+  ],
+  "hero": {
+    "label": "two cookie-less visits to / that got different hero variants (hero-promise running)",
+    "strictSame": false,
+    "strictDifferences": [
+      {
+        "route": "/",
+        "selector": "html > body > main > div > section[data-sec=\"hero\"] > div:nth-of-type(2) > h1 > span > text()",
+        "before": "Winter repair",
+        "after": "14 days"
+      },
+      {
+        "route": "/",
+        "selector": "html > body > main > div > section[data-sec=\"hero\"] > div:nth-of-type(2) > h1 > text()",
+        "before": ", started.",
+        "after": "Visibly brighter in"
+      },
+      {
+        "route": "/",
+        "selector": "html > body > main > div > section[data-sec=\"hero\"] > div:nth-of-type(2) > p:nth-of-type(2) > text()",
+        "before": "The night-cream routine your skin asked for in October.",
+        "after": "Or your money back."
+      }
+    ],
+    "withAllowedSame": true,
+    "allowedApplied": [
+      {
+        "route": "/",
+        "id": "hero-test-variant"
+      }
+    ]
+  }
+}
