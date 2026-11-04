@@ -952,6 +952,47 @@ await t("PUT /api/admin/media (usage preview): a failing document scan answers a
   ok(!("usage" in r.body), "no usage list that could read as 'not used':");
 });
 
+// --- P5-SETTING: bundle refs (COM-02) --------------------------------------------------------
+console.log("— bundle references (P5-SETTING)");
+await t("P5-SETTING: a section's bundle and bundle-list settings write document_refs rows ('bundle', <id>); a /bundles/<slug> link still writes ('bundle', <slug>)", async () => {
+  // a throwaway kind (P5-BLOCKS declares the real bundle_card and bundle_grid)
+  R.defineSection({
+    kind: "zz_bundlerefs",
+    label: "Bundle refs probe",
+    documentTypes: ["home"],
+    settings: [
+      { key: "bundle", kind: "bundle", label: "Bundle", default: null },
+      { key: "bundles", kind: "bundle_list", label: "Bundles to show", default: [] },
+    ],
+  });
+  const Refs = await import("../lib/documents/refs.js");
+  const versionId = "ver_p5setting_refs";
+  try {
+    const body = {
+      ...R.emptyBody("home"),
+      sections: [
+        { ...R.newSection("zz_bundlerefs", { id: "sec_bref1" }), settings: { bundle: { id: "bun-0a1b2c3d" }, bundles: [{ id: "bnd_p1c" }, { id: "bun-ffee01" }, { id: "bun-0a1b2c3d" }] } },
+        { ...R.newSection("banner", { id: "sec_bref2" }), settings: { ...R.newSection("banner").settings, title: "Kits", button: { label: "See the kit", link: { type: "url", href: "/bundles/gym-kit?ref=home" } } } },
+      ],
+    };
+    ok(R.validateDocument(body, { mode: "publish" }).ok, "the body publishes:");
+    // the rows the publish batch writes for a version (lib/documents/build.js
+    // refRows, inserted by commit.js), into this store's real document_refs
+    for (const st of Refs.refInsertStatements(Refs.refRows(versionId, body))) await raw.docs.execute(st);
+    const rows = await sql("SELECT ref_type, ref_id FROM document_refs WHERE version_id = ? ORDER BY ref_type, ref_id", [versionId]);
+    eq(
+      rows.filter((r) => r.ref_type === "bundle").map((r) => r.ref_id),
+      ["bnd_p1c", "bun-0a1b2c3d", "bun-ffee01", "gym-kit"],
+      "bundle rows (ids for the settings, the slug for the link, one row per bundle):",
+    );
+    // and the index reads them back by target, as the reference reads do
+    eq((await sql("SELECT version_id FROM document_refs WHERE ref_type = 'bundle' AND ref_id = ?", ["bun-ffee01"])).map((r) => r.version_id), [versionId], "found by bundle id:");
+  } finally {
+    R.removeSection("zz_bundlerefs");
+    await raw.docs.execute({ sql: "DELETE FROM document_refs WHERE version_id = ?", args: [versionId] });
+  }
+});
+
 // --- the write guard -----------------------------------------------------------------------
 console.log("— one writer");
 const WRITE_RE = /\b(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE|DELETE\s+FROM|REPLACE\s+INTO)\s+["'`]?(documents|document_versions|publish_log)\b|\b(?:insertInto|updateTable|deleteFrom|replaceInto)\(\s*["'`](documents|document_versions|publish_log)["'`]/i;

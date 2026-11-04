@@ -511,6 +511,39 @@ await t("P3-FIX1: a stored accent_label the founder did not set (equal to the on
 
 // ---- acceptance 6: edge-safe ---------------------------------------------------------
 
+// P5-SETTING (COM-02): bundles chosen by id read as what happened to them,
+// with no id and no title.
+await t("P5-SETTING: a bundle setting and a bundle list give 'added a bundle', 'removed a bundle', 'changed the bundle', counted list rows and 'reordered the bundles', never an id", async () => {
+  R.defineSection({
+    kind: "zz_bundlediff",
+    label: "Bundle grid probe",
+    documentTypes: ["home"],
+    settings: [
+      { key: "bundle", kind: "bundle", label: "Bundle", default: null },
+      { key: "bundles", kind: "bundle_list", label: "Bundles to show", default: [] },
+    ],
+  });
+  try {
+    const b = (settings) => home([sec("zz_bundlediff", "sec_bd1", settings)]);
+    const row = (from, to) => words(diffBodies("home", b(from), b(to)));
+    const A = { id: "bun-aaa" };
+    const B = { id: "bun-bbb" };
+    const C = { id: "bnd_ccc" };
+    eq(row({ bundles: [A] }, { bundles: [A, B] }), ["Bundle grid probe: added a bundle"], "list add:");
+    eq(row({ bundles: [A, B, C] }, { bundles: [A] }), ["Bundle grid probe: removed 2 bundles"], "list remove:");
+    eq(row({ bundles: [A, B] }, { bundles: [A, C] }), ["Bundle grid probe: changed a bundle"], "list swap:");
+    eq(row({ bundles: [A, B] }, { bundles: [B, A] }), ["Bundle grid probe: reordered the bundles"], "list reorder:");
+    eq(row({ bundle: null }, { bundle: A }), ["Bundle grid probe: added a bundle"], "pick:");
+    eq(row({ bundle: A }, { bundle: null }), ["Bundle grid probe: removed a bundle"], "unpick:");
+    eq(row({ bundle: A }, { bundle: B }), ["Bundle grid probe: changed the bundle"], "change:");
+    eq(row({ bundle: null, bundles: [A] }, { bundle: B, bundles: [] }), ["Bundle grid probe: added a bundle, removed a bundle"], "both:");
+    for (const w of [...row({ bundles: [A] }, { bundles: [B, C] }), ...row({ bundle: A }, { bundle: C })]) ok(!/bun-|bnd_|\bid\b/.test(w), `no id in ${w}`);
+    eq(D.__diffInternals.ITEM_NOUNS.bundle_list, "bundle", "the item noun:");
+  } finally {
+    R.removeSection("zz_bundlediff");
+  }
+});
+
 await t("lib/documents/diff.js imports no node: API, directly or through what it imports (edge guard list)", async () => {
   const BUILTINS = /^(?:node:|fs$|path$|os$|crypto$|child_process$|url$|util$|stream$|buffer$|http$|https$|net$|zlib$|events$)/;
   const FORBIDDEN = /^(?:react(?:-dom)?(?:\/|$)|next(?:\/|$))/;
