@@ -375,10 +375,17 @@ export function createDocumentStore({
     const sentSeq = seq;
     const out = outgoing(body);
     const r = await api.call("saveDraft", { id, body: out.body }, { revision });
-    if (disposed) return r;
+    if (disposed) {
+      // P3-FIX3: a late answer after the tab closed. When it saved everything
+      // typed (nothing after it), this tab's own backups are on the server
+      // now: clear them, so the next open doesn't offer saved text.
+      if (r.ok && seq === sentSeq && !out.held) clearOwnKeys();
+      return r;
+    }
     if (r.ok && isObj(r.data?.document)) {
       const d = r.data.document;
       adopt(d);
+      await dropOfferIfSaved();
       ackedSeq = sentSeq;
       // nothing typed since: the server's body (sanitized, ids stamped) is
       // the local body. An address held back stays as the founder typed it.
@@ -754,7 +761,10 @@ export function createDocumentStore({
       found = null;
     }
     if (found) {
-      const same = (await hashOf(found.body)) === draftHash && draftHash != null;
+      // P3-FIX3: text the server already holds, as the draft or as the live
+      // version, is not offered as "edits that weren't saved"
+      const h = await hashOf(found.body);
+      const same = h != null && ((draftHash != null && h === draftHash) || (doc.publishedHash != null && h === doc.publishedHash));
       if (same) {
         try {
           storage.removeItem(found.key);
@@ -795,6 +805,32 @@ export function createDocumentStore({
     emit();
     return r;
   }
+  // P3-FIX3: this tab's own backup keys, removed (a late answer after dispose).
+  function clearOwnKeys() {
+    if (!storage) return;
+    for (const k of [...ownKeys]) {
+      try {
+        storage.removeItem(k);
+      } catch {
+        /* nothing */
+      }
+      ownKeys.delete(k);
+    }
+  }
+  // P3-FIX3: an offered backup whose text the server now holds (this tab just
+  // saved the same body) is no longer "edits that weren't saved": it goes.
+  async function dropOfferIfSaved() {
+    if (!backupOffer || draftHash == null) return;
+    const offer = backupOffer;
+    if ((await hashOf(offer.body)) !== draftHash || backupOffer !== offer) return;
+    try {
+      storage?.removeItem(offer.key);
+    } catch {
+      /* nothing */
+    }
+    backupOffer = null;
+  }
+
   function dismissBackup() {
     if (!backupOffer) return;
     try {

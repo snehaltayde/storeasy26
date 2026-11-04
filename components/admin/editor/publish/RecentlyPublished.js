@@ -16,12 +16,14 @@ import { WORDS, createUndoFlow, recentGroupsOf } from "./publishModel";
 //   call        documentsApi.call or the store's wrapper (undo, undoSet)
 //   editorHref(documentId)   the link to a row's page in the editor (optional)
 //   onUndone(outcome, target), onDocument(doc), onOpenEarlierVersions
+//   access      { canPublish, reason }: staff see Undo disabled with the
+//               reason (P3-FIX3; the server refuses them too)
 //   timeZone    for the times (optional)
 //   flow        an existing createUndoFlow() (tests)
 
-export function RecentlyPublishedView({ groups, state, onUndo, onConfirm, onCancel, editorHref = null, onOpenEarlierVersions }) {
+export function RecentlyPublishedView({ groups, state, access = null, onUndo, onConfirm, onCancel, editorHref = null, onOpenEarlierVersions }) {
   const active = state?.target || null;
-  const undoBlock = (target) => <UndoNoticeView state={active === target ? state : { phase: "idle" }} target={target} onStart={() => onUndo(target)} onConfirm={onConfirm} onCancel={onCancel} onOpenEarlierVersions={onOpenEarlierVersions} />;
+  const undoBlock = (target) => <UndoNoticeView state={active === target ? state : { phase: "idle" }} target={target} access={access} onStart={() => onUndo(target)} onConfirm={onConfirm} onCancel={onCancel} onOpenEarlierVersions={onOpenEarlierVersions} />;
   if (!groups.length) return <p className="text-[13px] text-fg-muted">{WORDS.recentEmpty}</p>;
   return (
     <ul className="space-y-3" aria-label="Recently published" data-recently-published="">
@@ -60,14 +62,15 @@ export function RecentlyPublishedView({ groups, state, onUndo, onConfirm, onCanc
   );
 }
 
-export default function RecentlyPublished({ rows, call, editorHref, onUndone, onDocument, onOpenEarlierVersions, timeZone, flow: given }) {
+export default function RecentlyPublished({ rows, call, access = null, editorHref, onUndone, onDocument, onOpenEarlierVersions, timeZone, flow: given }) {
   const groups = useMemo(() => recentGroupsOf(rows, { timeZone }), [rows, timeZone]);
-  const flow = useMemo(() => given || createUndoFlow({ call, onDocument, onUndone }), [given]); // eslint-disable-line react-hooks/exhaustive-deps
+  const flow = useMemo(() => given || createUndoFlow({ call, onDocument, onUndone, access }), [given]); // eslint-disable-line react-hooks/exhaustive-deps
   const state = useSyncExternalStore(flow.subscribe, flow.getState, flow.getState);
   return (
     <RecentlyPublishedView
       groups={groups}
       state={state}
+      access={access}
       onUndo={(t) => flow.start(t)}
       onConfirm={() => flow.confirm()}
       onCancel={() => flow.cancel()}

@@ -225,6 +225,11 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
             {o.message}
           </Banner>
           <IssueList issues={o.issues} labelOf={labelOf} offerSize={offerSize} busy={s.busy} onAct={h.act} onFocus={h.focus} />
+          {s.busy && (
+            <p className="text-[13px] text-fg-muted" role="status" data-keeps-running="">
+              {WORDS.keepsRunning}
+            </p>
+          )}
           {closeOnly}
         </>
       );
@@ -232,7 +237,7 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
     case "done": {
       const undoable = (o.published || []).filter((p) => p.undo);
       const undoTarget = o.undoSet
-        ? { kind: "set", setId: o.undoSet.setId, members: o.undoSet.members, labels: o.undoSet.labels }
+        ? { kind: "set", setId: o.undoSet.setId, members: o.undoSet.members, labels: o.undoSet.labels, revisions: o.undoSet.revisions }
         : undoable.length === 1
           ? { kind: "one", label: undoable[0].label, undo: undoable[0].undo }
           : null;
@@ -256,7 +261,7 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
           </ul>
           {o.skipped?.length > 0 && <p className="text-[13px] text-fg-muted">{`${WORDS.alreadyLive} ${o.skipped.join(", ")}`}</p>}
           {o.warnings?.length > 0 && <IssueList issues={o.warnings} labelOf={labelOf} offerSize={offerSize} busy={s.busy} onAct={h.act} onFocus={h.focus} />}
-          <UndoNotice target={undoTarget} note={note} call={call} onDocument={h.document} onOpenEarlierVersions={h.openEarlierVersions} />
+          <UndoNotice target={undoTarget} note={note} call={call} access={access} onDocument={h.document} onOpenEarlierVersions={h.openEarlierVersions} />
           {closeOnly}
         </>
       );

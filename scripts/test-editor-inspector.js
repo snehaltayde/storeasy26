@@ -719,6 +719,22 @@ await t("unit+driven: changing the kind of page drops or looks up the document i
   eq(stored.at(-1), { type: "page", slug: "shipping", family: "page", document: "doc_ship" }, "back to the page's own id");
 });
 
+await t("P3-FIX3 unit+driven: typing a web name while the link is a Campaign or a Journal post keeps that kind and that page's own id", () => {
+  const pages = [
+    { slug: "shipping", family: "page", document: "doc_ship" },
+    { slug: "shipping", family: "journal", document: "doc_jship" },
+    { slug: "spring", family: "campaign", document: "doc_spring" },
+  ];
+  const stored = [];
+  const at = (value) => driveLink({ owner: null, path: "items.0.link", label: "Link", value, onChange: (v) => stored.push(v), issues: [], context: { pages } });
+  at({ type: "page", slug: "", family: "campaign" })("f-doc-items-0-link-slug").onChange("spring");
+  eq(stored.at(-1), { type: "page", slug: "spring", family: "campaign", document: "doc_spring" }, "a campaign: its kind and its id");
+  at({ type: "page", slug: "", family: "journal" })("f-doc-items-0-link-slug").onChange("shipping");
+  eq(stored.at(-1), { type: "page", slug: "shipping", family: "journal", document: "doc_jship" }, "a journal post: its kind and its own id, not the page's");
+  at({ type: "page", slug: "spring", family: "campaign", document: "doc_spring" })("f-doc-items-0-link-slug").onChange("shipping");
+  eq(stored.at(-1), { type: "page", slug: "shipping", family: "campaign" }, "no campaign at that name: the kind stays, the old id is dropped");
+});
+
 const seconds = ((Date.now() - started) / 1000).toFixed(1);
 console.log(`\n${pass} passed, ${failures.length} failed in ${seconds} s`);
 if (failures.length) {

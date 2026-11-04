@@ -548,6 +548,131 @@ await t("unit: 'Use the newer version' keeps text typed while its keep is in fli
   eq([s.getState().status, s.getState().notice], ["saved", St.WORDS.backupKept], "and it says the edits were kept:");
 });
 
+// ---- P3-FIX3 ----
+const { documentHash: realHash } = await import("../lib/registry/body.js");
+// a server whose draftHash is the real documentHash of what it holds
+const hashingApi = (doc) => {
+  const api = fakeApi(doc);
+  api.on.saveDraft = async (args, extra, server, documentOf) => {
+    if (extra?.revision !== server.revision) return { conflict: true, code: "DOCUMENT_CHANGED", message: "changed", current: { ...documentOf(), updatedByName: "Asha" } };
+    server.body = clone(args.body);
+    server.revision++;
+    server.draftHash = await realHash(server.body);
+    return { ok: true, data: { ok: true, document: documentOf(), issues: [] } };
+  };
+  return api;
+};
+// leave a backup at revision 3 with this title, as a closed tab would
+async function leaveBackup(storage, title, clock = fakeClock()) {
+  const api = fakeApi(fakeDoc());
+  const s = St.createDocumentStore({ api, document: fakeDoc(), tenant: "t1", storage, timers: clock, now: clock.now });
+  await s.open();
+  api.holdNext("saveDraft");
+  s.setField(T1, title);
+  await clock.advance(P);
+  s.dispose();
+  return api;
+}
+
+await t("P3-FIX3 unit: a dismissed backup is gone from storage, and isn't offered again", async () => {
+  const storage = memoryStorage();
+  await leaveBackup(storage, "Not wanted");
+  eq(storage.m.size, 1, "the backup:");
+  const s = St.createDocumentStore({ api: fakeApi(fakeDoc()), document: fakeDoc(), tenant: "t1", storage, timers: fakeClock(), now: () => 0 });
+  await s.open();
+  ok(s.getState().backupOffer, "offered");
+  s.dismissBackup();
+  eq([s.getState().backupOffer, storage.m.size], [null, 0], "dismissed and gone from storage:");
+  s.dispose();
+  const again = St.createDocumentStore({ api: fakeApi(fakeDoc()), document: fakeDoc(), tenant: "t1", storage, timers: fakeClock(), now: () => 0 });
+  await again.open();
+  eq(again.getState().backupOffer, null, "not offered again:");
+});
+
+await t("P3-FIX3 unit: a second conflict after 'Use the newer version' (and after 'Keep mine') can still be answered: the choice is reset", async () => {
+  const clock = fakeClock();
+  const api = fakeApi(fakeDoc());
+  const s = St.createDocumentStore({ api, document: fakeDoc(), timers: clock, now: clock.now });
+  const conflictNow = async (theirs, mine) => {
+    api.server.revision++;
+    api.server.body = pageBody("p1", [textSec("sec_t1", theirs)]);
+    api.server.draftHash = `h${api.server.revision}`;
+    s.setField(T1, mine);
+    await clock.advance(P);
+    eq(s.getState().status, "conflict", `the conflict (${mine}):`);
+  };
+  await conflictNow("Theirs 1", "Mine 1");
+  ok((await s.useNewer()).ok, "the first useNewer");
+  await conflictNow("Theirs 2", "Mine 2");
+  const r2 = await s.useNewer();
+  ok(r2.ok, `the second useNewer is answered, not BUSY: ${JSON.stringify(r2)}`);
+  eq(titleOf(s.getState().body), "Theirs 2", "the newer version:");
+  await conflictNow("Theirs 3", "Mine 3");
+  ok((await s.keepMine()).ok, "keepMine after two useNewer");
+  await clock.advance(P);
+  await conflictNow("Theirs 4", "Mine 4");
+  ok((await s.useNewer()).ok, "and useNewer after keepMine");
+  eq(api.server.kept.map((b) => titleOf(b)), ["Mine 1", "Mine 2", "Theirs 3", "Mine 4"], "each choice kept the other body:");
+});
+
+await t("P3-FIX3 unit: a backup whose text is already on the server isn't offered as edits that weren't saved (a late answer after the tab closed; the live version; this tab saving the same text)", async () => {
+  // a late answer after dispose: the save landed, so the tab's own backup goes
+  let storage = memoryStorage();
+  const api = await leaveBackup(storage, "Landed late");
+  eq(storage.m.size, 1, "the backup while the save is in flight:");
+  api.release();
+  await settle();
+  eq(storage.m.size, 0, "the late answer cleared it:");
+  let s = St.createDocumentStore({ api: fakeApi(fakeDoc()), document: { ...fakeDoc(), revision: 4 }, tenant: "t1", storage, timers: fakeClock(), now: () => 0 });
+  await s.open();
+  eq(s.getState().backupOffer, null, "not offered:");
+  // a late answer that saved only part of the typing keeps the backup
+  storage = memoryStorage();
+  {
+    const clock = fakeClock();
+    const a = fakeApi(fakeDoc());
+    const s1 = St.createDocumentStore({ api: a, document: fakeDoc(), tenant: "t1", storage, timers: clock, now: clock.now });
+    await s1.open();
+    a.holdNext("saveDraft");
+    s1.setField(T1, "Sent");
+    await clock.advance(P);
+    s1.setField(T1, "Sent, then more");
+    clock.advance(10);
+    s1.dispose();
+    a.release();
+    await settle();
+    eq([...storage.m.values()].map((v) => titleOf(JSON.parse(v).body)), ["Sent, then more"], "the unsent typing stays:");
+  }
+  // the live version holds the text: not offered
+  storage = memoryStorage();
+  await leaveBackup(storage, "Published already");
+  const liveBody = JSON.parse([...storage.m.values()][0]).body;
+  s = St.createDocumentStore({ api: fakeApi(fakeDoc()), document: fakeDoc({ publishedHash: await realHash(liveBody) }), tenant: "t1", storage, timers: fakeClock(), now: () => 0 });
+  await s.open();
+  eq([s.getState().backupOffer, storage.m.size], [null, 0], "the live text isn't offered, and is cleared:");
+  // this tab saves the same text while the offer is open: the offer goes
+  storage = memoryStorage();
+  await leaveBackup(storage, "Typed twice");
+  const clock = fakeClock();
+  const api2 = hashingApi(fakeDoc());
+  s = St.createDocumentStore({ api: api2, document: fakeDoc(), tenant: "t1", storage, timers: clock, now: clock.now });
+  await s.open();
+  ok(s.getState().backupOffer, "offered");
+  s.setField(T1, "Typed twice");
+  await clock.advance(P);
+  await settle();
+  eq([titleOf(api2.server.body), s.getState().backupOffer, storage.m.size], ["Typed twice", null, 0], "saved here, so not offered any more:");
+  // different text saved: the offer stays
+  storage = memoryStorage();
+  await leaveBackup(storage, "Keep offering me");
+  const clock3 = fakeClock();
+  s = St.createDocumentStore({ api: hashingApi(fakeDoc()), document: fakeDoc(), tenant: "t1", storage, timers: clock3, now: clock3.now });
+  await s.open();
+  s.setField(T1, "Something else");
+  await clock3.advance(P);
+  eq(titleOf(s.getState().backupOffer?.body), "Keep offering me", "other text: still offered:");
+});
+
 await t("unit: a throwing storage changes nothing else (the same saves, the same state)", async () => {
   async function script(storage) {
     const clock = fakeClock();

@@ -108,7 +108,20 @@ export const WORDS = Object.freeze({
   historyEmpty: "No earlier versions yet. Each publish and each pause in your editing keeps one.",
   recentEmpty: "Nothing has been published yet.",
   openInEditor: "Open in the editor",
+  // P3-FIX3
+  staffUndoReason: "Only the store owner or an admin can undo a publish. You can edit and preview.",
+  keepsRunning: "This keeps running if you close the panel: the change is saved and published.",
+  undoChecking: "We couldn't confirm the Undo. Checking…",
+  undoCheckedDone: "It looks like the Undo went through: what is live changed since you asked. Reload the page to see what is live now.",
+  undoCheckedNot: "Your Undo didn't go through. Nothing changed on your store. Try again.",
+  undoCheckedUnknown: "We still couldn't confirm the Undo. Reload the page to see what is live.",
+  undoSetOfflineTitle: (n, labels) => `Undo all ${n} pages of this publish? ${listWords(labels)} ${labels.length === 1 ? "goes" : "go"} offline.`,
 });
+
+// P3-FIX3: Undo needs the same right as Publish (storefront.publish). access
+// is getDocument's { canPublish, reason }, or { canUndo, reason }.
+export const undoDenied = (access) => Boolean(access && (access.canUndo === false || access.canPublish === false));
+export const undoDeniedReason = (access) => (undoDenied(access) ? (typeof access.reason === "string" && access.reason) || WORDS.staffUndoReason : null);
 
 export const LEVEL_WORDS = Object.freeze({ blocks: "Must fix", warns: "Check", inherited: "Already live like this" });
 
@@ -147,6 +160,13 @@ export function when(iso, { timeZone } = {}) {
 // A singleton (home, header, design, …) has no "take offline": its first
 // publish has nothing to undo to (spec PUB-04).
 export const isRouteType = (type) => documentType(type)?.route === true;
+// P3-FIX3: a singleton's id is doc_<type> (validate.js), so its type is known
+// even when it came in through an offer that carried no type.
+export function typeOfId(id, types) {
+  if (isObj(types) && typeof types[id] === "string") return types[id];
+  const t = typeof id === "string" && id.startsWith("doc_") ? documentType(id.slice(4)) : null;
+  return t?.singleton ? t.type : null;
+}
 
 // ---- issue actions: edit the body ------------------------------------------------------
 
@@ -314,13 +334,14 @@ export function outcomeOf(result, ctx = {}) {
   if (r.ok) {
     const d = r.data || {};
     const published = (Array.isArray(d.published) ? d.published : []).map((p) => {
-      const firstOfSingleton = ctx.firstPublish?.[p.id] === true && ctx.types?.[p.id] && !isRouteType(ctx.types[p.id]);
+      const type = typeOfId(p.id, ctx.types);
+      const firstOfSingleton = ctx.firstPublish?.[p.id] === true && type && !isRouteType(type);
       return { id: p.id, label: labelFrom(ctx, p.id), liveUrl: typeof p.liveUrl === "string" ? p.liveUrl : null, undo: firstOfSingleton ? null : isObj(p.undo) ? p.undo : null, note: firstOfSingleton ? WORDS.firstVersion : null };
     });
     const skipped = (Array.isArray(d.skipped) ? d.skipped : []).map((id) => labelFrom(ctx, typeof id === "string" ? id : id?.id));
     const warnings = Array.isArray(d.issues) ? d.issues : [];
     const undoable = published.filter((p) => p.undo);
-    const undoSet = published.length > 1 && undoable.length > 1 && d.setId ? { setId: d.setId, members: undoable.map((p) => ({ id: p.id, logId: p.undo.logId })), labels: undoable.map((p) => p.label) } : null;
+    const undoSet = published.length > 1 && undoable.length > 1 && d.setId ? { setId: d.setId, members: undoable.map((p) => ({ id: p.id, logId: p.undo.logId })), labels: undoable.map((p) => p.label), revisions: undoable.map((p) => p.undo.revision) } : null;
     const title = published.length > 1 ? `Published ${published.length} pages.` : published.length === 1 ? `Published ${q(published[0].label)}.` : "Nothing new to publish: it was all live already.";
     return { phase: "done", title, published, skipped, warnings, undoSet };
   }
@@ -357,10 +378,12 @@ export function outcomeOf(result, ctx = {}) {
     const by = r.current?.updatedByName || null;
     return { phase: "conflict", title: WORDS.blockedTitle, words: r.message, by, conflicts: conflicts.length > 1 ? conflicts : [], current: r.current || null };
   }
-  if (r.code === "PUBLISH_UNKNOWN") {
+  // P3-FIX3: a lost answer (NETWORK_ERROR) may have gone live too: it is
+  // checked like PUBLISH_UNKNOWN, never shown as "nothing was saved"
+  if (r.code === "PUBLISH_UNKNOWN" || r.code === "NETWORK_ERROR") {
     return { phase: "checking", words: WORDS.checking, release: isObj(r.release) ? r.release : null };
   }
-  const retry = r.retryable === true || r.code === "PUBLISH_BUSY" || r.code === "PUBLISH_FAILED" || r.code === "NETWORK_ERROR";
+  const retry = r.retryable === true || r.code === "PUBLISH_BUSY" || r.code === "PUBLISH_FAILED";
   return { phase: "error", title: WORDS.blockedTitle, words: r.message, retry };
 }
 
@@ -488,21 +511,29 @@ export function createPublishFlow(deps = {}) {
     return false;
   };
 
-  async function send(items, { asSet = false } = {}) {
+  // P3-FIX3: closing the panel while a publish (or a fix) runs doesn't stop
+  // it (WORDS.keepsRunning says so). The answer then doesn't open the panel
+  // again: onPublished still hears a publish that went live.
+  async function send(items, { asSet = false, run = seq } = {}) {
     set({ busy: true, notice: null });
     const req = publishRequest(items, { set: asSet });
     let res;
     try {
       res = await call(req.op, req.args, req.extra);
     } catch {
-      res = { error: true, code: "NETWORK_ERROR", message: "We couldn't reach Storeasy, so nothing was published. Check your internet connection, then try again." };
+      res = { error: true, code: "NETWORK_ERROR", message: "We couldn't reach Storeasy. Check your internet connection." };
+    }
+    if (run !== seq) {
+      const late = outcomeOf(res, { ...ctx(), items });
+      if (late.phase === "done") deps.onPublished?.(late);
+      return late;
     }
     state = { ...state, items };
     const outcome = outcomeOf(res, ctx());
     if (outcome.phase === "offer") return enterOffer(outcome);
     set({ phase: outcome.phase, outcome, busy: false });
     if (outcome.phase === "done") deps.onPublished?.(outcome);
-    if (outcome.phase === "checking") await check(outcome);
+    if (outcome.phase === "checking") await check(outcome, run);
     return outcome;
   }
 
@@ -515,7 +546,7 @@ export function createPublishFlow(deps = {}) {
     return outcome;
   }
 
-  async function check(outcome) {
+  async function check(outcome, run = seq) {
     const items = state.items;
     let live;
     try {
@@ -533,6 +564,7 @@ export function createPublishFlow(deps = {}) {
       }
     }
     const resolved = resolveUnknown({ release: outcome.release, live, documents, items });
+    if (run !== seq) return resolved;
     set({ phase: "checked", outcome: { ...outcome, ...resolved } });
     return resolved;
   }
@@ -562,27 +594,28 @@ export function createPublishFlow(deps = {}) {
       const otherBlocks = state.outcome?.otherBlocks === true;
       return enterOffer({ phase: "offer", reason: "links", message: state.outcome?.message, issues: state.outcome?.issues || [], offer: state.outcome.offer, documents: state.outcome?.documents || [], otherBlocks });
     }
+    const run = seq;
     set({ busy: true, notice: null });
     let body = bodies ? local.body : null;
     let revision = bodies ? local.revision : null;
     for (const step of steps) {
       if (step.kind === "getDocument") {
         const r = await call("getDocument", step.id);
-        if (!r?.ok) return set({ busy: false, notice: r?.message || WORDS.changesFailed });
+        if (!r?.ok) return run === seq ? set({ busy: false, notice: r?.message || WORDS.changesFailed }) : null;
         body = r.data.document.body;
         revision = r.data.document.revision;
       } else if (step.kind === "saveDraft") {
         const edited = applyAction(body, step.edit);
-        if (!edited.ok) return set({ busy: false, notice: edited.message });
+        if (!edited.ok) return run === seq ? set({ busy: false, notice: edited.message }) : null;
         const r = await call("saveDraft", { id: step.id, body: edited.body }, { revision });
-        if (!r?.ok) return set({ busy: false, notice: r?.message || WORDS.changesFailed });
+        if (!r?.ok) return run === seq ? set({ busy: false, notice: r?.message || WORDS.changesFailed }) : null;
         const doc = r.data.document;
         deps.onDocument?.(doc);
         const known = state.items.some((it) => it.id === doc.id);
         const items = known ? state.items.map((it) => (it.id === doc.id ? { ...it, revision: doc.revision, draftHash: doc.draftHash } : it)) : [...state.items, { id: doc.id, label: doc.label, type: doc.type, revision: doc.revision, draftHash: doc.draftHash }];
         state = { ...state, items };
       } else if (step.kind === "publish") {
-        return send(state.items);
+        return send(state.items, { run });
       }
     }
     return null;
@@ -612,6 +645,8 @@ export function createPublishFlow(deps = {}) {
     seq++;
     set({ phase: "closed", outcome: null, busy: false, notice: null, lists: {}, order: [], offerItems: [] });
   };
+  // the publish is still running (a confirm or a fix in flight)
+  const running = () => state.busy === true && state.phase !== "closed";
 
   return {
     getState: () => state,
@@ -625,6 +660,7 @@ export function createPublishFlow(deps = {}) {
     act,
     keepLive,
     close,
+    running,
     retry: () => send(state.items),
   };
 }
@@ -633,7 +669,10 @@ export function createPublishFlow(deps = {}) {
 
 // A target:
 //   { kind: "one", label, undo: {id, revision, logId} }
-//   { kind: "set", setId, members: [{id, logId}], labels }
+//   { kind: "set", setId, members: [{id, logId}], labels, revisions }
+//     revisions[i] is members[i]'s revision, from its own undo args: the
+//     server refuses an undo without one (428 REVISION_REQUIRED), even a dry
+//     run, so each member's own dry run sends it (undoSet takes none)
 //   { kind: "offline", label, id, revision }
 const requestOf = (t, dryRun) => {
   if (t.kind === "set") return { op: "undoSet", args: { setId: t.setId, members: t.members, ...(dryRun ? { dryRun: true } : {}) } };
@@ -643,14 +682,24 @@ const requestOf = (t, dryRun) => {
 export const undoRequest = requestOf;
 
 // The dry run in words for the confirm.
-export function dryRunView(target, dry) {
+// P3-FIX3: `members` (a whole-set Undo that takes a page offline) is each
+// member's own dry run, [{ label, dry }], so the confirm names the page that
+// goes offline, and, when only one member changes, whose changes they are.
+export function dryRunView(target, dry, { members = null } = {}) {
   const d = isObj(dry) ? dry : {};
-  const changes = (d.changes || []).map((c) => c.words);
+  let changes = (d.changes || []).map((c) => c.words);
   const linkers = (d.linkers || []).map((l) => l.label);
   const empty = !d.willTakeOffline && !changes.length && !d.target;
-  const title =
+  let title =
     target.kind === "set" ? WORDS.undoSetTitle(target.members.length) : target.kind === "offline" ? WORDS.offlineTitle(target.label) : d.willTakeOffline ? WORDS.undoOfflineTitle(target.label) : WORDS.undoTitle;
-  return { title, willTakeOffline: d.willTakeOffline === true, changes, linkers, goesBackTo: d.target?.name ? WORDS.undoGoesBackTo(d.target.name) : null, empty };
+  let offline = [];
+  if (target.kind === "set" && Array.isArray(members)) {
+    offline = members.filter((m) => m.dry?.willTakeOffline === true).map((m) => m.label);
+    const going = members.filter((m) => m.dry?.willTakeOffline === true || (m.dry?.changes || []).length > 0);
+    if (going.length === 1) changes = changes.map((w) => (w.startsWith(`${going[0].label}: `) ? w : `${going[0].label}: ${w}`));
+    if (offline.length) title = WORDS.undoSetOfflineTitle(target.members.length, offline);
+  }
+  return { title, willTakeOffline: d.willTakeOffline === true, changes, linkers, goesBackTo: d.target?.name ? WORDS.undoGoesBackTo(d.target.name) : null, empty, offline };
 }
 
 // An Undo answer in words.
@@ -660,14 +709,17 @@ export function undoOutcomeOf(target, result) {
     const d = r.data || {};
     if (d.nothing) return { phase: "done", words: d.message || WORDS.undoNothing, lines: [], savedVersion: false };
     if (target.kind === "set" && Array.isArray(d.documents)) {
+      const kept = typeof d.message === "string" && d.message.includes("Earlier versions");
+      // P3-FIX3: the server's own words name which pages are live again,
+      // which went offline and which stayed as they were (nothing earlier),
+      // and say so when nothing was undone at all
+      if (typeof d.message === "string" && d.message) return { phase: "done", words: d.message, lines: [], savedVersion: kept };
       const live = d.documents.filter((x) => x.live).map((x) => x.label);
       const off = d.documents.filter((x) => !x.live).map((x) => x.label);
       const lines = [];
       if (live.length) lines.push(WORDS.liveNow(live));
       if (off.length) lines.push(WORDS.offlineNow(off));
-      const kept = typeof d.message === "string" && d.message.includes("Earlier versions");
-      if (kept) lines.push(WORDS.keptInEarlier);
-      return { phase: "done", words: "Undone.", lines, savedVersion: kept };
+      return { phase: "done", words: "Undone.", lines, savedVersion: false };
     }
     return { phase: "done", words: d.message || "Undone.", lines: [], savedVersion: isObj(d.savedVersion), liveUrl: d.liveUrl ?? null };
   }
@@ -675,10 +727,36 @@ export function undoOutcomeOf(target, result) {
     const w = slugTakenWords(r, { items: target.undo ? [{ id: target.undo.id, label: target.label }] : [] }, { undo: true });
     return { phase: "error", words: `${w.words} ${w.next}`, lines: [] };
   }
-  if (r.code === "PUBLISH_UNKNOWN") return { phase: "error", words: "We couldn't confirm the Undo. Reload the page to see what is live.", lines: [] };
+  if (r.code === "PUBLISH_UNKNOWN" || r.code === "NETWORK_ERROR") return { phase: "checking", words: WORDS.undoChecking, lines: [] };
   return { phase: "error", words: r.message || "Something went wrong on our side, so nothing changed. Try again.", lines: [], by: r.current?.updatedByName || null };
 }
 
+// An Undo whose answer was lost (NETWORK_ERROR, PUBLISH_UNKNOWN), resolved by
+// asking the same dry run again: an Undo that went through leaves its row no
+// longer current (409 PUBLISHED_ELSEWHERE) or nothing left to undo; one that
+// didn't gives the same dry run.
+export function resolveUndo(target, dry) {
+  const r = isObj(dry) ? dry : {};
+  if (r.ok) {
+    const view = dryRunView(target, r.data);
+    if (view.empty && target.kind !== "offline") return { phase: "checked", done: true, words: WORDS.undoCheckedDone, lines: [] };
+    return { phase: "checked", done: false, words: WORDS.undoCheckedNot, lines: [], retry: true };
+  }
+  if (r.conflict || r.code === "PUBLISHED_ELSEWHERE" || r.code === "DOCUMENT_CHANGED") return { phase: "checked", done: true, words: WORDS.undoCheckedDone, lines: [] };
+  return { phase: "checked", done: null, words: WORDS.undoCheckedUnknown, lines: [] };
+}
+
+const lostAnswer = (r) => !isObj(r) || r.code === "NETWORK_ERROR" || r.code === "PUBLISH_UNKNOWN";
+const safeCall = async (call, req) => {
+  try {
+    return await call(req.op, req.args, req.extra);
+  } catch {
+    return { error: true, code: "NETWORK_ERROR", message: "We couldn't reach Storeasy. Check your internet connection." };
+  }
+};
+
+// deps: call, onDocument, onUndone, access (P3-FIX3: without the right to
+// undo, start() sends nothing)
 export function createUndoFlow(deps = {}) {
   const call = deps.call;
   let state = { phase: "idle", target: null, view: null, outcome: null, busy: false };
@@ -688,22 +766,44 @@ export function createUndoFlow(deps = {}) {
     for (const fn of subs) fn(state);
   };
   async function start(target) {
+    if (undoDenied(deps.access)) return null;
     set({ phase: "loading", target, view: null, outcome: null, busy: true });
     const req = requestOf(target, true);
-    const r = await call(req.op, req.args, req.extra);
+    const r = await safeCall(call, req);
     if (state.target !== target) return null;
+    if (lostAnswer(r)) return set({ phase: "result", outcome: { phase: "error", words: r?.message || WORDS.changesFailed, lines: [] }, busy: false });
     if (!r?.ok) return set({ phase: "result", outcome: undoOutcomeOf(target, r), busy: false });
-    const view = dryRunView(target, r.data);
+    // P3-FIX3: a whole-set Undo that takes a page offline asks each member's
+    // own dry run, so the confirm can name that page
+    let members = null;
+    if (target.kind === "set" && r.data?.willTakeOffline === true) {
+      // P3-FIX3 round 1: with its revision; a member without one is not asked
+      const each = await Promise.all(target.members.map((m, i) => (Number.isInteger(target.revisions?.[i]) ? safeCall(call, requestOf({ kind: "one", undo: { id: m.id, logId: m.logId, revision: target.revisions[i] } }, true)) : null)));
+      if (state.target !== target) return null;
+      members = target.members.map((m, i) => ({ label: target.labels?.[i] || "That page", dry: each[i]?.ok ? each[i].data : null }));
+    }
+    const view = dryRunView(target, r.data, { members });
     if (view.empty && target.kind !== "offline") return set({ phase: "result", view, outcome: { phase: "done", words: WORDS.undoNothing, lines: [] }, busy: false });
     set({ phase: "confirm", view, busy: false });
     return view;
   }
   async function confirm() {
-    if (state.phase !== "confirm") return null;
+    if (state.phase !== "confirm" || state.busy) return null;
     const target = state.target;
     set({ busy: true });
     const req = requestOf(target, false);
-    const r = await call(req.op, req.args, req.extra);
+    const r = await safeCall(call, req);
+    if (state.target !== target) return null;
+    if (lostAnswer(r)) {
+      // P3-FIX3: "Checking…", then the dry run again
+      set({ phase: "checking", outcome: undoOutcomeOf(target, r) });
+      const again = await safeCall(call, requestOf(target, true));
+      if (state.target !== target) return null;
+      const outcome = resolveUndo(target, again);
+      set({ phase: "result", outcome, busy: false });
+      if (outcome.done) deps.onUndone?.(outcome, target);
+      return outcome;
+    }
     const outcome = undoOutcomeOf(target, r);
     if (r?.ok && r.data?.document) deps.onDocument?.(r.data.document);
     if (r?.ok && Array.isArray(r.data?.documents)) for (const d of r.data.documents) deps.onDocument?.(d);
@@ -772,7 +872,7 @@ export function recentGroupsOf(rows, { timeZone } = {}) {
   }
   for (const g of groups) {
     const undoable = g.rows.filter((x) => x.canUndo);
-    g.undoSet = g.rows.length > 1 && undoable.length > 1 ? { kind: "set", setId: g.setId, members: undoable.map((x) => ({ id: x.undo.id, logId: x.undo.logId })), labels: undoable.map((x) => x.label) } : null;
+    g.undoSet = g.rows.length > 1 && undoable.length > 1 ? { kind: "set", setId: g.setId, members: undoable.map((x) => ({ id: x.undo.id, logId: x.undo.logId })), labels: undoable.map((x) => x.label), revisions: undoable.map((x) => x.undo.revision) } : null;
   }
   return groups;
 }

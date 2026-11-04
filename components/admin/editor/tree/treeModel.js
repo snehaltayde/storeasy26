@@ -31,6 +31,13 @@
 //        document
 //   remove(sections, id, { type })   (also exported as `delete`)
 //
+// P3-FIX3: add and duplicate also take `body` (the whole draft, optional).
+// When the draft with the new section would be over the draft cap
+// (validate.js DRAFT_MAX_BYTES, which saveDraft refuses as DRAFT_TOO_LARGE),
+// the operation is refused with DRAFT_TOO_LARGE, so the tree never offers a
+// copy that can't be saved. Without `body`, the sections alone are measured
+// (the rest of a draft is small: settings and meta).
+//
 // The composition rules are the registry's, not a copy of them: before an
 // operation is answered ok, the result is checked with validateDocument in
 // draft mode and refused if it would add a "structure" issue the list did not
@@ -54,7 +61,7 @@
 //                                       section) and problem (an "error")
 //   groupIssues(issues)                 { [sectionId]: issues } from a flat list
 import { sectionType, documentType, allowedKinds, newSection, emptyBody, validateDocument, mintSectionId, mintBlockId, starterSection, isBlank } from "../../../../lib/registry/index.js";
-import { issueClass, STRUCTURE, INCOMPLETE } from "../../../../lib/registry/validate.js";
+import { issueClass, STRUCTURE, INCOMPLETE, DRAFT_MAX_BYTES } from "../../../../lib/registry/validate.js";
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const list = (sections) => (Array.isArray(sections) ? sections : []);
@@ -179,7 +186,17 @@ function candidateIndexes(kind, index, length) {
   return [...new Set(out)];
 }
 
-export function add(sections, kind, index, { type, collections = null } = {}) {
+// The draft's size in bytes (UTF-8 JSON), as validate.js draftCaps measures it.
+function draftBytes(type, body, sections) {
+  try {
+    return new TextEncoder().encode(JSON.stringify({ ...(isObj(body) ? body : { schema: 1, type }), sections })).length;
+  } catch {
+    return 0;
+  }
+}
+const tooLarge = (verb) => refuse("DRAFT_TOO_LARGE", `This section can't be ${verb}: the page would be too big to save. Shorten some text or remove a section first.`);
+
+export function add(sections, kind, index, { type, collections = null, body = null } = {}) {
   const before = list(sections);
   const d = sectionType(kind);
   if (!d) return refuse("UNKNOWN_KIND", "That kind of section isn't one we know.");
@@ -190,7 +207,7 @@ export function add(sections, kind, index, { type, collections = null } = {}) {
   for (const at of candidateIndexes(kind, index, before.length)) {
     const after = [...before.slice(0, at), section, ...before.slice(at)];
     const r = guarded(type, before, after, "added", { selectedId: id, id, index: at });
-    if (r.ok) return r;
+    if (r.ok) return draftBytes(type, body, after) > DRAFT_MAX_BYTES ? tooLarge("added") : r;
     first ??= r;
   }
   return first;
@@ -240,7 +257,7 @@ export function show(sections, id, { type } = {}) {
   return guarded(type, before, replaceAt(before, i, next), "shown", { selectedId: id });
 }
 
-export function duplicate(sections, id, { type } = {}) {
+export function duplicate(sections, id, { type, body = null } = {}) {
   const before = list(sections);
   const i = indexOf(before, id);
   if (i < 0) return refuse("NOT_FOUND", "That section isn't on this page any more.");
@@ -252,7 +269,8 @@ export function duplicate(sections, id, { type } = {}) {
   copy.id = freshId(mintSectionId, used);
   if (Array.isArray(copy.blocks)) copy.blocks = copy.blocks.map((b) => (isObj(b) ? { ...b, id: freshId(mintBlockId, used) } : b));
   const after = [...before.slice(0, i + 1), copy, ...before.slice(i + 1)];
-  return guarded(type, before, after, "copied", { selectedId: copy.id, id: copy.id });
+  const r = guarded(type, before, after, "copied", { selectedId: copy.id, id: copy.id });
+  return r.ok && draftBytes(type, body, after) > DRAFT_MAX_BYTES ? tooLarge("copied") : r;
 }
 
 export function remove(sections, id, { type } = {}) {
@@ -269,24 +287,24 @@ export { remove as delete };
 
 // ---- what the tree shows -----------------------------------------------------
 
-export function addOptions(type, sections, index) {
+export function addOptions(type, sections, index, { body = null } = {}) {
   return allowedKinds(type).map((kind) => {
     const d = sectionType(kind);
-    const r = add(sections, kind, index, { type });
+    const r = add(sections, kind, index, { type, body });
     return { kind, label: d.label, placeholder: d.placeholder, ok: r.ok, reason: r.ok ? null : r.message, index: r.ok ? r.index : null };
   });
 }
 
-const allow = (r) => ({ ok: r.ok, reason: r.ok ? null : r.message });
+const allow = (r) => ({ ok: r.ok, reason: r.ok ? null : r.message, code: r.ok ? null : r.code });
 
-export function rowActions(sections, id, type) {
+export function rowActions(sections, id, type, { body = null } = {}) {
   const s = list(sections)[indexOf(sections, id)];
   return {
     moveUp: allow(moveUp(sections, id, { type })),
     moveDown: allow(moveDown(sections, id, { type })),
-    hide: isHidden(s) ? { ok: false, reason: "This section is hidden." } : allow(hide(sections, id, { type })),
-    show: isHidden(s) ? allow(show(sections, id, { type })) : { ok: false, reason: "This section is shown." },
-    duplicate: allow(duplicate(sections, id, { type })),
+    hide: isHidden(s) ? { ok: false, reason: "This section is hidden.", code: "HIDDEN" } : allow(hide(sections, id, { type })),
+    show: isHidden(s) ? allow(show(sections, id, { type })) : { ok: false, reason: "This section is shown.", code: "SHOWN" },
+    duplicate: allow(duplicate(sections, id, { type, body })),
     remove: allow(remove(sections, id, { type })),
   };
 }

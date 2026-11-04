@@ -591,20 +591,14 @@ await t("TakeOfflineConfirm lists the linkers and the dry run's words", async ()
   ok(undoPage.includes("data-take-offline") && textOf(undoPage).includes("Undo takes “Diwali sale” offline"), textOf(undoPage));
 });
 
-await t("whole-set Undo says which pages are live and which went offline", () => {
+await t("whole-set Undo shows the server's words, which say which pages are live and which went offline", () => {
   const target = { kind: "set", setId: "set_1", members: [{ id: "doc_home", logId: "log_1" }, { id: SALE.id, logId: "log_2" }], labels: ["Home page", "Diwali sale"] };
-  const result = {
-    ok: true,
-    data: {
-      ok: true,
-      message: "2 pages are back to how they were before that publish. “Diwali sale” is offline now. To bring it back, publish again.",
-      documents: [DOC({ live: true }), DOC({ id: SALE.id, label: "Diwali sale", live: false })],
-    },
-  };
+  const message = "“Home page” is live again, as it was before that publish. “Diwali sale” is offline now, as it was before that publish. To bring it back, open it and publish it again.";
+  const result = { ok: true, data: { ok: true, message, documents: [DOC({ live: true }), DOC({ id: SALE.id, label: "Diwali sale", live: false })] } };
   const out = M.undoOutcomeOf(target, result);
   const text = plain(html(h(Undo.UndoNoticeView, { state: { phase: "result", outcome: out }, target })), "set undo");
-  ok(text.includes("Live now: “Home page”.") && text.includes("Offline now: “Diwali sale”."), text);
-  ok(!text.includes("2 pages are back"), "the words that read as if both are live are not shown");
+  ok(text.includes(message), text);
+  ok(!text.includes("Undone.") && !text.includes("Live now"), `no words of its own on top: ${text}`);
 });
 
 await t("staff see Publish disabled with access.reason, and nothing opens", async () => {
@@ -804,9 +798,314 @@ await t("a set publish offers Undo of the whole set with the publish's own undo 
   const body = clone(P.ok.body);
   body.published.push({ id: SALE.id, versionId: "ver_3", hash: "h_draft2", liveUrl: "/api/preview?exit=1&to=%2Fcampaigns%2Fdiwali", undo: { id: SALE.id, revision: 3, logId: "log_2" } });
   const out = M.outcomeOf({ ok: true, data: body }, { items: [HOME, SALE] });
-  eq(out.undoSet, { setId: "set_1", members: [{ id: "doc_home", logId: "log_1" }, { id: SALE.id, logId: "log_2" }], labels: ["Home page", "Diwali sale"] }, "set target:");
+  eq(out.undoSet, { setId: "set_1", members: [{ id: "doc_home", logId: "log_1" }, { id: SALE.id, logId: "log_2" }], labels: ["Home page", "Diwali sale"], revisions: [4, 3] }, "set target:");
   const text = plain(html(h(Panel.PublishPanelView, { state: { phase: "done", outcome: out, items: [HOME, SALE], order: [], lists: {} }, call: async () => ({}) })), "set done");
   ok(text.includes("Published 2 pages.") && text.includes("Undo all 2"), text);
+});
+
+// =========================================================================================
+console.log("— P3-FIX3: the batch 3 review findings");
+
+const SET_T = () => ({ kind: "set", setId: "set_1", members: [{ id: "doc_home", logId: "log_1" }, { id: SALE.id, logId: "log_2" }], labels: ["Home page", "Diwali sale"], revisions: [4, 2] });
+
+await t("P3-FIX3 unit: whole-set Undo with nothing undone shows the server's words, not 'Undone.'; in a mixed set a page that stayed is listed as stayed, not 'Live now'", async () => {
+  const nothing = { ok: true, data: { ok: true, message: "There's nothing earlier to undo.", documents: [DOC({ live: true }), DOC({ id: SALE.id, label: "Diwali sale", live: true })] } };
+  const out = M.undoOutcomeOf(SET_T(), nothing);
+  eq([out.words, out.lines], ["There's nothing earlier to undo.", []], "nothing undone:");
+  const mixed = { ok: true, data: { ok: true, message: "“Diwali sale” is live again, as it was before that publish. “Home page” stayed as it was: there was nothing earlier.", documents: [DOC({ live: true }), DOC({ id: SALE.id, label: "Diwali sale", live: true })] } };
+  const text = plain(html(h(Undo.UndoNoticeView, { state: { phase: "result", outcome: M.undoOutcomeOf(SET_T(), mixed) }, target: SET_T() })), "mixed");
+  ok(text.includes("“Home page” stayed as it was") && !text.includes("Live now") && !text.includes("Undone."), text);
+  // through the flow: the dry run had something, the Undo itself found nothing (a race)
+  const call = stub({ undoSet: (a) => (a.dryRun ? { ok: true, data: { ...clone(SHAPES.undoSet.outcomes.dryRun.body) } } : clone(nothing)) });
+  const flow = M.createUndoFlow({ call });
+  const tg = SET_T();
+  await flow.start(tg);
+  eq(flow.getState().phase, "confirm", "the confirm:");
+  await flow.confirm();
+  ok(plain(html(h(Undo.UndoNoticeView, { state: flow.getState(), target: tg })), "flow").includes("There's nothing earlier to undo."), "the flow shows the server's words");
+});
+
+await t("P3-FIX3 unit: a NETWORK_ERROR on publish and publishSet goes through 'Checking…', never 'nothing was saved' (a returned error and a thrown call)", async () => {
+  const lost = { error: true, code: "NETWORK_ERROR", message: "We couldn't reach Storeasy, so nothing was saved. Check your internet connection, then try again." };
+  for (const [op, docs, how] of [
+    ["publish", [HOME], "returned"],
+    ["publishSet", [HOME, SALE], "returned"],
+    ["publish", [HOME], "thrown"],
+  ]) {
+    const call = stub({
+      listChanges: changes([{ kind: "edited", sectionId: "sec_hero", words: "Hero: title changed" }]),
+      [op]: () => {
+        if (how === "thrown") throw new Error("offline");
+        return clone(lost);
+      },
+      getDocument: (id) => ({ ok: true, data: { ok: true, document: DOC({ id, publishedHash: id === SALE.id ? "h_draft2" : "h_draft" }) } }),
+    });
+    const flow = M.createPublishFlow({ call, checkLive: async () => undefined });
+    const texts = [];
+    flow.subscribe((st) => texts.push(textOf(renderPanel({ getState: () => st, canConfirm: () => false }))));
+    await flow.open(docs);
+    await flow.confirm();
+    ok(texts.some((x) => x.includes(M.WORDS.checking)), `${op} ${how}: showed Checking…`);
+    ok(texts.every((x) => !/nothing was (saved|published)/.test(x)), `${op} ${how}: never 'nothing was saved': ${texts.find((x) => /nothing was/.test(x))}`);
+    eq(flow.getState().phase, "checked", `${op} ${how}: resolved:`);
+    ok(textOf(renderPanel(flow)).includes(M.WORDS.checkedLive), `${op} ${how}: it went live (its hashes)`);
+  }
+  eq(M.outcomeOf(lost, { items: [HOME] }).phase, "checking", "outcomeOf:");
+});
+
+await t("P3-FIX3 unit: a NETWORK_ERROR on undo and undoSet goes through 'Checking…' and asks the dry run again", async () => {
+  const lost = { error: true, code: "NETWORK_ERROR", message: "We couldn't reach Storeasy, so nothing was saved." };
+  const one = { kind: "one", label: "Diwali sale", undo: { id: SALE.id, revision: 2, logId: "log_2" } };
+  const dry = { ok: true, data: clone(SHAPES.undo.outcomes.dryRun.body) };
+  for (const [target, op] of [
+    [one, "undo"],
+    [SET_T(), "undoSet"],
+  ]) {
+    for (const [again, want] of [
+      [{ conflict: true, code: "PUBLISHED_ELSEWHERE", message: "This was changed after that publish." }, M.WORDS.undoCheckedDone],
+      [dry, M.WORDS.undoCheckedNot],
+      [{ ok: true, data: { ok: true, willTakeOffline: false, linkers: [], changes: [], target: null } }, M.WORDS.undoCheckedDone],
+      [clone(lost), M.WORDS.undoCheckedUnknown],
+    ]) {
+      const call = stub({ [op]: (a, x, n) => (n === 1 ? clone(dry) : n === 2 ? clone(lost) : clone(again)) });
+      const flow = M.createUndoFlow({ call });
+      const seen = [];
+      flow.subscribe((st) => seen.push(st.phase === "checking" ? textOf(html(h(Undo.UndoNoticeView, { state: st, target }))) : null));
+      await flow.start(target);
+      await flow.confirm();
+      ok(seen.includes(M.WORDS.undoChecking), `${op}: showed Checking…`);
+      eq(call.calls.map((c) => Boolean(c.args.dryRun)), [true, false, true], `${op}: the dry run is asked again:`);
+      const text = textOf(html(h(Undo.UndoNoticeView, { state: flow.getState(), target })));
+      ok(text.includes(want) && !/nothing was saved/.test(text), `${op}: ${text}`);
+      if (want === M.WORDS.undoCheckedNot) ok(text.includes(M.WORDS.tryAgain), "Try again is offered");
+    }
+  }
+});
+
+await t("P3-FIX3 unit+rendered: the whole-set Undo confirm names the page that goes offline; an offered singleton's first publish offers no set Undo", async () => {
+  const tg = SET_T();
+  const call = stub({
+    undoSet: { ok: true, data: { ok: true, willTakeOffline: true, linkers: [], changes: [{ words: "Taken offline" }], target: null } },
+    undo: (a) => (a.id === SALE.id ? { ok: true, data: { ok: true, willTakeOffline: true, linkers: [], changes: [{ words: "Taken offline" }], target: null } } : { ok: true, data: { ok: true, willTakeOffline: false, linkers: [], changes: [], target: null } }),
+  });
+  const flow = M.createUndoFlow({ call });
+  await flow.start(tg);
+  const v = flow.getState().view;
+  eq([v.title, v.changes, v.offline], ["Undo all 2 pages of this publish? “Diwali sale” goes offline.", ["Diwali sale: Taken offline"], ["Diwali sale"]], "named:");
+  eq(call.calls.filter((c) => c.op === "undo").map((c) => [c.args.id, c.args.logId, c.args.dryRun, c.extra?.revision]), [["doc_home", "log_1", true, 4], [SALE.id, "log_2", true, 2]], "each member's dry run, with its revision:");
+  const text = plain(html(h(Offline.default, { open: true, view: v, onConfirm() {}, onCancel() {} })), "set offline confirm");
+  ok(text.includes("“Diwali sale” goes offline"), text);
+  // no one goes offline: no member dry runs
+  const quiet = stub({ undoSet: { ok: true, data: clone(SHAPES.undoSet.outcomes.dryRun.body) } });
+  await M.createUndoFlow({ call: quiet }).start(SET_T());
+  eq(quiet.ops(), ["undoSet"], "no extra calls:");
+  // the home page came in through an offer (no type recorded): its first publish has no Undo, so no set Undo
+  const body = clone(P.ok.body);
+  body.published.push({ id: SALE.id, versionId: "ver_3", hash: "h_draft2", liveUrl: null, undo: { id: SALE.id, revision: 3, logId: "log_2" } });
+  const out = M.outcomeOf({ ok: true, data: body }, { items: [SALE], offerItems: [HOME, SALE], firstPublish: { doc_home: true, [SALE.id]: true }, types: {} });
+  eq([out.published.find((p) => p.id === "doc_home").undo, out.undoSet], [null, null], "no set Undo:");
+  eq([M.typeOfId("doc_home", {}), M.typeOfId("doc_header", null), M.typeOfId(SALE.id, {}), M.typeOfId("doc_x", { doc_x: "page" })], ["home", "header", null, "page"], "typeOfId:");
+});
+
+await t("P3-FIX3 round 1: the whole-set Undo confirm names the page that goes offline through the real client and the server's parser, which refuse an undo without a revision (428 REVISION_REQUIRED), dry run or not", async () => {
+  // the server side: the real parser (lib/admin/documents-api.js) and the
+  // rule documents-api applies after it (PUBLISH_NEEDS_REVISION: undo and
+  // unpublish need a revision, a dry run too; pinned against the real
+  // handler in scripts/test-publish-service.js "428 without a revision")
+  const Api = await import("../lib/admin/documents-api.js");
+  const { createDocumentsApi } = await import("../components/admin/editor/documentsApi.js");
+  const offline = { ok: true, willTakeOffline: true, linkers: [], changes: [{ words: "Taken offline" }], target: null };
+  const stays = { ok: true, willTakeOffline: false, linkers: [], changes: [{ words: "Hero: title changed" }], target: { versionId: "ver_prev", name: "Published 2 Nov, 10:00 by Asha" } };
+  const sent = [];
+  const fetch = async (_url, init) => {
+    const parsed = Api.parseDocumentsOperation(JSON.parse(init.body));
+    const op = parsed.op;
+    sent.push(op ? { kind: op.kind, id: op.id, dryRun: op.dryRun, hasRevision: op.hasRevision, revision: op.revision } : parsed);
+    const reply = (status, body) => ({ status, json: async () => clone(body) });
+    if (parsed.error) return reply(400, { error: parsed.error, code: parsed.code });
+    if ((op.kind === "undo" || op.kind === "unpublish") && !op.hasRevision) return reply(428, SHAPES.undo.outcomes.revisionRequired.body);
+    if (op.kind === "undoSet") return reply(200, { ...offline, changes: [{ words: "Diwali sale: Taken offline" }, { words: "Home page: Hero: title changed" }] });
+    if (op.kind === "undo") return reply(200, op.id === SALE.id ? offline : stays);
+    throw new Error(`unexpected ${op.kind}`);
+  };
+  const { call } = createDocumentsApi({ fetch });
+  // the two ways a set target is made: the publish answer and Recently published
+  const body = clone(P.ok.body);
+  body.published.push({ id: SALE.id, versionId: "ver_3", hash: "h_draft2", liveUrl: null, undo: { id: SALE.id, revision: 3, logId: "log_2" } });
+  const fromPublish = M.outcomeOf({ ok: true, data: body }, { items: [HOME, SALE] }).undoSet;
+  const row = clone(SHAPES.listRecentlyPublished.outcomes.ok.body.rows[0]);
+  const fromRecent = M.recentGroupsOf([row, { ...row, logId: "log_2", documentId: SALE.id, label: "Diwali sale", undo: { id: SALE.id, revision: 2, logId: "log_2" } }], { timeZone: "UTC" })[0].undoSet;
+  for (const [name, set, revs] of [
+    ["the publish answer", { kind: "set", ...fromPublish }, [4, 3]],
+    ["Recently published", fromRecent, [row.undo.revision, 2]],
+  ]) {
+    sent.length = 0;
+    const flow = M.createUndoFlow({ call });
+    await flow.start(set);
+    const v = flow.getState().view;
+    eq(v?.title, "Undo all 2 pages of this publish? “Diwali sale” goes offline.", `${name}: the confirm names the page:`);
+    eq(v.offline, ["Diwali sale"], `${name}: offline:`);
+    eq(sent.filter((x) => x.kind === "undo").map((x) => [x.id, x.dryRun, x.hasRevision, x.revision]), [["doc_home", true, true, revs[0]], [SALE.id, true, true, revs[1]]], `${name}: each member's dry run carries its revision:`);
+    const text = plain(html(h(Offline.default, { open: true, view: v, onConfirm() {}, onCancel() {} })), `${name} confirm`);
+    ok(text.includes("“Diwali sale” goes offline"), text);
+  }
+  // the PublishPanel's done state builds its target with the revisions too
+  const flow = M.createUndoFlow({ call });
+  const tree = Panel.PublishPanelView({ state: { phase: "done", outcome: M.outcomeOf({ ok: true, data: body }, { items: [HOME, SALE] }), items: [HOME, SALE], order: [], lists: {} }, call });
+  const find = (el) => {
+    if (!el || typeof el !== "object") return null;
+    if (Array.isArray(el)) return el.map(find).find(Boolean) || null;
+    if (el.props && el.props.target && el.props.target.kind === "set") return el.props.target;
+    return find(el.props?.children);
+  };
+  const panelTarget = find(tree);
+  eq(panelTarget?.revisions, [4, 3], "the panel's set target carries the revisions:");
+  sent.length = 0;
+  await flow.start(panelTarget);
+  eq(flow.getState().view.offline, ["Diwali sale"], "the panel's Undo all names the page:");
+  // a set target with no revisions (an older host) sends no member dry run that would only be refused
+  sent.length = 0;
+  const { revisions: _r, ...noRevs } = SET_T();
+  const f3 = M.createUndoFlow({ call });
+  await f3.start(noRevs);
+  eq(sent.map((x) => x.kind), ["undoSet"], "no doomed member requests:");
+  eq(f3.getState().view.title, M.WORDS.undoSetTitle(2), "the generic title then:");
+});
+
+await t("P3-FIX3 rendered: without undo rights, Undo is disabled with the reason as text (RecentlyPublished, UndoNotice, the publish answer); start() sends nothing", async () => {
+  const access = clone(SHAPES.getDocument.outcomes.ok.body.document.access);
+  ok(access.canPublish === false && access.reason, "the shapes' staff access");
+  const row = clone(SHAPES.listRecentlyPublished.outcomes.ok.body.rows[0]);
+  const rows = [row, { ...row, logId: "log_2", documentId: SALE.id, label: "Diwali sale", undo: { id: SALE.id, revision: 2, logId: "log_2" } }];
+  const page = html(h(Recent.default, { rows, call: async () => ({}), access, timeZone: "UTC" }));
+  const buttons = page.match(/<button[^>]*>(Undo|Undo all 2)<\/button>/g) || [];
+  eq(buttons.length, 3, "two rows and the set:");
+  ok(buttons.every((b) => /disabled=""/.test(b)), `all disabled: ${buttons}`);
+  for (const b of buttons) {
+    const id = /aria-describedby="([^"]+)"/.exec(b)?.[1];
+    ok(id && page.includes(`id="${id}"`), `the reason is named: ${b}`);
+  }
+  eq((textOf(page).match(new RegExp(access.reason.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length, 3, "the reason is shown as text, each time:");
+  const owner = html(h(Recent.default, { rows, call: async () => ({}), access: { canPublish: true, reason: null }, timeZone: "UTC" }));
+  ok(!/disabled=""[^>]*>Undo/.test(owner) && !owner.includes("data-undo-reason"), "an owner's Undo is enabled");
+  const notice = html(h(Undo.default, { target: { kind: "one", label: "Diwali sale", undo: { id: SALE.id, revision: 2, logId: "log_2" } }, call: async () => ({}), access }));
+  ok(/<button[^>]*disabled=""[^>]*>Undo<\/button>/.test(notice) && textOf(notice).includes(access.reason), "UndoNotice");
+  ok(textOf(html(h(Undo.UndoNoticeView, { state: { phase: "idle" }, target: SET_T(), access: { canUndo: false } }))).includes(M.WORDS.staffUndoReason), "the default reason");
+  // the publish answer's Undo, for a host that passes staff access
+  const ok2 = clone(P.ok);
+  ok2.body.published[0].id = SALE.id;
+  const out = M.outcomeOf(answer(ok2), { items: [SALE] });
+  const done = html(h(Panel.PublishPanelView, { state: { phase: "done", outcome: out, items: [SALE], order: [], lists: {} }, access, call: async () => ({}) }));
+  ok(/<button[^>]*disabled=""[^>]*>Undo<\/button>/.test(done), "the publish answer's Undo");
+  const call = stub({});
+  eq(await M.createUndoFlow({ call, access }).start({ kind: "one", label: "x", undo: { id: SALE.id, revision: 2, logId: "log_2" } }), null, "start refused:");
+  eq(call.calls.length, 0, "no call:");
+});
+
+await t("P3-FIX3 pins: whole-set Undo needs two undoable rows; stale answers are ignored (lists, open, Undo start); a double confirm sends once; pinned() needs a revision", async () => {
+  // (1) the threshold
+  const row = clone(SHAPES.listRecentlyPublished.outcomes.ok.body.rows[0]);
+  const g = M.recentGroupsOf([row, { ...row, logId: "log_2", canUndo: false, undo: null }]);
+  eq([g.length, g[0].rows.length, g[0].undoSet], [1, 2, null], "one undoable row of two: no set Undo:");
+  // (2a) loadLists: an answer for an older open is dropped
+  const slow = later();
+  const call = stub({ listChanges: (a) => (a.id === HOME.id ? slow.p : changes([{ kind: "edited", sectionId: "sec_x", words: "Banner: title changed" }])) });
+  const flow = M.createPublishFlow({ call });
+  const first = flow.open([HOME]);
+  await tick();
+  flow.close();
+  await flow.open([SALE]);
+  slow.res(changes([{ kind: "edited", sectionId: "sec_hero", words: "Hero: title changed" }]));
+  await first;
+  eq([Object.keys(flow.getState().lists), Object.keys(flow.getState().firstPublish).includes(HOME.id)], [[SALE.id], false], "the older answer is dropped:");
+  // (2b) open(): a pin that answers after a newer open is dropped
+  const pin = later();
+  const c2 = stub({ getDocument: () => pin.p, listChanges: changes([{ kind: "edited", sectionId: "sec_x", words: "Banner: title changed" }]) });
+  const f2 = M.createPublishFlow({ call: c2 });
+  const o1 = f2.open([{ id: HOME.id, label: "Home page" }]);
+  await tick();
+  await f2.open([SALE]);
+  pin.res({ ok: true, data: { ok: true, document: DOC({ revision: 9, draftHash: "h_9" }) } });
+  await o1;
+  eq(f2.getState().items.map((i) => i.id), [SALE.id], "the newer open wins:");
+  eq(c2.calls.filter((c) => c.op === "listChanges").map((c) => c.args.id), [SALE.id], "no list for the older open:");
+  // (2c) Undo start: an older dry run answering late changes nothing
+  const d1 = later();
+  const t1 = { kind: "one", label: "Home page", undo: { id: HOME.id, revision: 3, logId: "log_1" } };
+  const t2 = { kind: "one", label: "Diwali sale", undo: { id: SALE.id, revision: 2, logId: "log_2" } };
+  const dryB = { ok: true, data: { ok: true, willTakeOffline: false, linkers: [], changes: [{ words: "Banner: back to before" }], target: null } };
+  const u = M.createUndoFlow({ call: stub({ undo: (a) => (a.id === HOME.id ? d1.p : clone(dryB)) }) });
+  const s1 = u.start(t1);
+  await u.start(t2);
+  d1.res({ ok: true, data: { ok: true, willTakeOffline: true, linkers: [], changes: [{ words: "Taken offline" }], target: null } });
+  await s1;
+  eq([u.getState().target === t2, u.getState().phase, u.getState().view.changes], [true, "confirm", ["Banner: back to before"]], "the newer Undo stays:");
+  // (3) a double confirm sends one publish
+  const pub = later();
+  const c3 = stub({ listChanges: changes([{ kind: "edited", sectionId: "sec_hero", words: "Hero: title changed" }]), publish: () => pub.p });
+  const f3 = M.createPublishFlow({ call: c3 });
+  await f3.open([HOME]);
+  const a = f3.confirm();
+  eq(f3.canConfirm(), false, "busy: Confirm is off:");
+  const b = await f3.confirm();
+  pub.res(answer(P.ok));
+  await a;
+  eq([b, c3.ops().filter((x) => x === "publish").length], [null, 1], "one publish:");
+  // ...and a double Undo confirm sends one undo
+  const un = later();
+  const c4 = stub({ undo: (x) => (x.dryRun ? clone(dryB) : un.p) });
+  const f4 = M.createUndoFlow({ call: c4 });
+  await f4.start(t2);
+  const ua = f4.confirm();
+  eq(await f4.confirm(), null, "the second Undo confirm:");
+  un.res({ ok: true, data: { ok: true, message: "“Diwali sale” is back.", document: DOC({ id: SALE.id }) } });
+  await ua;
+  eq(c4.calls.filter((c) => !c.args.dryRun).length, 1, "one undo:");
+  // (4) pinned(): a hash without a revision is read again
+  const c5 = stub({ getDocument: { ok: true, data: { ok: true, document: DOC({ revision: 7, draftHash: "h_7" }) } }, listChanges: changes([{ kind: "edited", sectionId: "sec_hero", words: "Hero: title changed" }]) });
+  const f5 = M.createPublishFlow({ call: c5 });
+  await f5.open([{ id: HOME.id, label: "Home page", draftHash: "h_draft" }]);
+  eq([c5.ops()[0], f5.getState().items[0].revision, f5.getState().items[0].draftHash], ["getDocument", 7, "h_7"], "read again:");
+});
+
+await t("P3-FIX3 pins (rendered): the offer review hides the per-issue Publish both; the home link says 'Make your home page'", async () => {
+  const call = stub({ listChanges: changes([{ kind: "edited", sectionId: "sec_x", words: "Banner: title changed" }]), publish: answer(P.linksToUnpublished) });
+  const flow = M.createPublishFlow({ call });
+  await flow.open([HOME]);
+  await flow.confirm();
+  await tick();
+  eq(flow.getState().phase, "offer", "the offer:");
+  ok((flow.getState().outcome.issues || []).some((i) => (i.actions || []).some((x) => x.type === "publishBoth")), "an issue carries publishBoth");
+  const page = renderPanel(flow);
+  eq((page.match(/>Publish both</g) || []).length, 1, "only the review's own Confirm says Publish both:");
+  const noHome = html(h(Panel.PublishPanelView, { state: { phase: "noHome", outcome: { phase: "noHome", title: M.WORDS.noHomeTitle, message: "Make it." }, items: [], order: [], lists: {} } }));
+  ok(/<a href="\/admin\/editor\?path=%2F"[^>]*>Make your home page<\/a>/.test(noHome), `the link and its words: ${noHome}`);
+});
+
+await t("P3-FIX3: closing the panel while a fix runs says it keeps running; the fix finishes without opening the panel again, and onPublished hears it", async () => {
+  const save = later();
+  const call = stub({
+    listChanges: changes([{ kind: "edited", sectionId: "sec_hero", words: "Hero: title changed" }]),
+    publish: (a, x, n) => (n === 1 ? answer(P.validationFailed) : answer(P.ok)),
+    getDocument: { ok: true, data: { ok: true, document: DOC({ body: HOME_BODY, revision: 3 }) } },
+    saveDraft: () => save.p,
+  });
+  const heard = [];
+  const adopted = [];
+  const flow = M.createPublishFlow({ call, onPublished: (o) => heard.push(o.phase), onDocument: (d) => adopted.push(d.revision) });
+  await flow.open([HOME]);
+  await flow.confirm();
+  const issue = flow.getState().outcome.issues[0];
+  const running = flow.act(issue.actions[0], issue);
+  await tick();
+  eq([flow.getState().phase, flow.getState().busy, flow.running()], ["blocked", true, true], "running:");
+  ok(textOf(renderPanel(flow)).includes(M.WORDS.keepsRunning), "says it keeps running");
+  flow.close();
+  save.res({ ok: true, data: { ok: true, document: DOC({ revision: 4, draftHash: "h_after_fix" }), issues: [] } });
+  await running;
+  eq(call.ops(), ["listChanges", "publish", "getDocument", "saveDraft", "publish"], "the fix ran to the end:");
+  eq([flow.getState().phase, heard, adopted], ["closed", ["done"], [4]], "the panel stays closed; the host hears it:");
+  ok(!textOf(html(h(Panel.PublishPanelView, { state: { phase: "blocked", busy: false, outcome: { issues: [], message: "x" }, items: [], order: [], lists: {} } }))).includes(M.WORDS.keepsRunning), "not said when nothing runs");
 });
 
 const secs = ((Date.now() - started) / 1000).toFixed(1);

@@ -78,13 +78,43 @@ await t("unit: each listed path opens its document", () => {
 });
 
 await t("unit: an unknown path opens home with a note that names the path", () => {
-  for (const path of ["/nowhere", "/campaigns/missing", "/journal/", "/policies/a/b", "/products/serum"]) {
+  for (const path of ["/nowhere", "/campaigns/missing", "/journal/missing", "/policies/a/b", "/About"]) {
     const r = open({ path });
     eq(r.document.id, "doc_home", `${path}:`);
     ok(typeof r.note === "string" && r.note.includes("home page") && r.note.includes(path.replace(/\/$/, "") || "/"), `${path}: note ${r.note}`);
   }
   const bad = open({ path: "https://evil.example/about" });
   ok(bad.document.id === "doc_home" && bad.note && !bad.note.includes("evil"), `an off-site address: ${JSON.stringify(bad)}`);
+});
+
+await t("P3-FIX3 unit: 'Edit this page' on a product or collection opens its layout; no store route with real data says 'Nothing on your store lives at'", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const p = open({ path: "/products/whey-protein?variant=1" });
+  eq([p.document.id, p.document.type, p.note], ["doc_product_layout", "product_layout", E.NOTES.productLayout], "/products/x:");
+  const c = open({ path: "/collections/protein/" });
+  eq([c.document.id, c.document.type, c.note], ["doc_collection_layout", "collection_layout", E.NOTES.collectionLayout], "/collections/x:");
+  eq([open({ path: "/collections" }).document.id, open({ path: "/collections" }).note], ["doc_collections_index", null], "/collections:");
+  // a row, when the store has one, is used as it is
+  eq(open({ path: "/products/x" }, [...DOCS, { id: "doc_product_layout", type: "product_layout", slug: null, label: "My layout" }]).document.label, "My layout", "the row:");
+  for (const path of ["/journal", "/journal/", "/campaigns", "/search", "/search?q=whey", "/cart", "/checkout", "/account/orders", "/wishlist", "/policies"]) {
+    const r = open({ path });
+    eq([r.document.id, r.note], ["doc_home", E.NOTES.storeData], `${path}:`);
+  }
+  // /about and /contact before their page exists: the store's own words, not "nothing"
+  eq(open({ path: "/about" }, DOCS.filter((d) => d.slug !== "about")).note, E.NOTES.storeData, "/about with no page yet:");
+  // every storefront route folder is placed: a document route or a store route
+  const folders = (await readdir(join(ROOT, "app/(storefront)"), { withFileTypes: true })).filter((d) => d.isDirectory() && !d.name.startsWith("[") && !d.name.startsWith("(")).map((d) => d.name);
+  ok(folders.length > 10, `folders: ${folders}`);
+  for (const f of folders) {
+    ok(E.STORE_ROUTES.has(f), `the storefront route /${f} is in STORE_ROUTES`);
+    for (const path of [`/${f}`, `/${f}/x`]) {
+      const note = open({ path }).note || "";
+      const isDocPage = ["policies", "campaigns", "journal"].includes(f) && path !== `/${f}`;
+      ok(isDocPage || !note.includes("Nothing on your store lives at"), `${path}: ${note}`);
+    }
+  }
+  // a page, campaign or post that isn't there is still "nothing"
+  ok(open({ path: "/campaigns/missing" }).note.includes("Nothing on your store lives at /campaigns/missing"), "a missing campaign");
 });
 
 await t("unit: every document with an address round-trips: livePath(doc) opens that doc", () => {
@@ -418,6 +448,26 @@ await t("rendered: SidebarNav in documents mode links the storefront to /admin/e
   ok(s.filter((h) => h === "/admin/editor").length === 1 && !s.includes("/admin/storefront/designer") && !s.includes("/admin/brand"), `shell: ${s}`);
 });
 
+await t("P3-FIX3 rendered: the phone drawer, rendered open, gets cmsMode too: documents links to the editor, legacy is unchanged", () => {
+  const docs = shell({ cmsMode: "documents", drawerOpen: true });
+  const drawer = docs.slice(docs.indexOf("<dialog"), docs.indexOf("</dialog>"));
+  ok(drawer.includes("Close menu"), "the drawer is open");
+  const inDrawer = hrefs(drawer);
+  ok(inDrawer.includes("/admin/editor"), `the drawer links to the editor: ${inDrawer}`);
+  for (const old of LEGACY_STOREFRONT.slice(0, 8)) ok(!inDrawer.includes(old), `the drawer still links to ${old}`);
+  eq(hrefs(docs).filter((h) => h === "/admin/editor").length, 2, "both sidebars:");
+  // on an editor route the drawer is the only nav, and it has the mode too
+  const ed = shell({ cmsMode: "documents", drawerOpen: true }, "/admin/editor");
+  ok(hrefs(ed).includes("/admin/editor") && !hrefs(ed).includes("/admin/storefront/designer"), `editor route drawer: ${hrefs(ed)}`);
+  // legacy: the open drawer is the legacy nav
+  const legacy = shell({ cmsMode: "legacy", drawerOpen: true });
+  const lDrawer = hrefs(legacy.slice(legacy.indexOf("<dialog"), legacy.indexOf("</dialog>")));
+  eq(lDrawer, hrefs(shell({ drawerOpen: true }).slice(shell({ drawerOpen: true }).indexOf("<dialog"))).slice(0, lDrawer.length), "legacy drawer as without a mode:");
+  ok(lDrawer.includes("/admin/storefront/designer") && !lDrawer.includes("/admin/editor"), `legacy drawer: ${lDrawer}`);
+  // closed (the default), the drawer renders no links
+  eq(hrefs(shell({ cmsMode: "documents" })).filter((h) => h === "/admin/editor").length, 1, "closed, only the desktop sidebar:");
+});
+
 await t("rendered: SidebarNav outside documents mode is exactly the legacy nav", () => {
   pathname = "/admin/storefront/home";
   const base = renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "owner", badges: {} }));
@@ -647,6 +697,23 @@ await t("unit: candidateFailure words every failure plainly, never as 'nothing w
   eq(F(cases[1][0]).issues.length, 1, "the issues ride along:");
 });
 
+await t("P3-FIX3 unit: candidateFailure keeps a 5xx answer's own plain message, and on a migrating store doesn't suggest Save will work", () => {
+  const F = DesignerMod.candidateFailure;
+  const mode = F({ ok: false, status: 503, code: "CMS_MODE_UNAVAILABLE", error: "We couldn't check which editor this store uses, so nothing was saved. Try again in a minute." });
+  eq(mode.message.startsWith("We couldn't check which editor this store uses, so the preview didn't update. Try again in a minute."), true, `its own words: ${mode.message}`);
+  ok(!/nothing was saved\./.test(mode.message) && mode.message.includes("still shows an earlier version"), mode.message);
+  const plain503 = F({ ok: false, status: 503, code: "BUSY", error: "The store is busy right now." });
+  ok(plain503.message.startsWith("The store is busy right now. The preview didn't update."), plain503.message);
+  // a message with a code in it, or none, still gets the generic words
+  ok(/went wrong on our side \(error 503\)/.test(F({ ok: false, status: 503, code: "DB_DOWN", error: "Something failed (DB_DOWN), so nothing was saved." }).message), "a code in the message");
+  ok(/went wrong on our side \(error 500\)/.test(F({ ok: false, status: 500 }).message), "no message");
+  // migrating: the refusal's words, and no promise that Save works
+  const mig = F({ ok: false, status: 409, code: "STORE_USES_DOCUMENTS", error: "This store is moving to the new editor right now, so the preview didn't change. Make this change in the new editor once the move is done." });
+  ok(mig.message.startsWith("This store is moving to the new editor right now") && mig.message.includes("still shows an earlier version"), mig.message);
+  ok(!/until you press Save/.test(mig.message) && /can't be saved here/.test(mig.message), `no Save promise: ${mig.message}`);
+  ok(/until you press Save/.test(F({ ok: false, status: 409, code: "NO_PREVIEW", error: "The preview isn't open any more." }).message), "other answers still say Save keeps them");
+});
+
 await t("rendered: a failed push shows a plain message, and the label stops saying the preview shows the edits", async () => {
   const d = await designerSession();
   try {
@@ -699,10 +766,48 @@ await t("rendered: an incomplete section names the section and links to it; an e
     API.answers.push({ ok: false, error: "boom, nothing was saved", code: "INTERNAL", status: 500 });
     d.typeTitle("y");
     await d.push();
-    ok(/error 500/.test(renderToStaticMarkup(d.banner())) && !d.banner().props.actions, "a server error");
+    // P3-FIX3: a 5xx answer's own plain words are kept, worded for the preview
+    ok(/boom, so the preview didn(&#x27;|')t update/.test(renderToStaticMarkup(d.banner())) && !d.banner().props.actions, `a server error: ${renderToStaticMarkup(d.banner())}`);
   } finally {
     d.done();
   }
+});
+
+await t("P3-FIX3 rendered: 'Reopen preview' clears the failed-push message, and so does undoing the edits back to the last save", async () => {
+  const d = await designerSession();
+  try {
+    // an expired preview, then Reopen
+    API.answers.push({ ok: false, error: "The preview isn't open any more. Reopen the preview, then keep editing.", code: "NO_PREVIEW", status: 409 });
+    d.typeTitle("Skin first, again");
+    await d.push();
+    const reopen = d.banner()?.props.actions;
+    ok(reopen && textOf(reopen) === "Reopen preview", "Reopen is offered");
+    reopen.props.onClick();
+    await flush();
+    d.s.render();
+    ok(!d.banner(), `Reopen clears it: ${d.banner() && renderToStaticMarkup(d.banner())}`);
+  } finally {
+    d.done();
+  }
+  const e = await designerSession();
+  try {
+    API.answers.push({ ok: false, error: "We couldn't reach Storeasy, so nothing was saved.", code: "NETWORK" });
+    e.typeTitle("Skin first, typed");
+    await e.push();
+    ok(e.banner(), "the failed push shows");
+    const before = API.pushes.length;
+    e.typeTitle("Skin first"); // back to the last save: nothing dirty
+    await e.push();
+    eq(API.pushes.length, before, "nothing is pushed:");
+    ok(!e.banner() && /Preview shows your last save/.test(e.status()), `undoing the edits clears it: ${e.status()}`);
+  } finally {
+    e.done();
+  }
+});
+
+await t("P3-FIX3 unit: editorHref encodes the id", () => {
+  eq(E.editorHref("doc a&b=c"), "/admin/editor?doc=doc%20a%26b%3Dc", "encoded:");
+  eq([E.editorHref(""), E.editorHref(null)], ["/admin/editor", "/admin/editor"], "none:");
 });
 
 await t("rendered: Designer's static render is unchanged when nothing failed (no banner)", () => {

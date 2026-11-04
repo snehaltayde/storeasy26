@@ -526,5 +526,209 @@ await t("the open picker lists every registered kind for the type with its label
   ok(closed.includes("Add a section") && !closed.includes("data-kind"), "closed, it is one button");
 });
 
+// ---- P3-FIX3: the batch 3 review findings --------------------------------------------
+console.log("— P3-FIX3");
+
+// Drive the real component: a host calls it as a plain function (its hooks are
+// the host's), and the element tree it returns is searched for a button's props.
+function drive(Component, props) {
+  let tree = null;
+  const Host = () => {
+    tree = Component(props);
+    return null;
+  };
+  renderToStaticMarkup(React.createElement(Host));
+  const all = [];
+  const walk = (node) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (node.props) {
+      all.push(node);
+      walk(node.props.children);
+    }
+  };
+  walk(tree);
+  const find = (pred) => all.find((n) => pred(n.props, n))?.props || null;
+  return { find, all };
+}
+const record = () => {
+  const changes = [];
+  const selects = [];
+  return { changes, selects, onChange: (next, info) => changes.push({ next, info }), onSelect: (id) => selects.push(id) };
+};
+// the whole row, its reasons list included (rowOf stops at the first </li>)
+const wholeRow = (html, id) => {
+  const start = html.indexOf(`data-section-row="${id}"`);
+  ok(start >= 0, `no row for ${id}`);
+  const next = html.indexOf("data-section-row=", start + 20);
+  return html.slice(html.lastIndexOf("<li", start), next < 0 ? html.indexOf("</ol>", start) : html.lastIndexOf("<li", next));
+};
+const buttonTag = (html, label) => html.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`))?.[0] || "";
+
+await t("P3-FIX3 rendered: every enabled tree icon button keeps its label as its tooltip; a disabled one's title is its reason", () => {
+  const html = renderToStaticMarkup(React.createElement(SectionTree, { type: "home", sections: sample("home"), selectedId: "sec_text" }));
+  const row = rowOf(html, "sec_text");
+  for (const label of ["Move Text up", "Move Text down", "Hide Text", "Copy Text", "Delete Text"]) {
+    const tag = buttonTag(row, label);
+    ok(tag && !tag.includes('disabled=""'), `${label} is enabled`);
+    ok(tag.includes(`title="${label}"`), `${label} has its tooltip: ${tag}`);
+  }
+  const hero = buttonTag(rowOf(html, "sec_hero"), "Move Hero down");
+  ok(/disabled=""/.test(hero) && /title="The hero can only go at the top/.test(hero), `disabled with its reason: ${hero}`);
+});
+
+await t("P3-FIX3 rendered: a disabled button's reason is text under the row, named by aria-describedby; at the top, Move up is disabled", () => {
+  const html = renderToStaticMarkup(React.createElement(SectionTree, { type: "product_layout", sections: sample("product_layout"), selectedId: null }));
+  const row = wholeRow(html, "sec_main");
+  for (const verb of ["Hide", "Copy", "Delete"]) {
+    const tag = buttonTag(row, `${verb} Product details and buy button`);
+    const id = /aria-describedby="([^"]+)"/.exec(tag)?.[1];
+    ok(id, `${verb} names its reason: ${tag}`);
+    const li = row.match(new RegExp(`<li id="${id}"( class="[^"]*")?>([^<]*)</li>`));
+    ok(li && li[2].length > 10 && !/sr-only/.test(li[1] || ""), `${verb}: the reason is visible text: ${li?.[0]}`);
+    ok(tag.includes(`title="${li[2].replace(/'/g, "&#x27;")}"`), `${verb}: the title is the same reason`);
+  }
+  ok(row.includes("can&#x27;t be hidden: shoppers need it to buy") || row.includes("can't be hidden: shoppers need it to buy"), "the hide reason is readable");
+  // the first row: Move up is disabled, its reason only for screen readers
+  const first = wholeRow(html, "sec_rich");
+  const up = buttonTag(first, "Move Rich text up");
+  ok(/disabled=""/.test(up), `Move up is disabled at the top: ${up}`);
+  const upId = /aria-describedby="([^"]+)"/.exec(up)?.[1];
+  ok(upId && new RegExp(`<li id="${upId}" class="sr-only">This section is already at the top.</li>`).test(first), "the top's reason is for screen readers");
+  // an enabled button names nothing
+  ok(!/aria-describedby/.test(buttonTag(wholeRow(renderToStaticMarkup(React.createElement(SectionTree, { type: "home", sections: sample("home"), selectedId: null })), "sec_text"), "Copy Text")), "an enabled button has no aria-describedby");
+});
+
+await t("P3-FIX3 unit+rendered: a copy (or an add) that would make the draft too big to save is refused with DRAFT_TOO_LARGE", async () => {
+  const big = "x".repeat(19_000);
+  const s = [sec("rich_text", "sec_big0", { html: `<p>${big}</p>` })];
+  let sections = s;
+  let copies = 0;
+  for (; copies < 40; copies++) {
+    const r = T.duplicate(sections, "sec_big0", { type: "page", body: bodyOf("page", sections) });
+    if (!r.ok) {
+      eq([r.code, /too big to save/.test(r.message)], ["DRAFT_TOO_LARGE", true], "refused:");
+      break;
+    }
+    sections = r.sections;
+    ok(validateDocument(bodyOf("page", sections), { mode: "draft" }).ok, `copy ${copies + 1} saves`);
+  }
+  ok(copies > 0 && copies < 40, `refused at copy ${copies + 1}`);
+  // the refused copy really would not save
+  const forced = [...sections, { ...sections[0], id: "sec_forced1" }];
+  eq(validateDocument(bodyOf("page", forced), { mode: "draft" }).issues.filter((i) => i.code === "DRAFT_TOO_LARGE").length, 1, "the draft cap agrees:");
+  // the tree shows Copy disabled with that reason
+  const html = renderToStaticMarkup(React.createElement(SectionTree, { type: "page", sections, body: bodyOf("page", sections), selectedId: null }));
+  const tag = buttonTag(wholeRow(html, "sec_big0"), "Copy Rich text");
+  ok(/disabled=""/.test(tag) && /too big to save/.test(tag), `Copy is disabled: ${tag}`);
+  // without the body, the sections alone are measured
+  eq(T.duplicate(sections, "sec_big0", { type: "page" }).code, "DRAFT_TOO_LARGE", "sections alone:");
+  // an add too
+  const { DRAFT_MAX_BYTES } = await import("../lib/registry/validate.js");
+  const bytes = (b) => new TextEncoder().encode(JSON.stringify(b)).length;
+  const near = bodyOf("page", s);
+  near.meta.description = "";
+  near.meta.description = "d".repeat(DRAFT_MAX_BYTES - bytes(near) - 20); // 20 bytes under the cap
+  ok(bytes(near) <= DRAFT_MAX_BYTES, "the padded draft is under the cap");
+  eq(T.add(s, "text", 1, { type: "page", body: near }).code, "DRAFT_TOO_LARGE", "an add over the cap:");
+  ok(T.add(s, "text", 1, { type: "page", body: bodyOf("page", s) }).ok, "an add under the cap");
+  // the tree passes its body: the copy is disabled and a call does nothing,
+  // though the sections alone are small
+  const padded = bodyOf("page", s);
+  padded.meta.description = "d".repeat(DRAFT_MAX_BYTES - bytes(padded) - 100);
+  const shown = renderToStaticMarkup(React.createElement(SectionTree, { type: "page", sections: s, body: padded, selectedId: null }));
+  ok(/disabled=""/.test(buttonTag(wholeRow(shown, "sec_big0"), "Copy Rich text")), "Copy is disabled by the body's size");
+  const rec = record();
+  drive(SectionTree, { type: "page", sections: s, body: padded, selectedId: null, ...rec }).find((p) => p.label === "Copy Rich text").onClick();
+  eq(rec.changes.length, 0, "a copy call is refused:");
+  ok(T.duplicate(s, "sec_big0", { type: "page", body: bodyOf("page", s) }).ok, "a small draft copies");
+});
+
+await t("P3-FIX3 driven: move, copy and delete call onChange and onSelect; Delete asks first; Move up is refused at the top", () => {
+  const s = sample("home");
+  // move: the moved row is selected (even an unselected one)
+  let r = record();
+  let d = drive(SectionTree, { type: "home", sections: s, selectedId: "sec_text", ...r });
+  d.find((p) => p.label === "Move Banner down").onClick();
+  eq([r.changes[0].info.op, r.changes[0].next.map((x) => x.id), r.selects], ["moveDown", ["sec_hero", "sec_coll", "sec_text", "sec_bann", "sec_faq"], ["sec_bann"]], "move:");
+  // copy: the copy is selected
+  r = record();
+  d = drive(SectionTree, { type: "home", sections: s, selectedId: "sec_text", ...r });
+  d.find((p) => p.label === "Copy Text").onClick();
+  const copyId = r.changes[0].info.id;
+  ok(copyId !== "sec_text" && r.changes[0].next[4].id === copyId, "the copy is below the original");
+  eq(r.selects, [copyId], "the copy is selected:");
+  // delete asks first: the trash icon calls nothing
+  r = record();
+  d = drive(SectionTree, { type: "home", sections: s, selectedId: "sec_text", ...r });
+  d.find((p) => p.label === "Delete Text").onClick();
+  eq([r.changes.length, r.selects.length], [0, 0], "the trash icon only asks:");
+  // the confirm: Delete removes, the neighbour is selected; Keep it removes nothing
+  r = record();
+  d = drive(SectionTree, { type: "home", sections: s, selectedId: "sec_text", confirmingId: "sec_text", ...r });
+  ok(d.find((p) => p["aria-label"] === "Delete Text: Our story?"), "the confirm shows in the row");
+  ok(!d.find((p) => p.label === "Delete Text"), "the row's buttons give way to it");
+  d.find((p, n) => n.type !== "p" && p.variant === "ghost" && p.children === "Keep it").onClick();
+  eq(r.changes.length, 0, "Keep it changes nothing:");
+  d.find((p) => p.variant === "danger" && p.children === "Delete").onClick();
+  eq([r.changes[0].info.op, r.changes[0].next.map((x) => x.id), r.selects], ["remove", ["sec_hero", "sec_coll", "sec_bann", "sec_faq"], ["sec_faq"]], "delete:");
+  // at the top: Move up is disabled, and does nothing if called
+  r = record();
+  d = drive(SectionTree, { type: "home", sections: s, selectedId: null, ...r });
+  const up = d.find((p) => p.label === "Move Hero up");
+  ok(up.disabled === true, "Move up is disabled at the top");
+  up.onClick();
+  eq(r.changes.length, 0, "and refused:");
+});
+
+await t("P3-FIX3 pin: a copy's block ids are minted against the document's ids (a drawn block id already in use is drawn again)", () => {
+  defineSection({ kind: "tree_blocks2", documentTypes: ["page"], label: "Blocks probe two", blocks: { allowed: ["x"], max: 5 } });
+  const real = crypto.getRandomValues.bind(crypto);
+  let forced = 0;
+  Object.defineProperty(crypto, "getRandomValues", { value: (arr) => (forced++ < 6 ? arr.fill(0xaa) : real(arr)), configurable: true, writable: true });
+  try {
+    const s = deepFreeze([{ id: "sec_bbbbbbbb", kind: "tree_blocks2", v: 1, enabled: true, settings: {}, blocks: [{ id: "blk_aaaaaaaa" }] }]);
+    const r = T.duplicate(s, "sec_bbbbbbbb", { type: "page" });
+    ok(r.ok, r.message);
+    const ids = r.sections.flatMap((x) => [x.id, ...(x.blocks || []).map((b) => b.id)]);
+    eq(ids.length, new Set(ids).size, `ids unique: ${ids}`);
+    ok(forced >= 2, "the forced draws were used");
+  } finally {
+    delete crypto.getRandomValues;
+    if (crypto.getRandomValues !== Object.getPrototypeOf(crypto).getRandomValues) Object.defineProperty(crypto, "getRandomValues", { value: real, configurable: true, writable: true });
+    removeSection("tree_blocks2");
+  }
+});
+
+await t("P3-FIX3 driven: AddSection adds below the selected row with the tree's collections, and selects the new section at once (ED-04)", () => {
+  const s = sample("home").filter((x) => x.kind !== "collections");
+  const collections = [
+    { handle: "empty", id: "gid://shopify/Collection/1", available_count: 0, product_count: 0 },
+    { handle: "protein", id: "gid://shopify/Collection/2", available_count: 3, product_count: 3 },
+  ];
+  const r = record();
+  const d = drive(SectionTree, { type: "home", sections: s, selectedId: "sec_bann", collections, ...r });
+  const addProps = d.find((p, n) => n.type === AddSection);
+  eq([addProps.index, addProps.collections === collections, addProps.onSelect === r.onSelect, addProps.afterLabel], [s.findIndex((x) => x.id === "sec_bann") + 1, true, true, "banner"], "the picker's props:");
+  const picker = drive(AddSection, { ...addProps, open: true });
+  picker.find((p) => p["data-kind"] === "product_rail").onClick();
+  const { next, info } = r.changes[0];
+  const at = next.findIndex((x) => x.id === info.id);
+  eq([info.op, at, next[at].kind, r.selects], ["add", s.findIndex((x) => x.id === "sec_bann") + 1, "product_rail", [info.id]], "added below and selected:");
+  ok(JSON.stringify(next[at]).includes("protein") && !JSON.stringify(next[at]).includes('"empty"'), `the rail got the collection with products: ${JSON.stringify(next[at].settings)}`);
+  // nothing selected: at the end
+  const r2 = record();
+  const d2 = drive(SectionTree, { type: "home", sections: s, selectedId: null, ...r2 });
+  eq(d2.find((p, n) => n.type === AddSection).index, s.length, "nothing selected: at the end:");
+});
+
+await t("P3-FIX3 rendered: 'Needs a fix' marks a section with an error, and only that one", () => {
+  const s = sample("home");
+  const issues = { sec_text: [{ severity: "error", code: "TOO_LONG", sectionId: "sec_text", message: "Too long." }], sec_faq: [{ severity: "warning", code: "X", sectionId: "sec_faq", message: "Check." }] };
+  const html = renderToStaticMarkup(React.createElement(SectionTree, { type: "home", sections: s, selectedId: null, issuesBySection: issues }));
+  ok(rowOf(html, "sec_text").includes(">Needs a fix</span>"), "the error row");
+  for (const id of ["sec_hero", "sec_coll", "sec_bann", "sec_faq"]) ok(!rowOf(html, id).includes("Needs a fix"), `${id} is not marked`);
+});
+
 console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);
 process.exit(fail ? 1 : 0);

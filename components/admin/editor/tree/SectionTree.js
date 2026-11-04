@@ -11,6 +11,9 @@
 //     onSelect(id)     a row was picked (or the selection moved after a delete)
 //     issuesBySection  { [sectionId]: issues } (treeModel.groupIssues)
 //     collections      for a new product rail (starterSection)
+//     body             the whole draft (optional): a copy or an add that would
+//                      make it too big to save is refused (DRAFT_TOO_LARGE)
+//     confirmingId     the row whose delete confirm shows first (tests, hosts)
 //   />
 //
 // Each row shows the kind's label and the section's own title, and is marked:
@@ -18,9 +21,13 @@
 //   Unfinished   the section has an "incomplete" issue (DOC-05, PV-02)
 //   Needs a fix  the section has an "error" issue
 //   Hidden       enabled:false, or hidden on both screens (TREE-05)
-// Its buttons (move up, move down, hide or show, copy, delete) are disabled,
-// with the reason as their title, whenever the registry's composition rules
-// would refuse the result. Delete asks once, in the row.
+// Its buttons (move up, move down, hide or show, copy, delete) are disabled
+// whenever the registry's composition rules would refuse the result. Every
+// button's title is its reason when disabled, else its label (P3-FIX3: an
+// enabled icon keeps its tooltip). A disabled button can't take focus, so its
+// reason is also text under the row, named by the button's aria-describedby;
+// "already at the top / bottom" is only for screen readers (the greyed arrow
+// says it). Delete asks once, in the row.
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, Trash2 } from "lucide-react";
 import { cx } from "@/components/console/cx";
@@ -31,12 +38,15 @@ import { moveUp, moveDown, hide, show, duplicate, remove, rowActions, rowState }
 
 const OPS = { moveUp, moveDown, hide, show, duplicate, remove };
 
-export default function SectionTree({ type, sections, selectedId = null, onChange, onSelect, issuesBySection = {}, collections = null }) {
-  const [confirmId, setConfirmId] = useState(null);
+// a reason that the button's place already says
+const OBVIOUS = new Set(["AT_TOP", "AT_BOTTOM"]);
+
+export default function SectionTree({ type, sections, selectedId = null, onChange, onSelect, issuesBySection = {}, collections = null, body = null, confirmingId = null }) {
+  const [confirmId, setConfirmId] = useState(confirmingId);
   const list = Array.isArray(sections) ? sections : [];
 
   const run = (op, id) => {
-    const r = OPS[op](list, id, { type });
+    const r = OPS[op](list, id, { type, body });
     if (!r.ok) return;
     setConfirmId(null);
     onChange?.(r.sections, { op, id: r.id ?? id, selectedId: r.selectedId });
@@ -56,8 +66,20 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
             const id = s && typeof s.id === "string" ? s.id : null;
             const row = rowState(s, id ? issuesBySection?.[id] : []);
             const selected = id != null && id === selectedId;
-            const can = id ? rowActions(list, id, type) : null;
+            const can = id ? rowActions(list, id, type, { body }) : null;
             const name = row.title ? `${row.label}: ${row.title}` : row.label;
+            const buttons = can
+              ? [
+                  { op: "moveUp", label: `Move ${row.label} up`, icon: <ArrowUp size={14} aria-hidden />, onClick: () => run("moveUp", id) },
+                  { op: "moveDown", label: `Move ${row.label} down`, icon: <ArrowDown size={14} aria-hidden />, onClick: () => run("moveDown", id) },
+                  row.hidden
+                    ? { op: "show", label: `Show ${row.label}`, icon: <Eye size={14} aria-hidden />, onClick: () => run("show", id) }
+                    : { op: "hide", label: `Hide ${row.label}`, icon: <EyeOff size={14} aria-hidden />, onClick: () => run("hide", id) },
+                  { op: "duplicate", label: `Copy ${row.label}`, icon: <Copy size={14} aria-hidden />, onClick: () => run("duplicate", id) },
+                  { op: "remove", label: `Delete ${row.label}`, icon: <Trash2 size={14} aria-hidden />, onClick: () => setConfirmId(id) },
+                ].map((b) => ({ ...b, ...can[b.op], whyId: !can[b.op].ok && can[b.op].reason ? `${id}--why-${b.op}` : undefined }))
+              : [];
+            const why = buttons.filter((b) => b.whyId);
             return (
               <li
                 key={id ?? `at-${i}`}
@@ -89,17 +111,22 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
                   </span>
                 </div>
                 {can && confirmId !== id && (
-                  <div className="mt-1 flex items-center gap-0.5" role="group" aria-label={`Change ${name}`}>
-                    <IconButton label={`Move ${row.label} up`} title={can.moveUp.reason || undefined} icon={<ArrowUp size={14} aria-hidden />} disabled={!can.moveUp.ok} onClick={() => run("moveUp", id)} />
-                    <IconButton label={`Move ${row.label} down`} title={can.moveDown.reason || undefined} icon={<ArrowDown size={14} aria-hidden />} disabled={!can.moveDown.ok} onClick={() => run("moveDown", id)} />
-                    {row.hidden ? (
-                      <IconButton label={`Show ${row.label}`} title={can.show.reason || undefined} icon={<Eye size={14} aria-hidden />} disabled={!can.show.ok} onClick={() => run("show", id)} />
-                    ) : (
-                      <IconButton label={`Hide ${row.label}`} title={can.hide.reason || undefined} icon={<EyeOff size={14} aria-hidden />} disabled={!can.hide.ok} onClick={() => run("hide", id)} />
+                  <>
+                    <div className="mt-1 flex items-center gap-0.5" role="group" aria-label={`Change ${name}`}>
+                      {buttons.map((b) => (
+                        <IconButton key={b.op} label={b.label} title={b.reason || b.label} icon={b.icon} disabled={!b.ok} aria-describedby={b.whyId} onClick={b.onClick} data-op={b.op} />
+                      ))}
+                    </div>
+                    {why.length > 0 && (
+                      <ul className="mt-0.5 space-y-0.5 px-1 text-[11px] text-fg-subtle" data-why="">
+                        {why.map((b) => (
+                          <li key={b.op} id={b.whyId} className={OBVIOUS.has(b.code) ? "sr-only" : undefined}>
+                            {b.reason}
+                          </li>
+                        ))}
+                      </ul>
                     )}
-                    <IconButton label={`Copy ${row.label}`} title={can.duplicate.reason || undefined} icon={<Copy size={14} aria-hidden />} disabled={!can.duplicate.ok} onClick={() => run("duplicate", id)} />
-                    <IconButton label={`Delete ${row.label}`} title={can.remove.reason || undefined} icon={<Trash2 size={14} aria-hidden />} disabled={!can.remove.ok} onClick={() => setConfirmId(id)} />
-                  </div>
+                  </>
                 )}
                 {can && confirmId === id && (
                   <div className="mt-1 flex flex-wrap items-center gap-1.5" role="group" aria-label={`Delete ${name}?`}>
@@ -123,6 +150,7 @@ export default function SectionTree({ type, sections, selectedId = null, onChang
         index={selectedIndex >= 0 ? selectedIndex + 1 : list.length}
         afterLabel={selectedRow ? selectedRow.label.toLowerCase() : ""}
         collections={collections}
+        body={body}
         onChange={onChange}
         onSelect={onSelect}
       />
