@@ -28,12 +28,17 @@ const storeHostAnswer = tenantHandler(async () => {
 const ldId = () => "ld_" + Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(16).padStart(2, "0")).join("");
 
 export async function POST(request) {
+  // The rate limit comes first, so a store host reads its release pointer and
+  // cms_state (the closed-store gate) only within the same budget.
+  const limited = rateLimit(request, { name: "leads", limit: 5, windowMs: 60 * 60 * 1000 });
+  if (limited) return limited;
   if (!isPlatformSiteHost(request.headers.get("host"))) {
+    // Only the closed store's 403 is passed on. An unknown or suspended host
+    // (tenantHandler's 404 TENANT_UNKNOWN / 503 TENANT_SUSPENDED) and every
+    // open store host get today's plain 404.
     const res = await storeHostAnswer(request).catch(() => null);
     return res?.status === 403 ? res : NOT_FOUND();
   }
-  const limited = rateLimit(request, { name: "leads", limit: 5, windowMs: 60 * 60 * 1000 });
-  if (limited) return limited;
   if (!platformConfigured()) return NextResponse.json({ error: "temporarily unavailable" }, { status: 503 });
 
   const body = await request.json().catch(() => ({}));

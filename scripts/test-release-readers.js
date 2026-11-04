@@ -65,7 +65,7 @@ process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 process.env.PLATFORM_SITE_HOSTS = "";
 
-const TENANTS = ["dv", "dz", "lg", "pre", "brk", "dm", "p0", "p1k", "sm", "lag", "bg", "beastlife", "lgx", "mgx", "prex", "prey", "mt", "ml", "bg2", "fc"];
+const TENANTS = ["dv", "dz", "lg", "pre", "brk", "dm", "p0", "p1k", "sm", "lag", "bg", "beastlife", "lgx", "mgx", "prex", "prey", "mt", "ml", "bg2", "fc", "dpo"];
 const dbs = [".test-rr-default.db", ".test-rr-platform.db", ".test-rr-legacy-outputs.json", ".test-rr-journal-outputs.json", ...TENANTS.map((t) => `.test-rr-${t}.db`)];
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
@@ -1086,6 +1086,22 @@ await t("PUB-06: a valid preview session on a closed store still previews the dr
   }
   await withTenant(DM, () => PS.revokePreviewSession({ sid: s.sid }));
   eq((await asRequest("dm.test", () => withTenant(DM, () => Res.contentSource()), cookies)).mode, "closed", "revoked:");
+});
+
+await t("P3-FIX1: a v4 store with a release and a valid preview session is open: closedStoreGate() is null and isStoreClosed() false (the gate's preview branch needs no release)", async () => {
+  const PS = await import("../lib/preview-sessions.js");
+  const DP = await tenant("dpo");
+  await setMode(DP, "documents");
+  await publish(DP, [{ id: "doc_home", body: body("home", { sections: [sec("hero", "sec_dpohero", { title: "OPEN HOME" })] }) }]);
+  const s = await withTenant(DP, () => PS.createPreviewSession({ actor: { kind: "merchant", id: "u_dpo" } }));
+  const cookies = { [Res.PREVIEW_COOKIE]: s.token };
+  const src = await asRequest("dpo.test", () => withTenant(DP, () => Res.contentSource()), cookies);
+  eq(src.preview, true, "the preview session counts:");
+  ok(src.releaseId != null, "the store has a release");
+  eq(await asRequest("dpo.test", () => withTenant(DP, () => Res.closedStoreGate()), cookies), null, "closedStoreGate in a preview of an open store:");
+  eq(await asRequest("dpo.test", () => withTenant(DP, () => Res.isStoreClosed()), cookies), false, "isStoreClosed in a preview of an open store:");
+  eq(await asRequest("dpo.test", () => withTenant(DP, () => Res.closedStoreGate())), null, "closedStoreGate for a shopper:");
+  await withTenant(DP, () => PS.revokePreviewSession({ sid: s.sid }));
 });
 
 await t("PUB-06 legacy: a legacy and a migrating store with no release keep today's draft path; every getter's output equals the same drafts on a store from before 0021 (the a6d028e path)", async () => {

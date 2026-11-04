@@ -341,6 +341,150 @@ await t("firstPublishRows lists the title and the visible sections only", async 
   ok(firstPublishRows("page", long)[0].words.length < 90, "a long title is cut");
 });
 
+// ---- P3-FIX1: the batch 1 review findings ---------------------------------------------
+
+await t("P3-FIX1: a removed id-less section is named as removed, not the one that was edited (pass 3 skips a kind whose unmatched counts differ)", async () => {
+  // live [Text A, Text B], no ids; the draft removes A and edits B, which gains an id
+  const live = home([sec("text", undefined, { title: "A" }), sec("text", undefined, { title: "B" })]);
+  for (const s of live.sections) delete s.id;
+  const draft = home([{ ...clone(live.sections[1]), id: "sec_bbbb", settings: { ...live.sections[1].settings, title: "B two" } }]);
+  const rows = diffBodies("home", live, draft);
+  eq(rows, [
+    { kind: "added", sectionId: "sec_bbbb", words: "Text: added" },
+    { kind: "removed", words: "Text 1: removed" },
+    { kind: "removed", words: "Text 2: removed" },
+  ]);
+  ok(!rows.some((r) => r.kind === "edited"), "A is never compared against B as an edit");
+  // equal counts still pair: one id-less section against one stamped and edited
+  const one = home([sec("text", undefined, { title: "A" })]);
+  delete one.sections[0].id;
+  eq(diffBodies("home", one, home([{ ...clone(one.sections[0]), id: "sec_aaaa", settings: { ...one.sections[0].settings, title: "A two" } }])), [{ kind: "edited", sectionId: "sec_aaaa", words: "Text: title changed" }]);
+});
+
+// sec_a and sec_b (the review's names) are one character short of SECTION_ID_RE,
+// so they count as no id; sec_aa and sec_bb are the smallest valid ids.
+await t("P3-FIX1: [Banner sec_aa 'one'] to [Banner sec_bb 'two'] gives 'Banner: added' plus 'Banner: removed' (pass 3 needs an id-less side)", async () => {
+  const rows = diffBodies("home", home([sec("banner", "sec_aa", { title: "one" })]), home([sec("banner", "sec_bb", { title: "two" })]));
+  eq(rows, [
+    { kind: "added", sectionId: "sec_bb", words: "Banner: added" },
+    { kind: "removed", sectionId: "sec_aa", words: "Banner: removed" },
+  ]);
+  // pass 1 pairs by id only when the kind is the same
+  eq(diffBodies("home", home([sec("banner", "sec_same", { title: "one" })]), home([sec("text", "sec_same", { title: "one" })])), [
+    { kind: "added", sectionId: "sec_same", words: "Text: added" },
+    { kind: "removed", sectionId: "sec_same", words: "Banner: removed" },
+  ]);
+});
+
+await t("P3-FIX1: a changed body never gives [] (the 'some details changed' row, pinned)", async () => {
+  const live = home([sec("hero", "sec_hero")]);
+  const draft = { ...clone(live), later_field: { a: 1 } };
+  eq(diffBodies("home", live, draft), [{ kind: "settings", words: "Home page: some details changed" }]);
+  eq(diffBodies("home", draft, live), [{ kind: "settings", words: "Home page: some details changed" }]);
+});
+
+await t("P3-FIX1: the other review survivors are pinned: an image description, the bound products, extra section settings, 'Look: applied again'", async () => {
+  const withImage = home([sec("hero", "sec_hero", { image: { media: "/api/media/med_one", alt: "A runner" } })]);
+  const alt = clone(withImage);
+  alt.sections[0].settings.image.alt = "A runner at dawn";
+  eq(diffBodies("home", withImage, alt), [{ kind: "edited", sectionId: "sec_hero", words: "Hero: image description changed" }]);
+  const bound = home([sec("collections", "sec_coll", {}, { bindings: { collection: "summer" } })]);
+  const rebound = clone(bound);
+  rebound.sections[0].bindings = { collection: "winter" };
+  eq(diffBodies("home", bound, rebound), [{ kind: "edited", sectionId: "sec_coll", words: "Collections grid: the products or collections it shows changed" }]);
+  const extra = clone(bound);
+  extra.sections[0].settings.later_setting = 1;
+  eq(diffBodies("home", bound, extra), [{ kind: "edited", sectionId: "sec_coll", words: "Collections grid: other settings changed" }]);
+  const look = R.emptyBody("design");
+  look.settings.theme = { kit: "glow", version: 1, applied_at: "2026-11-01T00:00:00.000Z" };
+  const again = clone(look);
+  again.settings.theme.applied_at = "2026-11-02T00:00:00.000Z";
+  eq(diffBodies("design", look, again), [{ kind: "settings", words: "Look: applied again" }]);
+  const other = clone(look);
+  other.settings.theme.kit = "pulse";
+  eq(diffBodies("design", look, other), [{ kind: "settings", words: "Look: a different look chosen" }]);
+});
+
+await t("P3-FIX1: a null or empty side gives no false meta or 'reordered' rows", async () => {
+  const empty = R.emptyBody("page");
+  for (const [from, to] of [[null, empty], [empty, null], [undefined, empty], [empty, {}]]) {
+    const rows = diffBodies("page", from, to);
+    ok(!rows.some((r) => r.kind === "meta" || /reordered/.test(r.words)), `${JSON.stringify(from)} to ${JSON.stringify(to)}: ${JSON.stringify(rows)}`);
+  }
+  eq(diffBodies("page", null, empty), [], "null against an empty page:");
+  eq(diffBodies("page", empty, null), [], "an empty page against null:");
+  // a first publish (null to a real page) and taking it offline (a real page to null)
+  const real = page([sec("text", "sec_t1", { title: "Hello" })], { title: "About us" });
+  eq(diffBodies("page", null, real), [
+    { kind: "meta", words: "Web address added" },
+    { kind: "meta", words: "Page title added" },
+    { kind: "added", sectionId: "sec_t1", words: "Text: added" },
+  ]);
+  eq(diffBodies("page", real, null), [
+    { kind: "meta", words: "Web address removed" },
+    { kind: "meta", words: "Page title removed" },
+    { kind: "removed", sectionId: "sec_t1", words: "Text: removed" },
+  ]);
+  // a sparse meta (missing keys) against blank ones: no meta row
+  const sparse = clone(real);
+  sparse.meta = { slug: "about-us", title: "About us" };
+  ok(!diffBodies("page", sparse, real).some((r) => r.kind === "meta"), "sparse meta");
+  // redirects: missing is empty, a doubled address collapsing is a removal, reordered only for the same items
+  const r = (list) => ({ ...clone(real), meta: { ...real.meta, redirect_from: list } });
+  const noRedirects = clone(real);
+  delete noRedirects.meta.redirect_from;
+  ok(!diffBodies("page", noRedirects, r([])).some((x) => x.kind === "meta"), "missing against []");
+  eq(diffBodies("page", r(["old", "old"]), r(["old"])), [{ kind: "meta", words: "Old addresses that lead here: an old address removed" }]);
+  eq(diffBodies("page", r(["a", "b"]), r(["b", "a"])), [{ kind: "meta", words: "Old addresses that lead here: reordered" }]);
+});
+
+await t("P3-FIX1: a section hidden on both phones and computers reads as hidden, in firstPublishRows and as one diffBodies row", async () => {
+  const live = home([sec("hero", "sec_hero"), sec("text", "sec_txt", { title: "Hi" })]);
+  const both = clone(live);
+  both.sections[1].show = { mobile: false, desktop: false };
+  eq(firstPublishRows("home", both), [{ words: "Hero" }]);
+  eq(diffBodies("home", live, both), [{ kind: "hidden", sectionId: "sec_txt", words: "Text: hidden" }]);
+  // shown again on computers only: one shown row, and the phones it still hides from
+  const computers = clone(both);
+  computers.sections[1].show = { mobile: false, desktop: true };
+  eq(diffBodies("home", both, computers), [
+    { kind: "shown", sectionId: "sec_txt", words: "Text: shown" },
+    { kind: "edited", sectionId: "sec_txt", words: "Text: still hidden on phones" },
+  ]);
+  // one screen only is not hidden
+  eq(diffBodies("home", live, computers), [{ kind: "edited", sectionId: "sec_txt", words: "Text: now hidden on phones" }]);
+});
+
+await t("P3-FIX1: reversing three sections names only the two that moved; the middle one stayed", async () => {
+  const live = home([sec("text", "sec_aaaa", { title: "A" }), sec("text", "sec_bbbb", { title: "B" }), sec("text", "sec_cccc", { title: "C" })]);
+  const turned = clone(live);
+  turned.sections.reverse();
+  eq(diffBodies("home", live, turned), [
+    { kind: "moved", sectionId: "sec_cccc", words: "Text 1: moved up" },
+    { kind: "moved", sectionId: "sec_aaaa", words: "Text 3: moved down" },
+  ]);
+  ok(diffBodies("home", live, turned).every((r) => !/: moved$/.test(r.words)), "never a 'moved' row with no direction");
+});
+
+await t("P3-FIX1: a stored accent_label the founder did not set (equal to the one worked out from the accent) gives no row", async () => {
+  const live = R.emptyBody("design");
+  live.settings.brand = { accent: "#84cc16", background: "#ffffff", foreground: "#0a0a0b", radius: "md", type_scale: "regular", button_shape: "pill", section_spacing: "regular" };
+  const { validateBrand } = await import("../lib/brand.js");
+  const stamped = clone(live);
+  stamped.settings.brand.accent_label = validateBrand(live.settings.brand).value.accent_label;
+  eq(diffBodies("design", live, stamped), []);
+  eq(diffBodies("design", stamped, live), []);
+  // a stored label that differs from the worked-out one does render differently
+  const other = clone(live);
+  other.settings.brand.accent_label = stamped.settings.brand.accent_label === "#ffffff" ? "#0a0a0b" : "#ffffff";
+  eq(diffBodies("design", live, other), [{ kind: "settings", words: "Colours: text on accent changed" }]);
+  // an accent change that moves the worked-out label is the accent row alone
+  const dark = clone(live);
+  dark.settings.brand.accent = "#1e3a8a";
+  ok(validateBrand(dark.settings.brand).value.accent_label !== validateBrand(live.settings.brand).value.accent_label, "the worked-out label moves");
+  eq(diffBodies("design", live, dark), [{ kind: "settings", words: "Colours: accent changed" }]);
+});
+
 // ---- acceptance 6: edge-safe ---------------------------------------------------------
 
 await t("lib/documents/diff.js imports no node: API, directly or through what it imports (edge guard list)", async () => {
