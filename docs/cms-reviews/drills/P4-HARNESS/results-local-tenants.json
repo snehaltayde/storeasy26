@@ -1,0 +1,317 @@
+{
+  "id": "P4-HARNESS",
+  "part": "local-tenants",
+  "ranAt": "2026-11-04T14:28:52.503Z",
+  "outDir": "/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt out",
+  "passed": 22,
+  "failed": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "v1: legacy, live on a version 1 release, no documents",
+      "detail": {
+        "want": {
+          "mode": "legacy",
+          "liveRelease": "rel_fixture_v1",
+          "v": 1,
+          "releases": 1,
+          "documents": 0
+        },
+        "got": {
+          "mode": "legacy",
+          "liveRelease": "rel_fixture_v1",
+          "v": 1,
+          "releases": 1,
+          "documents": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "v1: holds the catalog, drafts and entity rows",
+      "detail": {
+        "mode": "legacy",
+        "liveRelease": "rel_fixture_v1",
+        "v": 1,
+        "releases": 1,
+        "products": 23,
+        "cms_pages": 6,
+        "cms_blocks": 8,
+        "product_overrides": 5,
+        "placements": 8,
+        "collection_overrides": 2,
+        "page_redirects": 4,
+        "cms_templates": 2,
+        "documents": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "v1: the operator flag is none",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "v1: the copied control plane points tenant p4-local-v1 at this file",
+      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt%20out/v1.db"
+    },
+    {
+      "ok": true,
+      "label": "v2: legacy, live on a version 2 release, no documents",
+      "detail": {
+        "want": {
+          "mode": "legacy",
+          "liveRelease": "rel_fixture_v2",
+          "v": 2,
+          "releases": 1,
+          "documents": 0
+        },
+        "got": {
+          "mode": "legacy",
+          "liveRelease": "rel_fixture_v2",
+          "v": 2,
+          "releases": 1,
+          "documents": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "v2: holds the catalog, drafts and entity rows",
+      "detail": {
+        "mode": "legacy",
+        "liveRelease": "rel_fixture_v2",
+        "v": 2,
+        "releases": 1,
+        "products": 23,
+        "cms_pages": 6,
+        "cms_blocks": 8,
+        "product_overrides": 5,
+        "placements": 8,
+        "collection_overrides": 2,
+        "page_redirects": 4,
+        "cms_templates": 2,
+        "documents": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "v2: the version 2 release froze the entity rows",
+      "detail": {
+        "overrides": 5,
+        "placements": 8,
+        "pins": 2,
+        "redirects": 4
+      }
+    },
+    {
+      "ok": true,
+      "label": "v2: the operator flag is none",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "v2: the copied control plane points tenant p4-local-v2 at this file",
+      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt%20out/v2.db"
+    },
+    {
+      "ok": true,
+      "label": "v3: legacy, live on a version 3 release, no documents",
+      "detail": {
+        "want": {
+          "mode": "legacy",
+          "liveRelease": "rel_fixture_v3",
+          "v": 3,
+          "releases": 1,
+          "documents": 0
+        },
+        "got": {
+          "mode": "legacy",
+          "liveRelease": "rel_fixture_v3",
+          "v": 3,
+          "releases": 1,
+          "documents": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "v3: holds the catalog, drafts and entity rows",
+      "detail": {
+        "mode": "legacy",
+        "liveRelease": "rel_fixture_v3",
+        "v": 3,
+        "releases": 1,
+        "products": 23,
+        "cms_pages": 6,
+        "cms_blocks": 8,
+        "product_overrides": 5,
+        "placements": 8,
+        "collection_overrides": 2,
+        "page_redirects": 4,
+        "cms_templates": 2,
+        "documents": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "v3: the version 3 release froze the entity rows",
+      "detail": {
+        "overrides": 4,
+        "placements": 6,
+        "pins": 1,
+        "redirects": 3
+      }
+    },
+    {
+      "ok": true,
+      "label": "v3: the operator flag is none",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "v3: the copied control plane points tenant p4-local-v3 at this file",
+      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt%20out/v3.db"
+    },
+    {
+      "ok": true,
+      "label": "open: legacy, no release (--store-open), no documents",
+      "detail": {
+        "want": {
+          "mode": "legacy",
+          "liveRelease": null,
+          "v": null,
+          "releases": 0,
+          "documents": 0
+        },
+        "got": {
+          "mode": "legacy",
+          "liveRelease": null,
+          "v": null,
+          "releases": 0,
+          "documents": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "open: holds the catalog, drafts and entity rows",
+      "detail": {
+        "mode": "legacy",
+        "liveRelease": null,
+        "v": null,
+        "releases": 0,
+        "products": 23,
+        "cms_pages": 6,
+        "cms_blocks": 8,
+        "product_overrides": 5,
+        "placements": 8,
+        "collection_overrides": 2,
+        "page_redirects": 4,
+        "cms_templates": 2,
+        "documents": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "open: the operator flag is --store-open",
+      "detail": "--store-open"
+    },
+    {
+      "ok": true,
+      "label": "open: the copied control plane points tenant p4-local-open at this file",
+      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt%20out/open.db"
+    },
+    {
+      "ok": true,
+      "label": "closed: legacy, no release (--not-launched), no documents",
+      "detail": {
+        "want": {
+          "mode": "legacy",
+          "liveRelease": null,
+          "v": null,
+          "releases": 0,
+          "documents": 0
+        },
+        "got": {
+          "mode": "legacy",
+          "liveRelease": null,
+          "v": null,
+          "releases": 0,
+          "documents": 0
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: holds the catalog, drafts and entity rows",
+      "detail": {
+        "mode": "legacy",
+        "liveRelease": null,
+        "v": null,
+        "releases": 0,
+        "products": 23,
+        "cms_pages": 6,
+        "cms_blocks": 8,
+        "product_overrides": 5,
+        "placements": 8,
+        "collection_overrides": 2,
+        "page_redirects": 4,
+        "cms_templates": 2,
+        "documents": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed: the operator flag is --not-launched",
+      "detail": "--not-launched"
+    },
+    {
+      "ok": true,
+      "label": "closed: the copied control plane points tenant p4-local-closed at this file",
+      "detail": "file:/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/lt%20out/closed.db"
+    }
+  ],
+  "tenants": [
+    {
+      "name": "v1",
+      "id": "p4-local-v1",
+      "state": "live_v1",
+      "flag": null,
+      "liveRelease": "rel_fixture_v1",
+      "v": 1
+    },
+    {
+      "name": "v2",
+      "id": "p4-local-v2",
+      "state": "live_v2",
+      "flag": null,
+      "liveRelease": "rel_fixture_v2",
+      "v": 2
+    },
+    {
+      "name": "v3",
+      "id": "p4-local-v3",
+      "state": "live_v3",
+      "flag": null,
+      "liveRelease": "rel_fixture_v3",
+      "v": 3
+    },
+    {
+      "name": "open",
+      "id": "p4-local-open",
+      "state": "no_release_open",
+      "flag": "--store-open",
+      "liveRelease": null,
+      "v": null
+    },
+    {
+      "name": "closed",
+      "id": "p4-local-closed",
+      "state": "no_release_not_launched",
+      "flag": "--not-launched",
+      "liveRelease": null,
+      "v": null
+    }
+  ]
+}

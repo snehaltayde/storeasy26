@@ -9,10 +9,17 @@
 //      in this process and through the three recorders, which are now thin
 //      wrappers over the builders;
 //   4. what each named builder writes, and what the store then answers.
+// P4-HARNESS adds: redirect_to_code_default_page needs BeastLife or the env
+// store (and its target renders there), a second build on one database is
+// refused, and the stale backfill's versions hold what its live rows say.
+// P4-HARNESS fix round 1: scripts/drills/p4/local-tenants.mjs never wipes its
+// --out folder; it refuses one holding anything it did not write, and clears
+// an earlier build of its own file by file.
 // File databases only (.test-lfx-*.db at the checkout's root, removed at the
 // end). Nothing reaches the network or Shopify.
 //   pnpm test:legacy-fixtures
 import { readFile, readdir, rm } from "node:fs/promises";
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -170,6 +177,9 @@ const liveContent = async (db) => {
 };
 let seq = 0;
 const tenant = (opts = {}) => makeLegacyTenant(world, { id: opts.id ?? `lfx-${++seq}`, set: "vgate", ...opts, file: opts.file ?? `t${++seq}` });
+// Every entity fixture an ordinary tenant can hold (redirect_to_code_default_page
+// needs BeastLife or the env store; it has its own case in part 7).
+const ORDINARY_ENTITIES = Object.keys(ENTITY_FIXTURES).filter((e) => !ENTITY_FIXTURES[e].requires);
 
 try {
   // ====================================================================================
@@ -305,7 +315,7 @@ try {
     const routes = await allGetterRoutes();
     for (const n of names) ok(routes.some(([fn]) => fn === n), `${n} is not recorded`);
     for (const [fn, args] of LEGACY_RELEASE_ROUTES) ok(routes.some(([f, a]) => f === fn && JSON.stringify(a) === JSON.stringify(args)), `${routeKey(fn, args)} dropped`);
-    const { db } = await tenant({ state: "live_v3", entities: Object.keys(ENTITY_FIXTURES) });
+    const { db } = await tenant({ state: "live_v3", entities: ORDINARY_ENTITIES });
     const rec = await recordOutputs(db);
     for (const [fn, args] of routes) ok(Object.hasOwn(rec, routeKey(fn, args)), `${routeKey(fn, args)} missing`);
     ok(rec.getLiveReleaseState.ok.release.v === 3 && rec.contentSource.ok.mode === "live", "state not recorded");
@@ -507,7 +517,7 @@ try {
   // ====================================================================================
   console.log("— 7. the entity fixtures");
   // ====================================================================================
-  const ALL_ENTITIES = Object.keys(ENTITY_FIXTURES);
+  const ALL_ENTITIES = ORDINARY_ENTITIES;
   await t("on live_v3 every entity lands in the live tables AND in the release's frozen arrays", async () => {
     const { db } = await tenant({ id: "lfx-ent3", state: "live_v3", entities: ALL_ENTITIES });
     const ov = Object.fromEntries((await rows(db, "SELECT product_id, modules, badge FROM product_overrides")).map((r) => [r.product_id, { modules: JSON.parse(r.modules), badge: r.badge }]));
@@ -527,7 +537,7 @@ try {
     const st = (await block(db, "surface_templates")).value;
     same([st.products?.[P(240)], st.collections?.[COL(241)]], ["editorial", "sidebar"], "template maps:");
     const rd = Object.fromEntries((await rows(db, "SELECT from_slug, to_slug FROM page_redirects")).map((r) => [r.from_slug, r.to_slug]));
-    same([rd["old-about"], rd["old-post-address"], rd["old-terms"], rd["old-gone"]], ["redirect-page", "redirect-post", "terms", "gone-forever"], "redirects:");
+    same([rd["old-about"], rd["old-post-address"], rd["old-terms"], rd["old-gone"]], ["redirect-page", "redirect-post", undefined, "gone-forever"], "redirects:");
     const fam = Object.fromEntries((await rows(db, "SELECT slug, family FROM cms_pages WHERE slug IN ('redirect-page','redirect-post','terms','gone-forever')")).map((r) => [r.slug, r.family]));
     same(fam, { "redirect-page": "page", "redirect-post": "journal" }, "redirect targets:");
     same((await rows(db, "SELECT family FROM cms_templates ORDER BY family")).map((r) => r.family), ["journal", "page"], "templates:");
@@ -539,17 +549,46 @@ try {
     for (const pid of [201, 202, 203, 204]) ok(live.product_overrides.some((o) => o.product_id === P(pid)), `frozen override ${pid}`);
     for (const id of ["pl_fx_pairs_title", "pl_fx_pairs_default", "pl_fx_pairs_off", "pl_fx_pairs_a", "pl_fx_pairs_b", "pl_fx_cart"]) ok(live.placements.some((p) => p.id === id), `frozen ${id}`);
     ok(live.collection_pins.some((c) => c.collection_id === COL(230)), "frozen pins");
-    same(live.redirects.map((r) => r.from_slug).sort(), ["old-about", "old-gone", "old-post-address", "old-terms"], "frozen redirects:");
+    same(live.redirects.map((r) => r.from_slug).sort(), ["old-about", "old-gone", "old-post-address"], "frozen redirects:");
     same([live.blocks.surface_templates.products[P(240)], live.blocks.surface_templates.collections[COL(241)]], ["editorial", "sidebar"], "frozen template maps:");
     // shoppers on the live release see the frozen rows
     eq((await db.run(() => Res.resolvedProductOverride(P(201))))?.badge, "Lab tested", "live override:");
     eq((await db.run(() => Res.resolvedSurfaceTemplateFor("pdp", P(240))))?.template, "editorial", "live template:");
-    eq(await db.run(() => Res.resolvedSlugRedirect("old-terms")), "terms", "live redirect:");
+    eq(await db.run(() => Res.resolvedSlugRedirect("old-gone")), "gone-forever", "live redirect:");
     mark(...ALL_ENTITIES);
   });
 
+  await t("redirect_to_code_default_page on BeastLife: the old address redirects to the terms page, which renders with no row of its own; an ordinary tenant is refused", async () => {
+    for (const state of ["live_v3", "live_v1"]) {
+      const { db } = await tenant({ id: "beastlife", state, entities: ["redirect_to_code_default_page"] });
+      eq((await rows(db, "SELECT to_slug FROM page_redirects WHERE from_slug = 'old-terms'"))[0]?.to_slug, "terms", `${state} redirect row:`);
+      eq((await rows(db, "SELECT COUNT(*) AS n FROM cms_pages WHERE slug = 'terms'"))[0].n, 0, `${state}: a terms row:`);
+      const to = await db.run(() => Res.resolvedSlugRedirect("old-terms"));
+      eq(to, "terms", `${state} the live redirect:`);
+      const page = await db.run(() => Res.resolvedContentPage(to));
+      eq(page?.title, CODE_PAGES.terms.title, `${state}: the redirect target renders:`);
+      ok(Array.isArray(page?.sections) && page.sections.length > 0, `${state}: the terms page has no sections`);
+      if (state === "live_v3") ok((await liveContent(db)).redirects.some((r) => r.from_slug === "old-terms" && r.to_slug === "terms"), "frozen in v3");
+    }
+    // an ordinary tenant: the target would not render, so the fixture refuses
+    await rejects(() => tenant({ state: "live_v3", entities: ["redirect_to_code_default_page"] }), /needs the env store .*"beastlife"/, "an ordinary tenant");
+    // why: on an ordinary tenant the terms slug resolves to nothing
+    const plain = await tenant({ state: "live_v3", entities: ["redirect_to_nothing"] });
+    eq(await plain.db.run(() => Res.resolvedContentPage("terms")), null, "terms on an ordinary tenant:");
+    mark("redirect_to_code_default_page");
+  });
+
+  await t("buildLegacyTenant refuses a second build on the same database, in plain words, before writing anything", async () => {
+    const { db } = await tenant({ state: "live_v3", entities: ["cart_upsell"] });
+    const count = async () => (await rows(db, "SELECT (SELECT COUNT(*) FROM products) + (SELECT COUNT(*) FROM releases) + (SELECT COUNT(*) FROM placements) AS n"))[0].n;
+    const before = await count();
+    await rejects(() => buildLegacyTenant(db, { state: "live_v3" }), /already holds a store's catalog or content, so it was built before\. Each database can be built only once/, "a second build");
+    await rejects(() => buildLegacyTenant(db, { state: "no_release_open", set: "empty" }), /built before/, "a second build of another set");
+    eq(await count(), before, "the refused build wrote:");
+  });
+
   await t("on live_v1 the entities stay in the live tables only (v1 never froze them), and the v1 read uses them", async () => {
-    const { db } = await tenant({ state: "live_v1", entities: ALL_ENTITIES });
+    const { db } = await tenant({ state: "live_v1", entities: ORDINARY_ENTITIES });
     const live = await liveContent(db);
     // v1 froze no entity arrays: they stay out of the envelope (blocks and pages,
     // which v1 does freeze, carry the template maps and redirect targets)
@@ -595,17 +634,30 @@ try {
     const { db } = await tenant({ state: "live_v3" });
     const out = await buildStaleBackfill(db);
     const docs = Object.fromEntries((await rows(db, "SELECT id, type, draft, updated_at, published_version_id FROM documents")).map((r) => [r.id, r]));
-    same(Object.keys(docs).sort(), [out.ids.about, out.ids.home, out.ids.product].sort(), "documents:");
+    same(Object.keys(docs).sort(), [out.ids.about, out.ids.home, out.ids.product, out.ids.collection].sort(), "documents:");
+    ok(/^doc_coll_[0-9a-f]{16}$/.test(out.ids.collection), `collection document id: ${out.ids.collection}`);
     for (const d of Object.values(docs)) {
-      ok(Reg.validateDocument(JSON.parse(d.draft), { mode: "draft" }).ok, `${d.id} does not validate`);
+      // the collection body comes from the registry once collection_content is registered (P4-LIVEROW)
+      if (d.type !== "collection_content" || out.collectionBody === "registry") ok(Reg.validateDocument(JSON.parse(d.draft), { mode: "draft" }).ok, `${d.id} does not validate`);
       eq(d.published_version_id, null, `${d.id} published:`);
     }
+    eq(docs[out.ids.collection].type, "collection_content", "collection document type:");
+    // every live row names a real version, in the service's ver_<16 hex> shape
+    for (const k of ["home", "about", "product", "collection"]) ok(/^ver_[0-9a-f]{16}$/.test(out.versions[k]), `${k} version id: ${out.versions[k]}`);
+    const vrows = Object.fromEntries((await rows(db, "SELECT id, document_id, kind, body FROM document_versions")).map((r) => [r.id, r]));
+    eq(vrows[out.versions.collection]?.document_id, out.ids.collection, "the collection row's version:");
+    // the product version holds the older modules the live row holds
+    const pv = JSON.parse(vrows[out.versions.product].body);
+    same(pv.sections.map((x) => [x.kind, x.settings.title, x.settings.html]), out.older.modules.map((m) => ["rich_text", m.title, m.html]), "the product version's modules:");
+    same(out.liveRowOnly, out.collectionBody === "registry" ? ["product badge", "product pairs"] : ["product badge", "product pairs", "collection pins"], "live-row-only fields:");
     ok(JSON.stringify(JSON.parse(docs.doc_home.draft)).includes("Older hero"), "the old home draft");
     eq(JSON.parse(docs[out.ids.about].draft).meta.title, "About (older)", "the old about draft:");
     eq((await block(db, "hero")).value.title, "Newer hero", "the newer legacy hero:");
     eq((await rows(db, "SELECT title FROM cms_pages WHERE slug = 'about'"))[0].title, "About (newer)", "the newer legacy about:");
     const [live] = await rows(db, "SELECT document_id, version_id, badge FROM product_content_live WHERE product_id = ?", [P(1)]);
     same([live.document_id, live.version_id, live.badge], [out.ids.product, out.versions.product, "OLDER"], "stale live row:");
+    const [clive] = await rows(db, "SELECT document_id, version_id FROM collection_content_live WHERE collection_id = ?", [COL(2)]);
+    same([clive.document_id, clive.version_id], [out.ids.collection, out.versions.collection], "stale collection live row:");
     eq((await rows(db, "SELECT badge FROM product_overrides WHERE product_id = ?", [P(1)]))[0].badge, "NEWER", "newer override:");
     eq((await rows(db, "SELECT pinned FROM collection_content_live WHERE collection_id = ?", [COL(2)]))[0].pinned, JSON.stringify([P(1)]), "stale pins:");
     eq((await rows(db, "SELECT pinned FROM collection_overrides WHERE collection_id = ?", [COL(2)]))[0].pinned, JSON.stringify([P(2), P(1)]), "newer pins:");
@@ -618,6 +670,79 @@ try {
     eq((await db.run(() => Res.resolvedHero())).title, "Live hero v3", "shoppers:");
     mark("stale_backfill");
   });
+
+  // ====================================================================================
+  console.log("— 8b. local-tenants.mjs never deletes what it did not write");
+  // ====================================================================================
+  const LT = join(ROOT, "scripts", "drills", "p4", "local-tenants.mjs");
+  const ltDir = (name) => {
+    const d = join(ROOT, `.test-lfx-outdir-${process.pid}`, name);
+    mkdirSync(d, { recursive: true });
+    return d;
+  };
+  const listing = (d) => readdirSync(d).sort();
+  try {
+    await t("local-tenants.mjs --out <a folder holding an unknown file> is refused, exits 1, and leaves the folder as it was", () => {
+      const d = ltDir("precious dir");
+      writeFileSync(join(d, "founder-notes.txt"), "do not lose me\n");
+      const r = spawnSync(process.execPath, [LT, "--out", d], { cwd: ROOT, encoding: "utf8", timeout: 120_000 });
+      ok(existsSync(join(d, "founder-notes.txt")), "the founder's file was deleted");
+      eq(readFileSync(join(d, "founder-notes.txt"), "utf8"), "do not lose me\n", "the founder's file changed:");
+      same(listing(d), ["founder-notes.txt"], "the folder changed:");
+      eq(r.status, 1, `exit code (stdout ${String(r.stdout).slice(-300)}):`);
+      ok(/Refused to build in .*files this tool did not write \(founder-notes\.txt\)\. Nothing was deleted/.test(r.stderr), `stderr: ${r.stderr}`);
+      ok(!/passed/.test(r.stdout), `it reported a result: ${r.stdout}`);
+    });
+
+    await t("prepareOutDir refuses, deleting nothing: an unknown file beside an earlier build, a manifest.json not written by this tool, the checkout root, a file", async () => {
+      const { prepareOutDir, OWN_FILES, MANIFEST_TOOL } = await import(LT);
+      ok(typeof prepareOutDir === "function", "no prepareOutDir");
+      // an earlier build of this tool plus one foreign file
+      const a = ltDir("build-plus-notes");
+      writeFileSync(join(a, "manifest.json"), JSON.stringify({ tool: MANIFEST_TOOL }));
+      writeFileSync(join(a, "v1.db"), "x");
+      writeFileSync(join(a, "notes.md"), "keep");
+      await rejects(() => prepareOutDir(a), /files this tool did not write \(notes\.md\)\. Nothing was deleted/, "build plus a foreign file");
+      same(listing(a), ["manifest.json", "notes.md", "v1.db"], "build plus a foreign file changed:");
+      // a manifest.json of another kind, with only file names this tool uses
+      const b = ltDir("other-manifest");
+      writeFileSync(join(b, "manifest.json"), JSON.stringify({ name: "someone else's" }));
+      writeFileSync(join(b, "platform.db"), "y");
+      await rejects(() => prepareOutDir(b), /not an earlier build of this tool/, "another manifest");
+      same(listing(b), ["manifest.json", "platform.db"], "another manifest changed:");
+      // database files with no manifest at all
+      const c = ltDir("no-manifest");
+      writeFileSync(join(c, "v2.db"), "z");
+      await rejects(() => prepareOutDir(c), /not an earlier build of this tool/, "no manifest");
+      same(listing(c), ["v2.db"], "no manifest changed:");
+      // the checkout root (a typo such as --out .)
+      const rootBefore = listing(ROOT);
+      await rejects(() => prepareOutDir(ROOT), /files this tool did not write .*Nothing was deleted/, "the checkout root");
+      same(listing(ROOT), rootBefore, "the checkout root changed:");
+      // a plain file
+      const f = join(ltDir("file-parent"), "a-file");
+      writeFileSync(f, "q");
+      await rejects(() => prepareOutDir(f), /not a folder/, "a file");
+      eq(readFileSync(f, "utf8"), "q", "the file changed:");
+      ok(OWN_FILES.includes("manifest.json") && OWN_FILES.includes("closed.db-wal") && OWN_FILES.length === 19, `OWN_FILES ${OWN_FILES}`);
+    });
+
+    await t("prepareOutDir makes a new folder, accepts an empty one, and clears an earlier build of its own file by file (the folder stays)", async () => {
+      const { prepareOutDir, OWN_FILES, MANIFEST_TOOL } = await import(LT);
+      const fresh = join(ROOT, `.test-lfx-outdir-${process.pid}`, "new", "deeper");
+      same(prepareOutDir(fresh), { created: true, removed: [] }, "new folder:");
+      ok(existsSync(fresh), "not created");
+      same(prepareOutDir(fresh), { created: false, removed: [] }, "empty folder:");
+      const d = ltDir("earlier-build");
+      for (const n of OWN_FILES) writeFileSync(join(d, n), n === "manifest.json" ? JSON.stringify({ tool: MANIFEST_TOOL }) : "db");
+      const r = prepareOutDir(d);
+      same(r.removed.sort(), [...OWN_FILES].sort(), "removed:");
+      same(listing(d), [], "left:");
+      ok(existsSync(d), "the folder itself was removed");
+    });
+  } finally {
+    rmSync(join(ROOT, `.test-lfx-outdir-${process.pid}`), { recursive: true, force: true });
+  }
 
   // ====================================================================================
   console.log("— 9. every required builder was checked");
