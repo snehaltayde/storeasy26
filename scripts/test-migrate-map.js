@@ -17,6 +17,8 @@
 //  10. team access for the cart offer, from the role table
 //  11. DOC-03: every section of every body is a merged, registered kind
 //  12. editability: typeHasEditor's system check, and cartEditable() refusals
+//  13. P4-FIX1: the MAPPER review's findings (six safety lines, the ids.js
+//      hashes, "not checked", unique section ids, the cart handle)
 //   pnpm test:migrate-map
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -683,6 +685,38 @@ try {
     eq(both.status, 1, "both flags:");
   });
 
+  await t("P4-FIX1: the command refuses a control plane (PLATFORM_DB_URL) that isn't local, before reading it, unless --hosted --confirm; the URL is never printed", async () => {
+    // a .invalid host never resolves, so even a broken check couldn't reach anything;
+    // no case passes --hosted (builders never do)
+    const hostedPlatform = { PLATFORM_DB_URL: "libsql://mmap-platform.invalid", PLATFORM_DB_TOKEN: "dummy-not-a-token" };
+    for (const tenantArg of ["mmapcli", "_default"]) {
+      const r = cli(["--tenant", tenantArg, "--dry-run"], hostedPlatform);
+      eq(r.status, 1, `${tenantArg}: exit:`);
+      ok(/refusing: the control plane \(PLATFORM_DB_URL\) is not a local database/.test(r.stderr) && new RegExp(`--hosted --confirm ${tenantArg}`).test(r.stderr), r.stderr);
+      ok(!/mmap-platform|dummy/.test(r.stderr + r.stdout), "the URL and token are not printed");
+      eq(r.stdout, "", "nothing printed, nothing read");
+      const c = cli(["--tenant", tenantArg, "--dry-run", "--confirm", tenantArg], hostedPlatform);
+      eq(c.status, 1, `${tenantArg}: --confirm alone is not enough:`);
+      ok(/refusing: the control plane/.test(c.stderr), c.stderr);
+    }
+    // a control plane on this machine (the harness's sqld) is accepted like a file one
+    const onMachine = cli(["--tenant", "_default", "--dry-run", "--json"], { PLATFORM_DB_URL: "http://127.0.0.1:7169" });
+    ok(!/control plane/.test(onMachine.stderr), `a local sqld address is not refused: ${onMachine.stderr.slice(0, 200)}`);
+  });
+
+  await t("P4-FIX1: the dry run says, below Details, which routes the in-process data check covered", async () => {
+    const r = cli(["--tenant", "mmapcli", "--dry-run"]);
+    eq(r.status, 0, `exit (stderr ${r.stderr.slice(0, 300)}):`);
+    const m = /\n {2}routes given to the data check \((\d+)\):\n/.exec(r.stdout);
+    ok(m && r.stdout.indexOf(m[0]) > r.stdout.indexOf("\nDetails\n"), "the routes line is below Details");
+    const j = JSON.parse(cli(["--tenant", "mmapcli", "--dry-run", "--json"]).stdout);
+    ok(Array.isArray(j.details.routesChecked) && j.details.routesChecked.length === Number(m[1]), "the JSON lists the same routes");
+    ok(j.details.routesChecked.some((x) => x.fn === "resolvedAnnouncement"), "a no-argument getter");
+    ok(j.details.routesChecked.some((x) => x.fn === "resolvedContentPage" && x.args[0] === "about"), "a page of the store");
+    ok(/\n {4}resolvedContentPage: .*"about"/.test(r.stdout), "printed by getter, with its arguments");
+    eq(j.details.dataCheck.compared + j.details.dataCheck.skipped, j.details.routesChecked.length, "every route given was compared or skipped:");
+  });
+
   // ====================================================================================
   console.log("— 9. the plain report");
   // ====================================================================================
@@ -812,6 +846,264 @@ try {
     ok(yes.documents.some((d) => d.type === "cart"), "mapped");
     const none = await mapIt((await tenant({ set: "journal", state: "live_v3", id: "jl" })).db, { editability: { typeHasEditor: Ed.typeHasEditor, cartEditable: () => false }, record: false });
     ok(!none.report.refusals.some((r) => r.code === "NO_EDITOR"), "no cart offer: nothing to refuse");
+  });
+
+  // ====================================================================================
+  console.log("— 13. P4-FIX1: the MAPPER review's findings");
+  // ====================================================================================
+  const E = await import("../lib/migrate/map-entities.js");
+  // The entity part as it is while unbuilt, handed in, so this case keeps
+  // pinning map.js's refusal after P4-OVL07 builds the real one.
+  const unbuiltEntities = async (source) => ({ built: false, documents: [], bodies: new Map(), liveRows: { product: [], collection: [] }, refs: [], holds: E.entityHoldings(source) });
+  const sha = (s) => createHash("sha256").update(String(s)).digest("hex");
+
+  await t("(1a) a ready store plus one product_overrides row is refused with ENTITY_CONTENT_NOT_MOVABLE while the entity part isn't built", async () => {
+    const { db } = await tenant({ set: "journal", state: "live_v3", id: "mmapent" });
+    const mapEnt = () => db.run(() => M.mapTenant({ platform: world.control.platformDb(), entities: unbuiltEntities }));
+    const ready = await mapEnt();
+    same(ready.report.refusals, [], "the store starts ready:");
+    eq(Rep.buildReport(ready, await checkOf(db, ready)).verdict.ready, true, "ready:");
+    await exec(db, "INSERT INTO product_overrides (product_id, modules, badge, updated_at) VALUES (?, ?, 'One badge', 'x')", [P(1), JSON.stringify([{ title: "A module", html: "<p>a</p>" }])]);
+    const out = await mapEnt();
+    const r = out.report.refusals.find((x) => x.code === "ENTITY_CONTENT_NOT_MOVABLE");
+    ok(r, `refused: ${JSON.stringify(out.report.refusals)}`);
+    eq(r.holds.products, 1, "one product's content:");
+    const report = Rep.buildReport(out, await checkOf(db, out));
+    eq(report.verdict.ready, false, "not ready:");
+    ok(report.verdict.fixes.some((f) => f.code === "ENTITY_CONTENT_NOT_MOVABLE" && /product and collection extras/.test(f.what)), "said in founder words");
+    // once the entity part is built, the same holds are no longer refused
+    const builtPart = async (source) => ({ ...(await unbuiltEntities(source)), built: true });
+    const later = await db.run(() => M.mapTenant({ platform: world.control.platformDb(), entities: builtPart }));
+    ok(!later.report.refusals.some((x) => x.code === "ENTITY_CONTENT_NOT_MOVABLE"), "a built entity part is not refused");
+  });
+
+  await t("(1b) a data-check difference alone makes the verdict 'Not ready' (a store whose only problem is a change shoppers would see)", async () => {
+    const { db } = await tenant({ set: "journal", state: "live_v3", id: "mmapdiff" });
+    const out = await mapIt(db, { record: false });
+    const real = await checkOf(db, out);
+    eq(real.differences.length, 0, "the real check:");
+    eq(Rep.buildReport(out, real).verdict.ready, true, "ready with the real check:");
+    // the same store, with a candidate that would show shoppers another bar
+    const ann = { schema: 1, type: "announcement", meta: {}, settings: { enabled: true, text: "Not what shoppers see", link: null } };
+    const v = await Ids.migratedVersion("doc_announcement", ann);
+    const bodies = new Map(out.bodies);
+    bodies.set(v.id, { document_id: "doc_announcement", body: ann });
+    const list = { ...out.list, documents: { ...out.list.documents, doc_announcement: { version: v.id, hash: v.bodyHash } } };
+    const check = await db.run(() => C.dataCheck({ ...out, list, bodies, releaseId: null }, { routes: C.routesFor(out.source, routes) }));
+    ok(check.ran && check.differences.length > 0, "the check found the change");
+    const report = Rep.buildReport(out, check);
+    same(out.report.refusals, [], "no refusal");
+    same(out.report.unresolvedRedirects, [], "no unmatched address");
+    eq(report.verdict.ready, false, "the difference alone: not ready:");
+    same(report.verdict.fixes.map((f) => f.kind), ["shoppers"], "the only fix:");
+    const text = Rep.renderText(report, "0".repeat(64));
+    ok(text.startsWith("Not ready: 1 thing to fix\n"), text.split("\n")[0]);
+    ok(/\n {2}- The announcement bar would look different after the move\.\n/.test(text), "named under What shoppers will see change");
+  });
+
+  await t("(1c) an accepted agency grant is refused with AGENCY_ACCESS (and an unreadable agency check with AGENCY_UNCHECKED)", async () => {
+    const { db } = await tenant({ set: "journal", state: "live_v3", id: "mmapagency", entities: ["agency_grant"] });
+    const out = await mapIt(db, { record: false });
+    const r = out.report.refusals.find((x) => x.code === "AGENCY_ACCESS");
+    ok(r, `refused: ${JSON.stringify(out.report.refusals)}`);
+    eq(r.grants.length, 1, "one grant:");
+    eq(r.grants[0].agency, "agc_fixture02", "the agency:");
+    same(out.report.refusals.map((x) => x.code), ["AGENCY_ACCESS"], "the only refusal:");
+    const report = Rep.buildReport(out, await checkOf(db, out));
+    eq(report.verdict.ready, false, "not ready:");
+    ok(report.verdict.fixes.some((f) => /An agency has access to your store/.test(f.what) && /Settings > Team/.test(f.where)), "in founder words");
+    const blind = await db.run(() => M.mapTenant({ platform: null }));
+    ok(blind.report.refusals.some((x) => x.code === "AGENCY_UNCHECKED"), "no control plane: refused as unchecked");
+  });
+
+  await t("(1d) a brand or theme edit between rehearsal and cutover changes the source hash (the design is in it)", async () => {
+    const { db } = await tenant({ set: "journal", state: "live_v3", id: "mmapbrand" });
+    const a = await mapIt(db, { record: false });
+    const as = (config) => withTenant({ ...db.tenant, config: { ...db.tenant.config, ...config } }, () => M.mapTenant({ platform: world.control.platformDb() }));
+    const branded = await as({ brand: { accent: "#0d9488" } });
+    eq(doc(branded, "doc_design")?.draft.settings.brand.accent, "#0d9488", "the edit is read:");
+    ok(branded.sourceHash !== a.sourceHash, "a brand edit changes the source hash");
+    const themed = await as({ brand: { accent: "#0d9488" }, theme: { kit: "glow", version: 1 } });
+    ok(themed.sourceHash !== branded.sourceHash, "a theme edit changes the source hash");
+    // the design alone moves the hash (nothing else in the source changed)
+    ok((await M.sourceHashOf({ ...a.source, design: { brand: { accent: "#111111" }, theme: null } })) !== a.sourceHash, "sourceHashOf reads the design");
+  });
+
+  await t("(1e) two enabled cart offers merge their products in position order, the first offer's empty title becomes the default words, and shoppers see no change", async () => {
+    const { db } = await tenant({ set: "journal", state: "no_release_open", id: "mmapcart2", entities: ["cart_upsell"] });
+    // pl_fx_cart is at position 2 (P220, P221); this one at position 0 comes first
+    await exec(db, "INSERT INTO placements (id, kind, source_product_id, target_product_ids, title, enabled, position, updated_at) VALUES ('pl_fix_cart0', 'cart_upsell', NULL, ?, '', 1, 0, 'x')", [JSON.stringify([P(221), P(1)])]);
+    await exec(db, "INSERT INTO placements (id, kind, source_product_id, target_product_ids, title, enabled, position, updated_at) VALUES ('pl_fix_cartoff', 'cart_upsell', NULL, ?, 'Off', 0, 1, 'x')", [JSON.stringify([P(1)])]);
+    const out = await mapIt(db, { storeOpen: true });
+    const cart = doc(out, "doc_cart").published.body.settings;
+    same(cart.products.map((p) => p.id), [P(221), P(1), P(220)], "merged in position order, each product once:");
+    eq(cart.title, M.CART_DEFAULT_TITLE, "the first offer's '' title:");
+    ok(out.report.leftOut.some((l) => l.reason === "later_offer_title_not_shown" && l.id === "pl_fx_cart"), "the later offer's title is listed");
+    const check = await checkOf(db, out);
+    ok(check.ran, "ran");
+    ok(!check.differences.some((d) => d.fn === "resolvedCartUpsell"), `the cart offer answers as today: ${JSON.stringify(check.differences).slice(0, 400)}`);
+  });
+
+  await t("(1f) an absent announcement maps to no document (the code default, null), never a default body", async () => {
+    for (const [state, storeOpen] of [["live_v3", undefined], ["no_release_open", true]]) {
+      const { db } = await tenant({ set: "journal", state, id: "mmapann" });
+      const rows = (await exec(db, "SELECT key FROM cms_blocks WHERE key = 'announcement'")).rows;
+      eq(rows.length, 0, `${state}: no announcement row:`);
+      const out = await mapIt(db, { storeOpen });
+      ok(!doc(out, "doc_announcement"), `${state}: no announcement document`);
+      eq(out.list.documents.doc_announcement, null, `${state}: the list holds the code default:`);
+      const check = await checkOf(db, out);
+      ok(!check.differences.some((d) => d.fn === "resolvedAnnouncement"), `${state}: the bar answers as today`);
+    }
+  });
+
+  await t("(2) draft and published hashes strip section ids, and the version id hashes the document id with the body (checked with sha256 here, not migratedVersion)", async () => {
+    // live (v3 release) home sections with no ids, drafts with the same content and ids of their own
+    const { db } = await tenant({ set: "journal", state: "live_v3", id: "mmaphash", traps: ["home_sections_no_ids"] });
+    const SECS = [
+      { id: "sec_new01", kind: "new", title: "New in", limit: 4 },
+      { id: "sec_bann01", kind: "banner", title: "Free shipping", text: "This week only.", label: "Shop", href: "/collections" },
+      { id: "sec_coll01", kind: "collections", title: "Shop by collection", limit: 3 },
+    ];
+    await exec(db, "INSERT OR REPLACE INTO cms_blocks (key, value, updated_at, schema_version) VALUES ('home_sections', ?, 'x', 2)", [JSON.stringify(SECS)]);
+    const out = await mapIt(db);
+    const home = doc(out, "doc_home");
+    same(home.published.body.sections.map((s) => s.id), ["sec_hero", "sec_l0", "sec_l1", "sec_l2"], "the live sections had no ids:");
+    same(home.draft.sections.map((s) => s.id), ["sec_hero", "sec_new01", "sec_bann01", "sec_coll01"], "the drafts carry their own:");
+    const strip = (b) => ({ ...b, sections: b.sections.map(({ id: _id, ...s }) => s) });
+    same(strip(home.draft), strip(home.published.body), "the same content");
+    ok(sha(Reg.stableStringify(home.draft)) !== sha(Reg.stableStringify(home.published.body)), "the bodies differ only by ids");
+    eq(home.draftHash, home.publishedHash, "the draft and published hashes ignore ids:");
+    eq(home.dirty, false, "so the home is not an unpublished change:");
+    // the hashes themselves, on a body whose ids are changed or removed
+    const renamed = { ...home.draft, sections: home.draft.sections.map((s, i) => ({ ...s, id: `sec_zz${i}` })) };
+    eq(await Ids.draftHash(renamed), await Ids.draftHash(home.draft), "draftHash with other ids:");
+    eq(await Ids.publishedHash(renamed), await Ids.publishedHash(home.draft), "publishedHash with other ids:");
+    ok((await Ids.draftHash(home.draft)) !== sha(Reg.stableStringify(home.draft)), "not the ids-kept body hash");
+    const changed = { ...home.draft, sections: home.draft.sections.map((s, i) => (i === 1 ? { ...s, settings: { ...s.settings, title: "Other" } } : s)) };
+    ok((await Ids.draftHash(changed)) !== (await Ids.draftHash(home.draft)), "a content change still changes the hash");
+    // every listed version id: ver_ + 16 hex of sha256(documentId + sha256(canonical body))
+    let n = 0;
+    for (const [versionId, v] of out.bodies) {
+      const bodyHash = sha(Reg.stableStringify(v.body));
+      eq(versionId, `ver_${sha(v.document_id + bodyHash).slice(0, 16)}`, `${v.document_id}: the version id:`);
+      ok(versionId !== `ver_${sha(bodyHash).slice(0, 16)}`, `${v.document_id}: the document id is part of the hash`);
+      n++;
+    }
+    ok(n >= 5, `${n} versions checked`);
+    for (const d of out.documents.filter((x) => x.published)) eq(d.published.bodyHash, sha(Reg.stableStringify(d.published.body)), `${d.id}: the list entry's hash keeps ids:`);
+    // the same body under two documents: two ids
+    const page = out.documents.find((d) => d.type === "page" && d.published);
+    const other = "doc_p_zzfix1other";
+    eq((await Ids.migratedVersion(other, page.published.body)).id, `ver_${sha(other + sha(Reg.stableStringify(page.published.body))).slice(0, 16)}`, "another document's id:");
+    ok((await Ids.migratedVersion(other, page.published.body)).id !== page.published.versionId, "another document, another version id");
+  });
+
+  await t("(3) when the data check did not run, 'What shoppers will see change' says it was not checked, never 'Nothing.'", async () => {
+    const sectionOf = (text) => {
+      const at = text.indexOf(`\n${Rep.SECTION_TITLES[0]}\n`);
+      return text.slice(at + Rep.SECTION_TITLES[0].length + 2).split("\n\n")[0];
+    };
+    const cases = [];
+    cases.push(["no flag", await mapIt((await tenant({ set: "journal", state: "no_release_open", id: "mmapnc1" })).db, { record: false })]);
+    const sched = await tenant({ set: "journal", state: "pending_schedule", id: "mmapnc2" });
+    cases.push(["pending schedule", await mapIt(sched.db, { record: false }), sched.db]);
+    cases.push(["live read error", await mapIt((await tenant({ set: "journal", state: "live_read_error", id: "mmapnc3" })).db, { storeOpen: true, record: false })]);
+    const live = await tenant({ set: "journal", state: "live_v3", id: "mmapnc4" });
+    const base = await mapIt(live.db, { record: false });
+    for (const mode of ["migrating", "documents"]) {
+      const mapped = await M.mapLegacy({ ...base.source, state: { ...base.source.state, mode } });
+      cases.push([mode, { source: base.source, ...mapped }]);
+    }
+    const codes = { "no flag": "NEEDS_FLAG", "pending schedule": "PENDING_SCHEDULE", "live read error": "LIVE_READ_ERROR", migrating: "MIGRATING", documents: "ALREADY_DOCUMENTS" };
+    for (const [name, out, db] of cases) {
+      ok(out.report.refusals.some((r) => r.code === codes[name]), `${name}: refused with ${codes[name]}: ${JSON.stringify(out.report.refusals.map((r) => r.code))}`);
+      const check = await (db ?? live.db).run(() => C.dataCheck(out, { routes: C.routesFor(out.source, routes) }));
+      eq(check.ran, false, `${name}: the check did not run:`);
+      for (const c of [check, null]) {
+        const report = Rep.buildReport(out, c);
+        eq(report.shopperChangesChecked, false, `${name}: not checked:`);
+        const text = Rep.renderText(report, "0".repeat(64));
+        eq(sectionOf(text), `  ${Rep.NOT_CHECKED}`, `${name}${c ? "" : " (no check)"}:`);
+        ok(!/\n {2}Nothing\.\n/.test(text.slice(0, text.indexOf("\nDetails\n")).split(`${Rep.SECTION_TITLES[1]}\n`)[0]), `${name}: no 'Nothing.' for shoppers`);
+        eq(report.verdict.ready, false, `${name}: not ready:`);
+      }
+    }
+    // through the command too, for the scheduled store
+    const cliText = cli(["--tenant", "mmapnc2", "--dry-run"]);
+    eq(cliText.status, 0, "exit:");
+    eq(sectionOf(cliText.stdout), "  Not checked: fix the things above first.", "the command's words:");
+    // a check that ran with nothing to report still says Nothing.; no check at all on a store with no refusal is a fix
+    const ran = Rep.buildReport(base, await checkOf(live.db, base));
+    eq(sectionOf(Rep.renderText(ran, "0".repeat(64))), "  Nothing.", "a check that ran:");
+    const unchecked = Rep.buildReport(base, null);
+    eq(unchecked.verdict.ready, false, "no comparison, no 'Ready to move':");
+    ok(unchecked.verdict.fixes.some((f) => f.kind === "check"), "the missing comparison is a fix");
+  });
+
+  await t("(4) generated section ids skip ids already taken: stored [sec_l1, no id, no id] never gives two sec_l1 (home, page and product page sections)", async () => {
+    same(M.uniqueSectionIds([{ id: "sec_l1", stored: true }, { id: "sec_l1", stored: false }, { id: "sec_l2", stored: false }]), ["sec_l1", "sec_l1x2", "sec_l2"], "the rule:");
+    same(M.uniqueSectionIds([{ id: "sec_l0", stored: false }, { id: "sec_l0", stored: true }]), ["sec_l0x2", "sec_l0"], "a stored id wins over a generated one before it:");
+    same(M.uniqueSectionIds([{ id: "sec_hero", stored: true }], ["sec_hero"]), ["sec_herox2"], "a reserved id is never reused:");
+    same(M.uniqueSectionIds([{ id: "sec_abcdefghijklmnop", stored: true }, { id: "sec_abcdefghijklmnop", stored: true }]), ["sec_abcdefghijklmnop", "sec_dup2"], "a repeat of a long stored id:");
+    const HOME = [
+      { id: "sec_l1", kind: "new", title: "Stored id", limit: 4 },
+      { kind: "new", title: "No id one", limit: 4 },
+      { kind: "collections", title: "No id two", limit: 3 },
+    ];
+    for (const schemaVersion of [1, 2]) {
+      const { db } = await tenant({ set: "journal", state: "no_release_open", id: "mmapids" });
+      // schema 1 rows are stamped at read (sec_l<stored place>); schema 2 rows are read as stored
+      await exec(db, "INSERT OR REPLACE INTO cms_blocks (key, value, updated_at, schema_version) VALUES ('home_sections', ?, 'x', ?)", [JSON.stringify(HOME), schemaVersion]);
+      await exec(db, "INSERT OR REPLACE INTO cms_blocks (key, value, updated_at, schema_version) VALUES ('pdp_extras', ?, 'x', 1)", [
+        JSON.stringify([
+          { id: "sec_l1", title: "Stored", html: "<p>a</p>" },
+          { title: "No id", html: "<p>b</p>" },
+          { title: "No id", html: "<p>c</p>" },
+          { id: "sec_productmain", title: "Clash", html: "<p>d</p>" },
+        ]),
+      ]);
+      await exec(db, "INSERT INTO cms_pages (slug, title, description, sections, enabled, family) VALUES ('id-clash', 'Id clash', '', ?, 1, 'page')", [
+        JSON.stringify([{ id: "sec_l1", kind: "text", heading: "Stored", body: ["a"] }, { kind: "text", heading: "No id", body: ["b"] }, { kind: "text", heading: "No id", body: ["c"] }]),
+      ]);
+      const out = await mapIt(db, { storeOpen: true });
+      const unique = (ids, what) => eq(new Set(ids).size, ids.length, `schema ${schemaVersion} ${what} ids ${JSON.stringify(ids)}:`);
+      const home = doc(out, "doc_home").published.body.sections.map((s) => s.id);
+      unique(home, "home");
+      eq(home[1], "sec_l1", "the stored id is kept:");
+      eq(home.filter((id) => id === "sec_l1").length, 1, "one sec_l1:");
+      const pdp = doc(out, "doc_product_layout").published.body.sections.map((s) => s.id);
+      unique(pdp, "product page");
+      same(pdp.slice(0, 2), ["sec_productmain", "sec_l1"], "the product module and the stored id:");
+      const page = out.documents.find((d) => d.slug === "id-clash").published.body.sections.map((s) => s.id);
+      unique(page, "page");
+      eq(page[0], "sec_l1", "the page's stored id is kept:");
+      for (const id of ["doc_home", "doc_product_layout", out.documents.find((d) => d.slug === "id-clash").id]) {
+        const issues = Reg.validateDocument(doc(out, id).draft, { mode: "draft", documentId: id }).issues.filter((i) => i.code === "SECTION_ID_DUPLICATE");
+        same(issues, [], `${id}: no duplicate id stops a draft save:`);
+      }
+      const check = await checkOf(db, out);
+      ok(!check.differences.some((d) => ["resolvedHomePage", "resolvedHomeSections", "resolvedContentPage"].includes(d.fn)), `shoppers see the same: ${JSON.stringify(check.differences).slice(0, 400)}`);
+      // product page extras stored WITH an id: the old getter returns the id,
+      // the new reader doesn't (known limit, MAPPER's comparison rules: a
+      // false "Not ready", the safe way round). Apart from ids, the same.
+      const pdpDiff = check.differences.find((d) => d.fn === "resolvedPdpExtras");
+      if (pdpDiff) same(pdpDiff.legacy.ok.map(({ id: _id, ...x }) => x), pdpDiff.candidate.ok, "product page extras apart from ids:");
+    }
+  });
+
+  await t("(5) the cart document keeps each product's catalog handle (the reader needs it); a Shopify handle change leaves the source hash alone and moves the cart and release ids (for P4-CUTOVER)", async () => {
+    const { db } = await tenant({ set: "journal", state: "no_release_open", id: "mmapcarth", entities: ["cart_upsell"] });
+    const a = await mapIt(db, { storeOpen: true, record: false });
+    const picks = doc(a, "doc_cart").published.body.settings.products;
+    ok(picks.every((p) => typeof p.handle === "string" && p.handle && p.id), `handle and id: ${JSON.stringify(picks)}`);
+    await exec(db, "UPDATE products SET handle = 'renamed-in-shopify' WHERE id = ?", [P(220)]);
+    const b = await mapIt(db, { storeOpen: true, record: false });
+    eq(b.sourceHash, a.sourceHash, "the catalog is outside the source hash:");
+    ok(b.releaseId !== a.releaseId, "the release id moves");
+    ok(doc(b, "doc_cart").published.versionId !== doc(a, "doc_cart").published.versionId, "the cart version id moves");
+    const check = await checkOf(db, b);
+    ok(!check.differences.some((d) => d.fn === "resolvedCartUpsell"), "shoppers see the same offer");
   });
 } finally {
   await world.cleanup();

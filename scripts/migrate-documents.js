@@ -23,8 +23,9 @@
 // the same with or without --json. P4-CUTOVER requires it.
 //
 // Which database: a local file (file:) or a database on this machine
-// (localhost, 127.0.0.1, [::1], such as the harness's sqld). Anything else is
-// refused unless --hosted --confirm <the same store id> is given: a real dry
+// (localhost, 127.0.0.1, [::1], such as the harness's sqld). The same holds
+// for the control plane (PLATFORM_DB_URL), checked before it is read. Anything
+// else is refused unless --hosted --confirm <the same store id> is given: a real dry
 // run reads real data, so that is the owner's step, never a builder's. No
 // token or secret is ever printed.
 import { registerHooks } from "node:module";
@@ -71,6 +72,17 @@ if (has("store-open") && has("not-launched")) fail("Use --store-open or --not-la
 const storeOpen = has("store-open") ? true : has("not-launched") ? false : undefined;
 const hosted = has("hosted");
 const confirm = value("confirm");
+const hostedConfirmed = hosted && confirm === tenantArg;
+let needsHosted = false;
+
+// The control plane (store list, agency access) gets the same check as the
+// store's database, before anything is read from it (P4-FIX1). The URL is
+// never printed.
+const platformUrl = process.env.PLATFORM_DB_URL || "file:platform.db";
+if (!isLocalDbUrl(platformUrl)) {
+  if (!hostedConfirmed) fail(`refusing: the control plane (PLATFORM_DB_URL) is not a local database. Only the owner runs a dry run against hosted data, with --hosted --confirm ${tenantArg}.`);
+  needsHosted = true;
+}
 
 const { getTenant, platformDb } = await import("../lib/platform/control.js");
 const { withTenant } = await import("../lib/tenant-context.js");
@@ -89,10 +101,10 @@ if (tenantArg === "_default") {
   url = tenant.dbUrl;
 }
 if (!isLocalDbUrl(url)) {
-  if (!hosted || confirm !== tenantArg) fail(`refusing: "${tenantArg}" is not a local database. Only the owner runs a dry run on a hosted store, with --hosted --confirm ${tenantArg}.`);
-} else if (hosted) {
-  fail("--hosted is only for a hosted database; this store's database is local. Run it without --hosted.");
+  if (!hostedConfirmed) fail(`refusing: "${tenantArg}" is not a local database. Only the owner runs a dry run on a hosted store, with --hosted --confirm ${tenantArg}.`);
+  needsHosted = true;
 }
+if (hosted && !needsHosted) fail("--hosted is only for a hosted database; this store's database and the control plane are local. Run it without --hosted.");
 
 const { mapTenant } = await import("../lib/migrate/map.js");
 const { dataCheck, routesFor } = await import("../lib/migrate/check.js");
@@ -101,8 +113,10 @@ const { buildReport, renderText, reportDigest } = await import("../lib/migrate/r
 try {
   const out = await withTenant(tenant, async () => {
     const mapped = await mapTenant({ storeOpen, platform: tenant ? platformDb() : null });
-    const check = await dataCheck(mapped, { routes: routesFor(mapped.source) });
-    const report = buildReport(mapped, check);
+    const routes = routesFor(mapped.source);
+    const check = await dataCheck(mapped, { routes });
+    // the report's Details list the routes this comparison covered
+    const report = buildReport(mapped, check, { routes });
     return { report, digest: await reportDigest(report) };
   });
   if (has("json")) console.log(JSON.stringify({ ...out.report, digest: out.digest }, null, 2));
