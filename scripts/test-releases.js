@@ -1077,6 +1077,110 @@ console.log("— P2-GUARD: the guarded flip and the documents marker");
     eq(await pointer(), p0, "pointer:");
   });
 
+  // P4-GUARD (MIG-03): the legacy guard rides inside the flip's own batch.
+  // Each caller of classifyAbort in lib/releases.js gets one case: the hook
+  // moves the store off legacy AFTER the pre-check and before the batch.
+  const M = await import("../lib/cms-mode.js");
+  const setMode = (mode) => inGd(() => libsql.execute({ sql: "UPDATE cms_state SET mode = ? WHERE id = 1", args: [mode] }));
+  const modeWords = (mode) => (mode === "migrating" ? M.MIGRATING_MESSAGE : "This store publishes with the new editor, so nothing was published here. Publish from the editor instead.");
+  const flipModeOnce = (mode, kind) => {
+    let fired = 0;
+    const hook = async (info) => {
+      if (info.kind !== kind) return;
+      fired++;
+      if (fired === 1) await setMode(mode);
+    };
+    return { hook, fired: () => fired };
+  };
+
+  for (const mode of ["migrating", "documents"]) {
+    await t(`P4-GUARD: createRelease whose store turns '${mode}' after the pre-check is refused inside the flip with the plain 409 words, never 'Another publish just went live'; no row, pointer unchanged`, async () => {
+      await inGd(() => S.setBlock("hero", { title: `Guarded ${mode} publish` }));
+      const p0 = await pointer();
+      const r0 = JSON.stringify(await rows());
+      const h = flipModeOnce(mode, "publish");
+      let err;
+      try {
+        err = await hooked(h.hook, () => inGd(() => R.createRelease({ note: `guard ${mode}`, actor }).then(() => null, (e) => e)));
+      } finally {
+        await setMode("legacy");
+      }
+      eq(h.fired(), 1, "hook:");
+      ok(err, "the publish went through on a store that left legacy");
+      eq([err.status, err.code, err.message].join(" | "), `409 | STORE_USES_DOCUMENTS | ${modeWords(mode)}`, "refusal:");
+      ok(err.code !== "PUBLISH_RACE" && !/Another publish/.test(err.message), "reported as a lost race");
+      eq(await pointer(), p0, "pointer:");
+      eq(JSON.stringify(await rows()), r0, "releases:");
+    });
+
+    await t(`P4-GUARD: rollbackRelease whose store turns '${mode}' after the pre-check is refused inside the flip (409 plain words, not a lost race); pointer unchanged`, async () => {
+      await inGd(() => S.setBlock("hero", { title: `Rollback ${mode}` }));
+      const target = (await inGd(() => R.createRelease({ note: `rb base ${mode}`, actor }))).id;
+      await inGd(() => S.setBlock("hero", { title: `Rollback ${mode} newer` }));
+      await inGd(() => R.createRelease({ note: `rb newer ${mode}`, actor }));
+      const p0 = await pointer();
+      const r0 = JSON.stringify(await rows());
+      const h = flipModeOnce(mode, "rollback");
+      let err;
+      try {
+        err = await hooked(h.hook, () => inGd(() => R.rollbackRelease(target, { actor }).then(() => null, (e) => e)));
+      } finally {
+        await setMode("legacy");
+      }
+      eq(h.fired(), 1, "hook:");
+      ok(err, "the rollback went through on a store that left legacy");
+      eq([err.status, err.code, err.message].join(" | "), `409 | STORE_USES_DOCUMENTS | ${modeWords(mode)}`, "refusal:");
+      eq(await pointer(), p0, "pointer:");
+      eq(JSON.stringify(await rows()), r0, "releases:");
+    });
+
+    await t(`P4-GUARD: publishReleaseById whose store turns '${mode}' after the pre-check returns {skipped:'mode'} after ONE attempt; the job completes and is not retried; pointer unchanged`, async () => {
+      await inGd(() => S.setBlock("hero", { title: `Scheduled ${mode}` }));
+      const sched = await inGd(() => R.createRelease({ note: `sched ${mode}`, actor, scheduledFor: new Date(Date.now() + 60_000).toISOString() }));
+      const job = (await C.platformDb().execute({ sql: "SELECT id FROM jobs WHERE idempotency_key = ?", args: [`publish_${sched.id}`] })).rows[0];
+      await C.platformDb().execute({ sql: "UPDATE jobs SET run_after = ? WHERE id = ?", args: [new Date(Date.now() - 1000).toISOString(), job.id] });
+      const p0 = await pointer();
+      const h = flipModeOnce(mode, "scheduled");
+      let res;
+      try {
+        res = await hooked(h.hook, () => W.runJobById(job.id));
+      } finally {
+        await setMode("legacy");
+      }
+      eq(h.fired(), 1, "flip attempts:");
+      eq(res.ok, true, `job: ${JSON.stringify(res)}`);
+      eq([res.result?.skipped, res.result?.mode, res.result?.id].join(), `mode,${mode},${sched.id}`, "result:");
+      const after = (await C.platformDb().execute({ sql: "SELECT status, attempts FROM jobs WHERE id = ?", args: [job.id] })).rows[0];
+      eq([after.status, Number(after.attempts)].join(), "done,1", "the job is done, not retried:");
+      eq(await pointer(), p0, "pointer:");
+      ok(!(await rows()).find((r) => r.id === sched.id)?.published_at, "the scheduled row was stamped");
+      // called directly, the same answer
+      const h2 = flipModeOnce(mode, "scheduled");
+      let direct;
+      try {
+        direct = await hooked(h2.hook, () => inGd(() => R.publishReleaseById(sched.id)));
+      } finally {
+        await setMode("legacy");
+      }
+      eq([direct.skipped, h2.fired()].join(), "mode,1", "direct:");
+      eq(await pointer(), p0, "pointer after the direct call:");
+    });
+  }
+
+  await t("P4-GUARD: a lost pointer race on a store still on legacy is still a lost race (classifyAbort re-reads the mode)", async () => {
+    await inGd(() => S.setBlock("hero", { title: "Still a race" }));
+    let fired = false;
+    const loser = await hooked(
+      async (info) => {
+        if (fired || info.kind !== "publish") return;
+        fired = true;
+        await R.createRelease({ note: "race winner", actor });
+      },
+      () => inGd(() => R.createRelease({ note: "race loser", actor }).then(() => null, (e) => e)),
+    );
+    eq([loser?.status, loser?.code].join(), "409,PUBLISH_RACE", "loser:");
+  });
+
   // gd4: a store whose live release is a documents list (v4)
   const GD4 = await mk("gd4", ".test-rel-gd4.db");
   const inGd4 = (fn) => withTenant(GD4, fn);

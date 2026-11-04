@@ -663,6 +663,38 @@ export const BLOCK_WRITER_ALLOW = new Set(["lib/cms/store.js", "lib/admin/cms-ap
 // Test suites set up their own fixtures; they are not product code.
 const isTest = (p) => /^scripts\/test-[\w.-]+\.js$/.test(p) || p.startsWith("scripts/support/") || p.startsWith("scripts/drills/");
 const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+// P4-GUARD (MIG-03): a raw write to a legacy content table must go through
+// the guarded helpers, which send it in one batch behind the legacy guard
+// (lib/cms-mode.js runLegacyBatch, or the guarded flip in lib/releases.js).
+const LEGACY_TABLES = ["cms_blocks", "cms_pages", "page_redirects", "placements", "product_overrides", "collection_overrides", "cms_templates", "cms_approvals", "release_state"];
+const LT = LEGACY_TABLES.join("|");
+const LEGACY_SQL_WRITE_RE = new RegExp(`\\b(?:INSERT\\s+(?:OR\\s+\\w+\\s+)?INTO|UPDATE|DELETE\\s+FROM|REPLACE\\s+INTO)\\s+["'\`]?(?:${LT})\\b`, "i");
+const LEGACY_KYSELY_WRITE_RE = new RegExp(`\\b(?:insertInto|updateTable|deleteFrom|replaceInto)\\(\\s*["'\`](?:${LT})["'\`]`, "g");
+// The guarded helpers: their Kysely writes are compiled and handed to
+// runLegacyBatch, never executed on their own (the check below).
+export const GUARDED_HELPERS = new Set(["lib/cms/store.js", "lib/cms/placements.js", "lib/catalog-overrides.js", "lib/cms/templates-store.js", "lib/cms/approvals.js", "lib/releases.js"]);
+// Raw SQL writes are allowed in one guarded helper only: the release_state
+// statements of guardedFlip, which go into the batch behind the legacy guard.
+const GUARDED_SQL = new Set(["lib/releases.js"]);
+// Allowed to write these tables raw, and why:
+export const LEGACY_WRITE_ALLOW = [
+  ["lib/documents/", "documents publish flips release_state under the pointer guard and the documents guard"],
+  ["lib/migrate/", "cutover and reversal write their own statements under the migrating guard"],
+  ["migrations/", "the schema and its seed rows"],
+  ["scripts/seed-cms-beastlife.js", "a seed script: builds a fixture, never a founder's content"],
+  ["scripts/perf-docs-fixture.js", "a perf fixture on a local database"],
+];
+const legacyAllowed = (path) => LEGACY_WRITE_ALLOW.some(([p]) => (p.endsWith("/") ? path.startsWith(p) : path === p));
+// A Kysely write in a guarded helper that is executed on its own: the text
+// from the write to the end of its statement holds .execute…(.
+function executedWrites(code) {
+  const out = [];
+  for (const m of code.matchAll(LEGACY_KYSELY_WRITE_RE)) {
+    const end = code.indexOf(";", m.index);
+    if (/\.execute\w*\s*\(/.test(code.slice(m.index, end < 0 ? undefined : end))) out.push(m[0]);
+  }
+  return out;
+}
 export function directWriters(files) {
   const out = [];
   for (const { path, text } of files) {
@@ -670,6 +702,10 @@ export function directWriters(files) {
     const code = stripComments(text);
     if (!BLOCK_WRITER_ALLOW.has(path) && (BLOCK_WRITE_RE.test(code) || BLOCK_IMPORT_RE.test(code))) out.push(`${path}: block/page writer`);
     if (!path.startsWith("lib/documents/") && DOC_WRITE_RE.test(code)) out.push(`${path}: document-table writer`);
+    if (legacyAllowed(path)) continue;
+    if (GUARDED_HELPERS.has(path)) {
+      if (executedWrites(code).length || (!GUARDED_SQL.has(path) && LEGACY_SQL_WRITE_RE.test(code))) out.push(`${path}: unguarded legacy write`);
+    } else if (LEGACY_SQL_WRITE_RE.test(code) || code.match(LEGACY_KYSELY_WRITE_RE)) out.push(`${path}: unguarded legacy write`);
   }
   return out;
 }
@@ -719,6 +755,37 @@ await t("the grep guard finds no direct block, page or document-table writer out
   eq(directWriters([{ path: "lib/cms/x.js", text: "// setBlock(\"hero\") used to be here\nawait getBlock('hero'); db.selectFrom('documents')" }]), [], "reads and comments:");
   eq(directWriters([{ path: "lib/content-writes.js", text: "await setBlock(key, v)" }]), [], "the door itself:");
   eq(directWriters([{ path: "scripts/test-cms.js", text: "await setBlock(key, v)" }]), [], "test suites:");
+});
+
+await t("P4-GUARD: the grep guard fails on a raw write to each legacy content table outside the guarded helpers, and passes for lib/documents/* and lib/migrate/*", async () => {
+  for (const table of LEGACY_TABLES) {
+    const plants = [
+      `await db.insertInto("${table}").values(row).execute();`,
+      `await db.updateTable('${table}').set({ a: 1 }).where("id", "=", 1).executeTakeFirst();`,
+      `await db.deleteFrom("${table}").where("id", "=", id).execute();`,
+      `await libsql.execute("UPDATE ${table} SET a = 1 WHERE id = 1");`,
+      `await libsql.execute({ sql: "INSERT INTO ${table} (id) VALUES (?)", args: [1] });`,
+      `await libsql.batch([{ sql: "DELETE FROM ${table} WHERE id = ?", args: [1] }], "write");`,
+      `const q = "insert or replace into ${table} (id) values (1)";`,
+    ];
+    for (const text of plants) {
+      for (const path of ["lib/cms/x.js", "app/api/admin/x/route.js", "lib/experiments.js", "scripts/some-tool.js"]) {
+        eq(directWriters([{ path, text }]), [`${path}: unguarded legacy write`], `caught in ${path}: ${text}`);
+      }
+      for (const path of ["lib/documents/commit.js", "lib/documents/x.js", "lib/migrate/flip.js", "lib/migrate/reverse.js", "migrations/tenant/0099_x.sql", "scripts/support/x.js", "scripts/test-x.js"]) {
+        eq(directWriters([{ path, text }]), [], `allowed in ${path}: ${text}`);
+      }
+    }
+    // inside a guarded helper: an executed Kysely write is caught; a compiled
+    // one handed to runLegacyBatch is not
+    eq(directWriters([{ path: "lib/cms/store.js", text: `await db.insertInto("${table}").values(row).execute();` }]), ["lib/cms/store.js: unguarded legacy write"], `executed in a helper: ${table}`);
+    eq(directWriters([{ path: "lib/cms/store.js", text: `await runLegacyBatch([db.insertInto("${table}").values(row)]);` }]), [], `guarded in a helper: ${table}`);
+    eq(directWriters([{ path: "lib/cms/placements.js", text: `await libsql.execute("DELETE FROM ${table}");` }]), ["lib/cms/placements.js: unguarded legacy write"], `raw SQL in a helper: ${table}`);
+  }
+  // reads and comments are not writes
+  eq(directWriters([{ path: "lib/cms/x.js", text: '// UPDATE cms_blocks SET … used to be here\nawait db.selectFrom("cms_blocks").selectAll().execute();' }]), [], "reads and comments:");
+  // every allowlist entry says why
+  ok(LEGACY_WRITE_ALLOW.every(([p, why]) => p && why.length > 20), "reasons:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);
