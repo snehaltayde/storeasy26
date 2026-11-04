@@ -846,5 +846,59 @@
     ]
    }
   ]
+ },
+ {
+  "name": "Phase 3 closing fixes",
+  "items": [
+   {
+    "id": "P3-FIX5",
+    "branch": "cms/p3-fix5",
+    "reqs": [
+     "TOK-03",
+     "PV-01",
+     "AU-01",
+     "ED-03"
+    ],
+    "brief": "Close the batch 5 review findings before phase 4. Read finding D1 and the From review lists in docs/cms-reviews/P3-DRILLS.md and P3-FIX4.md.\nBlockers for this item:\n(1) Finding D1: the editor's preview says 'Up to date' while the frame shows the old design colours. Cause: setShowDesign turns colours on in the editor's own preview session, but the frame uses whichever session owns the browser's single _preview cookie (a second tab, or React strict mode's double effect in next dev, mints a second session). Fix it at the root so the session the frame actually renders is the one whose show_design is set: for example make showDesign apply to the session named by the request's _preview cookie (app/api/admin/preview-session/route.js, lib/admin/preview-session-api.js, lib/preview-sessions.js), or make the editor's controller (components/admin/editor/editorModel.js) re-confirm its own session into the cookie before it reports ready, and never report 'Up to date' when the frame says its new colours are not shown. Make the mint idempotent per mount so strict mode does not create two sessions. Unit test in scripts/test-logout-preview.js or scripts/test-editor-shell.js; then change scripts/drills/p3/matrix.mjs so the one-tab and two-tab design checks are plain checks (remove the 'raced -> known D1' escape) and pass.\n(2) scripts/drills/p3/rte.mjs step 7 still expects the <product-info> paste to be refused; P3-FIX4 now cleans it on save. Make step 7 expect the cleaned save (visible text kept, tag gone), keep a refused case for a real loss, and run the rte drill.\nAlso fix:\n(3) lib/sanitize.js: pin an unclosed noscript with an attribute ('<p>Hi</p><noscript class=\"x\">Founder note') in STILL_REFUSED (scripts/test-rich-text.js). Refusal words (lib/registry/text.js, lib/cms/store.js): name a tag only when it parses as a real known or custom element with real attributes; '<b and c>' and 'Size <XL or bigger>' keep the '< or > signs' words. Test both.\n(4) lib/documents/after-commit.js writeThemePin: throw (write nothing) on a tenant whose config is not valid JSON instead of replacing it; a write with rowsAffected 0 logs a failure; the cache refresh (getTenant fresh) is pinned by a test that fails without it; a late write never replaces a newer pin (compare the build's release or version before writing). Tests in scripts/test-design-doc.js. app/api/admin/theme/route.js: pin the DESIGN_ID check in watchDesignSave.\n(5) Kept local backup wording: a version saved from the local backup must not read 'Kept from another tab'; say it came from edits this browser kept (lib/documents/changes.js or wherever the note is set). Extend matrix.mjs's keepalive part to check the unsent text is in the stored version.\n(6) scripts/drills/p2/run.mjs: add a guard that fails when an expected flipped label (NOTE_CHECKS / REWORDED) is missing from the results, so a renamed check cannot silently disappear.\nDo not edit package.json or anything under .github/. If a code or shape changes, you own lib/admin/documents-api-shapes.js and scripts/test-api-shapes.js. Run pnpm test and the full drills (node scripts/drills/p3/run.mjs) and report the counts.\n- Ports on this Mac: 5000 and 7000 are taken by ControlCenter (AirPlay), 5037 and 5500 are in use, and Node's fetch refuses 5060 and 5061. Use only the ports you are given. If a drill stops at '#login-email' with /admin/login 500 (next/font Fraunces error), delete the worktree's .next and retry.",
+    "migrations": [],
+    "files": [
+     "app/api/admin/preview-session/route.js",
+     "lib/admin/preview-session-api.js",
+     "lib/preview-sessions.js",
+     "components/admin/editor/editorModel.js",
+     "components/admin/editor/PreviewPane.js",
+     "components/admin/editor/previewMachine.js",
+     "scripts/test-logout-preview.js",
+     "scripts/test-editor-shell.js",
+     "scripts/drills/p3/matrix.mjs",
+     "scripts/drills/p3/rte.mjs",
+     "scripts/drills/p3/lib.mjs",
+     "scripts/drills/p2/run.mjs",
+     "lib/sanitize.js",
+     "lib/registry/text.js",
+     "lib/cms/store.js",
+     "scripts/test-rich-text.js",
+     "lib/documents/after-commit.js",
+     "app/api/admin/theme/route.js",
+     "scripts/test-design-doc.js",
+     "lib/documents/changes.js",
+     "lib/documents/service.js",
+     "scripts/test-doc-changes.js",
+     "lib/admin/documents-api-shapes.js",
+     "scripts/test-api-shapes.js",
+     "docs/cms-reviews/P3-FIX5.md"
+    ],
+    "acceptance": [
+     "drill: the design checks in matrix.mjs pass in one tab and two tabs with no 'known D1' escape; the preview never says Up to date while showing old colours",
+     "unit: one editor mount mints one preview session; showDesign reaches the session the frame renders",
+     "drill: rte step 7 expects and gets the cleaned save; a real loss is still refused",
+     "unit: the unclosed noscript with an attribute is refused; '<b and c>' keeps the '< or > signs' words",
+     "unit: writeThemePin refuses a corrupt config, logs rowsAffected 0, refreshes the cache, and a late write never replaces a newer pin",
+     "unit: a local-backup version is not called 'Kept from another tab'; drill: the unsent text is in the stored version",
+     "drill: p2 run fails when an expected flipped label is missing",
+     "unit: pnpm test passes; drill: node scripts/drills/p3/run.mjs passes all stages"
+    ]
+   }
+  ]
  }
 ]
