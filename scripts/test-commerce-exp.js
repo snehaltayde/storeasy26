@@ -716,6 +716,111 @@ await t("P5: compatFrom keeps the legacy problems and adds states in order (not_
   same([e.saving, e.liveSaving], [200.2 - 99.6, 101], "saving stays legacy; liveSaving is rounded like the engine");
 });
 
+console.log("— P5-PANEL: picked products only, edits keep what they don't send, home use, whole quantities");
+
+await t("P5-PANEL: a handle (or any non-GID) variantId on `bundle` or `check` is refused 422 'Pick the product again.', and no row is written", async () => {
+  const n = await bundleCount();
+  const offers = Number((await raw("SELECT count(*) AS n FROM offers")).rows[0].n);
+  const r = await callRoute("POST", { bundle: { slug: "by-handle", title: "By handle", items: [{ variantId: "fixture-product-1", quantity: 1 }, { variantId: V(2), quantity: 1 }], bundle_price: 250, enable: false } });
+  same([r.status, r.body.error, r.body.code], [422, "Pick the product again.", "BAD_ITEM"], "bundle refused");
+  const only = await callRoute("POST", { bundle: { slug: "by-handle", title: "By handle", items: [{ variantId: "some-handle" }], bundle_price: 250 } });
+  same([only.status, only.body.error], [422, "Pick the product again."], "the brief's case");
+  const blank = await callRoute("POST", { bundle: { slug: "by-handle", title: "By handle", items: [{ variantId: "" }, { variantId: V(2) }], bundle_price: 250 } });
+  eq(blank.status, 422, "an empty variant id is refused too:");
+  const c = await callRoute("POST", { check: { items: [{ variantId: "fixture-product-1", quantity: 1 }, { variantId: V(2), quantity: 1 }], bundle_price: 250 } });
+  same([c.status, c.body.error, c.body.compat], [422, "Pick the product again.", undefined], "check refused, no compat");
+  // an edit of an existing bundle by handle changes nothing either
+  const before = [await rowOf(M.avail), await offerOf(M.avail)];
+  const e = await callRoute("POST", { bundle: { id: M.avail, title: "Avail", items: [{ variantId: "fixture-product-1" }, { variantId: V(2) }], bundle_price: 250 } });
+  eq(e.status, 422, "edit by handle:");
+  same([await rowOf(M.avail), await offerOf(M.avail)], before, "the edited bundle is unchanged");
+  same([await bundleCount(), Number((await raw("SELECT count(*) AS n FROM offers")).rows[0].n)], [n, offers], "no row, no offer");
+  eq((await raw("SELECT count(*) AS n FROM bundles WHERE slug = 'by-handle'")).rows[0].n, 0, "no 'by-handle' slug:");
+});
+
+await t("P5-PANEL: an edit through the route without slug, enable or description keeps all three and updates the bundle-<id> offer price and items", async () => {
+  const b = await inB(() => B.upsertBundle({ slug: "panel-edit", title: "Panel edit", description: "Stays as it was", items: it2(11, 12), bundle_price: 2000, enable: true }));
+  const r = await callRoute("POST", { bundle: { id: b.id, title: "Panel edit 2", items: [...it2(11, 12), { variantId: V(13), quantity: 2 }], bundle_price: 4500 } });
+  eq(r.status, 200, JSON.stringify(r.body));
+  const row = await rowOf(b.id);
+  same([row.slug, Number(row.enabled), row.description, row.title, Number(row.bundle_price)], ["panel-edit", 1, "Stays as it was", "Panel edit 2", 4500], "row");
+  const offer = await offerOf(b.id);
+  const cfg = JSON.parse(offer.config);
+  same([Number(offer.enabled), cfg.price, cfg.items], [1, 4500, [{ variantId: V(11), quantity: 1 }, { variantId: V(12), quantity: 1 }, { variantId: V(13), quantity: 2 }]], "offer");
+  await inB(() => B.deleteBundle(b.id));
+});
+
+await t("P5-PANEL: GET marks usedOnHome for a bundle the LIVE home refers to (not an older home version, not another document)", async () => {
+  const ids = await inB(async () => [
+    (await B.createBundle({ title: "On home", items: it2(1, 2), bundle_price: 250, enable: true })).id,
+    (await B.createBundle({ title: "Old home", items: it2(1, 2), bundle_price: 250 })).id,
+    (await B.createBundle({ title: "On a page", items: it2(1, 2), bundle_price: 250 })).id,
+  ]);
+  const [live, old, page] = ids;
+  const ts = new Date().toISOString();
+  const before = await callRoute("GET", null);
+  ok(before.body.bundles.every((x) => x.usedOnHome === false), "no live home yet: all false");
+  await raw("INSERT INTO documents (id, type, label, draft, draft_hash, schema_version, published_version_id, created_at, updated_at) VALUES ('doc_home', 'home', 'Home', '{}', 'h', 1, 'ver_home2', ?, ?)", [ts, ts]);
+  await raw("INSERT INTO documents (id, type, label, draft, draft_hash, schema_version, published_version_id, created_at, updated_at) VALUES ('doc_pg', 'page', 'About', '{}', 'h', 1, 'ver_pg1', ?, ?)", [ts, ts]);
+  await raw("INSERT INTO document_refs (version_id, ref_type, ref_id) VALUES ('ver_home2', 'bundle', ?), ('ver_home1', 'bundle', ?), ('ver_pg1', 'bundle', ?), ('ver_home2', 'media', ?)", [live, old, page, old]);
+  try {
+    const g = await callRoute("GET", null);
+    eq(g.status, 200, JSON.stringify(g.body));
+    const by = new Map(g.body.bundles.map((x) => [x.id, x.usedOnHome]));
+    same([by.get(live), by.get(old), by.get(page), by.get(M.avail)], [true, false, false, false], "usedOnHome");
+  } finally {
+    await raw("DELETE FROM document_refs WHERE version_id IN ('ver_home1', 'ver_home2', 'ver_pg1')");
+    await raw("DELETE FROM documents WHERE id IN ('doc_home', 'doc_pg')");
+    for (const id of ids) await inB(() => B.deleteBundle(id));
+  }
+});
+
+await t("P5-PANEL: a store without the documents tables reads every bundle as not on the home (no error)", async () => {
+  await raw("ALTER TABLE document_refs RENAME TO document_refs_away");
+  try {
+    const g = await callRoute("GET", null);
+    eq(g.status, 200, JSON.stringify(g.body));
+    ok(g.body.bundles.length > 0 && g.body.bundles.every((x) => x.usedOnHome === false), "all false");
+  } finally {
+    await raw("ALTER TABLE document_refs_away RENAME TO document_refs");
+  }
+});
+
+await t("P5-PANEL: a quantity that is not whole (1.5) gives the bad_quantity reason (not_ready), a turned-off draft saves with it, and it can never be turned on", async () => {
+  await inB(async () => {
+    const c = await B.bundleCompat({ items: [{ variantId: V(1), quantity: 1.5 }, { variantId: V(2), quantity: 1 }], bundle_price: 250 });
+    same([c.ok, c.state, c.reasons.map((r) => [r.kind, r.index ?? null])], [false, "not_ready", [["bad_quantity", 0]]], "the check");
+    eq(c.reasons[0].title, "Fixture product 1", "the reason names the product:");
+    ok(!/₹|component/i.test(c.reasons[0].words), `plain words: ${c.reasons[0].words}`);
+    const whole = await B.bundleCompat({ items: [{ variantId: V(1), quantity: 2 }, { variantId: V(2), quantity: "1" }, { variantId: V(3) }], bundle_price: 500 });
+    ok(!whole.reasons.some((r) => r.kind === "bad_quantity"), "whole numbers, a string '1' and a missing quantity are fine");
+    const draft = await B.createBundle({ title: "Half kit", items: [{ variantId: V(1), quantity: 1.5 }, { variantId: V(2), quantity: 1 }], bundle_price: 250 });
+    same([Number(draft.enabled), draft.compat.state], [0, "not_ready"], "saved turned off, not ready");
+    const listed = (await B.listBundles()).find((b) => b.id === draft.id);
+    same([listed.compat.ok, listed.compat.state, listed.compat.reasons.map((r) => r.kind)], [false, "not_ready", ["bad_quantity"]], "listBundles never shows it as ready to turn on");
+    same([await codeOf(B.setBundleEnabled(draft.id, true)), Number((await rowOf(draft.id)).enabled)], ["BUNDLE_INVALID", 0], "turning it on is refused");
+    eq(await codeOf(B.upsertBundle({ id: draft.id, title: "Half kit", items: [{ variantId: V(1), quantity: 1.5 }, { variantId: V(2), quantity: 1 }], bundle_price: 250, enable: true })), "BUNDLE_INVALID", "enable: true on an edit:");
+    eq(await codeOf(B.createBundle({ title: "Half kit", items: [{ variantId: V(1), quantity: 1.5 }, { variantId: V(2) }], bundle_price: 250, enable: true })), "BUNDLE_INVALID", "create asked to go on:");
+    // fixed to a whole number, it turns on
+    await B.upsertBundle({ id: draft.id, title: "Half kit", items: it2(1, 2), bundle_price: 250 });
+    await B.setBundleEnabled(draft.id, true);
+    same([Number((await rowOf(draft.id)).enabled), Number((await offerOf(draft.id))?.enabled)], [1, 1], "on, with its offer");
+    await B.deleteBundle(draft.id);
+  });
+  const r = await callRoute("POST", { check: { items: [{ variantId: V(1), quantity: 1.5 }, { variantId: V(2), quantity: 1 }], bundle_price: 250 } });
+  same([r.status, r.body.compat.state, r.body.compat.reasons.map((x) => x.kind)], [200, "not_ready", ["bad_quantity"]], "the route's check says it too");
+});
+
+await t("P5-PANEL: createBundle's pre-check: mustPass with enable: false and a 2-character name is refused, and nothing is saved", async () => {
+  await inB(async () => {
+    const before = [await bundleCount(), Number((await raw("SELECT count(*) AS n FROM offers")).rows[0].n)];
+    const e = await B.createBundle({ title: "Gy", items: it2(1, 2), bundle_price: 250, enable: false, mustPass: true }).then(() => null, (x) => x);
+    same([e?.code, e?.message], ["BUNDLE_INVALID", "Give the bundle a name of at least 3 characters. Nothing was saved."], "refused in plain words");
+    same([await bundleCount(), Number((await raw("SELECT count(*) AS n FROM offers")).rows[0].n)], before, "no row, no offer");
+    eq((await raw("SELECT count(*) AS n FROM bundles WHERE slug LIKE 'gy%'")).rows[0].n, 0, "no 'gy' slug:");
+  });
+});
+
 rawClient.close();
 await tn.cleanup();
 

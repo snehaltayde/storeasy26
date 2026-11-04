@@ -10,7 +10,9 @@ import { ConfirmDialog } from "@/components/console/Dialog";
 import { Field, Input } from "@/components/console/fields";
 import { EmptyState } from "@/components/console/bits";
 import { Switch } from "@/components/console/Switch";
-import { VariantPicker } from "@/components/admin/cms/RefPicker";
+import { BundleForm, reasonWords } from "@/components/admin/bundles/BundleForm";
+import { formatMoney } from "@/lib/format";
+import { stateLine } from "@/lib/commerce/bundle-words";
 
 // S46 commerce-expansion panels (redesigned S50): BundlesPanel + QuizPanel,
 // both on the Catalog page. They talk to /api/admin/bundles and
@@ -20,221 +22,151 @@ import { VariantPicker } from "@/components/admin/cms/RefPicker";
 // buttons became labeled IconButtons.
 // (ReturnsPanel was removed in S50 — the Orders page owns its returns view.)
 
-const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-
 async function postJson(url, body) {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || "Request failed");
+  if (!res.ok) throw Object.assign(new Error(json.error || "Request failed"), { body: json });
   return json;
 }
 
-// ---- Bundles (BE31 + SF18) ----------------------------------------------------
+// ---- Bundles (BE31 + SF18; P5-PANEL) -------------------------------------------
+//
+// P5-PANEL (COM-02): the form is components/admin/bundles/BundleForm.js
+// (products picked, never typed; the slug derived; an edit keeps a live
+// bundle live). Money is formatMoney with the store's currency. Every
+// bundle-state sentence comes from lib/commerce/bundle-words.js, built from
+// the structured reasons, never from the legacy problem strings. The card is
+// the #bundles anchor the editor links to (/admin/catalog#bundles). A draft
+// that would not pass the check is never offered Enable. Turning off or
+// deleting a bundle the live home page shows says so first.
 
-const EMPTY_BUNDLE = { id: null, slug: "", title: "", description: "", bundle_price: "", items: [{ variantId: "", quantity: 1 }, { variantId: "", quantity: 1 }] };
+const HOME_GOES = "Shoppers will stop seeing this bundle on your home page right away.";
 
-export function BundlesPanel({ initial }) {
+const reasonList = (reasons, currency) => (reasons || []).map((r) => reasonWords(r, currency)).filter(Boolean);
+
+export function BundlesPanel({ initial, currency }) {
   const [bundles, setBundles] = useState(initial || []);
-  const [form, setForm] = useState(null); // null = closed
-  const [compat, setCompat] = useState(null);
-  const [checking, setChecking] = useState(false);
-  const [saving, setSaving] = useState(null); // "draft" | "enable"
+  const [cur, setCur] = useState(currency);
+  const [form, setForm] = useState(null); // null = closed | { key, initial }
   const [toggling, setToggling] = useState(null); // bundle id
   const [err, setErr] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // bundle
-  const [pickerRow, setPickerRow] = useState(null); // component index with the variant picker open (S53 B2)
+  const [confirmOff, setConfirmOff] = useState(null); // bundle on the live home
+  const money = (n) => formatMoney(n, cur ?? undefined);
 
   async function refresh() {
     const data = await fetch("/api/admin/bundles").then((r) => r.json()).catch(() => null);
-    if (data?.ok) setBundles(data.bundles);
+    if (data?.ok) {
+      setBundles(data.bundles);
+      if (data.currency) setCur(data.currency);
+    }
   }
 
-  async function toggle(b) {
+  async function setEnabled(b, enabled) {
     setToggling(b.id);
     setErr(null);
     try {
-      await postJson("/api/admin/bundles", { enable: { id: b.id, enabled: !b.enabled } });
+      await postJson("/api/admin/bundles", { enable: { id: b.id, enabled } });
       await refresh();
     } catch (e) {
-      setErr(String(e?.message || e));
+      const said = reasonList(e?.body?.reasons, cur);
+      setErr(said.length ? `${b.title}: ${said.join(" · ")}` : String(e?.message || e));
     } finally {
       setToggling(null);
     }
   }
 
-  async function check() {
-    setChecking(true);
+  const openForm = (b) => {
     setErr(null);
-    try {
-      const r = await postJson("/api/admin/bundles", { check: { items: form.items, bundle_price: Number(form.bundle_price) } });
-      setCompat(r.compat);
-    } catch (e) {
-      setErr(String(e?.message || e));
-    } finally {
-      setChecking(false);
-    }
-  }
-
-  async function save(enable) {
-    setSaving(enable ? "enable" : "draft");
-    setErr(null);
-    try {
-      await postJson("/api/admin/bundles", { bundle: { ...form, bundle_price: Number(form.bundle_price), enable } });
-      setForm(null);
-      setCompat(null);
-      await refresh();
-    } catch (e) {
-      setErr(String(e?.message || e));
-    } finally {
-      setSaving(null);
-    }
-  }
-
-  const setItem = (i, patch) => setForm({ ...form, items: form.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+    setForm({ key: b ? b.id : `new-${Date.now()}`, initial: b || null });
+  };
 
   return (
-    <Card>
+    <Card id="bundles">
       <CardHeader
         title="Bundles"
-        description="A bundle is a set price for a fixed group of variants — applied automatically in the cart through the offers engine. Enabling checks that every component is live and the price actually saves."
+        description="A bundle is a set price for a fixed group of products, applied automatically in the cart. It can be shown to shoppers only when every product is in stock and the price saves money."
         actions={
-          <Button size="sm" icon={<Plus size={13} aria-hidden />} onClick={() => { setForm(EMPTY_BUNDLE); setCompat(null); setErr(null); }}>
+          <Button size="sm" icon={<Plus size={13} aria-hidden />} onClick={() => openForm(null)}>
             New bundle
           </Button>
         }
       />
 
-      {err && !form && <Banner tone="danger" className="mb-3">{err}</Banner>}
+      {err && <Banner tone="danger" className="mb-3">{err}</Banner>}
 
       {bundles.length === 0 && !form ? (
-        <EmptyState title="No bundles yet" body="Create one to sell a fixed group of variants at a set price." className="py-6" />
+        <EmptyState title="No bundles yet" body="Create one to sell a fixed group of products at a set price." className="py-6" />
       ) : (
         <ul className="space-y-2">
-          {bundles.map((b) => (
-            <li key={b.id} className="rounded-ctl border border-edge p-3 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-fg">{b.title}</span>
-                <span className="font-mono text-xs text-fg-subtle">/bundles/{b.slug}</span>
-                <StatusBadge status={b.enabled ? "live" : "draft"} />
-                <span className="ml-auto text-xs tabular-nums text-fg-muted">
-                  {inr(b.bundle_price)} {b.compat?.componentsSum ? <s className="text-fg-subtle">{inr(b.compat.componentsSum)}</s> : null}
-                </span>
-              </div>
-              {!b.compat?.ok && (
-                <Banner tone="warning" className="mt-2">
-                  {b.compat?.problems?.join(" · ") || "components unavailable"} — {b.enabled ? "shoppers see it as unavailable" : "can’t be enabled"}
-                </Banner>
-              )}
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                <Button size="sm" busy={toggling === b.id} disabled={!!toggling && toggling !== b.id} onClick={() => toggle(b)}>
-                  {b.enabled ? "Disable" : "Enable"}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setForm({ id: b.id, slug: b.slug, title: b.title, description: b.description || "", bundle_price: b.bundle_price, items: b.items });
-                    setCompat(null);
-                    setErr(null);
-                  }}
-                >
-                  Edit
-                </Button>
-                <Button size="sm" variant="dangerOutline" onClick={() => setConfirmDelete(b)}>
-                  Delete
-                </Button>
-              </div>
-            </li>
-          ))}
+          {bundles.map((b) => {
+            const state = b.compat?.state;
+            const ready = state === "available";
+            const said = reasonList(b.compat?.reasons, cur);
+            return (
+              <li key={b.id} className="rounded-ctl border border-edge p-3 text-sm" data-bundle-id={b.id}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-fg">{b.title}</span>
+                  <span className="font-mono text-xs text-fg-subtle">/bundles/{b.slug}</span>
+                  <StatusBadge status={b.enabled ? "live" : "draft"} />
+                  {b.usedOnHome && <span className="text-xs text-fg-muted">On your home page</span>}
+                  <span className="ml-auto text-xs tabular-nums text-fg-muted">
+                    {money(b.bundle_price)} {b.compat?.componentsSum ? <s className="text-fg-subtle">{money(b.compat.componentsSum)}</s> : null}
+                  </span>
+                </div>
+                {state && !ready && (
+                  <Banner tone="warning" className="mt-2" title={b.enabled ? stateLine(state, b.compat?.reasons, { currency: cur ?? undefined }) : undefined}>
+                    {said.length ? said.join(" · ") : null}
+                  </Banner>
+                )}
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {b.enabled ? (
+                    <Button size="sm" busy={toggling === b.id} disabled={!!toggling && toggling !== b.id} onClick={() => (b.usedOnHome ? setConfirmOff(b) : setEnabled(b, false))}>
+                      Disable
+                    </Button>
+                  ) : ready ? (
+                    <Button size="sm" busy={toggling === b.id} disabled={!!toggling && toggling !== b.id} onClick={() => setEnabled(b, true)}>
+                      Enable
+                    </Button>
+                  ) : null}
+                  <Button size="sm" onClick={() => openForm(b)}>
+                    Edit
+                  </Button>
+                  <Button size="sm" variant="dangerOutline" onClick={() => setConfirmDelete(b)}>
+                    Delete
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
       {form && (
-        <div className="mt-4 rounded-ctl border border-edge bg-surface-sunken p-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Slug" htmlFor="bundle-slug">
-              <Input id="bundle-slug" mono placeholder="starter-stack" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
-            </Field>
-            <Field label="Title" htmlFor="bundle-title">
-              <Input id="bundle-title" placeholder="Starter stack" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            </Field>
-            <Field label="Description" htmlFor="bundle-desc" hint="Shown on the bundle page." className="sm:col-span-2">
-              <Input id="bundle-desc" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-            </Field>
-            <Field label="Bundle price (₹)" htmlFor="bundle-price">
-              <Input id="bundle-price" type="number" min="1" value={form.bundle_price} onChange={(e) => setForm({ ...form, bundle_price: e.target.value })} />
-            </Field>
-          </div>
-
-          <p className="mt-4 text-xs font-medium text-fg-muted">Components — pick a variant from the catalog, or type a product handle (first variant) / variant ID, plus quantity</p>
-          {form.items.map((c, i) => (
-            <div key={i} className="mt-2 flex items-center gap-2">
-              <Input
-                mono
-                className="flex-1 text-xs"
-                aria-label={`Component ${i + 1}`}
-                placeholder="product-handle or gid://shopify/ProductVariant/…"
-                value={c.variantId}
-                onChange={(e) => setItem(i, { variantId: e.target.value.trim() })}
-              />
-              <Button size="sm" onClick={() => setPickerRow(i)}>
-                Choose…
-              </Button>
-              <Input
-                type="number"
-                min="1"
-                className="w-16"
-                aria-label={`Component ${i + 1} quantity`}
-                value={c.quantity}
-                onChange={(e) => setItem(i, { quantity: Number(e.target.value) || 1 })}
-              />
-              {form.items.length > 2 && (
-                <IconButton label={`Remove component ${i + 1}`} icon={<X size={14} aria-hidden />} onClick={() => setForm({ ...form, items: form.items.filter((_, j) => j !== i) })} />
-              )}
-            </div>
-          ))}
-          <Button size="sm" variant="ghost" icon={<Plus size={13} aria-hidden />} className="mt-2" onClick={() => setForm({ ...form, items: [...form.items, { variantId: "", quantity: 1 }] })}>
-            Add component
-          </Button>
-
-          {compat && (
-            <Banner
-              tone={compat.ok ? "success" : "warning"}
-              className="mt-3"
-              title={compat.ok ? `Compatible — components sum to ${inr(compat.componentsSum)}, shoppers save ${inr(compat.saving)}` : compat.problems.join(" · ")}
-            >
-              {compat.components?.length > 0 && (
-                <ul className="space-y-0.5">
-                  {compat.components.map((c, i) => (
-                    <li key={i}>
-                      {c.title
-                        ? `${c.title}${c.variant_title && c.variant_title !== "Default Title" ? ` — ${c.variant_title}` : ""} ×${c.quantity} (${inr(c.price)})`
-                        : `component ${i + 1}: not found`}
-                      {c.state === "missing" ? " · missing" : c.available === false ? " · sold out" : ""}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Banner>
-          )}
-
-          {err && <Banner tone="danger" className="mt-3">{err}</Banner>}
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button busy={checking} disabled={!!saving} onClick={check}>
-              Check compatibility
-            </Button>
-            <Button busy={saving === "draft"} disabled={checking || saving === "enable"} onClick={() => save(false)}>
-              Save draft
-            </Button>
-            <Button variant="primary" busy={saving === "enable"} disabled={checking || saving === "draft"} onClick={() => save(true)}>
-              Save &amp; enable
-            </Button>
-            <Button variant="ghost" disabled={checking || !!saving} onClick={() => { setForm(null); setCompat(null); setErr(null); }}>
-              Cancel
-            </Button>
-          </div>
+        <div className="mt-4">
+          <BundleForm key={form.key} initial={form.initial} currency={cur} onSaved={refresh} onCancel={() => setForm(null)} />
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmOff}
+        onClose={() => setConfirmOff(null)}
+        title="Disable bundle"
+        tone="danger"
+        confirmLabel="Disable"
+        body={
+          confirmOff && (
+            <>
+              <strong>{confirmOff.title}</strong> stops being sold as a bundle. {HOME_GOES}
+            </>
+          )
+        }
+        onConfirm={async () => {
+          const b = confirmOff;
+          await postJson("/api/admin/bundles", { enable: { id: b.id, enabled: false } });
+          await refresh();
+        }}
+      />
 
       <ConfirmDialog
         open={!!confirmDelete}
@@ -245,26 +177,14 @@ export function BundlesPanel({ initial }) {
         body={
           confirmDelete && (
             <>
-              Removes <strong>{confirmDelete.title}</strong> permanently. Its linked cart offer goes too — shoppers can no longer buy it as a bundle.
+              Removes <strong>{confirmDelete.title}</strong> permanently. Its linked cart offer goes too, so shoppers can no longer buy it as a bundle.
+              {confirmDelete.usedOnHome ? ` ${HOME_GOES}` : ""}
             </>
           )
         }
         onConfirm={async () => {
           await postJson("/api/admin/bundles", { remove: { id: confirmDelete.id } });
           await refresh();
-        }}
-      />
-
-      {/* S53 B2: fills the SAME component field (a variant GID string) the
-          form always sent — typed handles/GIDs still work for anything the
-          catalog hasn't synced. */}
-      <VariantPicker
-        open={pickerRow != null}
-        onClose={() => setPickerRow(null)}
-        title={pickerRow != null ? `Choose component ${pickerRow + 1}` : "Choose a variant"}
-        selectedVariantId={pickerRow != null && form?.items[pickerRow]?.variantId?.startsWith("gid://") ? form.items[pickerRow].variantId : undefined}
-        onConfirm={({ variantId }) => {
-          if (pickerRow != null) setItem(pickerRow, { variantId });
         }}
       />
     </Card>
