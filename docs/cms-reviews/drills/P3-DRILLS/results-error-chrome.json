@@ -1,0 +1,76 @@
+{
+  "id": "P3-DRILLS",
+  "part": "error-chrome",
+  "title": "P3-DRILLS — error-chrome",
+  "ranAt": "2026-11-04T07:55:00.194Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "error chrome: / with only the header's version missing gives the error page",
+      "detail": {
+        "status": 500,
+        "text": "Store\nShop all\nSomething went wrong\n\nA temporary error stopped this page from loading. It's usually gone on retry.\n\nRef: 3697987620\n\nTry again\nBack to home\n\nSto"
+      }
+    },
+    {
+      "ok": true,
+      "label": "error chrome: /policies/shipping with only the header's version missing gives the error page",
+      "detail": {
+        "status": 500,
+        "text": "Store\nShop all\nSomething went wrong\n\nA temporary error stopped this page from loading. It's usually gone on retry.\n\nRef: 3079128778\n\nTry again\nBack to home\n\nSto"
+      }
+    },
+    {
+      "ok": true,
+      "label": "error chrome: /campaigns/p3-weekend-offer with only the header's version missing gives the error page",
+      "detail": {
+        "status": 500,
+        "text": "Store\nShop all\nSomething went wrong\n\nA temporary error stopped this page from loading. It's usually gone on retry.\n\nRef: 27061258\n\nTry again\nBack to home\n\nStore"
+      }
+    },
+    {
+      "ok": true,
+      "label": "error chrome: with the list put back, the store shows again",
+      "detail": {
+        "status": 200
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_5dd1f1eb0204b376, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.6s"
+  ],
+  "screenshots": [
+    {
+      "name": "error-chrome-home-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/error-chrome-home-1440.png",
+      "bytes": 11478,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "error-chrome-policies-shipping-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/error-chrome-policies-shipping-1440.png",
+      "bytes": 11417,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/shipping"
+    },
+    {
+      "name": "error-chrome-campaigns-p3-weekend-offer-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/error-chrome-campaigns-p3-weekend-offer-1440.png",
+      "bytes": 11400,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/campaigns/p3-weekend-offer"
+    }
+  ]
+}

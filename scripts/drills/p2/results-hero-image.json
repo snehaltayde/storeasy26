@@ -2,8 +2,8 @@
   "id": "P2-DRILLS",
   "part": "hero-image",
   "title": "P2-DRILLS — hero-image",
-  "ranAt": "2026-11-04T00:06:53.821Z",
-  "harness": "http://localhost:3800",
+  "ranAt": "2026-11-04T07:43:37.873Z",
+  "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 32,
   "failed": 0,
@@ -14,7 +14,7 @@
       "label": "a hero photo is uploaded to the media library (POST /api/admin/media)",
       "detail": {
         "status": 200,
-        "url": "/api/media/med_63a8a4fa620906ce20"
+        "url": "/api/media/med_06b7f2f4b63f0850ac"
       }
     },
     {
@@ -37,8 +37,8 @@
       "ok": true,
       "label": "library photo at 1440: the hero renders the image with its alt text",
       "detail": {
-        "src": "/api/media/med_63a8a4fa620906ce20",
-        "currentSrc": "http://localhost:3800/api/media/med_63a8a4fa620906ce20",
+        "src": "/api/media/med_06b7f2f4b63f0850ac",
+        "currentSrc": "http://localhost:6100/api/media/med_06b7f2f4b63f0850ac",
         "alt": "A jar on linen in morning light",
         "complete": true,
         "naturalWidth": 1600,
@@ -50,13 +50,13 @@
       "label": "library photo at 1440: the image loaded (not broken)",
       "detail": {
         "naturalWidth": 1600,
-        "currentSrc": "http://localhost:3800/api/media/med_63a8a4fa620906ce20"
+        "currentSrc": "http://localhost:6100/api/media/med_06b7f2f4b63f0850ac"
       }
     },
     {
       "ok": true,
       "label": "library photo at 1440: a library photo is served from its own /api/media url",
-      "detail": "/api/media/med_63a8a4fa620906ce20"
+      "detail": "/api/media/med_06b7f2f4b63f0850ac"
     },
     {
       "ok": true,
@@ -69,8 +69,8 @@
       "ok": true,
       "label": "library photo at 375: the hero renders the image with its alt text",
       "detail": {
-        "src": "/api/media/med_63a8a4fa620906ce20",
-        "currentSrc": "http://localhost:3800/api/media/med_63a8a4fa620906ce20",
+        "src": "/api/media/med_06b7f2f4b63f0850ac",
+        "currentSrc": "http://localhost:6100/api/media/med_06b7f2f4b63f0850ac",
         "alt": "A jar on linen in morning light",
         "complete": true,
         "naturalWidth": 1600,
@@ -82,13 +82,13 @@
       "label": "library photo at 375: the image loaded (not broken)",
       "detail": {
         "naturalWidth": 1600,
-        "currentSrc": "http://localhost:3800/api/media/med_63a8a4fa620906ce20"
+        "currentSrc": "http://localhost:6100/api/media/med_06b7f2f4b63f0850ac"
       }
     },
     {
       "ok": true,
       "label": "library photo at 375: a library photo is served from its own /api/media url",
-      "detail": "/api/media/med_63a8a4fa620906ce20"
+      "detail": "/api/media/med_06b7f2f4b63f0850ac"
     },
     {
       "ok": true,
@@ -116,7 +116,7 @@
       "label": "own path photo at 1440: the hero renders the image with its alt text",
       "detail": {
         "src": "/icons/icon-512.png",
-        "currentSrc": "http://localhost:3800/icons/icon-512.png",
+        "currentSrc": "http://localhost:6100/icons/icon-512.png",
         "alt": "The store's own icon, as a hero photo",
         "complete": true,
         "naturalWidth": 512,
@@ -128,7 +128,7 @@
       "label": "own path photo at 1440: the image loaded (not broken)",
       "detail": {
         "naturalWidth": 512,
-        "currentSrc": "http://localhost:3800/icons/icon-512.png"
+        "currentSrc": "http://localhost:6100/icons/icon-512.png"
       }
     },
     {
@@ -136,7 +136,7 @@
       "label": "own path photo at 1440: a photo off the Shopify CDN loads from its own url, not /_next/image",
       "detail": {
         "src": "/icons/icon-512.png",
-        "currentSrc": "http://localhost:3800/icons/icon-512.png"
+        "currentSrc": "http://localhost:6100/icons/icon-512.png"
       }
     },
     {
@@ -151,7 +151,7 @@
       "label": "own path photo at 375: the hero renders the image with its alt text",
       "detail": {
         "src": "/icons/icon-512.png",
-        "currentSrc": "http://localhost:3800/icons/icon-512.png",
+        "currentSrc": "http://localhost:6100/icons/icon-512.png",
         "alt": "The store's own icon, as a hero photo",
         "complete": true,
         "naturalWidth": 512,
@@ -163,7 +163,7 @@
       "label": "own path photo at 375: the image loaded (not broken)",
       "detail": {
         "naturalWidth": 512,
-        "currentSrc": "http://localhost:3800/icons/icon-512.png"
+        "currentSrc": "http://localhost:6100/icons/icon-512.png"
       }
     },
     {
@@ -171,7 +171,7 @@
       "label": "own path photo at 375: a photo off the Shopify CDN loads from its own url, not /_next/image",
       "detail": {
         "src": "/icons/icon-512.png",
-        "currentSrc": "http://localhost:3800/icons/icon-512.png"
+        "currentSrc": "http://localhost:6100/icons/icon-512.png"
       }
     },
     {
@@ -199,8 +199,8 @@
       "ok": true,
       "label": "https photo off the Shopify CDN at 1440: the hero renders the image with its alt text",
       "detail": {
-        "src": "https://localhost:4806/hero.jpg",
-        "currentSrc": "https://localhost:4806/hero.jpg",
+        "src": "https://localhost:7106/hero.jpg",
+        "currentSrc": "https://localhost:7106/hero.jpg",
         "alt": "A photo from another https host",
         "complete": true,
         "naturalWidth": 1200,
@@ -212,15 +212,15 @@
       "label": "https photo off the Shopify CDN at 1440: the image loaded (not broken)",
       "detail": {
         "naturalWidth": 1200,
-        "currentSrc": "https://localhost:4806/hero.jpg"
+        "currentSrc": "https://localhost:7106/hero.jpg"
       }
     },
     {
       "ok": true,
       "label": "https photo off the Shopify CDN at 1440: a photo off the Shopify CDN loads from its own url, not /_next/image",
       "detail": {
-        "src": "https://localhost:4806/hero.jpg",
-        "currentSrc": "https://localhost:4806/hero.jpg"
+        "src": "https://localhost:7106/hero.jpg",
+        "currentSrc": "https://localhost:7106/hero.jpg"
       }
     },
     {
@@ -234,8 +234,8 @@
       "ok": true,
       "label": "https photo off the Shopify CDN at 375: the hero renders the image with its alt text",
       "detail": {
-        "src": "https://localhost:4806/hero.jpg",
-        "currentSrc": "https://localhost:4806/hero.jpg",
+        "src": "https://localhost:7106/hero.jpg",
+        "currentSrc": "https://localhost:7106/hero.jpg",
         "alt": "A photo from another https host",
         "complete": true,
         "naturalWidth": 1200,
@@ -247,15 +247,15 @@
       "label": "https photo off the Shopify CDN at 375: the image loaded (not broken)",
       "detail": {
         "naturalWidth": 1200,
-        "currentSrc": "https://localhost:4806/hero.jpg"
+        "currentSrc": "https://localhost:7106/hero.jpg"
       }
     },
     {
       "ok": true,
       "label": "https photo off the Shopify CDN at 375: a photo off the Shopify CDN loads from its own url, not /_next/image",
       "detail": {
-        "src": "https://localhost:4806/hero.jpg",
-        "currentSrc": "https://localhost:4806/hero.jpg"
+        "src": "https://localhost:7106/hero.jpg",
+        "currentSrc": "https://localhost:7106/hero.jpg"
       }
     },
     {
@@ -274,13 +274,13 @@
     }
   ],
   "notes": [
-    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_95354b4749d1f0ef, 0.5s"
+    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_27948d7ccfeb9080, 0.5s"
   ],
   "screenshots": [
     {
       "name": "hero-image-library-photo-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/hero-image-library-photo-1440.png",
-      "bytes": 25534,
+      "bytes": 22945,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -289,7 +289,7 @@
     {
       "name": "hero-image-library-photo-375",
       "file": "docs/cms-reviews/drills/P2-DRILLS/hero-image-library-photo-375.png",
-      "bytes": 31258,
+      "bytes": 28616,
       "width": 375,
       "height": 812,
       "viewport": 375,
@@ -316,7 +316,7 @@
     {
       "name": "hero-image-https-photo-off-the-shopify-cdn-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/hero-image-https-photo-off-the-shopify-cdn-1440.png",
-      "bytes": 23595,
+      "bytes": 26056,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -325,7 +325,7 @@
     {
       "name": "hero-image-https-photo-off-the-shopify-cdn-375",
       "file": "docs/cms-reviews/drills/P2-DRILLS/hero-image-https-photo-off-the-shopify-cdn-375.png",
-      "bytes": 29159,
+      "bytes": 31720,
       "width": 375,
       "height": 812,
       "viewport": 375,

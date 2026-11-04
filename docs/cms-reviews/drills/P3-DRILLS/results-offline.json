@@ -1,0 +1,81 @@
+{
+  "id": "P3-DRILLS",
+  "part": "offline",
+  "title": "P3-DRILLS — offline",
+  "ranAt": "2026-11-04T07:53:02.275Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 4,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "offline: the confirm lists the live pages that link to it (the home page)",
+      "detail": {
+        "words": "Take “Weekend offer” offline?\n\nShoppers can't open it any more. Your draft keeps its text, so you can publish it again later.\n\nThese live pages link to it, so their links will stop working:\n\nHome page\n\nThis changes on your live store:\n\nTaken offline\nCancel\nTake it offline"
+      }
+    },
+    {
+      "ok": true,
+      "label": "offline: shoppers get 404 at the campaign's address",
+      "detail": {
+        "status": 404,
+        "result": "",
+        "clicks": 2
+      }
+    },
+    {
+      "ok": true,
+      "label": "offline: the preview's bar says 'This page is offline. Publishing it brings it back.'",
+      "detail": {
+        "line": "This page is offline. Publishing it brings it back."
+      }
+    },
+    {
+      "ok": true,
+      "label": "offline: Publish asks 'Publish it again?', and after it the campaign is live again",
+      "detail": {
+        "phases": [
+          "review",
+          "republish",
+          "done"
+        ],
+        "words": "Publish it again?\n\nYou took “Weekend offer” offline. Publish the same content again?\n\nCancel\nPublish it again",
+        "clicks": 3
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_bd57b7fc50877577, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s"
+  ],
+  "screenshots": [
+    {
+      "name": "offline-confirm-linkers-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/offline-confirm-linkers-1440.png",
+      "bytes": 40850,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "offline-preview-line-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/offline-preview-line-1440.png",
+      "bytes": 34684,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "offline-publish-again-confirm-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/offline-publish-again-confirm-1440.png",
+      "bytes": 32659,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    }
+  ]
+}

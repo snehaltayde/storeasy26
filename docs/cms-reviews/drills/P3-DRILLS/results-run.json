@@ -1,0 +1,315 @@
+{
+  "ranAt": "2026-11-04T07:26:20.523Z",
+  "finishedAt": "2026-11-04T07:49:54.556Z",
+  "stages": [
+    "items",
+    "matrix",
+    "legacy",
+    "p2"
+  ],
+  "rows": [
+    {
+      "stage": "items",
+      "name": "smoke",
+      "id": "P3-HARNESS",
+      "exit": 0,
+      "seconds": 28,
+      "passed": 26,
+      "failed": 0,
+      "known": 0,
+      "results": "items/P3-HARNESS-results-smoke.json"
+    },
+    {
+      "stage": "items",
+      "name": "routes",
+      "id": "P3-ROUTES",
+      "exit": 0,
+      "seconds": 68,
+      "passed": 31,
+      "failed": 0,
+      "known": 0,
+      "results": "items/P3-ROUTES-results-routes.json"
+    },
+    {
+      "stage": "items",
+      "name": "editor",
+      "id": "P3-EDITOR",
+      "exit": 0,
+      "seconds": 43,
+      "passed": 22,
+      "failed": 0,
+      "known": 0,
+      "results": "items/P3-EDITOR-results-editor.json"
+    },
+    {
+      "stage": "items",
+      "name": "design",
+      "id": "P3-DESIGN",
+      "exit": 0,
+      "seconds": 24,
+      "passed": 26,
+      "failed": 0,
+      "known": 0,
+      "results": "items/P3-DESIGN-results-design.json"
+    },
+    {
+      "stage": "items",
+      "name": "rte",
+      "id": "P3-RTE",
+      "exit": 0,
+      "seconds": 13,
+      "passed": 43,
+      "failed": 0,
+      "known": 0,
+      "results": "items/P3-RTE-results-rte.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "task1",
+      "exit": 0,
+      "seconds": 14,
+      "passed": 3,
+      "failed": 0,
+      "known": 0,
+      "clicks": [
+        "task 1 timing: {\"seconds\":2.7,\"clicks\":4,\"path\":[\"section:400 products · 30 collections\\n\\nSkin first.\",\"input:\",\"button:Publish\",\"button:Publish\"]}"
+      ],
+      "results": "results-task1.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "task4",
+      "exit": 1,
+      "seconds": 39,
+      "passed": 2,
+      "failed": 1,
+      "known": 0,
+      "aborted": "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-edit-this-page]')\n    - locator resolved to <a data-edit-this-page=\"\" href=\"/admin/editor?path=%2Fpolicies%2Fshipping\" class=\"fixed bottom-4 left-4 z-40 rounded-sf-button bg-sf-accent px-4 py-2 text-sm font-bold text-s",
+      "clicks": [],
+      "results": "results-task4.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "task5",
+      "exit": 0,
+      "seconds": 49,
+      "passed": 8,
+      "failed": 0,
+      "known": 0,
+      "clicks": [
+        "task 5 timing: same document {\"seconds\":1.3,\"clicks\":2,\"path\":[\"button:Undo\",\"button:Undo\"]}; another document {\"seconds\":32.3,\"clicks\":3,\"path\":[\"a:Publishing\\n2\",\"button:Undo\",\"button:Undo\"]}"
+      ],
+      "results": "results-task5.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "closed",
+      "exit": 0,
+      "seconds": 19,
+      "passed": 10,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-closed.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "publish-both",
+      "exit": 0,
+      "seconds": 10,
+      "passed": 3,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-publish-both.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "offline",
+      "exit": 0,
+      "seconds": 72,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-offline.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "keep-live",
+      "exit": 0,
+      "seconds": 16,
+      "passed": 3,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-keep-live.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "conflict",
+      "exit": 0,
+      "seconds": 18,
+      "passed": 5,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-conflict.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "keepalive",
+      "exit": 0,
+      "seconds": 18,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-keepalive.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "pv01",
+      "exit": 1,
+      "seconds": 136,
+      "passed": 4,
+      "failed": 2,
+      "known": 0,
+      "clicks": [],
+      "results": "results-pv01.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "session",
+      "exit": 0,
+      "seconds": 18,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-session.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "design",
+      "exit": 0,
+      "seconds": 53,
+      "passed": 3,
+      "failed": 0,
+      "known": 2,
+      "clicks": [],
+      "results": "results-design.json"
+    },
+    {
+      "stage": "matrix",
+      "name": "error-chrome",
+      "exit": 0,
+      "seconds": 11,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "clicks": [],
+      "results": "results-error-chrome.json"
+    },
+    {
+      "stage": "legacy",
+      "name": "legacy",
+      "exit": 0,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-legacy.json"
+    },
+    {
+      "stage": "p2",
+      "name": "sections",
+      "exit": 0,
+      "passed": 453,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-sections.json"
+    },
+    {
+      "stage": "p2",
+      "name": "hero-image",
+      "exit": 0,
+      "passed": 32,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-hero-image.json"
+    },
+    {
+      "stage": "p2",
+      "name": "policy-typo",
+      "exit": 0,
+      "passed": 8,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-policy-typo.json"
+    },
+    {
+      "stage": "p2",
+      "name": "error-chrome",
+      "exit": 0,
+      "passed": 15,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-error-chrome.json"
+    },
+    {
+      "stage": "p2",
+      "name": "edge",
+      "exit": 0,
+      "passed": 25,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-edge.json"
+    },
+    {
+      "stage": "p2",
+      "name": "preview",
+      "exit": 0,
+      "passed": 22,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-preview.json"
+    },
+    {
+      "stage": "p2",
+      "name": "unfinished",
+      "exit": 0,
+      "passed": 9,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-unfinished.json"
+    },
+    {
+      "stage": "p2",
+      "name": "redirect",
+      "exit": 0,
+      "passed": 115,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-redirect.json"
+    },
+    {
+      "stage": "p2",
+      "name": "space",
+      "exit": 0,
+      "passed": 3,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-space.json"
+    },
+    {
+      "stage": "p2",
+      "name": "legacy",
+      "exit": 0,
+      "passed": 4,
+      "failed": 0,
+      "known": 0,
+      "results": "scripts/drills/p2/results-legacy.json"
+    }
+  ],
+  "failed": 2
+}

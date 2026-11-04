@@ -1,0 +1,115 @@
+{
+  "id": "P3-DRILLS",
+  "part": "task5",
+  "title": "P3-DRILLS — task5",
+  "ranAt": "2026-11-04T07:51:21.554Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "task 5 set-up: a hero change is live",
+      "detail": {
+        "phase": "done"
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 5 (same document): Undo says what will change, and the previous hero is live again",
+      "detail": {
+        "confirm": "Undo this publish?\n\nThis changes on your live store:\n\nHero: title changed\n\nIt goes back to: Published 4 Nov, 13:20 by Asha Founder.\n\nUndo\nCancel",
+        "result": "“Home page” is back to the version that went live on 4 Nov, 13:20."
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 5 (same document): the next Publish has nothing to ship (the undone title is not in the draft)",
+      "detail": {
+        "heroDraft": "Skin first. Makeup second.",
+        "review": "What will go live\n\nNothing has changed since the last publish, so there is nothing to publish.\n\nCancel\nPublish"
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 5 (same document): 2 clicks, 1.4 s (target under 60 s)",
+      "detail": {
+        "seconds": 1.4,
+        "clicks": 2,
+        "path": [
+          "button:Undo",
+          "button:Undo"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 5 set-up: a change to another page (the size guide) is live",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "task 5 (another document): the top row of Recently published names the page; Undo says what changes, and the previous version is live",
+      "detail": {
+        "row": "Published Size Guide\n\nAsha Founder · 4 Nov, 13:20\n\nText 1: title changed\nUndo\nOpen in the editor",
+        "confirm": "Published Size Guide\n\nAsha Founder · 4 Nov, 13:20\n\nText 1: title changed\n\nUndo this publish?\n\nThis changes on your live store:\n\nText 1: title changed\n\nIt goes back to: Published 4 Nov, 13:20 by Asha Founder.\n\nUndo\nCancel\nOpen in the editor"
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 5 (another document): the next Publish of that page has nothing to ship",
+      "detail": {
+        "rows": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "task 5 (another document): 3 clicks, 31.5 s (target under 60 s)",
+      "detail": {
+        "seconds": 31.5,
+        "clicks": 3,
+        "path": [
+          "a:Publishing\n2",
+          "button:Undo",
+          "button:Undo"
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_e65937694f7a19d7, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s",
+    "hero tests paused for this part: hero-promise",
+    "task 5 timing: same document {\"seconds\":1.4,\"clicks\":2,\"path\":[\"button:Undo\",\"button:Undo\"]}; another document {\"seconds\":31.5,\"clicks\":3,\"path\":[\"a:Publishing\\n2\",\"button:Undo\",\"button:Undo\"]}"
+  ],
+  "screenshots": [
+    {
+      "name": "task5-undone-same-document-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/task5-undone-same-document-1440.png",
+      "bytes": 46075,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "task5-recently-published-confirm-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/task5-recently-published-confirm-1440.png",
+      "bytes": 26666,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    },
+    {
+      "name": "task5-undone-from-publishing-1440",
+      "file": "docs/cms-reviews/drills/P3-DRILLS/task5-undone-from-publishing-1440.png",
+      "bytes": 24369,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/releases"
+    }
+  ]
+}

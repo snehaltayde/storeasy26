@@ -64,8 +64,16 @@ async function documentsPart(drill) {
   }
   await page.goto("/admin/storefront/designer", { waitUntil: "load" });
   await settle(page);
-  const d = await page.evaluate(() => ({ frames: document.querySelectorAll("iframe").length, shell: !!document.querySelector("[data-editor-shell]") }));
-  drill.check(where(page) === "/admin/editor?doc=doc_home" && d.frames === 0 && !d.shell, "documents: the Designer is never reached (finding 2): no Designer shell, no legacy preview frame", { at: where(page), ...d });
+  // P3-DRILLS (P3-EDITOR review): the new editor has its own preview frame
+  // ([data-preview-frame]); the check is about the Designer's frame only, the
+  // one outside the new editor (the Designer's has no data-preview-frame)
+  const d = await page.evaluate(() => ({
+    legacyFrames: [...document.querySelectorAll("iframe")].filter((f) => !f.hasAttribute("data-preview-frame") && !f.closest("[data-document-editor]")).length,
+    editorFrames: document.querySelectorAll("[data-document-editor] iframe[data-preview-frame]").length,
+    shell: !!document.querySelector("[data-editor-shell]"),
+    editor: !!document.querySelector("[data-document-editor]"),
+  }));
+  drill.check(where(page) === "/admin/editor?doc=doc_home" && d.legacyFrames === 0 && !d.shell && d.editor, "documents: the Designer is never reached (finding 2): no Designer shell, no legacy preview frame (the new editor's own frame aside)", { at: where(page), ...d });
   await drill.screenshot(page, "documents-designer-redirect-1440");
 
   // the nav, then a real click on it
@@ -167,7 +175,10 @@ async function legacyPart(drill) {
   const title = page.locator("#ins-hero-title");
   await title.fill(`${await title.inputValue()} (drill)`);
   const shown = await page
-    .waitForFunction(() => /The preview didn.t update/.test(document.body.innerText) && /Something went wrong on our side \(error 503\), so the preview didn.t update/.test(document.body.innerText), null, { timeout: 15_000 })
+    // P3-DRILLS: since P3-FIX3 a 5xx keeps the server's own plain words,
+    // worded for a preview ("We couldn't reach the database, so the preview
+    // didn't update."), instead of "Something went wrong on our side (error 503)"
+    .waitForFunction(() => /The preview didn.t update/.test(document.body.innerText) && /We couldn.t reach the database, so the preview didn.t update\. The preview still shows an earlier version/.test(document.body.innerText), null, { timeout: 15_000 })
     .then(() => true)
     .catch(() => false);
   const status = await page.locator('[data-editor-pane="preview"] [role="status"]').first().innerText().catch(() => "");

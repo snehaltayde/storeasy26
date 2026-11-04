@@ -456,6 +456,22 @@ No owner checks for this item.
 - [ ] Optional: a later item that owns scripts/test-publish-undo.js could commit the real-handler probe (createUndoFlow on a Recently published set with a new page, on both stores)
 - [ ] Server design question: the dispatcher refuses an undo dry run without a revision even though undo.js ignores the revision on a dry run; the owner may decide whether dry runs should skip that check (service/documents-api are not this item's files)
 
+## Phase 3, batch 5
+
+### Every phase 3 drill, and the cross-item matrix (P3-DRILLS)
+The drills ran in headless desktop Chrome on the design harness, on `next dev`, on this Mac. These are the checks only you can do (plan section 5, plus what the drills found).
+- [ ] **Hosted Turso, on a staging documents test tenant (not a real tenant):** Undo, take offline, whole-set Undo, an Undo racing an autosave, and an Undo racing a publish (the second gets 409 "published elsewhere") are each all-or-nothing.
+- [ ] **Local production build:** run the closed-store RSC probe against `next build && next start`. The drill (`matrix.mjs closed`) ran on `next dev` only. `scripts/drills/p1/prod-harness.mjs build` then `start` runs the harness on `next start`; the matrix's own runner starts `next dev`, so the probe would need running by hand against it.
+- [ ] **Rulings to give:** finding 3 (a missing chrome version gives the error page, not neutral chrome); decision 4 (an offline page keeps its address until archived); decision 9 (the PV-02 draft-mode change); the first publish must include the home page; logout ending previews on every device and in legacy; catalog data on a closed store's product, collection and search routes; a console-made preview session counts as the "verified console session".
+- [ ] **The five timed founder tasks with real people** (tasks 1, 4 and 5 are in scope). The drill timed a script, not a person: task 1 took 4 clicks, task 4 took 4 clicks starting from the live page, task 5 took 2 clicks from the same page and 3 from Publishing. Run them with 5 founders, read aloud, no help.
+- [ ] **Phones:** the closed store's "Opening soon" page, the preview bar, and the offline line ("This page is offline. Publishing it brings it back.") on a real phone.
+- [ ] **Deploy order:** run migration 0023 (`tenant:migrate --all --check` first) before the code that writes document refs.
+- [ ] **Finding D1 (founder-facing, not shoppers):** with two editor tabs open, the older tab's design colours are turned on in its own preview session while the browser's cookie belongs to the newer tab's, so the older tab's preview keeps the old colours and still says "Up to date" (the frame's own bar does say "Your new colours are not shown here. Show them"). In `next dev` the same happens in one tab about half the time, because dev mounts the editor twice and makes two sessions. Decide who fixes it (`components/admin/editor/editorModel.js` preview controller, or `/api/admin/preview-session` showDesign by cookie). Then check one tab and two tabs on staging.
+- [ ] **A banner on a page or campaign page doesn't render for shoppers** (P2-SECTIONS known limit, seen again here): the seed's spring guide links to the campaign through a banner, the publish check catches that link, but `/policies/<slug>` never shows the banner. Decide whether page routes should render banners (DOC-06) or the editor should not offer them there.
+- [ ] **The test order:** the drill placed one cash on delivery order on the closed test store with `snehal@mediastic.in` and cancelled it at once (local harness database only; the harness has no Shopify keys, so nothing reached Shopify). On staging, place one COD order through a preview of a closed documents test tenant, then cancel it in the console and in Shopify.
+- [ ] **Rich text paste:** P3-FIX4 (clean a web page's paste on save) was not merged when this ran, so the drill proved the "Edit as HTML" way out instead. After P3-FIX4 merges, run `node scripts/drills/p3/rte.mjs` and change its step 7 to expect the cleaned save.
+- [ ] **CI sqld download:** still not touched (no `.github/` change). Approve its source and checksum.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.

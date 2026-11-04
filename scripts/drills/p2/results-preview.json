@@ -2,17 +2,22 @@
   "id": "P2-DRILLS",
   "part": "preview",
   "title": "P2-DRILLS — preview",
-  "ranAt": "2026-11-04T00:09:45.652Z",
-  "harness": "http://localhost:3800",
+  "ranAt": "2026-11-04T07:46:25.521Z",
+  "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
-  "passed": 20,
+  "passed": 22,
   "failed": 0,
-  "knownFailures": 1,
+  "knownFailures": 0,
   "checks": [
     {
       "ok": true,
+      "label": "before the first publish (--drafts-only): a shopper gets 200 'Opening soon', not the error page (finding 4, P3-CLOSED)",
+      "detail": "before the first publish a shopper gets 200 at /: \"Design Demo Co\\n\\nOpening soon\\n\\nWe're getting the shop ready. Check back soon.\""
+    },
+    {
+      "ok": true,
       "label": "before the first publish: a shopper sees none of the drafts",
-      "detail": "Store\nShop all\nSomething went wrong\n\nA temporary error stopped this page from loading. It's usually gone on retry.\n\nRef:"
+      "detail": "Design Demo Co\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
     },
     {
       "ok": true,
@@ -30,8 +35,13 @@
     },
     {
       "ok": true,
-      "label": "before the first publish: the preview bar shows",
-      "detail": null
+      "label": "before the first publish (--drafts-only): the preview bar shows, in the documents preview's words (\"You're seeing your unpublished changes.\", See the live store)",
+      "detail": {
+        "words": "You're seeing your unpublished changes. See the live storeYour new colours are not shown here. Show them",
+        "href": "/api/preview?exit=1&to=%2F",
+        "oldCheck": "before the first publish: the preview bar shows",
+        "oldResult": false
+      }
     },
     {
       "ok": true,
@@ -122,27 +132,26 @@
       }
     },
     {
-      "ok": false,
+      "ok": true,
       "label": "after signing out of the console, the same browser no longer sees the draft overlay",
       "detail": {
-        "hero": "Preview only: a draft hero nobody published",
-        "previewCookie": true
-      },
-      "known": "finding 1"
+        "hero": "Skin first. Makeup second.",
+        "previewCookie": false
+      }
     }
   ],
   "notes": [
     "re-seeded fresh (--drafts-only): the harness store is in documents mode: 36 documents, none published (before the first publish), 0.5s",
     "hero tests paused for this part: hero-promise (running again afterwards)",
-    "before the first publish a shopper gets 500 at /: \"Store\\nShop all\\nSomething went wrong\\n\\nA temporary error stopped this page from loading. It's usually gone on retry.\\n\\nRef: 1016449659\\n\\nTry again\\nBack to home\\n\\nSto\"",
-    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_80cf474321515c8b, 0.5s",
+    "before the first publish a shopper gets 200 at /: \"Design Demo Co\\n\\nOpening soon\\n\\nWe're getting the shop ready. Check back soon.\"",
+    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_6c1ee24cb825956a, 0.5s",
     "hero tests paused for this part: hero-promise (running again afterwards)"
   ],
   "screenshots": [
     {
       "name": "preview-before-first-publish-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/preview-before-first-publish-1440.png",
-      "bytes": 42449,
+      "bytes": 43007,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -151,7 +160,7 @@
     {
       "name": "preview-before-first-publish-shopper-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/preview-before-first-publish-shopper-1440.png",
-      "bytes": 15772,
+      "bytes": 6208,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -160,7 +169,7 @@
     {
       "name": "preview-colours-not-shown-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/preview-colours-not-shown-1440.png",
-      "bytes": 38936,
+      "bytes": 37848,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -169,7 +178,7 @@
     {
       "name": "preview-colours-shown-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/preview-colours-shown-1440.png",
-      "bytes": 38745,
+      "bytes": 38548,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -178,7 +187,7 @@
     {
       "name": "preview-old-token-live-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/preview-old-token-live-1440.png",
-      "bytes": 44599,
+      "bytes": 32309,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -187,7 +196,7 @@
     {
       "name": "preview-after-sign-out-1440",
       "file": "docs/cms-reviews/drills/P2-DRILLS/preview-after-sign-out-1440.png",
-      "bytes": 38936,
+      "bytes": 44799,
       "width": 720,
       "height": 450,
       "viewport": 1440,
