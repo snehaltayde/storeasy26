@@ -1,0 +1,421 @@
+{
+  "id": "P4-DRILLS",
+  "part": "runbook",
+  "title": "P4-DRILLS — runbook",
+  "ranAt": "2026-11-04T21:16:24.448Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 47,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "runbook 0.1: the env store's updates (pnpm migrate, the sentence above the code block)",
+      "detail": [
+        "• offers: seeded 6 from lib/offers/config.js",
+        "✓ schema applied → http://127.0.0.1:7102"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "runbook 0.1: the database updates, then the check with the env store (--check --include-env) says every store is current",
+      "detail": {
+        "all": [
+          "✓ design: 0 applied (none), 25 recorded",
+          "✓ all tenants migrated"
+        ],
+        "check": [
+          "✓ the env store (_default): current, all 25 migrations up to 0025_media_archived",
+          "✓ design: current, all 25 migrations up to 0025_media_archived",
+          "✓ all 1 tenant(s) and the env store hold every migration up to 0025_media_archived. Safe to deploy."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "runbook 3.1: restore-drill.js --tenant design --keep writes restore-drill-design.db and its checks pass",
+      "detail": [
+        "",
+        "Restore drill for design: 58 tables, 4922 rows → restore-drill-design.db in 1.0s (measured RTO for this size).",
+        "(kept: restore-drill-design.db — delete it when done; *.db files are never committed)"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "runbook 3.2: serve-copy loads the copy into a local database server and points the store's local row at it",
+      "detail": "✓ the copy (58 tables, 4922 rows) is served at http://127.0.0.1:7103, and the harness's store \"design\" reads it. Use http://127.0.0.1:7103 as --db for the rehearsal, and http://localhost:6100 as --base. Press Ctrl-C when the rehearsal is done."
+    },
+    {
+      "ok": true,
+      "label": "runbook 3.3: the route list (it says a hero test is running and keeps its name)",
+      "detail": [
+        "Wrote 75 routes to /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/runbook-mw2m682l/routes-runbook.json: 12 canaries, 59 more products and 4 more collections with old content. A hero test is running (hero-promise): its hero is set aside when both captures show it."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "runbook 4: the dry run says Not ready, in plain words: an agency has access, and where to remove it",
+      "detail": "Not ready: 1 thing to fix\n  1. An agency has access to your store, which the new editor doesn't support yet. Where: Settings > Team: remove the agency's access, or wait for the Storeasy update.\n\nWhat shoppers will see change\n  Nothing.\n\nUnpublished changes that will carry over as drafts\n  None.\n\nDrafts kept as older versions\n  None.\n\nThings the new editor will flag\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates (1 journal post, 1 page). They are not changed. After the move they stay readable on the Saved templates page of the new editor, where you "
+    },
+    {
+      "ok": true,
+      "label": "runbook 4: the founder removes the agency's access on the Settings page (Agency access, Revoke)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "runbook 4: the dry run says Ready to move, in plain words, and ends with its digest",
+      "detail": "Ready to move\n\nWhat shoppers will see change\n  Nothing.\n\nUnpublished changes that will carry over as drafts\n  None.\n\nDrafts kept as older versions\n  None.\n\nThings the new editor will flag\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates (1 journal post, 1 page). They are not changed. After the move they stay readable on the Saved templates page of the new editor, where you can make a page from one.\n\nTeam access that changes\n  - Staff can still change the cart offer, but an owner or admin has to publish it before shoppers see it.\n"
+    },
+    {
+      "ok": true,
+      "label": "runbook 5: the rehearsal on the copy ends with Result: passed",
+      "detail": [
+        "",
+        "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/runbook-mw2m682l/rehearsal-runbook/rehearsal.json",
+        "Result: passed. Give this file to the real move with --rehearsal."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "runbook 3.2: Ctrl-C on serve-copy points the store's row back at its own database and stops the copy's server",
+      "detail": "✓ the copy's server stopped; the store \"design\" reads http://127.0.0.1:7101 again. Delete /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/wt/restore-drill-design.db and its -wal and -shm files now."
+    },
+    {
+      "ok": true,
+      "label": "runbook 3.1: the restore-drill copy (and its -wal and -shm files) deleted when the rehearsal is done",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "runbook 8: the move stops midway (killed after its backfill): the store is left 'being updated', its run open at the backfill",
+      "detail": {
+        "exit": null,
+        "mode": "migrating",
+        "run": {
+          "step": "backfilled",
+          "outcome": null,
+          "finished_at": null
+        },
+        "tail": [
+          "(drill: the process stops here, right after \"backfilled\", as a power cut would)"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "runbook 8: --status says, in plain words, that the store is being updated, which step finished, and to run --resume or --abort",
+      "detail": "Your store is being updated (moving to the new editor).\n  Started: 2026-11-04 21:14 UTC, less than a minute ago.\n  Done so far: your content was copied into the new editor.\n  While this lasts, the old editors don't save and the catalog copy from Shopify waits. Shoppers still see your store as before.\n\nWhat to do next\n  - To carry on from here: node --env-file=.env.local scripts/migrate-documents.js --tenant design --resume (with the same proofs you gave the first time)\n  - To stop and go back to the old editor: node --env-file=.env.local scripts/migrate-documents.js --tenant design --abort\n    Nothing shoppers see changes either way until the move finishes."
+    },
+    {
+      "ok": true,
+      "label": "runbook 8 (and 0.3): while the store is being updated an old editor's save is refused in plain words and saves nothing",
+      "detail": {
+        "status": 409,
+        "words": "This store is moving to the new editor right now, so nothing was saved. Make this change in the new editor once the move is done."
+      }
+    },
+    {
+      "ok": true,
+      "label": "runbook 8: shoppers still get the store while it is being updated",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "runbook 8: --abort puts the store back on the old editor in one step; --status says so",
+      "detail": {
+        "abort": [
+          "The move was stopped and the store is back on the old editor. The old editors save again and the catalog copy from Shopify carries on. What was already copied stays in the new editor's tables, unseen by shoppers; the next move takes the old editor's content again."
+        ],
+        "status": "Your store uses the old editor. No update is under way."
+      }
+    },
+    {
+      "ok": true,
+      "label": "runbook 8: after --abort the old Storefront screen opens again",
+      "detail": "http://localhost:6100/admin/storefront"
+    },
+    {
+      "ok": true,
+      "label": "runbook 8 → 6: after --abort the move refuses the rehearsal made before the stop, in plain words ('Make a fresh copy, rehearse again')",
+      "detail": "Not moved: The store changed since that rehearsal (its content isn't the same as the copy you rehearsed on). Make a fresh copy, rehearse again, and pass the new report."
+    },
+    {
+      "ok": true,
+      "label": "after the abort 3.1: restore-drill.js --tenant design --keep writes restore-drill-design.db and its checks pass",
+      "detail": [
+        "",
+        "Restore drill for design: 58 tables, 5457 rows → restore-drill-design.db in 1.2s (measured RTO for this size).",
+        "(kept: restore-drill-design.db — delete it when done; *.db files are never committed)"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after the abort 3.2: serve-copy loads the copy into a local database server and points the store's local row at it",
+      "detail": "✓ the copy (58 tables, 5457 rows) is served at http://127.0.0.1:7103, and the harness's store \"design\" reads it. Use http://127.0.0.1:7103 as --db for the rehearsal, and http://localhost:6100 as --base. Press Ctrl-C when the rehearsal is done."
+    },
+    {
+      "ok": true,
+      "label": "after the abort 3.3: the route list (it says a hero test is running and keeps its name)",
+      "detail": [
+        "Wrote 75 routes to /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/runbook-mw2m682l/routes-after-the-abort.json: 12 canaries, 59 more products and 4 more collections with old content. A hero test is running (hero-promise): its hero is set aside when both captures show it."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after the abort 4: the dry run says Ready to move, in plain words, and ends with its digest",
+      "detail": "Ready to move\n\nWhat shoppers will see change\n  Nothing.\n\nUnpublished changes that will carry over as drafts\n  None.\n\nDrafts kept as older versions\n  None.\n\nThings the new editor will flag\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates (1 journal post, 1 page). They are not changed. After the move they stay readable on the Saved templates page of the new editor, where you can make a page from one.\n\nTeam access that changes\n  - Staff can still change the cart offer, but an owner or admin has to publish it before shoppers see it.\n"
+    },
+    {
+      "ok": true,
+      "label": "after the abort 5: the rehearsal on the copy ends with Result: passed",
+      "detail": [
+        "",
+        "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/runbook-mw2m682l/rehearsal-after-the-abort/rehearsal.json",
+        "Result: passed. Give this file to the real move with --rehearsal."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "after the abort 3.2: Ctrl-C on serve-copy points the store's row back at its own database and stops the copy's server",
+      "detail": "✓ the copy's server stopped; the store \"design\" reads http://127.0.0.1:7101 again. Delete /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/wt/restore-drill-design.db and its -wal and -shm files now."
+    },
+    {
+      "ok": true,
+      "label": "after the abort 3.1: the restore-drill copy (and its -wal and -shm files) deleted when the rehearsal is done",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "runbook 6: the move, with the digest and the fresh rehearsal, finishes",
+      "detail": "{\"ts\":\"2026-11-04T21:14:58.896Z\",\"evt\":\"theme_pin_written\",\"tenant\":\"design\",\"release\":\"rel_mig_cca75b39176ae92d\",\"kit\":null,\"version\":null}\nYour store now uses the new editor.\n  Switched at 2026-11-04 21:14 UTC. Shoppers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
+    },
+    {
+      "ok": true,
+      "label": "runbook 7.3: the move's report says 'Recorded.' under 'The store's look'",
+      "detail": "The store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n\nDetails\n  store design; run mrun_015ace7117f934ef; state live_v3; live release at the pause rel_c3964b2ee050b590; new rele"
+    },
+    {
+      "ok": true,
+      "label": "runbook 7.3: the store's look is pinned in its control-plane row (theme_pin)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "runbook 8: --status after the move says the store uses the new editor",
+      "detail": "Your store uses the new editor. No update is under way."
+    },
+    {
+      "ok": true,
+      "label": "runbook 7.1: the shopper canaries load as before (home, a page, the journal, a product with extra sections and goes-well-with, a pinned collection, the cart)",
+      "detail": {
+        "bad": [],
+        "pdp": {
+          "modules": 6,
+          "pairs": "Goes well with your routine"
+        },
+        "cartOk": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "runbook 7.2: signed in, the console's Editor opens the new editor; home, a product and a collection open; Storefront, Catalog and Upsells lead to it",
+      "detail": {
+        "opens": [
+          {
+            "q": "doc=doc_home",
+            "ok": true
+          },
+          {
+            "q": "product=gid%3A%2F%2Fshopify%2FProduct%2F8000011",
+            "ok": true
+          },
+          {
+            "q": "collection=gid%3A%2F%2Fshopify%2FCollection%2F7000001",
+            "ok": true
+          }
+        ],
+        "leads": [
+          {
+            "p": "/admin/storefront",
+            "at": "/admin/editor"
+          },
+          {
+            "p": "/admin/catalog?product=gid%3A%2F%2Fshopify%2FProduct%2F8000011",
+            "at": "/admin/editor"
+          },
+          {
+            "p": "/admin/upsells",
+            "at": "/admin/editor"
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "runbook 9 (setup): the founder renames a product in the new editor and publishes",
+      "detail": {
+        "phase": "done"
+      }
+    },
+    {
+      "ok": true,
+      "label": "runbook 9.2: the reversal's dry run is ready and lists the product with its new name, in plain words",
+      "detail": "Ready to move back to the old editor\n\nWhat shoppers will see change\n  - “Micronised Creatine”: new name (“Runbook Drill Renamed”). Shoppers see what the old editor had again.\n\nEdits from the new editor that won't show any more\n  - 1 part of your store was published in the new editor since the move (1 publish).\n  - 1 product edit (names, descriptions, photos, brand or type shown) on 1 product follow Shopify again.\n  - 0 unpublished drafts stay in the new editor.\n\nUnpublished drafts in the new editor\n  None.\n\nAfter going back\n  - The old editors work again at once; edits made there show as before.\n  - Moving to the new editor again later brings the product edits listed above back (names, descriptions, photos, brand and type shown). Other things published in the new editor stay saved as older versions there.\n"
+    },
+    {
+      "ok": true,
+      "label": "runbook 9.4: the reversal finishes; the report sets the look back and ends with the message to pass on",
+      "detail": "Your store is back on the old editor.\n  Moved back at 2026-11-04 21:15 UTC.\n\nEdits from the new editor that won't show any more\n  - “Micronised Creatine”: new name (“Runbook Drill Renamed”).\n  - 1 part of your store was published in the new editor since the move (1 publish).\n  - 1 product edit (names, descriptions, photos, brand or type shown) on 1 product follow Shopify again.\n  - 0 unpublished drafts stay in the new editor.\n\nUnpublished drafts in the new editor\n  None.\n\nSearch\n  Search is being updated to Shopify's names.\n\nThe store's look (for Storeasy's own screens)\n  Set back to the old editor's look.\n\nA message you can pass on\n  Your store is back on the old editor. Shoppers see it as it was before the move to the new editor.\n  These edits from the new editor don't show any more:\n    - “Micronised Creatine”: new name (“Runbook Drill Renamed”).\n  The old editors work again right away.\n  When your store moves to the new editor again, the product edits above (names, descriptions, photos, brand and type shown) come back. Other things you published in the new editor stay saved there as older versions.\n"
+    },
+    {
+      "ok": true,
+      "label": "runbook 9: the reversal's --status says the store uses the old editor",
+      "detail": "Your store uses the old editor. No reversal is under way."
+    },
+    {
+      "ok": true,
+      "label": "runbook 9.5: as a shopper the renamed product shows Shopify's name on its page, in its collection and in search",
+      "detail": {
+        "h1": "Micronised Creatine"
+      }
+    },
+    {
+      "ok": true,
+      "label": "runbook 9.5: signed in, the old editors work again at once (Storefront opens)",
+      "detail": "http://localhost:6100/admin/storefront"
+    },
+    {
+      "ok": true,
+      "label": "the move again 3.1: restore-drill.js --tenant design --keep writes restore-drill-design.db and its checks pass",
+      "detail": [
+        "",
+        "Restore drill for design: 58 tables, 5749 rows → restore-drill-design.db in 1.1s (measured RTO for this size).",
+        "(kept: restore-drill-design.db — delete it when done; *.db files are never committed)"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the move again 3.2: serve-copy loads the copy into a local database server and points the store's local row at it",
+      "detail": "✓ the copy (58 tables, 5749 rows) is served at http://127.0.0.1:7103, and the harness's store \"design\" reads it. Use http://127.0.0.1:7103 as --db for the rehearsal, and http://localhost:6100 as --base. Press Ctrl-C when the rehearsal is done."
+    },
+    {
+      "ok": true,
+      "label": "the move again 3.3: the route list (it says a hero test is running and keeps its name)",
+      "detail": [
+        "Wrote 75 routes to /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/runbook-mw2m682l/routes-the-move-again.json: 12 canaries, 59 more products and 4 more collections with old content. A hero test is running (hero-promise): its hero is set aside when both captures show it."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the move again 4: the dry run says Ready to move, in plain words, and ends with its digest",
+      "detail": "Ready to move\n\nWhat shoppers will see change\n  Nothing.\n\nUnpublished changes that will carry over as drafts\n  None.\n\nDrafts kept as older versions\n  - Product content: the draft already in the new editor is kept as an older version.\n\nThings the new editor will flag\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates (1 journal post, 1 page). They are not changed. After the move they stay readable on the Saved templates page of the new editor, where you can make a page from one.\n\nTeam access that changes\n  - Staff can still change the cart offer, but an owner or admin has to publish it before shoppers see it.\n\nEdits that come back at the move\n  - “Micronised Creatine”: new name (“Runbook Drill Renamed”).\n"
+    },
+    {
+      "ok": true,
+      "label": "the move again 5: the rehearsal on the copy ends with Result: passed",
+      "detail": [
+        "",
+        "Rehearsal report: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/scratch/runbook-mw2m682l/rehearsal-the-move-again/rehearsal.json",
+        "Result: passed. Give this file to the real move with --rehearsal."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the move again 3.2: Ctrl-C on serve-copy points the store's row back at its own database and stops the copy's server",
+      "detail": "✓ the copy's server stopped; the store \"design\" reads http://127.0.0.1:7101 again. Delete /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/wt/restore-drill-design.db and its -wal and -shm files now."
+    },
+    {
+      "ok": true,
+      "label": "the move again 3.1: the restore-drill copy (and its -wal and -shm files) deleted when the rehearsal is done",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the move again: the dry run lists, by name, the edit that comes back",
+      "detail": "Ready to move\n\nWhat shoppers will see change\n  Nothing.\n\nUnpublished changes that will carry over as drafts\n  None.\n\nDrafts kept as older versions\n  - Product content: the draft already in the new editor is kept as an older version.\n\nThings the new editor will flag\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates (1 journal post, 1 page). They are not changed. After the move they stay readable on the Saved templates page of the new editor, where you can make a page from one.\n\nTeam access that changes\n  - Staff can still change the cart offer, but an owner or admin has to publish it before shoppers see it.\n\nEdits that come back at the move\n  - “Micronised Creatine”: new name (“Runbook Drill Renamed”).\n"
+    },
+    {
+      "ok": true,
+      "label": "the move again finishes",
+      "detail": "pers saw no change.\n\nWhat was moved\n  - 155 pages and parts of your store now open in the new editor\n  - the extras of 59 products (sections, badges, products shown together, layouts)\n  - the pinned products or layouts of 5 collections\n\nEdits that came back\n  - “Micronised Creatine”: new name (“Runbook Drill Renamed”).\n\nDrafts kept as older versions\n  None.\n\nOld addresses that couldn't be matched\n  None.\n\nSaved templates\n  2 saved templates stay readable on the Saved templates page of the new editor.\n\nThe store's look (for Storeasy's own screens)\n  Recorded.\n\nSearch\n  Search is being updated.\n"
+    },
+    {
+      "ok": true,
+      "label": "after the move again, the shopper sees the name from the new editor",
+      "detail": {
+        "h1": "Runbook Drill Renamed"
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_c3964b2ee050b590): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.6s",
+    "runbook 0.1: the code block's two commands leave the env store behind: \"✗ the env store (_default): behind, missing 0001_baseline, 0002_sync_runs, 0003_order_projection, 0004_cart_price_at_add, 0005_privacy_events, 0006_cms_revision\". The sentence above the block says to run pnpm migrate for it; running it, then the check again.",
+    "runbook 0.1: the env store's updates: pnpm migrate [developer knowledge: the code block alone leaves the env store behind and the check then fails; pnpm migrate was only in the sentence]",
+    "runbook 0.1: pnpm tenant:migrate -- --all, then --check --include-env [developer knowledge: the package scripts load .env.local (the hosted control plane); on the harness the same files run with the harness's own env]",
+    "runbook 0.2-0.4, 1, 2: deploy order, staging atomicity, PITR, the quiet window, the founder warning, the backup time: owner steps with no harness equivalent (the backup time is only passed with --hosted)",
+    "runbook 4: the dry run said Not ready (an agency has access); the agency's access removed on the Settings page (Agency access, Revoke), in Chrome [developer knowledge: the report says 'Settings > Team', but the agency's access is its own panel, 'Agency access', further down the Settings page]",
+    "runbook 3.1: the restore-drill copy (restore-drill.js --tenant X --keep)",
+    "runbook 3.2: serve the copy with the local harness [developer knowledge: the runbook named no command for loading the file into sqld or for pointing the row; a developer had to write both]",
+    "runbook 3.3: the route list (migrate-render --make-routes)",
+    "runbook 4: the dry run (Ready to move, the digest kept) [developer knowledge: --hosted --confirm X is refused on a local store ('Run it without --hosted'); the owner's real run needs it]",
+    "runbook 5: the rehearsal on the copy (Result: passed)",
+    "runbook 8: --status during the stop [developer knowledge: --status prints its next commands with --env-file=.env.local even on a local store: on the harness they must run with the harness env]",
+    "runbook 0.3 and 8: an old editor's save while the store is being updated [developer knowledge: the runbook quoted words the store no longer says; it answers: \"This store is moving to the new editor right now, so nothing was saved. Make this change in the new editor once the move is done.\"]",
+    "runbook 8: --abort before the switch, back on the old editor",
+    "runbook 8 → 6: after --abort, the earlier rehearsal is refused ('The store changed since that rehearsal…') [developer knowledge: the runbook didn't say that after --abort the move needs a fresh copy, rehearsal and dry run]",
+    "runbook 6: the move with the digest and the rehearsal report",
+    "runbook 9: the reversal's dry run, the reversal with its digest, its --status",
+    "steps that needed developer knowledge: 8 (runbook-steps.json)"
+  ],
+  "screenshots": [
+    {
+      "name": "runbook-agency-removed-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/runbook-agency-removed-1440.png",
+      "bytes": 31316,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/settings"
+    },
+    {
+      "name": "runbook-shopper-while-migrating-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/runbook-shopper-while-migrating-1440.png",
+      "bytes": 31558,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "runbook-shopper-cart-after-move-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/runbook-shopper-cart-after-move-1440.png",
+      "bytes": 43051,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "runbook-editor-after-move-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/runbook-editor-after-move-1440.png",
+      "bytes": 39111,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "runbook-old-editor-after-reversal-1440",
+      "file": "docs/cms-reviews/drills/P4-DRILLS/runbook-old-editor-after-reversal-1440.png",
+      "bytes": 39024,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront"
+    }
+  ]
+}

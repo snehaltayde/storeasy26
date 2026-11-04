@@ -2,8 +2,8 @@
   "id": "P4-HARNESS",
   "part": "smoke",
   "title": "P4-HARNESS — smoke",
-  "ranAt": "2026-11-04T14:15:27.254Z",
-  "harness": "http://localhost:6160",
+  "ranAt": "2026-11-04T21:04:24.399Z",
+  "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 16,
   "failed": 0,
@@ -88,8 +88,8 @@
       "label": "with a hero experiment running, two captures with the fixed unit show the same hero (captures are deterministic)",
       "detail": {
         "heroes": [
-          "Visibly brighter in 14 days",
-          "Visibly brighter in 14 days"
+          "Winter repair, started.",
+          "Winter repair, started."
         ],
         "control": "Winter repair, started.",
         "variants": [
@@ -150,23 +150,23 @@
     {
       "ok": true,
       "label": "in Chrome, the old post address lands on the renamed post",
-      "detail": "http://localhost:6160/journal/protein-myths-1-updated"
+      "detail": "http://localhost:6100/journal/protein-myths-1-updated"
     },
     {
       "ok": true,
       "label": "the owner signs in through the real form and reaches the console",
-      "detail": "http://localhost:6160/admin/dashboard"
+      "detail": "http://localhost:6100/admin/dashboard"
     },
     {
       "ok": true,
       "label": "the staff signs in through the real form and reaches the console",
-      "detail": "http://localhost:6160/admin/dashboard"
+      "detail": "http://localhost:6100/admin/dashboard"
     }
   ],
   "notes": [
-    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_24a2b019193de6d6): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.6s",
-    "with no cookie at all, 8 captures of / showed 2 different heroes: [\"Winter repair, started.\",\"Visibly brighter in 14 days\"] (a random unit per request; that is why captures send a fixed unit)",
-    "shopper captures in /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b2/P4-HARNESS/wt/.design-data/p4-captures (index.json)"
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_fbf3fa9a5cf29229): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.5s",
+    "with no cookie at all, 8 captures of / showed 2 different heroes: [\"Visibly brighter in 14 days\",\"Winter repair, started.\"] (a random unit per request; that is why captures send a fixed unit)",
+    "shopper captures in /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p4-b7/P4-DRILLS/wt/.design-data/p4-captures (index.json)"
   ],
   "screenshots": [
     {

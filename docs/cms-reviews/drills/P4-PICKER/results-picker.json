@@ -2,8 +2,8 @@
   "id": "P4-PICKER",
   "part": "picker",
   "title": "P4-PICKER — library picker, gallery and archive",
-  "ranAt": "2026-11-04T15:12:17.558Z",
-  "harness": "http://localhost:6140",
+  "ranAt": "2026-11-04T20:25:57.596Z",
+  "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 11,
   "failed": 0,
@@ -62,7 +62,7 @@
       "ok": true,
       "label": "archive: Archive hides the file from the library and the store holds it as archived",
       "detail": {
-        "archivedAt": "2026-11-04T15:12:13.707Z"
+        "archivedAt": "2026-11-04T20:25:54.153Z"
       }
     },
     {
@@ -75,14 +75,14 @@
       "label": "archive: the editor's media picker no longer offers the archived file",
       "detail": {
         "offered": 32,
-        "archived": "drill-unused-27008.png"
+        "archived": "drill-unused-52577.png"
       }
     },
     {
       "ok": true,
       "label": "refuse: deleting the photo the product's draft uses is refused in plain words naming the product, with Archive it instead and no Delete anyway; the file is kept",
       "detail": {
-        "words": "This file is still used by Advanced Anti-dandruff Shampoo (draft), so it wasn't deleted. Remove it from there first.\n\nUsed by:\n\nAdvanced Anti-dandruff Shampoo (draft)\n\nArchive it instead to hide it from the image picker. Pages that use it keep showing it."
+        "words": "This file is still used, so it wasn't deleted. Remove it from the places below first.\n\nUsed by:\n\nAdvanced Anti-dandruff Shampoo (draft)\n\nArchive it instead to hide it from the image picker. Pages that use it keep showing it."
       }
     },
     {
@@ -94,13 +94,13 @@
     }
   ],
   "notes": [
-    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_221d8dddb5c4c251, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s"
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_6d3fe61c10b223a4, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.6s"
   ],
   "screenshots": [
     {
       "name": "editor-gallery-following-1440",
       "file": "docs/cms-reviews/drills/P4-PICKER/editor-gallery-following-1440.png",
-      "bytes": 42079,
+      "bytes": 53717,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -109,7 +109,7 @@
     {
       "name": "editor-media-picker-1440",
       "file": "docs/cms-reviews/drills/P4-PICKER/editor-media-picker-1440.png",
-      "bytes": 47174,
+      "bytes": 49459,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -118,7 +118,7 @@
     {
       "name": "editor-gallery-library-image-1440",
       "file": "docs/cms-reviews/drills/P4-PICKER/editor-gallery-library-image-1440.png",
-      "bytes": 41394,
+      "bytes": 36000,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -127,7 +127,7 @@
     {
       "name": "media-archived-shown-1440",
       "file": "docs/cms-reviews/drills/P4-PICKER/media-archived-shown-1440.png",
-      "bytes": 38836,
+      "bytes": 39264,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -136,7 +136,7 @@
     {
       "name": "media-delete-refused-1440",
       "file": "docs/cms-reviews/drills/P4-PICKER/media-delete-refused-1440.png",
-      "bytes": 46051,
+      "bytes": 46115,
       "width": 720,
       "height": 450,
       "viewport": 1440,

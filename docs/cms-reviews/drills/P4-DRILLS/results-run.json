@@ -1,0 +1,99 @@
+{
+  "ranAt": "2026-11-04T21:03:50.969Z",
+  "finishedAt": "2026-11-04T21:16:24.770Z",
+  "stages": [
+    "seed",
+    "smoke",
+    "cutover",
+    "product",
+    "collection",
+    "routes",
+    "media",
+    "reverse",
+    "search-rename",
+    "runbook"
+  ],
+  "rows": [
+    {
+      "stage": "seed",
+      "exit": 0,
+      "seconds": 9,
+      "passed": 35,
+      "failed": 0,
+      "results": "../P4-HARNESS/results-seed.json"
+    },
+    {
+      "stage": "smoke",
+      "exit": 0,
+      "seconds": 25,
+      "passed": 16,
+      "failed": 0,
+      "results": "../P4-HARNESS/results-smoke.json"
+    },
+    {
+      "stage": "cutover",
+      "exit": 0,
+      "seconds": 95,
+      "passed": 22,
+      "failed": 0,
+      "results": "results-cutover.json"
+    },
+    {
+      "stage": "product",
+      "exit": 0,
+      "seconds": 73,
+      "passed": 29,
+      "failed": 0,
+      "results": "results-product.json"
+    },
+    {
+      "stage": "collection",
+      "exit": 0,
+      "seconds": 51,
+      "passed": 9,
+      "failed": 0,
+      "results": "results-collection.json"
+    },
+    {
+      "stage": "routes",
+      "exit": 0,
+      "seconds": 122,
+      "passed": 17,
+      "failed": 0,
+      "results": "results-routes.json"
+    },
+    {
+      "stage": "media",
+      "exit": 0,
+      "seconds": 57,
+      "passed": 16,
+      "failed": 0,
+      "results": "results-media.json"
+    },
+    {
+      "stage": "reverse",
+      "exit": 0,
+      "seconds": 101,
+      "passed": 24,
+      "failed": 0,
+      "results": "results-reverse.json"
+    },
+    {
+      "stage": "search-rename",
+      "exit": 0,
+      "seconds": 49,
+      "passed": 16,
+      "failed": 0,
+      "results": "results-search-rename.json"
+    },
+    {
+      "stage": "runbook",
+      "exit": 0,
+      "seconds": 171,
+      "passed": 47,
+      "failed": 0,
+      "results": "results-runbook.json"
+    }
+  ],
+  "failed": 0
+}
