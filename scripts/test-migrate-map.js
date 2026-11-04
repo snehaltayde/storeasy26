@@ -763,7 +763,12 @@ try {
   await t("every section of every mapped body is a registered kind allowed on its type, under its merged name, on every state and trap", async () => {
     // map every trap and entity fixture once more, so all of them are walked
     for (const trap of Object.keys(MAPPING_TRAPS)) if (!MAPPING_TRAPS[trap].requires && trap !== "agency_home_sections_v2") await mapIt((await tenant({ state: "no_release_open", traps: [trap] })).db, { storeOpen: true });
-    await mapIt((await tenant({ state: "live_v1", entities: Object.keys(ENTITY_FIXTURES) })).db);
+    // fixtures that need a given store (P4-HARNESS: the code-default redirect) are mapped on that store
+    const ordinaryEntities = Object.keys(ENTITY_FIXTURES).filter((e) => !ENTITY_FIXTURES[e].requires);
+    const beastlifeEntities = Object.keys(ENTITY_FIXTURES).filter((e) => [].concat(ENTITY_FIXTURES[e].requires || []).includes("beastlife"));
+    ok(ordinaryEntities.length + beastlifeEntities.length === Object.keys(ENTITY_FIXTURES).length, "every entity fixture is walked");
+    await mapIt((await tenant({ state: "live_v1", entities: ordinaryEntities })).db);
+    if (beastlifeEntities.length) await mapIt((await tenant({ id: "beastlife", state: "live_v1", entities: beastlifeEntities })).db);
     const preMerge = Object.entries(Reg.LEGACY_KIND_NAMES).filter(([old, v]) => v.kind !== old).map(([old]) => old);
     same(preMerge.sort(), ["image", "rich"], "the pre-merge names:");
     let n = 0;
