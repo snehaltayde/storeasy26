@@ -450,8 +450,10 @@ await t("candidate: unknown block → 400; invalid value → 422; publishing NEV
     ["upsells/[id] DELETE", () => route("admin/upsells/[id]", "DELETE", {}, { params: { id: "pl-1" } })],
     ["brand PUT", () => route("admin/brand", "PUT", { brand: { accent: "#0f766e" } })],
     ["brand reset", () => route("admin/brand", "PUT", { reset: true })],
-    ["theme POST (applyKit)", () => route("admin/theme", "POST", { action: "apply", kit: "glow" })],
   ];
+  // P3-DESIGN (TOK-03): theme POST (applyKit) left this list too. In documents
+  // mode it saves a doc_design draft through the documents service
+  // (scripts/test-design-doc.js); in 'migrating' it still refuses (below).
   // P2-WRITERS: experiment adopt, insight apply and agency kit apply left this
   // list. They no longer refuse in documents mode: lib/content-writes.js saves
   // a doc_home or doc_announcement draft instead (scripts/test-writers.js).

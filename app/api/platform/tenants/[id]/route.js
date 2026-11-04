@@ -6,6 +6,7 @@ import { audit } from "@/lib/platform/audit";
 import { startCatalogSync, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
 import { withTenant } from "@/lib/tenant-context.js";
 import { slog } from "@/lib/log";
+import { themePinOf } from "@/lib/themes/kits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,7 +53,8 @@ export async function GET(request, { params }) {
         site_name: tenant.config?.site?.name || null,
         support_email: tenant.config?.site?.support_email || null,
         checkout_mode: tenant.config?.checkout_mode || "direct",
-        theme: tenant.config?.theme || null,
+        // P3-DESIGN (TOK-03): the live look's pin, not the draft
+        theme_pin: themePinOf(tenant.config),
         billing: tenant.config?.billing || null,
         onboarding_manual: tenant.config?.onboarding?.manual || {},
       },

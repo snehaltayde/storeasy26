@@ -1,5 +1,672 @@
-// Placeholder suite, pre-registered by P3-SCAFFOLD (phase 3 plan decision 3)
-// so that no later phase 3 item edits package.json. cms/p3-design replaces
-// this file with the real suite.
-console.log("pending: owned by cms/p3-design");
-process.exit(0);
+// P3-DESIGN (TOK-03): the design document (doc_design) in documents mode.
+// Run for real: real tenant databases with every migration, the real console
+// routes with real sessions, the real publish and Undo, storage re-read after
+// every write or refusal.
+//
+//   1. kit apply: a doc_design DRAFT through the documents service, live and
+//      the control-plane config untouched; legacy as before; migrating refuses
+//   2. the brand API: save and reset refuse, sending the founder to the editor
+//   3. two admins saving doc_design at once (the design form's saveDraft and
+//      kit apply): one success, one 409 with the current document
+//   4. listChanges for doc_design: the token rows and, under each, the live
+//      sections that use that token group (lib/registry/token-usage.js)
+//   5. theme_pin: a design publish and a design Undo write it (after-commit);
+//      a failing pin write leaves the publish answer as it was
+//   6. readers: onboarding, Help, the agency kit export and brand readability
+//      read the LIVE doc_design; the operator screens read theme_pin
+//   7. kits that leave an unpublishable draft say so, naming what to fix
+//   8. the guard: no config.brand / config.theme read outside the allowlist
+//
+//   pnpm test:design-doc
+import { readFile, readdir, rm } from "node:fs/promises";
+import { registerHooks } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { dirname, join, relative } from "node:path";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(here, "..");
+
+registerHooks({
+  resolve(spec, ctx, next) {
+    if (spec.startsWith("@/")) return next(pathToFileURL(join(ROOT, spec.slice(2) + (/\.\w+$/.test(spec) ? "" : ".js"))).href, ctx);
+    if (/^next\/(headers|server|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
+    return next(spec, ctx);
+  },
+});
+process.env.RATE_LIMIT_DISABLED = "1";
+process.env.TURSO_DB_URL = "";
+process.env.TURSO_DB_AUTH_TOKEN = "";
+process.env.DATABASE_URL = "file:.test-design-doc-default.db";
+process.env.PLATFORM_DB_URL = "file:.test-design-doc-platform.db";
+process.env.PLATFORM_DB_TOKEN = "";
+process.env.PLATFORM_SECRET = "test-platform-secret";
+process.env.PLATFORM_CACHE_MS = "0";
+process.env.PLATFORM_SITE_HOSTS = "";
+process.env.PLATFORM_ADMIN_PASSWORD = "design-doc-operator-pass";
+
+const dbs = [".test-design-doc-default.db", ".test-design-doc-platform.db", ".test-design-doc-docs.db", ".test-design-doc-legacy.db"];
+const cleanup = async () => {
+  for (const f of dbs) await rm(join(ROOT, f), { force: true });
+};
+await cleanup();
+
+const started = Date.now();
+const { createClient } = await import("@libsql/client");
+const C = await import("../lib/platform/control.js");
+const S = await import("../lib/platform/sessions.js");
+const I = await import("../lib/platform/identity.js");
+const A = await import("../lib/platform/agency.js");
+const { withTenant } = await import("../lib/tenant-context.js");
+const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+const K = await import("../lib/themes/kits.js");
+const Docs = await import("../lib/documents/service.js");
+const After = await import("../lib/documents/after-commit.js");
+const Ch = await import("../lib/documents/changes.js");
+const TU = await import("../lib/registry/token-usage.js");
+const R = await import("../lib/registry/index.js");
+const B = await import("../lib/brand.js");
+const BR = await import("../lib/admin/brand-readability.js");
+const ON = await import("../lib/admin/onboarding.js");
+const { handleDocumentsPut } = await import("../lib/admin/documents-api.js");
+const { DOCUMENTS_MESSAGE } = await import("../lib/cms-mode.js");
+const { platformSessionToken } = await import("../lib/platform/admin-auth.js");
+
+let pass = 0;
+let fail = 0;
+async function t(name, fn) {
+  try {
+    await fn();
+    pass++;
+    console.log(`✓ ${name}`);
+  } catch (e) {
+    fail++;
+    console.error(`✗ ${name}\n   ${e.stack?.split("\n").slice(0, 3).join("\n   ") || e.message}`);
+  }
+}
+const eq = (got, want, label = "") => {
+  const g = JSON.stringify(got);
+  const w = JSON.stringify(want);
+  if (g !== w) throw new Error(`${label} expected ${w}, got ${g}`);
+};
+const ok = (cond, label = "") => {
+  if (!cond) throw new Error(`${label} expected truthy`);
+};
+
+// --- stores and people ------------------------------------------------------------------
+await C.migratePlatform(await readFile(join(ROOT, "lib/platform/schema.sql"), "utf8"));
+await runMigrations(C.platformDb(), await loadMigrations("platform"), {});
+const schema = await readFile(join(ROOT, "lib/schema.sql"), "utf8");
+const MIGRATIONS = await loadMigrations("tenant");
+const raw = {};
+for (const [key, file] of [["docs", ".test-design-doc-docs.db"], ["legacy", ".test-design-doc-legacy.db"]]) {
+  const c = createClient({ url: `file:${file}` });
+  await c.executeMultiple(schema);
+  await runMigrations(c, MIGRATIONS);
+  raw[key] = c;
+}
+await raw.docs.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+// Both stores carry an OLD control-plane brand and pin (purple, pulse): on the
+// documents store nothing may read them.
+const STALE = { brand: { accent: "#7c3aed" }, theme: { kit: "pulse", version: 1, applied_at: "2026-01-01T00:00:00.000Z" } };
+await C.upsertTenant({ id: "dd", name: "Design Docs", domains: ["dd.test"], dbUrl: "file:.test-design-doc-docs.db", config: { ...STALE, site: { name: "Design Docs" } }, secrets: {} });
+await C.upsertTenant({ id: "dl", name: "Design Legacy", domains: ["dl.test"], dbUrl: "file:.test-design-doc-legacy.db", config: { ...STALE, site: { name: "Design Legacy" } }, secrets: {} });
+const tenant = async (id) => C.getTenant(id);
+const inD = async (fn) => withTenant(await tenant("dd"), fn);
+const inL = async (fn) => withTenant(await tenant("dl"), fn);
+const sql = async (store, q, args = []) => (await raw[store].execute({ sql: q, args })).rows.map((r) => ({ ...r }));
+const cfgOf = async (id) => JSON.parse(String((await C.platformDb().execute({ sql: "SELECT config FROM tenants WHERE id = ?", args: [id] })).rows[0].config));
+
+const ownerU = await I.createUser({ email: "owner@dd.test", name: "Asha Rao", password: "owner-pass-design" });
+const adminU = await I.createUser({ email: "admin@dd.test", name: "Meera Admin", password: "admin-pass-design" });
+for (const tid of ["dd", "dl"]) {
+  await I.addMembership(ownerU.id, tid, "owner");
+  await I.addMembership(adminU.id, tid, "admin");
+}
+const tok = async (u) => (await S.createSession({ userId: u.id, kind: "merchant", ttlMs: 600_000 })).token;
+const OWNER = await tok(ownerU);
+const ADMIN = await tok(adminU);
+
+const reqFor = (host, body, { cookie = OWNER, cookies = {} } = {}) => {
+  const url = new URL(`http://${host}/api/x`);
+  const jar = { _admin: cookie, ...cookies };
+  return {
+    url: url.href,
+    nextUrl: url,
+    cookies: { get: (n) => (jar[n] != null ? { name: n, value: jar[n] } : undefined) },
+    headers: { get: (k) => ({ host })[k.toLowerCase()] ?? null },
+    json: async () => body,
+  };
+};
+const hostOf = (store) => (store === "docs" ? "dd.test" : "dl.test");
+async function route(store, path, method, body, opts = {}) {
+  const mod = await import(`../app/api/${path}/route.js`);
+  const res = await mod[method](reqFor(hostOf(store), body, opts), { params: Promise.resolve(opts.params || {}) });
+  return { status: res.status, body: await res.json() };
+}
+const api = (body, { as = OWNER } = {}) => inD(() => handleDocumentsPut(reqFor("dd.test", body, { cookie: as })));
+async function platformGet(path, params = {}) {
+  const mod = await import(`../app/api/platform/${path}/route.js`);
+  const tokv = await platformSessionToken();
+  const res = await mod.GET({ cookies: { get: (n) => (n === "_platform" ? { value: tokv } : undefined) }, headers: { get: () => null }, nextUrl: new URL("http://ops.test/x") }, { params: Promise.resolve(params) });
+  return { status: res.status, body: await res.json() };
+}
+
+async function logsOf(fn) {
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => {
+    const s = a.join(" ");
+    try {
+      lines.push(JSON.parse(s));
+    } catch {
+      orig(...a);
+    }
+  };
+  try {
+    return { result: await fn(), lines };
+  } finally {
+    console.log = orig;
+  }
+}
+
+const body = (type, { settings, sections, meta } = {}) => {
+  const b = R.emptyBody(type);
+  if (settings) b.settings = { ...(b.settings || {}), ...settings };
+  if (sections) b.sections = sections;
+  if (meta) b.meta = { ...b.meta, ...meta };
+  return b;
+};
+const sec = (kind, id, settings = {}, extra = {}) => {
+  const s = R.newSection(kind, { id });
+  return { ...s, settings: { ...s.settings, ...settings }, ...extra };
+};
+const doc = (id) => inD(() => Docs.getDocument(id));
+async function publishOne(id, { as = OWNER } = {}) {
+  const d = await doc(id);
+  return api({ publish: { id, draftHash: d.draftHash }, revision: d.revision }, { as });
+}
+async function saveDesign(mutate, { as = OWNER, revision } = {}) {
+  const d = await doc("doc_design");
+  const next = structuredClone(d.body);
+  mutate(next);
+  return api({ saveDraft: { id: "doc_design", body: next }, revision: revision ?? d.revision }, { as });
+}
+const liveOf = async () => (await sql("docs", "SELECT live_release_id AS live FROM release_state WHERE id = 1"))[0].live;
+const designRow = async () => (await sql("docs", "SELECT revision, draft, published_version_id, published_hash FROM documents WHERE id = 'doc_design'"))[0] || null;
+
+// The live store: a home page (hero, banner, a HIDDEN faq, text), an about
+// page (text) and the announcement bar on. Published before any design work.
+await inD(async () => {
+  await Docs.createDocument({
+    type: "home",
+    body: body("home", {
+      sections: [
+        sec("hero", "sec_hero", { title: "Welcome" }),
+        sec("banner", "sec_banner", { title: "Sale", text: "Ten percent off" }),
+        sec("faq", "sec_faq", { title: "Questions", items: [{ q: "Q?", a: "A." }] }, { enabled: false }),
+        sec("text", "sec_text", { title: "Our story", body: ["We make things."] }),
+      ],
+    }),
+  });
+  await Docs.createDocument({ type: "page", body: body("page", { meta: { slug: "about", title: "About us" }, sections: [sec("text", "sec_about", { title: "About", body: ["Hello."] })] }) });
+  await Docs.createDocument({ type: "announcement", body: body("announcement", { settings: { enabled: true, text: "Free shipping" } }) });
+});
+{
+  const docsNow = await sql("docs", "SELECT id, revision, draft_hash FROM documents WHERE id IN ('doc_home', 'doc_announcement') OR type = 'page' ORDER BY id");
+  const r = await api({ publishSet: docsNow.map((d) => ({ id: d.id, revision: Number(d.revision), draftHash: String(d.draft_hash) })) });
+  if (r.status !== 200) throw new Error(`seed publish: ${JSON.stringify(r.body).slice(0, 400)}`);
+}
+
+// ======================================================================================
+console.log("— 1. kit apply");
+
+await t("unit: applyKit on a documents store writes the doc_design draft only: live, the published design and the config are unchanged; the hero preset is a doc_home draft", async () => {
+  const cfg = await cfgOf("dd");
+  const live = await liveOf();
+  const releases = await sql("docs", "SELECT count(*) AS n FROM releases");
+  const homeLive = (await sql("docs", "SELECT published_version_id, published_hash FROM documents WHERE id = 'doc_home'"))[0];
+  eq(await designRow(), null, "no design document yet:");
+  const r = await route("docs", "admin/theme", "POST", { action: "apply", kit: "glow" });
+  eq(r.status, 200, `apply: ${JSON.stringify(r.body).slice(0, 300)}`);
+  eq([r.body.applied.theme.kit, r.body.applied.presets, r.body.theme.kit, r.body.design.id], ["glow", ["hero"], "glow", "doc_design"], "answer:");
+  const d = await designRow();
+  const draft = JSON.parse(String(d.draft));
+  eq([draft.settings.theme.kit, draft.settings.theme.version, draft.settings.brand.accent], ["glow", 1, K.KITS.glow.brand.accent], "the doc_design draft:");
+  eq([d.published_version_id, d.published_hash], [null, null], "the design is not published:");
+  eq(await liveOf(), live, "the live pointer:");
+  eq(await sql("docs", "SELECT count(*) AS n FROM releases"), releases, "no release:");
+  eq((await sql("docs", "SELECT published_version_id, published_hash FROM documents WHERE id = 'doc_home'"))[0], homeLive, "the live home:");
+  const home = JSON.parse(String((await sql("docs", "SELECT draft FROM documents WHERE id = 'doc_home'"))[0].draft));
+  eq(home.sections.find((s) => s.kind === "hero").settings.title, K.KITS.glow.presets.hero.title, "the hero preset is a home DRAFT:");
+  eq(await cfgOf("dd"), cfg, "control-plane config (brand, theme) untouched:");
+  eq(await sql("docs", "SELECT count(*) AS n FROM cms_blocks"), [{ n: 0 }], "no legacy block:");
+  // GET answers the draft's look and its revision, with the editor's address
+  const g = await route("docs", "admin/theme", "GET", null);
+  eq([g.status, g.body.theme.kit, g.body.design.revision, g.body.design.editor], [200, "glow", Number(d.revision), "/admin/editor?doc=doc_design"], "GET:");
+  // withBrand false keeps the draft's brand; a second apply is a new revision
+  const keep = await route("docs", "admin/theme", "POST", { action: "apply", kit: "pulse", withBrand: false, withPresets: false });
+  eq(keep.status, 200, `apply without brand: ${JSON.stringify(keep.body).slice(0, 200)}`);
+  const d2 = JSON.parse(String((await designRow()).draft));
+  eq([d2.settings.theme.kit, d2.settings.brand.accent], ["pulse", K.KITS.glow.brand.accent], "look changed, brand kept:");
+});
+
+await t("unit: applyKit on legacy behaves as before (config pin and brand, the hero as a legacy draft); a migrating store refuses and writes nothing", async () => {
+  const r = await route("legacy", "admin/theme", "POST", { action: "apply", kit: "glow" });
+  eq([r.status, r.body.theme.kit, r.body.applied.presets], [200, "glow", ["hero"]], `legacy apply: ${JSON.stringify(r.body).slice(0, 200)}`);
+  const cfg = await cfgOf("dl");
+  eq([cfg.theme.kit, cfg.brand.accent], ["glow", K.KITS.glow.brand.accent], "legacy config:");
+  eq((await sql("legacy", "SELECT count(*) AS n FROM cms_blocks WHERE key = 'hero'"))[0].n, 1, "legacy hero block:");
+  eq((await sql("legacy", "SELECT count(*) AS n FROM documents")), [{ n: 0 }], "no document on legacy:");
+  const g = await route("legacy", "admin/theme", "GET", null);
+  eq([g.body.theme.kit, g.body.design], ["glow", undefined], "legacy GET:");
+  // migrating
+  await raw.docs.execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
+  try {
+    const before = await designRow();
+    const m = await route("docs", "admin/theme", "POST", { action: "apply", kit: "glow" });
+    eq([m.status, m.body.code], [409, "STORE_USES_DOCUMENTS"], "migrating:");
+    eq(await designRow(), before, "nothing written:");
+  } finally {
+    await raw.docs.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+  }
+});
+
+// ======================================================================================
+console.log("— 2. the brand API");
+
+await t("unit: the brand API on a documents store refuses save and reset with the documents message and the editor's address; GET reads the design draft; preview stays open", async () => {
+  const before = await designRow();
+  const cfg = await cfgOf("dd");
+  for (const b of [{ brand: { accent: "#0f766e" } }, { reset: true }]) {
+    const r = await route("docs", "admin/brand", "PUT", b);
+    eq([r.status, r.body.code, r.body.editor], [409, "STORE_USES_DOCUMENTS", "/admin/editor?doc=doc_design"], `${JSON.stringify(b)}:`);
+    ok(r.body.error.startsWith(DOCUMENTS_MESSAGE) && /editor/.test(r.body.error) && /nothing was saved/.test(r.body.error), `words: ${r.body.error}`);
+  }
+  eq(await designRow(), before, "design untouched:");
+  eq(await cfgOf("dd"), cfg, "config untouched:");
+  const g = await route("docs", "admin/brand", "GET", null);
+  eq([g.status, g.body.documents, g.body.brand.accent, g.body.editor], [200, true, K.KITS.glow.brand.accent, "/admin/editor?doc=doc_design"], "GET reads the doc_design draft, not config.brand:");
+  const p = await route("docs", "admin/brand", "PUT", { preview: { accent: "#0f766e" } });
+  eq([p.status, p.body.ok], [200, true], "preview:");
+  // legacy GET is unchanged
+  const lg = await route("legacy", "admin/brand", "GET", null);
+  eq([lg.body.brand.accent, lg.body.documents], [K.KITS.glow.brand.accent, undefined], "legacy GET:");
+});
+
+// ======================================================================================
+console.log("— 3. two admins");
+
+await t("unit: two admins saving doc_design at once (the design form's save and kit apply, both from revision N) give one success and one 409 with the current document, in either order", async () => {
+  for (const order of ["form first", "kit first"]) {
+    const d = await doc("doc_design");
+    const N = d.revision;
+    const form = () => saveDesign((b) => (b.settings.brand = { ...b.settings.brand, accent: "#0f766e" }), { as: OWNER, revision: N });
+    const kitApply = () => route("docs", "admin/theme", "POST", { action: "apply", kit: "glow", withPresets: false, revision: N }, { cookie: ADMIN });
+    const [a, b] = order === "form first" ? await Promise.all([form(), kitApply()]) : await Promise.all([kitApply(), form()]);
+    const answers = [a, b];
+    const won = answers.filter((x) => x.status === 200);
+    const lost = answers.filter((x) => x.status === 409);
+    eq([won.length, lost.length], [1, 1], `${order}: ${answers.map((x) => `${x.status} ${x.body.code || ""}`).join(", ")}`);
+    eq(lost[0].body.code, "DOCUMENT_CHANGED", `${order} code:`);
+    ok(lost[0].body.current && lost[0].body.current.id === "doc_design" && lost[0].body.current.revision === N + 1, `${order} current: ${JSON.stringify(lost[0].body.current).slice(0, 160)}`);
+    ok(typeof lost[0].body.current.updatedByName === "string" && lost[0].body.current.updatedByName.length > 0, `${order} names who saved:`);
+    eq((await doc("doc_design")).revision, N + 1, `${order}: exactly one write:`);
+  }
+  // a stale revision on its own is the same 409, nothing written
+  const d = await doc("doc_design");
+  const stale = await route("docs", "admin/theme", "POST", { action: "apply", kit: "pulse", revision: d.revision - 1 });
+  eq([stale.status, stale.body.code, stale.body.current?.revision], [409, "DOCUMENT_CHANGED", d.revision], "stale revision:");
+  eq((await doc("doc_design")).revision, d.revision, "nothing written:");
+});
+
+// ======================================================================================
+console.log("— 4. the design change list");
+
+await t("unit: every registered section kind has a token-usage entry; groupsOfRow and affectsWords say it in plain words", async () => {
+  const missing = R.sectionKinds().filter((k) => !TU.SECTION_TOKENS[k]);
+  eq(missing, [], "section kinds without an entry:");
+  for (const [k, groups] of Object.entries(TU.SECTION_TOKENS)) ok(R.sectionType(k) && groups.every((g) => TU.TOKEN_GROUPS.includes(g)), `${k}: ${groups}`);
+  eq(TU.groupsOfRow("Colours: accent changed"), ["colours"], "colours:");
+  eq(TU.groupsOfRow("Look: a different look chosen"), ["look"], "look:");
+  eq(TU.groupsOfRow("Brand: other settings changed"), TU.TOKEN_GROUPS, "anything else is every group:");
+  const live = { chrome: ["header", "footer"], pages: [{ label: "Home page", sections: [{ kind: "hero", label: "Hero" }, { kind: "text", label: "Text" }, { kind: "text", label: "Text" }] }] };
+  eq(TU.affectsWords(["spacing"], live), [{ words: "Home page: Text" }], "spacing skips the hero and the chrome:");
+  eq(TU.affectsWords(["look"], live), [{ words: "Every page: header" }, { words: "Home page: Hero" }], "look:");
+  const many = { chrome: [], pages: Array.from({ length: 9 }, (_, i) => ({ label: `P${i}`, sections: [{ kind: "text", label: "Text" }] })) };
+  const w = TU.affectsWords(["colours"], many);
+  eq([w.length, w[w.length - 1].words], [TU.AFFECTS_PAGE_CAP + 1, "and 3 more pages"], "capped:");
+  eq(TU.affectsWords([], live), [], "no group, no rows:");
+});
+
+await t("unit: listChanges for doc_design lists the changed token rows and, under each, the live sections that use that group, in plain words (hidden sections and drafts left out)", async () => {
+  // a design never published is compared with the platform default
+  const first = await api({ listChanges: "doc_design" });
+  eq([first.status, first.body.firstPublish], [200, false], `never published: ${JSON.stringify(first.body).slice(0, 300)}`);
+  const look = first.body.rows.find((r) => r.words.startsWith("Look:"));
+  eq(look?.affects, [{ words: "Every page: header" }, { words: "Home page: Hero" }], "the look row:");
+  const colours = first.body.rows.find((r) => r.words.startsWith("Colours:"));
+  ok(colours, `a colours row: ${JSON.stringify(first.body.rows)}`);
+  eq(colours.affects, [{ words: "Every page: header, footer and announcement bar" }, { words: "Home page: Hero, Banner and Text" }, { words: "About us: Text" }], "the colours row:");
+  // publish it, then change only the spacing: one row, and the hero is not in it
+  const p = await publishOne("doc_design");
+  eq(p.status, 200, `publish design: ${JSON.stringify(p.body).slice(0, 200)}`);
+  eq((await api({ listChanges: "doc_design" })).body.rows, [], "nothing changed:");
+  // a draft-only section on home must not count: it isn't live
+  await inD(async () => {
+    const h = await Docs.getDocument("doc_home");
+    await Docs.saveDraft({ id: "doc_home", revision: h.revision, body: { ...h.body, sections: [...h.body.sections, sec("faq", "sec_draftfaq", { title: "Draft FAQ", items: [{ q: "q", a: "a" }] })] } });
+  });
+  const s = await saveDesign((b) => (b.settings.brand = { ...b.settings.brand, section_spacing: "airy" }));
+  eq(s.status, 200, "save spacing:");
+  const rows = (await api({ listChanges: "doc_design" })).body.rows;
+  eq(rows, [{ kind: "settings", words: "Spacing: space between sections changed", affects: [{ words: "Home page: Banner and Text" }, { words: "About us: Text" }] }], "spacing only:");
+  // the words carry no ids, hashes or kinds
+  ok(rows.every((r) => r.affects.every((a) => !/sec_|doc_|ver_|[0-9a-f]{16}/.test(a.words))), "plain words:");
+  // when the live parts can't be read the row says so, the list still answers
+  const [live0] = await sql("docs", "SELECT r.id AS id, r.content AS content FROM release_state s JOIN releases r ON r.id = s.live_release_id WHERE s.id = 1");
+  await raw.docs.execute({ sql: "UPDATE releases SET content = 'not a list' WHERE id = ?", args: [live0.id] });
+  let broken;
+  try {
+    broken = await api({ listChanges: "doc_design" });
+  } finally {
+    await raw.docs.execute({ sql: "UPDATE releases SET content = ? WHERE id = ?", args: [live0.content, live0.id] });
+  }
+  eq([broken.status, broken.body.rows.map((r) => r.affects)], [200, [[{ words: Ch.AFFECTS_UNKNOWN }]]], "unknown:");
+  // put the spacing back so later tests start from the published design
+  await saveDesign((b) => delete b.settings.brand.section_spacing);
+});
+
+// ======================================================================================
+console.log("— 5. theme_pin");
+
+await t("unit: a design publish and a design Undo each write theme_pin; publishing another document leaves it", async () => {
+  // the design published in test 4 holds glow
+  const pin1 = (await cfgOf("dd")).theme_pin;
+  eq([pin1?.kit, pin1?.version], ["glow", 1], `after the design publish: ${JSON.stringify(pin1)}`);
+  ok(typeof pin1.release === "string" && pin1.release === (await liveOf()), "names the release it came from:");
+  // the old control-plane pin is still there and still stale: the pin is separate
+  eq((await cfgOf("dd")).theme.kit, "pulse", "config.theme is not written:");
+  // a new look, published
+  const a = await route("docs", "admin/theme", "POST", { action: "apply", kit: "pulse", withPresets: false, withBrand: false });
+  eq(a.status, 200, "apply pulse:");
+  const p = await publishOne("doc_design");
+  eq(p.status, 200, `publish pulse: ${JSON.stringify(p.body).slice(0, 200)}`);
+  eq((await cfgOf("dd")).theme_pin.kit, "pulse", "after the second publish:");
+  // another document's publish: the pin stays
+  await inD(async () => {
+    const h = await Docs.getDocument("doc_home");
+    await Docs.saveDraft({ id: "doc_home", revision: h.revision, body: h.body });
+  });
+  const pinBefore = (await cfgOf("dd")).theme_pin;
+  eq((await publishOne("doc_home")).status, 200, "publish home:");
+  eq((await cfgOf("dd")).theme_pin, pinBefore, "home publish leaves the pin:");
+  // Undo the pulse publish: the pin is glow again
+  const undo = p.body.items?.[0]?.undo || p.body.published?.[0]?.undo;
+  ok(undo?.logId, `the publish answer offers Undo: ${JSON.stringify(p.body).slice(0, 300)}`);
+  const d = await doc("doc_design");
+  const u = await api({ undo: { id: "doc_design", logId: undo.logId }, revision: d.revision });
+  eq(u.status, 200, `undo: ${JSON.stringify(u.body).slice(0, 300)}`);
+  const pin3 = (await cfgOf("dd")).theme_pin;
+  eq([pin3.kit, pin3.release], ["glow", await liveOf()], "after Undo, the live look again:");
+});
+
+await t("unit: a failing pin write does not change the publish result (logged, the old pin stays)", async () => {
+  const pinBefore = (await cfgOf("dd")).theme_pin;
+  await route("docs", "admin/theme", "POST", { action: "apply", kit: "pulse", withPresets: false, withBrand: false });
+  const d = await doc("doc_design");
+  After.setThemePinWriter(async () => {
+    throw new Error("control plane is down");
+  });
+  let r;
+  let lines;
+  try {
+    ({ result: r, lines } = await logsOf(() => publishOne("doc_design")));
+  } finally {
+    After.setThemePinWriter(null);
+  }
+  eq(r.status, 200, `publish: ${JSON.stringify(r.body).slice(0, 300)}`);
+  const item = (r.body.items || r.body.published || [])[0];
+  eq([item?.id, (await doc("doc_design")).publishedVersionId === item?.versionId], ["doc_design", true], "the design went live:");
+  ok(r.body.ok === true && !r.body.error && !r.body.code, `a plain success: ${JSON.stringify(r.body).slice(0, 200)}`);
+  ok(lines.some((l) => l.evt === "documents_after_commit_failed" && l.handler === "themePin" && /control plane is down/.test(l.error)), `logged: ${JSON.stringify(lines.map((l) => l.evt))}`);
+  eq((await cfgOf("dd")).theme_pin, pinBefore, "the old pin stays:");
+  eq((await doc("doc_design")).revision, d.revision, "the publish itself writes no draft:");
+  // the next publish writes it again
+  await saveDesign((b) => (b.settings.brand = { ...b.settings.brand, accent: "#0f766e" }));
+  eq((await publishOne("doc_design")).status, 200, "publish again:");
+  eq((await cfgOf("dd")).theme_pin.kit, "pulse", "written by the next publish:");
+});
+
+await t("unit: themePinOf reads a build's design version; a design with no look of its own pins null; kits.themePinOf falls back to the legacy pin only when no theme_pin was ever written", async () => {
+  const v = (theme) => ({ versions: [{ document_id: "doc_design", body: JSON.stringify({ type: "design", settings: { brand: null, theme } }) }], now: "t", releaseId: "rel_x" });
+  eq(After.themePinOf({ versions: [{ document_id: "doc_home", body: "{}" }] }), undefined, "no design in the build:");
+  eq(After.themePinOf(v(null)), null, "the platform default:");
+  eq(After.themePinOf(v({ kit: "glow", version: 1, applied_at: "a" })), { kit: "glow", version: 1, applied_at: "a", published_at: "t", release: "rel_x" }, "a look:");
+  eq(K.themePinOf({ theme: { kit: "glow", version: 1 } }), { kit: "glow", version: 1 }, "legacy pin:");
+  eq(K.themePinOf({ theme: { kit: "glow", version: 1 }, theme_pin: null }), null, "a published default wins over the legacy pin:");
+  eq(K.themePinOf({ theme: { kit: "glow", version: 1 }, theme_pin: { kit: "pulse", version: 1 } }).kit, "pulse", "theme_pin wins:");
+  eq(K.themePinOf(null), null, "no config:");
+});
+
+// ======================================================================================
+console.log("— 6. readers");
+
+await t("unit: onboarding, Help, the agency kit export and brand readability read the LIVE doc_design in documents mode (never config.brand / config.theme); legacy reads its config as before", async () => {
+  // the live design now: pulse, accent #0f766e (test 5). The config still says
+  // purple and pulse; a draft says something else again.
+  await saveDesign((b) => {
+    b.settings.brand = { ...b.settings.brand, accent: "#dc2626" };
+    b.settings.theme = { kit: "glow", version: 1, applied_at: "2026-11-01T00:00:00.000Z" };
+  });
+  const live = await inD(() => BR.liveDesign());
+  eq([live.brand.accent, live.theme.kit], ["#0f766e", "pulse"], "liveDesign (not the draft):");
+  // onboarding: done from the live design, linking to the editor
+  const ob = await inD(() => ON.buildChecklist());
+  const step = ob.items.find((i) => i.id === "brand");
+  eq([step.done, step.href], [true, "/admin/editor?doc=doc_design"], "onboarding:");
+  // Help: the live look (the old config pin is moved to glow so the two differ)
+  const cfg0 = await cfgOf("dd");
+  await C.patchTenant("dd", { config: { theme: { kit: "glow", version: 1 } } });
+  let h;
+  try {
+    h = await route("docs", "admin/help", "GET", null);
+  } finally {
+    await C.patchTenant("dd", { config: { theme: cfg0.theme } });
+  }
+  eq([h.status, h.body.diagnostics.theme], [200, "pulse@1"], "help:");
+  // agency export: the live brand
+  const agency = await A.createAgency({ name: "Design Studio" });
+  const inv = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@dd.test", role: "staff" });
+  ok(await A.acceptGrant(inv.token, { tenantId: "dd", actorEmail: "owner@dd.test" }), "grant accepted");
+  const kitRow = await A.exportAgencyKit({ agencyId: agency.id, tenantId: "dd", name: "From docs" });
+  eq(kitRow.payload.brand?.accent, "#0f766e", "agency export:");
+  // brand readability: compared with the live design (#cccccc text kept as
+  // live is a warning, not a block); with no live brand it would block
+  // A publish refuses unreadable grey text, so the live design that already
+  // has it is set up in the live list directly (as a store that published it
+  // before TOK-02 would be).
+  const [rel] = await sql("docs", "SELECT r.id AS id, r.content AS content FROM release_state s JOIN releases r ON r.id = s.live_release_id WHERE s.id = 1");
+  const list = JSON.parse(String(rel.content));
+  const liveBody = JSON.parse(String((await sql("docs", "SELECT body FROM document_versions WHERE id = ?", [list.documents.doc_design.version]))[0].body));
+  const greyBrand = { ...liveBody.settings.brand, foreground: "#cccccc" };
+  const grey = { ...liveBody, settings: { ...liveBody.settings, brand: greyBrand } };
+  const strict = await inD(() => BR.brandReadability(greyBrand));
+  eq([strict.documents, strict.blocking], [true, true], `before: the live design has dark text, so grey text blocks: ${JSON.stringify(strict).slice(0, 200)}`);
+  await raw.docs.execute({
+    sql: "INSERT INTO document_versions (id, document_id, kind, body, body_hash, schema_version, note, created_by, created_at) VALUES ('ver_greytext000000', 'doc_design', 'published', ?, 'h', 1, NULL, NULL, ?)",
+    args: [JSON.stringify(grey), new Date().toISOString()],
+  });
+  await raw.docs.execute({ sql: "UPDATE releases SET content = ? WHERE id = ?", args: [JSON.stringify({ ...list, documents: { ...list.documents, doc_design: { version: "ver_greytext000000", hash: "h" } } }), rel.id] });
+  try {
+    const rd = await inD(() => BR.brandReadability(greyBrand));
+    eq([rd.documents, rd.blocking, rd.warnings.length], [true, false, 1], `readability against the live design (grey kept as live warns): ${JSON.stringify(rd).slice(0, 200)}`);
+  } finally {
+    await raw.docs.execute({ sql: "UPDATE releases SET content = ? WHERE id = ?", args: [rel.content, rel.id] });
+  }
+  // legacy readers: their config, as before
+  const lob = await inL(() => ON.buildChecklist());
+  eq([lob.items.find((i) => i.id === "brand").done, lob.items.find((i) => i.id === "brand").href], [true, "/admin/theme"], "legacy onboarding:");
+  const lh = await route("legacy", "admin/help", "GET", null);
+  eq(lh.body.diagnostics.theme, "glow@1", "legacy help (its config pin):");
+  const inv2 = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@dd.test", role: "staff" });
+  await A.acceptGrant(inv2.token, { tenantId: "dl", actorEmail: "owner@dd.test" });
+  eq((await A.exportAgencyKit({ agencyId: agency.id, tenantId: "dl", name: "From legacy" })).payload.brand?.accent, K.KITS.glow.brand.accent, "legacy agency export:");
+});
+
+await t("unit: onboarding on a documents store with no published design is not done, even with an old config brand", async () => {
+  // a second documents store whose config has a brand and no design document
+  const c = createClient({ url: "file:.test-design-doc-default.db" });
+  await c.executeMultiple(schema);
+  await runMigrations(c, MIGRATIONS);
+  await c.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+  await C.upsertTenant({ id: "dn", name: "Design New", domains: ["dn.test"], dbUrl: "file:.test-design-doc-default.db", config: { ...STALE }, secrets: {} });
+  const ob = await withTenant(await tenant("dn"), () => ON.buildChecklist());
+  const step = ob.items.find((i) => i.id === "brand");
+  eq([step.done, step.href], [false, "/admin/editor?doc=doc_design"], "not done on the old config:");
+  c.close();
+});
+
+await t("unit: the operator screens read theme_pin (overview, themes, tenant detail); a store with no pin yet shows its legacy pin", async () => {
+  const cfg = await cfgOf("dd");
+  eq([cfg.theme.kit, cfg.theme_pin.kit], ["pulse", "pulse"], "setup:");
+  // make the two differ so the screens show which one they read
+  await C.patchTenant("dd", { config: { theme_pin: { ...cfg.theme_pin, kit: "glow", version: 1 } } });
+  const ov = await platformGet("overview");
+  eq(ov.status, 200, `overview: ${JSON.stringify(ov.body).slice(0, 200)}`);
+  eq(ov.body.fleet.find((f) => f.tenant === "dd")?.kit, "glow-1", "overview, documents store:");
+  eq(ov.body.fleet.find((f) => f.tenant === "dl")?.kit, "glow-1", "overview, legacy store (its config pin):");
+  const th = await platformGet("themes");
+  const row = th.body.tenants.find((x) => x.id === "dd");
+  eq([row.kit, row.version, row.pinned], ["glow", 1, true], "themes:");
+  const det = await platformGet("tenants/[id]", { id: "dd" });
+  eq([det.status, det.body.tenant.config.theme_pin?.kit, Object.hasOwn(det.body.tenant.config, "theme")], [200, "glow", false], `tenant detail: ${JSON.stringify(det.body.tenant?.config).slice(0, 200)}`);
+  const src = await readFile(join(ROOT, "components/platform/TenantDetail.js"), "utf8");
+  ok(/t\.config\.theme_pin/.test(src) && !/t\.config\.theme\b(?!_)/.test(src), "TenantDetail shows theme_pin:");
+  // a published default look pins null: no kit on the detail, the default on the overview
+  await C.patchTenant("dd", { config: { theme_pin: null } });
+  eq((await platformGet("overview")).body.fleet.find((f) => f.tenant === "dd")?.kit, "pulse-1", "overview, default look:");
+  eq((await platformGet("tenants/[id]", { id: "dd" })).body.tenant.config.theme_pin, null, "detail, default look:");
+  await C.patchTenant("dd", { config: { theme_pin: cfg.theme_pin } });
+});
+
+// ======================================================================================
+console.log("— 7. kits that leave an unpublishable draft");
+
+await t("unit: an agency kit that leaves the home draft unpublishable says so in plain words and names what to fix; a theme kit whose draft publishes says nothing", async () => {
+  const agency = await A.createAgency({ name: "Broken Kits" });
+  const inv = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@dd.test", role: "staff" });
+  await A.acceptGrant(inv.token, { tenantId: "dd", actorEmail: "owner@dd.test" });
+  await C.platformDb().execute({
+    sql: "INSERT INTO agency_kits (id, agency_id, name, source_note, payload, created_at) VALUES (?, ?, ?, 'x', ?, ?)",
+    args: ["akit_offsite_dd", agency.id, "offsite", JSON.stringify({ home_sections: [{ kind: "banner", title: "Sale", text: "", label: "Shop", href: "https://elsewhere.example/sale" }] }), new Date().toISOString()],
+  });
+  const r = await A.applyAgencyKit({ agencyId: agency.id, kitId: "akit_offsite_dd", tenantId: "dd" });
+  ok(Array.isArray(r.unpublishable) && r.unpublishable[0]?.documentId === "doc_home", `unpublishable: ${JSON.stringify(r).slice(0, 300)}`);
+  ok(/The home page was saved as a draft but can't be published yet\. Fix this in the editor first: Banner/.test(r.note), `the note names it: ${r.note}`);
+  ok(!/sec_|doc_|LINK_NOT|incomplete/.test(r.note), `plain words: ${r.note}`);
+  // a theme kit on a clean home: no unpublishable note
+  await inD(async () => {
+    const h = await Docs.getDocument("doc_home");
+    await Docs.discardDraft({ id: "doc_home", revision: h.revision }); // back to the live home
+  });
+  const k = await route("docs", "admin/theme", "POST", { action: "apply", kit: "glow" });
+  eq([k.status, k.body.applied.unpublishable, k.body.note], [200, undefined, undefined], `clean: ${JSON.stringify(k.body.applied).slice(0, 300)}`);
+  // a theme kit whose hero preset lands in a home draft that can't publish: said
+  await inD(async () => {
+    const h = await Docs.getDocument("doc_home");
+    await Docs.saveDraft({ id: "doc_home", revision: h.revision, body: { ...h.body, sections: [...h.body.sections, sec("banner", "sec_bad", { title: "Bad", text: "x", button: { label: "Go", link: { type: "url", href: "https://elsewhere.example/" } } })] } });
+  });
+  const k2 = await route("docs", "admin/theme", "POST", { action: "apply", kit: "pulse" });
+  eq(k2.status, 200, "applied:");
+  ok(/Your home page was saved as a draft but can't be published yet\. Fix this in the editor first: Banner/.test(k2.body.note || ""), `the theme kit says so: ${k2.body.note}`);
+  eq(k2.body.applied.unpublishable?.[0]?.label, "Your home page", "named:");
+  ok(K.unpublishableNote([]) === null && K.unpublishableNote([{ label: "X", problems: ["a.", "b.", "c.", "d."] }]).endsWith("(and 1 more)"), "note helper:");
+});
+
+// ======================================================================================
+console.log("— 8. the guard");
+
+// Reads of the control-plane brand and theme pin. Comments are stripped
+// first; writes (patchTenant({ config: { brand } })) are not reads.
+const READ_PATTERNS = [
+  /\bconfig\s*\??\.\s*(brand|theme)\b(?!_)/g, // config.brand, config?.theme (not theme_pin)
+  /\bconfig\s*\??\.?\s*\[\s*["'`](brand|theme)["'`]\s*\]/g, // config["brand"], config?.["theme"]
+  /\b(?:tenantOwnCfg|tenantCfg|cfg)\s*\(\s*["'`](brand|theme)["'`]/g, // tenantOwnCfg("brand")
+  /\{[^{}]*\b(brand|theme)\b[^{}]*\}\s*=\s*[\w.?]*\bconfig\b/g, // const { brand } = tenant.config
+];
+// file -> why it may read them
+const ALLOW = {
+  "lib/brand.js": "the brand engine itself; legacy-mode reads of the brand",
+  "lib/cms/schemas.js": "legacy (v1-v3) block schemas",
+  "lib/releases.js": "legacy releases snapshot config.brand and config.theme (legacy mode only)",
+  "lib/content/resolve.js": "the legacy draft branch of resolvedBrand / resolvedTheme (v4 reads doc_design)",
+  "lib/themes/kits.js": "legacy applyKit, and draftDesignOf / themePinOf, the one place other files read through",
+  "app/api/admin/theme/route.js": "the legacy branch of the theme API",
+  "app/api/admin/brand/route.js": "the legacy branch of the brand API",
+  "app/(console)/admin/(authed)/brand/page.js": "the legacy Brand screen; P3-ROUTES redirects it in documents mode",
+  "app/(console)/admin/(authed)/theme/page.js": "the legacy Theme screen; P3-ROUTES redirects it in documents mode",
+};
+
+const stripComments = (src) =>
+  src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, (m, p) => p + " ".repeat(m.length - p.length));
+
+export function configReads(src) {
+  const code = stripComments(src);
+  const out = [];
+  for (const re of READ_PATTERNS) {
+    re.lastIndex = 0;
+    for (let m; (m = re.exec(code)); ) out.push({ line: code.slice(0, m.index).split("\n").length, text: m[0].replace(/\s+/g, " ").slice(0, 80) });
+  }
+  return out;
+}
+
+async function walk(dir) {
+  const out = [];
+  for (const e of await readdir(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) {
+      if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+      out.push(...(await walk(p)));
+    } else if (/\.(m?js|jsx|ts|tsx)$/.test(e.name)) out.push(p);
+  }
+  return out;
+}
+
+await t("unit: the scanner catches every read form it claims to (and skips comments, writes and theme_pin)", async () => {
+  const bad = ["x = tenant.config.brand", "x = t?.config?.theme", "x = cfg.config['brand']", 'x = tenantOwnCfg("theme", null, null)', "const { brand } = tenant.config"];
+  for (const b of bad) eq(configReads(b).length, 1, `caught: ${b}`);
+  const fine = ["// tenant.config.brand in a comment", "/* config.theme */ x = 1", "patchTenant(id, { config: { brand: v } })", "x = tenant.config.theme_pin", "x = t.config?.billing"];
+  for (const f of fine) eq(configReads(f).length, 0, `not a read: ${f}`);
+});
+
+await t("unit: the guard finds no config.brand or config.theme read outside the allowlist (lib, app, components)", async () => {
+  const files = [...(await walk(join(ROOT, "lib"))), ...(await walk(join(ROOT, "app"))), ...(await walk(join(ROOT, "components")))];
+  ok(files.length > 200, `scanned ${files.length} files`);
+  const found = [];
+  const allowedHits = new Set();
+  for (const f of files) {
+    const rel = relative(ROOT, f).split("\\").join("/");
+    const hits = configReads(await readFile(f, "utf8"));
+    if (!hits.length) continue;
+    if (Object.hasOwn(ALLOW, rel)) allowedHits.add(rel);
+    else found.push(...hits.map((h) => `${rel}:${h.line} ${h.text}`));
+  }
+  eq(found, [], "reads outside the allowlist:");
+  // every allowlisted file exists and has a reason
+  for (const [f, why] of Object.entries(ALLOW)) {
+    ok(why.length > 10, `${f} has a reason`);
+    await readFile(join(ROOT, f), "utf8");
+  }
+  // the readers this item moved really read nothing themselves
+  for (const f of ["lib/admin/onboarding.js", "app/api/admin/help/route.js", "lib/platform/agency.js", "lib/admin/brand-readability.js", "app/api/platform/overview/route.js", "app/api/platform/themes/route.js", "app/api/platform/tenants/[id]/route.js", "components/platform/TenantDetail.js"]) {
+    eq(configReads(await readFile(join(ROOT, f), "utf8")), [], `${f}:`);
+  }
+  ok(allowedHits.has("lib/themes/kits.js") && allowedHits.has("lib/content/resolve.js"), `the allowlist is used: ${[...allowedHits]}`);
+});
+
+// ======================================================================================
+await cleanup();
+console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);
+process.exit(fail ? 1 : 0);

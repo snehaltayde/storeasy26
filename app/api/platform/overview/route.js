@@ -7,7 +7,7 @@ import { billingOverview } from "@/lib/platform/billing";
 import { salesRollup } from "@/lib/reporting";
 import { getLiveRelease } from "@/lib/releases";
 import { DOCUMENTS_MESSAGE } from "@/lib/cms-mode";
-import { kitAttr } from "@/lib/themes/kits";
+import { kitAttr, themePinOf } from "@/lib/themes/kits";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/tenant-context";
 
@@ -63,7 +63,8 @@ export async function GET(request) {
               ? { id: live.id, documents: true, message: DOCUMENTS_MESSAGE, hash: String(live.content_hash || "").slice(0, 12), published_at: live.published_at }
               : { id: live.id, hash: live.content_hash.slice(0, 12), published_at: live.published_at }
             : null,
-          kit: kitAttr(tenant.config?.theme || null),
+          // P3-DESIGN (TOK-03): the live look's pin (theme_pin), not the draft
+          kit: kitAttr(themePinOf(tenant.config)),
         };
       });
     } catch (e) {
