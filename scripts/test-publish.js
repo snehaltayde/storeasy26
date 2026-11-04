@@ -14,6 +14,7 @@
 //
 // sqld is required. If it is missing the suite FAILS; it never skips.
 // Install the Turso CLI (puts sqld in ~/.turso) or set SQLD_BIN.
+// Ports: TEST_PUBLISH_PORTS="<sqld>,<proxy>" picks them; otherwise free ports.
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import net from "node:net";
@@ -687,9 +688,10 @@ try {
   const found = H.findSqld(); // throws (the suite fails) when sqld is missing: never a skip
   dataDir = await mkdtemp(join(tmpdir(), "storeasy-test-publish-"));
   const sqldStarted = Date.now();
-  sqld = H.startSqld({ bin: found.bin, key: "publish", port: await freePort(), dataDir });
+  const [sqldPort, proxyPort] = (process.env.TEST_PUBLISH_PORTS || "").split(",").map((p) => Number(p) || 0);
+  sqld = H.startSqld({ bin: found.bin, key: "publish", port: sqldPort || (await freePort()), dataDir });
   await H.waitForHealth(sqld.url, sqld.child, { logFile: sqld.logFile, label: "test:publish" });
-  proxy = startFaultProxy({ listenPort: 0, upstreamPort: sqld.port });
+  proxy = startFaultProxy({ listenPort: proxyPort || 0, upstreamPort: sqld.port });
   await proxy.ready;
   const raw = (url = proxy.url) => {
     const c = createClient({ url });

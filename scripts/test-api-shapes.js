@@ -90,6 +90,10 @@ const docSources = Object.fromEntries(await Promise.all(docFiles.map(async (f) =
 const serviceSource = docSources["service.js"];
 const publishSource = docSources["publish.js"];
 const versionsSource = docSources["versions.js"];
+// P3-COMMIT: the build helpers moved from publish.js to build.js, and later
+// items may move more. Checks on "the publish code" read every lib/documents
+// file together, so a move between files never turns this suite red.
+const documentsSource = docFiles.map((f) => docSources[f]).join("\n");
 // Where the API's codes come from today.
 const EMITTERS = { "lib/admin/documents-api.js": apiSource, "lib/cms/issues.js": issuesSource, ...Object.fromEntries(docFiles.map((f) => [`lib/documents/${f}`, docSources[f]])) };
 
@@ -341,7 +345,7 @@ check("publish answers today's keys, plus liveUrl and undo per item", () => {
   const keys = ["ok", ...[...m[1].matchAll(/(\w+):/g)].map((x) => x[1])];
   const ok = SHAPES.publish.outcomes.ok;
   sameList(Object.keys(ok.body), keys, "publish 200");
-  const item = /published: build\.documents\.map\(\(d\) => \(\{ ([^}]*) \}\)\)/.exec(publishSource);
+  const item = /published: build\.documents\.map\(\(d\) => \(\{ ([^}]*) \}\)\)/.exec(documentsSource);
   if (!item) fail("can't read a published item");
   sameList(keysWithout(ok.body.published[0], ok.addedInPhase3, "published[]."), [...item[1].matchAll(/(\w+):/g)].map((x) => x[1]), "published item");
   sameList(Object.keys(ok.body.published[0].undo), ["id", "revision", "logId"], "undo args");
@@ -351,15 +355,15 @@ check("publish answers today's keys, plus liveUrl and undo per item", () => {
 
 check("publish conflicts carry what conflictError() sends", () => {
   const o = SHAPES.publish.outcomes.changed;
-  const fn = /const stale = \(cur\) => \(\{([\s\S]*?)\}\);/.exec(publishSource);
+  const fn = /const stale = \(cur\) => \(\{([\s\S]*?)\}\);/.exec(documentsSource);
   if (!fn) fail("can't read publish.js stale()");
   sameList(Object.keys(o.body.conflicts[0]), [...fn[1].matchAll(/^\s+(\w+):/gm)].map((x) => x[1]), "conflict entry");
-  if (!/\{ conflicts: list, \.\.\.\(list\.length === 1 \? \{ current: first\.current \} : \{\}\) \}/.test(publishSource)) fail("conflictError() changed");
+  if (!/\{ conflicts: list, \.\.\.\(list\.length === 1 \? \{ current: first\.current \} : \{\}\) \}/.test(documentsSource)) fail("conflictError() changed");
 });
 
 check("slug refusals carry slug and other (and document on publish)", () => {
   if (!/\{ slug, other \}/.test(serviceSource)) fail("service.js slugTaken extra changed");
-  if (!/\{ slug, document: p\.doc\.id, other \}/.test(publishSource)) fail("publish.js slugClash extra changed");
+  if (!/\{ slug, document: p\.doc\.id, other \}/.test(documentsSource)) fail("slugClash extra changed (lib/documents)");
   sameList(keysWithout(SHAPES.saveDraft.outcomes.slugTaken.body, []), ["error", "code", "slug", "other"], "save SLUG_TAKEN");
   sameList(keysWithout(SHAPES.publish.outcomes.slugTaken.body, []), ["error", "code", "slug", "document", "other"], "publish SLUG_TAKEN");
   // today's other is { id, title }; label is phase 3, title is kept
@@ -381,15 +385,15 @@ check("constant words are copied exactly", () => {
 
 check("error bodies of DocumentError refusals carry today's extra fields", () => {
   sameList(Object.keys(SHAPES.publish.outcomes.deleted.body), ["error", "code", "missing"], "DOCUMENT_DELETED");
-  if (!/"DOCUMENT_DELETED", DELETED_MESSAGE, \{ missing:/.test(publishSource)) fail("DOCUMENT_DELETED extra changed");
+  if (!/"DOCUMENT_DELETED", DELETED_MESSAGE, \{ missing:/.test(documentsSource)) fail("DOCUMENT_DELETED extra changed");
   sameList(Object.keys(SHAPES.publish.outcomes.unknown.body), ["error", "code", "release"], "PUBLISH_UNKNOWN");
-  if (!/"PUBLISH_UNKNOWN", UNKNOWN_MESSAGE, \{ release: \{ id: build\.releaseId \} \}/.test(publishSource)) fail("PUBLISH_UNKNOWN extra changed");
+  if (!/"PUBLISH_UNKNOWN", UNKNOWN_MESSAGE, \{ release: \{ id: build\.releaseId \} \}/.test(documentsSource)) fail("PUBLISH_UNKNOWN extra changed");
   sameList(Object.keys(SHAPES.publish.outcomes.failed.body), ["error", "code", "reason"], "PUBLISH_FAILED");
-  if (!/"PUBLISH_FAILED", infraMessage\("internal", "publish"\), \{ reason:/.test(publishSource)) fail("PUBLISH_FAILED extra changed");
+  if (!/"PUBLISH_FAILED", infraMessage\("internal", "publish"\), \{ reason:/.test(documentsSource)) fail("PUBLISH_FAILED extra changed");
   for (const n of ["notPublishable", "publishNotAvailable"]) {
     sameList(Object.keys(SHAPES.publish.outcomes[n].body), ["error", "code", "document"], n);
   }
-  if ((publishSource.match(/\{ document: d\.id \}/g) || []).length !== 2) fail("NOT_PUBLISHABLE / PUBLISH_NOT_AVAILABLE extra changed");
+  if ((documentsSource.match(/\{ document: d\.id \}/g) || []).length !== 2) fail("NOT_PUBLISHABLE / PUBLISH_NOT_AVAILABLE extra changed");
   if (!/"DOCUMENT_ARCHIVED", `[^`]*`, \{ current: publicDocument\(current\) \}/.test(serviceSource)) fail("DOCUMENT_ARCHIVED extra changed");
   if (!/"DOCUMENT_EXISTS", `[^`]*`, \{ current: publicDocument\(cur\) \}/.test(serviceSource)) fail("DOCUMENT_EXISTS extra changed");
 });
