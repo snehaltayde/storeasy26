@@ -877,6 +877,9 @@ console.log(`— a documents tenant at ${BEFORE_REFS} (no document_refs) publish
 
   await t(`at ${BEFORE_REFS}: create, save and publish a page through the real handler; no refs; after ${REFS} the next publish writes them`, async () => {
     __forgetRefsTable();
+    // P3-CHECKS (PUB-06): a closed store opens with its home page first
+    const h = await call({ createDocument: { type: "home", body: { schema: 1, type: "home", meta: {}, sections: [{ id: "sec_schome", kind: "hero", v: 1, enabled: true, settings: { title: "Compat home" }, blocks: [] }] } } });
+    eq((await call({ publish: { id: h.body.document.id, draftHash: h.body.document.draftHash }, revision: h.body.document.revision })).status, 200, "the home page opens the store:");
     const c = await call({ createDocument: { type: "page", body: pageBody("Rail") } });
     eq(c.status, 200, `create: ${JSON.stringify(c.body).slice(0, 200)}`);
     const p = await call({ publish: { id: c.body.document.id, draftHash: c.body.document.draftHash }, revision: c.body.document.revision });

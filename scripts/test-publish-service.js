@@ -184,9 +184,9 @@ const save = async (store, d, newBody) => {
   return r.body.document;
 };
 const current = (store, id) => inT(() => Docs.getDocument(id), store);
-const publishApi = async (store, id, { as = OWNER, revision, draftHash } = {}) => {
+const publishApi = async (store, id, { as = OWNER, revision, draftHash, confirmRepublish } = {}) => {
   const d = await current(store, id);
-  return api({ publish: { id, draftHash: draftHash ?? d.draftHash }, revision: revision ?? d.revision }, { store, as });
+  return api({ publish: { id, draftHash: draftHash ?? d.draftHash, ...(confirmRepublish ? { confirmRepublish: true } : {}) }, revision: revision ?? d.revision }, { store, as });
 };
 const publishSetApi = async (store, list, { as = OWNER } = {}) => {
   const items = [];
@@ -242,18 +242,26 @@ const defaultsWanted = (name) => [
 // =========================================================================================
 console.log("— first publish, scoped publish (PUB-01, PUB-02, DOC-05)");
 
-await t("the first publish on a never-published documents store, of one policy page only, goes live; every other getter returns its code default and nothing errors", async () => {
+// P3-CHECKS (PUB-06): a closed store opens with its home page, so the first
+// publish of a policy page alone is refused with an offer that adds doc_home
+// (scripts/test-publish-checks.js has the full case). With the home page in
+// the set it goes live, and every other getter keeps its code default.
+await t("the first publish on a never-published documents store, of one policy page plus the home page, goes live; every other getter returns its code default and nothing errors", async () => {
   const before = await pointerOf("first");
   eq(before.pointer, null, "never published:");
   const privacy = await create("first", "page", { body: page("privacy", "Privacy", "We keep little.") });
-  const r = published(await publishApi("first", privacy.id), "first publish");
-  eq(r.published.map((p) => p.id), [privacy.id], "only the page:");
+  const alone = await publishApi("first", privacy.id);
+  eq([alone.status, alone.body.code], [409, "FIRST_PUBLISH_NEEDS_HOME"], "a policy page alone:");
+  const home = await create("first", "home", { body: body("home", { sections: [sec("hero", "sec_hero", { title: "First home" })] }) });
+  const r = published(await publishSetApi("first", [privacy.id, home.id]), "first publish");
+  eq(r.published.map((p) => p.id).sort(), [home.id, privacy.id].sort(), "the page and the home page:");
   const live = await pointerOf("first");
   eq(live.pointer, r.release.id, "the pointer is the new release:");
-  for (const t of R.singletonTypes()) eq(live.list.documents[`doc_${t}`], null, `doc_${t} is an explicit null:`);
+  for (const t of R.singletonTypes()) if (t !== "home") eq(live.list.documents[`doc_${t}`], null, `doc_${t} is an explicit null:`);
   eq(live.list.pages.map((p) => [p.slug, p.document]), [["privacy", privacy.id]], "the page row:");
   eq(live.list.indexes.journal, null, "no journal index:");
   for (const [fn, args, want] of defaultsWanted("PS first Store")) {
+    if (fn === "resolvedHero" || fn === "resolvedHomeSections") continue; // the home page is live now
     let got;
     try {
       got = await inT(() => Res[fn](...args), "first");
@@ -262,11 +270,12 @@ await t("the first publish on a never-published documents store, of one policy p
     }
     eq(got, want, `${fn}(${args.join(",")}):`);
   }
+  eq((await inT(() => Res.resolvedHero(), "first")).title, "First home", "the home page is live:");
   eq((await inT(() => Res.resolvedContentPageList(), "first")).find((p) => p.slug === "privacy"), { slug: "privacy", title: "Privacy", enabled: true, source: "custom", family: "page" }, "listed:");
   eq((await inT(() => Res.resolvedContentPage("privacy"), "first")).sections, [{ id: "sec_t1", kind: "text", heading: "Privacy", body: ["We keep little."] }], "the policy page:");
   eq(await inT(() => Res.resolvedJournalEntries(), "first"), [], "no journal:");
   const row = (await sql("SELECT published_version_id, published_hash, draft_hash FROM documents WHERE id = ?", [privacy.id], "first"))[0];
-  eq(row.published_version_id, r.published[0].versionId, "documents.published_version_id:");
+  eq(row.published_version_id, r.published.find((p) => p.id === privacy.id).versionId, "documents.published_version_id:");
   eq(row.published_hash, row.draft_hash, "published_hash uses the draft hash rule (ids stripped):");
 });
 
@@ -863,7 +872,7 @@ await t("FIX4 late commit: a {lost} whose batch actually committed after the rea
   eq(r.status, 200, `status: ${JSON.stringify(r.body).slice(0, 400)}`);
   ok(!/someone else/i.test(JSON.stringify(r.body)), "never 'someone else published'");
   eq(r.body.release.id, first.releaseId, "the release that went live:");
-  eq(r.body.published, [{ id: d.id, versionId: first.documents[0].published_version_id, hash: first.documents[0].published_hash }], "its published version:");
+  eq(r.body.published, [{ id: d.id, versionId: first.documents[0].published_version_id, hash: first.documents[0].published_hash, liveUrl: "/api/preview?exit=1&to=%2Fpolicies%2Flate-commit", undo: { id: d.id, revision: d.revision, logId: first.log[0].id } }], "its published version (P3-CHECKS: with liveUrl and undo of the build that went live):");
   const live = await pointerOf();
   eq(live.pointer, first.releaseId, "live pointer:");
   eq(live.list.documents[d.id].version, first.documents[0].published_version_id, "live entry:");
@@ -1208,6 +1217,10 @@ await t("P3-COMMIT: a draft rewrite onto a slug another non-archived draft holds
 
 await t("P3-COMMIT: a publish on a documents store without 0023 succeeds, writes no refs and logs document_refs_missing; the probe is one statement per publish until 0023 runs", async () => {
   B.__forgetRefsTable();
+  // P3-CHECKS: the store opens with its home page first (FIRST_PUBLISH_NEEDS_HOME)
+  const home = await create("pre23", "home", { body: body("home", { sections: [sec("hero", "sec_hero", { title: "Pre refs home" })] }) });
+  published(await publishApi("pre23", home.id), "the home page opens the store");
+  B.__forgetRefsTable();
   const d = await create("pre23", "page", { body: page("pre-refs", "Pre refs", "x") });
   const { currentDatabase } = await import("../lib/db.js");
   const run = () => inT(() => watchStatements(currentDatabase().libsql, () => publishApi("pre23", d.id)), "pre23");
@@ -1321,7 +1334,9 @@ await t("P3-COMMIT: an offline page writes enabled:false with an unchanged docum
   eq((await sql("SELECT action, from_version_id, to_version_id FROM publish_log WHERE set_id = ?", [b.setId])).map((x) => [x.action, x.from_version_id, x.to_version_id]), [["unpublish", pub.published[0].versionId, entry.version]], "log:");
   eq(await inT(() => Res.resolvedContentPage("off-page")), null, "shoppers don't see the page:");
   // publishing again writes the redirects again from the body, and is live
-  const again = published(await publishApi("docs", d.id), "again");
+  // (the same content as taken offline: P3-CHECKS asks for the founder's yes)
+  eq((await publishApi("docs", d.id)).body.code, "REPUBLISH_CONFIRM_NEEDED", "the same content needs a yes:");
+  const again = published(await publishApi("docs", d.id, { confirmRepublish: true }), "again");
   const l2 = await pointerOf();
   eq(l2.list.pages.filter((p) => p.document === d.id).map((p) => p.enabled), [true], "back on:");
   eq(l2.list.redirects.filter((x) => x.document === d.id).map((x) => x.from_slug), ["old-off-page"], "redirects written again:");
@@ -1695,13 +1710,19 @@ try {
     });
   const mk = (b) => inS(async () => (await Docs.createDocument({ type: b.type, body: b, actor: ACTOR })).document);
 
-  await t("sqld: the first publish of one page goes live; every singleton stays an explicit null", async () => {
+  await t("sqld: the first publish of one page with the home page goes live; every other singleton stays an explicit null", async () => {
     const d = await mk(page("privacy", "Privacy", "Little."));
-    const r = await pub([d.id]);
+    // P3-CHECKS: a closed store opens with its home page
+    let refused = null;
+    await pub([d.id]).catch((e) => (refused = e));
+    eq(refused?.code, "FIRST_PUBLISH_NEEDS_HOME", "a page alone:");
+    const h = await mk(body("home", { sections: [sec("hero", "sec_hero", { title: "Sqld home" })] }));
+    const r = await pub([d.id, h.id]);
     const [row] = await dsql("SELECT s.live_release_id AS live, r.content AS content FROM release_state s JOIN releases r ON r.id = s.live_release_id");
     eq(row.live, r.release.id, "pointer:");
     const list = JSON.parse(String(row.content));
-    for (const ty of R.singletonTypes()) eq(list.documents[`doc_${ty}`], null, `doc_${ty}:`);
+    for (const ty of R.singletonTypes()) if (ty !== "home") eq(list.documents[`doc_${ty}`], null, `doc_${ty}:`);
+    eq(list.documents.doc_home?.version, r.published.find((p) => p.id === "doc_home").versionId, "doc_home:");
   });
 
   await t("sqld (proxy commit_then_drop): a lost response then retry reports success with no duplicate rows", async () => {

@@ -116,7 +116,11 @@ const EMITTERS = { "lib/admin/documents-api.js": apiSource, "lib/cms/issues.js":
 // Codes phase 3 adds (plan section 2 and the P3 briefs). Every other code a
 // "p3" outcome uses must already exist.
 // NOT_BUILT is no longer new: P3-COMMIT's NotBuiltError emits it.
-const NEW_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "TOO_MANY_KEPT", "CANNOT_TAKE_OFFLINE"]);
+// P3-CHECKS: BUILT_CODES are new codes the code now emits: each must be
+// emitted, with its outcome's status (a renamed one fails). NEW_CODES are not
+// built yet (P3-UNDO, P3-CHANGES): emitted or not, a status must match.
+const BUILT_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED"]);
+const NEW_CODES = new Set([...BUILT_CODES, "TOO_MANY_KEPT", "CANNOT_TAKE_OFFLINE"]);
 
 // ---- walking the shapes ------------------------------------------------------------
 
@@ -243,8 +247,10 @@ check("every code the API gives today is copied exactly, with its status", () =>
       if (statuses.size && !statuses.has(o.status)) fail(`${where}: ${code} is ${o.status} here, the code says ${[...statuses].join(" or ")}`);
     } else if (!statuses && !NEW_CODES.has(code)) {
       fail(`${where}: ${code} is neither a code of today nor one of phase 3's new codes`);
-    } else if (statuses && NEW_CODES.has(code)) {
-      fail(`${where}: ${code} is listed as new but the code already emits it`);
+    } else if (!statuses && BUILT_CODES.has(code)) {
+      fail(`${where}: ${code} is built in phase 3 (P3-CHECKS), but no emitter has that code (renamed?)`);
+    } else if (BUILT_CODES.has(code) && !statuses.has(o.status)) {
+      fail(`${where}: ${code} is ${o.status} here, the code says ${[...statuses].join(" or ") || "no status"}`);
     } else if (statuses && statuses.size && !statuses.has(o.status)) {
       // a p3 outcome reusing a code of today keeps its status
       fail(`${where}: ${code} is ${o.status} here, the code says ${[...statuses].join(" or ")}`);
@@ -260,7 +266,8 @@ check("the new phase 3 codes are each used by an outcome", () => {
 // The codes today's documents API can answer, from its sources, each have an
 // outcome here (nothing missing from the contract).
 check("every DocumentError code of today has an outcome", () => {
-  const used = new Set(allOutcomes.filter(({ o }) => o.since === "p2").map(({ o }) => o.body.code));
+  // a phase 3 code that is built has its p3 outcome
+  const used = new Set(allOutcomes.filter(({ o }) => o.since === "p2" || NEW_CODES.has(o.body.code)).map(({ o }) => o.body.code));
   const emitted = new Set();
   for (const src of [apiSource, ...Object.values(docSources)]) {
     for (const m of src.matchAll(/DocumentError\(\s*\d{3}\s*,\s*"([A-Z_]+)"/g)) emitted.add(m[1]);
@@ -285,7 +292,55 @@ check("ISSUE is what issue() makes", () => sameList(Object.keys(Sh.ISSUE), Objec
 check("PUBLISH_ISSUE is ISSUE plus level, anchor, where and actions", () => {
   sameList(Object.keys(Sh.PUBLISH_ISSUE), [...Issues.ISSUE_KEYS, "level", "anchor", "where", "actions"], "publish issue keys");
   if (!["blocks", "warns", "inherited"].includes(Sh.PUBLISH_ISSUE.level)) fail("level");
-  for (const a of Sh.PUBLISH_ISSUE.actions) if (!["hideSection", "removeSection", "removeItem", "publishBoth"].includes(a.type)) fail(`action ${a.type}`);
+  sameList(Sh.PUBLISH_ACTION_TYPES, ["hideSection", "removeSection", "removeItem", "publishBoth", "openField"], "action types");
+  for (const a of Sh.PUBLISH_ISSUE.actions) if (!Sh.PUBLISH_ACTION_TYPES.includes(a.type)) fail(`action ${a.type}`);
+});
+
+// P3-CHECKS: what lib/documents/checks.js decorate() and publish.js send.
+check("P3-CHECKS: a decorated issue is PUBLISH_ISSUE's keys; every action type the code makes is in the contract", () => {
+  const src = docSources["checks.js"];
+  if (!src) fail("lib/documents/checks.js is missing");
+  const at = src.indexOf("export function decorate(");
+  if (at < 0) fail("can't find decorate()");
+  const ret = src.indexOf("return {", at);
+  const lit = literalParts(balanced(src, ret + "return ".length));
+  sameList(lit.keys, Object.keys(Sh.PUBLISH_ISSUE), "decorate() keys");
+  // the action types it writes: type: "…", and the two of a ternary
+  const actionsSrc = src.slice(src.indexOf("export function actionsFor("), src.indexOf("export function levelOf("));
+  const made = new Set([...actionsSrc.matchAll(/"([a-z]+(?:Section|Item|Both|Field))"/g)].map((m) => m[1]));
+  if (made.size < 5) fail(`only ${[...made].join(", ")} action types found: the scan is broken`);
+  for (const ty of made) if (!Sh.PUBLISH_ACTION_TYPES.includes(ty)) fail(`checks.js makes action ${ty}, which the contract doesn't list`);
+  for (const ty of Sh.PUBLISH_ACTION_TYPES) if (!made.has(ty)) fail(`the contract lists action ${ty}, which checks.js never makes`);
+  for (const lvl of ["blocks", "warns", "inherited"]) if (!src.includes(`"${lvl}"`)) fail(`level ${lvl} is not in checks.js`);
+});
+
+check("P3-CHECKS: the new refusals carry the contract's extra fields, and the offer items its keys", () => {
+  const o = SHAPES.publish.outcomes;
+  sameList(Object.keys(o.republishConfirmNeeded.body), ["error", "code", "id"], "REPUBLISH_CONFIRM_NEEDED");
+  if (!/"REPUBLISH_CONFIRM_NEEDED", REPUBLISH_MESSAGE, \{ id: p\.doc\.id \}/.test(publishSource)) fail("REPUBLISH_CONFIRM_NEEDED extra changed");
+  sameList(Object.keys(o.firstPublishNeedsHome.body), ["error", "code", "offer"], "FIRST_PUBLISH_NEEDS_HOME");
+  sameList(Object.keys(o.firstPublishNoHome.body), ["error", "code", "offer"], "FIRST_PUBLISH_NEEDS_HOME, no home");
+  if (!/"FIRST_PUBLISH_NEEDS_HOME", NEEDS_HOME_MESSAGE, \{ offer: \{ publishSet:/.test(publishSource)) fail("FIRST_PUBLISH_NEEDS_HOME extra changed");
+  if (!/"FIRST_PUBLISH_NEEDS_HOME", NO_HOME_MESSAGE, \{ offer: null \}/.test(publishSource)) fail("FIRST_PUBLISH_NEEDS_HOME (no home) extra changed");
+  sameList(Object.keys(o.linksToUnpublished.body), ["error", "code", "issues", "offer"], "LINKS_TO_UNPUBLISHED");
+  if (!/"LINKS_TO_UNPUBLISHED", message, \{ issues: allIssues, offer \}/.test(publishSource)) fail("LINKS_TO_UNPUBLISHED extra changed");
+  const item = /const offerItem = \(d\) => \((\{[^}]*\})\);/.exec(publishSource);
+  if (!item) fail("can't read publish.js offerItem()");
+  sameList(literalParts(item[1]).keys, Object.keys(Sh.OFFER.publishSet[0]), "offer item");
+  for (const n of ["REPUBLISH_MESSAGE", "NEEDS_HOME_MESSAGE", "NO_HOME_MESSAGE"]) if (!new RegExp(`const ${n} = `).test(publishSource)) fail(`${n} is gone`);
+  for (const [name, msg] of [["republishConfirmNeeded", "REPUBLISH_MESSAGE"], ["firstPublishNeedsHome", "NEEDS_HOME_MESSAGE"], ["firstPublishNoHome", "NO_HOME_MESSAGE"]]) {
+    if (!publishSource.includes(`const ${msg} = ${JSON.stringify(o[name].body.error)};`)) fail(`${name}: "${o[name].body.error}" is not ${msg} in publish.js`);
+  }
+});
+
+check("P3-CHECKS: publish conflicts name who changed it (current.updatedBy, current.updatedByName)", () => {
+  if (!/current: \{ \.\.\.c\.current, updatedBy, updatedByName \}/.test(publishSource)) fail("withWho() no longer adds updatedBy and updatedByName");
+  if (!/const NAMED = new Set\(\["DOCUMENT_CHANGED", "DRAFT_CHANGED", "PUBLISHED_ELSEWHERE"\]\)/.test(publishSource)) fail("the named conflicts changed");
+  for (const n of ["changed", "draftChanged", "publishedElsewhere"]) {
+    const ob = SHAPES.publish.outcomes[n];
+    if ((ob.optional || []).some((x) => /updatedBy/.test(x)) || (ob.addedInPhase3 || []).some((x) => /updatedBy/.test(x))) fail(`${n}: updatedBy is sent now, so it must be required`);
+    sameList(Object.keys(ob.body.current), Object.keys(Sh.CURRENT), `${n} current`);
+  }
 });
 
 check("validationFailed is validationBody() exactly", () => {
@@ -447,11 +502,15 @@ check("publish answers today's keys, plus liveUrl and undo per item", () => {
   const at = documentsSource.indexOf("published: build.documents.map((d) => ({");
   if (at < 0) fail("can't read a published item");
   const item = literalParts(balanced(documentsSource, at + "published: build.documents.map((d) => (".length));
-  const added = ok.addedInPhase3.filter((x) => x.startsWith("published[].")).map((x) => x.slice("published[].".length));
-  keysBetween(Object.keys(ok.body.published[0]), item.keys, added, "published item");
+  // P3-CHECKS: liveUrl and undo are sent, so they are required now
+  if ((ok.addedInPhase3 || []).length) fail(`publish 200 still lists addedInPhase3 ${ok.addedInPhase3.join(", ")}: everything is sent now`);
+  keysBetween(Object.keys(ok.body.published[0]), item.keys, [], "published item");
+  if (!/liveUrl: placeOf\(d\.id\)/.test(documentsSource) || !/liveExitUrl\(livePath\(p\.doc\.type, p\.body\?\.meta\)\)/.test(documentsSource)) fail("liveUrl is no longer liveExitUrl(livePath(type, meta))");
+  sameList(literalParts(item.values.undo).keys, ["id", "revision", "logId"], "the code's undo args");
   sameList(Object.keys(ok.body.published[0].undo), ["id", "revision", "logId"], "undo args");
   if (!ok.body.published[0].liveUrl.startsWith("/api/preview?exit=1&to=") || /token/i.test(ok.body.published[0].liveUrl)) fail("liveUrl");
-  sameList(Object.keys(SHAPES.publish.outcomes.validationFailed.body), [...Object.keys(Issues.validationBody([])), "documents"], "publish 422");
+  sameList(Object.keys(SHAPES.publish.outcomes.validationFailed.body), [...Object.keys(Issues.validationBody([])), "documents", "offer"], "publish 422");
+  if (!/documents: blocked\.map\(\(d\) => \(\{ id: d\.id, label: d\.label \}\)\), \.\.\.\(offer \? \{ offer \} : \{\}\)/.test(publishSource)) fail("refusedForIssues() extra changed");
 });
 
 check("publish conflicts carry what conflictError() sends", () => {
