@@ -4,7 +4,7 @@ import TrackEvent from "@/components/analytics/TrackEvent";
 import SearchResults from "@/components/analytics/SearchResults";
 import { numericId } from "@/lib/ids";
 import { typesenseSearch } from "@/lib/typesense-search";
-import { searchProductsInDb } from "@/lib/repo";
+import { searchProductsInDb, displayHits } from "@/lib/repo";
 import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function generateMetadata({ searchParams }) {
 async function runSearch(q) {
   try {
     const ts = await typesenseSearch(q, { limit: 36 });
-    if (ts) return ts;
+    if (ts) return displayHits(ts);
   } catch {
     /* fall back */
   }
@@ -33,7 +33,8 @@ export default async function SearchPage({ searchParams }) {
   const products = result.hits.map((h) => ({
     handle: h.handle,
     title: h.title,
-    product_type: h.product_type,
+    // P4-EFFECTIVE (OVL-05): the card's type label is the display type
+    display_type: h.display_type,
     featured_image: h.image,
     price_min: h.price,
     currency: h.currency,

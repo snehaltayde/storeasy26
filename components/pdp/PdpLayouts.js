@@ -13,11 +13,12 @@ import { sanitizeHtml } from "@/lib/sanitize";
 //   editorial — full-bleed lead image, centered story flow, sticky buy panel
 // The family default is picked in Theme → Page templates (draft → publish).
 
+// P4-EFFECTIVE (OVL-03): the vendor line shows the effective display_vendor.
 function VendorBadge({ product, override, center = false }) {
-  if (!product.vendor && !override?.badge) return null;
+  if (!product.display_vendor && !override?.badge) return null;
   return (
     <p className={`flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-sf-accent-text ${center ? "justify-center" : ""}`}>
-      {product.vendor}
+      {product.display_vendor}
       {override?.badge ? (
         <span className="rounded-full bg-sf-accent-soft px-2.5 py-0.5 text-sf-2xs font-bold normal-case tracking-normal text-sf-on-accent-soft">
           {override.badge}

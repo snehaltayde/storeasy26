@@ -6,7 +6,9 @@ export default function ProductCard({ product, priority = false }) {
   const {
     handle,
     title,
-    product_type,
+    // P4-EFFECTIVE (OVL-03): the type label the store shows (the founder's
+    // display type, else Shopify's), never the raw type used for logic
+    display_type,
     featured_image,
     featured_image_alt,
     price_min,
@@ -51,9 +53,9 @@ export default function ProductCard({ product, priority = false }) {
       </div>
 
       <div className="mt-3 space-y-1">
-        {product_type ? (
+        {display_type ? (
           <p className="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
-            {product_type}
+            {display_type}
           </p>
         ) : null}
         <h3 className="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">

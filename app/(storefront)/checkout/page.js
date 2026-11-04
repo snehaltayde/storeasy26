@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
+import { getCart, emptyCart, shopperCart, CART_COOKIE } from "@/lib/cart";
 import { tenantOwnCfg, tenantShippingConfig } from "@/lib/tenant-context";
 import { checkoutCapability } from "@/lib/commerce/adapter";
 import { siteName, siteLogo } from "@/lib/site";
@@ -30,7 +30,10 @@ export const dynamic = "force-dynamic";
 export default async function CheckoutPage() {
   const id = (await cookies()).get(CART_COOKIE)?.value;
   const { cart, storeName, logo, razorpayEnabled, capability, policies, shippingConfig } = await tfetch(async () => ({
-    cart: id ? await getCart(id) : emptyCart(),
+    // P4-EFFECTIVE (OVL-06): CheckoutFlow is a client component, so it gets the
+    // shopper's projection (no Shopify title or SKU). The order itself is made
+    // by the checkout API from the full server-side cart.
+    cart: id ? shopperCart(await getCart(id)) : emptyCart(),
     storeName: siteName(),
     logo: siteLogo(), // S55 fix: the checkout wordmark hardcoded BEASTLIFE on every tenant
     // Key id is public; TENANT-aware presence gates the Razorpay option (a

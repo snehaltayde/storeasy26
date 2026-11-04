@@ -9,9 +9,10 @@
 //   3. Top products, AI insights and the agency report count one product as one
 //      row, by product id, under its current title.
 //   4. Neither value reaches Shopify through the real push.
-// Overlay titles don't exist yet (OVL-01, OVL-03), so "the shopper saw another
-// title" is made the way OVL-03 will make it: the cart's `title` differs from
-// its raw catalog_title.
+// P4-EFFECTIVE: "the shopper saw another title" is now a real published title,
+// a product_content_live row (what a publish writes), read through
+// lib/catalog/effective.js. Before OVL-03 it was faked by editing the cart's
+// `title` by hand.
 //   pnpm test:order-catalog
 import { readFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -122,15 +123,22 @@ async function cartWith(lines) {
   for (const [variantId, qty] of lines) await addItem(id, variantId, qty);
   return id;
 }
-// `retitle` stands in for OVL-03: the title the shopper saw differs from Shopify's.
+// `retitle`: a published title (a live row) for these products while the order
+// is placed, removed again after, so the shopper saw another title than Shopify's.
+const publishTitle = (productId, title) =>
+  db.insertInto("product_content_live").values({ product_id: productId, document_id: "doc_prod_ocat", version_id: "ver_ocat", title, published_at: "2026-11-04T00:00:00.000Z" }).onConflict((oc) => oc.column("product_id").doUpdateSet({ title })).execute();
 async function placeOrder(lines, { retitle = {}, method = "cod" } = {}) {
   return inT(async () => {
-    const cartId = await cartWith(lines);
-    const cart = await getCart(cartId);
-    for (const it of cart.items) if (retitle[it.productId]) it.title = retitle[it.productId];
-    const o = await O.createOrder({ cartId, cart, contact: CONTACT, address: ADDRESS, paymentMethod: method, idempotencyKey: `ocat-${seq}`, razorpayOrderId: method === "razorpay" ? `order_oc${seq}` : null });
-    if (method === "razorpay") await O.markOrderPaid(o.id, { razorpayPaymentId: `pay_oc${seq}` });
-    return o.id;
+    for (const [pid, title] of Object.entries(retitle)) await publishTitle(pid, title);
+    try {
+      const cartId = await cartWith(lines);
+      const cart = await getCart(cartId);
+      const o = await O.createOrder({ cartId, cart, contact: CONTACT, address: ADDRESS, paymentMethod: method, idempotencyKey: `ocat-${seq}`, razorpayOrderId: method === "razorpay" ? `order_oc${seq}` : null });
+      if (method === "razorpay") await O.markOrderPaid(o.id, { razorpayPaymentId: `pay_oc${seq}` });
+      return o.id;
+    } finally {
+      await db.deleteFrom("product_content_live").execute();
+    }
   });
 }
 const rawLines = (orderId) => inT(async () => (await libsql.execute({ sql: "SELECT * FROM order_items WHERE order_id = ? ORDER BY position", args: [orderId] })).rows.map((r) => ({ ...r })));
@@ -146,16 +154,27 @@ await t("cart lines carry Shopify's title and the SKU next to the title the shop
   eq(cart.items.find((i) => i.variantId === V3).sku, null, "a variant with no SKU:");
 });
 
-// P1-FIX-C (MIG-05/OVL-06 review): taking catalog_title from the line's own
-// title passed every test, because the two are equal until OVL-03 gives the
-// line an overlay title. No behaviour can tell them apart yet, so this reads
-// the code: catalog_title in lib/cart.js comes from the raw product title
-// column and nowhere else.
-await t("the cart's catalog_title is the raw catalog column, never the line's title (a source check until OVL-03)", async () => {
+// P1-FIX-C (MIG-05/OVL-06 review) asked for proof that catalog_title is the
+// raw catalog column and never the line's title; until OVL-03 the two were
+// always equal, so it was a source check. P4-EFFECTIVE: it is now behaviour (a
+// published title differs from Shopify's), plus the updated source pin: the
+// cart takes catalog_title from effective.js cartRows, where it is p.title.
+await t("the cart's catalog_title is Shopify's raw title, never the line's (published) title", async () => {
+  const cart = await inT(async () => {
+    await publishTitle(P1, "Morning Whey");
+    try {
+      return await getCart(await cartWith([[V1, 1]]));
+    } finally {
+      await db.deleteFrom("product_content_live").execute();
+    }
+  });
+  same([cart.items[0].title, cart.items[0].catalog_title], ["Morning Whey", "Whey Gold"], "title, catalog_title");
   const src = (await readFile(join(ROOT, "lib/cart.js"), "utf8")).replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
   const assigned = [...src.matchAll(/\bcatalog_title:\s*([^,\n}]+)/g)].map((m) => m[1].trim());
-  same(assigned, ["r.product_title", "i.catalog_title"], "every catalog_title in lib/cart.js");
-  ok(/"p\.title as product_title"/.test(src), "product_title is no longer the products table's own title column");
+  same(assigned, ["r.catalog_title", "i.catalog_title", "null", "r.catalog_title ?? null"], "every catalog_title in lib/cart.js (lines, the response, a gift not in the catalog, a gift)");
+  const eff = await readFile(join(ROOT, "lib/catalog/effective.js"), "utf8");
+  ok(/\n\s*catalog_title: \["p\.title", "p\.title"\],/.test(eff), "effective.js catalog_title is no longer the products table's own title column, live or raw");
+  ok(/cols\(live, \["title", "catalog_title", "featured_image", "logic_tags", "logic_type"\]\)/.test(eff), "cartRows no longer selects catalog_title");
 });
 
 let firstOrder;

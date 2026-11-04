@@ -10,7 +10,7 @@ import Pixels from "@/components/analytics/Pixels";
 import ErrorReporter from "@/components/analytics/ErrorReporter";
 import { cookies } from "next/headers";
 import { getAllCollections } from "@/lib/repo";
-import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
+import { getCart, emptyCart, shopperCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { resolveBrand, brandCssVars } from "@/lib/brand";
@@ -224,10 +224,12 @@ async function closedNow() {
 // The maintenance curtain's name, brand and theme when they can't be read.
 const NEUTRAL_CURTAIN = ["Store", null, null];
 
+// P4-EFFECTIVE (OVL-06, plan decision 13): the cart handed to CartProvider (a
+// client component) is the shopper's projection: no Shopify title or SKU.
 async function initialCart() {
   try {
     const id = (await cookies()).get(CART_COOKIE)?.value;
-    return id ? await tfetch(() => getCart(id)) : emptyCart();
+    return id ? shopperCart(await tfetch(() => getCart(id))) : emptyCart();
   } catch {
     return emptyCart();
   }

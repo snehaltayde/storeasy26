@@ -10,22 +10,31 @@ import { tfetch } from "@/lib/tenant-request";
 
 export const dynamic = "force-dynamic";
 
+// P4-EFFECTIVE (OVL-03, OVL-08 fallback chain): every value here is the
+// effective one (lib/catalog/effective.js through getProductByHandle): the
+// founder's published SEO title and description first, then the title and a
+// trimmed description, which was the only behaviour before.
+const metaDescription = (p) => p.seo_description || (p.description ? p.description.slice(0, 160) : undefined);
+
 export async function generateMetadata({ params }) {
   const { handle } = await params;
   const p = await tfetch(() => getProductByHandle(handle));
   // Thrown HERE (before streaming starts) so the response is a REAL 404 —
   // inside the page body the loading.js boundary has already committed a 200.
   if (!p) notFound();
+  const title = p.seo_title || p.title;
+  const description = metaDescription(p);
+  const shareImage = p.og_image || p.featured_image;
   return {
-    title: p.title,
-    description: p.description ? p.description.slice(0, 160) : undefined,
+    title,
+    description,
     alternates: { canonical: `/products/${handle}` },
     openGraph: {
       type: "website",
-      title: p.title,
-      description: p.description ? p.description.slice(0, 160) : undefined,
+      title,
+      description,
       url: `/products/${handle}`,
-      ...(p.featured_image ? { images: [{ url: p.featured_image }] } : {}),
+      ...(shareImage ? { images: [{ url: shareImage }] } : {}),
     },
   };
 }
@@ -60,7 +69,7 @@ function productJsonLd(product, brandName) {
       name: product.title,
       description: product.description || undefined,
       image: (product.images || []).slice(0, 6).map((i) => i.url),
-      brand: { "@type": "Brand", name: product.vendor || brandName },
+      brand: { "@type": "Brand", name: product.display_vendor || brandName },
       url: abs(`/products/${product.handle}`),
       offers,
     },
@@ -119,7 +128,7 @@ export default async function ProductPage({ params }) {
         <Link href="/" className="hover:text-sf-text-muted">
           Home
         </Link>{" "}
-        / <span className="text-sf-text-subtle">{product.product_type || "Product"}</span> /{" "}
+        / <span className="text-sf-text-subtle">{product.display_type || "Product"}</span> /{" "}
         <span className="text-sf-text-muted">{product.title}</span>
       </nav>
 
