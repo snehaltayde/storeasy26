@@ -794,6 +794,42 @@ await t("a singleton's first publish offers no Undo and shows the first-version 
   ok(renderPanel(f2).includes(">Undo<"), "a page's first publish can be undone (take it offline)");
 });
 
+// P3-FIX4 (DESIGN reviewer): listChanges for doc_design never says
+// firstPublish (its rows compare with the platform default), so a first design
+// publish used to offer an Undo that only answers FIRST_VERSION_MESSAGE.
+await t("P3-FIX4 unit: a first design publish offers no Undo (neverPublished), shows the first-version note; a later design publish offers Undo", async () => {
+  const DESIGN = { id: "doc_design", label: "Brand", type: "design", revision: 4, draftHash: "h_design" };
+  const listed = { ok: true, data: clone(SHAPES.listChanges.outcomes.ok.body) };
+  eq(listed.data.neverPublished, true, "the shape's example is a never-published design:");
+  const published = clone(P.ok);
+  published.body.published[0].id = "doc_design";
+  published.body.published[0].undo = { id: "doc_design", revision: 4, logId: "log_d1" };
+  const call = stub({ listChanges: listed, publish: answer(published) });
+  const flow = M.createPublishFlow({ call });
+  await flow.open([DESIGN]);
+  eq(flow.getState().lists.doc_design.rows.length > 0, true, "the token rows are still listed (not a first-publish list):");
+  await flow.confirm();
+  const out = flow.getState().outcome;
+  eq([out.phase, out.published[0].undo, out.published[0].note, out.undoSet], ["done", null, M.WORDS.firstVersion, null], "the outcome:");
+  const page = renderPanel(flow);
+  ok(!page.includes(">Undo<"), "no Undo");
+  ok(textOf(page).includes(M.WORDS.firstVersion), "the note");
+  // the same publish when the design was published before: Undo is offered
+  const before = clone(listed);
+  delete before.data.neverPublished;
+  const f2 = M.createPublishFlow({ call: stub({ listChanges: before, publish: answer(published) }) });
+  await f2.open([DESIGN]);
+  await f2.confirm();
+  eq(f2.getState().outcome.published[0].undo, { id: "doc_design", revision: 4, logId: "log_d1" }, "a later design publish keeps its Undo:");
+  ok(renderPanel(f2).includes(">Undo<"), "Undo shown");
+  // changeListOf keeps the flag only when it is true
+  eq(M.changeListOf(listed, "Brand").neverPublished, true, "kept:");
+  ok(!Object.hasOwn(M.changeListOf(before, "Brand"), "neverPublished"), "absent otherwise");
+  // Recently published: the server's row for a first design publish has canUndo false (test-design-doc proves it on the real server), and gives no target
+  const g = M.recentGroupsOf([{ logId: "log_d1", setId: "set_1", documentId: "doc_design", label: "Brand", action: "publish", actionWords: "Published", byName: "Asha", at: "2026-10-01T10:00:00.000Z", summary: [], canUndo: false, undo: null }], { timeZone: "UTC" });
+  eq([g[0].rows[0].canUndo, g[0].rows[0].target, g[0].undoSet ?? null], [false, null, null], "no Undo in Recently published:");
+});
+
 await t("a set publish offers Undo of the whole set with the publish's own undo args", async () => {
   const body = clone(P.ok.body);
   body.published.push({ id: SALE.id, versionId: "ver_3", hash: "h_draft2", liveUrl: "/api/preview?exit=1&to=%2Fcampaigns%2Fdiwali", undo: { id: SALE.id, revision: 3, logId: "log_2" } });
