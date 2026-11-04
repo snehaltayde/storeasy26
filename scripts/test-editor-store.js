@@ -469,6 +469,85 @@ await t("unit: every unacknowledged body is kept in storage, cleared on ack; on 
   eq(s3.getState().backupOffer, null, "other store or document:");
 });
 
+await t("unit: an offered backup stays in storage until the founder answers: two reloads without answering still offer it, leaving warns, a failed keep keeps it, and typing at the same revision does not overwrite it", async () => {
+  const clock = fakeClock();
+  const storage = memoryStorage();
+  const api = fakeApi(fakeDoc());
+  const s1 = St.createDocumentStore({ api, document: fakeDoc(), tenant: "t1", storage, timers: clock, now: clock.now });
+  await s1.open();
+  api.holdNext("saveDraft"); // the save never answers: the tab is closed
+  s1.setField(T1, "Typed, then the tab closed");
+  await clock.advance(P);
+  const key = `${St.BACKUP_PREFIX}t1:doc_p1:3`;
+  eq([...storage.m.keys()], [key], "the backup is in storage:");
+  s1.dispose();
+  // the server is still at revision 3 (the keepalive was lost)
+  const openTab = async () => {
+    const s = St.createDocumentStore({ api: fakeApi(fakeDoc()), document: fakeDoc(), tenant: "t1", storage, timers: fakeClock(), now: clock.now });
+    s.subscribe(() => {});
+    await s.open();
+    return s;
+  };
+  const s2 = await openTab();
+  eq(titleOf(s2.getState().backupOffer?.body), "Typed, then the tab closed", "offered on the next open:");
+  eq([...storage.m.keys()], [key], "and still in storage while not answered:");
+  ok(s2.beforeUnload(), "leaving warns while the offer is not answered");
+  s2.dispose();
+  const s3 = await openTab(); // reload without answering
+  s3.dispose();
+  const s4 = await openTab(); // and again
+  eq(titleOf(s4.getState().backupOffer?.body), "Typed, then the tab closed", "offered after two reloads:");
+  // offline: the keep fails, and the backup stays
+  const api5 = fakeApi(fakeDoc());
+  api5.on.keepAsEarlierDraft = () => ({ error: true, code: "NETWORK_ERROR", message: "We couldn't reach Storeasy, so nothing was saved." });
+  const s5 = St.createDocumentStore({ api: api5, document: fakeDoc(), tenant: "t1", storage, timers: clock, now: clock.now });
+  await s5.open();
+  const r5 = await s5.acceptBackup();
+  eq(r5.ok, undefined, "the keep failed:");
+  ok(s5.getState().backupOffer, "still offered");
+  eq(storage.m.size, 1, "still in storage:");
+  // typing in this tab, at the offered backup's own revision, keeps both
+  api5.holdNext("saveDraft");
+  s5.setField(T1, "New typing in this tab");
+  await clock.advance(P);
+  const bodies = [...storage.m.values()].map((v) => titleOf(JSON.parse(v).body)).sort();
+  eq(bodies, ["New typing in this tab", "Typed, then the tab closed"], "both bodies are in storage:");
+  api5.release();
+  await settle();
+  eq([...storage.m.values()].map((v) => titleOf(JSON.parse(v).body)), ["Typed, then the tab closed"], "on ack only this tab's own backup is cleared:");
+  delete api5.on.keepAsEarlierDraft;
+  const r6 = await s5.acceptBackup();
+  ok(r6.ok, "kept once online");
+  eq(titleOf(api5.server.kept[0]), "Typed, then the tab closed", "the offered body was kept:");
+  eq(storage.m.size, 0, "and cleared on ack:");
+  eq(s5.beforeUnload(), false, "nothing left to warn about:");
+  s5.dispose();
+  const s7 = await openTab();
+  eq(s7.getState().backupOffer, null, "not offered again:");
+});
+
+await t("unit: 'Use the newer version' keeps text typed while its keep is in flight: the newest body is kept too", async () => {
+  const clock = fakeClock();
+  const api = fakeApi(fakeDoc());
+  api.server.revision = 4; // another tab saved
+  api.server.body = pageBody("p1", [textSec("sec_t1", "Theirs")]);
+  const s = St.createDocumentStore({ api, document: fakeDoc(), timers: clock, now: clock.now });
+  s.setField(T1, "Mine");
+  await clock.advance(P);
+  eq(s.getState().status, "conflict", "the 409:");
+  api.holdNext("keepAsEarlierDraft");
+  const p = s.useNewer();
+  await settle();
+  s.setField(T1, "Mine plus more typed during the choice");
+  eq((await s.keepMine()).code, "BUSY", "a second choice while one runs is refused:");
+  api.release();
+  const r = await p;
+  ok(r.ok, "useNewer ok");
+  eq(api.server.kept.map((b) => titleOf(b)), ["Mine", "Mine plus more typed during the choice"], "the newest body is kept as well:");
+  eq(titleOf(s.getState().body), "Theirs", "then the newer version is shown:");
+  eq([s.getState().status, s.getState().notice], ["saved", St.WORDS.backupKept], "and it says the edits were kept:");
+});
+
 await t("unit: a throwing storage changes nothing else (the same saves, the same state)", async () => {
   async function script(storage) {
     const clock = fakeClock();

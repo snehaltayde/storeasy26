@@ -215,6 +215,8 @@ export function createDocumentStore({
   let slugHeld = false; // the last save sent the last saved address instead
   let taken = null; // { slug, message } from a SLUG_TAKEN
   let backupOffer = null;
+  let ownKeys = new Set(); // the backup keys this tab wrote (only these does mirror clear)
+  let choosing = false; // useNewer or keepMine is running
   let notice = null;
   let ackCount = 0;
   let disposed = false;
@@ -594,12 +596,29 @@ export function createDocumentStore({
 
   async function useNewer() {
     if (!conflict) return { ok: true, nothing: true };
+    if (choosing) return { error: true, code: "BUSY", message: WORDS.busy };
     const current = conflict.current;
     if (!isObj(current) || !isObj(current.body)) return { error: true, code: "NO_CURRENT", message: conflict.message };
-    const k = await keepBody(body);
-    if (!k.ok) {
-      emit();
-      return k;
+    choosing = true;
+    let k;
+    try {
+      // Text typed while a keep is in flight is not in the kept body: keep
+      // again until the kept body is the newest one, so nothing is dropped.
+      for (let i = 0; ; i++) {
+        const keptSeq = seq;
+        k = await keepBody(body);
+        if (!k.ok || disposed) {
+          emit();
+          return k;
+        }
+        if (seq === keptSeq) break;
+        if (i >= 20) {
+          emit();
+          return { error: true, code: "NOT_KEPT", message: WORDS.notSavedFirst };
+        }
+      }
+    } finally {
+      choosing = false;
     }
     adopt(current);
     body = current.body;
@@ -615,9 +634,16 @@ export function createDocumentStore({
 
   async function keepMine() {
     if (!conflict) return { ok: true, nothing: true };
+    if (choosing) return { error: true, code: "BUSY", message: WORDS.busy };
     const current = conflict.current;
     if (!isObj(current) || !isObj(current.body)) return { error: true, code: "NO_CURRENT", message: conflict.message };
-    const k = await keepBody(current.body);
+    choosing = true;
+    let k;
+    try {
+      k = await keepBody(current.body);
+    } finally {
+      choosing = false;
+    }
     if (!k.ok) {
       emit();
       return k;
@@ -643,9 +669,10 @@ export function createDocumentStore({
     return f;
   }
 
-  // true: warn. Sends the save with fetch keepalive when it fits.
+  // true: warn. Sends the save with fetch keepalive when it fits. A backup
+  // offered and not answered yet also warns.
   function beforeUnload() {
-    const warn = unacknowledged();
+    const warn = unacknowledged() || Boolean(backupOffer);
     if (warn && unsavedEdits() && !conflict && typeof api.sendKeepalive === "function") {
       const args = { id, body: outgoing(body).body };
       const extra = { revision };
@@ -681,13 +708,28 @@ export function createDocumentStore({
     }
     return out;
   }
+  // Only this tab's own keys are ever cleared here. A backup found on open
+  // (or another tab's) stays until acceptBackup or dismissBackup answers it.
   function mirror() {
     if (!storage) return;
     try {
       const keep = unsavedEdits() || Boolean(slugProblem(body)) || Boolean(conflict);
       const key = `${docPrefix()}${revision}`;
-      for (const k of backupKeys()) if (/:\d+$/.test(k) && (!keep || k !== key)) storage.removeItem(k);
-      if (keep && !disposed) storage.setItem(key, JSON.stringify({ v: 1, baseRevision: revision, savedAt: now(), body }));
+      for (const k of [...ownKeys]) {
+        if (keep && k === key) continue;
+        storage.removeItem(k);
+        ownKeys.delete(k);
+      }
+      if (!keep || disposed) return;
+      if (backupOffer && backupOffer.key === key && !ownKeys.has(key)) {
+        // the offered backup sits where this tab's own would go: move it first
+        const moved = `${docPrefix()}found-${backupOffer.baseRevision}-${backupOffer.savedAt ?? 0}`;
+        const raw = storage.getItem(key);
+        storage.setItem(moved, raw ?? JSON.stringify({ v: 1, baseRevision: backupOffer.baseRevision, savedAt: backupOffer.savedAt, body: backupOffer.body }));
+        backupOffer = { ...backupOffer, key: moved };
+      }
+      storage.setItem(key, JSON.stringify({ v: 1, baseRevision: revision, savedAt: now(), body }));
+      ownKeys.add(key);
     } catch {
       /* storage that throws changes nothing else */
     }
