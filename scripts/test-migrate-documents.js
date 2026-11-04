@@ -310,8 +310,10 @@ await t("ALLOWED_DIFFERENCES (lib/migrate/allowed-differences.js) is the list th
   for (const a of ALLOWED_DIFFERENCES) {
     ok(typeof a.reason === "string" && a.reason.length > 40, `${a.id}: a reason`);
     const page = (body) => [{ route: a.fixture.route, status: 200, contentType: "text/html", location: null, origin: null, body }];
-    eq(RC.compare(page(a.fixture.before), page(a.fixture.after), { allowed: [] }).same, false, `${a.id} without the entry:`);
-    eq(RC.compare(page(a.fixture.before), page(a.fixture.after), { allowed: ALLOWED_DIFFERENCES }).same, true, `${a.id} with the entry:`);
+    // the fixture's running hero test, if any, goes to compare() as P4-FIX4 made it
+    const heroExperiments = a.fixture.heroExperiments ?? null;
+    eq(RC.compare(page(a.fixture.before), page(a.fixture.after), { allowed: [], heroExperiments }).same, false, `${a.id} without the entry:`);
+    eq(RC.compare(page(a.fixture.before), page(a.fixture.after), { allowed: ALLOWED_DIFFERENCES, heroExperiments }).same, true, `${a.id} with the entry:`);
   }
 });
 
