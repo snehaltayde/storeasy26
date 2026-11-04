@@ -1,0 +1,662 @@
+[
+ {
+  "name": "Batch 0: contract and suite scaffold",
+  "items": [
+   {
+    "id": "P3-SCAFFOLD",
+    "branch": "cms/p3-scaffold",
+    "reqs": [
+     "PUB-02",
+     "PUB-04",
+     "PUB-11",
+     "ED-02"
+    ],
+    "brief": "Small, merged before any batch 1 branch is cut, so no later branch edits package.json (except P3-RTE, and only if a dependency is approved) and every client and server test reads one response contract.\n\n(1) package.json: add one script per new suite, each exactly 'node scripts/test-<name>.js' (scripts/run-tests.js fails the gate if any scripts/test-*.js has no matching test:* script or the command differs from that form). Suites and owners: test:logout-preview (P3-SESSION), test:doc-diff (P3-DIFF), test:publish-checks (P3-CHECKS), test:publish-undo (P3-UNDO), test:doc-changes (P3-CHANGES), test:preview-frame (P3-FRAME), test:editor-store (P3-STORE), test:editor-inspector (P3-INSPECTOR), test:editor-tree (P3-TREE), test:publish-ui (P3-PUBLISHUI), test:editor-routes (P3-ROUTES), test:editor-shell (P3-EDITOR), test:design-doc (P3-DESIGN), test:rich-text (P3-RTE). Each new scripts/test-<name>.js prints 'pending: owned by cms/p3-<id>' and exits 0. Each owner later replaces only its own file.\n\n(2) New lib/admin/documents-api-shapes.js: data only, no imports, edge-safe. It is the single contract for the documents API in phase 3. For every operation it exports the HTTP status, the code and every field of each outcome, as one example object per outcome. Copy the existing codes and fields from lib/admin/documents-api.js and lib/documents/*.js exactly (do not rename anything that exists). New entries:\n- publish/publishSet 200: items[i] gains liveUrl ('/api/preview?exit=1&to=<path>') and undo {id, revision, logId}; items accept confirmRepublish:true.\n- 409 DOCUMENT_CHANGED and PUBLISHED_ELSEWHERE: current {id, revision, draftHash, updatedBy, updatedByName}.\n- 409 SLUG_TAKEN: other {id, label}. 409 REPUBLISH_CONFIRM_NEEDED {id}. 409 FIRST_PUBLISH_NEEDS_HOME with offer {publishSet:[{id, revision, draftHash, label}]}. 409 TOO_MANY_KEPT. 409 STORE_USES_LEGACY (also for the two new reads).\n- 422 VALIDATION_FAILED: issues[i] gains level ('blocks'|'warns'|'inherited'), anchor, where and actions [{type:'hideSection'|'removeSection'|'removeItem'|'publishBoth', documentId, sectionId?, field?, index?}].\n- 422 LINKS_TO_UNPUBLISHED: issues plus offer {publishSet:[{id, revision, draftHash, label}]}.\n- 501 NOT_BUILT.\n- undo 200 {ok, nothing?, message, savedVersion?:{id, where:'Earlier versions'}, liveUrl, document}; undo/unpublish/undoSet with dryRun:true 200 {willTakeOffline, linkers:[{id,label}], changes:[{words}], target:{versionId, name}|null}.\n- unpublish 200 {ok, message, document}. undoSet 200 {ok, message, documents:[…]}.\n- listRecentlyPublished 200 {rows:[{logId, setId, documentId, label, action, actionWords, byName, at, summary:[{words}], canUndo, undo:{id, revision, logId}|null, note?}]}.\n- listChanges 200 {firstPublish:false, rows:[{kind, sectionId?, words}]} or {firstPublish:true, sections:[{words}]}; doc_design rows may carry affects:[{words}].\n- keepLiveSection 200 {document}. keepAsEarlierDraft 200 {savedVersion:{id, note}}.\n- getDocument/listDocuments: document.access {canPublish, reason}.\nExport also SHAPES_VERSION = 1. Batch 1 and 2 server tests assert their responses against these examples (same keys); P3-SESSION's mapper tests feed these examples to the client.",
+    "migrations": [],
+    "files": [
+     "package.json",
+     "lib/admin/documents-api-shapes.js",
+     "scripts/test-logout-preview.js",
+     "scripts/test-doc-diff.js",
+     "scripts/test-publish-checks.js",
+     "scripts/test-publish-undo.js",
+     "scripts/test-doc-changes.js",
+     "scripts/test-preview-frame.js",
+     "scripts/test-editor-store.js",
+     "scripts/test-editor-inspector.js",
+     "scripts/test-editor-tree.js",
+     "scripts/test-publish-ui.js",
+     "scripts/test-editor-routes.js",
+     "scripts/test-editor-shell.js",
+     "scripts/test-design-doc.js",
+     "scripts/test-rich-text.js"
+    ],
+    "acceptance": [
+     "unit: pnpm test is green with every placeholder; run-tests.js reports each new suite as a pass.",
+     "unit: documents-api-shapes.js imports nothing and every example's code matches the code string the API emits today for existing outcomes (a small check in the scaffold commit that greps lib/admin/documents-api.js and lib/documents for each existing code)."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 1: server foundations",
+  "items": [
+   {
+    "id": "P3-COMMIT",
+    "branch": "cms/p3-commit",
+    "reqs": [
+     "PUB-04",
+     "PUB-03",
+     "PUB-02",
+     "PUB-11",
+     "PUB-05"
+    ],
+    "brief": "Extend the proven commit core, move the build helpers into one shared module, and lay the API for every later item. Gate: batch 2 does not start until test:publish passes on sqld with this branch merged.\n\n(1) New lib/documents/build.js. First a pure move out of lib/documents/publish.js with no behaviour change: readLive, liveFrom, liveEntryOf, readVersionBodies, makeBuild, slugClash, journalIndexOf, failedError, pageRow, redirectsOf, and the rebuild loop (up to MAX_ATTEMPTS with the lost/unknown/failed mapping) as runGuardedBuild(buildFn, context). publish.js imports them; __publishInternals keeps its names. Then extend, all in build.js:\n- makeBuild(live, items, ctx): each item may carry action ('publish'|'unpublish'|'undo'), offline:true, draft {body, hash, slug, label}, published {versionId|null, hash|null}, undone (id|null), expectPublished (id|null), extraVersions, undoesLogId, savedVersionId, note.\n- offline:true writes the entry with a fresh copy of the last live body, the pages row with enabled:false, or for a journal post the index entry with enabled:false through a new override argument to nextJournalIndexBody(journalBody, posts, {disabled:[documentId]}). The body is not edited, so its documentHash is unchanged. The document's redirects are dropped from list.redirects. A later publish writes them again from the body (existing redirectsOf).\n- liveEntryOf: an entry whose pages row or index entry is enabled:false returns {offline:true, liveBody:null, version}. classify then treats the document as not live, so the inherited rule never applies to an offline page.\n- slugClash: a disabled entry whose document is archived does not count as taken, and the result lists release:[documentId]; makeBuild removes those entries (setEntries remove). Archive is terminal: no code path sets archived_at back to NULL (assert by a grep test), so no extra guard term is needed.\n- draftSlugOwner(slug, exceptId): one statement, SELECT id, label FROM documents WHERE slug = ? AND archived_at IS NULL AND id <> ?.\n- After an ok commit, build.js calls every handler in new lib/documents/after-commit.js (export const afterCommit = [] and runAfterCommit({build, items}), best effort, errors logged as 'documents_after_commit_failed', never thrown). It is empty in this batch; P3-DESIGN adds the theme_pin handler.\n\n(2) lib/documents/commit.js, per-document fields:\n- draft {body, hash, slug, label, by, at}: the documents UPDATE sets exactly the columns service.draftWrite sets (draft, draft_hash, slug, label, revision = revision + 1, updated_at, updated_by), in the same guarded statement as the pointer fields. A test compares the column sets.\n- published {versionId|null, hash|null}. The hash is always documentHash(body) (ids stripped, lib/registry/body.js), never document_versions.body_hash (ids kept). Name this in the code comment.\n- undone; expectPublished adds 'AND published_version_id IS ?' to that document's guard.\n- extraVersions [{id, kind:'undo_saved', body, hash, by, note}] are kept separate from versions: inserted ON CONFLICT(id) DO NOTHING in the batch, counted by the flip guard, and excluded from liveListHoldsMine and from publish.js's sent/ownBuildIn map. Reconcile of a resent undo-shaped batch is ok through oursPresent; a comment and a test pin this so nobody later 'fixes' liveListHoldsMine.\n- refs rows INSERT ... ON CONFLICT DO NOTHING; log rows carry action, undoes_log_id and saved_version_id.\n- A UNIQUE failure on documents.slug inside the batch maps to refusal code SLUG_TAKEN (409), not DB_REFUSED.\n\n(3) Migration 0023_document_refs.sql, all IF NOT EXISTS: document_refs(version_id, ref_type, ref_id, PRIMARY KEY(all three)); index document_refs_target(ref_type, ref_id); publish_log_set ON publish_log(set_id) WHERE set_id IS NOT NULL; publish_log_undoes ON publish_log(undoes_log_id) WHERE undoes_log_id IS NOT NULL; publish_log_recent ON publish_log(created_at).\n\n(4) Refs presence: hasRefsTable() reads sqlite_master once and caches only a positive answer per tenant in the isolate (a missing table is probed again next publish). That is one statement per publish until 0023 has run, counted in the statement budget. When missing, the build omits the refs statements and logs 'document_refs_missing'; publish and later Undo still succeed. Phase 2 documents versions have no refs rows (no backfill here; P3-HARNESS re-seeds through publish; MIG-01 owns the legacy backfill).\n\n(5) New lib/documents/refs.js (pure, edge-safe): refRows(versionId, body) from registry refsOf() and document settings; ref_type in document, collection, product, media, bundle, offer, quiz; a page link resolves to its document id when it carries one, else 'slug:<family>:<slug>'. linkersStatement(documentId, slugKey): one statement over document_refs JOIN documents ON version_id = published_version_id. makeBuild writes refRows for every fresh published version.\n\n(6) New lib/documents/paths.js (pure): livePath(type, meta): home and every singleton '/'; page '/about' or '/contact' for those slugs, else '/policies/<slug>'; campaign '/campaigns/<slug>'; journal '/journal/<slug>'. liveExitUrl(path) = '/api/preview?exit=1&to=' + encodeURIComponent(path).\n\n(7) lib/admin/documents-api.js, keeping parse (400) -> authorize -> mode (409) -> 428 -> service:\n- unpublish {id, revision, dryRun?}, undo {id, revision, logId, dryRun?}, undoSet {setId, members:[{id, logId}], dryRun?} under storefront.publish;\n- listRecentlyPublished {limit?: 1..50, default 20} and listChanges {id} under storefront.read;\n- keepLiveSection {id, sectionId, revision} and keepAsEarlierDraft {id, body} (no 428) under storefront.write;\n- publish and publishSet items accept confirmRepublish:true.\nThe parser copies dryRun, logId and confirmRepublish; the dispatcher passes the whole parsed op to the module and returns the module's {status, body} as-is, so no batch 2 item edits this file. Mode: writes are checked as today; the two new reads check getCmsMode themselves and answer 409 STORE_USES_LEGACY on legacy or migrating; getDocument and listDocuments keep today's behaviour. getDocument and listDocuments add access {canPublish, reason}; the staff reason: 'Only the store owner or an admin can publish. You can edit and preview.' The UNREADABLE wording for publish operations says '…so nothing was published…'.\nStub modules lib/documents/undo.js (undo, undoSet, unpublish, listRecentlyPublished) and lib/documents/changes.js (listChanges, keepLiveSection, keepAsEarlierDraft) throw NotBuiltError (501 NOT_BUILT). Each stub's header copies its signature and the shapes from lib/admin/documents-api-shapes.js.\n\n(8) lib/platform/export.js: document_refs in EXPORT_TABLES (skipped when missing). scripts/test-schema-compat.js: 0023 constants and a documents tenant at 0022 case.\n\nLegacy: releases.js and the legacy APIs are untouched; test-releases and test-cms-api stay green.",
+    "migrations": [
+     "0023_document_refs.sql"
+    ],
+    "files": [
+     "lib/documents/build.js",
+     "lib/documents/after-commit.js",
+     "lib/documents/commit.js",
+     "lib/documents/publish.js",
+     "lib/documents/journal-index.js",
+     "lib/documents/release-list.js",
+     "lib/documents/refs.js",
+     "lib/documents/paths.js",
+     "lib/documents/undo.js",
+     "lib/documents/changes.js",
+     "lib/admin/documents-api.js",
+     "lib/platform/export.js",
+     "migrations/tenant/0023_document_refs.sql",
+     "scripts/test-publish.js",
+     "scripts/test-publish-service.js",
+     "scripts/test-schema-compat.js"
+    ],
+    "acceptance": [
+     "unit: every existing test:publish and test-publish-service case is green after the move to build.js and before any extension (two commits; the first is the pure move).",
+     "unit (sqld): an undo-shaped build (draft rewrite with slug and label, revision+1, undone_version_id, published null, an undo_saved extra version, an undo log row with undoes_log_id and saved_version_id, refs) commits all or nothing; a lost pointer race leaves no undo_saved, refs or log row.",
+     "unit (sqld): commit_then_drop replay of an undo-shaped build reports ok through oursPresent with single rows; the busy case gives lost; the flip refuses when an extraVersions row is missing; the P2 'null body or null hash' case still fails whole.",
+     "unit: the commit's draft UPDATE sets the same column set as service.draftWrite; published hash equals documentHash(body) for a body whose section ids differ from another version with equal content.",
+     "unit: expectPublished that no longer matches makes the batch lose with nothing written.",
+     "unit: a draft slug that another non-archived document's draft holds gives refusal SLUG_TAKEN (409), not DB_REFUSED or 500; draftSlugOwner names that document.",
+     "unit: a publish on a documents tenant without 0023 succeeds, writes no refs, logs document_refs_missing; with 0023 every published version has refs equal to refRows(body); linkersStatement returns exactly the live documents linking by id or by slug and ignores drafts and superseded versions.",
+     "unit: an offline item (page and journal post) writes enabled:false, keeps documentHash(body) unchanged, drops that document's redirects; liveEntryOf of it returns liveBody null; an archived offline page's slug is released and its entry dropped; a non-archived offline page's slug is still taken; a grep finds no code setting archived_at back to NULL.",
+     "unit: an afterCommit handler runs once after ok, never on lost or failed, and a throwing handler does not change the publish result.",
+     "unit: livePath covers home, every singleton, page (about, contact, a policy), campaign and journal; liveExitUrl never contains 'token' and passes the P2-FIX4 destination() check.",
+     "unit (test-publish-service): each new op is 400 when malformed or mixed, 401/403 before mode, 409 STORE_USES_LEGACY on a legacy store (writes and the two new reads), 428 without revision where required, 501 NOT_BUILT from the stub; dryRun, logId and confirmRepublish reach the module; staff get 403 on unpublish, undo and undoSet with storage unchanged; getDocument on a legacy store behaves as before.",
+     "unit: access.canPublish is false with the plain reason for staff and true for an admin; a malformed publish body's message says 'published'.",
+     "unit: migration 0023 applies twice cleanly; export includes document_refs and skips it when absent; pnpm test green."
+    ]
+   },
+   {
+    "id": "P3-DIFF",
+    "branch": "cms/p3-diff",
+    "reqs": [
+     "PUB-09",
+     "PUB-04",
+     "PUB-03",
+     "TOK-03"
+    ],
+    "brief": "New pure module lib/documents/diff.js (edge-safe, no DB), used by P3-CHANGES (listChanges), P3-UNDO (dry-run and Recently published summaries) and the publish-both review.\n\ndiffBodies(type, fromBody, toBody) returns rows [{kind, sectionId?, words}] with kind one of added, removed, edited, moved, hidden, shown, meta, settings.\n- Sections match by id first; unmatched sections then pair by kind plus stripIds content, so lazily stamped ids never show as changes.\n- edited rows name the changed fields by registry labels: 'Banner: button text changed'. Nested paths (buttons.0.label, body.2, items.1.question) use the parent label plus a plain position word only where the registry has no better label ('Text: a paragraph changed').\n- meta rows: web address (never the word slug), title, windows, redirects.\n- document settings rows from the type's settings labels.\n- doc_design: one row per changed token group in plain words ('Colours: accent changed').\n- No row text contains a hash, an id, 'slug', 'handle', 'CTA' or 'href'.\nfirstPublishRows(type, body): what will go live, one row per visible section plus the title.\nIf fromBody and toBody have equal documentHash, return [].",
+    "migrations": [],
+    "files": [
+     "lib/documents/diff.js",
+     "scripts/test-doc-diff.js"
+    ],
+    "acceptance": [
+     "unit: a home draft with an edited hero title and a new banner gives exactly 'Hero: title changed' and 'Banner: added'.",
+     "unit: bodies that differ only by section ids give []; equal documentHash gives [].",
+     "unit: moved, hidden, shown, removed, meta web address and title, a window, a redirect and a document setting change each give one plain row.",
+     "unit: for a corpus of every registered type and section kind (registry worstCase fixtures), no row matches /\\b(slug|handle|CTA|href)\\b/i, an id pattern or a 40+ hex hash.",
+     "unit: a doc_design token change gives one 'Colours' or 'Fonts' row; firstPublishRows lists visible sections only.",
+     "unit: the module imports no node: API (edge guard list)."
+    ]
+   },
+   {
+    "id": "P3-CLOSED",
+    "branch": "cms/p3-closed",
+    "reqs": [
+     "PUB-06",
+     "PUB-01"
+    ],
+    "brief": "Fixes drills findings 4 and 3. PUB-06 is built before PUB-03/PUB-05 on purpose (the closed reader state does not depend on the checks; recorded as an intended reorder against spec 8.11 / section 11).\n\n(1) lib/content/resolve.js liveSource(): mode 'documents' with state 'none' returns a v4-shaped source over the empty list: {mode:'closed', v:4, list:Docs.emptyList(), content:null, preview:false} (add emptyList to documents-reader.js if it does not exist: no documents, no pages, no redirects, no journal index). Every resolved* getter then takes its existing v4 path and returns P2-VGATE's neutral empties; no getter gets a hand-written closed branch (default-deny). legacy and migrating with state none keep today's draft path byte for byte. An unreadable or unknown mode still fails closed. A valid documents preview session still goes to documentsPreview, over the empty list plus the drafts (pre-first-publish preview keeps working). Export isStoreClosed() (async, uses the same cached source).\n\n(2) app/(storefront)/layout.js: when the source mode is 'closed' and there is no valid preview, render new components/StoreClosed.js instead of children: the store name, 'Opening soon' and 'We're getting the shop ready. Check back soon.', neutral brand values, no maintenance words. Closed wins over maintenance (the maintenance check and bypass are not consulted when closed). generateMetadata is neutral.\n\n(3) app/sitemap.js: closed returns only '/'. The manifest and offline routes need no edit when resolvedBrand is null; prove by test and edit only if a test fails.\n\n(4) Checkout, contact, leads and quiz on a closed store. checkoutCapability() in lib/commerce/adapter.js stays synchronous and unchanged (callers: lib/integrations.js, app/api/checkout/route.js, app/(storefront)/checkout/page.js, the layout). The closed check lives only in the routes:\n- app/api/checkout/route.js: if await isStoreClosed(): an anonymous request gets 403 STORE_CLOSED 'This store isn't open yet.' A request whose _preview cookie parses (readPreviewToken) and whose preview_sessions row is valid for this tenant may place a COD order only; Razorpay is refused with 403 'Card and UPI payments open when your store does. Use cash on delivery for a test order.' A bare _admin, _platform or _mx cookie is not proof. If the order row has a notes or tags field, write 'Test order: store not open yet'; if not, record it in the packet (no migration). The order still follows the normal Shopify order push; the drill cancels every test order (test-order rule).\n- app/api/contact/route.js, app/api/leads/route.js, app/api/quiz/[slug]/route.js (POST only): 403 STORE_CLOSED with the same words when closed and no valid preview session. GETs are unchanged.\nRecord the owner interpretation: the spec's 'verified console session' is read as 'a valid preview session minted from the console'.\n\n(5) Finding 3: add pageChromeGuard(src) in resolve.js. For v4 sources it awaits Docs.documentBodies(src.list, CHROME_DOCUMENTS), the same cached promise the layout uses. resolvedHomePage, resolvedContentPage, the journal page getters, resolvedSurfaceTemplateFor and resolvedPdpExtras call it, so a missing chrome version throws ContentUnavailableError from the page and gives error.js. The layout keeps its neutral-chrome catch. Statement count: unchanged on a full render; an RSC navigation that skips the layout adds one statement (record it).\n\n(6) Suites expecting DOCUMENTS_UNPUBLISHED: this item owns and updates scripts/test-release-readers.js (the 'documents mode with no release' case) and scripts/test-preview-overlay.js line ~470 (the no-cookie case now expects closed live content, not a throw). grep every suite for DOCUMENTS_UNPUBLISHED and list any other hit in the packet. P3-SESSION does not edit test-preview-overlay.js.\n\nLegacy: no change for v1-3 sources or for legacy/migrating with state none.",
+    "migrations": [],
+    "files": [
+     "lib/content/resolve.js",
+     "lib/content/documents-reader.js",
+     "app/(storefront)/layout.js",
+     "components/StoreClosed.js",
+     "app/sitemap.js",
+     "app/manifest.webmanifest/route.js",
+     "app/(storefront)/offline/route.js",
+     "app/api/checkout/route.js",
+     "app/api/contact/route.js",
+     "app/api/leads/route.js",
+     "app/api/quiz/[slug]/route.js",
+     "scripts/test-release-readers.js",
+     "scripts/test-preview-overlay.js",
+     "scripts/test-commerce.js"
+    ],
+    "acceptance": [
+     "unit (test-release-readers): a documents tenant with no release gets mode 'closed'; a test walks every exported resolved* getter of resolve.js (enumerated from the module, so a new getter is covered automatically) and each returns its neutral value; no string from a seeded draft or from code defaults (DEFAULT_HOME_SECTIONS copy) appears in any output.",
+     "unit: a legacy and a migrating tenant with no release keep the draft path with output equal to the fixture; running 0021-0023 on a live legacy tenant with state none does not close it.",
+     "rendered: the closed layout renders 'Opening soon', no maintenance words and no draft string; forged _admin=x, _platform=x and _mx=x cookies give the same page; with maintenance on, the closed page still shows.",
+     "unit: the sitemap on a closed store is only '/'; manifest and offline route use neutral brand values.",
+     "unit (test-commerce): anonymous checkout on a closed store is 403 STORE_CLOSED, also with forged console cookies; with a valid documents preview session a COD order passes the gate and Razorpay is refused; a legacy store is unaffected; checkoutCapability's signature is unchanged.",
+     "unit: contact, leads and quiz POST on a closed store are 403 STORE_CLOSED for anonymous requests and accepted with a valid preview session; legacy stores unaffected.",
+     "unit: finding 3. Only doc_header's version missing gives ContentUnavailableError from the home, policy and campaign page getters; the statement count of a full render is unchanged under the request-cache stub.",
+     "unit: the P2 v4 cases in test-release-readers and test-preview-overlay stay green; the no-cookie case now expects closed live content.",
+     "drill (harness, recorded in the packet): anonymous requests with 'RSC: 1' and a router-state header claiming the layout is loaded, to /, /contact, /about, /policies/<slug>, /campaigns/<slug>, /journal, /journal/<slug> and /collections on a closed store return no draft or content-document strings. Catalog data on product, collection and search routes is listed as the owner interpretation."
+    ]
+   },
+   {
+    "id": "P3-SESSION",
+    "branch": "cms/p3-session",
+    "reqs": [
+     "PV-01",
+     "PUB-11",
+     "ED-02"
+    ],
+    "brief": "Fixes drills finding 1 and adds the console's client for the documents APIs. All tests go in scripts/test-logout-preview.js (placeholder from P3-SCAFFOLD); this item does not edit test-preview-overlay.js.\n\n(1) app/api/admin/logout/route.js is wrapped in tenantHandler(…, {allowUnresolved:true}). Before revokeSessionByToken it resolves the actor with verifySession(token, 'merchant'), falling back to the bootstrap actor exactly as requireAdmin does, and calls new revokePreviewSessionsFor({actor}) in lib/preview-sessions.js: UPDATE preview_sessions SET revoked_at = ? WHERE tenant_id = ? AND created_by = ? AND revoked_at IS NULL. The response always clears PREVIEW_COOKIE and ADMIN_COOKIE with the attributes /api/preview sets (httpOnly, sameSite lax, path '/', secure in production, maxAge 0), in every mode. A missing table, no tenant or a DB error logs 'preview_logout_revoke_failed' and never blocks logout.\nKnown changes, recorded in the packet and for the owner: logout ends that actor's previews on every device; on a legacy store logout now also ends the Designer's preview (a re-login re-mints it).\n\n(2) app/api/platform/logout/route.js: also clears _preview with the same attributes. Platform-created preview sessions live in each tenant's DB and are not revoked (they expire within the hour): a recorded known limit.\n\n(3) New components/admin/editor/documentsApi.js, plain JS, node-testable, fetch injectable. It maps responses using lib/admin/documents-api-shapes.js (import it; do not restate shapes). call(op, args) never throws and returns:\n- {ok:true, data};\n- {conflict:true, code, current} for 409 DOCUMENT_CHANGED or PUBLISHED_ELSEWHERE (current carries updatedByName);\n- {refused:true, code, message, other?, offer?} for other 409s;\n- {issues, code, message, offer?} for 422;\n- {needsRevision:true} for 428;\n- {notBuilt:true} for 501;\n- {error:true, code, message} for other 4xx/5xx, using the failure() words;\n- {error:true, code:'NETWORK_ERROR', message} when fetch rejects.\nsendKeepalive(op, args) uses fetch keepalive and returns false when the JSON body exceeds 60,000 bytes. startDocumentsPreview({showDesign}) posts {create:true} to /api/admin/preview-session, sets showDesign when asked, fetches previewUrl same-origin, and returns {sid, expiresAt} or a mapped error. setShowDesign(sid, on) wraps the existing showDesign call.\n\nThe legacy components/admin/cms/api.js is not changed.",
+    "migrations": [],
+    "files": [
+     "app/api/admin/logout/route.js",
+     "app/api/platform/logout/route.js",
+     "lib/preview-sessions.js",
+     "components/admin/editor/documentsApi.js",
+     "scripts/test-logout-preview.js"
+    ],
+    "acceptance": [
+     "unit: after logout, every unrevoked preview_sessions row created_by this actor on this tenant is revoked; another actor's rows are untouched (merchant and bootstrap actors).",
+     "unit: the logout Set-Cookie clears _preview (Max-Age=0, Path=/) and _admin on a legacy and on a documents store; platform logout clears _preview.",
+     "unit: after logout, contentSource with the old _preview cookie on a documents store serves live content only.",
+     "unit: a revoke failure (no table, thrown DB error, unresolved tenant) still returns the normal logout response with both cookies cleared and logs preview_logout_revoke_failed.",
+     "unit: legacy store, logout then a new login, the Designer's preview-session mint succeeds (no stale revoked state blocks it).",
+     "unit: documentsApi.call maps every example outcome in documents-api-shapes.js to the listed shape with a stubbed fetch; a rejected fetch gives NETWORK_ERROR; nothing throws.",
+     "unit: sendKeepalive returns false above 60,000 bytes; startDocumentsPreview returns {sid, expiresAt} and maps 409 STORE_USES_LEGACY to plain words."
+    ]
+   },
+   {
+    "id": "P3-VALIDATE",
+    "branch": "cms/p3-validate",
+    "reqs": [
+     "PV-02",
+     "AU-02",
+     "AU-04"
+    ],
+    "brief": "(1) lib/registry/validate.js, draft mode only (the only draft-mode callers are lib/documents/service.js and lib/content/documents-reader.js; legacy writes do not use it):\n- an issue with cls 'invalid' and a sectionId gets severity 'incomplete': it is stored and the section previews as its unfinished note;\n- document-level meta length issues (title, description) and nav item link issues also get 'incomplete' in draft mode, so one half-typed field never blocks saving the rest;\n- SLUG_INVALID and every structure issue stay errors (saveDraft 422): the slug is the uniqueness key stored in documents.slug. P3-STORE handles a locally invalid slug without a 422 (it sends the last saved slug).\nPublish mode is unchanged. cls stays non-enumerable and unchanged, so classify() is unaffected.\n\n(2) New lib/registry/issue-words.js (pure): where(issue) gives plain words from registry labels ('Banner · Button'); fieldAnchor(issue) gives 'f-<sectionId|doc>-<field path with . turned into ->', falling back to the top-level setting key. Export both from lib/registry/index.js. Field paths are exactly validate's, for example title, buttons.0.label, body.2 (the text section's paragraphs live under 'body'), items.1.question.\n\n(3) Reword any registry message in settings.js, sections.js or validate.js that uses CTA, href, handle or slug, or is not a complete plain sentence.\n\n(4) New lib/registry/starter.js starterSection(kind, {collections}) (pure): product_rail picks the first collection with at least minItems available products, else the first non-empty one, and sets settings.collection {handle, id}; with no collections it returns newSection(kind); text kinds stay incomplete with their placeholder, with no publishable starter copy.\n\n(5) components/sections/index.js SectionView, narrowed to what server rendering allows: for server section components, call the component as a function inside try/catch (await it when async), so a throw in that section's own render or data binding is caught. In preview it renders the unfinished note 'This section couldn't be shown'; live keeps today's output for the healthy sections and drops the failing one, with a log line. A throw from a child component or a 'use client' section is not caught; list those kinds in the packet. lib/cms/section-data.js: one failing binding must not reject the batch resolver for the whole page (settle per binding).\n\n(6) Before changing expectations, grep every suite for saveDraft or createDocument cases expecting 422 for in-section TOO_LONG or LINK_*, or meta length or nav link issues. Owned and updated here: scripts/test-documents.js, scripts/test-registry-contract.js, scripts/test-sections-render.js, scripts/test-writers.js and scripts/test-failure-matrix.js (only the documents rows; legacy rows unchanged). test-publish-service.js cases are publish-mode and must not change; if one does, stop and report.",
+    "migrations": [],
+    "files": [
+     "lib/registry/validate.js",
+     "lib/registry/settings.js",
+     "lib/registry/sections.js",
+     "lib/registry/index.js",
+     "lib/registry/issue-words.js",
+     "lib/registry/starter.js",
+     "components/sections/index.js",
+     "lib/cms/section-data.js",
+     "scripts/test-registry-contract.js",
+     "scripts/test-documents.js",
+     "scripts/test-sections-render.js",
+     "scripts/test-writers.js",
+     "scripts/test-failure-matrix.js"
+    ],
+    "acceptance": [
+     "unit (test-documents): saveDraft of a home body with a banner link LINK_NOT_STOREFRONT and a hero title edit is 200; the hero edit is stored; the issue severity is 'incomplete'; publish of that body is 422 naming the banner.",
+     "unit: saveDraft with a too-long page title, or a nav item with a bad link, is 200 with an incomplete issue; with SLUG_INVALID or a structure issue it is 422 with nothing stored.",
+     "unit (test-registry-contract): every message from worstCase() plus crafted bad values for every setting kind and rules() function is non-empty, a sentence, has no position, and once quoted user values are removed matches none of /\\b(CTA|href|handle|slug)\\b/i.",
+     "unit: a coverage scan of lib/registry/*.js for code strings passed to report( and rules fails if any code is missing from the corpus.",
+     "unit: fieldAnchor is stable and unique per (section, field); where() names section and field labels for every registered kind; the text section's paragraph path is body.N.",
+     "unit (AU-04): for every registered section kind, starterSection(kind, fixture) saved by saveDraft in draft mode is 200 and previewDraftBody plus a render does not throw; product_rail with collections validates in publish mode with no issue; with no collections it equals newSection.",
+     "rendered (test-sections-render): one server section whose render throws shows the note in preview while the others render; live output for the healthy sections is unchanged and has no note; one failing data binding does not blank the page; legacy home render equivalence against a6d028e still passes.",
+     "unit: HIGHLIGHT_NOT_IN_TITLE stays a warning with a plain message on the hero title field; test-failure-matrix legacy rows unchanged."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 2: publish operations, change list, preview frame, harness",
+  "items": [
+   {
+    "id": "P3-CHECKS",
+    "branch": "cms/p3-checks",
+    "reqs": [
+     "PUB-03",
+     "PUB-05",
+     "PUB-04",
+     "PUB-11",
+     "PUB-06",
+     "TOK-03"
+    ],
+    "brief": "lib/documents/publish.js plus new lib/documents/checks.js. Build helpers come from lib/documents/build.js (P3-COMMIT); do not edit build.js.\n\n(1) Reference checks over the set's own bodies only, against M2: the live list with the set applied, the journal index, code-default page slugs, the set's own new slugs, and the collections, products and media tables (at most one IN statement per table, through refsOf()).\n- blocks: a hand-placed link (page link, or url to /policies|/campaigns|/journal/<slug>) to a missing or disabled target; a link to a missing collection or product; an empty required text and a missing purchase box (existing); an empty home page; a redirect_from that loops or targets itself.\n- warns, with removeItem or removeSection: a deleted or unavailable product in a list; a product_rail collection missing or empty; missing media (token fallback); missing alt text on an image; a redirect_from shadowed by a live page.\n- inherited: the existing classify() rule. An offline document (liveEntryOf offline) has liveBody null, so nothing in it is inherited.\nEach issue gains level, anchor (fieldAnchor), where (issue-words) and actions: hideSection {documentId, sectionId} for any section-level block, removeSection, removeItem {field, index}, or publishBoth.\n\n(2) A link whose target is an existing, non-archived document not live in M2 gives 422 LINKS_TO_UNPUBLISHED: 'This page links to <label>, which isn't published yet.' offer.publishSet holds the current set plus the targets {id, revision, draftHash, label}. Sending the offer runs the targets' own checks; a failing target gets the normal 422. The client shows each target's changes before the founder confirms (P3-PUBLISHUI); the server needs nothing more because draftHash pins what was reviewed.\n\n(3) Publish again: when an item's draft_hash equals documentHash(body of documents.undone_version_id) (read that one version body; never compare with document_versions.body_hash) and confirmRepublish is not set, answer 409 REPUBLISH_CONFIRM_NEEDED: 'You took this page offline. Publish the same content again?' A successful publish passes undone:null. Add the deferred P22 skip-rule test.\n\n(4) First publish: when the store state is none and the set does not include a publishable doc_home, answer 409 FIRST_PUBLISH_NEEDS_HOME: 'Publish your home page with this, so the store opens with a home page.' with offer.publishSet adding doc_home (until PUB-12 ships; open question).\n\n(5) Every publish result item carries liveUrl = liveExitUrl(livePath(type, meta)) and undo {id, revision, logId}.\n\n(6) Design document: confirm by test that P2-REG's live-aware rule blocks contrast only for changed tokens; fix it here if not.\n\nproduct_content stays PUBLISH_NOT_AVAILABLE. No other document's draft is read except the offered targets.",
+    "migrations": [],
+    "files": [
+     "lib/documents/publish.js",
+     "lib/documents/checks.js",
+     "scripts/test-publish-checks.js",
+     "scripts/test-publish-service.js"
+    ],
+    "acceptance": [
+     "unit: a page linking to an unpublished campaign is 422 LINKS_TO_UNPUBLISHED with a plain message and an offer naming both with revision and draftHash; sending the offer makes both live in one release; changing the target's draft after the offer gives 409 DOCUMENT_CHANGED.",
+     "unit: coverage. An image_with_text link to a missing page blocks; a product_rail on a deleted collection warns; a hero image whose media row is gone warns; an image with empty alt warns; a redirect_from equal to its own slug blocks; a link to a code-default policy slug passes.",
+     "unit (negative): a broken link in the dirty home draft does not stop publishing a policy page; a deleted product only in a home list warns and does not block a hero typo publish.",
+     "unit: a typo publish on a migrated-shape fixture whose untouched sections carry issues succeeds with those issues as level 'inherited'; the same issues on an offline page block (not inherited).",
+     "unit: every issue in a 422 has level, anchor, where and at least one action; hideSection then saveDraft then publish succeeds (service-level replay).",
+     "unit: after take-offline (fixture undone_version_id whose stored body has different section ids), publishing the same content is 409 REPUBLISH_CONFIRM_NEEDED; with confirmRepublish it is live and undone_version_id is null; a changed body publishes with no confirm.",
+     "unit: the P22 skip rule. A document whose hash equals publishedHash but whose live entry points to another version is not skipped.",
+     "unit: on a closed store, publishing a policy alone is 409 FIRST_PUBLISH_NEEDS_HOME with an offer adding doc_home; publishing home alone, or home with the policy, opens the store.",
+     "unit: every publish response item has liveUrl starting '/api/preview?exit=1&to=' with no token and undo {id, revision, logId} matching the new log row; responses match documents-api-shapes.js keys.",
+     "unit: design publish blocks only when a changed token pair fails contrast; an unchanged failing pair is inherited; all P2 test-publish-service cases stay green."
+    ]
+   },
+   {
+    "id": "P3-UNDO",
+    "branch": "cms/p3-undo",
+    "reqs": [
+     "PUB-04",
+     "PUB-05",
+     "PUB-02"
+    ],
+    "brief": "Replace the stubs in lib/documents/undo.js with the spec 8.6 Undo, built only from lib/documents/build.js (makeBuild overrides, runGuardedBuild, draftSlugOwner, slugClash) and lib/documents/diff.js. Do not edit build.js, commit.js or publish.js.\n\nTarget rule. An undoable row is a publish_log row with action publish, unpublish or restore that no 'undo' row references (publish_log_undoes index). 'undo' and 'migrated' rows are never targets. A row is 'current' when it is the document's latest undoable row and the live state still matches it: for publish/restore, documents.published_version_id = to_version_id; for unpublish, published_version_id IS NULL and undone_version_id = from_version_id.\n\nundo({id, revision, logId, dryRun, actor}):\n1. Read the row by logId. If it is not current, answer 409 PUBLISHED_ELSEWHERE ('This was changed after that publish. Reload to see the latest.') with current.\n2. Floors: a 'migrated' row, or no row: 200 {nothing:true, message:'There's nothing earlier to undo.'}. Target = from_version_id. A null target on a singleton: 200 {nothing:true, message:'This is the first published version. Edit it, or go back to your starting design.'}. A null target on a page, campaign or post: take offline.\n3. Target body = upgradeBody(target version body) (spec 8.7 step 6), so the draft and the fresh version are in the current schema.\n4. Slug: if the target meta.slug differs from the current draft slug, check slugClash against the live list and draftSlugOwner against other drafts; a clash is 409 SLUG_TAKEN naming that page with nothing written. Reference checks are skipped.\n5. If the current draft's draft_hash differs from both the live hash and documentHash(target), add an extraVersions undo_saved row of the current draft with the note 'Saved before Undo'.\n6. One guarded build through makeBuild: a fresh published version copying the target body; entry, pages row or journal index entry and redirects from the target meta; draft {body: target, hash, slug, label}; published {versionId, hash: documentHash(target)}; undone null; expectPublished = the row's live version; an 'undo' log row with undoes_log_id = logId and saved_version_id; refs for the fresh version.\n   Take offline: action 'undo', offline:true, draft unchanged, published null, undone = the live version, expectPublished = live version. The response says how to bring it back: 'It's offline now. To bring it back, open it and publish it again.'\n   Undo of an 'unpublish' row: the target is that row's from_version_id; the build re-enables the entry, writes redirects and refs, sets published to the fresh version, clears undone, and keeps the draft as it is (the draft never changed when the page went offline).\n7. runGuardedBuild: on lost, re-check step 1 (still current) and rebuild, up to 3 times; when the row is no longer current answer 409 PUBLISHED_ELSEWHERE; after 3 losses 409 DOCUMENT_CHANGED; unknown 503. No undo_saved orphan can survive a lost attempt (it is in the batch).\nResponse: {ok, message naming what changed, savedVersion?:{id, where:'Earlier versions'}, liveUrl, document}.\n\ndryRun:true on undo, unpublish or undoSet writes nothing and returns {willTakeOffline, linkers:[{id,label}] from linkersStatement, changes: diffBodies(type, live body, target body) words, target:{versionId, name}}.\n\nunpublish({id, revision}): take offline as its own publish with action 'unpublish', guarded by expectPublished = the live version. Refused for singletons: 'This part of the store can't be taken offline.'\n\nundoSet({setId, members:[{id, logId}]}): every member's row must be current (else 409 PUBLISHED_ELSEWHERE naming the member, nothing changes). Read each member's current revision and guard on it in the batch; a member whose draft diverges from both live and target gets its own undo_saved row. One build for all members, all-or-none.\n\nlistRecentlyPublished({limit}): publish_log ORDER BY created_at DESC LIMIT n, joined to documents.label, names via versions.namesFor, action words ('Published', 'Took offline', 'Undid'), grouped by set_id. Each row carries summary = diffBodies(from body, to body) (bodies fetched in one IN statement), canUndo true only when the row is current, and undo args {id, revision, logId}. An 'undo' row that took a page offline carries note 'Publish it again from the editor to bring it back.' Offer changes (COM-03) are not included (recorded gap).\n\nproduct_content Undo stays refused (OVL-02).",
+    "migrations": [],
+    "files": [
+     "lib/documents/undo.js",
+     "scripts/test-publish-undo.js"
+    ],
+    "acceptance": [
+     "unit (sqld and file): after Undo the live list serves the previous version, the draft equals it with revision+1, documents.slug and label follow the target, and publishing the unchanged draft is skipped as already live.",
+     "unit: Undo three times steps back through three publishes; a fourth on a page whose first publish it was takes it offline and the reader 404s that slug; redirects pointing to it are gone.",
+     "unit (negative): tab A publishes v2 while tab B's Undo of v1 (logId of v1's row) is in flight: B answers 409 PUBLISHED_ELSEWHERE and v2 stays live; an Undo with a logId that is not the latest undoable row is 409.",
+     "unit (negative): Undo to a target slug that another document's draft now holds is 409 SLUG_TAKEN naming that page, nothing written.",
+     "unit: Undo on one document leaves every other document's entry, published_version_id and draft unchanged.",
+     "unit (negative): newer unpublished edits are saved as an undo_saved version listed by listHistory with its note, survive 25 later autosaves, and the response names 'Earlier versions'.",
+     "unit (negative): an autosave committing between Undo's read and its batch makes the batch lose; Undo re-reads and succeeds on the new revision with the autosaved text kept as undo_saved; no undo_saved orphan after a lost attempt.",
+     "unit: an old-schema target body is upgraded before it becomes the draft and the fresh version.",
+     "unit (negative): staff calling undo, undoSet or unpublish get 403 with storage unchanged; singleton first-version and migrated-floor notes as specified.",
+     "unit: whole-set Undo after a 3-document publishSet restores all three in one release even when one member autosaved since (its draft saved as undo_saved); if one member was published since, 409 and nothing changes; a single-document Undo of a set member works.",
+     "unit: unpublish of a live page and of a journal post writes an 'unpublish' row, 404s it, keeps its draft, nulls published_version_id (archive then allowed), sets undone_version_id; dryRun returns linkers from document_refs and the change words, and writes nothing; Undo of that unpublish row brings it back with redirects and refs and clears undone.",
+     "unit: listRecentlyPublished returns plain names, labels and summaries, never raw actor ids or hashes, newest first, grouped by set, canUndo true only on current rows; responses match documents-api-shapes.js keys."
+    ]
+   },
+   {
+    "id": "P3-CHANGES",
+    "branch": "cms/p3-changes",
+    "reqs": [
+     "PUB-09",
+     "ED-03"
+    ],
+    "brief": "Replace the stubs in lib/documents/changes.js.\n\nlistChanges({id}): if draft_hash equals published_hash, []. If never published (or offline), {firstPublish:true, sections: firstPublishRows(type, draft)}. Else {firstPublish:false, rows: diffBodies(type, published body, draft)} from lib/documents/diff.js. No hash or id in any words.\n\nkeepLiveSection({id, sectionId}, revision) (storefront.write): writes a checkpoint first, then copies the published section into the draft: an edited section is replaced, an added section is removed, a removed section is re-inserted at its live index clamped to range. The save goes through the service's saveDraft rules (revision check, draft-mode validation, 409 stale). Returns {document} with the new draftHash and revision.\n\nkeepAsEarlierDraft({id, body}) (storefront.write, no revision): validate in draft mode and sanitize; a structurally invalid body is 422. If an undo_saved version with the same documentHash already exists for the document, return it (dedupe). If the document already has 10 versions noted 'Kept from another tab', answer 409 TOO_MANY_KEPT: 'There are already 10 kept drafts for this page. Open Earlier versions to tidy them.' Otherwise store kind 'undo_saved' with note 'Kept from another tab'. The draft, revision and hash never change. It stays under the storefront.write rate limit.\n\nlib/documents/service.js: the stale 409 body's current carries updatedBy and updatedByName (DOC_COLS gains updated_by; names via versions.namesFor; the same actor reads 'another tab').\n\nlib/documents/versions.js: pruneStatement is limited by index to the one document (p.document_id = :d, d.id = :d), so autosave doesn't scan all of publish_log; retention rules are unchanged.",
+    "migrations": [],
+    "files": [
+     "lib/documents/changes.js",
+     "lib/documents/service.js",
+     "lib/documents/versions.js",
+     "scripts/test-doc-changes.js",
+     "scripts/test-documents.js"
+    ],
+    "acceptance": [
+     "unit: a home draft with an edited hero title and a half-done new banner lists exactly 'Hero: title changed' and 'Banner: added'; keepLiveSection on the banner removes it; a publish then ships only the hero edit.",
+     "unit (negative): a migrated document whose draft differs only by lazily stamped ids lists no changes; a document whose draft equals its published version lists none; an offline page lists firstPublish rows.",
+     "unit: removed (keepLiveSection re-inserts it at its live position), moved and hidden sections each restore correctly.",
+     "unit: keepLiveSection with a stale revision is 409 with current; a checkpoint is written first.",
+     "unit: keepAsEarlierDraft stores an undo_saved version visible in listHistory with its note, leaves draft, revision and hash unchanged, dedupes an identical body, answers 409 TOO_MANY_KEPT at 10, refuses a structurally invalid body with 422, and is 403 for read-only callers.",
+     "unit: a stale saveDraft 409 includes updatedByName (team member's plain name; 'another tab' for the same actor).",
+     "unit: prune keeps every P2 retention rule under the per-document query; responses match documents-api-shapes.js keys; test-documents stays green."
+    ]
+   },
+   {
+    "id": "P3-FRAME",
+    "branch": "cms/p3-frame",
+    "reqs": [
+     "PV-01",
+     "ED-04",
+     "ED-02",
+     "PUB-11",
+     "PV-02"
+    ],
+    "brief": "The storefront side of the editor, preview only. Shopper HTML without console cookies stays byte-identical.\n\n(1) lib/content/resolve.js documentsPreview returns {refused: reason} for a correctly signed token whose session is revoked, expired or not found. contentSource then serves live content with source.previewRefused = reason.\n\n(2) Bridge mounting in app/(storefront)/layout.js:\n- valid documents preview: the bridge with state {kind, sid, docs:{[id]: draftHash}, offline:[ids], skipped, designShown};\n- refused preview: a minimal bar 'Your preview has ended, so you're seeing the live store.' with an Exit link to /api/preview?exit=1, and the bridge with {ok:false, reason};\n- no preview cookie but an _admin or _platform cookie present (presence only): the bridge with {ok:false, reason:'live'} and no bar. This is how the editor learns its frame shows the live store after 'See the live store' or an exit.\n\n(3) New components/preview/bridge-core.js: plain module, window and document passed in, no React. It holds the whole protocol; components/preview/PreviewBridge.js becomes a thin useEffect wrapper that calls it. v1 messages for the legacy Designer are unchanged. v2 starts after 'storeasy:editor:hello' {v:2}:\n- ready {v:2, state, ok, reason?, unfinished:[section ids from [data-unfinished]]};\n- capture-phase interception while v2 is active: every anchor click, form submit and button submit is prevented;\n- pick {type:'storeasy:pick', doc, sectionId, kind, field, offset} from the closest [data-doc], [data-section-id] and [data-field]; offset is the clicked block child's index inside a rich text field;\n- select {type:'storeasy:select', sectionId} from the parent outlines and scrolls;\n- refresh reloads and restores scroll and selection through sessionStorage (try/catch).\n\n(4) Preview-only attributes, rendered only when ctx.preview: data-doc on Header (doc_header; doc_announcement on the bar), Footer (doc_footer) and main (the route's document id from the getter); data-field on editable text in HeroSection, the HomeSections renderers and ContentPage with exactly validate's field paths: title, subtitle, buttons.N.label, body.N (text section paragraphs), items.N.question, items.N.answer. HeroSection selects by data-section-id; v1 data-sec='hero' stays.\n\n(5) components/PreviewBanner.js: 'You're seeing your unpublished changes.' and 'See the live store' to /api/preview?exit=1&to=<client pathname>. When the route's document is offline (state.offline), add: 'This page is offline. Publishing it brings it back.'\n\n(6) New components/preview/EditThisPage.js (client, usePathname): rendered only with no preview and an _admin or _platform cookie present; links to /admin/editor?path=<pathname>.",
+    "migrations": [],
+    "files": [
+     "lib/content/resolve.js",
+     "app/(storefront)/layout.js",
+     "components/preview/bridge-core.js",
+     "components/preview/PreviewBridge.js",
+     "components/PreviewBanner.js",
+     "components/preview/EditThisPage.js",
+     "components/sections/HeroSection.js",
+     "components/sections/HomeSections.js",
+     "components/sections/index.js",
+     "components/ContentPage.js",
+     "components/Header.js",
+     "components/Footer.js",
+     "scripts/test-preview-frame.js",
+     "scripts/test-sections-render.js",
+     "scripts/test-preview-overlay.js"
+    ],
+    "acceptance": [
+     "unit (test-preview-overlay): a revoked, an expired and an unknown sid each give live content plus previewRefused with the reason; a tampered HMAC gives neither overlay nor bar.",
+     "rendered (test-preview-frame): a refused session renders the bar and the bridge with ok:false; no preview cookie plus _admin renders the bridge with reason 'live' and no bar; no cookies at all renders no bridge (byte-equal to before); a valid session renders the banner with 'See the live store' to /api/preview?exit=1&to=… and no token; an offline route doc adds the offline line.",
+     "rendered: in preview Header, Footer and main carry the right data-doc; the hero title, a button label, a text paragraph (body.2) and an FAQ question carry data-field equal to the validate issue field for the same value; live renders carry neither (byte-equal for legacy and v4 fixtures).",
+     "unit (bridge-core with a minimal DOM stub, no jsdom): after a v2 hello, a click on an anchor inside or outside a section is prevented and posts pick {doc, sectionId, field, offset}; a form submit is prevented; without a hello, v1 behaviour (data-sec click, highlight, refresh) is unchanged.",
+     "unit: ready carries state.docs equal to the overlay's draft hashes, the offline ids and the [data-unfinished] ids; select outlines the section; refresh restores scroll from sessionStorage and survives a throwing storage.",
+     "rendered: EditThisPage renders only with no preview and a console cookie, with href /admin/editor?path=…; never without the cookie."
+    ]
+   },
+   {
+    "id": "P3-HARNESS",
+    "branch": "cms/p3-harness",
+    "reqs": [
+     "PUB-06",
+     "PUB-04",
+     "AU-04"
+    ],
+    "brief": "Seeds and shared drill helpers so every later drill (batches 3 to 5) runs on the design harness (docs/cms-reviews/P1-HARNESS.md). Keep the P2 drill seed working.\n\n(1) scripts/seed-design-documents.js and scripts/seed-design-preview.js:\n- every documents-mode publish in the seed goes through the publish service, so publish_log, document_refs (0023) and liveUrl exist;\n- a second documents tenant in state none (closed);\n- a staff (non-publishing) login on the harness documents tenant, credentials written only to the harness seed config, never printed;\n- content for the drills: a page linking to an unpublished campaign, a live campaign that can be taken offline and is linked from home, a journal post, a home with a product_rail whose collection has products, and a three-document publishSet history for whole-set Undo.\nIdempotent; re-running resets state.\n\n(2) New scripts/drills/p3/lib.mjs: ports from DESIGN_PORT and DESIGN_SQLD_PORT (never 3017), reseed(), login(role: 'owner'|'staff'), a click counter, screenshot(name) into the drill's results folder, and a results writer in the P2 format. Uses playwright-core only.\n\n(3) Append the new seed contents and the lib.mjs helpers to docs/cms-reviews/P1-HARNESS.md.",
+    "migrations": [],
+    "files": [
+     "scripts/seed-design-documents.js",
+     "scripts/seed-design-preview.js",
+     "scripts/drills/p3/lib.mjs",
+     "scripts/drills/p3/smoke.mjs",
+     "docs/cms-reviews/P1-HARNESS.md"
+    ],
+    "acceptance": [
+     "drill (harness): scripts/drills/p3/smoke.mjs reseeds, logs in as owner and staff, opens / on the closed tenant and sees 'Opening soon', opens / on the live tenant, and records results.",
+     "unit: the seed run twice gives the same row counts; document_refs has rows for every seeded published version; the closed tenant has no release.",
+     "drill: scripts/drills/p2/run.mjs still passes (its known checks unchanged) against the new seed."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 3: editor building blocks (prop-driven, logic in pure models)",
+  "items": [
+   {
+    "id": "P3-STORE",
+    "branch": "cms/p3-store",
+    "reqs": [
+     "ED-02",
+     "ED-03",
+     "PV-01",
+     "PV-02",
+     "PUB-04",
+     "PUB-09"
+    ],
+    "brief": "Pure client logic, no React and no DOM: components/admin/editor/store.js and components/admin/editor/previewMachine.js. Timers, fetch (documentsApi from P3-SESSION, injected) and storage are injected so node tests drive them.\n\nstore.js, one per open document:\n- edits: setField(path, value) and tree operations replace the local body; autosave debounces (one pause, the ED-03 value) with a single flight; a save ack adopts the returned revision and draftHash and keeps any text typed since.\n- server-replace operations (undo, keepLiveSection, discardDraft for 'Go back to the live version', restoreVersion): flush() pending edits first, then hold autosave during the call. The response's document replaces the local body and revision. Edits made during the hold are recorded as field-path operations and replayed on top of the new body, then saved; never a stale full-body overwrite.\n- publish and publishSet: flush, hold, then publish with the acked draftHash.\n- 409 conflict: autosave stops; the store exposes the choice. useNewer: keepAsEarlierDraft(mine) then adopt current. keepMine: keepAsEarlierDraft(current body) then saveDraft(mine, current.revision). Whichever is not chosen is kept as an earlier draft.\n- 422 pending: keep the local text, expose the issues, and mark unsavedWarning. While meta.slug is locally invalid, autosave sends the last saved slug and marks the slug field 'not saved yet', so other edits keep saving.\n- navigation: beforeNavigate() returns a promise that flushes (used for in-app links and document switches); beforeUnload() returns true (warn) while anything is unacknowledged and fires sendKeepalive when the body is at most 60,000 bytes.\n- local backup: every unacknowledged body is mirrored to localStorage (key: tenant, document, base revision; wrapped in try/catch; cleared on ack). On open, a backup whose base revision is older than the server's is offered for keepAsEarlierDraft ('We found edits that weren't saved. Keep them as an earlier draft?').\n\npreviewMachine.js: states and the three PV-01 labels exactly as spec section 7 PV-01 words them; inputs: save ack, refresh sent, ready {ok:true}, ready {ok:false, reason}, no ready within 3 seconds of a frame load, mint ok, mint failed. Output: label, whether to re-mint, whether to reload the frame.",
+    "migrations": [],
+    "files": [
+     "components/admin/editor/store.js",
+     "components/admin/editor/previewMachine.js",
+     "scripts/test-editor-store.js"
+    ],
+    "acceptance": [
+     "unit: typing during an in-flight save is kept and saved next; only one save is in flight; a burst within the pause gives one save.",
+     "unit (one test each for undo, keepLiveSection, discardDraft and restoreVersion): pending edits are flushed before the call; the response body replaces the local body; an edit typed during the hold is replayed onto the new body and saved; the next autosave never writes the pre-operation text.",
+     "unit: 409 stops autosave; useNewer and keepMine each leave both bodies stored (one as the draft, one as an undo_saved 'Kept from another tab'), neither as a prunable checkpoint.",
+     "unit: a 422 keeps the text and the issues; a locally invalid slug saves the other edits with the last saved slug.",
+     "unit: beforeNavigate flushes; beforeUnload warns while unacknowledged and fires keepalive only at or below 60,000 bytes; a backup in a stub storage is offered on the next open and cleared on ack; a throwing storage changes nothing else.",
+     "unit: previewMachine gives the right label and actions for each input, including re-mint on ready ok:false (reason live, ended) and on no ready within 3 seconds."
+    ]
+   },
+   {
+    "id": "P3-INSPECTOR",
+    "branch": "cms/p3-inspector",
+    "reqs": [
+     "ED-12",
+     "AU-02",
+     "TOK-03",
+     "AU-01",
+     "ED-04"
+    ],
+    "brief": "Prop-driven forms. Every component takes {value, onChange, issues, focusRequest?} and imports no store. Logic lives in components/admin/editor/fields/inspectorModel.js (pure).\n\n(1) A registry-driven settings form for every control kind in lib/registry/settings.js (text, rich text, link, image, collection, product list, list of items, toggle, select, number, colour and any other registered kind), with each issue's message shown at its field (by fieldAnchor) and the field's id equal to the anchor.\n(2) A menu control ported from components/admin/cms/NavigationEditor (behaviour, not code sharing; the legacy file is untouched).\n(3) The design form for doc_design tokens.\n(4) RichTextField interface (final): props {value, onChange, issues, focusRequest:{path, offset}, readOnlyReason?}; this item ships a fallback implementation behind it. P3-RTE replaces the implementation, not the interface.\n(5) docs/cms-reviews/P3-ED12-CHECKLIST.md: every control on today's legacy screens (NavigationEditor, HomeEditor collections index, PdpExtrasEditor, SurfaceTemplatesCard, the header, footer and announcement editors) mapped field by field to a new form field, or marked as waiting (cart, product content, collection content) with what it waits for.",
+    "migrations": [],
+    "files": [
+     "components/admin/editor/fields/inspectorModel.js",
+     "components/admin/editor/fields/SettingsForm.js",
+     "components/admin/editor/fields/controls.js",
+     "components/admin/editor/fields/MenuControl.js",
+     "components/admin/editor/fields/DesignForm.js",
+     "components/admin/editor/fields/RichTextField.js",
+     "docs/cms-reviews/P3-ED12-CHECKLIST.md",
+     "scripts/test-editor-inspector.js"
+    ],
+    "acceptance": [
+     "unit: inspectorModel maps every registered setting kind to a control and every section kind and singleton type to a form; an unknown kind is a test failure.",
+     "rendered (SSR): each form renders for a worstCase() body of every registered type; each issue's message appears next to the element whose id equals fieldAnchor(issue).",
+     "unit: the menu model adds, reorders, edits and removes items; its output validates; the checklist lists every legacy control with a mapped field or a named wait.",
+     "rendered: RichTextField fallback renders value and readOnlyReason; focusRequest is part of its props contract (documented in the file header)."
+    ]
+   },
+   {
+    "id": "P3-TREE",
+    "branch": "cms/p3-tree",
+    "reqs": [
+     "ED-02",
+     "AU-04",
+     "ED-04"
+    ],
+    "brief": "components/admin/editor/tree/treeModel.js (pure) and components/admin/editor/tree/SectionTree.js (prop-driven: {sections, selectedId, onChange, onSelect, issuesBySection}).\n- add(kind, index, {collections}) uses starterSection with a client-minted id (lib/documents/ids.js, edge-safe);\n- move, hide/show, duplicate (fresh ids for the section and nested items), delete;\n- an add-section picker listing every registered kind for the document type with its label;\n- each row shows 'unfinished' when its section has an incomplete issue.",
+    "migrations": [],
+    "files": [
+     "components/admin/editor/tree/treeModel.js",
+     "components/admin/editor/tree/SectionTree.js",
+     "components/admin/editor/tree/AddSection.js",
+     "scripts/test-editor-tree.js"
+    ],
+    "acceptance": [
+     "unit: add, move, hide, duplicate and delete give bodies that validate in draft mode with no structure issue; duplicate never reuses an id; ids are stable across moves.",
+     "unit: add of every registered kind for each type works; product_rail add picks a collection with products when given collections.",
+     "rendered: the tree marks unfinished sections and the selected one."
+    ]
+   },
+   {
+    "id": "P3-PUBLISHUI",
+    "branch": "cms/p3-publishui",
+    "reqs": [
+     "PUB-02",
+     "PUB-03",
+     "PUB-04",
+     "PUB-05",
+     "PUB-09"
+    ],
+    "brief": "Prop-driven publish UI. Logic in components/admin/editor/publish/publishModel.js (pure): maps documentsApi results to panel state and turns an issue action into client steps (hideSection or removeSection or removeItem: saveDraft of the edited body, then publish; publishBoth: publishSet with the offer).\n\nComponents (all props, no store import):\n- PublishPanel: the listChanges rows per document with a 'Keep the live version' button per row that has a sectionId; issue rows with where, message, actions and a fix link to the field anchor. For LINKS_TO_UNPUBLISHED, FIRST_PUBLISH_NEEDS_HOME and 'Publish all changes', the panel loads listChanges for every offered document (props.loadChanges) and shows them before Confirm; Confirm stays disabled until every list has loaded. REPUBLISH_CONFIRM_NEEDED shows the plain confirm.\n- UndoNotice: after publish, 'Undo' with the undo args; it shows the dryRun change words in the confirm.\n- TakeOfflineConfirm: the linkers list and the words from dryRun.\n- EarlierVersions: listHistory rows including 'Saved before Undo' and 'Kept from another tab' versions, with restore.\n- RecentlyPublished: rows with action words, names, summary, Undo only when canUndo, and the 'Publish it again from the editor' note on offline rows; whole-set Undo for set groups. (Mounted on /admin/releases by P3-EDITOR.)",
+    "migrations": [],
+    "files": [
+     "components/admin/editor/publish/publishModel.js",
+     "components/admin/editor/publish/PublishPanel.js",
+     "components/admin/editor/publish/UndoNotice.js",
+     "components/admin/editor/publish/TakeOfflineConfirm.js",
+     "components/admin/editor/publish/EarlierVersions.js",
+     "components/admin/editor/publish/RecentlyPublished.js",
+     "scripts/test-publish-ui.js"
+    ],
+    "acceptance": [
+     "unit: each action maps to the right client steps; publishBoth sends exactly the offer.",
+     "unit: for an offer the model requests listChanges for each target and Confirm is disabled until all have loaded; the rendered panel lists the target's changes (or its first-publish sections).",
+     "rendered (SSR, from documents-api-shapes.js examples): every outcome renders plain words with no code, hash or id; staff see Publish disabled with access.reason; RecentlyPublished hides Undo when canUndo is false."
+    ]
+   },
+   {
+    "id": "P3-ROUTES",
+    "branch": "cms/p3-routes",
+    "reqs": [
+     "ED-02",
+     "PUB-11",
+     "PV-01"
+    ],
+    "brief": "(1) app/(console)/admin/(authed)/editor/page.js, runtime nodejs, reads getCmsMode() fresh: documents opens DocumentEditor (a placeholder component in this batch, components/admin/editor/DocumentEditor.js, rendering the chosen document's label); legacy shows a note linking to /admin/storefront/designer; migrating shows a read-only note.\n(2) lib/admin/editor-entry.js (pure): ?doc=<id> or ?path=<pathname> to a document id (reverse of livePath; unknown paths open home with a note).\n(3) Documents-mode redirects (3 lines each, documents mode only) to /admin/editor?doc=…: app/(console)/admin/(authed)/storefront/page.js, storefront/designer, storefront/home, storefront/navigation, storefront/pages, storefront/product-pages, brand/page.js and theme/page.js (both to doc_design). Finding 2 is fixed by this: the Designer is never reached on a documents store.\n(4) Console nav: app/(console)/admin/(authed)/layout.js passes the mode to components/console/nav/SidebarNav.js (and through ConsoleShell if needed); in documents mode the storefront links point to /admin/editor. Legacy output of ConsoleShell is unchanged (test-editor-layout stays green).\n(5) PV-01 legacy slice: components/admin/cms/Designer.js shows a failed candidate push in plain words instead of swallowing it. Nothing else in legacy components changes.\n(6) Drill scripts/drills/p3/routes.mjs (uses lib.mjs): each redirect, the nav, the Designer redirect on documents, legacy unchanged.",
+    "migrations": [],
+    "files": [
+     "app/(console)/admin/(authed)/editor/page.js",
+     "components/admin/editor/DocumentEditor.js",
+     "lib/admin/editor-entry.js",
+     "app/(console)/admin/(authed)/storefront/page.js",
+     "app/(console)/admin/(authed)/storefront/designer/page.js",
+     "app/(console)/admin/(authed)/storefront/home/page.js",
+     "app/(console)/admin/(authed)/storefront/navigation/page.js",
+     "app/(console)/admin/(authed)/storefront/pages/page.js",
+     "app/(console)/admin/(authed)/storefront/product-pages/page.js",
+     "app/(console)/admin/(authed)/brand/page.js",
+     "app/(console)/admin/(authed)/theme/page.js",
+     "app/(console)/admin/(authed)/layout.js",
+     "components/console/nav/SidebarNav.js",
+     "components/console/nav/ConsoleShell.js",
+     "components/admin/cms/Designer.js",
+     "scripts/test-editor-routes.js",
+     "scripts/drills/p3/routes.mjs"
+    ],
+    "acceptance": [
+     "unit: editor-entry maps /, /about, /contact, /policies/x, /campaigns/x, /journal/x and an unknown path; every mapping round-trips with livePath.",
+     "rendered: /admin/editor renders the editor placeholder in documents, the note in legacy and the read-only note in migrating; each listed legacy route redirects in documents mode only and renders as before in legacy and migrating.",
+     "rendered: SidebarNav in documents mode links storefront items to /admin/editor; test-editor-layout's legacy ConsoleShell output is unchanged.",
+     "rendered: Designer shows a plain message for a failed candidate push (stubbed api); test-admin-console stays green.",
+     "drill (harness): routes.mjs passes for the Designer redirect, the nav and the legacy tenant."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 4: integration",
+  "items": [
+   {
+    "id": "P3-EDITOR",
+    "branch": "cms/p3-editor",
+    "reqs": [
+     "ED-02",
+     "ED-03",
+     "ED-04",
+     "PV-01",
+     "PV-02",
+     "PUB-02",
+     "PUB-04",
+     "PUB-06",
+     "PUB-11"
+    ],
+    "brief": "components/admin/editor/DocumentEditor.js replaces the placeholder and wires store, preview machine, forms, tree and publish UI. Interaction logic stays in components/admin/editor/editorModel.js (pure). In this batch this item may fix the batch 3 editor components (store.js, previewMachine.js, fields/* except RichTextField.js, tree/*, publish/*) when its drill finds a defect.\n\n- Switcher: every document by label with name search; products are listed by name with a plain 'not yet editable here' state (product_content waits for OVL-02; recorded partial).\n- Layout: the tree and inspector beside the preview; a rich-text-only document (policies) opens in a full-width writing view with the preview behind a toggle.\n- Preview pane: mint with startDocumentsPreview; showDesign on while doc_design is open (setShowDesign), off otherwise; re-mint when the bridge reports ok:false (ended, live) or when no ready arrives within 3 seconds of a frame load; 'Reconnecting' shown meanwhile. No re-mint before expiry (PV-04 is P1).\n- Click-to-select: pick selects the section and focuses the field (focusRequest with path and offset); a pick whose doc differs from the open document switches to that document with a visible note and writes nothing to the open one; a newly added section shows 'Adding to preview…' until the next refresh contains it, then select outlines it.\n- Navigation: while the store is not acknowledged, a capture-phase click handler on console anchors and the switcher awaits store.beforeNavigate() before routing; beforeunload uses store.beforeUnload().\n- Status line, conflict choice (Use the newer version / Keep mine), 'Go back to the live version' (discardDraft through the store's server-replace path), Publish, Undo and take offline wired to P3-PUBLISHUI, the local backup recovery offer, and state-true copy for a closed store ('Your store isn't open yet. Publishing your home page opens it.').\n- app/(console)/admin/(authed)/releases/page.js: in documents mode render RecentlyPublished; legacy unchanged.\n- Drill scripts/drills/p3/editor.mjs (lib.mjs): edit, autosave, click-to-select, other-document pick, add section, conflict in two tabs, link click within the pause loses nothing, See the live store then reconnect, publish, Undo.",
+    "migrations": [],
+    "files": [
+     "components/admin/editor/DocumentEditor.js",
+     "components/admin/editor/editorModel.js",
+     "components/admin/editor/Switcher.js",
+     "components/admin/editor/PreviewPane.js",
+     "components/admin/editor/StatusLine.js",
+     "app/(console)/admin/(authed)/releases/page.js",
+     "scripts/test-editor-shell.js",
+     "scripts/drills/p3/editor.mjs"
+    ],
+    "acceptance": [
+     "unit (editorModel): a pick for another document switches with a note and no write to the open document; a pick on the open document selects and builds focusRequest {path, offset}.",
+     "unit: showDesign is set when doc_design opens and cleared when another document opens; re-mint is requested on ready ok:false and on no ready within 3 seconds.",
+     "unit: an in-app navigation while dirty awaits the flush before routing.",
+     "rendered: a policy opens in the full-width writing view; a closed store shows the opening copy; staff see Publish disabled with the reason; /admin/releases renders RecentlyPublished in documents mode and the legacy screen otherwise.",
+     "drill (harness): editor.mjs passes every step listed, with screenshots and click counts, including 'typed then clicked a console link within the pause, nothing lost' and 'See the live store, back to the editor, Reconnecting then Up to date'."
+    ]
+   },
+   {
+    "id": "P3-DESIGN",
+    "branch": "cms/p3-design",
+    "reqs": [
+     "TOK-03"
+    ],
+    "brief": "doc_design in documents mode.\n\n(1) lib/themes/kits.js applyKit and app/api/admin/theme/route.js, documents mode: write the doc_design draft through the documents service (no publish); legacy unchanged. app/api/admin/brand/route.js documents mode: keep refusing writes with DOCUMENTS_MESSAGE pointing to the editor.\n(2) theme_pin: add a handler to lib/documents/after-commit.js that writes config.theme_pin best effort when a build publishes or undoes doc_design.\n(3) Readers in documents mode read doc_design (live version): lib/admin/onboarding.js, app/api/admin/help/route.js, lib/platform/agency.js, lib/admin/brand-readability.js. Operator screens read config.theme_pin instead of config.theme: app/api/platform/overview/route.js, app/api/platform/themes/route.js, app/api/platform/tenants/[id]/route.js, components/platform/TenantDetail.js.\n(4) Guard test (test-design-doc): scans lib, app and components for config.brand and config.theme reads. Allowlist with a reason per file: lib/brand.js, lib/cms/schemas.js, lib/releases.js and lib/content/resolve.js (legacy-mode branches), lib/themes/kits.js and app/api/admin/theme/route.js and app/api/admin/brand/route.js (legacy branches), the console brand and theme pages (redirected in documents mode by P3-ROUTES). Any other file fails.\n(5) Design publish panel: lib/documents/changes.js listChanges for doc_design adds affects rows: the live sections that use a changed token group, from a new static map lib/registry/token-usage.js (section kind to token groups).\n(6) Drill scripts/drills/p3/design.mjs: change a colour, preview, publish, Undo.",
+    "migrations": [],
+    "files": [
+     "lib/themes/kits.js",
+     "app/api/admin/theme/route.js",
+     "app/api/admin/brand/route.js",
+     "lib/documents/after-commit.js",
+     "lib/admin/onboarding.js",
+     "app/api/admin/help/route.js",
+     "lib/platform/agency.js",
+     "lib/admin/brand-readability.js",
+     "app/api/platform/overview/route.js",
+     "app/api/platform/themes/route.js",
+     "app/api/platform/tenants/[id]/route.js",
+     "components/platform/TenantDetail.js",
+     "lib/documents/changes.js",
+     "lib/registry/token-usage.js",
+     "scripts/test-design-doc.js",
+     "scripts/drills/p3/design.mjs"
+    ],
+    "acceptance": [
+     "unit: applyKit on a documents store writes the doc_design draft only (live unchanged); on legacy it behaves as before (test-themes green).",
+     "unit: a design publish and a design Undo each write theme_pin; a failing pin write does not change the publish result.",
+     "unit: two admins saving doc_design at once (design form save and applyKit) give one success and one 409 with current.",
+     "unit: onboarding, help, agency export and brand readability read doc_design in documents mode; operator screens read theme_pin.",
+     "unit: the guard finds no config.brand or config.theme read outside the allowlist.",
+     "unit: listChanges for doc_design lists the changed token rows and the affected live sections in plain words.",
+     "drill (harness): design.mjs passes."
+    ]
+   },
+   {
+    "id": "P3-RTE",
+    "branch": "cms/p3-rte",
+    "reqs": [
+     "AU-01"
+    ],
+    "brief": "Replace the RichTextField implementation (interface from P3-INSPECTOR unchanged). Conditional on the owner's answer: Tiptap (Option A, needs package.json, pnpm-lock.yaml and possibly next.config.* for transpiling; the SWC registerHooks loader copies in the rendered suites must resolve @tiptap ESM in node) or a contentEditable fallback with no dependency (Option B).\n- Allowed marks and blocks are exactly what the server sanitizer keeps (lib/registry/text.js sanitize); the server is the only sanitizer: the client sends what was typed or pasted, saveDraft sanitizes, and the field re-renders the stored value. If documents saveDraft does not sanitize rich text, add it in lib/documents/service.js.\n- Paste from Word or a web page is cleaned on the server; any script is removed.\n- Content with tags the editor can't edit (table, figure, pre and similar that the sanitizer allows) opens read-only with 'Edit as HTML', a plain textarea whose value the server sanitizes.\n- An untouched value round-trips byte for byte.\n- focusRequest {path, offset} places the caret at block child offset.\n- Editor and storefront share one .rte stylesheet.\n- Drill scripts/drills/p3/rte.mjs: type, bold, link, paste a Word fragment, save, preview.",
+    "migrations": [],
+    "files": [
+     "components/admin/editor/fields/RichTextField.js",
+     "components/admin/editor/fields/richTextModel.js",
+     "app/rte.css",
+     "lib/documents/service.js",
+     "package.json",
+     "pnpm-lock.yaml",
+     "next.config.mjs",
+     "scripts/test-rich-text.js",
+     "scripts/drills/p3/rte.mjs"
+    ],
+    "acceptance": [
+     "unit: an untouched value round-trips byte for byte; a pasted Word fragment with a script and inline styles is stored sanitized by saveDraft; no client module calls a sanitizer (grep).",
+     "rendered: content with a table opens read-only with 'Edit as HTML'; editing it as HTML stores the sanitized result.",
+     "rendered: editor and storefront rich text both use the .rte stylesheet.",
+     "unit: focusRequest offset 2 targets the third block child.",
+     "drill (harness): rte.mjs passes. package.json and pnpm-lock.yaml change only if Option A was approved."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 5: drills",
+  "items": [
+   {
+    "id": "P3-DRILLS",
+    "branch": "cms/p3-drills",
+    "reqs": [
+     "PUB-02",
+     "PUB-03",
+     "PUB-04",
+     "PUB-05",
+     "PUB-06",
+     "PUB-09",
+     "PUB-11",
+     "ED-02",
+     "ED-03",
+     "ED-04",
+     "ED-12",
+     "PV-01",
+     "PV-02",
+     "AU-01",
+     "AU-02",
+     "AU-04",
+     "TOK-03"
+    ],
+    "brief": "scripts/drills/p3/run.mjs runs the per-item drills (smoke, routes, editor, design, rte) and adds the cross-item matrix in desktop Chrome on the harness, re-seeding between state-changing drills, with screenshots and click counts:\n- timed founder tasks 1, 4 and 5;\n- closed store, first open (FIRST_PUBLISH_NEEDS_HOME then home publish), and a COD test order on the closed store with a preview session (then cancelled at once per the test-order rule; Razorpay refused);\n- RSC probe on every route listed in P3-CLOSED;\n- checks, 'publish both' with the target's changes shown before confirm;\n- take offline (linkers shown), the offline banner line, then 'publish again';\n- PUB-09 keep the live version;\n- two-tab conflict, both choices;\n- tab close within the pause (keepalive) and the backup recovery offer;\n- the PV-01 failure matrix (revoked, expired, exit, network);\n- See the live store then reconnect;\n- logout ends preview;\n- the Designer redirect;\n- staff Publish disabled;\n- design publish and Undo;\n- error page for corrupted chrome;\n- legacy smoke and edge drills unchanged.\nFlip the four P2-DRILLS 'known' checks (and the preview --drafts-only check) in scripts/drills/p2/run.mjs to plain passes. Write docs/cms-reviews/P3-DRILLS.md and add owner checks to docs/cms-reviews/MANUAL-CHECKS.md.",
+    "migrations": [],
+    "files": [
+     "scripts/drills/p3/run.mjs",
+     "scripts/drills/p3/matrix.mjs",
+     "scripts/drills/p2/run.mjs",
+     "docs/cms-reviews/P3-DRILLS.md",
+     "docs/cms-reviews/MANUAL-CHECKS.md"
+    ],
+    "acceptance": [
+     "drill: every listed step passes and is recorded with screenshots and click counts; the test order is cancelled.",
+     "drill: P2 drills run with the former known checks as passes; drill:smoke and drill:edge unchanged.",
+     "unit: pnpm test green."
+    ]
+   }
+  ]
+ }
+]
