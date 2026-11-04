@@ -621,7 +621,8 @@ await t("API: a mixed payload gives 400 before anything is authorized or written
       ok(["AMBIGUOUS_OPERATION", "UNKNOWN_OPERATION"].includes(r.body.code), `code ${r.body.code}:`);
     }
   }
-  for (const [body, code] of [[{}, "NO_OPERATION"], [null, "NO_OPERATION"], [{ revision: 2 }, "NO_OPERATION"], [{ saveDraft: { id: "doc_home" } }, "MALFORMED"], [{ saveDraft: { id: "doc_home", body: [] } }, "MALFORMED"], [{ archive: "doc_x", revision: "2" }, "MALFORMED"], [{ unpublish: "doc_home" }, "UNKNOWN_OPERATION"], [{ publish: "doc_home" }, "MALFORMED"]]) {
+  for (const [body, code] of [[{}, "NO_OPERATION"], [null, "NO_OPERATION"], [{ revision: 2 }, "NO_OPERATION"], [{ saveDraft: { id: "doc_home" } }, "MALFORMED"], [{ saveDraft: { id: "doc_home", body: [] } }, "MALFORMED"], [{ archive: "doc_x", revision: "2" }, "MALFORMED"], [{ unpublish: "doc_home" }, "MALFORMED"], [{ schedule: "doc_home" }, "UNKNOWN_OPERATION"], [{ publish: "doc_home" }, "MALFORMED"]]) {
+    // P3-COMMIT parses unpublish (a bare id is malformed); schedules are still unknown
     eq(parseDocumentsOperation(body).code, code, `${JSON.stringify(body)}:`);
     eq((await api(body)).status, 400, `${JSON.stringify(body)} answers 400:`);
   }

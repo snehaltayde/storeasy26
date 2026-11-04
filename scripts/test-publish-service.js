@@ -43,7 +43,7 @@ process.env.PLATFORM_CACHE_MS = "50";
 process.env.PLATFORM_SITE_HOSTS = "";
 
 const STORES = ["docs", "first", "legacy", "rel", "busy"];
-const FILES = [".test-ps-default.db", ".test-ps-platform.db", ...STORES.map((s) => `.test-ps-${s}.db`)];
+const FILES = [".test-ps-default.db", ".test-ps-platform.db", ...STORES.map((s) => `.test-ps-${s}.db`), ".test-ps-pre23.db"];
 for (const f of FILES) await rm(join(ROOT, f), { force: true });
 
 const started = Date.now();
@@ -107,9 +107,19 @@ for (const s of STORES) {
   await C.upsertTenant({ id: `ps${s}`, name: `PS ${s}`, domains: [`ps${s}.test`], dbUrl: `file:.test-ps-${s}.db`, config: { site: { name: `PS ${s} Store` }, site_url: `https://ps${s}.test` }, secrets: {} });
   TEN[s] = await C.getTenant(`ps${s}`);
 }
+// P3-COMMIT: a documents store at 0022 (no document_refs table yet)
+{
+  const c = createClient({ url: "file:.test-ps-pre23.db" });
+  await c.executeMultiple(schema);
+  await runMigrations(c, MIGRATIONS.filter((m) => m.id < "0023"));
+  await c.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+  raw.pre23 = c;
+  await C.upsertTenant({ id: "pspre23", name: "PS pre23", domains: ["pspre23.test"], dbUrl: "file:.test-ps-pre23.db", config: { site: { name: "PS pre23 Store" }, site_url: "https://pspre23.test" }, secrets: {} });
+  TEN.pre23 = await C.getTenant("pspre23");
+}
 const ownerU = await I.createUser({ email: "owner@ps.test", name: "Asha Rao", password: "owner-pass-publish" });
 const staffU = await I.createUser({ email: "staff@ps.test", name: "Ravi", password: "staff-pass-publish" });
-for (const s of STORES) {
+for (const s of [...STORES, "pre23"]) {
   await I.addMembership(ownerU.id, `ps${s}`, "owner");
   await I.addMembership(staffU.id, `ps${s}`, "staff");
 }
@@ -1085,6 +1095,558 @@ await t("journal-index.js is edge-safe: no node: imports, no process, no Buffer"
   ok(!/from\s+["']node:|require\(|\bprocess\.|\bBuffer\b/.test(src), "edge-safe");
   const imports = [...src.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]);
   eq(imports, ["../registry/index.js"], "imports:");
+});
+
+// =========================================================================================
+// P3-COMMIT: the shared build (lib/documents/build.js), refs, paths and the API.
+console.log("— P3-COMMIT: the build, refs, take offline, after-commit, paths and the new API operations");
+
+const B = await import("../lib/documents/build.js");
+const Refs = await import("../lib/documents/refs.js");
+const Paths = await import("../lib/documents/paths.js");
+const After = await import("../lib/documents/after-commit.js");
+const Api = await import("../lib/admin/documents-api.js");
+const { SHAPES, COMMON } = await import("../lib/admin/documents-api-shapes.js");
+const { watchStatements } = await import("./support/request-cache.js");
+
+// Every log line printed while fn runs, parsed.
+async function logsOf(fn) {
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => {
+    const s = a.join(" ");
+    try {
+      lines.push(JSON.parse(s));
+    } catch {
+      orig(...a);
+    }
+  };
+  try {
+    return { result: await fn(), lines };
+  } finally {
+    console.log = orig;
+  }
+}
+// The same keys as a shapes example, all the way down (the first element of a
+// list), leaving out the optional paths.
+// A document's body is the founder's content, not part of the contract.
+const FREE = new Set(["document.body", "current.body", "documents[].body"]);
+function sameKeys(got, want, optional = [], path = "") {
+  if (FREE.has(path)) return;
+  if (Array.isArray(want)) {
+    ok(Array.isArray(got), `${path || "body"} is a list`);
+    if (want.length && got.length) sameKeys(got[0], want[0], optional, `${path}[]`);
+    return;
+  }
+  if (want === null || typeof want !== "object") return;
+  if (got === null) return; // a key that may be null is present with null
+  ok(got && typeof got === "object", `${path || "body"} is an object`);
+  const opt = (k) => optional.includes(`${path ? `${path}.` : ""}${k}`.replace(/^\./, ""));
+  const missing = Object.keys(want).filter((k) => !(k in got) && !opt(k));
+  const extra = Object.keys(got).filter((k) => !(k in want));
+  ok(!missing.length && !extra.length, `${path || "body"}: missing [${missing}], extra [${extra}]`);
+  for (const k of Object.keys(want)) if (k in got) sameKeys(got[k], want[k], optional, path ? `${path}.${k}` : k);
+}
+const shapeOf = (op, name) => (SHAPES[op].outcomes || SHAPES[SHAPES[op].sameOutcomesAs].outcomes)[name];
+const likeShape = (r, o, label) => {
+  eq(r.status, o.status, `${label} status:`);
+  sameKeys(r.body, o.body, o.optional || []);
+  if (o.body.code) eq(r.body.code, o.body.code, `${label} code:`);
+};
+
+await t("P3-COMMIT: published_hash is documentHash(body), never the version's body_hash: two bodies whose section ids differ get the same hash", async () => {
+  const doc = { id: "doc_hashprobe0000001", type: "page", revision: 1, label: "Probe", publishedVersionId: null };
+  const b1 = page("probe", "Probe", "Same words.");
+  const b2 = { ...b1, sections: b1.sections.map((s) => ({ ...s, id: "sec_other1" })) };
+  ok(b1.sections[0].id !== b2.sections[0].id, "the ids differ");
+  const live = { pointer: null, list: L.emptyList(1, R.singletonTypes()) };
+  const at = new Date().toISOString();
+  const x1 = await B.makeBuild(live, [{ doc, body: b1, liveEntry: null }], { by: "t", at, journal: { body: null } });
+  const x2 = await B.makeBuild(live, [{ doc, body: b2, liveEntry: null }], { by: "t", at, journal: { body: null } });
+  eq(x1.documents[0].published_hash, await R.documentHash(b1), "build 1:");
+  eq(x2.documents[0].published_hash, x1.documents[0].published_hash, "the same content, other ids, the same hash:");
+  ok(x1.versions[0].body_hash !== x2.versions[0].body_hash, "the version body_hash keeps the ids, so it differs");
+  ok(x1.documents[0].published_hash !== x1.versions[0].body_hash, "published_hash is not the body_hash");
+  // and through a real publish
+  const d = await create("docs", "page", { body: b1 });
+  const r = published(await publishApi("docs", d.id), "probe");
+  const row = (await sql("SELECT published_hash, draft_hash FROM documents WHERE id = ?", [d.id]))[0];
+  const v = (await sql("SELECT body_hash FROM document_versions WHERE id = ?", [r.published[0].versionId]))[0];
+  eq(row.published_hash, row.draft_hash, "documents.published_hash equals the draft hash (both documentHash):");
+  ok(row.published_hash !== v.body_hash, "and not the version's body_hash");
+});
+
+await t("P3-COMMIT: a draft rewrite onto a slug another non-archived draft holds is 409 SLUG_TAKEN naming it (not DB_REFUSED, not 500); draftSlugOwner names that document", async () => {
+  const owner = await create("docs", "page", { body: page("held-address", "Holder page", "x") });
+  const mover = await create("docs", "page", { body: page("mover-address", "Mover", "x") });
+  eq(await inT(() => B.draftSlugOwner("held-address", mover.id)), { id: owner.id, label: "Holder page" }, "draftSlugOwner:");
+  eq(await inT(() => B.draftSlugOwner("held-address", owner.id)), null, "not itself:");
+  eq(await inT(() => B.draftSlugOwner("nobody-here", mover.id)), null, "a free slug:");
+  const before = await dump();
+  const target = page("held-address", "Mover", "earlier words");
+  let e = null;
+  await inT(async () => {
+    const live = await B.readLive();
+    const d = await Docs.getDocument(mover.id);
+    try {
+      await B.runGuardedBuild(
+        ({ live: from, refs }) =>
+          B.makeBuild(from, [{ doc: d, body: target, action: "undo", draft: { body: target, hash: "dh_x", slug: "held-address", label: "Mover" }, liveEntry: null }], { by: "merchant:x", at: new Date().toISOString(), journal: { body: null }, refs }),
+        { live, done: (b) => b, onLost: async () => null },
+      );
+    } catch (err) {
+      e = err;
+    }
+  });
+  ok(e, "refused");
+  eq([e.status, e.code], [409, "SLUG_TAKEN"], "refusal:");
+  eq(e.extra, { slug: "held-address", other: { id: owner.id, title: "Holder page", label: "Holder page" } }, "names the other page:");
+  eq(e.message, "Another page already uses /held-address: Holder page", "words:");
+  sameKeys({ error: e.message, code: e.code, ...e.extra }, SHAPES.undo.outcomes.slugTaken.body);
+  await unchanged(before, "slug taken");
+});
+
+await t("P3-COMMIT: a publish on a documents store without 0023 succeeds, writes no refs and logs document_refs_missing; the probe is one statement per publish until 0023 runs", async () => {
+  B.__forgetRefsTable();
+  const d = await create("pre23", "page", { body: page("pre-refs", "Pre refs", "x") });
+  const { currentDatabase } = await import("../lib/db.js");
+  const run = () => inT(() => watchStatements(currentDatabase().libsql, () => publishApi("pre23", d.id)), "pre23");
+  const { result: { result: r, statements }, lines } = await logsOf(run);
+  published(r, "pre-0023 publish");
+  eq(statements.filter((s) => /sqlite_master/.test(s)).length, 1, "one probe statement:");
+  ok(!statements.some((s) => /document_refs/.test(s) && !/sqlite_master/.test(s)), "no refs statement was sent");
+  ok(lines.some((l) => l.evt === "document_refs_missing"), "document_refs_missing is logged");
+  eq((await sql("SELECT count(*) AS n FROM sqlite_master WHERE name = 'document_refs'", [], "pre23"))[0].n, 0, "still no table:");
+  // a missing table is asked again: the next publish probes again
+  await save("pre23", await current("pre23", d.id), page("pre-refs", "Pre refs", "y"));
+  const again = await logsOf(run);
+  published(again.result.result, "second");
+  eq(again.result.statements.filter((s) => /sqlite_master/.test(s)).length, 1, "probed again:");
+  // once 0023 runs, the very next publish writes refs
+  await runMigrations(raw.pre23, MIGRATIONS);
+  await save("pre23", await current("pre23", d.id), body("page", { meta: { slug: "pre-refs", title: "Pre refs" }, sections: [sec("product_rail", "sec_r1", { title: "Rail", collection: { handle: "shirts" } })] }));
+  const third = await logsOf(run);
+  const p3 = published(third.result.result, "after 0023");
+  eq((await sql("SELECT ref_type, ref_id FROM document_refs WHERE version_id = ?", [p3.published[0].versionId], "pre23")), [{ ref_type: "collection", ref_id: "shirts" }], "refs after 0023:");
+  ok(!third.lines.some((l) => l.evt === "document_refs_missing"), "nothing missing any more");
+  // and the yes is remembered: no probe on the next publish
+  await save("pre23", await current("pre23", d.id), page("pre-refs", "Pre refs", "z"));
+  const fourth = await logsOf(run);
+  published(fourth.result.result, "fourth");
+  eq(fourth.result.statements.filter((s) => /sqlite_master/.test(s)).length, 0, "no probe once seen:");
+});
+
+const linkingPage = (slug, title, links, type = "page") =>
+  body(type, {
+    meta: { slug, title },
+    sections: [
+      ...links.map((link, i) => sec("banner", `sec_bn${i}`, { title: `Banner ${i}`, text: "x", button: { label: "Go", link } })),
+      sec("product_rail", "sec_rl1", { title: "Rail", collection: { handle: "linen" } }),
+    ],
+  });
+
+await t("P3-COMMIT: with 0023 every published version has refs equal to refRows(body); linkersStatement returns exactly the live documents linking by id or by slug, ignoring drafts and superseded versions", async () => {
+  B.__forgetRefsTable();
+  const target = await create("docs", "page", { body: page("link-target", "Link target", "x") });
+  const byId = await create("docs", "page", { body: linkingPage("links-by-id", "Links by id", [{ type: "page", family: "page", slug: "link-target", document: target.id }]) });
+  const bySlug = await create("docs", "campaign", { body: linkingPage("links-by-slug", "Links by slug", [{ type: "page", family: "page", slug: "link-target" }], "campaign") });
+  const byUrl = await create("docs", "journal", { body: linkingPage("links-by-url", "Links by url", [{ type: "url", href: "/policies/link-target" }], "journal") });
+  const draftOnly = await create("docs", "page", { body: linkingPage("links-draft-only", "Draft only", [{ type: "page", family: "page", slug: "link-target", document: target.id }]) });
+  const superseded = await create("docs", "page", { body: linkingPage("links-once", "Linked once", [{ type: "page", family: "page", slug: "link-target", document: target.id }]) });
+  const r = published(await publishSetApi("docs", [target.id, byId.id, bySlug.id, byUrl.id, superseded.id]), "the set");
+  for (const p of r.published) {
+    const want = Refs.refRows(p.versionId, await versionBody(p.versionId));
+    eq(await sql("SELECT version_id, ref_type, ref_id FROM document_refs WHERE version_id = ? ORDER BY ref_type, ref_id", [p.versionId]), want, `${p.id} refs:`);
+  }
+  // the journal index version carries none
+  eq((await sql("SELECT count(*) AS n FROM document_refs WHERE version_id = ?", [(await pointerOf()).list.indexes.journal.version]))[0].n, 0, "index refs:");
+  // the once-linking page is published again without the link: its old version is superseded
+  await save("docs", await current("docs", superseded.id), page("links-once", "Linked once", "no link now"));
+  published(await publishApi("docs", superseded.id), "superseded");
+  // the draft-only page gets a link in its draft but is never published
+  void draftOnly;
+  const st = Refs.linkersStatement(target.id, Refs.slugKey("page", "link-target"));
+  const rows = (await raw.docs.execute(st)).rows.map((x) => ({ id: String(x.id), label: String(x.label) }));
+  eq(rows.map((x) => x.id).sort(), [byId.id, bySlug.id, byUrl.id].sort(), "linkers:");
+  ok(rows.every((x) => typeof x.label === "string" && x.label), "each with its label");
+  // by id only (no slug key)
+  eq((await raw.docs.execute(Refs.linkersStatement(target.id))).rows.map((x) => String(x.id)), [byId.id], "by id only:");
+});
+
+await t("P3-COMMIT: refs.js and paths.js are edge-safe (no node:, process or Buffer; refs.js imports only the registry; paths.js imports nothing)", async () => {
+  for (const [f, want] of [["lib/documents/refs.js", ["../registry/index.js", "../registry/settings.js"]], ["lib/documents/paths.js", []]]) {
+    const src = await readFile(join(ROOT, f), "utf8");
+    const code = src.replace(/^\s*\/\/.*$/gm, "");
+    ok(!/from\s+["']node:|require\(|\bprocess\.|\bBuffer\b/.test(code), `${f} edge-safe`);
+    eq([...code.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]), want, `${f} imports:`);
+  }
+});
+
+// Take a document offline straight through the build (P3-UNDO's job later):
+// the last live body, a fresh version, enabled false.
+async function takeOffline(store, id, { action = "unpublish" } = {}) {
+  return inT(async () => {
+    const live = await B.readLive();
+    const d = await Docs.getDocument(id);
+    const journal = live.list.indexes?.journal ? await B.journalIndexOf(live.list) : { body: null };
+    const liveEntry = B.liveEntryOf(live.list, journal.body, d);
+    const liveBody = (await B.readVersionBodies([liveEntry.version])).get(liveEntry.version).body;
+    return B.runGuardedBuild(
+      ({ live: from, refs }) =>
+        B.makeBuild(from, [{ doc: d, body: liveBody, offline: true, action, undone: d.publishedVersionId, liveEntry }], { by: "merchant:x", at: new Date().toISOString(), journal, refs }),
+      { live, done: (b) => b, onLost: async () => null },
+    );
+  }, store);
+}
+
+await t("P3-COMMIT: an offline page writes enabled:false with an unchanged documentHash, drops its redirects, nulls its pointer; liveEntryOf gives liveBody null; shoppers don't see it", async () => {
+  const d = await create("docs", "page", { body: body("page", { meta: { slug: "off-page", title: "Off page", redirect_from: ["old-off-page"] }, sections: [textSec("sec_t1", "Off", "Words.")] }) });
+  const pub = published(await publishApi("docs", d.id), "live");
+  const before = await current("docs", d.id);
+  eq(await inT(() => Res.resolvedSlugRedirect("old-off-page")), "off-page", "the redirect is live first:");
+  const b = await takeOffline("docs", d.id);
+  const live = await pointerOf();
+  eq(live.pointer, b.releaseId, "live:");
+  const entry = live.list.documents[d.id];
+  ok(entry && entry.version !== pub.published[0].versionId, "the entry stays, at a fresh version");
+  const offBody = await versionBody(entry.version);
+  eq(await R.documentHash(offBody), before.publishedHash, "the body is not edited: documentHash unchanged:");
+  eq(live.list.pages.filter((p) => p.document === d.id).map((p) => [p.slug, p.enabled]), [["off-page", false]], "the pages row:");
+  eq(live.list.redirects.filter((x) => x.document === d.id), [], "its redirects are dropped:");
+  eq(await inT(() => Res.resolvedSlugRedirect("old-off-page")), null, "and shoppers aren't sent on:");
+  const now = await current("docs", d.id);
+  eq([now.publishedVersionId, now.publishedHash, now.undoneVersionId, now.draftHash, now.revision], [null, null, pub.published[0].versionId, before.draftHash, before.revision], "the documents row:");
+  const le = B.liveEntryOf(live.list, null, now);
+  eq([le.offline, le.liveBody, le.version], [true, null, entry.version], "liveEntryOf:");
+  eq((await sql("SELECT action, from_version_id, to_version_id FROM publish_log WHERE set_id = ?", [b.setId])).map((x) => [x.action, x.from_version_id, x.to_version_id]), [["unpublish", pub.published[0].versionId, entry.version]], "log:");
+  eq(await inT(() => Res.resolvedContentPage("off-page")), null, "shoppers don't see the page:");
+  // publishing again writes the redirects again from the body, and is live
+  const again = published(await publishApi("docs", d.id), "again");
+  const l2 = await pointerOf();
+  eq(l2.list.pages.filter((p) => p.document === d.id).map((p) => p.enabled), [true], "back on:");
+  eq(l2.list.redirects.filter((x) => x.document === d.id).map((x) => x.from_slug), ["old-off-page"], "redirects written again:");
+  eq((await current("docs", d.id)).publishedVersionId, again.published[0].versionId, "pointer:");
+});
+
+await t("P3-COMMIT: an offline page is not 'inherited': its unchanged incomplete section blocks the next publish (the inherited rule needs a live body)", async () => {
+  const d = await create("docs", "page", { body: page("off-inherit", "Off inherit", "Words.") });
+  published(await publishApi("docs", d.id), "live");
+  // an incomplete section that is live as it is
+  const withGap = body("page", { meta: { slug: "off-inherit", title: "Off inherit" }, sections: [textSec("sec_t1", "Off inherit", "Words."), sec("text", "sec_gap1", { title: "", body: [] })] });
+  await liveFixture(d.id, withGap);
+  await save("docs", await current("docs", d.id), withGap);
+  const warns = await publishApi("docs", d.id);
+  eq(warns.status, 200, `live as it is: inherited, it only warns (${JSON.stringify(warns.body).slice(0, 200)})`);
+  ok(warns.body.skipped.includes(d.id) || warns.body.issues.some((i) => /already live/.test(i.message)), "inherited");
+  await takeOffline("docs", d.id);
+  const blocked = await publishApi("docs", d.id);
+  eq([blocked.status, blocked.body.code], [422, "VALIDATION_FAILED"], "offline: the same section now blocks:");
+});
+
+await t("P3-COMMIT: an offline journal post's index entry is enabled:false (the override), its hash unchanged; liveEntryOf gives liveBody null; shoppers' journal leaves it out", async () => {
+  const p = await create("docs", "journal", { body: page("off-post", "Off post", "Post words.", "journal") });
+  const pub = published(await publishApi("docs", p.id), "post");
+  const before = await current("docs", p.id);
+  eq((await inT(() => Res.resolvedJournalEntries())).some((e) => e.slug === "off-post"), true, "listed first:");
+  await takeOffline("docs", p.id);
+  const live = await pointerOf();
+  ok(!Object.hasOwn(live.list.documents, p.id), "still no list.documents entry (PERF-01)");
+  const ib = await versionBody(live.list.indexes.journal.version);
+  const row = J.journalEntriesOf(ib).find((e) => e.document === p.id);
+  eq(row.enabled, false, "index entry:");
+  ok(row.version !== pub.published[0].versionId, "a fresh version");
+  eq(await R.documentHash(await versionBody(row.version)), before.publishedHash, "hash unchanged:");
+  const le = B.liveEntryOf(live.list, ib, await current("docs", p.id));
+  eq([le.offline, le.liveBody], [true, null], "liveEntryOf:");
+  eq((await inT(() => Res.resolvedJournalEntries())).some((e) => e.slug === "off-post"), false, "shoppers' journal:");
+  // the override itself, pure
+  const pure = J.nextJournalIndexBody(ib, [], { disabled: [] });
+  eq(J.journalEntriesOf(pure).find((e) => e.document === p.id).enabled, false, "kept entries keep their state:");
+  const on = J.nextJournalIndexBody(null, [{ documentId: p.id, versionId: row.version, body: before.body }], { disabled: [p.id] });
+  eq(J.journalEntriesOf(on)[0].enabled, false, "the override disables an added entry:");
+  eq(J.journalEntriesOf(J.nextJournalIndexBody(null, [{ documentId: p.id, versionId: row.version, body: before.body }])).at(0).enabled, true, "without it, the body decides:");
+});
+
+await t("P3-COMMIT: a non-archived offline page keeps its slug (409 SLUG_TAKEN); once archived, a publish claiming it releases it and drops its entry", async () => {
+  const off = await create("docs", "page", { body: page("keep-addr", "Keeper", "x") });
+  published(await publishApi("docs", off.id), "live");
+  await takeOffline("docs", off.id);
+  // its draft moves on to another address, so the old one is free in drafts
+  await save("docs", await current("docs", off.id), page("keeper-moved", "Keeper", "x"));
+  const claim = await create("docs", "page", { body: page("keep-addr", "Claimer", "y") });
+  const before = await dump();
+  const refused = await publishApi("docs", claim.id);
+  eq([refused.status, refused.body.code], [409, "SLUG_TAKEN"], "the offline page still holds it:");
+  eq(refused.body.other.id, off.id, "names the offline page:");
+  await unchanged(before, "slug kept");
+  // archive the offline page (it is not live: published_version_id is null)
+  const ar = await api({ archive: off.id, revision: (await current("docs", off.id)).revision });
+  eq(ar.status, 200, `archive: ${JSON.stringify(ar.body).slice(0, 200)}`);
+  const r = published(await publishApi("docs", claim.id), "claim");
+  const live = await pointerOf();
+  ok(!Object.hasOwn(live.list.documents, off.id), "the archived page's entry is removed");
+  ok(!live.list.pages.some((p) => p.document === off.id), "and its pages row");
+  eq(live.list.pages.filter((p) => p.slug === "keep-addr").map((p) => [p.document, p.enabled]), [[claim.id, true]], "the slug is the claimer's:");
+  eq(live.pointer, r.release.id, "one release:");
+});
+
+await t("P3-COMMIT: archive is terminal: no code sets archived_at back to NULL (grep over lib, app, components, scripts and migrations)", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const files = [];
+  const walk = async (dir) => {
+    for (const e of await readdir(join(ROOT, dir), { withFileTypes: true })) {
+      const p = `${dir}/${e.name}`;
+      if (e.isDirectory()) {
+        if (e.name !== "node_modules" && !e.name.startsWith(".")) await walk(p);
+      } else if (/\.(m?js|sql)$/.test(e.name)) files.push(p);
+    }
+  };
+  for (const d of ["lib", "app", "components", "scripts", "migrations"]) await walk(d);
+  ok(files.length > 100, `only ${files.length} files found: the walk is broken`);
+  const writers = [];
+  for (const f of files) {
+    const src = await readFile(join(ROOT, f), "utf8");
+    if (/archived_at\s*=\s*NULL/i.test(src.replace(/archived_at\s*=\s*NULL\b[^\n]*grep/gi, ""))) writers.push(`${f}: archived_at = NULL`);
+    if (/\bSET\b[^;"`]*\barchived_at\s*=/i.test(src)) writers.push(f);
+  }
+  // the one writer: service.js archive(), which sets it to the time
+  eq(writers.filter((w) => !w.startsWith("scripts/test-")), ["lib/documents/service.js"], "files that set archived_at:");
+  const svc = await readFile(join(ROOT, "lib/documents/service.js"), "utf8");
+  ok(/SET archived_at = \?, revision = revision \+ 1, updated_at = \?, updated_by = \? WHERE[^"]*",\s*args: \[at, at, by,/.test(svc), "archive() sets archived_at to the time, never null");
+});
+
+await t("P3-COMMIT: an afterCommit handler runs once after ok, never on lost or failed, and a throwing one does not change the publish result", async () => {
+  const calls = [];
+  const handler = async ({ build, items }) => calls.push({ release: build.releaseId, items: items.map((i) => i.doc.id) });
+  After.afterCommit.push(handler);
+  try {
+    const d = await create("docs", "page", { body: page("after-one", "After one", "x") });
+    const r = published(await publishApi("docs", d.id), "ok");
+    eq(calls, [{ release: r.release.id, items: [d.id] }], "once, after ok:");
+    // lost every time (busy): never
+    await save("docs", await current("docs", d.id), page("after-one", "After one", "y"));
+    const live = await pointerOf();
+    Pub.setPublishHooks({ commit: async () => ({ lost: true, outcome: "lost", pointer: live.pointer, list: live.list, busy: true }) });
+    eq((await publishApi("docs", d.id)).body.code, "PUBLISH_BUSY", "lost:");
+    Pub.setPublishHooks({ commit: async () => ({ failed: true, outcome: "failed", code: "DB_REFUSED" }) });
+    eq((await publishApi("docs", d.id)).body.code, "PUBLISH_FAILED", "failed:");
+    Pub.setPublishHooks({ commit: async () => ({ unknown: true, outcome: "unknown" }) });
+    eq((await publishApi("docs", d.id)).body.code, "PUBLISH_UNKNOWN", "unknown:");
+    Pub.setPublishHooks({});
+    eq(calls.length, 1, "never on lost, failed or unknown:");
+    // a late commit found through onLost counts once
+    let first = true;
+    Pub.setPublishHooks({
+      commit: async (b) => {
+        const real = await commitPublishBatch(b);
+        if (first) {
+          first = false;
+          const now = await inT(() => B.readLive());
+          return { lost: true, outcome: "lost", pointer: now.pointer, list: now.list };
+        }
+        return real;
+      },
+    });
+    const late = published(await publishApi("docs", d.id), "late commit");
+    Pub.setPublishHooks({});
+    eq(calls.length, 2, "the late commit, once:");
+    eq(calls[1].release, late.release.id, "its release:");
+    // a throwing handler: logged, the answer is the same
+    After.afterCommit.push(async () => {
+      throw new Error("handler broke");
+    });
+    await save("docs", await current("docs", d.id), page("after-one", "After one", "z"));
+    const { result, lines } = await logsOf(() => publishApi("docs", d.id));
+    const body2 = published(result, "with a throwing handler");
+    sameKeys(body2, shapeOf("publish", "ok").body, [...(shapeOf("publish", "ok").addedInPhase3 || []), ...(shapeOf("publish", "ok").optional || [])]);
+    eq((await current("docs", d.id)).publishedVersionId, body2.published[0].versionId, "live:");
+    ok(lines.some((l) => l.evt === "documents_after_commit_failed" && /handler broke/.test(l.error)), "logged");
+    eq(calls.length, 3, "the good handler still ran:");
+  } finally {
+    After.afterCommit.length = 0;
+    Pub.setPublishHooks({});
+  }
+});
+
+await t("P3-COMMIT: livePath covers home, every singleton, page (about, contact, a policy), campaign and journal; liveExitUrl has no token and passes /api/preview's destination()", async () => {
+  for (const t1 of R.singletonTypes()) eq(Paths.livePath(t1, {}), "/", `${t1}:`);
+  eq(Paths.livePath("home", null), "/", "home:");
+  eq(Paths.livePath("page", { slug: "about" }), "/about", "about:");
+  eq(Paths.livePath("page", { slug: "contact" }), "/contact", "contact:");
+  eq(Paths.livePath("page", { slug: "refund-policy" }), "/policies/refund-policy", "a policy:");
+  eq(Paths.livePath("campaign", { slug: "diwali" }), "/campaigns/diwali", "campaign:");
+  eq(Paths.livePath("journal", { slug: "hello" }), "/journal/hello", "journal:");
+  eq(Paths.livePath("product_content", { slug: "x" }), "/", "no address of its own:");
+  const route = await import(pathToFileURL(join(ROOT, "app/api/preview/route.js")).href);
+  for (const path of ["/", "/about", "/contact", "/policies/refund-policy", "/campaigns/diwali", "/journal/hello"]) {
+    const url = Paths.liveExitUrl(path);
+    ok(url.startsWith("/api/preview?exit=1&to=") && !/token/i.test(url), `${url}`);
+    const u = new URL(`https://psdocs.test${url}`);
+    const res = await inT(() => route.GET({ headers: new Headers({ host: "psdocs.test" }), nextUrl: u, url: u.href, cookies: { get: () => undefined } }));
+    eq([res.status, res.headers.get("location")], [302, `https://psdocs.test${path}`], `${path} lands where it says:`);
+    ok(/_preview=;|Max-Age=0/i.test(res.headers.get("set-cookie") || ""), "and clears the preview cookie");
+  }
+  eq(Paths.liveExitUrl("https://evil.test/"), "/api/preview?exit=1&to=%2F", "only a path:");
+});
+
+// ---- the API: the phase 3 operations -----------------------------------------------------------
+
+const adminU = await I.createUser({ email: "admin@ps.test", name: "Meera", password: "admin-pass-publish" });
+for (const s of STORES) await I.addMembership(adminU.id, `ps${s}`, "admin");
+const ADMIN = await tok(adminU);
+
+const NEW_OPS = {
+  unpublish: { good: (id) => ({ unpublish: { id }, revision: 1 }), bad: { unpublish: { id: 7 }, revision: 1 }, module: ["Undo", "unpublish"], publish: true, revision: true },
+  undo: { good: (id) => ({ undo: { id, logId: "log_00000000000000aa" }, revision: 1 }), bad: { undo: { id: "doc_x" }, revision: 1 }, module: ["Undo", "undo"], publish: true, revision: true },
+  undoSet: { good: (id) => ({ undoSet: { setId: "set_00000000000000aa", members: [{ id, logId: "log_00000000000000aa" }] } }), bad: { undoSet: { setId: "set_x", members: "all" } }, module: ["Undo", "undoSet"], publish: true },
+  listRecentlyPublished: { good: () => ({ listRecentlyPublished: { limit: 5 } }), bad: { listRecentlyPublished: { limit: 99 } }, module: ["Undo", "listRecentlyPublished"], read: true },
+  listChanges: { good: (id) => ({ listChanges: { id } }), bad: { listChanges: { id: 5 } }, module: ["Changes", "listChanges"], read: true },
+  keepLiveSection: { good: (id) => ({ keepLiveSection: { id, sectionId: "sec_t1" }, revision: 1 }), bad: { keepLiveSection: { id: "doc_x" }, revision: 1 }, module: ["Changes", "keepLiveSection"], revision: true },
+  keepAsEarlierDraft: { good: (id) => ({ keepAsEarlierDraft: { id, body: { type: "page" } } }), bad: { keepAsEarlierDraft: { id: "doc_x", body: "text" } }, module: ["Changes", "keepAsEarlierDraft"] },
+};
+
+await t("P3-COMMIT API: each new operation is 400 when malformed or mixed with another, before any authorization; publish-shaped ones say 'nothing was published'", async () => {
+  const before = await dump();
+  for (const [name, o] of Object.entries(NEW_OPS)) {
+    for (const as of [OWNER, null]) {
+      const r = await api(o.bad, { as });
+      eq([r.status, r.body.code], [400, "MALFORMED"], `${name} malformed (${as ? "signed in" : "signed out"}):`);
+      ok(o.publish ? /nothing was published/.test(r.body.error) : /nothing was saved/.test(r.body.error), `${name} words: ${r.body.error}`);
+      likeShape(r, o.publish ? COMMON.outcomes.malformedPublish : COMMON.outcomes.malformed, `${name} malformed`);
+      const mixed = await api({ ...o.good("doc_x"), getDocument: "doc_x" }, { as });
+      eq([mixed.status, mixed.body.code], [400, "AMBIGUOUS_OPERATION"], `${name} mixed:`);
+    }
+  }
+  // a malformed publish's words say 'published' too
+  const mp = await api({ publish: { id: "doc_x", draftHash: 5 }, revision: 1 });
+  eq(mp.status, 400, "malformed publish:");
+  ok(/so nothing was published/.test(mp.body.error), mp.body.error);
+  const ms = await api({ publishSet: [{ id: "doc_x", revision: "1" }] });
+  ok(/so nothing was published/.test(ms.body.error), ms.body.error);
+  await unchanged(before, "400s");
+});
+
+await t("P3-COMMIT API: 401 and 403 come before the mode check; staff get 403 on unpublish, undo and undoSet with storage unchanged; the rest of staff's new operations get past authorization", async () => {
+  for (const store of ["docs", "legacy"]) {
+    const before = await dump(store);
+    for (const [name, o] of Object.entries(NEW_OPS)) {
+      const out = await api(o.good("doc_home"), { as: null, store });
+      eq(out.status, 401, `${name} signed out on ${store}:`);
+      likeShape(out, COMMON.outcomes.unauthorized, `${name} 401`);
+      const staff = await api(o.good("doc_home"), { as: STAFF, store });
+      if (o.publish) {
+        eq(staff.status, 403, `${name} staff on ${store}:`);
+        likeShape(staff, COMMON.outcomes.forbidden, `${name} 403`);
+      } else ok(staff.status !== 401 && staff.status !== 403, `${name}: staff may (${staff.status})`);
+    }
+    await unchanged(before, `401/403 on ${store}`, store);
+  }
+});
+
+await t("P3-COMMIT API: a legacy store answers 409 STORE_USES_LEGACY for the new writes and the two new reads (a migrating one for the reads too); getDocument and listDocuments behave as before", async () => {
+  const before = await dump("legacy");
+  for (const [name, o] of Object.entries(NEW_OPS)) {
+    const r = await api(o.good("doc_home"), { store: "legacy" });
+    eq([r.status, r.body.code], [409, "STORE_USES_LEGACY"], `${name}:`);
+    likeShape(r, SHAPES[name].outcomes.legacy, `${name} legacy`);
+  }
+  await unchanged(before, "legacy", "legacy");
+  // migrating: the two reads refuse too (and writes, as today)
+  await raw.busy.execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
+  try {
+    for (const name of ["listRecentlyPublished", "listChanges"]) {
+      const r = await api(NEW_OPS[name].good("doc_home"), { store: "busy" });
+      eq([r.status, r.body.code], [409, "STORE_USES_LEGACY"], `${name} migrating:`);
+    }
+  } finally {
+    await raw.busy.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+  }
+  // today's reads have no mode check: same answers as the service gives
+  const g = await api({ getDocument: "doc_home" }, { store: "legacy" });
+  eq([g.status, g.body.code], [404, "NOT_FOUND"], "getDocument on a legacy store (no document there):");
+  const l = await api({ listDocuments: true }, { store: "legacy" });
+  eq([l.status, l.body.documents], [200, []], "listDocuments on a legacy store:");
+  await raw.legacy.execute({ sql: "INSERT INTO documents (id, type, slug, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES ('doc_home', 'home', NULL, 'Home page', ?, 'dh', 1, 1, 'x', 'x')", args: [JSON.stringify(R.emptyBody("home"))] });
+  const g2 = await api({ getDocument: "doc_home" }, { store: "legacy" });
+  eq(g2.status, 200, "getDocument of a row on a legacy store:");
+  eq(g2.body.document.id, "doc_home", "the row:");
+  await raw.legacy.execute("DELETE FROM documents WHERE id = 'doc_home'");
+});
+
+await t("P3-COMMIT API: 428 without a revision for unpublish, undo and keepLiveSection; 501 NOT_BUILT from every stub; storage unchanged", async () => {
+  const d = await create("docs", "page", { body: page("stub-target", "Stub target", "x") });
+  const before = await dump();
+  for (const [name, o] of Object.entries(NEW_OPS)) {
+    const req0 = o.good(d.id);
+    if (o.revision) {
+      const { revision: _r, ...noRev } = req0;
+      const r = await api(noRev);
+      eq([r.status, r.body.code], [428, "REVISION_REQUIRED"], `${name} without a revision:`);
+      ok(o.publish ? /nothing was published/.test(r.body.error) : /nothing was saved/.test(r.body.error), `${name} 428 words`);
+      likeShape(r, SHAPES[name].outcomes.revisionRequired, `${name} 428`);
+    }
+    const r = await api(req0);
+    eq([r.status, r.body.code], [501, "NOT_BUILT"], `${name} stub:`);
+    likeShape(r, COMMON.outcomes.notBuilt, `${name} 501`);
+  }
+  await unchanged(before, "stubs");
+});
+
+await t("P3-COMMIT API: the whole parsed op reaches the module (dryRun, logId, setId, members, limit, sectionId, body) and the module's {status, body} is sent as it is; confirmRepublish reaches publish", async () => {
+  const seen = [];
+  const spy = (mod) => new Proxy({}, { get: (_t, fn) => async (op, ctx) => (seen.push({ mod, fn, op, actor: ctx?.actor?.kind }), { status: 299, body: { ok: true, echo: fn } }) });
+  Api.setDocumentsApiModules({ Undo: spy("Undo"), Changes: spy("Changes") });
+  try {
+    const cases = [
+      [{ undo: { id: "doc_a", logId: "log_1", dryRun: true }, revision: 4 }, { kind: "undo", id: "doc_a", logId: "log_1", dryRun: true, hasRevision: true, revision: 4 }],
+      [{ undo: { id: "doc_a", logId: "log_2" }, revision: 5 }, { kind: "undo", id: "doc_a", logId: "log_2", dryRun: false, hasRevision: true, revision: 5 }],
+      [{ unpublish: { id: "doc_a", dryRun: true }, revision: 2 }, { kind: "unpublish", id: "doc_a", dryRun: true, hasRevision: true, revision: 2 }],
+      [{ undoSet: { setId: "set_1", members: [{ id: "doc_a", logId: "log_1" }, { id: "doc_b", logId: "log_2" }], dryRun: true } }, { kind: "undoSet", setId: "set_1", members: [{ id: "doc_a", logId: "log_1" }, { id: "doc_b", logId: "log_2" }], dryRun: true, hasRevision: false, revision: null }],
+      [{ listRecentlyPublished: {} }, { kind: "listRecentlyPublished", limit: 20, hasRevision: false, revision: null }],
+      [{ listRecentlyPublished: { limit: 50 } }, { kind: "listRecentlyPublished", limit: 50, hasRevision: false, revision: null }],
+      [{ listChanges: { id: "doc_a" } }, { kind: "listChanges", id: "doc_a", hasRevision: false, revision: null }],
+      [{ keepLiveSection: { id: "doc_a", sectionId: "sec_x" }, revision: 3 }, { kind: "keepLiveSection", id: "doc_a", sectionId: "sec_x", hasRevision: true, revision: 3 }],
+      [{ keepAsEarlierDraft: { id: "doc_a", body: { type: "page", sections: [] } } }, { kind: "keepAsEarlierDraft", id: "doc_a", body: { type: "page", sections: [] }, hasRevision: false, revision: null }],
+    ];
+    for (const [reqBody, wantOp] of cases) {
+      seen.length = 0;
+      const r = await api(reqBody);
+      eq([r.status, r.body], [299, { ok: true, echo: wantOp.kind }], `${wantOp.kind} answer as it is:`);
+      eq(seen.length, 1, `${wantOp.kind} called once:`);
+      eq(seen[0].op, wantOp, `${wantOp.kind} op:`);
+      eq(seen[0].actor, "merchant", `${wantOp.kind} actor:`);
+    }
+    // confirmRepublish reaches publish (and its items)
+    const pubSeen = [];
+    Api.setDocumentsApiModules({ Publish: { publish: async (a) => (pubSeen.push(a.ids), { release: null, setId: null, published: [], skipped: [], issues: [] }) } });
+    eq((await api({ publish: { id: "doc_a", draftHash: "h", confirmRepublish: true }, revision: 1 })).status, 200, "publish:");
+    eq((await api({ publishSet: [{ id: "doc_a", revision: 1, draftHash: "h" }, { id: "doc_b", revision: 2, draftHash: "h2", confirmRepublish: true }] })).status, 200, "publishSet:");
+    eq(pubSeen, [[{ id: "doc_a", revision: 1, draftHash: "h", confirmRepublish: true }], [{ id: "doc_a", revision: 1, draftHash: "h", confirmRepublish: false }, { id: "doc_b", revision: 2, draftHash: "h2", confirmRepublish: true }]], "the items:");
+  } finally {
+    Api.setDocumentsApiModules({});
+  }
+  // back to the real modules
+  eq((await api({ listChanges: { id: "doc_a" } })).body.code, "NOT_BUILT", "restored:");
+});
+
+await t("P3-COMMIT API: getDocument and listDocuments carry access: staff can't publish (with the plain reason), an admin and the owner can; the answers match the shapes", async () => {
+  const d = await create("docs", "page", { body: page("access-page", "Access", "x") });
+  for (const [as, who, want] of [
+    [STAFF, "staff", { canPublish: false, reason: "Only the store owner or an admin can publish. You can edit and preview." }],
+    [ADMIN, "admin", { canPublish: true, reason: null }],
+    [OWNER, "owner", { canPublish: true, reason: null }],
+  ]) {
+    const g = await api({ getDocument: d.id }, { as });
+    eq(g.status, 200, `${who} getDocument:`);
+    eq(g.body.document.access, want, `${who} getDocument access:`);
+    likeShape(g, SHAPES.getDocument.outcomes.ok, `${who} getDocument`);
+    const l = await api({ listDocuments: { type: "page" } }, { as });
+    eq(l.status, 200, `${who} listDocuments:`);
+    ok(l.body.documents.length > 0 && l.body.documents.every((x) => canon(x.access) === canon(want)), `${who} listDocuments access`);
+    likeShape(l, SHAPES.listDocuments.outcomes.ok, `${who} listDocuments`);
+  }
+  // staff really can't publish, as access says
+  eq((await publishApi("docs", d.id, { as: STAFF })).status, 403, "staff publish:");
 });
 
 // =========================================================================================

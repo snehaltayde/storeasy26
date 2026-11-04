@@ -1002,7 +1002,9 @@ await t("migration 0022 is additive, re-runs cleanly, and tenant-migrate --check
   const c = createClient({ url: "file:.test-pvo-m21.db" });
   await c.executeMultiple(schema);
   await runMigrations(c, MIGRATIONS.filter((m) => m.id < "0022"));
-  same((await checkLedger(c, MIGRATIONS)).missing, ["0022_preview_sessions"], "a 0021 store misses exactly 0022:");
+  // P3-COMMIT: later migrations (0023) follow 0022, so a 0021 store misses 0022 and those
+  same((await checkLedger(c, MIGRATIONS)).missing, MIGRATIONS.filter((m) => m.id >= "0022").map((m) => m.id), "a 0021 store misses 0022 and later:");
+  same((await checkLedger(c, MIGRATIONS)).missing[0], "0022_preview_sessions", "first missing:");
   await runMigrations(c, MIGRATIONS);
   await c.executeMultiple(M22.sql); // a second run changes nothing
   ok((await checkLedger(c, MIGRATIONS)).current, "current after 0022");
@@ -1018,7 +1020,7 @@ await t("migration 0022 is additive, re-runs cleanly, and tenant-migrate --check
   });
   const out = `${r.stdout}${r.stderr}`;
   eq(r.status, 0, `--check exit (output: ${out.trim().slice(0, 400)}):`);
-  ok(out.includes(`✓ pd: current, all ${MIGRATIONS.length} migrations up to 0022_preview_sessions`), `pd current at 0022:\n${out.slice(0, 600)}`);
+  ok(out.includes(`✓ pd: current, all ${MIGRATIONS.length} migrations up to ${MIGRATIONS[MIGRATIONS.length - 1].id}`), `pd current:\n${out.slice(0, 600)}`);
 });
 
 await t("token formats: the new token carries its sid and binds it; the old format still verifies", async () => {
