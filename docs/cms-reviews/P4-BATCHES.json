@@ -1,0 +1,737 @@
+[
+ {
+  "name": "Batch 0 - Scaffold (start now, parallel with P3-FIX5)",
+  "items": [
+   {
+    "id": "P4-SCAFFOLD",
+    "branch": "cms/p4-scaffold",
+    "reqs": [
+     "OVL-02",
+     "MIG-01",
+     "MIG-05",
+     "MIG-03"
+    ],
+    "brief": "Lay the ground for phase 4. It touches no P3-FIX5 file, so it can start now.\n\n(1) migrations/tenant/0024_content_live.sql, using CREATE TABLE IF NOT EXISTS / CREATE INDEX IF NOT EXISTS only. The DDL is pinned here; a later column need is a new 0026 file with a named owner, never an edit to 0024.\n- product_content_live: exactly the spec 8.2 columns (product_id TEXT PRIMARY KEY, document_id TEXT NOT NULL, version_id TEXT NOT NULL, title, description, description_html, featured_image, featured_image_alt, gallery, seo_title, seo_description, og_image, display_vendor, display_type, badge, modules, layout_document_id, pairs, keep_variant_images INTEGER, published_at TEXT NOT NULL) plus pairs_title TEXT and layout_template TEXT. Index product_content_live_document(document_id).\n- collection_content_live: spec columns (collection_id PK, document_id NOT NULL, version_id NOT NULL, pinned, layout_document_id, published_at NOT NULL) plus layout_template TEXT.\n- search_outbox: spec columns (product_id NOT NULL, handle, reason NOT NULL, created_at NOT NULL, done_at) and the partial index search_outbox_pending ON search_outbox(created_at) WHERE done_at IS NULL.\n- cms_migration_runs (id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('cutover','reverse')), step TEXT NOT NULL, source_hash TEXT, dry_run_digest TEXT, backup_ref TEXT, report TEXT, started_at TEXT NOT NULL, finished_at TEXT, outcome TEXT): the resumable state and lock of a cutover or reversal.\n- content_live_reversed (run_id TEXT NOT NULL, kind TEXT NOT NULL, entity_id TEXT NOT NULL, row_json TEXT NOT NULL, reversed_at TEXT NOT NULL, PRIMARY KEY(run_id, kind, entity_id)): where MIG-04 copies live rows aside (a fixed table instead of the spec's _reversed_<date>, recorded as a deviation).\nNothing reads these tables yet; table presence selects no behaviour.\n\n(2) lib/documents/ids.js: add productDocumentId(productId) -> 'doc_prod_' + 16 hex of sha256(productId) and collectionDocumentId -> 'doc_coll_'. They use the same Web Crypto helper as backfillRouteId, so they are ASYNC (return a Promise); say so in the JSDoc. Do not wire them in.\n\n(3) lib/registry/editability.js (new, pure): typeHasEditor(typeName) (true when the registry type is editable and not system) and cartEditable(), which returns the constant CART_EDITABLE = true (the plan's default for the doc_cart ruling; P4-LIVEROW makes the service match). MAPPER and CUTOVER read these instead of LIVEROW's code.\n\n(4) lib/admin/editor-entry.js: add pure entityEditorHref({product}|{collection}) -> '/admin/editor?product=<gid>' / '?collection=<gid>' (encoded) and parseEditorTarget(searchParams) -> {doc}|{product}|{collection}|{} (one key wins in that order; bad values give {}). Do not change LEGACY_ROUTE_DOCS (ED05 owns that later). Extend scripts/test-editor-routes.js for the two helpers.\n\n(5) scripts/support/tenant-fixture.js (exported helper, not a suite): makePlatform() and makeTenant({name, stage: '0017'|'0020'|'0022'|'0023'|'0024'|'latest', products}). It creates .test-<name>-*.db file databases at the repo root, migrates with runMigrations(client, MIGRATIONS.filter(m => m.id <= stage)) from lib/platform/migrate.js exactly as scripts/test-schema-compat.js:96 does, and seeds products by calling lib/sync.js writeProduct(p, syncedAt, generation) INSIDE withTenant (writeProduct takes no db). assertLocalDbUrl refuses anything but file:. Existing suites are not migrated to it.\n\n(6) scripts/test-schema-compat.js: add stage 0023 (before content live) and latest. Assert every 0024 table's exact columns with PRAGMA table_info, and that re-running 0024 succeeds.\n\n(7) scripts/tenant-migrate.js: add --check --include-env, which also checks the env store's ledger (DATABASE_URL, the _default store). Without the flag nothing changes. migrations/README.md: 0023, 0024 and 0025 must be applied on every tenant and on the env store (pnpm tenant:migrate -- --all, then --check --include-env) before code that reads or writes them deploys; that is an owner step.\n\n(8) package.json (the ONLY phase 4 item that edits it): register as 'node scripts/test-<x>.js' placeholder suites that print 'placeholder, owned by P4-<ID>' and exit 0: legacy-write-guard (GUARD), media-refs (MEDIA), legacy-fixtures (FIXTURES), content-seam (SEAM), effective-read (EFFECTIVE), product-content (LIVEROW), migrate-map (MAPPER), search-effective (SEARCH), entity-content (OVL07), media-picker (PICKER), product-editor (EDITOR), legacy-routes (ED05), migrate-render (EQUIV), migrate-documents (CUTOVER), migrate-reverse (REVERSE). Add the stable operator commands the runbook uses: \"migrate:documents\": \"node scripts/migrate-documents.js\", \"reverse:documents\": \"node scripts/reverse-documents.js\", \"media:reindex\": \"node scripts/reindex-document-refs.js\", \"drill:p4\": \"node scripts/drills/p4/run.mjs\". Create each of those four files as a stub that prints 'not built yet (P4-<owner>)' and exits 1; MAPPER, REVERSE, MEDIA and HARNESS replace them.\n\nNo behaviour change for any tenant.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [
+     "0024_content_live.sql"
+    ],
+    "files": [
+     "migrations/tenant/0024_content_live.sql",
+     "migrations/README.md",
+     "lib/documents/ids.js",
+     "lib/registry/editability.js",
+     "lib/admin/editor-entry.js",
+     "scripts/test-editor-routes.js",
+     "scripts/support/tenant-fixture.js",
+     "scripts/test-schema-compat.js",
+     "scripts/tenant-migrate.js",
+     "package.json",
+     "scripts/migrate-documents.js",
+     "scripts/reverse-documents.js",
+     "scripts/reindex-document-refs.js",
+     "scripts/drills/p4/run.mjs",
+     "scripts/test-legacy-write-guard.js",
+     "scripts/test-media-refs.js",
+     "scripts/test-legacy-fixtures.js",
+     "scripts/test-content-seam.js",
+     "scripts/test-effective-read.js",
+     "scripts/test-product-content.js",
+     "scripts/test-migrate-map.js",
+     "scripts/test-search-effective.js",
+     "scripts/test-entity-content.js",
+     "scripts/test-media-picker.js",
+     "scripts/test-product-editor.js",
+     "scripts/test-legacy-routes.js",
+     "scripts/test-migrate-render.js",
+     "scripts/test-migrate-documents.js",
+     "scripts/test-migrate-reverse.js",
+     "docs/cms-reviews/P4-SCAFFOLD.md"
+    ],
+    "acceptance": [
+     "pnpm test passes with 96 gated suites (81 plus 15 placeholders) and run-tests reports no unregistered scripts/test-*.js.",
+     "Unit (test-schema-compat): a tenant migrated to 0023 then 0024 has product_content_live (every spec 8.2 column plus pairs_title and layout_template), collection_content_live (plus layout_template), search_outbox with search_outbox_pending, cms_migration_runs and content_live_reversed, with exactly the pinned columns; running 0024 again succeeds.",
+     "Unit: await productDocumentId(x) is deterministic, matches /^doc_prod_[0-9a-f]{16}$/ and differs per id; collectionDocumentId likewise with doc_coll_.",
+     "Unit (test-editor-routes): entityEditorHref and parseEditorTarget round-trip product and collection gids, encode them, and give {} for junk.",
+     "Unit: tenant-fixture refuses a libsql:// URL and builds tenants at stages 0023, 0024 and latest whose products were written by writeProduct inside withTenant.",
+     "Unit: tenant-migrate --check --include-env fails when the env file database lacks 0024 and passes after migrating it (file databases only); --check without the flag behaves exactly as before.",
+     "The four operator stubs exit 1 with their 'not built yet' line; typeHasEditor and cartEditable are pure and have a unit case in test-registry-contract or the SCAFFOLD packet's chosen existing suite."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 1 - Foundations (cut only after P3-FIX5 has merged into cms/phase-1)",
+  "items": [
+   {
+    "id": "P4-GUARD",
+    "branch": "cms/p4-guard",
+    "reqs": [
+     "MIG-03",
+     "MIG-02",
+     "MIG-04",
+     "ED-05"
+    ],
+    "brief": "Move the content-system mode check of every old write into the write's own batch (MIG-03; P2-GUARD known limit; OC-G3, OC-W3), and give later items the guards they need. lib/cms/store.js is also a P3-FIX5 file: rebase on the merged FIX5 first.\n\n(1) lib/cms-mode.js exports three guard statements and a classifier:\n- legacyGuardStatement(): INSERT INTO cms_state (id, mode, ...) SELECT 2, ... WHERE EXISTS (SELECT 1 FROM cms_state WHERE id = 1 AND mode IS NOT 'legacy'). The EXISTS form means a table with no row reads as legacy, matching getCmsMode (lib/cms-mode.js:72-73). The CHECK(id = 1) failure aborts the batch.\n- documentsGuardStatement(): aborts unless EXISTS(id = 1 AND mode = 'documents'). LIVEROW adds it to every documents publish, Undo and live-row batch.\n- migratingGuardStatement(runId): aborts unless mode = 'migrating' AND a cms_migration_runs row with that id and finished_at IS NULL exists. Only lib/migrate/* uses it.\n- Tenants without cms_state (before 0021): probe once (the hasRefsTable pattern: cache only a positive answer) and skip the legacy guard; the other two guards refuse on such tenants.\n- classifyAbort(db, error, expectedMode): the CHECK text is identical to the release_state abort, so after any abort matching isGuardAbort it RE-READS cms_state.mode; if the mode is no longer the expected one it returns {kind: 'mode', mode}, otherwise {kind: 'lost'}. Message words: migrating -> 'Your store is being updated. Try again in a few minutes.'; documents -> today's STORE_USES_DOCUMENTS words.\n\n(2) Wrap every raw legacy write in one batch [legacyGuardStatement(), write]:\n- lib/cms/store.js: the cms_blocks, cms_pages and page_redirects writes.\n- lib/cms/placements.js: both writes. lib/catalog-overrides.js: all four writes. lib/cms/templates-store.js: all three writes.\n- lib/cms/approvals.js (cms_approvals) and lib/cms/history.js (history rows written beside guarded writes).\n- lib/content-writes.js.\n- lib/releases.js: guardedFlip, createRelease, rollbackRelease and publishReleaseById. These helpers stay LEGACY-ONLY: cutover and reversal never call them (they write their own statements under migratingGuardStatement in lib/migrate/*).\nKeep each existing pre-check for its nicer message. Every caller of isGuardAbort in lib/releases.js uses classifyAbort: guardedFlip maps a mode abort to the 409 mode words (never { lost } / 'Another publish just went live'); publishReleaseById does not retry a mode abort and returns {skipped: 'mode'} so the scheduled job stops retrying; add one test per caller. The brand and theme routes write the control plane and keep their pre-check only (spec 8.11 accepts this window): Known limit.\n\n(3) scripts/test-writers.js grep guard: a raw write to cms_blocks, cms_pages, page_redirects, placements, product_overrides, collection_overrides, cms_templates, cms_approvals or release_state outside the guarded helpers fails. Allowlist with reasons: lib/documents/* (documents publish flips release_state under the pointer and documents guard), lib/migrate/* (cutover and reversal, under the migrating guard), migrations, scripts/support/*, test files.\n\n(4) Sync pause (MIG-02): requestCatalogSync refuses to start (reports 'skipped: store is being updated') when mode is 'migrating'; runSyncSlice (lib/sync.js:775) checks the mode at the START OF EVERY SLICE and parks a running run as paused without writing, resuming on the first slice after the mode leaves 'migrating'. Webhook writes (syncProductByGid, deleteProductByGid) continue; record them as an allowed-difference source pending the owner's OK (open question).\n\n(5) Test hooks in the __contentWriteTestHooks style that flip the mode between the pre-check and the batch.\n\nLegacy tenants: identical behaviour plus one statement per batch. Documents tenants: refusals unchanged.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "lib/cms-mode.js",
+     "lib/cms/store.js",
+     "lib/cms/placements.js",
+     "lib/catalog-overrides.js",
+     "lib/cms/templates-store.js",
+     "lib/cms/approvals.js",
+     "lib/cms/history.js",
+     "lib/releases.js",
+     "lib/content-writes.js",
+     "lib/sync.js",
+     "scripts/test-legacy-write-guard.js",
+     "scripts/test-writers.js",
+     "scripts/test-releases.js",
+     "docs/cms-reviews/P4-GUARD.md"
+    ],
+    "acceptance": [
+     "Unit (test-legacy-write-guard): for every guarded write site, guardedFlip, createRelease, rollbackRelease and publishReleaseById, a hook sets mode='migrating' (and separately 'documents') after the pre-check; the write is refused with the plain 409 words, the row is unchanged, guardedFlip does not report 'lost', and publishReleaseById returns {skipped:'mode'} after one attempt.",
+     "Unit: a cms_state table with no row is legacy for every guarded writer (EXISTS form); a tenant at stage 0020 (no cms_state) saves through every writer.",
+     "Unit: documentsGuardStatement aborts on legacy and migrating; migratingGuardStatement aborts without a matching open cms_migration_runs row; classifyAbort tells a mode abort from a lost pointer race.",
+     "Unit (test-writers): the grep guard fails on a planted raw write to each listed table outside the allowlist and passes for lib/documents/* and lib/migrate/*.",
+     "Unit: on a migrating tenant requestCatalogSync reports skipped and changes no catalog rows; a run started in legacy and flipped to migrating mid-run writes nothing in its next slice and resumes after the mode returns to legacy. Legacy and documents tenants sync as before.",
+     "Unit: refusal messages are plain words with no codes or table names (snapshot). All existing suites stay green."
+    ]
+   },
+   {
+    "id": "P4-MEDIA",
+    "branch": "cms/p4-media",
+    "reqs": [
+     "MED-03"
+    ],
+    "brief": "The server side of the MED-03 reference index and archive. lib/documents/service.js is also a P3-FIX5 file: rebase on the merged FIX5 first.\n\n(1) Extraction:\n- lib/registry/settings.js refsOfSetting emits media refs (and document, product and collection link refs) from <img src> and <a href> inside rich_text html, qa_list answers and paragraphs.\n- lib/documents/refs.js refRows adds a regex belt over the whole canonical body for /api/media/<id> (absolute or relative, query string stripped). ref_id for media is the media id, never the raw src. Variants fold to their parent at usage time (media.parent_id). Unknown or carried legacy kinds are caught by the belt.\n- Export refRowsForBody(documentId, versionId, body) and releaseRefRows(releaseRow) (release:<id> rows by regex over releases.content) for CUTOVER's backfill.\n\n(2) Index every version kind: published (as today); undo_saved (widen commit.js BAD_BUILD to accept extraVersions); migrated (through the build); checkpoints (a conditional INSERT ... SELECT ... WHERE EXISTS(the version row) in the same batch as checkpointIfDueStatement); createDocument's first checkpoint. Use ON CONFLICT DO NOTHING on document_refs' key, never INSERT OR IGNORE (commit.js:58-62 rule).\n\n(3) Usage on documents-mode tenants = document_refs JOIN document_versions (so refs of pruned checkpoints never count) + a live scan of documents.draft (one row per document) + a live read of the brand and site config strings + release:<id> rows. It never runs instr() over document_versions.body or releases.content. Legacy tenants keep today's scan unchanged; tenants without 0023 fall back to the scan. Do not edit scripts/test-releases.js (GUARD owns it in this batch): put new usage cases in test-media-refs, and keep legacy usage output byte-identical so test-releases stays green untouched.\n\n(4) Migration 0025_media_archived.sql: ALTER TABLE media ADD COLUMN archived_at TEXT, alone in its file. Archive and unarchive operations on /api/admin/media; listMedia hides archived by default; /api/media/<id> keeps serving archived files. Delete is refused while any use exists; on documents tenants force deletes nothing a retained version, draft, config or release:<id> row uses; on legacy tenants force keeps today's semantics. Delete (forced or not) is refused while mode is 'migrating' ('Your store is being updated...'), so nothing the backfill indexed disappears before the flip. All code tolerates the column being absent.\n\n(5) scripts/reindex-document-refs.js (replaces SCAFFOLD's stub) and an exported reindexTenant(db, {releases}): idempotent, --tenant, --dry-run; re-extracts every document_versions row, rewrites src-form media rows to id form, and with --releases writes release:<id> rows for every retained releases row. Refuses non-file URLs unless --hosted --confirm <tenantId> (owner use only).\n\n(6) Record the MANUAL-CHECKS.md:44 decision default in the packet: the documents path fails closed; the legacy empty catch blocks are unchanged.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [
+     "0025_media_archived.sql"
+    ],
+    "files": [
+     "migrations/tenant/0025_media_archived.sql",
+     "lib/media.js",
+     "lib/documents/refs.js",
+     "lib/documents/build.js",
+     "lib/documents/commit.js",
+     "lib/documents/service.js",
+     "lib/registry/settings.js",
+     "app/api/admin/media/route.js",
+     "scripts/reindex-document-refs.js",
+     "scripts/test-media-refs.js",
+     "scripts/test-documents.js",
+     "docs/cms-reviews/P4-MEDIA.md"
+    ],
+    "acceptance": [
+     "Unit (test-media-refs): a rich_text <img src=/api/media/med_x> and a FAQ-answer image each yield media ref med_x; https://host/api/media/med_x?w=400 is stored as med_x.",
+     "Unit: across every section fixture the registry's media set is a subset of the regex belt's set.",
+     "Unit: a file used only by an older published version shows as used; a ref from a pruned checkpoint is not counted; after Undo to an old version its images are found; an undo_saved version's images are indexed.",
+     "Unit: with force:true, deleting a file used by a retained version or a release:<id> row (written by reindexTenant --releases) is refused on a documents tenant; any delete is refused on a migrating tenant.",
+     "Unit: on a documents tenant a counted client shows usage issues no statement reading document_versions.body or releases.content; legacy usage output is byte-identical to before (and scripts/test-releases.js is unchanged and green).",
+     "Unit: a tenant at stage 0024 (no archived_at) lists and deletes as before and archive is refused with a plain message; after 0025 an archived file is hidden from listMedia and still served by /api/media/<id>.",
+     "Unit: reindex-document-refs run twice gives identical rows; it refuses a libsql:// URL without --hosted --confirm."
+    ]
+   },
+   {
+    "id": "P4-FIXTURES",
+    "branch": "cms/p4-fixtures",
+    "reqs": [
+     "MIG-01",
+     "MIG-02",
+     "MIG-04"
+    ],
+    "brief": "Test infrastructure only; no lib edits.\n\n(1) Factor the tenant builders out of scripts/support/legacy-release-outputs.js, home-render-outputs.js and legacy-journal-outputs.js into scripts/support/legacy-tenants.js. Export buildLegacyTenant(db, {state, traps, entities}) and recordOutputs(db, {routes}) (enumerates every exported resolved* getter of lib/content/resolve.js). The three CLIs become thin wrappers; their JSON baselines stay byte-identical.\n\n(2) Named builders for each spec 8.11 state row: live on v1 (with live-table overrides, pins, placements, redirects), live on v2, live on v3, no release with the store open, no release not launched, a pending scheduled release, live read in error.\n\n(3) Named builders for each mapping trap: nav null vs [] vs absent (header AND footer); announcement set and empty; empty home_sections; home and page sections without ids; page sections without a kind; _default and BeastLife code-default pages; policies as cms_pages; journal family posts and index; agency home_sections stamped v2 with no ids; an unmatched highlight; a running hero experiment; AI proposal and agency kit payloads; each half-customized doc_home combination including the {store_name} default title.\n\n(4) Entity fixtures: product_overrides with modules and badge, including 6 modules (the legacy limit) and a 10000-char module, and module HTML that today's sanitizer would rewrite; pdp_pairs with a custom title and the default title; a DISABLED pdp_pairs placement; two pdp_pairs placements on one source product (different positions); a cart_upsell placement with title and position; collection pins; surface_templates.products and .collections; page_redirects to a page, a journal post, a code-default page and nothing; cms_templates rows in two families; cms_approvals rows and an agency grant.\n\n(5) Re-run fixtures for CUTOVER and REVERSE: buildPhase3Leftovers (a phase-3 random-id product_content row for a product, and a documents row holding a slug a legacy page also uses) and a 'stale backfill' state (documents and live rows from an earlier aborted run, then newer legacy edits).\n\nBuilders refuse non-file URLs.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "scripts/support/legacy-tenants.js",
+     "scripts/support/legacy-release-outputs.js",
+     "scripts/support/home-render-outputs.js",
+     "scripts/support/legacy-journal-outputs.js",
+     "scripts/test-legacy-fixtures.js",
+     "docs/cms-reviews/P4-FIXTURES.md"
+    ],
+    "acceptance": [
+     "Unit (test-legacy-fixtures): builders plus recordOutputs reproduce scripts/fixtures/legacy-release-outputs.a6d028e.json, the home-render baseline and the legacy-journal baseline exactly.",
+     "Unit: the test enumerates the required list of 8.11 state rows, mapping traps, entity fixtures and re-run fixtures in this brief and fails if any has no builder.",
+     "Unit: the builders refuse a libsql:// URL.",
+     "Every existing suite that runs the three support CLIs stays green with no baseline change."
+    ]
+   },
+   {
+    "id": "P4-SEAM",
+    "branch": "cms/p4-seam",
+    "reqs": [
+     "MIG-02",
+     "MIG-01"
+    ],
+    "brief": "Give the MIG-02 data check an explicit, production-safe source seam, so every resolved* getter can run against a given source (a candidate v4 list, in-memory bodies, injected entity rows) without cookies(), React cache() or a flip.\n\n(1) lib/content/resolve.js: every exported resolved* getter becomes a thin wrapper: resolvedX(...args) = resolvedXFrom(await contentSource(), ...args). Export contentGettersFor(src), which returns every getter bound to src, and candidateSource({list, releaseId, bodies, entityRows}) which builds {mode:'live', v:4, list, releaseId, content:null, preview:false, bodies, entityRows}. Production behaviour is identical: contentSource() is unchanged and still the only source on shopper requests. No module-level mutable source, no AsyncLocalStorage, no node: imports (edge route).\n(2) lib/content/documents-reader.js: documentBodies(list, ids, {bodies} = {}) reads a version body from the in-memory bodies map before the database, so a dry run can resolve a list whose versions were never written. Every documentBodies call in resolve.js passes src.bodies.\n(3) src.entityRows ({product: Map, collection: Map}) is carried but not read yet: P4-OVL07 makes the entity getters read it (and the live tables) whenever src.v === 4.\n(4) Do not change any getter's output, the closed/draft/live paths or the preview path.\n\nThis item owns resolve.js and documents-reader.js in batch 1; LIVEROW (documents-reader.js) and OVL07 (both) build on it later.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "lib/content/resolve.js",
+     "lib/content/documents-reader.js",
+     "scripts/test-content-seam.js",
+     "docs/cms-reviews/P4-SEAM.md"
+    ],
+    "acceptance": [
+     "Unit (test-content-seam): for every a6d028e fixture state, contentGettersFor(<the source contentSource() would build>) returns outputs deep-equal to the existing getters'; scripts/test-release-readers.js and the home-render and journal baselines stay green unchanged.",
+     "Unit: a candidate v4 list whose version bodies exist only in the bodies map resolves every non-entity getter, and a counted client shows no document_versions read for those ids.",
+     "Unit: an import scan finds no node: import reachable from resolve.js; no module-level variable holds a source (grep check).",
+     "Unit: a normal shopper request path (contentSource) never sees bodies or entityRows from a previous contentGettersFor call (two calls in sequence, then a request-shaped call)."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 2 - Server core",
+  "items": [
+   {
+    "id": "P4-EFFECTIVE",
+    "branch": "cms/p4-effective",
+    "reqs": [
+     "OVL-03",
+     "OVL-05",
+     "OVL-06",
+     "SHOP-02"
+    ],
+    "brief": "Build lib/catalog/effective.js (edge-safe Kysely, no node: imports) as the only shopper-path reader of product content columns, and move every shopper reader onto it. Do not edit lib/content/resolve.js (SEAM and OVL07 own it).\n\n(1) Selectors (COALESCE(c.x, p.x) over LEFT JOIN product_content_live c):\n- cardRows; productPage(handle) with description and description_html, seo_title, seo_description, og_image and the gallery (a non-null overlay gallery replaces product_images; its first item is the featured image); cartRows (also catalog_title = raw p.title and sku from the variant); byIds; search(q) with COALESCE(c.title, p.title) in WHERE and ORDER BY; indexRows({cursor, limit, ids}) for the Typesense builder (ids, when given, limits it to those product ids for P4-SEARCH's minimal OVL-17 drain; ids not in products are skipped; id, handle, effective title, display_type, display_vendor, effective featured image, raw tags, raw product_type, prices, availability, collection ids: everything buildSearchDoc needs; SEARCH uses it and never edits this file).\n- Shape: title, description, description_html, display_type, display_vendor, featured_image, featured_image_alt (the alt follows its image: spec 8.9 CASE), seo_*, og_image; logic_tags and logic_type carry the raw tags and product_type for logic; product_type is undefined. An empty-string overlay is a real value. modules, badge, pairs and template are not read here (OVL07).\n- Fallback: on 'no such table' for product_content_live, read raw with the same shape; cache the negative per database URL for 60 s and the positive forever.\n\n(2) Move every shopper reader: lib/repo.js getNewestProducts, getProductByHandle, getProductsInCollection, searchProductsInDb; lib/cart.js getCart; lib/wishlist.js; lib/quiz.js (results and the quiz email show effective values; scoring keeps logic_tags); lib/bundles.js; lib/cms/placements.js productsByIds and the automatic pairs ordered by effective title; the product page (metadata title AND description, JSON-LD name, description and brand = display_vendor, breadcrumb display_type, TrackEvent name); components/ProductCard.js, SearchBox.js, pdp/PdpLayouts.js; app/api/search/route.js and the search page. The offer engine, facets (lib/repo.js product_type facets) and the collection type filter stay on raw values by design.\n\n(3) Gift lines (OVL-03 consistency): at cart read, resolve each gift line's title by variant through effective.js instead of the offer config's stored title (lib/offers/engine.js:181 snapshot); lib/orders.js freezes the effective title plus catalog_title and sku on gift rows too.\n\n(4) OVL-06 ends and the cart leak: add shopperCart(cart) (strips catalog_title and sku from items and gift lines) and apply it at EVERY client boundary: app/api/cart/* responses, app/(storefront)/layout.js initialCart (around line 230 and the CartProvider prop), app/(storefront)/checkout/page.js (the CheckoutFlow cart prop) and any cart in app/api/checkout/route.js responses. createOrder (lib/orders.js:148) keeps the full server-side getCart. Orders freeze the effective title. Update test-order-catalog's literal source pin. Complete the SHOP-02 overlay sentinel: no Shopify push payload (including gift and bundle appliedDiscount.description) carries an overlay title.\n\n(5) Guard test (in test-effective-read), column-aware: in storefront paths (app/(storefront), shopper app/api routes and the lib modules they import), only effective.js may select product content columns (title, description*, images, vendor, product_type for display) from products or product_images. Allowlist, each with its reason: app/sitemap.js (handle, updated_at), lib/customers.js, lib/cms/placements.js:62, lib/repo.js product_type facets (raw logic by design), lib/content/resolve.js:669 cartPlacementRows (id and handle only). It catches selectAll and spread column constants.\n\n(6) Speed: measure getCart and the product page read on a 500-product file tenant with and without live rows, and record the numbers next to the PERF-04 baseline (MANUAL-CHECKS.md 'Speed baseline') in the packet; the effective join must not add more than one query per request.\n\nLegacy and not-yet-migrated tenants: with no live rows the output equals today's (snapshot); with no table, the raw fallback.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "lib/catalog/effective.js",
+     "lib/repo.js",
+     "lib/cart.js",
+     "lib/orders.js",
+     "lib/wishlist.js",
+     "lib/quiz.js",
+     "lib/bundles.js",
+     "lib/cms/placements.js",
+     "lib/offers/engine.js",
+     "app/(storefront)/products/[handle]/page.js",
+     "app/(storefront)/search/page.js",
+     "app/(storefront)/layout.js",
+     "app/(storefront)/checkout/page.js",
+     "app/api/search/route.js",
+     "app/api/cart/",
+     "app/api/checkout/route.js",
+     "components/ProductCard.js",
+     "components/SearchBox.js",
+     "components/pdp/PdpLayouts.js",
+     "scripts/test-effective-read.js",
+     "scripts/test-order-catalog.js",
+     "scripts/test-shopify-boundary.js",
+     "scripts/test-storefront.js",
+     "scripts/test-surfaces.js",
+     "docs/cms-reviews/P4-EFFECTIVE.md"
+    ],
+    "acceptance": [
+     "Unit (test-effective-read): the guard test passes with exactly the listed allowlist; a planted selectAll() from products in a storefront lib file makes it fail.",
+     "Unit: with a live row titled 'New', the card, product page (title, meta title, JSON-LD), cart, checkout page props, order confirmation, the shopper order page, search (SQL), wishlist, quiz result and quiz email, bundle, pairs and the TrackEvent name all show 'New'; search finds 'New' at once and orders by it.",
+     "Unit: a published description_html overlay renders on the product page and feeds the meta description and JSON-LD description.",
+     "Unit: a display_type or display_vendor override shows on card, search, breadcrumb, vendor line and JSON-LD and never changes which offers apply or which type filter or facet matches.",
+     "Unit: an order freezes the effective title and the raw catalog_title, for normal and gift lines; a past order is unchanged after a later title change; a gift line shows the effective title in the cart.",
+     "Unit: no cart reaching the browser (api/cart responses, layout initialCart prop, checkout page prop, api/checkout responses) contains catalog_title or sku; createOrder still receives them. test-order-catalog and the SHOP-02 sentinel (including gift and bundle descriptions) pass.",
+     "Unit: a draft-only edit (documents.draft, no live row) never reaches cart, search, sitemap or email.",
+     "Unit: on a tenant at stage 0023 (tenant-fixture) the cart, product page, search and order creation work and match today's outputs.",
+     "Unit: an overlay featured image never pairs with Shopify's alt; an empty-string overlay is respected; indexRows pages through every product with no gaps, and indexRows({ids}) returns exactly those products' effective rows, skipping ids that are not in products.",
+     "Unit: an import scan finds no node: import reachable from effective.js. The packet records the getCart and product-page timings against PERF-04."
+    ]
+   },
+   {
+    "id": "P4-LIVEROW",
+    "branch": "cms/p4-liverow",
+    "reqs": [
+     "OVL-01",
+     "OVL-02",
+     "OVL-07",
+     "ED-12",
+     "MED-03",
+     "OVL-05",
+     "OVL-17"
+    ],
+    "brief": "Make product content and collection content real, publishable documents with live rows. lib/documents/service.js, lib/documents/changes.js, lib/admin/documents-api-shapes.js and scripts/test-api-shapes.js are also P3-FIX5 files: rebase on the merged FIX5 first.\n\n(1) Registry, product_content: settings title, description_html (rich_text; plain description derived at publish), gallery, display_vendor, display_type, badge (up to 30 chars), template ('classic'|'editorial'|null), pairs ({title, products:[ids]}, a new pairs kind) and keep_variant_images. gallery is a new kind, an ordered list of {media, alt}, with refs (MED-03); hosts limited to cdn.shopify.com and /api/media/<id> (the OVL-13 allowlist, a P1 pulled forward: record it). Shopify-derived overlay fields are stored as {value, base_hash, base_value}; base = the raw value at first edit; image URLs are normalized by stripping the query string before hashing. Modules = sections narrowed to rich_text, text and faq for NEW content; image_with_text stays registered for product_content but not offered, so existing sections still load and show an inherited warning instead of being dropped. Values beyond today's limits (more than 6 modules, longer than the cap) load and save verbatim with an inherited warning; they are never truncated.\n\n(2) Registry, collection_content: pinned (ordered product ids) and template; publishable.\n\n(3) Service:\n- createDocument for these types uses await productDocumentId / collectionDocumentId. openEntityContent({type, entityId}) returns the row found by (type, entity_id) (including phase-3 random-id rows) or creates one; it un-archives an archived row when the entity exists. It also returns {titleEditable, titleBlockedReason} from the title gate below.\n- A write naming a Shopify-only field (price, compare_at_price, variants, inventory, availability, handle, tags, product_type, options) is refused with 422 SHOPIFY_OWNED and plain words; an empty title is refused; archive is refused while a live version exists.\n- Product deletion never archives the document: 'no longer in Shopify' is computed live from products, so a product that returns with the same id needs no un-archive and its edits apply at once.\n- discardOrphanEdits (storefront.publish): one batch [documentsGuardStatement, DELETE FROM product_content_live WHERE product_id = ? AND NOT EXISTS (SELECT 1 FROM products WHERE id = ?), log row, draft reset], so a webhook that re-creates the product between check and batch keeps the edits.\n- Cart ruling default: remove refuseCart, give doc_cart storefront.write and storefront.publish; cartEditable() in lib/registry/editability.js already returns true.\n\n(3b) Overlay field rules (OVL-04, R4). The editor relies on these, so the service enforces them, not the UI:\n- 'Reset to Shopify' and 'Use Shopify's' both set the field to null in the draft (follow Shopify again). Never a copy of base_value.\n- Saving a value equal to the current raw Shopify value (image URLs normalized as above) stores null, so the founder never silently stops following Shopify.\n- A new value on a field with no base takes base_hash and base_value from the current raw value; later edits keep that base.\n- resolveShopifyChange({id, field, choice}) (storefront.write): 'keep' re-bases base_hash and base_value to the current raw value in the draft and keeps the founder's value; 'shopify' sets the field to null. Both change only the draft, so the 'Changed in Shopify' notice and count (P4-SEARCH reads the draft's base) clear as soon as the founder decides, not after a later publish.\n- The gallery is one field. product_images ids are synthesized (<productId>::img::<i>, lib/schema.sql:28), so there is no per-image identity: editing any image, alt text or the order makes the whole gallery the founder's copy, and its base is the whole Shopify gallery.\n- New lib/admin/shopify-admin-url.js: shopifyAdminBase() moved verbatim from app/api/admin/catalog/route.js:25-29 (tenantOwnCfg shopify_store_domain) plus shopifyAdminUrl({product}|{collection}) for the entity's page in Shopify admin. Do not edit the route (P4-ED05 switches it to the import in batch 4). openEntityContent also returns shopifyAdminUrl.\n\n(4) Title gate, lib/catalog/title-gate.js (new): titleGate() is blocked when (a) typesenseConfigured() && productsCollection() is non-null for the current tenant, INCLUDING _default, which uses the env collection (lib/typesense-search.js:13-17), until P4-SEARCH ships the minimal OVL-17 reindex in batch 3 and removes this condition (owner answer OQ-1 (b)); or (b) the constant TITLE_READERS_READY is false (P4-SEARCH flips it when every console reader and the Typesense builder use effective values). Export a test seam (setTitleGateForTest(state|null)) so later items can force the gate closed or open in unit tests; never used outside tests. When blocked, a SAVE that sets title, display_type or display_vendor is refused at write time with 'Search on your store still shows Shopify's product names, so a new name can't be saved yet.' (drafts never hold an unpublishable title), and publish re-checks it as a belt. Clearing these fields (Reset, null) is never gated. The belt can only fire for a title saved before the gate turned on (for example Typesense configured later). It then follows today's set rule (lib/documents/publish.js:417-444: a blocked document refuses the set and is named): the refusal names the product in plain words, 'The new name for <product> can't go live yet, because search on your store still shows Shopify's names. Reset the name or leave this product out of this publish.' Badge, modules, pairs, gallery, description and template are never gated.\n\n(5) Publish and Undo for live-row types. lib/documents/live-rows.js exports liveRowFor(type, body, {documentId, versionId, publishedAt}) (CUTOVER's backfill uses this same function): modules = the pdpExtrasFromBody mapping to [{title, html}]; gallery = [{url, alt}] with the first item as featured_image and its alt; description = plain text from description_html; pairs ids + pairs_title; template -> layout_template. A set of only these types is one batch [documentsGuardStatement, version, live-row upsert or delete, log row (release_id null), document update guarded on published_version_id and revision, refs, search_outbox row] with no release row. A mixed set adds the live-row statements (search_outbox rows included) to commitPublishBatch guarded by the pointer being :new, and commitPublishBatch also gains documentsGuardStatement. search_outbox rows (the source of P4-SEARCH's minimal OVL-17 reindex): every batch that changes or deletes a product_content_live row (a live-row set, a mixed set, Undo, undoSet, discardOrphanEdits) writes one row per affected product INSIDE that batch: product_id, handle = products.handle at write time (null when the product is gone), reason 'publish' | 'undo' | 'discard', created_at, done_at null. A collection_content-only change writes none. Nothing drains them in this batch (P4-SEARCH, batch 3); they are never written outside the batch, because enqueueing afterwards can fail silently (spec OVL-17). Every abort goes through classifyAbort (mode change -> plain mode words, not 'lost'). Undo of a first publish deletes the live row. A retry after a lost response reuses its ids.\n\n(6) Remove the PUBLISH_NOT_AVAILABLE refusal for these types in lib/registry/validate.js:397, lib/documents/publish.js and lib/documents/undo.js:373. lib/documents/changes.js describes their changes. documents-reader.js: product_content and collection_content stay in NOT_OVERLAID (OVL07 does per-page draft preview instead).\n\n(7) documents-api.js gains openEntityContent, discardOrphanEdits and resolveShopifyChange with shapes in documents-api-shapes.js. Update test-registry-contract, test-publish, test-failure-matrix and test-editor-inspector for the new product_content shape (the editor UI stays read-only until EDITOR).\n\nPublishing still needs mode documents, so legacy and migrating tenants are untouched.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).\n\nOrchestrator ruling (unpublish): product and collection content documents cannot be taken offline. The unpublish op for these kinds answers 422 with plain words: \"Product content can't be taken offline. To go back to what Shopify sends, choose Use Shopify's on each field and publish.\" No live row is deleted and no search_outbox row is written. Add the error code to lib/admin/documents-api-shapes.js only if you own it this batch; otherwise reuse NOT_PUBLISHABLE with these words.",
+    "migrations": [],
+    "files": [
+     "lib/registry/document-types.js",
+     "lib/registry/settings.js",
+     "lib/registry/sections.js",
+     "lib/registry/validate.js",
+     "lib/documents/service.js",
+     "lib/documents/publish.js",
+     "lib/documents/undo.js",
+     "lib/documents/build.js",
+     "lib/documents/commit.js",
+     "lib/documents/changes.js",
+     "lib/documents/live-rows.js",
+     "lib/documents/checks.js",
+     "lib/catalog/title-gate.js",
+     "lib/content/documents-reader.js",
+     "lib/admin/documents-api.js",
+     "lib/admin/documents-api-shapes.js",
+     "scripts/test-product-content.js",
+     "scripts/test-publish-service.js",
+     "scripts/test-publish-undo.js",
+     "scripts/test-api-shapes.js",
+     "scripts/test-registry-contract.js",
+     "scripts/test-publish.js",
+     "scripts/test-failure-matrix.js",
+     "scripts/test-editor-inspector.js",
+     "lib/admin/shopify-admin-url.js",
+     "docs/cms-reviews/P4-LIVEROW.md"
+    ],
+    "acceptance": [
+     "Unit (test-product-content): publishing one product changes exactly one product_content_live row and inserts no releases row; no releases.content ever contains overlay values (scan); an unpublished draft never appears in product_content_live.",
+     "Unit: a hook that sets mode to 'migrating' (and to 'legacy') between the pre-check and the batch makes a live-row publish, an Undo, a discardOrphanEdits and a mixed-set publish abort with no row changed and the plain mode words (not 'another publish').",
+     "Unit: writeProduct (full sync) AND syncProductByGid (webhook) after an edit leave the edited fields' effective values unchanged and change the unedited ones.",
+     "Unit: a product deleted and returned with the same id keeps its edits with no editor visit, including when its document had been archived (openEntityContent un-archives it); a new id leaves the old edits orphaned; discardOrphanEdits removes the live row only for an orphan, is refused otherwise, and keeps the row when the product reappears between check and batch (hook).",
+     "Unit: writes naming price, handle, tags, product_type or variants are refused with SHOPIFY_OWNED; an empty title gives 422.",
+     "Unit: openEntityContent returns the same id as productDocumentId for a new product and reuses a phase-3 random-id row.",
+     "Unit: in a mixed set (doc_home plus a product), publishing is all-or-none under hrana-fault-proxy commitThenDrop and a retry; Undo restores the previous live row, or deletes it after a first publish.",
+     "Unit: title gate: with Typesense configured on _default (env collection, no own setting) and on a tenant with its own collection, saving a title or display_* is refused at save with the plain words and badge/modules save and publish; with Typesense off but TITLE_READERS_READY false the same refusal applies; openEntityContent reports titleEditable false with the reason.",
+     "Unit: an existing image_with_text module and a 7th module load and save verbatim with inherited warnings.",
+     "Unit: a gallery image outside the allowlist is refused at publish; gallery media appear in document_refs.",
+     "Unit: collection_content publish writes collection_content_live.pinned and layout_template; doc_cart saves and publishes with storefront.write/publish.",
+     "Unit: a publish on a legacy or migrating tenant is still refused; test-api-shapes covers the new operations; test-registry-contract, test-publish, test-failure-matrix and test-editor-inspector pass.",
+     "Unit: Reset and resolveShopifyChange 'shopify' store null; saving a value equal to the raw Shopify value stores null; 'keep' re-bases base_hash and base_value in the draft only (the published body and live row are unchanged); a second edit keeps the first base; with the gate blocked, clearing a title is allowed.",
+     "Unit: a mixed set (doc_home plus a product whose draft title was saved before the gate turned on) is refused, naming the product in plain words; the same set without that product publishes.",
+     "Unit: shopifyAdminUrl gives the Shopify admin product and collection pages for a configured store and null without a store domain; openEntityContent returns it.",
+     "Unit: every live-row publish, mixed-set publish, Undo, undoSet and discardOrphanEdits writes exactly one search_outbox row per affected product inside its batch (handle stored, null for a gone product; reason publish, undo or discard); an aborted batch (mode hook or hrana-fault-proxy) leaves no outbox row; a collection_content-only publish writes none.",
+     "unit: unpublish of a product or collection content document is refused with the plain words, leaves the live row and writes no search_outbox row"
+    ]
+   },
+   {
+    "id": "P4-MAPPER",
+    "branch": "cms/p4-mapper",
+    "reqs": [
+     "MIG-01",
+     "MIG-02",
+     "DOC-03"
+    ],
+    "brief": "A pure MIG-01 mapper plus a read-only dry run. It writes nothing.\n\n(1) lib/migrate/map.js maps legacy content to section 8.3 documents using the merged kind names: the 8 cms_blocks keys (header and footer honour nav null vs [] vs absent; announcement); cms_pages by family (doc_p_<hash> via backfillRouteId; policies; journal posts and index); design from config brand and theme (env config for _default); doc_cart from the cart_upsell placement (title and position kept); page_redirects attached to the target document's meta.redirect_from or reported unresolved; the surface_templates header, footer, pdp and collection entries. lib/migrate/state.js classifies the tenant per the spec 8.11 table, EXCEPT 'no release': that state needs an explicit operator flag, storeOpen: true|false (--store-open / --not-launched); without it the mapper returns a refusal 'needs --store-open or --not-launched' and never guesses. It honours every trap: sec_l<i> and i-<n> ids kept, the materialized half of a half-customized doc_home with a {store_name} binding, sections without a kind become text, code-default pages. Values that fail strict validation or exceed limits are carried verbatim with inherited warnings, never truncated.\n\n(2) lib/migrate/ids.js: ver_<16hex of sha256(documentId + bodyHash)> (content-addressed, so the same id always means the same body), rel_mig_<hash of the list>, draft_hash and published_hash with ids stripped (an unchanged tenant has 0 dirty documents). All async.\n\n(3) Existing rows (reconcile report, read-only): for each mapped document, whether a documents row already exists by id or by (type, entity_id) (phase-3 random ids are reused, never duplicated), whether its draft differs from the legacy-derived draft (it will be kept as a 'kept' version, never lost), and any slug collision with a documents row of another id (a refusal state). Existing product/collection live rows are listed.\n\n(4) cms_templates: not mapped (blueprints are DOC-09, P1); the report counts them per family and says where they stay reachable (P4-ED05's read-only 'saved templates' page).\n\n(5) Output: {documents, list (the v4 envelope with m), bodies (Map versionId -> body), liveRows, refs, report, sourceHash}. sourceHash is a stable hash of every legacy source row the mapping read (CUTOVER compares it to the rehearsal's). The entity part calls lib/migrate/map-entities.js, which this item creates as a stub returning empties (OVL07 owns it in batch 3). Live rows come from P4-LIVEROW's liveRowFor once map-entities fills bodies.\n\n(6) scripts/migrate-documents.js --tenant X --dry-run [--json] [--store-open|--not-launched] (replaces SCAFFOLD's stub).\nThe default output is a plain-words report a non-developer can act on (lib/migrate/report.js renders it), in this order:\n- one verdict line: 'Ready to move' or 'Not ready: N things to fix', each fix named in founder words with where to fix it;\n- 'What shoppers will see change' (expected: nothing; each exception named by page or product);\n- 'Unpublished changes that will carry over as drafts' and 'Drafts kept as older versions', named by page;\n- 'Things the new editor will flag' (inherited warnings, by page);\n- 'Old addresses that couldn't be matched';\n- 'Saved templates' (count, and where they stay reachable);\n- 'Team access that changes': the cart offer moves from upsells.write to storefront.write and storefront.publish, so the staff role (lib/platform/authz.js:19-20: upsells.write and storefront.write, no storefront.publish) can still edit the cart offer but needs an owner or admin to publish it.\nDeveloper detail goes below a 'Details' line, and in full with --json:  the mapping, unresolved refs, sections that would change, per document the sections failing strict validation, types holding content without an editor (typeHasEditor, cartEditable from lib/registry/editability.js, never LIVEROW code), refusal states (pending schedule, live read error, cms_approvals rows or agency grants: DOC-13 not built, slug collisions, missing 'no release' flag), the reconcile report, the cms_templates count, the in-process data check result (below), and estimated backfill and flip statement counts. Both outputs end with the dry-run digest, a hash of the full JSON report whatever the output format, which CUTOVER requires. Refuses non-file URLs unless --hosted --confirm <tenantId> (owner only: a real dry run reads real data).\n\n(7) In-process data check (non-entity part): build candidateSource({list, bodies}) through P4-SEAM and compare every non-entity resolved* getter against the legacy source's output for the routes in recordOutputs; differences are listed. OVL07 adds the entity getters.\n\n(8) A fixture shows that a running hero experiment still serves the same hero on the migrated home (heroVariantSettings), with no payload rewrite.\n\nTests use P4-FIXTURES builders.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "lib/migrate/map.js",
+     "lib/migrate/ids.js",
+     "lib/migrate/state.js",
+     "lib/migrate/report.js",
+     "lib/migrate/check.js",
+     "lib/migrate/map-entities.js",
+     "scripts/migrate-documents.js",
+     "scripts/test-migrate-map.js",
+     "docs/cms-reviews/P4-MAPPER.md"
+    ],
+    "acceptance": [
+     "Unit (test-migrate-map): every 8.11 state row and mapping-trap fixture maps as the spec says; 'no release' without a flag is a refusal; with --store-open its published versions come from the drafts; with --not-launched it has none.",
+     "Unit: mapping the same tenant twice gives deep-equal output including ids, hashes and sourceHash; any legacy edit changes sourceHash.",
+     "Unit: a draft that differs from the live release stays a draft (dirty); an unchanged tenant maps to 0 dirty documents.",
+     "Unit: the candidate list parses through documents-reader parseList, and for every non-entity getter the SEAM data check equals the legacy outputs on every fixture state, in-process with no write.",
+     "Unit: the running hero experiment fixture serves the same hero settings on the migrated home.",
+     "Unit: the reconcile report finds the phase-3 random-id product row (reused id) and the slug collision (refusal); over-limit values are carried verbatim with warnings.",
+     "Unit: the dry run leaves the database file byte-identical (hash before and after), prints the digest, reports the cms_templates count, unresolved redirects, cart/approval/schedule refusal states and strict-validation counts, and refuses a libsql:// URL without --hosted --confirm.",
+     "Unit (snapshot): the default dry-run output starts with the verdict line and the plain sections in order; above 'Details' it contains no table names, error codes, ids or statement counts; --json holds the full detail; the digest is the same with and without --json.",
+     "Unit: the 'Team access that changes' section names the staff role for the cart offer, from roleAllows, on a tenant with a cart_upsell placement.",
+     "Unit (MIG-01, DOC-03): every section in every mapped body uses a merged kind name registered in lib/registry; no pre-merge kind name appears in any body, on every fixture state and mapping trap."
+    ]
+   },
+   {
+    "id": "P4-HARNESS",
+    "branch": "cms/p4-harness",
+    "reqs": [
+     "MIG-02",
+     "MIG-03",
+     "MIG-04"
+    ],
+    "brief": "The proof infrastructure for phase 4. Do not edit scripts/drills/p3/*; import from it.\n\n(1) scripts/seed-design-documents.js --p4: the perf seed as a LEGACY store live on a v3 release made with createRelease (no takeOver). It includes 24 product overrides (one with 6 modules), 40 pairs (one with a custom pairs title, one disabled, one source product with two placements), a cart_upsell placement, 5 pinned collections, one per-product and one per-collection template exception, 32 library photos (one used only inside product module HTML), a running hero experiment, a page_redirect, two cms_templates rows, and the P3 logins. The --p3 seed is unchanged. Accept --p4 in dev-design.js if needed.\n\n(2) scripts/drills/p4/local-tenants.mjs builds file-database copies at v1, v2, v3, no release (open) and no release (closed) for CLI drills, using P4-FIXTURES builders.\n\n(3) scripts/drills/p4/lib.mjs re-exports the p3 lib (runDrill, storeSql, login, p3Ports, which refuses 3017) and adds reseedP4(), captureShopperRoutes(baseUrl, routes, outDir) (fetch with no cookies; experiments are deterministic without a unit cookie), and assertLocal(url).\n\n(4) scripts/drills/p4/run.mjs (replaces SCAFFOLD's stub) runs stages 'seed' and 'smoke'; P4-DRILLS adds the rest.\n\n(5) docs/cms-reviews/P4-HARNESS.md documents all of this, plus how an owner makes a local restore-drill copy of a real tenant for a rehearsal (scripts/restore-drill.js; the copy holds customer data and stays on the owner's machine).\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "scripts/seed-design-documents.js",
+     "scripts/dev-design.js",
+     "scripts/drills/p4/lib.mjs",
+     "scripts/drills/p4/run.mjs",
+     "scripts/drills/p4/local-tenants.mjs",
+     "docs/cms-reviews/P4-HARNESS.md"
+    ],
+    "acceptance": [
+     "Drill (run.mjs seed): after --p4, cms_state.mode is legacy, the live release has v 3, and SQL counts match the seed list (including the disabled placement and two cms_templates rows).",
+     "Drill (desktop Chrome on the harness): the storefront shows the badge, the custom pairs title, the pinned products first and the editorial template on the chosen product.",
+     "Drill: the p3 'items' stage still passes after reseeding with --p3.",
+     "Check inside lib.mjs: assertLocal refuses a non-localhost URL and p3Ports still refuses 3017.",
+     "local-tenants.mjs produces the five file-database states, verified by SQL."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 3 - Readers, search, entity content and pickers",
+  "items": [
+   {
+    "id": "P4-SEARCH",
+    "branch": "cms/p4-search",
+    "reqs": [
+     "OVL-05",
+     "OVL-03",
+     "OVL-04",
+     "OVL-06",
+     "OVL-17"
+    ],
+    "brief": "(1) lib/catalog/search-doc.js: buildSearchDoc(effectiveRow) is the one builder. indexTypesense in lib/sync.js reads through effective.js indexRows (shipped by P4-EFFECTIVE; do NOT edit lib/catalog/effective.js, OVL07 owns it in this batch), so a full sync no longer restores Shopify titles. After a full import it marks pending search_outbox rows done; a full sync also deletes done rows older than 30 days, and on tenants without Typesense it marks pending rows done (bounded growth). Only rows created before the import read its rows are marked done (a row written during the import stays pending). The one-product reindex is (6). For the spy test: lib/sync.js already accepts an injected indexer (lines 723 and 894); if the Typesense client itself needs a seam, add it in lib/typesense-search.js (this item's file).\n\n(2) Console readers show published effective values, never drafts, with shopify_title as secondary text when it differs: lib/admin/refs.js product picker (search and sort on the effective title; the cursor encodes the COALESCE value); lib/offers/catalog.js (offer names and example carts); the bundles AND upsells picker API routes; lib/reporting.js currentProductTitles (effective title, grouped by product id).\n\n(3) The editor's product list: lib/admin/product-content-list.js plus a listProductContent operation in documents-api.js (with its shape): paginated over every product with effective title, shopify_title, edited flag and document id; a q search that matches the effective title and the Shopify title; filter 'changed_in_shopify' (for edited products only, compare each overlay field's base_hash in the DRAFT with the current raw value, image URLs normalized; a field that is null in the draft never counts, so 'Keep mine', 'Use Shopify's' and Reset clear it at once without a publish, per P4-LIVEROW (3b)); filter 'orphaned' (product_content documents whose entity is not in products); counts for the shell. Measure the list on the perf seed and record it.\n\n(4) Order page: the 'Shopify title: X, SKU: Y' line uses a token measured at 4.5:1 or better (it was 2.56:1).\n\n(5) Title gate. When (1), (2) and (6) are done and their spy tests pass, in lib/catalog/title-gate.js set TITLE_READERS_READY = true AND remove condition (a), the Typesense half (owner answer OQ-1 (b): once the reindex ships and is proven, renaming works on every tenant, _default and Typesense tenants included). Keep titleGate()'s shape, the save-time refusal, the publish belt and LIVEROW's setTitleGateForTest seam, so a future gate reuses them. Rewrite LIVEROW's Typesense title-gate cases in scripts/test-product-content.js to the new rule (this item owns that file in batch 3).\n\n(6) Minimal OVL-17, pulled into phase 4 by the owner (OQ-1 (b)): a published, undone or reset product name reaches Typesense search without waiting for a full sync.\n- Source: the search_outbox rows P4-LIVEROW writes inside every live-row batch (publish, publishSet, Undo, undoSet, discardOrphanEdits), and that P4-CUTOVER (flip) and P4-REVERSE (reversal) write. A Reset changes only the draft; it reaches shoppers and search when that draft is published, through the same row.\n- New lib/catalog/search-reindex.js: drainSearchOutbox({ client = null, limit = 100, log }) for the current tenant. It reads pending rows (rowid, product_id, handle) oldest first; reads the effective values with indexRows({ ids }) (P4-EFFECTIVE; do not edit effective.js); builds each document with buildSearchDoc and upserts them (documents().import with action 'upsert'); deletes by the stored handle a product that no longer exists (a null handle is marked done and left to the next full sync, which rebuilds the collection); then marks done only the rowids it read, so a row written meanwhile stays pending. It never drops or recreates the collection and never writes outside the current tenant's productsCollection(); with Typesense not configured or no namespace it makes no client call and marks the rows done. client defaults to getAdminClient(); tests pass a spy client, never a real Typesense.\n- Triggers: (i) Fast path: lib/admin/documents-api.js, after a publish, publishSet, unpublish, undo, undoSet or discardOrphanEdits has answered success, calls kickSearchReindex() from search-reindex.js, which enqueues a durable 'search_reindex' job (enqueueDurable) and runs drainSearchOutbox inline with a short cap (SEARCH_REINDEX_TIMEOUT_MS, the same awaited-with-timeout pattern as lib/documents/after-commit.js, which stays unedited). A throw or timeout is logged ('search_reindex_failed' or 'search_reindex_timeout') and never changes the answer, because the publish is already live. The job idempotency key is 'search_reindex:' + tenantId() + ':' + the highest pending search_outbox rowid at kick time, so repeated kicks for the same pending rows coalesce but a later publish always gets a new job (jobs.idempotency_key is UNIQUE for all time and done jobs are kept for days, so a fixed per-tenant key would swallow every later kick); with no pending rows no job is enqueued. CUTOVER and REVERSE call the same kickSearchReindex(). (ii) Retry: a 'search_reindex' handler in lib/platform/worker.js HANDLERS runs drainSearchOutbox under the job's tenant; a failure throws into the job backoff. (iii) Backstop: every full sync drains the outbox after import ((1)), so rows left by a dead queue (enqueueDurable returns null), a store with no control plane or a failed fast path still converge.\n- Failures are retried (rows stay pending; 0024 is pinned, so there is no attempts column and no new migration) and logged; they never block or fail a publish, and nothing here writes to Shopify.\n\nLegacy tenants: pickers and reports equal today's output when no live rows exist.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).\n\nOrchestrator ruling (gate words): when you keep the title gate's shape for a future gate, the refusal reason must come from the condition that blocked (each condition carries its own plain words); never show the Typesense wording when Typesense is not the cause.",
+    "migrations": [],
+    "files": [
+     "lib/catalog/search-doc.js",
+     "lib/catalog/search-reindex.js",
+     "lib/catalog/title-gate.js",
+     "lib/sync.js",
+     "lib/platform/worker.js",
+     "lib/typesense-search.js",
+     "lib/admin/refs.js",
+     "lib/offers/catalog.js",
+     "lib/reporting.js",
+     "lib/admin/product-content-list.js",
+     "lib/admin/documents-api.js",
+     "lib/admin/documents-api-shapes.js",
+     "app/api/admin/bundles/",
+     "app/api/admin/upsells/",
+     "app/(console)/admin/(authed)/orders/[id]/page.js",
+     "lib/admin/order-view.js",
+     "scripts/test-product-content.js",
+     "scripts/test-search-effective.js",
+     "scripts/test-refs.js",
+     "scripts/test-api-shapes.js",
+     "docs/cms-reviews/P4-SEARCH.md"
+    ],
+    "acceptance": [
+     "Unit (test-search-effective): a spy shows indexTypesense builds every document with buildSearchDoc from indexRows; after a full sync the effective title is indexed, not Shopify's; a draft is never indexed; pending outbox rows are marked done and old done rows are pruned.",
+     "Unit: the refs picker finds a renamed product by its new name, shows the Shopify title as secondary text and never a draft title; cursor paging over 61 products with mixed overrides has no duplicates or gaps.",
+     "Unit: the offer, bundle and upsell pickers find a renamed product by its new name.",
+     "Unit: in top products, renaming a product keeps one row with the current title.",
+     "Unit: after writeProduct or syncProductByGid changes an edited field, changed_in_shopify and its count include the product; changing an unedited field does not; deleting the product moves it to orphaned; a query-string-only image change triggers nothing; the list pages through a catalog over 30.",
+     "Unit: TITLE_READERS_READY is true and condition (a) is gone: with Typesense configured on _default (env collection) and on a tenant with its own collection (dummy config, spy client), saving and publishing a title or display_* succeeds and the spy shows the new title indexed; with the gate forced closed by setTitleGateForTest the save-time refusal and the publish belt still fire with their plain words.",
+     "Rendered: the order page's Shopify-title line has computed contrast of at least 4.5:1.",
+     "Unit: listProductContent q finds a renamed product by its new name and by its Shopify name; after resolveShopifyChange 'keep' or 'shopify', or a Reset, the product leaves changed_in_shopify and its count at once, with no publish.",
+     "Unit (test-search-effective, spy client): publishing a renamed product (alone and in a publishSet) leaves one pending outbox row; the fast-path drain upserts only that product with the new effective title from indexRows({ids}), marks the row done and never deletes or recreates the collection; Undo puts the previous title back in the index; Reset then publish indexes Shopify's title; Undo of a first publish indexes Shopify's title; discardOrphanEdits of a gone product deletes it by its stored handle.",
+     "Unit (spy client): a client that throws or hangs leaves the publish answer unchanged (200), the row pending and a search_reindex_failed or search_reindex_timeout log line; the 'search_reindex' job then drains it; with enqueueDurable returning null and the inline drain failing, the next full sync converges (spec OVL-17: a queue failure after commit still converges); a row written during a drain stays pending; two kicks with the same pending rows enqueue one job, and a kick after a later publish (new pending rowid) enqueues a second job even though the first is done; no Shopify call is made anywhere in the path.",
+     "Unit: on a tenant without Typesense or without a namespace the drain makes no client call and marks the rows done; the drain only ever addresses the current tenant's productsCollection().",
+     "unit: with the gate forced closed by a non-Typesense condition, the refusal words name that condition, not search"
+    ]
+   },
+   {
+    "id": "P4-OVL07",
+    "branch": "cms/p4-ovl07",
+    "reqs": [
+     "OVL-07",
+     "OVL-02",
+     "ED-12",
+     "PV-03",
+     "MIG-02"
+    ],
+    "brief": "(1) The v4 reader uses the live rows. Whenever src.v === 4 (a live v4 release OR a SEAM candidateSource), these getters read the entity row from src.entityRows when given, else through new contentRowFor(productId) / collectionRowFor(collectionId) in lib/catalog/effective.js:\n- resolvedProductOverride -> {modules, badge} from product_content_live;\n- resolvedPdpPairs -> the live pairs (title and ids), then the automatic strip with legacy semantics;\n- resolvedSurfaceTemplateFor('pdp', productId) -> layout_template, else doc_product_layout; a template that is not live renders the default and logs;\n- resolvedCollectionPins and the collection template from collection_content_live; lib/cms/section-data.js home rails use the pins.\nlegacy-release.js is untouched and never reads live rows.\n\n(2) Product and collection draft preview, WITHOUT a heartbeat (no heartbeat or overlay column exists, and lib/preview-sessions.js is not edited): when the request has a valid documents preview session (the existing contentSource preview path), the product page merges that product's documents.draft over its effective row in the page layer, and the collection page does the same for its collection_content draft. They stay in NOT_OVERLAID for the list overlay. The cart, search and sitemap stay on the live tables even in preview. Record the deviation from spec 8.9's 'only when open in the editor'.\n\n(3) lib/migrate/map-entities.js (replaces MAPPER's stub) maps: product_overrides modules to rich_text sections {title, html} (carried verbatim, over-limit with warnings) and the badge; pdp_pairs placements to pairs {title, products} using the FIRST ENABLED placement by position per source product (lib/cms/placements.js:93-104 semantics), disabled placements never published, extra placements reported; surface_templates.products to template; collection_overrides pinned and surface_templates.collections to collection_content. v1 reads the live tables; v2/v3 read the frozen arrays. Bodies plus liveRows built with P4-LIVEROW's liveRowFor(body) (the same function publish uses), so title, description and image columns stay null. Ids reuse existing (type, entity_id) rows.\n\n(4) The entity half of the MIG-02 data check in lib/migrate/check.js: compare resolvedProductOverride, resolvedPdpPairs, resolvedSurfaceTemplateFor and resolvedCollectionPins for EVERY product and collection with legacy content, legacy source vs candidateSource({list, bodies, entityRows}) where entityRows are either the mapped liveRows (dry run) or read back from product_content_live (after backfill, before the flip). Module HTML that the current sanitizer would rewrite shows up as a difference here.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "lib/content/resolve.js",
+     "lib/content/documents-reader.js",
+     "lib/cms/section-data.js",
+     "lib/catalog/effective.js",
+     "lib/migrate/map-entities.js",
+     "lib/migrate/check.js",
+     "app/(storefront)/products/[handle]/page.js",
+     "app/(storefront)/collections/[handle]/page.js",
+     "scripts/test-entity-content.js",
+     "scripts/test-release-readers.js",
+     "scripts/test-preview-overlay.js",
+     "docs/cms-reviews/P4-OVL07.md"
+    ],
+    "acceptance": [
+     "Unit (test-entity-content): for each entity fixture (v1, v2, v3, disabled placement, two placements on one source, 6 modules, re-sanitized HTML), mapping then reading through candidateSource gives the same modules (in order, then pdp_extras), badge, pairs title and products, product template, collection pins and template as the legacy outputs, or the check reports the exact difference (re-sanitized HTML).",
+     "Unit: the entity data check reads back from product_content_live when entityRows are absent (rows written to a file tenant, no flip) and finds a planted mismatch.",
+     "Unit: a v1 release still reads product_overrides, collection_overrides and placements live; the a6d028e baseline in test-release-readers stays green.",
+     "Unit: on a legacy tenant (v3 live) with product_content_live modules/pairs rows present, shoppers see none of those rows.",
+     "Unit (test-preview-overlay): a product draft shows on its product page only for a valid documents preview session; a cookie-less request sees the live row; cart and search ignore the draft even in preview.",
+     "Unit: a layout_template that is no longer live renders the default layout without a shopper-visible error and logs."
+    ]
+   },
+   {
+    "id": "P4-PICKER",
+    "branch": "cms/p4-picker",
+    "reqs": [
+     "MED-03",
+     "OVL-04",
+     "ED-12",
+     "MED-02"
+    ],
+    "brief": "The editor controls the product and collection forms need. components/admin/editor/editorModel.js is a P3-FIX5 file: do not edit it here (EDITOR owns it in batch 4).\n\n(1) Library picker in the editor: DocumentEditor.js passes context.pickImage to ImageControl, opening the existing MediaPicker; an adapter maps MediaPicker's {url, alt} to {media, alt}. Archived files are hidden in the picker.\n(2) Gallery control (components/admin/editor/fields/GalleryControl.js): ordered list of {media, alt}, add from library or Shopify image, reorder by buttons (keyboard), remove, alt text per item; shows the Shopify gallery read-only beside it with 'Use Shopify's images' (clears the overlay).\n(3) Pairs control (fields/PairsControl.js) for the pairs kind: a title field (empty = the default title) and an ordered product list using the /api/admin/refs product picker (effective titles, Shopify title as secondary text).\n(4) Product list control (fields/ProductListControl.js) for collection_content.pinned: ordered product picks, same picker.\n(5) Media screen (components/admin/MediaAdmin.js): Archive and Unarchive actions, a 'Show archived' filter, and the 'used by' list from MED-03 usage; Delete stays refused while used, with the plain reason.\nEvery control is keyboard-usable with visible labels.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "components/admin/editor/DocumentEditor.js",
+     "components/admin/editor/fields/GalleryControl.js",
+     "components/admin/editor/fields/PairsControl.js",
+     "components/admin/editor/fields/ProductListControl.js",
+     "components/admin/editor/fields/index.js",
+     "components/admin/MediaAdmin.js",
+     "scripts/test-media-picker.js",
+     "docs/cms-reviews/P4-PICKER.md"
+    ],
+    "acceptance": [
+     "Unit (test-media-picker): choosing a library image in ImageControl stores {media: '/api/media/<id>', alt}; archived files are not offered.",
+     "Unit: GalleryControl adds, reorders, removes and edits alt, and 'Use Shopify's images' clears the overlay; PairsControl and ProductListControl keep order and show effective titles with the Shopify title as secondary text.",
+     "Unit: MediaAdmin archive and unarchive call the API and the archived filter shows them; delete of a used file shows the plain reason.",
+     "Drill (desktop Chrome, harness): pick a library image into a product gallery and archive an unused file."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 4 - Editor UI, old routes and the rendered comparison tool",
+  "items": [
+   {
+    "id": "P4-EDITOR",
+    "branch": "cms/p4-editor",
+    "reqs": [
+     "OVL-04",
+     "OVL-01",
+     "OVL-06",
+     "ED-12",
+     "ED-02"
+    ],
+    "brief": "The OVL-04 product editor and the ED-12 collection form. Owns components/admin/editor/editorModel.js, Switcher.js, DocumentEditor.js (after P4-PICKER) and app/(console)/admin/(authed)/editor/page.js in this batch.\n\n(1) Entry: editor/page.js reads parseEditorTarget (from lib/admin/editor-entry.js, SCAFFOLD) and for ?product=<gid> or ?collection=<gid> calls openEntityContent and opens that document.\n(2) Switcher: a 'Products' section using listProductContent (paginated, search, counts, filters 'Changed in Shopify' and 'No longer in Shopify') and a 'Collections' section; product_content stops being read-only in editorModel.js. The switcher stops calling GET /api/admin/catalog (DocumentEditor.js:321, the 30-row route) and reads products only through listProductContent (with its q search), so every product is reachable and a renamed product is found by its new name. The Products count and the two filter counts show in the shell.\n(3) Product form: overlay fields title, description, gallery, display vendor, display type with, for each, the Shopify value beside it (the title shows 'Shopify title: X' always, OVL-06), a 'Reset to Shopify' action, and a 'Differs from Shopify' label that is correct after edit, reset and sync. When titleEditable is false the title and display fields are disabled with titleBlockedReason shown at edit time. After P4-SEARCH (batch 3) the gate is open on every tenant, Typesense ones included (owner answer OQ-1 (b)), so this disabled state is the path for a future gate: test it with the gate forced closed (LIVEROW's setTitleGateForTest). Badge, modules (rich_text/text/faq sections), pairs (PairsControl), template and keep_variant_images. A per-product notice when Shopify changed an EDITED field ('Keep mine' or 'Use Shopify's'), absent for unedited fields. Price, variants and stock shown read-only with a 'Change in Shopify' link (admin product URL from the store domain). Rewrite CatalogAdmin's 'Shopify owns these' copy for documents stores into the same plain words. Orphans show 'No longer in Shopify' with the stored base values, Reset and the notice disabled, and 'Discard edits' (discardOrphanEdits) for people who can publish; anyone else sees the plain reason 'Only an owner or admin can discard these edits.' instead of the button.\nField semantics come from P4-LIVEROW (3b): Reset and 'Use Shopify's' clear the field (follow Shopify again); 'Keep mine' calls resolveShopifyChange 'keep'; the 'Change in Shopify' link uses openEntityContent's shopifyAdminUrl. While the title is gated, Reset on it stays available.\nGallery: at the first gallery edit, say plainly 'Your images replace Shopify's for this product. New images added in Shopify won't show until you choose Use Shopify's images.' When Shopify's images change under an edited gallery, the notice says 'Shopify's images changed' with 'Use Shopify's images' and 'Keep mine'.\n(4) Collection form: pinned products (ProductListControl) and template.\n(5) Parity list: docs/cms-reviews/P4-EDITOR.md contains a checked table of everything CatalogAdmin (badge, modules, pins, product and collection template) and UpsellsAdmin (pairs title and targets, cart slot) let a founder change, each mapped to its new form control; scripts/test-product-editor.js asserts every entry of an exported PARITY list resolves to a registered setting with a control.\nShoppers never see a 'differs' label or any editor-only text.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "app/(console)/admin/(authed)/editor/page.js",
+     "components/admin/editor/editorModel.js",
+     "components/admin/editor/Switcher.js",
+     "components/admin/editor/ProductForm.js",
+     "components/admin/editor/CollectionForm.js",
+     "components/admin/editor/parity.js",
+     "components/admin/CatalogAdmin.js",
+     "scripts/test-product-editor.js",
+     "scripts/test-editor-shell.js",
+     "components/admin/editor/DocumentEditor.js",
+     "docs/cms-reviews/P4-EDITOR.md"
+    ],
+    "acceptance": [
+     "Unit (test-product-editor): ?product=<gid> opens the deterministic document (or the phase-3 row); ?collection=<gid> opens collection content.",
+     "Unit: every overlay field has Reset; the 'differs' label is right after edit, after reset and after a sync that changes the Shopify value; the notice appears only for an edited field changed in Shopify and both choices work.",
+     "Unit: only allowed overlay fields have controls; price, variants and stock render read-only with the Shopify link; the rewritten copy contains no 'Shopify owns these'.",
+     "Unit: with the gate forced closed (setTitleGateForTest) the title and display fields are disabled and show the reason, and badge and modules stay editable; with the gate open on a tenant with Typesense configured (dummy config, no network) the title and display fields are editable.",
+     "Unit: the PARITY list covers every CatalogAdmin and UpsellsAdmin control and each maps to a working control; the collection form saves pins and template.",
+     "Unit: a shopper render of an edited product contains no 'differs' text (negative).",
+     "Drill (desktop Chrome, harness after a local takeOver): rename a product, publish, see it on the card, product page and cart, and find it by its new name in storefront search; reset it.",
+     "Unit: product 31 and later open from the switcher; a renamed product is found by its new name; the Products count and the 'Changed in Shopify' and 'No longer in Shopify' counts render in the shell; DocumentEditor no longer fetches /api/admin/catalog.",
+     "Unit: Reset and 'Use Shopify's' leave the field following Shopify; saving the Shopify value leaves no override; 'Keep mine' and 'Use Shopify's' clear the notice and the count before any publish.",
+     "Unit: the first gallery edit shows the plain note about new Shopify images; a Shopify image change on an edited gallery shows 'Shopify's images changed' with 'Use Shopify's images'.",
+     "Unit: an orphan shows its stored base values with Reset and the notice disabled, 'Discard edits' for an owner or admin, and the plain reason (no button) for staff."
+    ]
+   },
+   {
+    "id": "P4-ED05",
+    "branch": "cms/p4-ed05",
+    "reqs": [
+     "ED-05",
+     "MIG-03",
+     "DOC-06"
+    ],
+    "brief": "Old routes, frozen-table readers, setup links, saved templates and the D2 ruling. Owns lib/admin/editor-entry.js, lib/registry/sections.js and lib/documents/checks.js in this batch.\n\n(1) Redirects for a documents store (LEGACY_ROUTE_DOCS plus page-level redirects): /admin/catalog -> the editor's Products list (entityEditorHref for ?product= when a product is given); /admin/upsells pairs part -> the product's editor, cart slot -> /admin/editor?doc=doc_cart; /admin/storefront/designer/product -> doc_product_layout; /admin/storefront/designer/collection -> doc_collection_layout; /admin/storefront/pages/[slug] -> that page's document (backfillRouteId of its family and slug) or home with the missingDoc note; /admin/releases stays as today's documents 'Recently published' page (P3-EDITOR PUB-04), which is its destination. The API GET /api/admin/catalog keeps answering on documents stores (the read guard changes where it reads surface_templates, it never blocks the route); replace the route's local shopifyAdminBase with the import from lib/admin/shopify-admin-url.js (P4-LIVEROW).\n\n(2) Frozen-table readers (spec 8.13) read the new source on documents stores: lib/ai/insights.js:87-90 getHero -> the published doc_home hero via resolve getters; lib/admin/onboarding.js:45 listContentPages -> published page documents; app/api/admin/catalog/route.js:60 getBlock('surface_templates') -> live rows; lib/cms/view.js:36 -> the documents source. scripts/test-legacy-routes.js adds a READ guard: getBlock, getHero, getNav, listContentPages, listTemplates and direct selects from cms_blocks, cms_pages, placements, product_overrides, collection_overrides, page_redirects or surface_templates are allowed only in files listed with a reason (legacy paths behind a mode check, lib/migrate/*, legacy-release.js, and the read-only saved templates page from (4), which reads cms_templates on documents stores by design).\n\n(3) Setup, diff and help links: lib/admin/onboarding.js:94 'Publish legal pages' and :118 -> the editor's pages section for documents stores; :138 'Launch' -> the editor's Publish; components/admin/ReleasesAdmin.js:223 and components/admin/cms/PreviewFrame.js:10 links -> editor destinations on documents stores. Add a link test: for a documents store, every href produced by onboarding, ReleasesAdmin, PreviewFrame, the redirects table and a grep of hard-coded hrefs in components/admin and lib/admin (allowlist with reasons for links behind a mode check) never targets /admin/catalog, /admin/home, /admin/upsells or a bare /admin/storefront.\n\n(4) Saved templates (cms_templates, DOC-09 is P1): a read-only page app/(console)/admin/(authed)/editor/templates/page.js lists the old saved templates by family with a 'Make a page from this' action that creates a page/campaign/journal document from the template's sections (re-validated, fresh ids, unknown kinds become text with an inherited warning). The table is never edited or deleted. Record the DOC-09 partial pull-in.\n\n(5) D2 ruling: the banner section is no longer offered on page, campaign and journal documents (registry); existing banners keep saving with an inherited warning 'Banners don't show on this kind of page yet.' (checks.js). Rendering them is DOC-06 (P1). Check what the campaign and journal routes do with an existing banner (the page route drops it, per P3-DRILLS D2); if either route still shows it, the warning is not added for that type and the packet says so.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "lib/admin/editor-entry.js",
+     "app/(console)/admin/(authed)/catalog/page.js",
+     "app/(console)/admin/(authed)/upsells/page.js",
+     "app/(console)/admin/(authed)/storefront/designer/product/page.js",
+     "app/(console)/admin/(authed)/storefront/designer/collection/page.js",
+     "app/(console)/admin/(authed)/storefront/pages/[slug]/page.js",
+     "app/(console)/admin/(authed)/editor/templates/page.js",
+     "lib/ai/insights.js",
+     "lib/admin/onboarding.js",
+     "app/api/admin/catalog/route.js",
+     "lib/cms/view.js",
+     "components/admin/ReleasesAdmin.js",
+     "components/admin/cms/PreviewFrame.js",
+     "lib/registry/sections.js",
+     "lib/documents/checks.js",
+     "scripts/test-legacy-routes.js",
+     "scripts/test-editor-routes.js",
+     "docs/cms-reviews/P4-ED05.md"
+    ],
+    "acceptance": [
+     "Unit (test-legacy-routes): on a documents store every old URL (catalog, upsells, designer/product, designer/collection, pages/[slug] existing and missing, plus the existing nine) redirects to its listed destination; on legacy and migrating stores each renders as today.",
+     "Unit: the read guard fails on a planted getBlock call in a documents-path file and passes with the allowlist; insights, onboarding, the catalog route and cms/view read the documents source on a documents store and the legacy source on a legacy store.",
+     "Unit: onboarding steps, ReleasesAdmin and PreviewFrame links point at editor destinations on documents stores and are unchanged on legacy stores.",
+     "Unit: 'Make a page from this' creates a draft document with fresh ids from a cms_templates row and leaves cms_templates unchanged.",
+     "Unit: a page document no longer offers the banner; an existing banner saves with the inherited warning.",
+     "Unit: on a documents store no onboarding, ReleasesAdmin, PreviewFrame or hard-coded console link targets /admin/catalog, /admin/home, /admin/upsells or a bare /admin/storefront (a planted one fails the test).",
+     "Unit: GET /api/admin/catalog still answers 200 on a documents store and reads templates from the live rows; it uses the shared shopifyAdminBase.",
+     "Unit: a campaign and a journal post with an existing banner render without error, and the inherited warning matches what each route actually shows."
+    ]
+   },
+   {
+    "id": "P4-EQUIV",
+    "branch": "cms/p4-equiv",
+    "reqs": [
+     "MIG-02"
+    ],
+    "brief": "The MIG-02 rendered comparison tool (built and tested on synthetic captures; CUTOVER runs it on the harness).\n\n(1) lib/migrate/render-compare.js: normalize(html) (strip nonces, build ids, hashed asset names, timestamps, preview-only markup; collapse whitespace; sort attributes) and compare(before, after, {allowed}) -> {same, differences:[{route, selector, before, after}]}. The allowed-differences list is the exported ALLOWED_DIFFERENCES in lib/migrate/allowed-differences.js, each entry with a reason; the spec names test-migrate-documents for it, so CUTOVER's suite imports and asserts the same list (record the location).\n(2) scripts/migrate-render.mjs --base <url> --routes <file> --out <dir> captures cookie-less HTML of the canary routes (home, a page, a journal post, a campaign, a product with modules/pairs/template, a collection with pins, cart and search) and --compare <dirA> <dirB> exits non-zero on any non-allowed difference. It refuses non-localhost bases (assertLocal).\n(3) The route list is generated from a tenant: every product and collection with legacy content plus the canaries.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "lib/migrate/render-compare.js",
+     "lib/migrate/allowed-differences.js",
+     "scripts/migrate-render.mjs",
+     "scripts/test-migrate-render.js",
+     "docs/cms-reviews/P4-EQUIV.md"
+    ],
+    "acceptance": [
+     "Unit (test-migrate-render): two captures differing only in nonce, build id and asset hash compare same; a changed product title, a missing module, a reordered pair or a different template is a difference with its route and selector.",
+     "Unit: every ALLOWED_DIFFERENCES entry has a reason and a fixture proving it is needed.",
+     "Unit: --compare exits non-zero on a difference; the tool refuses a non-localhost base; capture requests carry no cookie header (no cart cookie, no experiment unit)."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 5 - Cutover and new-store provisioning (after batch 4 has merged)",
+  "items": [
+   {
+    "id": "P4-CUTOVER",
+    "branch": "cms/p4-cutover",
+    "reqs": [
+     "MIG-01",
+     "MIG-02",
+     "MIG-03",
+     "MED-03",
+     "ED-05",
+     "OVL-17"
+    ],
+    "brief": "The cutover command (MIG-01 backfill, MIG-02 checks, MIG-03 flip) and the owner runbook. Builders run it only on file tenants and the harness. Owns scripts/migrate-documents.js (after MAPPER) and lib/migrate/*.\n\n(1) Preconditions, checked by the tool (not trusted to the runbook), each a plain refusal:\n- the tenant ledger holds 0021 to 0025; no catalog sync_run is in progress; no pending schedule; mode is legacy (or migrating with an open run of this tool: resume);\n- not an approvals/agency tenant (cms_approvals rows or an agency grant: DOC-13 not built), no slug collision, every type holding content has an editor (typeHasEditor/cartEditable), the 'no release' state has --store-open or --not-launched;\n- --dry-run-digest <d> equal to a dry run of the current source (sourceHash unchanged since);\n- --rehearsal <report.json> from a PASSING rehearsal on a local restore-drill copy whose sourceHash equals the tenant's current sourceHash (data check and rendered comparison both clean);\n- hosted: --hosted --confirm <tenantId> --backup-ref <ref> (recorded in cms_migration_runs). The backup ref is the ISO time the owner records just before running the command, the Turso PITR point the runbook clones from. Builders never pass --hosted.\n\n(2) Steps, each recorded in cms_migration_runs (resumable from any step):\n a. Lock: one batch [legacyGuardStatement, set mode 'migrating', insert the cms_migration_runs row, with the live release id read at lock kept in its report JSON (0024 is pinned, so no new column)]. Catalog sync now parks (P4-GUARD); legacy writes refuse.\n b. Re-check pending schedule and live-read error AFTER the lock; a failure unlocks (mode back to legacy) and refuses.\n c. Backfill in chunks, every statement under migratingGuardStatement(run): documents UPSERT from the current legacy source (legacy wins: draft and published hashes from legacy; an existing different draft is first saved as a 'kept' version, counted in the report; update guarded by revision); versions with ON CONFLICT(id) DO NOTHING (content-addressed ids, so a conflict means the same body); refs via refRowsForBody; release:<id> rows via releaseRefRows for every retained release; product/collection live rows UPSERT of the legacy-derived columns only (modules, badge, pairs, pairs_title, layout_template, pinned) built with liveRowFor; title, description, gallery and display_* are never written here. Never INSERT OR IGNORE. After each chunk, verify row counts and ids exactly match the plan; any mismatch stops with a report.\n d. Data check (MIG-02, the hard gate): run the full lib/migrate/check.js (non-entity getters + entity getters reading back the backfilled live rows) through the SEAM, legacy source vs candidate. Any non-allowed difference unlocks and stops.\n e. Flip, one batch under migratingGuardStatement(run): insert the v4 release (rel_mig_), the pointer flip guarded on the pointer still equal to the live release id read at lock, migrated log rows, documents.published_*, any overlay columns being restored (REVERSE re-cutover only), search_outbox rows, cms_state mode 'documents' with cutover_release_id (the previous live release id or NULL), run step 'flipped'.\n f. After the flip: theme_pin. Build {versions, releaseId, now} with the doc_design version and call the after-commit entry (lib/documents/after-commit.js, imported, not edited) with the tenant context set (not _default) and a control-plane client; then RE-READ config.theme_pin, retry once, and report the result; resume redoes this step. On hosted runs this is a control-plane write: a runbook line.\n g. Finish the run row with the report: counts, kept drafts, unresolved redirects, cms_templates count, theme_pin result, and the flip time. The printed report uses lib/migrate/report.js's plain-words layout (this item owns report.js after MAPPER).\n h. Stuck in 'migrating' (R4): while mode is 'migrating', every old editor refuses and full catalog sync is parked with no end time, so the tool gives the owner a way out:\n  - --status: prints in plain words the store's mode, the open run's step, when it started and how long the store has been 'being updated', and what to run next. Read-only.\n  - --resume: continues an open cutover run from its recorded step (the same command as a crash resume).\n  - --abort: for a cutover run before the flip only. One batch under migratingGuardStatement(run): mode 'legacy', run finished with outcome 'aborted'. Backfilled documents and legacy-derived live rows stay; legacy wins on the next run (2c), and shoppers never read them on a legacy store. After the flip it refuses and points to the reversal tool (MIG-04).\n  The status and abort words are plain; no table names.\n\n(3) Rehearsal mode: --rehearsal-run on a local restore-drill copy runs a..g, then captures before (taken before step a) and after with P4-EQUIV's tool against the local harness serving that copy, and writes report.json with sourceHash, data-check and render results. That file is the precondition above.\n\n(4) docs/cms-reviews/P4-CUTOVER-RUNBOOK.md, owner steps per tenant: apply 0023-0025 (tenant:migrate --all, --check --include-env); pick a quiet window and warn the founder first (editing pauses and catalog sync waits while the store is being updated); backup: confirm the Turso plan has PITR, record the ISO time just before the real command and pass it as --backup-ref, and write out the disaster restore exactly as 'turso db create <new> --from-db <db> --timestamp <iso>' (scripts/restore-drill.js header, docs/platform-guide.md 5.3b) followed by repointing the tenant; state plainly that the supported way back is the reversal tool (pnpm reverse:documents), and that a PITR restore is the disaster path that also loses every order placed after that time; the restore-drill copy is a verification copy, not a backup; restore-drill copy; dry run (pnpm migrate:documents -- --tenant X --dry-run); rehearsal; staging check of hosted batch atomicity (Turso) before the first real cutover; real cutover command; post-checks (shopper canaries, editor opens, theme pin); if anything stops midway: pnpm migrate:documents -- --tenant X --status, then --resume or --abort as it says; reversal pointer (REVERSE adds its section). Deploy order: 0023 before any code that writes refs; 0024/0025 before batch 2 code deploys.\n\n(5) Provisioning is P4-PROVISION's (same batch): new tenants start in documents mode (owner answer OQ-4). The precondition 'mode is legacy' already refuses such a store; the refusal says in plain words that the store already uses the new editor and needs no move.\n\n(6) Search: after the flip (and again on resume), kick P4-SEARCH's reindex best effort (import and call kickSearchReindex() from lib/catalog/search-reindex.js, which enqueues the 'search_reindex' job with SEARCH's key rule and drains inline; spy client in tests). A failure is reported and never undoes the cutover; the next full sync converges.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "lib/migrate/cutover.js",
+     "lib/migrate/backfill.js",
+     "lib/migrate/preconditions.js",
+     "lib/migrate/flip.js",
+     "lib/migrate/runs.js",
+     "lib/migrate/check.js",
+     "scripts/migrate-documents.js",
+     "scripts/test-migrate-documents.js",
+     "docs/cms-reviews/P4-CUTOVER-RUNBOOK.md",
+     "lib/migrate/report.js",
+     "docs/cms-reviews/P4-CUTOVER.md"
+    ],
+    "acceptance": [
+     "Unit (test-migrate-documents): on each 8.11 state fixture (v1, v2, v3, no release open with --store-open, not launched), cutover ends in documents mode and every resolved* getter and the rendered canaries equal the legacy outputs (ALLOWED_DIFFERENCES imported and asserted here).",
+     "Unit: running the cutover twice, and resuming after a crash injected between EVERY pair of steps and after each backfill chunk, gives identical rows (documents, versions, log, refs, live rows) and no extra versions or log rows; with hrana-fault-proxy, shoppers see either the old store or the new one at every point.",
+     "Unit: the stale-backfill fixture (aborted earlier run, then newer legacy edits) cuts over to the NEWER legacy content; the differing old draft is kept as a 'kept' version and counted; a phase-3 random-id product row is reused; a slug collision refuses before the lock.",
+     "Unit: refusals by test: missing migration, sync in progress, pending schedule and a live read in error (each before and after the lock, the latter unlocking to legacy), approvals or agency tenant, a type with content and no editor, 'no release' without a flag, stale dry-run digest, missing or failing rehearsal, rehearsal sourceHash mismatch, hosted URL without --hosted --confirm --backup-ref.",
+     "Unit: a planted data-check difference stops before the flip and returns the tenant to legacy with no live release change; the data check runs while catalog sync is parked (a sync requested during it reports skipped).",
+     "Unit: after cutover document_refs holds release:<id> rows, so a file used only in a v3 rollback target is reported as used and cannot be deleted.",
+     "Unit: theme_pin is written for a tenant whose doc_design has a theme kit (setThemePinWriter + makePlatform), re-read and reported; a failed pin write is reported and redone on resume.",
+     "Unit: after cutover old screens redirect (ED05) and legacy writers refuse in-batch; /api/admin/releases still answers 409 for publish, schedule and rollback.",
+     "Drill (harness --p4): rehearsal run on a local copy passes, then the real-shaped run on the harness passes; the storefront canaries match before and after in desktop Chrome.",
+     "Unit: --status on a migrating tenant prints the step, start time and time spent in plain words; --abort before the flip returns the tenant to legacy, old writers save again and the parked catalog sync resumes; --abort after the flip refuses and names the reversal tool; --resume after an abort starts a new run.",
+     "Unit: a pointer moved after the lock (test hook) makes the flip batch abort with no change.",
+     "Runbook check: the runbook names the PITR command and timestamp step, the quiet-window and founder-warning step, and the status/resume/abort recovery, and says reversal is the supported way back.",
+     "Unit: a tenant already in documents mode (as every new tenant is after P4-PROVISION) is refused before the lock with the plain 'already uses the new editor' words; after a cutover the flip's outbox rows are drained by the spy client."
+    ]
+   },
+   {
+    "id": "P4-PROVISION",
+    "branch": "cms/p4-provision",
+    "reqs": [
+     "MIG-03",
+     "PUB-06",
+     "GEN-02",
+     "TOK-03",
+     "ED-05"
+    ],
+    "brief": "New tenants start in documents mode from phase 4 (owner answer OQ-4; spec MIG-03 and 8.11: 'Provisioning sets documents once this ships'). Existing tenants still move only by the owner's cutover (P4-CUTOVER). Builders test only on file databases (scripts/test-provision.js already provisions file tenants with a file control plane) and never provision a hosted tenant. This item runs in batch 5 because the documents read and write paths (LIVEROW, EFFECTIVE, OVL07), the reindex (SEARCH) and the documents-store onboarding links (ED05) have all merged by then.\n\n(1) lib/platform/provision.js: a new recorded step 'content_mode' after apply_schema and before seed_defaults. It opens the tenant database the way apply_schema does and runs ONE guarded statement: UPDATE cms_state SET mode = 'documents', updated_at = :now WHERE id = 1 AND mode = 'legacy' AND (SELECT live_release_id FROM release_state WHERE id = 1) IS NULL AND NOT EXISTS a row in releases, documents, cms_blocks, cms_pages, cms_templates, placements, product_overrides, collection_overrides or page_redirects (check the list against migrations/tenant). So only a fresh, empty database becomes a documents store. An adopted database (--db-url) or a --force re-provision of a store that already holds content stays legacy, and the step records refs.contentMode = 'documents' | 'legacy' with a plain reason ('This database already holds store content, so it keeps the old editor. Move it with the cutover.'). A resume re-reads cms_state first, so the step is idempotent. params.contentMode is 'documents' (default) or 'legacy' (an operator escape, recorded in the run). No compensation (the database is left in place, as today). Do NOT change applyTenantSchema: the env store (_default), scripts/migrate.js and every suite that calls applyTenantSchema stay legacy (spec: _default reads as legacy unless its own cms_state row says otherwise).\n\n(2) What a new documents tenant gets at creation, by design: no starter documents (GEN-01, the deterministic first-run generator, is not in phase 4; the editor creates singletons when opened and the first publish builds from emptyList); no release row; no legacy rows (nothing in cms_blocks, cms_pages, placements or the override tables); no theme_pin (an absent pin reads as never published in lib/themes/kits.js themePinOf; the first doc_design publish writes it through after-commit). The store is closed until its first publish (PUB-06, already built: documents mode with no live release gives contentSource {mode: 'closed'}, isStoreClosed() true and the 'Opening soon' page; anonymous checkout is refused; a verified console session can place a COD test order).\n\n(3) scripts/provision-tenant.js: --legacy-content passes contentMode 'legacy'; the closing summary says in plain words which editor the store starts on and that it stays private until the first publish.\n\n(4) Pre-onboarding on a documents-mode new tenant (lib/admin/onboarding.js; this item owns it in batch 5, after P4-ED05): every checklist step works and links to a working destination. Catalog sync (GEN-02 first sync) is unaffected by documents mode (only 'migrating' parks it). The design step goes to the editor's doc_design (brand setup happens there; /api/admin/brand already answers legacy brand writes on a documents store with the documents message). 'Publish legal pages' goes to the editor's pages (ED05) and is done only when published privacy and terms or refund page documents exist (a closed store shows no code-default pages). 'Review your draft preview' opens the editor preview. 'Place a test order' works on the closed store through the console session. 'Launch' goes to the editor's Publish; before the first publish its hint says plainly that the store is private until the first publish and publishing opens it, and after the first publish the step reads done from the live state, so the checklist never calls an open store 'not launched'. A legacy tenant's checklist is unchanged.\n\n(5) docs/onboarding.md: new stores start on the new editor and stay private ('Opening soon') until the first publish; existing stores move only by the owner's cutover runbook.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your tests go in the existing registered suites scripts/test-provision.js and scripts/test-tenancy.js; do not add package.json entries or new suites (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "lib/platform/provision.js",
+     "scripts/provision-tenant.js",
+     "lib/admin/onboarding.js",
+     "scripts/test-provision.js",
+     "scripts/test-tenancy.js",
+     "docs/onboarding.md",
+     "docs/cms-reviews/P4-PROVISION.md"
+    ],
+    "acceptance": [
+     "Unit (test-provision, file databases): a freshly provisioned tenant has cms_state mode 'documents', no live release, no releases, documents or legacy content rows and no theme_pin; the run records the content_mode step with contentMode 'documents'; a failure injected before every step (failAt) and resumed ends in the same state.",
+     "Unit: the new tenant is closed before its first publish: isStoreClosed() is true, contentSource() is {mode: 'closed'}, the home getters return neutral empties and the sitemap only '/'; an anonymous POST to /api/checkout is refused and a console-session COD test order is accepted (reusing the existing PUB-06 test helpers).",
+     "Unit: the founder publishes a first home page (open doc_home, save a valid section, publish): the store opens (isStoreClosed() false), resolvedHomePage shows the published section from a live content.v 4 release, and a later doc_design publish writes theme_pin (setThemePinWriter spy).",
+     "Unit: a --force re-provision or an adopted database that already holds content (a releases row or a cms_blocks row) stays legacy with the plain reason recorded; contentMode 'legacy' keeps a fresh tenant legacy; an existing legacy tenant is untouched by provisioning another; applyTenantSchema alone still leaves cms_state 'legacy' (test-tenancy: _default and the env store stay legacy).",
+     "Unit: on the new documents tenant the onboarding checklist builds and every step's href is an editor or working console destination (never /admin/theme, /admin/catalog, /admin/home, /admin/upsells or a bare /admin/storefront); the design step completes after a doc_design publish; the legal-pages step completes only after privacy and terms page documents are published; the launch hint says the store is private until the first publish and the step reads done after it; a legacy tenant's checklist output is unchanged.",
+     "Unit: legacy brand and theme writes on the new tenant answer 409 with the documents message, and saving doc_design through the documents API works."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 6 - Reversal (after P4-CUTOVER has merged)",
+  "items": [
+   {
+    "id": "P4-REVERSE",
+    "branch": "cms/p4-reverse",
+    "reqs": [
+     "MIG-04",
+     "OVL-17"
+    ],
+    "brief": "MIG-04: put a cut-over tenant back on the legacy store with no unmanaged overlay. lib/migrate/reverse.js and scripts/reverse-documents.js (replaces SCAFFOLD's stub). Local and harness only for builders; same --hosted --confirm --backup-ref rule as CUTOVER.\n\n(1) Step 1, one batch: [documentsGuardStatement, set mode 'migrating', insert a cms_migration_runs row kind 'reverse']. From here every live-row publish, Undo and discard aborts in-batch (LIVEROW's documents guard), so nothing can add an overlay after the copy.\n(2) Step 2, ONE batch under migratingGuardStatement(run): copy every product_content_live and collection_content_live row into content_live_reversed; DELETE them; write search_outbox rows for every affected product; move the pointer back to cms_state.cutover_release_id (or NULL for a 'no release' tenant, which is legacy's draft path); mode 'legacy'; finish the run row. A crash before it leaves a documents tenant intact with mode migrating (resume finishes or the operator re-runs); after it, a legacy tenant.\n(2b) After step 2, kick P4-SEARCH's reindex best effort (import and call kickSearchReindex() from lib/catalog/search-reindex.js, which enqueues the 'search_reindex' job with SEARCH's key rule and drains inline; spy client in tests), so search shows Shopify's names again without waiting for a full sync; a failure is reported and the next full sync converges.\n(3) Step 3: reset config.theme_pin to the legacy value (control plane; runbook line on hosted), re-read and report.\n(4) Report by count what was edited in documents mode and does not flow back: documents published after cutover, overlay fields (title, description, gallery, display_*), drafts. Also list the products by NAME with which of their edits no longer show (for example 'Protein Bar: new name, description'), in plain words through lib/migrate/report.js. Old editors work at once. The runbook gives a plain message the owner can pass to the founder: which products lost which edits, that the old editors work again, and that moving to the new editor again brings those edits back (OQ-9 default).\n(4b) Stuck reversal: scripts/reverse-documents.js gets --status (read-only, plain words) and --abort for a reverse run stopped after step 1 and before step 2 (one batch under migratingGuardStatement(run): mode back to 'documents', run outcome 'aborted'); after step 2 it refuses because the store is already legacy.\n(5) Re-cutover rule (spec MIG-04 'restores overlays from document versions'): CUTOVER's backfill keeps legacy as the source for everything legacy can edit; overlay-only columns (title, description, description_html, gallery, featured image, display_*, seo_*) are restored from each product_content document's latest published version, and they are written ONLY in the flip batch (never in backfill), so shoppers on the legacy store never see them early. Content published in documents mode for non-overlay documents is kept as older versions, not republished, and counted. Extend lib/migrate/backfill.js/flip.js for this (this item owns them after CUTOVER). The re-cutover dry run lists, by product name, the edits that will come back at the flip, in the plain report (lib/migrate/report.js; touch scripts/migrate-documents.js only if the CLI needs a change, which this item owns in batch 6). There is no extra opt-in flag: restoring is the OQ-9 default.\n(6) Runbook: add the reversal section to docs/cms-reviews/P4-CUTOVER-RUNBOOK.md.\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "lib/migrate/reverse.js",
+     "lib/migrate/backfill.js",
+     "lib/migrate/flip.js",
+     "scripts/reverse-documents.js",
+     "scripts/test-migrate-reverse.js",
+     "docs/cms-reviews/P4-CUTOVER-RUNBOOK.md",
+     "lib/migrate/report.js",
+     "scripts/migrate-documents.js",
+     "docs/cms-reviews/P4-REVERSE.md"
+    ],
+    "acceptance": [
+     "Unit (test-migrate-reverse): after reversal shoppers see Shopify values (effective reads raw), product and collection live rows sit in content_live_reversed and nowhere else, search_outbox has a row per affected product and a spy drain indexes Shopify's titles for them, the pointer equals cutover_release_id (NULL case covered), mode is legacy and old editors save at once.",
+     "Unit: a hook that publishes a product title between step 1 and step 2 is refused in-batch; a crash injected between steps leaves either the documents store intact or the legacy store complete.",
+     "Unit: the report counts documents-mode publishes, overlay fields and drafts that do not flow back.",
+     "Unit: re-cutover after reversal restores the overlay titles from document versions, shows them only after the flip, and publishes no other documents-mode content (counted as kept versions).",
+     "Unit: theme_pin is reset and reported.",
+     "Drill (harness): cut over, rename a product, reverse, see the Shopify title, re-cut over, see the renamed title.",
+     "Unit: the reversal report lists each affected product by name with the edits that no longer show; the re-cutover dry run lists by name the edits that will come back.",
+     "Unit: reverse --status prints the run's step in plain words; --abort after step 1 returns the store to documents mode with publishing working; --abort after step 2 refuses."
+    ]
+   }
+  ]
+ },
+ {
+  "name": "Batch 7 - Drills and owner checks",
+  "items": [
+   {
+    "id": "P4-DRILLS",
+    "branch": "cms/p4-drills",
+    "reqs": [
+     "OVL-04",
+     "MIG-02",
+     "MIG-03",
+     "MIG-04",
+     "ED-05",
+     "MED-03",
+     "OVL-17"
+    ],
+    "brief": "Browser proof of the founder tasks on the harness, plus collecting owner checks. Adds stages to scripts/drills/p4/run.mjs (HARNESS's file) and new stage files under scripts/drills/p4/.\n\nStages: 'cutover' (rehearsal then cutover of the --p4 harness; canaries before and after); 'product' (rename a product, edit description, gallery from library, badge, modules, pairs, template; see them on card, product page, cart, checkout, confirmation and order page; reset; Shopify-title line on the order page); 'collection' (pins and template); 'routes' (every old URL redirects; setup links); 'media' (archive, refused delete of a used file, file used only by a v3 rollback target reported used); 'reverse' (reverse, legacy editors work, re-cut over); 'search-rename' (replaces the old 'title-gate' stage, owner answer OQ-1 (b): the gate no longer blocks titles after P4-SEARCH. Rename a product and publish in the browser; storefront search (the SQL path the harness uses) finds it by the new name and not the old one, and its search_outbox row is marked done (the harness server has no Typesense, so its fast-path drain marks rows done without a client call). Then, because that row is already done, the spy step makes its own pending row: in the drill process only, publish a second rename in-process against the harness tenant database (inside withTenant, no server call), then call drainSearchOutbox({ client: spy }) there and show the upserted document carries the second name and the row is done. Undo in the browser and the old name is back in search. Never a real Typesense: no values from .env.local or any hosted Typesense; if the spy step needs Typesense env values (drainSearchOutbox makes no client call without them), set them in the drill process only, never on the harness server: a localhost host on a port nothing listens on and a fake key, and run no catalog sync in this stage; design-harness.js blanks these keys and is not this item's file, so if the harness cannot take the dummy values without editing it, record a Known limit and rely on P4-SEARCH's spy unit case); 'runbook' (scripts/drills/p4/runbook.mjs: follow P4-CUTOVER-RUNBOOK.md literally on a fresh --p4 harness, step by step: dry run, read the plain report, rehearsal, cutover, --status, post-checks, reverse, re-cutover, plus one deliberate stop in 'migrating' recovered with --status and --abort. Record every step that needed developer knowledge in P4-DRILLS.md and fix the runbook's wording or missing steps; this item owns the runbook in batch 7 for those fixes only). Desktop Chrome; phone and Safari are owner checks.\n\nCopy every phase 4 packet's Owner checks into docs/cms-reviews/MANUAL-CHECKS.md (the only item that edits it), including: run 0023-0025 migrations and --check --include-env; real dry runs, rehearsals and cutovers per tenant; hosted batch atomicity on staging; OQ-14 image URL query-string check on a dev store; Typesense tenants including _default: after the first rename on each, search shows the new name within a few minutes (the reindex job and the tick are running), and a full sync keeps it; phone and Safari; theme_pin on hosted; webhook allowed differences; confirm the Turso plan has PITR and record the PITR time before each real cutover; warn the founder and pick a quiet window; staff lose cart-offer publishing at cutover (OQ-6; tell the team before the cutover); provision one throwaway tenant on staging after P4-PROVISION deploys and confirm it starts on the new editor, shows 'Opening soon' to shoppers until its first publish, and its onboarding checklist links all work (OQ-4).\n\nCommon rules for every phase 4 item (from PLAN.md section 0): work only in your own worktree on your branch; never edit lib/preview-sessions.js, lib/sanitize.js, lib/documents/after-commit.js or scripts/drills/p3/* (import them only); never run anything against a hosted or real tenant (every CLI refuses non-file, non-localhost URLs unless given --hosted plus the extra proofs CUTOVER defines, and builders never pass --hosted); no new npm dependencies; never write to Shopify; plain words in every founder-facing message (no codes, table names or ids). Your packet docs/cms-reviews/<ID>.md has Known limits, From review and Owner checks; never edit MANUAL-CHECKS.md. Your suite already exists as a placeholder registered by P4-SCAFFOLD: replace its body, do not add package.json entries (package.json is SCAFFOLD-only; if you truly need a new script, record it as a Known limit for the orchestrator).",
+    "migrations": [],
+    "files": [
+     "scripts/drills/p4/run.mjs",
+     "scripts/drills/p4/cutover.mjs",
+     "scripts/drills/p4/product.mjs",
+     "scripts/drills/p4/routes.mjs",
+     "scripts/drills/p4/media.mjs",
+     "scripts/drills/p4/reverse.mjs",
+     "docs/cms-reviews/P4-DRILLS.md",
+     "scripts/drills/p4/runbook.mjs",
+     "docs/cms-reviews/P4-CUTOVER-RUNBOOK.md",
+     "docs/cms-reviews/MANUAL-CHECKS.md"
+    ],
+    "acceptance": [
+     "Drill: every stage passes on the harness in desktop Chrome with screenshots under the size limits of P1-DRILLS-C.",
+     "Drill: the p3 stages still pass after reseeding with --p3.",
+     "MANUAL-CHECKS.md lists every Owner check from every P4 packet, each with its packet link.",
+     "Drill (runbook): the runbook is followed literally end to end on the harness, including a stop in 'migrating' recovered with --status and --abort; P4-DRILLS.md lists each step that needed developer knowledge and the runbook fix made for it."
+    ]
+   }
+  ]
+ }
+]
