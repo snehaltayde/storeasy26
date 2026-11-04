@@ -1601,6 +1601,9 @@ await t("P3-COMMIT API: 428 without a revision for unpublish, undo and keepLiveS
       ok(o.publish ? /nothing was published/.test(r.body.error) : /nothing was saved/.test(r.body.error), `${name} 428 words`);
       likeShape(r, SHAPES[name].outcomes.revisionRequired, `${name} 428`);
     }
+    // P3-CHANGES built the Changes ops; their answers are tested in
+    // scripts/test-doc-changes.js. Only the remaining stubs answer 501.
+    if (o.module[0] === "Changes") continue;
     const r = await api(req0);
     // P3-UNDO built these four (scripts/test-publish-undo.js covers them):
     // they no longer answer 501, and on this fixture they refuse or read
@@ -1648,7 +1651,8 @@ await t("P3-COMMIT API: the whole parsed op reaches the module (dryRun, logId, s
     Api.setDocumentsApiModules({});
   }
   // back to the real modules
-  eq((await api({ listChanges: { id: "doc_a" } })).body.code, "NOT_BUILT", "restored:");
+  // (P3-CHANGES: listChanges is built, so the real module answers 404 for an unknown id)
+  eq((await api({ listChanges: { id: "doc_a" } })).body.code, "NOT_FOUND", "restored:");
 });
 
 await t("P3-COMMIT API: getDocument and listDocuments carry access: staff can't publish (with the plain reason), an admin and the owner can; the answers match the shapes", async () => {

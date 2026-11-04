@@ -118,11 +118,11 @@ const EMITTERS = { "lib/admin/documents-api.js": apiSource, "lib/cms/issues.js":
 // NOT_BUILT is no longer new: P3-COMMIT's NotBuiltError emits it.
 // P3-CHECKS: BUILT_CODES are new codes the code now emits: each must be
 // emitted, with its outcome's status (a renamed one fails). NEW_CODES are not
-// built yet (P3-CHANGES): emitted or not, a status must match.
+// built yet: emitted or not, a status must match.
 // P3-UNDO: CANNOT_TAKE_OFFLINE is emitted now (lib/documents/undo.js), so it
-// is built.
-const BUILT_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "CANNOT_TAKE_OFFLINE"]);
-const NEW_CODES = new Set([...BUILT_CODES, "TOO_MANY_KEPT"]);
+// is built. P3-CHANGES: TOO_MANY_KEPT likewise (lib/documents/changes.js).
+const BUILT_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "CANNOT_TAKE_OFFLINE", "TOO_MANY_KEPT"]);
+const NEW_CODES = new Set([...BUILT_CODES]);
 
 // ---- walking the shapes ------------------------------------------------------------
 
