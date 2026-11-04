@@ -1,0 +1,333 @@
+{
+  "id": "P3-HARNESS",
+  "part": "smoke",
+  "title": "P3-HARNESS — seed and helpers smoke",
+  "ranAt": "2026-11-04T03:20:17.028Z",
+  "harness": "http://localhost:3880",
+  "chrome": "156.0.8078.80",
+  "passed": 22,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the seed run twice gives the same row counts",
+      "detail": {
+        "first": {
+          "rows": {
+            "documents": 39,
+            "document_versions": 82,
+            "publish_log": 42,
+            "document_refs": 69,
+            "releases": 7,
+            "products": 400,
+            "collections": 30,
+            "collection_products": 1253,
+            "media": 32,
+            "publish_sets": 5
+          },
+          "refs": {
+            "publishedVersions": 43,
+            "versionsWithRefs": 25
+          },
+          "members": {
+            "owner": 1,
+            "staff": 1
+          },
+          "platform": {
+            "tenants": 2,
+            "users": 3,
+            "memberships": 2
+          },
+          "closed": {
+            "mode": "documents",
+            "liveRelease": null,
+            "releases": 0,
+            "documents": 2,
+            "published": 0,
+            "publishLog": 0,
+            "domains": [
+              "closed.localhost"
+            ]
+          },
+          "documents": 39,
+          "published": 38,
+          "dirty": 2
+        },
+        "second": {
+          "rows": {
+            "documents": 39,
+            "document_versions": 82,
+            "publish_log": 42,
+            "document_refs": 69,
+            "releases": 7,
+            "products": 400,
+            "collections": 30,
+            "collection_products": 1253,
+            "media": 32,
+            "publish_sets": 5
+          },
+          "refs": {
+            "publishedVersions": 43,
+            "versionsWithRefs": 25
+          },
+          "members": {
+            "owner": 1,
+            "staff": 1
+          },
+          "platform": {
+            "tenants": 2,
+            "users": 3,
+            "memberships": 2
+          },
+          "closed": {
+            "mode": "documents",
+            "liveRelease": null,
+            "releases": 0,
+            "documents": 2,
+            "published": 0,
+            "publishLog": 0,
+            "domains": [
+              "closed.localhost"
+            ]
+          },
+          "documents": 39,
+          "published": 38,
+          "dirty": 2
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the second run started again from scratch (a new live release, new ids)",
+      "detail": {
+        "first": "rel_850a2cc194c557f5",
+        "second": "rel_97d2b09319ad187e"
+      }
+    },
+    {
+      "ok": true,
+      "label": "document_refs holds exactly the refs of every seeded published version (none missing, none extra)",
+      "detail": {
+        "publishedVersions": 43,
+        "versionsWithRefs": 25,
+        "mismatched": [],
+        "orphanRefs": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "the closed store is in documents mode with no release (state none), drafts only",
+      "detail": {
+        "mode": "documents",
+        "liveRelease": null,
+        "releases": 0,
+        "documents": 2,
+        "published": 0,
+        "publishLog": 0,
+        "domains": [
+          "closed.localhost"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the design store has one owner and one staff login",
+      "detail": {
+        "owner": 1,
+        "staff": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "the seed prints neither password (they are only in the seed config)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the seed config is readable by its owner only (mode 600)",
+      "detail": "600"
+    },
+    {
+      "ok": true,
+      "label": "the live home page's refs name the live campaign (who links to it, for take offline)",
+      "detail": [
+        "doc_4u63ez2f7hxzwacp",
+        "slug:page:our-story"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the last publish set holds three documents, one publish_log row each",
+      "detail": [
+        {
+          "document_id": "doc_rqasppdndar3qihh",
+          "id": "log_da0739b8b9eb036e"
+        },
+        {
+          "document_id": "doc_4bw6ju723hcxeq74",
+          "id": "log_32985e089e51df88"
+        },
+        {
+          "document_id": "doc_announcement",
+          "id": "log_b743b6dcd8ac2bba"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the click counter saw the one click of the owner's sign-in",
+      "detail": [
+        {
+          "n": 1,
+          "path": "/admin/login",
+          "tag": "button",
+          "text": "Sign in"
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "owner: signed in, and may publish the home page",
+      "detail": {
+        "status": 200,
+        "access": {
+          "canPublish": true,
+          "reason": null
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff: signed in, may read the home page, may not publish it",
+      "detail": {
+        "status": 200,
+        "access": {
+          "canPublish": false,
+          "reason": "Only the store owner or an admin can publish. You can edit and preview."
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "staff: a publish is refused (403), nothing changes",
+      "detail": {
+        "status": 403,
+        "body": {
+          "error": "Your role (staff) can't do that"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed store: / shows 'Opening soon'",
+      "detail": {
+        "status": 200,
+        "text": "Closed Demo Co\n\nOpening soon\n\nWe're getting the shop ready. Check back soon."
+      }
+    },
+    {
+      "ok": true,
+      "label": "closed store: no draft reaches the shopper",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "live store: / shows the live home page (hero and the campaign banner)",
+      "detail": {
+        "status": 200,
+        "errorPage": false,
+        "h1": [
+          "Visibly brighter in 14 days"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "live store: the home page links to the live campaign",
+      "detail": {
+        "slug": "p3-weekend-offer"
+      }
+    },
+    {
+      "ok": true,
+      "label": "live store: the product rail shows products from its collection",
+      "detail": {
+        "railLinks": 8,
+        "collection": "top-rated"
+      }
+    },
+    {
+      "ok": true,
+      "label": "live store: the live campaign answers",
+      "detail": {
+        "status": 200,
+        "path": "/campaigns/p3-weekend-offer"
+      }
+    },
+    {
+      "ok": true,
+      "label": "live store: the unpublished campaign is not there (404, no draft text)",
+      "detail": {
+        "status": 404
+      }
+    },
+    {
+      "ok": true,
+      "label": "live store: the guide page is live, without its draft's link to the unpublished campaign",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "live store: the journal post answers",
+      "detail": {
+        "status": 200,
+        "path": "/journal/creatine-guide-2"
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_850a2cc194c557f5, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.1s",
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_97d2b09319ad187e, 42 publish_log rows, 69 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s"
+  ],
+  "screenshots": [
+    {
+      "name": "owner-dashboard",
+      "file": "docs/cms-reviews/drills/P3-HARNESS/owner-dashboard.png",
+      "bytes": 35921,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "staff-dashboard",
+      "file": "docs/cms-reviews/drills/P3-HARNESS/staff-dashboard.png",
+      "bytes": 35925,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/dashboard"
+    },
+    {
+      "name": "closed-home-1440",
+      "file": "docs/cms-reviews/drills/P3-HARNESS/closed-home-1440.png",
+      "bytes": 6194,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "live-home-1440",
+      "file": "docs/cms-reviews/drills/P3-HARNESS/live-home-1440.png",
+      "bytes": 22459,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

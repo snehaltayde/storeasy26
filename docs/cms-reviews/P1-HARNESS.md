@@ -390,3 +390,61 @@ Non-blocking findings from the independent reviews, added at merge. The first ni
 - **Running the seed with a different time zone can wipe a running harness's data.** The "same process" check compares start times from `ps -o lstart=`, which prints local time; the `ps` call pins `LC_ALL` but not `TZ`. With `TZ=UTC` set, a second seed thought the running harness was gone. On the way, `stopLeftovers` deleted the running harness's pid file even though it skipped every process. After that, a seed on other ports wiped and reseeded `.design-data`, said it succeeded, and the first harness started failing ("connect ECONNREFUSED", "no such table: app_errors"). Once the pid file is gone, any seed on other ports does this, with or without `TZ`. Not blocking: no project script sets `TZ`, and only local harness data is lost. Suggested fix: add `TZ: "UTC"` next to `LC_ALL: "C"`, and keep the pid file while the recorded launcher is alive and still names `dev-design.js`. On Linux (CI), `lstart` is worked out from boot time and can be off by a second, which the "can't happen in practice" wording above does not cover.
 - **Two deliberate breaks survive on harmless lines.** Dropping the start-time check on targets in `stopLeftovers` survives because the command-line check still guards each one (dropping that check is caught). Clearing the pid file before the loop instead of after survives and makes no difference.
 - **Not probed, likely harmless:** on a first `pnpm dev:design` with no data, the pid file is missing for a few milliseconds between the seed clearing it and the databases starting. A seed started in exactly that gap would only be stopped by the port check.
+
+## Phase 3 additions (P3-HARNESS)
+
+Added by `cms/p3-harness` so the phase 3 drills (batches 3 to 5) share one seed and one set of helpers. The packet is `docs/cms-reviews/P3-HARNESS.md`. Nothing above changed: `pnpm seed:design`, `pnpm dev:design`, the legacy seed, `drill:smoke`, `drill:edge` and the P2 drill seed (`seed-design-documents.js` without `--p3`) work as before.
+
+### The phase 3 seed
+
+```
+DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880 node scripts/seed-design-documents.js --p3   # harness stopped
+DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880 pnpm dev:design                              # then start it
+DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880 node scripts/seed-design-documents.js check --p3
+```
+
+`--p3` starts from a fresh perf seed by itself (the same as `node scripts/dev-design.js seed --fixture perf`), so it needs no step before it, and running it again resets everything: the same rows and counts, new ids and new passwords. It takes about 4 seconds. `--worst-case` and `--posts N` still work with it; `--drafts-only` doesn't (the drill content is published).
+
+What it holds, on top of the P2 documents store (the perf content as documents, published as one set):
+
+| What | Where | For |
+|---|---|---|
+| An owner login and a staff login on the design store | `founder@design.test` (owner) and `staff@design.test` (staff: edits and previews, can't publish). Passwords are made fresh by each seed and written only to `.design-data/p3-seed.json` (mode 600, gitignored). The seed never prints them | AU-04 and every role check |
+| A campaign that is never published | slug `p3-spring-edit`, `/campaigns/p3-spring-edit` answers 404 | PUB-03 "links to unpublished" |
+| A live page whose draft links to that campaign | slug `p3-spring-guide`, `/policies/p3-spring-guide`. Live without the link; the draft adds a banner whose button links to the campaign | the `LINKS_TO_UNPUBLISHED` offer |
+| A live campaign linked from home | slug `p3-weekend-offer`, published on its own (so its Undo is "take offline"), then the home page gains a banner `sec_p3camp` linking to it. The home page's live version has a `document_refs` row naming it | PUB-04 take offline, the linkers list |
+| A journal post | the fixture's first live post | Undo and offline on a post |
+| A home with a product rail whose collection has products | the fixture's `sec_pfrail1` (collection `top-rated`, 60 products) | AU-04 |
+| A three-document publish set, the last publish | pages `faq` and `size-guide` (first section title "Updated in the spring set") and the announcement, published together | whole-set Undo |
+| A second store, closed | tenant `design-closed`, host `closed.localhost`, name "Closed Demo Co". Documents mode, no release (state none), two drafts (a home page and an about page). Shoppers see "Opening soon". No members, so its setup password (`DESIGN_ADMIN_PASSWORD`) signs in | PUB-06 |
+
+Every publish goes through `lib/documents/publish.js`, as the owner, so `publish_log`, `document_refs` (migration 0023) and the live addresses all exist. `check --p3` compares each published version's `document_refs` rows with what `refRows` makes from its body.
+
+**The closed store's database** is the harness's third server (`DESIGN_SQLD_PORT + 2`, the env default database). No request otherwise uses it: an unknown host never falls back to it. `scripts/design-harness.js` still starts three servers, and only the design store's address is updated at start (`pointTenantAtThisRun`), so after changing `DESIGN_SQLD_PORT` reseed with `--p3` before using the closed store.
+
+**`closed.localhost`** resolves to this machine in Chrome without any hosts-file change. Other tools may need `--resolve` or a `Host` header.
+
+**Once the design store has members, its setup password no longer signs in there** (the console's bootstrap rule). Phase 3 drills sign in by email (`login()` below). `drill:smoke`, `drill:edge` and the P2 drills use the setup password, so they run on the plain or P2 seeds, not on `--p3`.
+
+`.design-data/p3-seed.json` holds: `stores` (live and closed, with host and the closed store's draft ids), `logins` (owner and staff: id, email, name, role, password), `documents` (home, liveCampaign, unpublishedCampaign, guide, journalPost: id, type, slug, label, path, `liveUrl` from `lib/documents/paths.js`, published version, the publish_log row of its seeded publish, and the links between them), and `publishSet` (set id, release and each member's `logId`).
+
+### Helpers for phase 3 drills: `scripts/drills/p3/lib.mjs`
+
+```
+DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880 node scripts/drills/p3/smoke.mjs [--headed]
+```
+
+| Helper | Does |
+|---|---|
+| `p3Ports()` | Reads `DESIGN_PORT` and `DESIGN_SQLD_PORT`. Both must be set, and 3017 is refused |
+| `runDrill({ id, part, title }, fn)` | Refuses a harness already running in this checkout, launches the installed Chrome (playwright-core, never a download), runs `fn(drill)`, writes the results file, closes Chrome and stops the harness it started. Returns the exit code |
+| `reseed(drill, { start, flags })` | Stops the harness this run started, runs `seed-design-documents.js --p3`, and (by default) starts the harness again. Returns `{ seed, out }` |
+| `readSeed()`, `seedState()` | The seed config, and `check --p3`'s answer |
+| `drill.login(role, { context, store })` | `'owner'` or `'staff'` through the real form, by email, on the live store; `store: 'closed'` signs in to the closed store as its owner. Cookies are reused per role within one seed (the sign-in route allows 5 tries a minute) |
+| `drill.clickCounter(context)` | Counts every real click in that context, on every page, across navigations: `count`, `clicks` (`path`, `tag`, `text`), `mark()`, `since(mark)`, `reset()` |
+| `drill.screenshot(page, name)` | A small PNG in the results folder (`drill.shoot`) |
+| `drill.writeResults()` | `results-<part>.json` in the P2 format: id, part, title, ranAt, harness, chrome, passed, failed, knownFailures, aborted, checks, notes, screenshots |
+| `storeUrl(drill, 'live' \| 'closed', path)`, `storeSql(store, statements)` | An address on either store; a read of either store's database (or `'platform'`) through the running harness's ports |
+| `docsApi(page, body)`, `bodyText`, `noThanks`, `settle` | The documents API from a signed-in page, the page's text, the cookie banner's "No thanks", wait for quiet |
+
+The results folder is `docs/cms-reviews/drills/<id>/`: screenshots and `results-<part>.json` together. Everything else from `scripts/drill.js` (`check`, `note`, `open`, `facts`, `atWidths`, `context`) works on a `P3Drill`.
