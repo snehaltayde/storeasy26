@@ -163,9 +163,19 @@ The operator commands carry no `--env-file`. A stub needs no env, and the builde
 - **`parseEditorTarget` accepts any URL-safe gid tail,** not only digits, because the test fixtures use words. Whether the product or collection exists is the editor's check, not the parser's.
 - **The operator commands have no `--env-file=.env.local`** (see Design (8)).
 
+From review:
+
+- The first full pnpm test run at 033a57c failed. It gave 95 of 96, and test:schema-compat failed on the old case 'a tenant migrated while the instance is warm: orders get the columns once the re-check window passes', which said 'inside the window, the column exists but is left out: expected null, got "Whey Gold"'. That case has a fixed window of 80 ms. The second full run passed 96 of 96. The suite run alone 6 times, and 8 more times under CPU load both with and without the 0024 file, always passed. The P1-MIG-05-OVL-06 packet already lists this timing case as possibly flaky, so it is not a SCAFFOLD regression. 0024 does add a little migration work inside that 80 ms window, so the P4-SCAFFOLD packet's Known limits should mention it for the orchestrator.
+- Mutation gap in lib/registry/editability.js. Replacing `t.system !== true` with `true` still passes every test (31 passed, 0 failed). Today no registered type is both editable and system (journal_index is editable:false and system:true), so the system check is never tested on its own. A unit case with a stubbed editable+system type would pin it.
+- typeHasEditor('cart') is true whatever cartEditable() returns. If OQ-6 is ruled false, MAPPER and CUTOVER have to check cartEditable() themselves, because typeHasEditor will not. This should be written in the packet or in editability.js before batch 2.
+- If neither TURSO_DB_URL nor DATABASE_URL is set, tenant-migrate --check --include-env falls back to file:local.db. That creates an empty local.db as a side effect of a check that is meant to be read-only. The check still fails safe: the ledger is missing everything, so it exits 1.
+- The four operator commands (migrate:documents, reverse:documents, media:reindex, drill:p4) have no --env-file=.env.local, unlike migrate and tenant:migrate. This matches the brief's exact strings and does not matter for the stubs, but MAPPER, REVERSE and MEDIA will need some way to load env. The builder already raised this for the orchestrator.
+- Two files changed outside the item's list, both disclosed as Known limits. In scripts/test-publish.js the P3-COMMIT assertion now expects 'every id >= 0023 missing, 0023 first'. It is still strict and not weakened. lib/platform/export.js does not export the new 0024 tables. That loses no data today because nothing writes them, but it needs a named owner before LIVEROW writes live rows, or a tenant export would quietly leave out live product content.
+- Checks that passed: the 0024 DDL matches spec 8.2 column for column, plus pairs_title and layout_template. Mutation tests are caught for each of these: a dropped column, the partial index, IF NOT EXISTS, the hash length, the doc_coll prefix, the parseEditorTarget no-fall-through rule, gid encoding, CART_EDITABLE, the assertLocalDbUrl file: check, writeProduct outside withTenant, the stage filter, the env-store result being ignored, and the --include-env refusal. All 4 stubs exit 1 with 'not built yet (P4-<owner>)'. pnpm build passes. Nothing changed under .github/ or MANUAL-CHECKS.md. The new lib files have no node: imports. The review worktree was removed and no processes were left running.
+
 ## From review
 
-Nothing yet.
+See "From review" at the end of Known limits.
 
 ## Owner checks
 
