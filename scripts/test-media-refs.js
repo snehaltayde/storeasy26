@@ -556,6 +556,25 @@ await t("a store at 0024 (no archived_at) lists and deletes as before, and archi
   eq(await old24.run(() => codeOf(M.archiveMedia("med_000000000000000000"))), "MEDIA_NOT_FOUND", "a missing file:");
 });
 
+await t("P4-FIX2: bytes that match an archived file bring it back on purpose and say so (unarchived: true); the file handed back is never still archived; a plain dedupe says unarchived: false; the upload route passes it on", async () => {
+  const n = pngN++;
+  const a = await docs.run(() => M.saveMedia({ filename: `fix2-${n}.png`, mime: "image/png", bytes: PNG(n) }));
+  eq([a.deduped, a.unarchived], [false, undefined], "a new file:");
+  await docs.run(() => M.archiveMedia(a.id));
+  const archivedRow = async () => (await sql(docs, "SELECT archived_at FROM media WHERE id = ?", [a.id]))[0].archived_at;
+  ok((await archivedRow()) != null, "archived");
+  const again = await docs.run(() => M.saveMedia({ filename: "same-bytes.png", mime: "image/png", bytes: PNG(n) }));
+  eq([again.id, again.deduped, again.unarchived], [a.id, true, true], "the same file, brought back and said:");
+  eq(await archivedRow(), null, "not archived any more:");
+  ok((await docs.run(() => M.listMedia())).some((m) => m.id === a.id), "back in the picker's list");
+  const third = await docs.run(() => M.saveMedia({ filename: "same-bytes.png", mime: "image/png", bytes: PNG(n) }));
+  eq([third.id, third.deduped, third.unarchived], [a.id, true, false], "a plain dedupe:");
+  // the upload route answers shape(original) = { ...saveMedia's row, url }, so
+  // the flag reaches the media screen and the picker
+  const routeSrc = await readFile(join(ROOT, "app/api/admin/media/route.js"), "utf8");
+  ok(/const shape = \(m\) => \(\{ \.\.\.m, url: mediaUrl\(m\.id\) \}\)/.test(routeSrc) && /media: shape\(original\)/.test(routeSrc), "the route passes saveMedia's answer through");
+});
+
 // =============================================================================
 // 5. the reindex
 // =============================================================================

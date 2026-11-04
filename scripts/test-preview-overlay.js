@@ -1298,6 +1298,47 @@ await t("a layout_template that is no longer offered renders the default layout 
   await inT(PX, () => libsql.execute({ sql: "UPDATE product_content_live SET layout_template = NULL WHERE product_id = ?", args: [P(1)] }));
 });
 
+// ---- P4-FIX2 -----------------------------------------------------------------------------
+await t("P4-FIX2: the frame is told a product or collection draft is showing: overlay.docs names each readable dirty entity draft with its draft hash, an unreadable one is in skipped; neither enters the list overlay", async () => {
+  const cc = await inT(PX, async () => String((await libsql.execute({ sql: "SELECT id FROM documents WHERE type = 'collection_content' AND entity_id = ?", args: [COL(2)] })).rows[0].id));
+  await inT(PX, () => libsql.execute({ sql: "UPDATE documents SET draft_hash = 'dh_fix2_coll', published_hash = NULL WHERE id = ?", args: [cc] }));
+  // a product whose saved draft can't be read
+  const bad = await createDraft(PX, "product_content", body("product_content", { settings: { badge: "Broken" } }), { entityId: P(3) });
+  await inT(PX, () => libsql.execute({ sql: "UPDATE documents SET draft = '{not json', draft_hash = 'dh_fix2_bad' WHERE id = ?", args: [bad.id] }));
+  try {
+    const s = await newSession(PX);
+    const o = (await asRequest(PX, () => Res.contentSource(), withToken(s.token))).overlay;
+    eq(o.docs[pcId], "dh_ovl07", "the product draft is reported with its hash:");
+    eq(o.docs[cc], "dh_fix2_coll", "the collection draft too:");
+    ok(!Object.hasOwn(o.docs, bad.id), "an unreadable draft is not reported as shown");
+    ok(o.skipped.includes(bad.id) && !o.skipped.includes(pcId), `skipped: ${JSON.stringify(o.skipped)}`);
+    ok(![pcId, cc, bad.id].some((id) => o.documents.includes(id)), "none of them in the list overlay");
+    // its page shows the live row, as skipped says
+    eq(await asRequest(PX, () => Res.previewEntityRow("product_content", P(3)), withToken(s.token)), null, "the unreadable draft is not shown:");
+    // shoppers get no overlay at all
+    eq((await asRequest(PX, () => Res.contentSource(), {})).overlay, undefined, "no overlay for shoppers:");
+  } finally {
+    await inT(PX, () => libsql.execute({ sql: "UPDATE documents SET archived_at = ? WHERE id = ?", args: [NOW, bad.id] }));
+  }
+});
+
+await t("P4-FIX2: an archived product content document's draft never previews (readEntityDraft's archived filter): the page shows the live row and the frame does not list it", async () => {
+  const s = await newSession(PX);
+  eq((await asRequest(PX, () => renderProductPage("glow-serum"), withToken(s.token))).h1, "Draft name", "control: the draft shows while the document is not archived:");
+  await inT(PX, () => libsql.execute({ sql: "UPDATE documents SET archived_at = ? WHERE id = ?", args: [NOW, pcId] }));
+  try {
+    eq(await asRequest(PX, () => Res.previewEntityRow("product_content", P(1)), withToken(s.token)), null, "previewEntityRow:");
+    const pv = await asRequest(PX, () => renderProductPage("glow-serum"), withToken(s.token));
+    eq(pv.h1, "Glow Serum", "the page's name:");
+    const t1 = text(pv.html);
+    ok(t1.includes("Live badge") && !t1.includes("Draft"), `the live row: ${t1.slice(0, 300)}`);
+    const o = (await asRequest(PX, () => Res.contentSource(), withToken(s.token))).overlay;
+    ok(!Object.hasOwn(o.docs, pcId) && !o.skipped.includes(pcId), "not listed");
+  } finally {
+    await inT(PX, () => libsql.execute({ sql: "UPDATE documents SET archived_at = NULL WHERE id = ?", args: [pcId] }));
+  }
+});
+
 console.log(`\n${pass} passed, ${fail} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 process.exit(fail ? 1 : 0);

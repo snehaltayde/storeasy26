@@ -62,7 +62,27 @@ export const usageLines = (uses) => [...new Set((Array.isArray(uses) ? uses : []
 // deleted, forced or not (lib/media.js deleteMedia).
 export const documentsUsage = (uses) => Array.isArray(uses) && uses.length > 0 && uses.every((u) => isObj(u) && (u.document || u.release || u.config));
 
+// P4-FIX2: "Delete anyway" is offered only when it can work: lib/media.js
+// deleteMedia refuses a forced delete whenever any usage row is a page
+// document (and always on a documents store), so a legacy store whose file is
+// used by an old section AND a page draft gets the refusal, not the choice.
+export const canForceDelete = (uses) => Array.isArray(uses) && uses.length > 0 && !documentsUsage(uses) && !uses.some((u) => isObj(u) && u.document);
+
+// P4-FIX2: what a refused delete says. The server's words for a used file are
+// never shown (on a legacy store they hold codes such as "block:promo"): the
+// console says it in fixed words and lists the places by usageLines. The
+// moving-store and changed-file refusals are fixed plain sentences on the
+// server (lib/media.js); anything else is the plain "failed" line.
+const SERVER_WORDS_SHOWN = new Set(["STORE_MIGRATING", "MEDIA_CHANGED"]);
+export function refusalWords(code, message) {
+  if (code === "MEDIA_IN_USE") return MEDIA_WORDS.inUse;
+  if (SERVER_WORDS_SHOWN.has(code) && typeof message === "string" && message) return message;
+  return MEDIA_WORDS.failed;
+}
+
 export const MEDIA_WORDS = Object.freeze({
+  inUse: "This file is still used, so it wasn't deleted. Remove it from the places below first.",
+  backFromArchive: (name) => `${name} was archived. It's back in your library now.`,
   archived: (name) => `${name} is archived. It's hidden from the image picker, and pages that use it still show it.`,
   unarchived: (name) => `${name} is back in your library.`,
   archivedNote: "Archived: hidden from the image picker. Pages that use it still show it.",
@@ -70,6 +90,14 @@ export const MEDIA_WORDS = Object.freeze({
   refusedTitle: "This file can't be deleted",
   refusedHelp: "Archive it instead to hide it from the image picker. Pages that use it keep showing it.",
   failed: "Something went wrong on our side, so nothing changed. Try again.",
+});
+
+// The refusal dialog's state for one refused delete.
+const refusalOf = (media, code, message, usage) => ({
+  media,
+  message: refusalWords(code, message),
+  lines: code === "MEDIA_IN_USE" ? usageLines(usage) : [],
+  offerArchive: code === "MEDIA_IN_USE" && media.archived_at == null,
 });
 
 export default function MediaAdmin({ initial, readOnly = false }) {
@@ -104,7 +132,10 @@ export default function MediaAdmin({ initial, readOnly = false }) {
           setError(r.message);
           return;
         }
-        if (r.media.deduped) toast.success(`${file.name} was already in the library — reused`);
+        // P4-FIX2: bytes that match an archived file bring it back on purpose
+        // (lib/media.js saveMedia), and the founder is told
+        if (r.media.deduped && r.media.unarchived) toast.success(MEDIA_WORDS.backFromArchive(file.name));
+        else if (r.media.deduped) toast.success(`${file.name} was already in the library — reused`);
         else toast.success(r.notice || `${file.name} uploaded`);
       }
     } finally {
@@ -337,8 +368,8 @@ export default function MediaAdmin({ initial, readOnly = false }) {
           const r = await requestDelete(m.id, false);
           if (r.refused) {
             const { code, message, usage } = r.refused;
-            if (code === "MEDIA_IN_USE" && usage.length && !documentsUsage(usage)) setUsageGuard({ media: m, lines: usageLines(usage) });
-            else setRefusal({ media: m, message, lines: code === "MEDIA_IN_USE" ? usageLines(usage) : [], offerArchive: code === "MEDIA_IN_USE" && m.archived_at == null });
+            if (code === "MEDIA_IN_USE" && canForceDelete(usage)) setUsageGuard({ media: m, lines: usageLines(usage) });
+            else setRefusal(refusalOf(m, code, message, usage));
           } else {
             toast.success("Deleted");
             await refresh();
@@ -413,8 +444,15 @@ export default function MediaAdmin({ initial, readOnly = false }) {
           )
         }
         onConfirm={async () => {
-          const r = await requestDelete(usageGuard.media.id, true);
-          if (r.refused) throw new Error(r.refused.message);
+          const m = usageGuard.media;
+          const r = await requestDelete(m.id, true);
+          if (r.refused) {
+            // the usage changed since (a page now uses it, or the store is
+            // being moved): the refusal in fixed words, never the server's text
+            setUsageGuard(null);
+            setRefusal(refusalOf(m, r.refused.code, r.refused.message, r.refused.usage));
+            return;
+          }
           toast.success("Deleted");
           await refresh();
         }}
