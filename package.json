@@ -134,6 +134,8 @@
     "test:migrate-render": "node scripts/test-migrate-render.js",
     "test:migrate-documents": "node scripts/test-migrate-documents.js",
     "test:migrate-reverse": "node scripts/test-migrate-reverse.js",
+    "test:commerce-blocks": "node scripts/test-commerce-blocks.js",
+    "test:bundle-form": "node scripts/test-bundle-form.js",
     "seed:design": "node scripts/dev-design.js seed",
     "dev:design": "node scripts/dev-design.js",
     "drill:smoke": "node scripts/drill.js smoke",
