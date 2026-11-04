@@ -61,7 +61,7 @@ process.env.PLATFORM_DB_TOKEN = "";
 process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
-const P4_DBS = ["fresh", "keep", "adoptrel", "adoptblk", "adoptdoc", "earlier", "badmode", ...Array.from({ length: 8 }, (_, i) => `fa${i}`)].map((n) => `.test-prov-${n}.db`);
+const P4_DBS = ["fresh", "keep", "live", "liveorders", "liveprod", "adoptrel", "adoptblk", "adoptdoc", "earlier", "badmode", ...Array.from({ length: 8 }, (_, i) => `fa${i}`)].map((n) => `.test-prov-${n}.db`);
 const dbs = [".test-prov-default.db", ".test-prov-platform.db", ".test-prov-t1.db", ...P4_DBS];
 const removeDbs = async () => {
   for (const f of dbs) for (const ext of ["", "-wal", "-shm", "-journal"]) await rm(join(here, "..", f + ext), { force: true });
@@ -419,7 +419,8 @@ await t("unit: a --force re-provision of a store that already holds content stay
   eq(r2.run.status, "done", `force (${r2.error}):`);
   same([r2.run.params.force, r2.run.params.contentMode], [true, "documents"], "a forced run asking for the new editor:");
   eq(r2.run.refs.contentMode, "legacy", "contentMode:");
-  eq(r2.run.refs.contentModeReason, P.CONTENT_MODE_REASONS.holdsContent, "reason:");
+  // fix 1: a registered store is never moved by a re-provision
+  eq(r2.run.refs.contentModeReason, P.CONTENT_MODE_REASONS.registered, "reason:");
   same(await storeState(".test-prov-keep.db"), before, "untouched:");
   // the escape is validated
   let refused = null;
@@ -430,6 +431,66 @@ await t("unit: a --force re-provision of a store that already holds content stay
   }
   ok(/contentMode must be one of documents, legacy/.test(refused || ""), `refused: ${refused}`);
   eq(await C.getTenant("badmode"), null, "nothing registered:");
+});
+
+// P4-PROVISION fix 1: content_mode runs before register_tenant (where an
+// existing tenant is refused), so it must never move a store that is already
+// registered, nor a database it did not create that already runs a store.
+await t("unit (fix 1): re-provisioning an existing legacy store with no editor content, with the default contentMode and no force, is refused and leaves its editor as it was (cms_state and the run's contentMode stay legacy)", async () => {
+  const r0 = await P.runProvision(params("live", { contentMode: "legacy" }));
+  eq(r0.run.status, "done", `first (${r0.error}):`);
+  const file = ".test-prov-live.db";
+  const before = await storeState(file);
+  const row = (await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0];
+  eq(before.mode, "legacy", "legacy, no editor content:");
+  same(before.counts, zeroCounts(), "no content rows:");
+  const r = await P.runProvision(params("live"));
+  eq(r.failedStep, "register_tenant", "refused at:");
+  eq(r.error, 'tenant "live" already exists (use force to re-provision)', "words:");
+  eq(r.run.params.contentMode, "documents", "the default was asked for:");
+  same([r.run.refs.contentMode, r.run.refs.contentModeReason], ["legacy", P.CONTENT_MODE_REASONS.registered], "the run records:");
+  same((await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], row, "cms_state untouched:");
+  same(await storeState(file), before, "the store:");
+  eq(await withTenant(await C.getTenant("live"), () => getCmsMode()), "legacy", "getCmsMode:");
+});
+
+await t("unit (fix 1): a --force re-provision of an existing legacy store with no editor content but live orders and products, default contentMode, finishes and keeps the old editor", async () => {
+  const file = ".test-prov-live.db";
+  const c = raw(file);
+  await c.execute("INSERT INTO products (id, handle, title, available) VALUES ('gid://p/live1','live-tee','Live Tee',1)");
+  await c.execute("INSERT INTO orders (id, email) VALUES ('ORD-LIVE-1', 'snehal@mediastic.in')");
+  c.close();
+  const before = await storeState(file);
+  const row = (await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0];
+  const r = await P.runProvision(params("live", { force: true }));
+  eq(r.run.status, "done", `force (${r.error}):`);
+  same([r.run.refs.contentMode, r.run.refs.contentModeReason], ["legacy", P.CONTENT_MODE_REASONS.registered], "kept:");
+  same((await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], row, "cms_state untouched:");
+  same(await storeState(file), before, "the store:");
+  eq(Number((await rawSql(file, "SELECT count(*) AS n FROM orders"))[0].n), 1, "its order is there:");
+  ok(/old editor/.test(P.editorSummary(r.run.refs)), P.editorSummary(r.run.refs));
+});
+
+await t("unit (fix 1): an adopted database (a new id) with no editor content that already holds orders or products keeps the old editor with the plain reason; it is not moved", async () => {
+  const seeds = {
+    liveorders: (c) => c.execute("INSERT INTO orders (id, email) VALUES ('ORD-ADOPT-1', 'snehal@mediastic.in')"),
+    liveprod: (c) => c.execute("INSERT INTO products (id, handle, title, available) VALUES ('gid://p/adopt1','adopt-tee','Adopt Tee',1)"),
+  };
+  for (const [id, seed] of Object.entries(seeds)) {
+    const file = `.test-prov-${id}.db`;
+    const c = raw(file);
+    await P.applyTenantSchema(c);
+    await seed(c);
+    c.close();
+    const before = await storeState(file);
+    const row = (await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0];
+    const r = await P.runProvision(params(id));
+    eq(r.run.status, "done", `${id} (${r.error}):`);
+    same([r.run.refs.contentMode, r.run.refs.contentModeReason], ["legacy", P.CONTENT_MODE_REASONS.holdsStoreData], `${id}:`);
+    eq(r.run.refs.contentModeReason, "This database already holds products, collections, customers or orders, so it keeps the old editor. Move it with the cutover.", `${id} words:`);
+    same((await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], row, `${id} cms_state untouched:`);
+    same(await storeState(file), before, `${id} the store:`);
+  }
 });
 
 await t("unit: a run that started before content_mode existed keeps the old editor when resumed (its stored settings have no contentMode)", async () => {
@@ -451,7 +512,9 @@ await t("unit: an existing legacy tenant is untouched by provisioning others (it
   eq(acmeBefore.row.mode, "legacy", "acme is legacy:");
   same(await storeState(".test-prov-t1.db"), acmeBefore.state, "acme's store:");
   same((await rawSql(".test-prov-t1.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], acmeBefore.row, "acme's cms_state row:");
-  const acmeRun = (await P.listProvisionRuns({ limit: 100 })).find((r) => r.tenant_id === "acme");
+  // the run that made acme (the refused re-provision after it records the
+  // fix 1 reason, "already registered")
+  const acmeRun = (await P.listProvisionRuns({ limit: 100 })).find((r) => r.tenant_id === "acme" && r.status === "done");
   same([acmeRun.refs.contentMode, acmeRun.refs.contentModeReason], ["legacy", P.CONTENT_MODE_REASONS.operator], "acme's run (contentMode 'legacy'):");
 });
 
