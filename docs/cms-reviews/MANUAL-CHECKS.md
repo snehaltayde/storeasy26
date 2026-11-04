@@ -619,6 +619,29 @@ The drills ran in headless desktop Chrome on the design harness, on `next dev`, 
 - [ ] test:migrate-map now starts a sqld, as test:publish does. CI's sqld download still needs the owner's approval of its source and checksum; nothing under .github/ was changed.
 - [ ] Owner/CUTOVER decisions: when a live-row read fails, the product page still shows the error page (modules and badge read the same row and fail closed), and collection pins still fail closed. Decide whether pins should degrade too.
 
+## Phase 4, batch 5
+
+### Moving a store to the new editor (P4-CUTOVER)
+- [ ] No new owner checks. The existing ones in docs/cms-reviews/P4-CUTOVER.md still stand: hosted batch atomicity on staging, PITR, the per-store runbook, OQ-5, sanitized module HTML, the hosted theme pin, CI sqld approval, phone and Safari.
+
+### New stores start on the new editor (P4-PROVISION)
+- [ ] Staging: run a /platform 'New tenant' with the slug of an existing throwaway legacy tenant. It should be refused, and that tenant should stay on the old editor (cms_state 'legacy', storefront still open).
+- [ ] CI: the sqld download in .github/ still needs the owner to approve its source and checksum. Nothing under .github/ was changed.
+
+### The P4-EDITOR review findings (P4-FIX3)
+- [ ] Desktop Chrome on a staging test tenant: give a product your own description and check Shopify's shows beside it as plain text. Change the description in Shopify, wait for the catalog update and reopen: the notice should read in plain words. Then switch to another product from the product list: the first product's name should never show with the second's Shopify title.
+- [ ] Catalog page on a documents store: the header should say the brand and product type shoppers see are set in the editor.
+- [ ] Phone and Safari: check the product form at phone width.
+- [ ] CI: the sqld download in .github/ still needs the owner's approval of its source and checksum. Nothing under .github/ was changed.
+- [ ] Orchestrator: add docs/cms-reviews/drills/P4-FIX3/ (the drill and its results) to P4-FIX3's file list.
+
+### Review findings of P4-EQUIV, P4-ED05 and P4-FIX2 (P4-FIX4)
+- [ ] Desktop Chrome on the design harness (P4-DRILLS): on a documents store the editor's product and collection pickers list as before; with the live release made unreadable on a local copy they still list products; /admin/upsells still redirects to the editor. Browser verification for this item is NOT DONE.
+- [ ] P4-CUTOVER rehearsal: run --make-routes on the restore-drill copy. If a hero test is running, the command says so and routes.json carries its slug. An exit 2 from --compare means the harness was broken before the move: fix it and capture again.
+- [ ] P4-CUTOVER's test-migrate-documents must pass fixture.heroExperiments to compare() when it replays the ALLOWED_DIFFERENCES fixtures.
+- [ ] Staging and production are NOT DONE: nothing ran against hosted Turso or a real Typesense, and nothing was pushed or deployed.
+- [ ] CI sqld download in .github/ still needs the owner's approval of its source and checksum (not touched here).
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
