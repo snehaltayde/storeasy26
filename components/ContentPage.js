@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SectionView, sectionShows } from "@/components/sections/index";
+import { SectionView, sectionShows, inDocumentsPreview } from "@/components/sections/index";
 import { EmptyPageNote } from "@/components/sections/parts";
 import { LEGACY_KIND_NAMES } from "@/lib/registry/sections";
 import { legacyPageSectionsToSections } from "@/lib/registry/legacy";
@@ -25,8 +25,13 @@ export function pageSections(list) {
   return legacyPageSectionsToSections(Array.isArray(list) ? list.map(asText) : []).filter((s) => sectionShows(s, {}, { surface: "page" }));
 }
 
+// P3-FRAME (ED-04): in a documents preview the title carries data-field
+// "meta.title" (validate's path for a page's title) and every section renders
+// with ctx.preview, so its words carry their own data-field
+// (components/sections/index.js). Live markup is unchanged.
 export default function ContentPage({ page, legalName = "", children = null }) {
   const sections = pageSections(page.sections);
+  const preview = inDocumentsPreview();
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       {/* P1-CONTRAST: the two links here (Home, Contact us) are subtle text,
@@ -38,7 +43,9 @@ export default function ContentPage({ page, legalName = "", children = null }) {
         </Link>{" "}
         / <span className="text-sf-text-muted">{page.title}</span>
       </nav>
-      <h1 className="text-3xl font-extrabold tracking-tight">{page.title}</h1>
+      <h1 {...(preview ? { "data-field": "meta.title" } : {})} className="text-3xl font-extrabold tracking-tight">
+        {page.title}
+      </h1>
       {page.effective_at ? (
         <p className="mt-2 text-sm text-sf-text-faint">
           Effective from{" "}
@@ -47,7 +54,7 @@ export default function ContentPage({ page, legalName = "", children = null }) {
       ) : null}
       <div className="mt-8 space-y-8">
         {sections.map((s, idx) => (
-          <SectionView key={`${s.id}-${idx}`} section={s} ctx={{ surface: "page" }} />
+          <SectionView key={`${s.id}-${idx}`} section={s} ctx={preview ? { surface: "page", preview: true } : { surface: "page" }} />
         ))}
       </div>
       {sections.length === 0 && !children ? <EmptyPageNote /> : null}

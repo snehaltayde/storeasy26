@@ -14,7 +14,7 @@ import { getCart, emptyCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { resolveBrand, brandCssVars } from "@/lib/brand";
-import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolvedContentPageList, resolvedSurfaceTemplates, contentSource, isContentUnavailable } from "@/lib/content/resolve";
+import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolvedContentPageList, resolvedSurfaceTemplates, contentSource, isContentUnavailable, previewFrameRoutes } from "@/lib/content/resolve";
 import { kitAttr } from "@/lib/themes/kits";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
@@ -23,7 +23,9 @@ import { headers } from "next/headers";
 import SiteNav from "@/components/site/SiteNav";
 import Link from "next/link";
 import PreviewBridgeMount from "@/components/preview/PreviewBridge";
-import PreviewBanner from "@/components/PreviewBanner";
+import PreviewBanner, { PreviewMain } from "@/components/PreviewBanner";
+import EditThisPage from "@/components/preview/EditThisPage";
+import { DOCUMENTS_RELEASE_VERSION } from "@/lib/releases";
 import StoreClosed from "@/components/StoreClosed";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -89,7 +91,7 @@ async function navCollections() {
 async function chromeData() {
   try {
     return await tfetch(async () => {
-      const [announcement, navHeader, navFooter, brand, theme, src, pageList, surfaces] = await Promise.all([
+      const [announcement, navHeader, navFooter, brand, theme, src, pageList, surfaces, routes] = await Promise.all([
         resolvedAnnouncement(),
         resolvedNav("header"),
         resolvedNav("footer"),
@@ -98,6 +100,7 @@ async function chromeData() {
         contentSource(),
         resolvedContentPageList().catch(() => []),
         resolvedSurfaceTemplates(), // S61: header/footer structural variants (release-governed)
+        previewFrameRoutes().catch(() => null), // P3-FRAME: documents preview only, else null
       ]);
       // S39 (MC11): footer links only to pages that EXIST on this store.
       const enabledPages = pageList.filter((p) => p.enabled && (p.family || "page") === "page");
@@ -132,6 +135,7 @@ async function chromeData() {
         preview: src.preview,
         // P2-PREVIEW: what a documents preview shows (null on legacy previews)
         previewOverlay: src.overlay ? { designDirty: src.overlay.designDirty, showDesign: src.overlay.showDesign, otherTab: src.overlay.otherTab } : null,
+        frame: frameOf(src, routes),
         footerPages,
         headerVariant: surfaces.header || "standard",
         footerVariant: surfaces.footer || "columns",
@@ -153,6 +157,7 @@ async function chromeData() {
       kitAttr: "pulse-1",
       preview: false,
       previewOverlay: null,
+      frame: null,
       footerPages: { about: false, policies: [] },
       headerVariant: "standard",
       footerVariant: "columns",
@@ -164,6 +169,42 @@ async function chromeData() {
     // catalog's collections instead.
     if (isContentUnavailable(e)) return { ...neutral, navHeader: [], navFooter: [] };
     return neutral;
+  }
+}
+
+// P3-FRAME (PV-01, ED-04): what the editor's frame needs from this request.
+//   documents preview  { kind: "documents", state, routes, offline } for the
+//                      bridge (ok), the banner and the preview-only data-doc
+//   ended preview      { kind: "refused", reason } (a session token this store
+//                      signed whose session was revoked, expired or not found)
+//   a live v4 page     { kind: "live" }: a console cookie may then mount the
+//                      bridge with reason "live" and the Edit this page link
+//   anything else      null: today's markup (legacy stores, legacy previews)
+function frameOf(src, routes) {
+  if (src.preview === true && src.v === DOCUMENTS_RELEASE_VERSION && src.overlay) {
+    const o = src.overlay;
+    const offline = Array.isArray(o.offline) ? o.offline : [];
+    return {
+      kind: "documents",
+      state: { kind: "documents", sid: o.sid, docs: o.docs || {}, offline, skipped: Array.isArray(o.skipped) ? o.skipped : [], designShown: o.designShown === true },
+      routes: routes || {},
+      offline,
+    };
+  }
+  if (src.preview !== true && typeof src.previewRefused === "string") return { kind: "refused", reason: src.previewRefused };
+  if (src.preview !== true && src.v === DOCUMENTS_RELEASE_VERSION && src.mode === "live") return { kind: "live" };
+  return null;
+}
+
+// Presence only: a browser signed in to the console (store or platform). Never
+// proof of anything; it only decides whether the founder's own frame helpers
+// (the bridge saying "live", the Edit this page link) are sent.
+async function consoleCookiePresent() {
+  try {
+    const jar = await cookies();
+    return Boolean(jar.get("_admin") || jar.get("_platform"));
+  } catch {
+    return false;
   }
 }
 
@@ -299,6 +340,9 @@ export default async function RootLayout({ children }) {
   const chromeRead = chromeData();
   const collectionsRead = chromeRead.then((c) => (Array.isArray(c.navHeader) && Array.isArray(c.navFooter) ? [] : navCollections()));
   const [collections, cart, chrome] = await Promise.all([collectionsRead, initialCart(), chromeRead]);
+  const frame = chrome.frame;
+  const editing = frame?.kind === "documents"; // preview-only data-doc / data-field
+  const liveConsole = frame?.kind === "live" && (await consoleCookiePresent());
   return (
     <html lang="en" data-kit={chrome.kitAttr} className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full`}>
       {/* Brand variables: values come from lib/brand.js (validated hex/enum
@@ -308,17 +352,31 @@ export default async function RootLayout({ children }) {
       {chrome.brandCss ? <style id="brand-vars" precedence="default" href="brand-vars">{chrome.brandCss}</style> : null}
       <body className="flex min-h-full flex-col bg-background text-foreground antialiased">
         {chrome.preview && (
-          <div className="bg-purple-700 px-4 py-1.5 text-center text-xs font-semibold text-white">
-            <PreviewBanner overlay={chrome.previewOverlay} />
+          <div data-preview-bar="" className="bg-purple-700 px-4 py-1.5 text-center text-xs font-semibold text-white">
+            <PreviewBanner overlay={chrome.previewOverlay} frame={editing ? { routes: frame.routes, offline: frame.offline } : null} />
+          </div>
+        )}
+        {/* P3-FRAME (PV-01): a preview that ended says so, with a way out
+            (the exit clears the stale cookie). */}
+        {frame?.kind === "refused" && (
+          <div data-preview-bar="" data-preview-ended="" className="bg-purple-700 px-4 py-1.5 text-center text-xs font-semibold text-white">
+            Your preview has ended, so you&apos;re seeing the live store.{" "}
+            <a href="/api/preview?exit=1" className="underline">
+              Exit
+            </a>
           </div>
         )}
         {/* S54: designer⇄preview bridge — preview mode ONLY, inert unless the
             console iframe performs the same-origin handshake. Public pages
-            never ship it. */}
-        {chrome.preview && <PreviewBridgeMount />}
+            never ship it. P3-FRAME: also for a preview that ended, and for a
+            console-signed-in browser on the live store (reason "live"), so
+            the editor knows what its frame shows. Never for a shopper. */}
+        {chrome.preview && (editing ? <PreviewBridgeMount state={frame.state} ok /> : <PreviewBridgeMount ok={false} reason="legacy" />)}
+        {frame?.kind === "refused" && <PreviewBridgeMount ok={false} reason={frame.reason} />}
+        {liveConsole && <PreviewBridgeMount ok={false} reason="live" />}
         <CartProvider initialCart={cart}>
-          <Header collections={collections} logo={chrome.logo} nav={chrome.navHeader} announcement={chrome.announcement} variant={chrome.headerVariant} />
-          <main className="flex-1">{children}</main>
+          <Header collections={collections} logo={chrome.logo} nav={chrome.navHeader} announcement={chrome.announcement} variant={chrome.headerVariant} editing={editing} />
+          {editing ? <PreviewMain routes={frame.routes}>{children}</PreviewMain> : <main className="flex-1">{children}</main>}
           <Footer
             collections={collections}
             logo={chrome.logo}
@@ -328,6 +386,7 @@ export default async function RootLayout({ children }) {
             legalName={chrome.legalName}
             pages={chrome.footerPages}
             variant={chrome.footerVariant}
+            editing={editing}
           />
           <CartDrawer />
         </CartProvider>
@@ -335,6 +394,7 @@ export default async function RootLayout({ children }) {
         <ConsentBanner storeName={chrome.name} />
         <Pixels ga4Id={chrome.ga4Id} metaPixelId={chrome.metaPixelId} />
         <ErrorReporter />
+        {liveConsole && <EditThisPage />}
       </body>
     </html>
   );

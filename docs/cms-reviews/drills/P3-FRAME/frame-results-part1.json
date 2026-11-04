@@ -1,0 +1,97 @@
+[
+  {
+    "name": "mount announces ready (v1 shape)",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "v2 ready, ok, with the session's state",
+    "pass": true,
+    "detail": "{\"type\":\"storeasy:ready\",\"v\":2,\"state\":{\"kind\":\"documents\",\"sid\":\"ps_39e2a07c5850e6d1\",\"docs\":{\"doc_home\":\"a1e01c8a379aaf7c439fd2d37c87a06085fbc7716d949484675b1080ff2cc753\"},\"offline\":[],\"skipped\":[],\"designShown\":false},\"ok\":true,\"unfinished\":[]}"
+  },
+  {
+    "name": "ready names no token",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "clicking the hero's button picks it and does not navigate",
+    "pass": true,
+    "detail": "{\"type\":\"storeasy:pick\",\"doc\":\"doc_home\",\"sectionId\":\"sec_hero\",\"kind\":\"hero\",\"field\":\"primary.label\",\"offset\":null}"
+  },
+  {
+    "name": "clicking a header link picks the header and does not navigate",
+    "pass": true,
+    "detail": "{\"type\":\"storeasy:pick\",\"doc\":\"doc_header\",\"sectionId\":null,\"kind\":null,\"field\":null,\"offset\":null}"
+  },
+  {
+    "name": "clicking an FAQ question picks items.1.q",
+    "pass": true,
+    "detail": "{\"type\":\"storeasy:pick\",\"doc\":\"doc_home\",\"sectionId\":\"sec_faq\",\"kind\":\"faq\",\"field\":\"items.1.q\",\"offset\":null}"
+  },
+  {
+    "name": "select outlines the section",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "refresh reloads and restores the scroll and the selection",
+    "pass": true,
+    "detail": "before 700, after {\"y\":700,\"sel\":true}"
+  },
+  {
+    "name": "the banner's live-store link is the exit to this address, no token",
+    "pass": true,
+    "detail": "/api/preview?exit=1&to=%2F"
+  },
+  {
+    "name": "no page errors",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "See the live store navigates the frame to the same address, live",
+    "pass": true,
+    "detail": "http://localhost:3860/about"
+  },
+  {
+    "name": "the preview cookie is gone",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "the bridge now says live",
+    "pass": true,
+    "detail": "{\"type\":\"storeasy:ready\",\"v\":2,\"state\":null,\"ok\":false,\"reason\":\"live\",\"unfinished\":[]}"
+  },
+  {
+    "name": "375: no sideways scroll in the preview",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "console cookie: the bridge mounts and announces",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "console cookie, no preview: ready ok:false reason live",
+    "pass": true,
+    "detail": "{\"type\":\"storeasy:ready\",\"v\":2,\"state\":null,\"ok\":false,\"reason\":\"live\",\"unfinished\":[]}"
+  },
+  {
+    "name": "Edit this page links to the editor at this address",
+    "pass": true,
+    "detail": "/admin/editor?path=%2Fabout"
+  },
+  {
+    "name": "no bar",
+    "pass": true,
+    "detail": ""
+  },
+  {
+    "name": "shopper: no Edit this page, no data-doc or data-field, no bar",
+    "pass": true,
+    "detail": ""
+  }
+]

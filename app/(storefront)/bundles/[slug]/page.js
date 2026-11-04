@@ -5,14 +5,35 @@ import { getBundle } from "@/lib/bundles";
 import { formatMoney } from "@/lib/format";
 import BundleAddButton from "@/components/BundleAddButton";
 import { tfetch } from "@/lib/tenant-request";
+import { closedStoreGate } from "@/lib/content/resolve";
+import { siteName } from "@/lib/site";
+import StoreClosed from "@/components/StoreClosed";
 
 // Bundle detail (S46 / SF18): the set, its components, the honest math
 // (components sum vs bundle price) and one-tap add — priced by the offers
 // engine, so the cart shows exactly this saving.
 export const dynamic = "force-dynamic";
 
+// P3-FRAME (PUB-06, after the P3-CLOSED review): a store that has never
+// published is closed. The layout shows "Opening soon" on a full page load,
+// but an in-app navigation renders this page without the layout, and Next
+// carries a page's metadata and its own render in the payload either way.
+// So the page itself answers the closed page, before reading the founder's
+// bundle: its title, words and products never reach a shopper. A valid
+// preview session still sees it (closedStoreGate's { preview: true }).
+async function closedHere() {
+  try {
+    const gate = await tfetch(() => closedStoreGate());
+    return gate?.preview === false ? await tfetch(async () => siteName()).catch(() => "Store") : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function generateMetadata({ params }) {
   const { slug } = await params;
+  const closed = await closedHere();
+  if (closed !== null) return { title: { absolute: `${closed} · Opening soon` }, description: "Opening soon.", robots: { index: false, follow: false } };
   const b = await tfetch(() => getBundle(slug));
   if (!b) notFound();
   return { title: b.title, description: b.description?.slice(0, 160) || `${b.components.length}-piece set`, alternates: { canonical: `/bundles/${slug}` } };
@@ -20,6 +41,8 @@ export async function generateMetadata({ params }) {
 
 export default async function BundlePage({ params }) {
   const { slug } = await params;
+  const closed = await closedHere();
+  if (closed !== null) return <StoreClosed name={closed} />;
   const b = await tfetch(() => getBundle(slug));
   if (!b) notFound();
   const cur = "INR";

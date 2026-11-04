@@ -696,6 +696,83 @@ await t("no cookie means live content only; a tampered hmac, an expired session,
   eq(await asRequest(PD, () => Res.resolvedHero(), withToken(s.token)).then((h) => h.title), "Draft hero two", "the untampered token:");
 });
 
+// P3-FRAME (PV-01): a correctly signed session token whose session ended is a
+// preview that ENDED: live content, plus previewRefused naming why, so the
+// layout can say so and tell the editor's frame. A token this store did not
+// sign is still no preview at all (no overlay, no refusal, so no bar).
+await t("P3-FRAME: a revoked, an expired and an unknown sid each give live content plus previewRefused with the reason; a tampered HMAC gives neither overlay nor previewRefused", async () => {
+  const refusedWith = async (cookies, reason, label) => {
+    await liveOnly(PD, cookies, label);
+    const src = await asRequest(PD, () => Res.contentSource(), cookies);
+    eq(src.previewRefused, reason, `${label}: previewRefused:`);
+    eq(src.mode, "live", `${label}: live mode:`);
+    ok(src.releaseId, `${label}: the live release serves`);
+  };
+  const rv = await newSession(PD);
+  eq((await admin(PD, { revoke: rv.sid })).status, 200, "revoke:");
+  await refusedWith(withToken(rv.token), "revoked", "revoked");
+  const ex = await newSession(PD);
+  await inT(PD, () => libsql.execute({ sql: "UPDATE preview_sessions SET expires_at = ? WHERE id = ?", args: [new Date(Date.now() - 1000).toISOString(), ex.sid] }));
+  await refusedWith(withToken(ex.token), "expired", "expired session row");
+  // a token past its own expiry, still this store's signature
+  const old = await inT(PD, () => R.previewToken({ sid: ex.sid, now: Date.now() - 2 * 3600_000 }));
+  await refusedWith(withToken(old), "expired", "expired token");
+  // a correctly signed sid this store has no row for
+  const unknown = await inT(PD, () => R.previewToken({ sid: "ps_0000000000000bad" }));
+  await refusedWith(withToken(unknown), "not_found", "unknown sid");
+  // a row of another store under this store's signature reads as not found
+  const theirs = "ps_00000000000000ab";
+  await inT(PD, () => libsql.execute({ sql: "INSERT INTO preview_sessions (id, tenant_id, created_by, created_at, expires_at, show_design) VALUES (?, 'pa', 'x', ?, ?, 0)", args: [theirs, new Date().toISOString(), new Date(Date.now() + 3600_000).toISOString()] }));
+  await refusedWith(withToken(await inT(PD, () => R.previewToken({ sid: theirs }))), "not_found", "another store's row");
+  // tampered: not this store's signature, so no preview and no refusal
+  const s = await newSession(PD);
+  const [p, exp, sid, sig] = s.token.split(".");
+  const flip = (c) => (c === "0" ? "1" : "0");
+  for (const [tok, label] of [
+    [`${p}.${exp}.${sid}.${flip(sig[0])}${sig.slice(1)}`, "tampered hmac"],
+    [`${p}.${Number(exp) - 7200}.${sid}.${sig}`, "tampered expiry, in the past"],
+    [(await newSession(PA)).token, "another store's token"],
+    ["garbage", "garbage"],
+  ]) {
+    await liveOnly(PD, withToken(tok), label);
+    const src = await asRequest(PD, () => Res.contentSource(), withToken(tok));
+    eq(src.previewRefused, undefined, `${label}: previewRefused:`);
+  }
+  // no cookie: no refusal either
+  eq((await asRequest(PD, () => Res.contentSource(), {})).previewRefused, undefined, "no cookie:");
+  // the session these were cut from still works
+  const src = await asRequest(PD, () => Res.contentSource(), withToken(s.token));
+  eq(src.preview, true, "the untampered session still previews:");
+  eq(src.previewRefused, undefined, "and is not refused:");
+});
+
+await t("P3-FRAME: the overlay tells the frame what it shows: docs equals each overlaid document's draft hash, offline lists the documents taken offline, skipped the drafts not shown", async () => {
+  const s = await newSession(PD);
+  const src = await asRequest(PD, () => Res.contentSource(), withToken(s.token));
+  const rows = await inT(PD, () => Docs.readDirtyDrafts());
+  const o = src.overlay;
+  ok(o.documents.length > 0, "something is overlaid");
+  same(Object.keys(o.docs).sort(), [...o.documents].sort(), "docs names exactly the overlaid documents:");
+  for (const id of o.documents) eq(o.docs[id], rows.find((r) => r.id === id).draft_hash, `${id}: draft hash:`);
+  same(o.skipped, rows.filter((r) => !o.documents.includes(r.id)).map((r) => r.id), "skipped:");
+  eq(o.designShown, o.documents.includes("doc_design"), "designShown:");
+  same(o.offline, [], "nothing offline yet:");
+  // take a page offline the way P3-COMMIT does (decision 4): no published version, undone set
+  const page = rows.find((r) => r.type === "page") || (await inT(PD, async () => (await libsql.execute("SELECT id FROM documents WHERE type = 'page' LIMIT 1")).rows[0]));
+  ok(page, "a page to take offline");
+  const pid = String(page.id);
+  const before = await inT(PD, async () => (await libsql.execute({ sql: "SELECT published_version_id, undone_version_id FROM documents WHERE id = ?", args: [pid] })).rows[0]);
+  await inT(PD, () => libsql.execute({ sql: "UPDATE documents SET undone_version_id = COALESCE(published_version_id, 'v_gone'), published_version_id = NULL WHERE id = ?", args: [pid] }));
+  try {
+    const off = await asRequest(PD, () => Res.contentSource(), withToken(s.token));
+    same(off.overlay.offline, [pid], "offline:");
+    // shoppers never pay for it: no cookie, no offline read
+    eq((await asRequest(PD, () => Res.contentSource(), {})).overlay, undefined, "no overlay for shoppers:");
+  } finally {
+    await inT(PD, () => libsql.execute({ sql: "UPDATE documents SET published_version_id = ?, undone_version_id = ? WHERE id = ?", args: [before.published_version_id ?? null, before.undone_version_id ?? null, pid] }));
+  }
+});
+
 await t("an old-format token on a documents store gives live only; on a legacy store it still gives today's draft preview", async () => {
   const oldTok = await inT(PD, () => R.previewToken());
   ok(/^p\.\d+\.[0-9a-f]{20}$/.test(oldTok), `old format: ${oldTok}`);
@@ -951,7 +1028,8 @@ await t("the real layout's preview bar: the colours note and toggle while the de
   await new Promise((r) => setTimeout(r, 5));
   const s2 = await newSession(PD);
   const older = text(await asRequest(PD, () => renderLayout(), withToken(s1.token)));
-  ok(older.includes("Draft preview"), "the bar:");
+  // P3-FRAME: a documents preview's bar says what it shows and links to the live store
+  ok(older.includes("You're seeing your unpublished changes.") && older.includes("See the live store"), `the bar: ${older.slice(0, 300)}`);
   ok(older.includes("Your new colours are not shown here. Show them"), `colours note: ${older.slice(0, 400)}`);
   ok(older.includes("You opened a newer preview in another tab."), "other-tab note:");
   ok(older.includes("Draft bar"), "the chrome shows the announcement draft:");
@@ -962,7 +1040,7 @@ await t("the real layout's preview bar: the colours note and toggle while the de
   ok(text(shown).includes("Your new colours are shown here. Hide them"), "toggle reads Hide them:");
   ok(/7c3aed/i.test(shown), "the draft accent is in the page's brand variables:");
   const shopper = await asRequest(PD, () => renderLayout());
-  ok(!text(shopper).includes("Draft preview") && !text(shopper).includes("colours"), "a shopper sees no bar:");
+  ok(!text(shopper).includes("Draft preview") && !text(shopper).includes("unpublished changes") && !text(shopper).includes("colours"), "a shopper sees no bar:");
   ok(!/7c3aed/i.test(shopper) && text(shopper).includes("Live bar"), "a shopper sees the live chrome:");
   // a legacy preview: today's bar, no notes
   const ltok = await inT(PL, () => R.previewToken());

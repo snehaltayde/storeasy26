@@ -1,0 +1,161 @@
+{
+  "label": "open store (control)",
+  "results": [
+    {
+      "path": "/quiz/skin",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL quiz title",
+        "FRAMEDRILL quiz intro words",
+        "FRAMEDRILL question one",
+        "FRAMEDRILL option oily"
+      ]
+    },
+    {
+      "path": "/quiz/skin",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL quiz title",
+        "FRAMEDRILL quiz intro words",
+        "FRAMEDRILL question one",
+        "FRAMEDRILL option oily"
+      ]
+    },
+    {
+      "path": "/quiz/skin",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL quiz title",
+        "FRAMEDRILL quiz intro words",
+        "FRAMEDRILL question one",
+        "FRAMEDRILL option oily"
+      ]
+    },
+    {
+      "path": "/quiz/skin",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL quiz title",
+        "FRAMEDRILL quiz intro words",
+        "FRAMEDRILL question one",
+        "FRAMEDRILL option oily"
+      ]
+    },
+    {
+      "path": "/quiz/skin",
+      "kind": "html",
+      "cookies": "_platform,_mx",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL quiz title",
+        "FRAMEDRILL quiz intro words",
+        "FRAMEDRILL question one",
+        "FRAMEDRILL option oily"
+      ]
+    },
+    {
+      "path": "/quiz/skin",
+      "kind": "rsc",
+      "cookies": "_platform,_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL quiz title",
+        "FRAMEDRILL quiz intro words",
+        "FRAMEDRILL question one",
+        "FRAMEDRILL option oily"
+      ]
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "html",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL bundle title",
+        "FRAMEDRILL bundle description words"
+      ]
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "rsc",
+      "cookies": "none",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL bundle title",
+        "FRAMEDRILL bundle description words"
+      ]
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "html",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL bundle title",
+        "FRAMEDRILL bundle description words"
+      ]
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL bundle title",
+        "FRAMEDRILL bundle description words"
+      ]
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "html",
+      "cookies": "_platform,_mx",
+      "status": 200,
+      "type": "text/html",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL bundle title",
+        "FRAMEDRILL bundle description words"
+      ]
+    },
+    {
+      "path": "/bundles/night",
+      "kind": "rsc",
+      "cookies": "_platform,_mx",
+      "status": 200,
+      "type": "text/x-component",
+      "openingSoon": false,
+      "leaks": [
+        "FRAMEDRILL bundle title",
+        "FRAMEDRILL bundle description words"
+      ]
+    }
+  ]
+}
