@@ -188,6 +188,31 @@ function HistoryDialog({ blockKey, onClose, onLoad }) {
   );
 }
 
+// PV-01 (legacy slice, P3-ROUTES): a live-preview push that failed, in plain
+// words. It used to be dropped, which left the frame on older content while
+// the label still said it showed the edits. `res` is the api.js result of
+// saveCandidate (never ok here). -> { message, issues, reopen }:
+//   issues   the 422's issues (an incomplete section, a bad link), worded and
+//            linked to their section by the Designer, or null
+//   reopen   true when the preview session is gone and must be reopened
+export function candidateFailure(res) {
+  const r = res && typeof res === "object" ? res : {};
+  const older = "The preview still shows an earlier version. Your changes are still here, and nothing is saved until you press Save.";
+  if (Array.isArray(r.issues) && r.issues.some((i) => i?.severity === "error")) {
+    return { message: `The preview didn't update, because something in your edits needs fixing. ${older}`, issues: r.issues.filter((i) => i?.severity === "error"), reopen: false };
+  }
+  if (Array.isArray(r.errors) && r.errors.length) {
+    return { message: `The preview didn't update: ${r.errors.join(" ")} ${older}`, issues: null, reopen: false };
+  }
+  if (r.code === "NETWORK") return { message: `We couldn't reach Storeasy, so the preview didn't update. Check your internet connection. ${older}`, issues: null, reopen: false };
+  if (r.code === "NO_PREVIEW") return { message: `${r.error || "The preview isn't open any more."} ${older}`, issues: null, reopen: true };
+  if (r.code === "UNREADABLE_RESPONSE" || !(Number(r.status) < 500) || !r.error) {
+    const code = Number(r.status) >= 400 ? ` (error ${r.status})` : "";
+    return { message: `Something went wrong on our side${code}, so the preview didn't update. Try again in a minute. ${older}`, issues: null, reopen: false };
+  }
+  return { message: `${r.error} ${older}`, issues: null, reopen: false };
+}
+
 // `tests`: the running tests by section ({ hero: { slug, name } }), PV-08.
 export default function Designer({ initial, tests = {} }) {
   const toast = useToast();
@@ -248,6 +273,7 @@ export default function Designer({ initial, tests = {} }) {
 
   async function mintPreview() {
     setMint({ phase: "minting", error: null });
+    setPushFail(null);
     setConnected(false);
     const r = await startPreview("/");
     if (!r.ok) setMint({ phase: "error", error: r.error || "Could not start the preview" });
@@ -267,6 +293,7 @@ export default function Designer({ initial, tests = {} }) {
   // the preview then shows the unsaved edits, clearly labeled. Saving or
   // reverting pushes null, which clears the candidate back to the last save.
   const [liveEdits, setLiveEdits] = useState(false);
+  const [pushFail, setPushFail] = useState(null); // PV-01: candidateFailure() of the last push, or null
   const candSeq = useRef(0);
   const candState = JSON.stringify([heroDirty && hero, annDirty && ann, sectionsDirty && stripKeys(sections)]);
   useEffect(() => {
@@ -274,7 +301,10 @@ export default function Designer({ initial, tests = {} }) {
     const seq = ++candSeq.current;
     const timer = setTimeout(async () => {
       const anyDirty = heroDirty || annDirty || sectionsDirty;
-      if (!anyDirty && !liveEdits) return; // nothing pushed, nothing to clear
+      if (!anyDirty && !liveEdits) {
+        setPushFail(null); // the frame shows the last save, which is what's on screen
+        return; // nothing pushed, nothing to clear
+      }
       const payload = anyDirty
         ? {
             ...(heroDirty ? { hero: heroValue(hero) } : {}),
@@ -286,10 +316,13 @@ export default function Designer({ initial, tests = {} }) {
       if (seq !== candSeq.current) return; // superseded by newer keystrokes
       if (res.ok) {
         setLiveEdits(anyDirty);
+        setPushFail(null);
         postRefresh();
+      } else {
+        // PV-01: the frame stays on the last candidate/save, and the founder
+        // is told why (one line, replaced by the next push, so no storm)
+        setPushFail(candidateFailure(res));
       }
-      // a mid-typing validation failure (or an expired preview) just leaves
-      // the frame on the last candidate/save — never an error storm
     }, 700);
     return () => clearTimeout(timer);
     // candState captures exactly the dirty payload; liveEdits gates the clear
@@ -934,9 +967,42 @@ export default function Designer({ initial, tests = {} }) {
               <Loader2 size={13} className="motion-safe:animate-spin" aria-hidden /> Connecting…
             </>
           )}
-          {mint.phase === "up" && connected && (liveEdits ? "Preview shows your UNSAVED edits — nothing is saved yet" : "Preview shows your last save")}
+          {mint.phase === "up" &&
+            connected &&
+            (pushFail ? "Preview didn't update: it shows an earlier version" : liveEdits ? "Preview shows your UNSAVED edits — nothing is saved yet" : "Preview shows your last save")}
         </span>
       </div>
+      {mint.phase === "up" && pushFail && (
+        <Banner
+          tone="warning"
+          title="The preview didn't update"
+          className="m-2 mb-0"
+          actions={
+            pushFail.reopen ? (
+              <Button size="sm" onClick={mintPreview}>
+                Reopen preview
+              </Button>
+            ) : null
+          }
+        >
+          <p data-preview-push-failed>{pushFail.message}</p>
+          {(pushFail.issues || []).map((it, i) => {
+            const text = issueText(it, { sections, sectionLabel: issueLabel, documentLabels: false });
+            const target = issueTarget(it);
+            return (
+              <p key={i}>
+                {target ? (
+                  <button type="button" className="text-left underline-offset-2 hover:underline focus-ring" onClick={() => selectNode(target)}>
+                    {text}
+                  </button>
+                ) : (
+                  text
+                )}
+              </p>
+            );
+          })}
+        </Banner>
+      )}
       {mint.phase === "error" && (
         <Banner
           tone="danger"

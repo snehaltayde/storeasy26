@@ -77,7 +77,7 @@ function SignOut({ collapsed }) {
   );
 }
 
-function SidebarBody({ storeName, host, role, actorKind, badges, collapsed, onNavigate }) {
+function SidebarBody({ storeName, host, role, actorKind, badges, cmsMode, collapsed, onNavigate }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className={cx("flex items-center gap-2.5 border-b border-edge px-3 py-3", collapsed && "justify-center px-0")}>
@@ -97,7 +97,7 @@ function SidebarBody({ storeName, host, role, actorKind, badges, collapsed, onNa
         </div>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
-        <SidebarNav role={role} badges={badges} collapsed={collapsed} onNavigate={onNavigate} />
+        <SidebarNav role={role} badges={badges} cmsMode={cmsMode} collapsed={collapsed} onNavigate={onNavigate} />
       </div>
       <div className="border-t border-edge px-2 py-2">
         {!collapsed && (
@@ -112,7 +112,10 @@ function SidebarBody({ storeName, host, role, actorKind, badges, collapsed, onNa
   );
 }
 
-export function ConsoleShell({ storeName, host, role, actorKind, badges, children }) {
+// cmsMode (P3-ROUTES): the store's content mode from the (authed) layout;
+// "documents" points the storefront links at the new editor. Anything else
+// (legacy, migrating, unknown, missing) renders exactly as before.
+export function ConsoleShell({ storeName, host, role, actorKind, badges, cmsMode = null, children }) {
   const pathname = usePathname();
   const editor = isEditorRoute(pathname);
   const [collapsed, setCollapsed] = useState(false);
@@ -133,7 +136,7 @@ export function ConsoleShell({ storeName, host, role, actorKind, badges, childre
   };
   const navDrawer = (
     <Drawer open={drawer} onClose={() => setDrawer(false)} side="left" title={storeName}>
-      <SidebarBody storeName={storeName} host={host} role={role} actorKind={actorKind} badges={badges} collapsed={false} onNavigate={() => setDrawer(false)} />
+      <SidebarBody storeName={storeName} host={host} role={role} actorKind={actorKind} badges={badges} cmsMode={cmsMode} collapsed={false} onNavigate={() => setDrawer(false)} />
     </Drawer>
   );
 
@@ -156,7 +159,7 @@ export function ConsoleShell({ storeName, host, role, actorKind, badges, childre
           ready && "motion-safe:transition-[width]"
         )}
       >
-        <SidebarBody storeName={storeName} host={host} role={role} actorKind={actorKind} badges={badges} collapsed={collapsed} />
+        <SidebarBody storeName={storeName} host={host} role={role} actorKind={actorKind} badges={badges} cmsMode={cmsMode} collapsed={collapsed} />
         <div className="border-t border-edge p-2">
           <IconButton
             label={collapsed ? "Expand navigation" : "Collapse navigation"}
