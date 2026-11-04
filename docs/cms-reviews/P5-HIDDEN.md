@@ -97,6 +97,17 @@ The suite now imports `scripts/support/request-cache.js` first, so `contentSourc
 - **Founder-only words.** The note says "<Label>: hidden from shoppers" with the label as the registry spells it.
 - Rendered tests are react-dom/server (plus `prerenderToNodeStream` for the async failed note), not the RSC renderer. The request scope through React `cache` was checked on a production build by the P3-FRAME review; this item adds no new reader of it.
 
+From review:
+
+- I reviewed cms/p5-hidden at c77b506 against b09f342 in a detached worktree. The worktree has been removed and nothing was started on ports 6360 or 7360 to 7369. pnpm test passed 96 of 96 suites in 197.6 s, and node scripts/test-sections-render.js passed 44 of 44.
+- The live markup is unchanged. I ran the base (b09f342) test-sections-render.js against the new components and all 36 tests passed. I also ran the new suite against the base components. Only the 5 new behaviour tests failed. The BASE_LIVE digest test and the live-request test passed, so the recorded digests really are the base's live output.
+- The tests catch my mutations. Each of these made at least one test fail: forcing preview:true into the HomeSections ctx (3 fails), treating any request scope as a documents preview (19), dropping secKey (1), removing FounderNote's preview guard (2), removing escapeHtml on the reason (3), making bindingCause ignore which fields failed (1), removing the preview check in hiddenNote (3), and marking the note data-unfinished (1).
+- The preview signal is correct. resolve.js noteRequestScope sets documentsPreview only when src.preview is true and the store is on v4 documents. contentSource runs inside the home page's tfetch before HomeSections renders. ContentPage and SectionView already read the same inDocumentsPreview, so legacy previews and an ended preview (previewRefused) never show the note.
+- The note sits safely in the frame. It is rendered with RichTextSection directly, not through SectionView, so annotateFields never adds bogus data-field marks. It keeps data-section-id, which bridge-core uses for click and highlight, and data-sec, which v1 uses.
+- The bindingFailedCause shape matches P5-SOURCES. P5-BATCHES sets data.bindingFailedCause = { [field]: cause }, and bindingCause reads exactly that object and only for fields listed in bindingFailed. Once P5-SOURCES merges, a test should run the real section-data source_unknown path end to end through HomeSections.
+- The source_unknown words include the section label ("This newest products section is set up..."). The brief's sample text has no label, but plan C4-4 has "<label>". The owner should sign off the wording, and it is already listed as an owner check.
+- The owner checks still stand: the browser click-to-select check, phone and Safari widths, staging, and the carried-over approval of the .github sqld download. The packet's Known limits are accurate. Only the home page calls hiddenNote, so a page kind that gets hiddenReason later would still hide silently.
+
 ## From review
 
 (Empty until the review.)
