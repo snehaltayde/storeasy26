@@ -795,6 +795,29 @@ Packet: [P5-HIDDEN.md](P5-HIDDEN.md), "Owner checks" and "Known limits" (From re
 - [ ] Staging: preview a hidden bundle section on one documents-mode tenant after phase 5 deploys.
 - [ ] Carried over: the CI sqld download in .github still needs the owner's approval of its source and checksum. This item did not touch .github.
 
+## Phase 5, batch 1
+
+### The bundle card and bundle grid sections (P5-BLOCKS)
+Packet: [P5-BLOCKS.md](P5-BLOCKS.md), "Owner checks" and "Known limits" (From review).
+- [ ] Wording sign-off: a bundle that saves nothing and also has a sold-out or deleted product shows only the no-saving sentence in its preview note, not the sold-out sentence as well.
+- [ ] Browser (P5-DRILLS): in a documents preview, a bundle card for a sold-out bundle that saves nothing shows the founder note, and the live page shows nothing for it.
+
+### Bundle warnings at publish (P5-CHECKS)
+Packet: [P5-CHECKS.md](P5-CHECKS.md), "Owner checks" and "Known limits" (From review).
+- [ ] Browser check, NOT DONE yet: the real bundle kinds (P5-BLOCKS) and the picker (P5-EDITOR) are not in yet. Once they are, check in the editor's publish panel (desktop Chrome via P5-DRILLS, then phone widths and Safari by the owner) that the six bundle warnings show under 'Check', that both Remove buttons do what the message says, and that the overlap warning only opens the field.
+- [ ] Sign off the warning words, including the quoted bundle id shown for a deleted bundle.
+- [ ] After P5-BLOCKS merges, confirm the no_saving BUNDLE_UNAVAILABLE message carries the owner's 'so shoppers don't see it' words, which come from bundle-words.js.
+- [ ] Staging, NOT DONE: needs phase 5 on staging with a documents-mode tenant.
+- [ ] Carried over: the CI sqld download in .github still needs the owner's approval of its source and checksum. This item did not touch .github.
+
+### The console bundle form and panel (P5-PANEL)
+Packet: [P5-PANEL.md](P5-PANEL.md), "Owner checks" and "Known limits" (From review).
+- [ ] Sign off the deviation 3.10 parts made here: handles and any other non-GID variant id are refused on the bundle and check actions, and a draft with a non-whole quantity shows as not ready and can't be turned on.
+- [ ] Decide whether the design-harness demo seed (scripts/seed-demo.js, variant ids like demo-1-v1) should get Shopify-style GID variant ids. Today bundles can be made on the harness only with --fixture perf.
+- [ ] On staging after deploy, on a documents store with a bundle card on the live home: check that Disable and Delete in Catalog > Bundles say 'Shoppers will stop seeing this bundle on your home page right away.' and that the 'On your home page' marker shows.
+- [ ] Check Catalog > Bundles and the bundle form at phone widths (375 and 768) and in Safari.
+- [ ] Carried over: approving the CI sqld download (source and checksum) for .github is still the owner's call. This item did not touch .github.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
