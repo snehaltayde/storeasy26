@@ -712,7 +712,7 @@ await t("a listed version still missing after one re-read throws ContentUnavaila
   const gone = live.list.documents.doc_announcement.version;
   const hideAlways = (sql, args, r) => (/document_versions/i.test(sql) ? { ...r, rows: r.rows.filter((row) => String(row.id) !== gone) } : r);
   // a draft that must never show
-  await inDz(() => S.setBlock("announcement", { enabled: true, text: "DRAFT BAR" }));
+  await asLegacy(DZ, () => S.setBlock("announcement", { enabled: true, text: "DRAFT BAR" }));
   const res = await inDz(() => runRequest(() => watch(() => settle(Res.resolvedAnnouncement()), { filter: hideAlways })));
   if (!res.result.e) throw new Error(`answered ${JSON.stringify(res.result.v)}`);
   eq(res.result.e.detail?.code, "MISSING_VERSION", "code:");
@@ -977,9 +977,22 @@ async function docDraft(T, id, b) {
     }),
   );
 }
+// P4-GUARD: the legacy writers refuse on a store that is not on legacy, so a
+// fixture that plants old drafts on such a store writes them as legacy and
+// then puts the store's mode back.
+async function asLegacy(T, fn) {
+  const mode = await withTenant(T, async () => (await libsql.execute("SELECT mode FROM cms_state WHERE id = 1").catch(() => ({ rows: [] }))).rows[0]?.mode ?? null);
+  const flip = mode != null && mode !== "legacy";
+  if (flip) await withTenant(T, () => libsql.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1"));
+  try {
+    return await withTenant(T, fn);
+  } finally {
+    if (flip) await withTenant(T, () => libsql.execute({ sql: "UPDATE cms_state SET mode = ? WHERE id = 1", args: [mode] }));
+  }
+}
 // Drafts of every kind a store can hold before its first publish.
 async function seedDrafts(T, { documents = true } = {}) {
-  await withTenant(T, async () => {
+  await asLegacy(T, async () => {
     await S.setBlock("hero", { title: "DRAFT HERO", subtitle: "DRAFT HERO words" });
     await S.setBlock("home_sections", [{ id: "sec_dr1", kind: "product_rail", title: "DRAFT RAIL", collection: "serums", collection_id: COL(2), limit: 4 }]);
     await S.setBlock("announcement", { enabled: true, text: "DRAFT BAR", href: "/collections" });
