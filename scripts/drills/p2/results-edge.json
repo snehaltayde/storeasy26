@@ -1,0 +1,238 @@
+{
+  "id": "P2-DRILLS",
+  "part": "edge",
+  "title": "P2-DRILLS — edge",
+  "ranAt": "2026-11-04T00:08:30.888Z",
+  "harness": "http://localhost:3800",
+  "chrome": "156.0.8078.80",
+  "passed": 25,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the harness store's live release is v4",
+      "detail": 4
+    },
+    {
+      "ok": true,
+      "label": "home /: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "home /: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Skin first. Makeup second."
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "policy page /policies/shipping: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "policy page /policies/shipping: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Shipping policy"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "page /policies/affiliate-program: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "page /policies/affiliate-program: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Affiliate Program"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "campaign /campaigns/festive-gifting: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "campaign /campaigns/festive-gifting: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Festive gifting"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "journal /journal: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "journal /journal: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Journal"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "journal post /journal/creatine-guide-2: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "journal post /journal/creatine-guide-2: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Creatine Guide, part 1"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "collections /collections: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "collections /collections: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Collections"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "collection /collections/accessories: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "collection /collections/accessories: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Accessories"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "product /products/advanced-anti-dandruff-shampoo-197: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "product /products/advanced-anti-dandruff-shampoo-197: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Advanced Anti-dandruff Shampoo"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "search /search?q=protein: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "search /search?q=protein: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Results for “protein”"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "contact /contact: x-edge-runtime: 1",
+      "detail": {
+        "status": 200,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "contact /contact: 200, not the error page",
+      "detail": {
+        "status": 200,
+        "h1": [
+          "Contact Design Demo Co"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "unknown page (404) /policies/no-such-page-here: x-edge-runtime: 1",
+      "detail": {
+        "status": 404,
+        "header": "1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "unknown page (404) /policies/no-such-page-here: 404, not the error page",
+      "detail": {
+        "status": 404,
+        "h1": [
+          "This page isn’t on Design Demo Co’s shelves"
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode: 36 documents, live release rel_450f658e8944179b, 0.5s"
+  ],
+  "screenshots": []
+}
