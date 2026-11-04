@@ -1,4 +1,5 @@
-import { SectionView, sectionShows } from "./index";
+import { Fragment } from "react";
+import { SectionView, sectionShows, hiddenNote } from "./index";
 import { EmptyPageNote } from "./parts";
 
 // THE shared home-section renderer (S54 / audit slice 2). Shoppers AND the
@@ -16,6 +17,16 @@ import { EmptyPageNote } from "./parts";
 //
 // emptyNote: the page has nothing else (no hero); when no section shows
 // either, shoppers get the neutral DOC-03 message and a link to collections.
+//
+// P5-HIDDEN (COM-01): a section that doesn't show renders hiddenNote instead
+// of nothing: the founder's "why it's hidden" note in a documents preview
+// (only for a kind whose component declares hiddenReason), null everywhere
+// else, so shoppers and legacy previews get exactly what they got before. The
+// preview is read from the request scope a documents preview sets
+// (inDocumentsPreview, as SectionView does for this page); the ctx carries
+// the same secKey SectionView gets, so the note is the click target. A note
+// never takes the #new anchor; in a preview it counts as something shown for
+// emptyNote (live it is null, so it never does).
 export const sectionKey = (s, i) => s?.legacyKey || s?.id || `i-${i}`;
 
 export default function HomeSections({ sections, dataById, emptyNote = false }) {
@@ -23,7 +34,10 @@ export default function HomeSections({ sections, dataById, emptyNote = false }) 
   const out = sections.map((s, i) => {
     const key = sectionKey(s, i);
     const data = dataById.get(key) || {};
-    if (!sectionShows(s, data)) return null;
+    if (!sectionShows(s, data)) {
+      const note = hiddenNote(s, data, { surface: "home", secKey: key });
+      return note ? <Fragment key={key}>{note}</Fragment> : null;
+    }
     let newAnchor = false;
     if (s.kind === "new") {
       newAnchor = !newAnchorUsed;

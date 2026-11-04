@@ -16,6 +16,7 @@ import { sectionType, validateDocument } from "@/lib/registry/index";
 import { issueClass } from "@/lib/registry/validate";
 import { slog } from "@/lib/log";
 import { currentTenant } from "@/lib/tenant-context";
+import { requestScope, inDocumentsPreview, isFounderPreview, FounderNote, FOUNDER_ONLY } from "./parts";
 
 // The renderer map (P2-SECTIONS, DOC-03; spec 8.5). One component per
 // registered section kind (lib/registry/sections.js), found by kind. The home
@@ -34,6 +35,14 @@ import { currentTenant } from "@/lib/tenant-context";
 // A component may carry a static shows(section, data, ctx): false means it
 // renders nothing for this data (a rail with too few products). Pages use it
 // to tell "nothing rendered" apart (the DOC-03 empty-page message).
+//
+// P5-HIDDEN (COM-01): a component may also carry a static
+// hiddenReason(section, data, ctx) -> string | null: when shows() is false,
+// the plain sentence that tells the founder why shoppers don't see the
+// section ("This bundle is turned off, so shoppers don't see it. ..."). The
+// home page renders it as a note, in a documents preview only (hiddenNote
+// below). No component had it when it was added, so every kind renders as
+// before (a product rail with too few products still vanishes, PV-09).
 //
 // P2-PREVIEW (DOC-05): in the founder's preview, a section the overlay marked
 // `unfinished` ({ label, placeholder }) renders as the founder's note, a rich
@@ -122,11 +131,27 @@ function unfinishedNote(section) {
 // (isPreviewRequest in lib/cms/section-data.js).
 export const FAILED_TITLE = "This section couldn't be shown";
 export const failedText = (label) => `Something went wrong while showing this ${label ? `${label.toLowerCase()} ` : ""}section. Only you can see this note in your preview: shoppers don't see the section until it works again. Reload the preview to try again.`;
+// P5-HIDDEN: a binding whose source the store no longer knows
+// (lib/cms/section-data.js data.bindingFailedCause, cause "source_unknown")
+// can't come back on a reload: the founder is told what does fix it, in the
+// words of the publish check (BINDING_INVALID).
+export const unknownSourceText = (label) => `This ${label ? `${label.toLowerCase()} ` : ""}section is set up in a way the editor can't fix. Remove it and add it again. Only you can see this note in your preview: shoppers don't see the section.`;
 const escapeHtml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-function failedNote(section, ctx) {
+// The cause of a failed binding, from data.bindingFailedCause ({ field: cause },
+// set by section-data): "source_unknown" when any failed field has it, else
+// "fault" (also when no cause was given: today's words).
+function bindingCause(data) {
+  const causes = data?.bindingFailedCause;
+  if (!causes || typeof causes !== "object") return "fault";
+  const fields = Array.isArray(data?.bindingFailed) ? data.bindingFailed : [];
+  return fields.some((f) => Object.hasOwn(causes, f) && causes[f] === "source_unknown") ? "source_unknown" : "fault";
+}
+
+function failedNote(section, ctx, cause = "fault") {
   const label = sectionType(section?.kind)?.label || "";
-  const note = { id: section.id, kind: "rich_text", settings: { title: FAILED_TITLE, html: `<p>${escapeHtml(failedText(label))}</p>` } };
+  const words = cause === "source_unknown" ? unknownSourceText(label) : failedText(label);
+  const note = { id: section.id, kind: "rich_text", settings: { title: FAILED_TITLE, html: `<p>${escapeHtml(words)}</p>` } };
   return <RichTextSection section={note} ctx={ctx} attrs={{ ...sectionAttrs(section), "data-unfinished": "", "data-section-failed": "" }} />;
 }
 
@@ -140,14 +165,15 @@ function logFailed(section, error, cause) {
   slog("section_render_failed", { ...(store ? { tenant: store } : {}), sectionId: section?.id ?? null, kind: section?.kind ?? null, cause, error: String(error?.message ?? error ?? "").slice(0, 200) });
 }
 
-async function FailedSectionAsync({ section, ctx }) {
-  return (await isPreviewRequest()) ? failedNote(section, ctx) : null;
+async function FailedSectionAsync({ section, ctx, noteCause }) {
+  return (await isPreviewRequest()) ? failedNote(section, ctx, noteCause) : null;
 }
 
-function failed(section, ctx, error, cause) {
+// noteCause: which words the preview note uses ("fault": reload; "source_unknown": remove and add again)
+function failed(section, ctx, error, cause, noteCause = "fault") {
   logFailed(section, error, cause);
-  if (typeof ctx?.preview === "boolean") return ctx.preview ? failedNote(section, ctx) : null;
-  return <FailedSectionAsync section={section} ctx={ctx} />;
+  if (typeof ctx?.preview === "boolean") return ctx.preview ? failedNote(section, ctx, noteCause) : null;
+  return <FailedSectionAsync section={section} ctx={ctx} noteCause={noteCause} />;
 }
 
 async function SettledSection({ pending, section, ctx }) {
@@ -164,21 +190,10 @@ const isThenable = (v) => v !== null && (typeof v === "object" || typeof v === "
 
 // ---- P3-FRAME: what this request renders (lib/content/resolve.js) -----------------
 //
-// contentSource notes, per request, the store's id and whether this is a
-// founder's documents preview, under a global symbol (this module can't
-// import resolve.js: next/headers would reach every suite that renders the
-// map). Outside a request the answer is "unknown" and "not a preview".
-const REQUEST_SCOPE_KEY = Symbol.for("storeasy.requestScope");
-export function requestScope() {
-  try {
-    const read = globalThis[REQUEST_SCOPE_KEY];
-    const scope = typeof read === "function" ? read() : null;
-    return scope && typeof scope === "object" ? scope : null;
-  } catch {
-    return null;
-  }
-}
-export const inDocumentsPreview = () => requestScope()?.documentsPreview === true;
+// requestScope() and inDocumentsPreview() live in ./parts (P5-HIDDEN moved
+// them there, so a section component can ask too); this module re-exports
+// them for its callers (ContentPage).
+export { requestScope, inDocumentsPreview, isFounderPreview, FounderNote };
 
 // ---- P3-FRAME (ED-04): preview-only data-field ---------------------------------
 //
@@ -316,6 +331,37 @@ export function sectionShows(section, data = {}, ctx = {}) {
   }
 }
 
+// ---- P5-HIDDEN (COM-01): why a section is hidden, for the founder -----------------
+//
+// hiddenNote(section, data, ctx): for a section that doesn't show (the caller
+// asked sectionShows), the founder's note saying why, or null. A note only
+// when all three hold:
+//   - this is a documents preview (isFounderPreview: ctx.preview, else the
+//     request scope a documents preview sets; never a legacy preview, never live);
+//   - the kind's component declares hiddenReason;
+//   - hiddenReason returns a non-empty sentence (a throw counts as no reason).
+// The note has the unfinished and failed notes' look (a rich text block on
+// the home page), keeps the section's data-section-id and data-section-kind,
+// and data-sec from ctx.secKey (the preview's click target, as the section
+// itself would), plus data-hidden-reason. It is not marked data-unfinished:
+// the section is finished, shoppers just don't see it.
+export const hiddenTitle = (label) => (label ? `${label}: hidden from shoppers` : "Hidden from shoppers");
+export function hiddenNote(section, data = {}, ctx = {}) {
+  const C = sectionComponent(section?.kind);
+  if (!C || typeof C.hiddenReason !== "function") return null;
+  if (!isFounderPreview(ctx)) return null;
+  let reason;
+  try {
+    reason = C.hiddenReason(section, data, ctx);
+  } catch {
+    return null;
+  }
+  if (typeof reason !== "string" || !reason.trim()) return null;
+  const label = sectionType(section.kind)?.label || "";
+  const note = { id: section.id, kind: "rich_text", settings: { title: hiddenTitle(label), html: `<p>${escapeHtml(`${reason.trim()} ${FOUNDER_ONLY}`)}</p>` } };
+  return <RichTextSection section={note} ctx={ctx} attrs={{ ...sectionAttrs(section), "data-hidden-reason": "" }} />;
+}
+
 // One section, through the map. Unknown kinds render nothing.
 export function SectionView({ section, data = {}, ctx: given = {} }) {
   const C = sectionComponent(section?.kind);
@@ -326,7 +372,7 @@ export function SectionView({ section, data = {}, ctx: given = {} }) {
   const ctx = given?.preview === undefined && inDocumentsPreview() ? { ...given, preview: true } : given;
   const note = unfinishedNote(section);
   if (note) return <RichTextSection section={note} ctx={ctx} attrs={{ ...sectionAttrs(section), "data-unfinished": "" }} />;
-  if (Array.isArray(data?.bindingFailed) && data.bindingFailed.length) return failed(section, ctx, `catalog data: ${data.bindingFailed.join(", ")}`, "data");
+  if (Array.isArray(data?.bindingFailed) && data.bindingFailed.length) return failed(section, ctx, `catalog data: ${data.bindingFailed.join(", ")}`, "data", bindingCause(data));
   // a "use client" section (a client reference) or a memo/forwardRef wrapper
   // can't be called: it renders as an element, as before, uncaught
   if (typeof C !== "function" || C.$$typeof) return <C section={section} data={data} ctx={ctx} attrs={sectionAttrs(section)} />;
