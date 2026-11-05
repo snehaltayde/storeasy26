@@ -43,10 +43,24 @@ const Announcement = ({ announcement, editing = false }) =>
     </div>
   ) : null;
 
+// P6-LOGO-RENDER (GEN-04): a documents store's picture logo (logo.image, from
+// the live design document; a library path only) replaces the text, inside the
+// same link. Its words are the founder's alt, else the store's name
+// (logo.name), never text1, which can be half of a split wordmark. An explicit
+// height (32px on a phone, 40px from md up) keeps an SVG with no size of its
+// own from collapsing or growing; width follows, at most 180px.
+export const HEADER_LOGO_CLASS = "block h-8 max-h-8 w-auto max-w-[180px] object-contain md:h-10 md:max-h-10";
+
 const Wordmark = ({ logo, className = "" }) => (
   <Link href="/" className={`shrink-0 text-xl font-extrabold tracking-tight ${className}`}>
-    {logo.text1}
-    {logo.text2 ? <span className="text-sf-header-accent">{logo.text2}</span> : null}
+    {logo.image?.media ? (
+      <img src={logo.image.media} alt={logo.image.alt || logo.name || ""} className={HEADER_LOGO_CLASS} />
+    ) : (
+      <>
+        {logo.text1}
+        {logo.text2 ? <span className="text-sf-header-accent">{logo.text2}</span> : null}
+      </>
+    )}
   </Link>
 );
 

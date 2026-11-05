@@ -18,18 +18,25 @@
 //   8. the guard: no config.brand / config.theme read outside the allowlist
 //   9. P6-LOGO-REG (GEN-04): designFromBody's logo, resolvedLogo per mode,
 //      and the preview of a design that was never published
+//  10. P6-LOGO-RENDER (GEN-04): the picture logo in both Header variants and
+//      both Footer spots, the real layout per mode, and the preview bar's
+//      design line
 //
 //   pnpm test:design-doc
 // request-cache must load before any app module that imports react
 // (P6-LOGO-REG: the storefront getters run in simulated requests below).
 import "./support/request-cache.js";
 import { readFile, readdir, rm } from "node:fs/promises";
-import { registerHooks } from "node:module";
+import { registerHooks, createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, resolve as resolvePath } from "node:path";
+import { createHash } from "node:crypto";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, "..");
+const require = createRequire(import.meta.url);
 
 // P6-LOGO-REG: next/headers answers for one simulated request at a time (as in
 // test-preview-overlay); outside one, headers() and cookies() throw, as the
@@ -1050,6 +1057,247 @@ await t("P6-LOGO-REG unit: the preview of a store with no live design shows the 
   eq(Reader.overlayList(liveBase, rows).documents, [], "a live design: not without the toggle:");
   eq(Reader.overlayList(liveBase, rows, { showDesign: true }).documents, ["doc_design"], "a live design: with it:");
   eq([Reader.overlayList(empty, rows).designDirty, Reader.overlayList(liveBase, rows).designDirty], [true, true], "designDirty either way:");
+});
+
+// ======================================================================================
+console.log("— 10. P6-LOGO-RENDER: the picture logo in the storefront chrome");
+
+// The SWC render pattern of test-copy and test-preview-overlay: compile the real
+// JSX file with Next's own SWC build, load its app imports for real, stub only
+// what can't run outside Next (fonts, CSS, the client cart, analytics).
+const swc = require("next/dist/build/swc/index.js");
+await swc.loadBindings();
+const compileJsx = async (file) =>
+  (
+    await swc.transform(await readFile(file, "utf8"), {
+      filename: file,
+      jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" },
+      module: { type: "commonjs" },
+    })
+  ).code;
+const jsxTarget = (from, id) => {
+  const p = id.startsWith("@/") ? join(ROOT, id.slice(2)) : resolvePath(dirname(from), id);
+  return p.endsWith(".js") ? p : `${p}.js`;
+};
+const isJsxFile = (file) => /^(app|components)\//.test(relative(ROOT, file));
+async function loadJsx(file, stubs = {}, seen = new Map()) {
+  if (seen.has(file)) return seen.get(file);
+  const mod = { exports: {} };
+  seen.set(file, mod.exports);
+  const code = await compileJsx(file);
+  const deps = new Map();
+  for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
+    if (id in stubs || deps.has(id) || id === "react" || id === "react/jsx-runtime") continue;
+    if (id.startsWith("@/") || id.startsWith(".")) {
+      const target = jsxTarget(file, id);
+      deps.set(id, isJsxFile(target) ? await loadJsx(target, stubs, seen) : await import(pathToFileURL(target).href));
+    } else if (id === "next/headers") deps.set(id, await import("next/headers"));
+    else deps.set(id, require(id));
+  }
+  const req = (id) => {
+    if (id in stubs) return stubs[id];
+    if (id === "react") return React;
+    if (id === "react/jsx-runtime") return require("react/jsx-runtime");
+    if (deps.has(id)) return deps.get(id);
+    throw new Error(`unresolved import "${id}" in ${relative(ROOT, file)}`);
+  };
+  new Function("require", "module", "exports", code)(req, mod, mod.exports);
+  seen.set(file, mod.exports);
+  return mod.exports;
+}
+const nothingC = { __esModule: true, default: () => null };
+const passthroughC = ({ children }) => React.createElement(React.Fragment, null, children);
+const fontC = () => ({ variable: "" });
+const LINK_STUB = { __esModule: true, default: ({ href, children, prefetch, ...rest }) => React.createElement("a", { href, ...rest }, children) };
+const CHROME_STUBS = { "next/link": LINK_STUB, "./SearchBox": nothingC, "./cart/CartButton": nothingC };
+const HeaderMod = await loadJsx(join(ROOT, "components/Header.js"), CHROME_STUBS);
+const FooterMod = await loadJsx(join(ROOT, "components/Footer.js"), CHROME_STUBS);
+const BannerMod = await loadJsx(join(ROOT, "components/PreviewBanner.js"), CHROME_STUBS);
+const html = (C, props) => renderToStaticMarkup(React.createElement(C, props));
+// the four wordmark spots, each rendered whole
+const SPOTS = {
+  "header standard": (logo) => html(HeaderMod.default, { logo, variant: "standard" }),
+  "header centered": (logo) => html(HeaderMod.default, { logo, variant: "centered" }),
+  "footer columns": (logo) => html(FooterMod.default, { logo, variant: "columns", legalName: "Acme Ltd" }),
+  "footer minimal": (logo) => html(FooterMod.default, { logo, variant: "minimal", legalName: "Acme Ltd" }),
+};
+const imgsOf = (h) => [...h.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
+const attrOf = (tag, a) => tag.match(new RegExp(`\\s${a}="([^"]*)"`))?.[1] ?? null;
+const sha = (s) => createHash("sha256").update(s).digest("hex").slice(0, 16);
+
+await t("P6-LOGO-RENDER rendered: both Header variants and both Footer spots with logo.image { media:'/api/media/x', alt:'Acme' } render one img with that src and alt and the size styles, inside the header's home link", async () => {
+  const logo = { image: { media: "/api/media/x", alt: "Acme" }, name: "Acme Store", text1: "Acme", text2: "" };
+  for (const [spot, render] of Object.entries(SPOTS)) {
+    const h = render(logo);
+    const imgs = imgsOf(h);
+    eq(imgs.length, 1, `${spot}: one img:`);
+    eq([attrOf(imgs[0], "src"), attrOf(imgs[0], "alt")], ["/api/media/x", "Acme"], `${spot}: src and alt:`);
+    const cls = attrOf(imgs[0], "class").split(" ");
+    if (spot.startsWith("header")) {
+      // 32px on a phone, 40px from md up, at most 180px wide, an explicit height
+      for (const c of ["h-8", "max-h-8", "md:h-10", "md:max-h-10", "max-w-[180px]", "w-auto", "object-contain", "block"]) ok(cls.includes(c), `${spot}: class ${c} in ${cls}`);
+      // the img sits inside the same home link, which takes its name from the alt
+      ok(/<a href="\/" class="shrink-0 text-xl font-extrabold tracking-tight[^"]*"><img [^>]*\/><\/a>/.test(h), `${spot}: the img is the home link's only content: ${h.slice(0, 900)}`);
+      eq(HeaderMod.HEADER_LOGO_CLASS.split(" ").sort(), [...cls].sort(), `${spot}: the exported class:`);
+    } else {
+      for (const c of ["h-12", "max-h-12", "w-auto", "max-w-full", "object-contain", "block"]) ok(cls.includes(c), `${spot}: class ${c} in ${cls}`);
+      ok(/<p class="text-xl font-extrabold"><img [^>]*\/><\/p>/.test(h), `${spot}: the img replaces the text wordmark: ${h}`);
+      if (spot === "footer minimal") ok(cls.includes("mx-auto"), "footer minimal: centred");
+    }
+  }
+});
+
+await t("P6-LOGO-RENDER rendered: with alt '' (or no alt) and a split wordmark (BEAST / LIFE), the alt is the store's name 'Beast Life Store', never 'BEAST', in all four spots", async () => {
+  for (const image of [{ media: "/api/media/med_bl", alt: "" }, { media: "/api/media/med_bl" }]) {
+    const logo = { image, name: "Beast Life Store", text1: "BEAST", text2: "LIFE" };
+    for (const [spot, render] of Object.entries(SPOTS)) {
+      const h = render(logo);
+      const imgs = imgsOf(h);
+      eq(imgs.length, 1, `${spot}: one img:`);
+      eq(attrOf(imgs[0], "alt"), "Beast Life Store", `${spot} (${JSON.stringify(image)}): alt:`);
+      ok(!/>BEAST|>LIFE</.test(h), `${spot}: no text wordmark beside the picture`);
+    }
+  }
+});
+
+// The four spots with no picture, rendered by the code before this item
+// (7506c9e) and pinned here by hash: a change to any byte fails.
+const TODAY = {
+  split: { text1: "BEAST", text2: "LIFE" },
+  single: { text1: "Acme", text2: "" },
+};
+const TODAY_HASHES = {"split":{"header standard":"b5c6b41110c63015","header centered":"76567f75047facab","footer columns":"9532db6dd6be4462","footer minimal":"2e28c4d69bedfcbb"},"single":{"header standard":"35278827511c355d","header centered":"0a921dc0167fc7c4","footer columns":"58a067fa1a079375","footer minimal":"62dc0cbd440a6922"}};
+await t("P6-LOGO-RENDER rendered: with no image the text wordmark markup is byte-identical to today in all four spots (no image key, image null, a library-less image, a name)", async () => {
+  for (const [k, base] of Object.entries(TODAY)) {
+    for (const [spot, render] of Object.entries(SPOTS)) {
+      const want = TODAY_HASHES[k][spot];
+      eq(sha(render(base)), want, `${k} ${spot}, today's props:`);
+      eq(sha(render({ ...base, image: null, name: "Beast Life Store" })), want, `${k} ${spot}, image null:`);
+      eq(sha(render({ ...base, image: { alt: "No file" }, name: "Beast Life Store" })), want, `${k} ${spot}, no media:`);
+      ok(!render(base).includes("<img"), `${k} ${spot}: no img`);
+    }
+  }
+  // and the wordmark itself, written out
+  ok(SPOTS["header standard"](TODAY.split).includes('<a href="/" class="shrink-0 text-xl font-extrabold tracking-tight ">BEAST<span class="text-sf-header-accent">LIFE</span></a>'), "header wordmark:");
+  ok(SPOTS["footer columns"](TODAY.split).includes('<p class="text-xl font-extrabold">BEAST<span class="text-sf-accent-strong">LIFE</span></p>'), "footer wordmark:");
+});
+
+// The real storefront layout, rendered inside a simulated request (section 9's
+// asRequest). Header is wrapped so the test sees exactly the logo it was given.
+const handed = [];
+const RealHeader = HeaderMod.default;
+const LAYOUT_STUBS = {
+  ...CHROME_STUBS,
+  "next/font/google": { Geist: fontC, Geist_Mono: fontC, Fraunces: fontC },
+  "../globals.css": {},
+  "@/components/Header": { __esModule: true, default: (props) => (handed.push(props), React.createElement(RealHeader, props)) },
+  "@/components/cart/CartContext": { CartProvider: passthroughC },
+  "@/components/cart/CartDrawer": nothingC,
+  "@/components/ServiceWorkerRegister": nothingC,
+  "@/components/analytics/ConsentBanner": nothingC,
+  "@/components/analytics/Pixels": nothingC,
+  "@/components/analytics/ErrorReporter": nothingC,
+  "@/components/site/SiteNav": nothingC,
+  "@/components/preview/PreviewBridge": nothingC,
+};
+const Layout = (await loadJsx(join(ROOT, "app/(storefront)/layout.js"), LAYOUT_STUBS)).default;
+async function layoutOf(id, cookies = {}) {
+  handed.length = 0;
+  const out = await asRequest(id, async () => renderToStaticMarkup(await Layout({ children: React.createElement("p", { id: "page" }, "page body") })), cookies);
+  return { html: out, header: handed.at(-1) || null };
+}
+const headerHtml = (h) => h.match(/<header\b[\s\S]*?<\/header>/)?.[0] ?? null;
+const footerHtml = (h) => h.match(/<footer\b[\s\S]*?<\/footer>/)?.[0] ?? null;
+const barText = (h) => (h.match(/<div data-preview-bar=""[\s\S]*?<\/div>/)?.[0] ?? "").replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ").trim();
+
+await t("P6-LOGO-RENDER rendered: the layout on a legacy fixture passes no image even when a design document with a logo exists, and its header is today's", async () => {
+  // a design document with a logo in the legacy store's own database (written
+  // while it was briefly in documents mode, then put back to legacy)
+  const LEGACY_LOGO = { media: "/api/media/med_legacylogo", alt: "Legacy logo" };
+  await raw.legacy.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+  try {
+    await inL(async () => {
+      const d = await Docs.getDocument("doc_design").catch(() => null);
+      if (d) await Docs.saveDraft({ id: d.id, revision: d.revision, body: designWith(BRAND_B, LEGACY_LOGO), actor: LOGO_ACTOR });
+      else await Docs.createDocument({ type: "design", body: designWith(BRAND_B, LEGACY_LOGO), actor: LOGO_ACTOR });
+    });
+  } finally {
+    await raw.legacy.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
+  }
+  eq((await sql("legacy", "SELECT count(*) AS n FROM documents WHERE id = 'doc_design' AND draft LIKE '%med_legacylogo%'"))[0].n, 1, "the design document is there:");
+  eq((await asRequest("dl", () => Res.contentSource())).mode, "draft", "a legacy store:");
+  const { html: page, header } = await layoutOf("dl");
+  ok(header, "the layout rendered the Header");
+  // exactly what siteLogo() gave before this item: the text pair, no image, no name
+  eq(header.logo, { text1: "Design Legacy", text2: "" }, "the logo handed to the Header:");
+  ok(!Object.hasOwn(header.logo, "image"), "no image key");
+  ok(!page.includes("<img") && !page.includes("med_legacylogo") && !page.includes("Legacy logo"), "no picture anywhere on the page");
+  // its header is the Header rendered with today's props (and today's wordmark)
+  eq(headerHtml(page), renderToStaticMarkup(React.createElement(RealHeader, { ...header, logo: { text1: "Design Legacy", text2: "" } })), "header output:");
+  ok(headerHtml(page).includes('<a href="/" class="shrink-0 text-xl font-extrabold tracking-tight ">Design Legacy</a>'), "today's wordmark:");
+  // a moving store is the same
+  const moving = await layoutOf("lgmoving");
+  ok(moving.header && !Object.hasOwn(moving.header.logo, "image") && !moving.html.includes("<img"), "a moving store: no image");
+});
+
+await t("P6-LOGO-RENDER rendered: the layout on an open documents store renders its live logo in the header and footer, and a store with no logo keeps its text wordmark; shoppers never see the draft logo", async () => {
+  const { html: page, header } = await layoutOf("lgopen");
+  eq(header.logo, { image: LOGO_A, name: "Logo lgopen", text1: "Logo lgopen", text2: "" }, "the logo handed to the Header:");
+  for (const [where, part] of [["header", headerHtml(page)], ["footer", footerHtml(page)]]) {
+    const imgs = imgsOf(part);
+    eq(imgs.length, 1, `${where}: one img:`);
+    eq([attrOf(imgs[0], "src"), attrOf(imgs[0], "alt")], [LOGO_A.media, LOGO_A.alt], `${where}: the live logo:`);
+  }
+  ok(!page.includes(LOGO_B.media), "the draft logo (section 9 saved one) is not a shopper's");
+  // a live logo with no alt: the store's name
+  const plain = await layoutOf("lgplain");
+  eq(plain.header.logo, { image: null, name: "Logo lgplain", text1: "Logo lgplain", text2: "" }, "no logo: image null:");
+  ok(!plain.html.includes("<img"), "no logo: no img");
+  ok(headerHtml(plain.html).includes('tracking-tight ">Logo lgplain</a>'), "no logo: the text wordmark");
+});
+
+await t("P6-LOGO-RENDER unit: a closed documents store renders StoreClosed with no logo image, no draft logo, alt or colour, and no Header", async () => {
+  const { html: page, header } = await layoutOf("lgclosed");
+  eq(header, null, "no Header:");
+  ok(page.includes("Opening soon") && page.includes("Logo lgclosed"), "StoreClosed with the name");
+  for (const leak of ["<img", "/api/media", LOGO_B.media, LOGO_B.alt, BRAND_B.accent.slice(1), "<header", "<footer", "data-preview-bar"]) ok(!page.toLowerCase().includes(leak.toLowerCase()), `the closed page shows ${leak}`);
+});
+
+await t("P6-LOGO-RENDER rendered: the preview bar never says the new colours are not shown while they are (closed store, toggle off and on; open store with a live design)", async () => {
+  // closed, toggle off: the draft design is shown (P6-LOGO-REG), so is its logo
+  const s = await inS("lgclosed", () => PS.createPreviewSession({ actor: LOGO_ACTOR }));
+  const ck = { [Res.PREVIEW_COOKIE]: s.token };
+  const src = await asRequest("lgclosed", () => Res.contentSource(), ck);
+  eq([src.overlay.designDirty, src.overlay.showDesign, src.overlay.designShown], [true, false, true], "closed, toggle off:");
+  const off = await layoutOf("lgclosed", ck);
+  ok(barText(off.html).includes(BannerMod.DESIGN_SHOWN_LINE), `the bar says shown: ${barText(off.html)}`);
+  ok(!barText(off.html).includes(BannerMod.DESIGN_HIDDEN_LINE) && !barText(off.html).includes("Show them"), `the bar: ${barText(off.html)}`);
+  eq(attrOf(imgsOf(headerHtml(off.html))[0] || "", "src"), LOGO_B.media, "the preview header shows the draft logo:");
+  // toggle on: the same words, with Hide them
+  await inS("lgclosed", () => PS.setShowDesign({ sid: s.sid, on: true }));
+  const on = await layoutOf("lgclosed", ck);
+  ok(barText(on.html).includes(`${BannerMod.DESIGN_SHOWN_LINE} Hide them`) && !barText(on.html).includes(BannerMod.DESIGN_HIDDEN_LINE), `toggle on: ${barText(on.html)}`);
+  await inS("lgclosed", () => PS.setShowDesign({ sid: s.sid, on: false }));
+  // open with a live design and a draft (section 9): the toggle still decides
+  const o = await inS("lgopen", () => PS.createPreviewSession({ actor: LOGO_ACTOR }));
+  const oc = { [Res.PREVIEW_COOKIE]: o.token };
+  const hidden = await layoutOf("lgopen", oc);
+  ok(barText(hidden.html).includes(`${BannerMod.DESIGN_HIDDEN_LINE} Show them`), `open, toggle off: ${barText(hidden.html)}`);
+  eq(attrOf(imgsOf(headerHtml(hidden.html))[0] || "", "src"), LOGO_A.media, "open, toggle off: the live logo");
+  await inS("lgopen", () => PS.setShowDesign({ sid: o.sid, on: true }));
+  const shown = await layoutOf("lgopen", oc);
+  ok(barText(shown.html).includes(`${BannerMod.DESIGN_SHOWN_LINE} Hide them`), `open, toggle on: ${barText(shown.html)}`);
+  eq(attrOf(imgsOf(headerHtml(shown.html))[0] || "", "src"), LOGO_B.media, "open, toggle on: the draft logo");
+  // the banner on its own, every combination: 'not shown' only when not shown
+  for (const designShown of [true, false, undefined]) {
+    for (const showDesign of [true, false]) {
+      const text = html(BannerMod.default, { overlay: { designDirty: true, showDesign, designShown } }).replace(/<[^>]+>/g, " ");
+      const really = designShown ?? showDesign;
+      eq(text.includes(BannerMod.DESIGN_HIDDEN_LINE), !really, `designShown ${designShown}, showDesign ${showDesign}: 'not shown':`);
+      eq(text.includes(BannerMod.DESIGN_SHOWN_LINE), really, `designShown ${designShown}, showDesign ${showDesign}: 'shown':`);
+      eq(text.includes("Show them") || text.includes("Hide them"), !(really && !showDesign), `designShown ${designShown}, showDesign ${showDesign}: a button:`);
+    }
+  }
 });
 
 // ======================================================================================

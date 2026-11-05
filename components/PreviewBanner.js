@@ -19,8 +19,9 @@ import { routeDocFor } from "@/components/preview/bridge-core";
 //                      taken offline
 //   overlay.otherTab   the same person opened a newer preview in another tab
 //   overlay.designDirty the design document has unpublished changes: say
-//                      whether they are shown, with a one-click toggle
-//                      (a same-origin form POST to /api/preview)
+//                      whether they are shown (overlay.designShown), with a
+//                      one-click toggle (a same-origin form POST to
+//                      /api/preview) where the toggle changes something
 export const OFFLINE_LINE = "This page is offline. Publishing it brings it back.";
 
 export default function PreviewBanner({ overlay = null, frame = null }) {
@@ -54,16 +55,37 @@ export default function PreviewBanner({ overlay = null, frame = null }) {
           You opened a newer preview in another tab. Both tabs show all your saved drafts.
         </span>
       ) : null}
-      {overlay?.designDirty ? (
-        <form data-preview-note="design" method="post" action="/api/preview" className="ml-3 inline">
-          <input type="hidden" name="design" value={overlay.showDesign ? "off" : "on"} />
-          {overlay.showDesign ? "Your new colours are shown here." : "Your new colours are not shown here."}{" "}
-          <button type="submit" className="font-semibold underline">
-            {overlay.showDesign ? "Hide them" : "Show them"}
-          </button>
-        </form>
-      ) : null}
+      {overlay?.designDirty ? <DesignNote overlay={overlay} /> : null}
     </>
+  );
+}
+
+// The design line. What it says comes from what the preview really shows
+// (overlay.designShown), not from the toggle: on a store with no live design
+// (a closed store, or one opened on the platform default) the draft is shown
+// with the toggle off (P6-LOGO-REG), so the bar says the colours are shown and
+// offers no button, because the toggle changes nothing there (P6-LOGO-RENDER).
+// An overlay without designShown (older callers) reads the toggle, as before.
+export const DESIGN_SHOWN_LINE = "Your new colours are shown here.";
+export const DESIGN_HIDDEN_LINE = "Your new colours are not shown here.";
+
+function DesignNote({ overlay }) {
+  const shown = typeof overlay.designShown === "boolean" ? overlay.designShown : Boolean(overlay.showDesign);
+  if (shown && !overlay.showDesign) {
+    return (
+      <span data-preview-note="design" className="ml-3">
+        {DESIGN_SHOWN_LINE}
+      </span>
+    );
+  }
+  return (
+    <form data-preview-note="design" method="post" action="/api/preview" className="ml-3 inline">
+      <input type="hidden" name="design" value={overlay.showDesign ? "off" : "on"} />
+      {shown ? DESIGN_SHOWN_LINE : DESIGN_HIDDEN_LINE}{" "}
+      <button type="submit" className="font-semibold underline">
+        {overlay.showDesign ? "Hide them" : "Show them"}
+      </button>
+    </form>
   );
 }
 
