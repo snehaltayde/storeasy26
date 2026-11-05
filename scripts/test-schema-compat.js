@@ -88,11 +88,29 @@ for (const f of dbs) await rm(join(ROOT, f), { force: true });
 
 // Plain Node can't resolve the app's "@/…" alias or "next/headers" (next has no
 // exports map), so the real routes and lib/content/resolve.js load through this.
+// P6-GEN (from the P6-FIXTURE review): the fixture's own import of
+// provisioning goes through a thin wrapper, so a test can act on the database
+// right before applyContentMode runs (globalThis.__p6BeforeContentMode). The
+// wrapper re-exports the real module; with no callback set it changes nothing.
+const PROVISION_URL = pathToFileURL(join(ROOT, "lib/platform/provision.js")).href;
+const PROVISION_SHIM = "p6-shim:provision";
 registerHooks({
   resolve(spec, ctx, next) {
     if (spec.startsWith("@/")) return next(pathToFileURL(join(ROOT, spec.slice(2) + (/\.\w+$/.test(spec) ? "" : ".js"))).href, ctx);
     if (/^next\/(headers|server|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
+    if (spec === "../../lib/platform/provision.js" && String(ctx.parentURL || "").endsWith("/scripts/support/tenant-fixture.js")) return { url: PROVISION_SHIM, shortCircuit: true };
     return next(spec, ctx);
+  },
+  load(url, ctx, next) {
+    if (url !== PROVISION_SHIM) return next(url, ctx);
+    const source =
+      `import * as real from ${JSON.stringify(PROVISION_URL)};\n` +
+      `export * from ${JSON.stringify(PROVISION_URL)};\n` +
+      "export async function applyContentMode(client, opts) {\n" +
+      "  if (typeof globalThis.__p6BeforeContentMode === 'function') await globalThis.__p6BeforeContentMode(client);\n" +
+      "  return real.applyContentMode(client, opts);\n" +
+      "}\n";
+    return { format: "module", source, shortCircuit: true };
   },
 });
 
@@ -1343,6 +1361,43 @@ console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LI
     same(F.fixtureCollection(1, { productIds: ["a"] }).products, { nodes: [{ id: "a" }] }, "fixtureCollection productIds:");
   });
 
+  // P6-GEN (from the P6-FIXTURE review): the fixture moves a store to
+  // documents mode through provisioning's applyContentMode, never a raw
+  // UPDATE of cms_state. A cms_blocks row planted right before that step (on
+  // the database the fixture just migrated) must make the move refuse, as
+  // provisioning refuses a database that already holds content.
+  await t("P6-GEN: makeTenant({ mode: 'documents' }) uses applyContentMode: a cms_blocks row planted before it makes the fixture refuse with provisioning's reason; and leaves a crashed run's file for the next test to heal", async () => {
+    let planted = 0;
+    globalThis.__p6BeforeContentMode = async (client) => {
+      planted++;
+      await client.execute({ sql: "INSERT INTO cms_blocks (key, value, updated_at) VALUES (?, ?, ?)", args: ["hero", "{}", new Date().toISOString()] });
+    };
+    let e = null;
+    try {
+      await F.makeTenant({ name: "compat-p6-planted", mode: "documents" });
+    } catch (err) {
+      e = err;
+    } finally {
+      delete globalThis.__p6BeforeContentMode;
+      await rm(join(ROOT, ".test-compat-p6-planted-tenant.db"), { force: true });
+    }
+    eq(planted, 1, "the fixture called applyContentMode once:");
+    ok(e && /did not move to documents/.test(e.message) && e.message.includes("already holds store content"), `the fixture moved a store holding content: ${e?.message}`);
+    // with nothing planted the same call is a documents store (the wrapper is inert)
+    const fx = await F.makeTenant({ name: "compat-p6-planted", mode: "documents" });
+    try {
+      eq(fx.mode, "documents", "unplanted:");
+    } finally {
+      await fx.cleanup();
+    }
+    // a crashed run's leftover file, left in place ON PURPOSE: the next test
+    // (bad options are refused before any file is made) must heal it itself
+    const c = createClient({ url: "file:.test-compat-p6-bad-tenant.db" });
+    await c.execute("CREATE TABLE IF NOT EXISTS leftover (x)");
+    c.close();
+    ok(existsSync(join(ROOT, ".test-compat-p6-bad-tenant.db")), "the leftover was made");
+  });
+
   await t("P6-FIXTURE: with no new option makeTenant is what it was (legacy, no sync_runs, no collections, the caller's config object); bad options are refused before any file is made", async () => {
     const config = { site: { name: "Plain" } };
     const fx = await F.makeTenant({ name: "compat-p6-old", products: 2, config });
@@ -1361,6 +1416,9 @@ console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LI
       [{ catalogShape: "huge" }, /unknown catalogShape/],
       [{ catalogShape: "few", products: 2 }, /not both/],
     ];
+    // P6-GEN: a file left by a crashed or mutated run would fail every later
+    // run's "left a database file" check; start from none
+    await rm(join(ROOT, ".test-compat-p6-bad-tenant.db"), { force: true });
     for (const [opts, re] of refusals) {
       let e = null;
       try {

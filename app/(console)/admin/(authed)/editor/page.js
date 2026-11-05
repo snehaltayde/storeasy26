@@ -9,6 +9,7 @@ import { entityEntry, entityForDocument, canEdit, ENTRY_WORDS } from "@/lib/admi
 import { tfetch } from "@/lib/console-request";
 import { roleAllows } from "@/lib/platform/authz";
 import { bundleCurrency } from "@/lib/bundles";
+import { slog } from "@/lib/log";
 import { PageHeader } from "@/components/console/PageHeader";
 import { Banner } from "@/components/console/Banner";
 import DocumentEditor from "@/components/admin/editor/DocumentEditor";
@@ -54,6 +55,23 @@ const currencyForBundles = async () => {
   }
 };
 
+// P6-GEN: the first-run generator, loaded only on this branch (a store with a
+// home page never loads it). The specifier is a template literal on purpose:
+// it bundles like a plain string, and the suites that compile this page with
+// stubbed modules don't follow it. A write during a server render, so it is
+// idempotent (the writer skips anything unchanged) and never fails the page:
+// an error is logged and the editor opens as it would have.
+async function firstStoreThen(actor, docs) {
+  try {
+    const { generateFirstStore } = await import(`@/lib/first-run/generate`);
+    const r = await generateFirstStore({ trigger: "editor", actor });
+    return r?.ran && r.written ? await listDocuments() : docs;
+  } catch (e) {
+    slog("editor_first_run_failed", { error: String(e?.message || e).slice(0, 200) });
+    return docs;
+  }
+}
+
 export default async function EditorPage({ searchParams }) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
@@ -71,7 +89,12 @@ export default async function EditorPage({ searchParams }) {
       if (out.document) return { mode, entry: { document: out.document, note: null }, entity: out.entity, readOnly: out.readOnly };
       return { mode, entry: { ...editorEntry({}, await listDocuments()), note: out.error || ENTRY_WORDS.failed }, entity: null, readOnly: null };
     }
-    const docs = await listDocuments();
+    let docs = await listDocuments();
+    // P6-GEN (GEN-01): a closed store that has no home page yet gets its
+    // starting store (made from the catalog) before the editor opens, so the
+    // editor never starts from empty pages. Only for someone who can edit; the
+    // generator checks the rest (closed, catalog in, nothing of the founder's).
+    if (editable && !docs.some((d) => d.id === "doc_home")) docs = await firstStoreThen(actor, docs);
     const e = editorEntry(query, docs);
     if (!ENTITY_TYPES.has(e.document?.type)) return { mode, entry: e, entity: null, readOnly: null };
     // ?doc= of a product's or collection's content: read what Shopify sends now
