@@ -18,7 +18,7 @@ Nothing here imports `lib/ai`. A suite test walks every static, re-export and dy
 Only `doc_home` and `doc_design`. The header and footer are left without a document, which means automatic mode: the menus come from the catalog when the page renders.
 
 **The hero:**
-- Title: the store's name, cut to 60 characters at a word boundary. A blank name falls back to the hero's own default, "Welcome to our store".
+- Title: the store's name, cut to 60 characters at a word boundary. A blank name falls back to the hero's own default, "Welcome to our store". P6-FIX1: when there is no space to cut at, the hard cut keeps whole graphemes (an emoji, a flag, a letter with its accents), so it never leaves half a character. The limit still counts UTF-16 code units, as the validator does. The same cut is used for alt text (300) and rail titles (50).
 - Highlight and badge: empty. No second button.
 - Subtitle, first one that fits:
   - "Shop {a} and {b}." when two collections have products in stock;
@@ -53,7 +53,7 @@ Only `doc_home` and `doc_design`. The header and footer are left without a docum
 **The design:** `designBodyFor(paletteId)`. The runner passes `startingPaletteId(config.onboarding)`, which is the brand step's recorded palette, else slate. There are no kit presets, announcement, reviews or badge.
 
 **summary:** `{ heroImage: { productTitle } | null, collections: [titles], rails: [titles], paletteId }`.
-- `collections` is the grid's collections (in stock, most stocked first, up to the grid's limit), and is empty when there is no grid.
+- `collections` is the collections the live grid shows, in its order (P6-FIX1; corrected): the same rule as `repo.getFeaturedCollections`, the grid's default source. That is every collection with at least one product, **sold-out ones included**, the most products first, then by title in code point order, up to the grid's limit (`gridCollections` in plan.js). It is empty when there is no grid. The grid is placed only when two or more collections have products in stock, but once placed it shows what getFeaturedCollections reads. The earlier text ("in stock, most stocked first") was wrong: with a sold-out collection of 10 products the grid shows it first, and the summary did not name it.
 - `summarizeFirstStore` is shared by the planner and `describeFirstStore`, so the start page's copy is re-derived from the stored drafts the same way.
 
 **Where every word comes from:** a fixed list (`WORDS`, `SUBTITLES`, `DEFAULT_HERO_SUBTITLE`), the store's name, or the founder's own catalog (collection and product titles, Shopify alt text). The provenance test checks every text value against those sources.
@@ -78,6 +78,12 @@ The second home check exists because the writer's `allowEmptyRefill: false` woul
 These checks run **before** the writer is called. When nothing needs writing, the writer answers `written: false` without asking any guard, even on a live, legacy or migrating store. So a written:false answer never means "generated". The route reports `generated: written`.
 
 If the writer refuses after the checks pass (the store changed mode or opened in between), the refusal maps to `ran: false` with the same reasons. A lost race (FIRST_RUN_RACE) is retried once from the top. A second race answers `race`.
+
+**The writer is called twice: the home, then the design (P6-FIX1).** The checks are read before the writer reads its own rows, so a founder save to `doc_home` can land in between. With one call, the writer then skipped the home as the founder's and still wrote the design alone. Now:
+- The first call carries only the home. If the writer skips it, the run stops with nothing written at all (not even the design), and the reason comes from the checks read again (`founder_started`, or `home_left_for_founder` on the sync trigger).
+- A founder save that lands after the writer read the home makes the home's guarded INSERT or UPDATE change no row, so that batch aborts (FIRST_RUN_RACE). The retry reads the checks again and now sees the founder's home.
+- Only then is the design written, in a second call. Each call is still the one writer, all or none.
+- Tested in test-first-run ("a founder save between the checks and the writer…"), with a test-only seam `firstRunGenerateHooks.afterChecks` in generate.js and the writer's own `firstRunHooks.beforeBatch`.
 
 ## The triggers
 
@@ -111,7 +117,8 @@ The worker hook only covers slices that run as queued `catalog_sync` jobs. The o
 ## Known limits
 
 - **A sync-time refill bumps the revision of an open generator-owned draft.** If the founder has the editor open on a home that is still the generator's (never saved by them) and a later sync changes the catalog, the refill raises the revision. Their next save then gets the editor's "changed somewhere else" conflict. An unchanged catalog writes nothing (the hash skip), so only a real catalog change does this. Owner check below.
-- **A founder save in the millisecond window between the runner's checks and the writer's own read** makes the writer skip the home as `founder`, and the design is still written. The writer's guarded batch never overwrites the founder's home. The result is a design draft the founder didn't ask for, which is the same slate draft P6-OPEN offers at first publish anyway.
+- ~~A founder save between the runner's checks and the writer's own read lets the design be written alone.~~ Closed by P6-FIX1 (home first, then the design; see Eligibility).
+- **(P6-FIX1) The home and the design are two writer calls now, not one batch.** If the home's call writes and the design's call then fails (the database stops answering), the store has a generated home and no design until the next run, which creates the design. That is the state P6-OPEN's design rule already handles (with `checkOpening`, the first publish makes and offers the slate design). A founder save to `doc_home` in the milliseconds between the two calls still lets the design be written, but only right after this run wrote the home itself, so the design is never written for a home the founder had already started.
 - **The fixed status colours.** `brandCssVars` always sets `--sf-success*` to the platform's lime-700/800/50/100 status colours, whatever the brand. They are not derived from the store's accent. The suite checks that no other colour variable is lime and that the status values are the same for every curated palette. Changing them is lib/brand.js's business, not this item's.
 - **The editor trigger runs on every editor open of a store that has no `doc_home`**, including stores that are not eligible (catalog not in yet). That costs one dynamic import and the read-only checks, and nothing is written.
 - **In test-product-editor** (an existing suite, unchanged), its store has no `doc_home`. The owner's editor render takes the generate branch, the suite's loader can't load the module, and the page logs `editor_first_run_failed` once and opens as before. The suite passes. The log line is expected.

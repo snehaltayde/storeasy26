@@ -664,6 +664,40 @@ await t("rebuild: checkout turned off after the first build loses its race is re
   eq(await livePointer(h), null, "nothing is live:");
 });
 
+// ---- P6-FIX1: review test gaps --------------------------------------------------------------
+console.log("— P6-FIX1: rule d's mixed case, test orders on a store with releases");
+await t("FIX1 d. a founder-saved privacy draft not in the set plus a missing returns page: 409 OPENING_NEEDS_POLICIES with offer null, although the report's own offer adds the privacy draft; nothing goes live", async () => {
+  const h = await store("mixed");
+  const home = await makeHome(h);
+  const design = await makeDesign(h);
+  const privacy = await makePage(h, "privacy-policy", "Privacy policy");
+  const before = await dump(h);
+  for (const flags of [{ checkOpening: true }, { checkOpening: true, confirmOpen: true }]) {
+    const r = await publishSet(h, [home, design], flags);
+    eq([r.status, r.body.code], [409, "OPENING_NEEDS_POLICIES"], `${JSON.stringify(flags)}:`);
+    eq(r.body.offer, null, "no offer (publishing the privacy draft would not open the store):");
+    eq([levels(r.body.report).privacy, levels(r.body.report).returns], ["info", "block"], "privacy info, returns blocks:");
+    ok((r.body.report.offer?.publishSet || []).some((o) => o.id === privacy.id), `the report's offer adds the privacy draft: ${JSON.stringify(r.body.report.offer)}`);
+    checkWords(r.body.report, `mixed ${JSON.stringify(flags)}`);
+  }
+  eq(await livePointer(h), null, "nothing is live:");
+  eq(await dump(h), before, "nothing was written:");
+});
+
+await t("FIX1 test_order: on a store with a release but no live pointer, an order placed after its first release does not count, and one placed before it does", async () => {
+  const h = await store("relorder");
+  const home = await makeHome(h);
+  const sql = (q, args = []) => h.run(() => libsql.execute({ sql: q, args }));
+  await sql("INSERT INTO releases (id, content, content_hash, created_at) VALUES ('rel_ocfix1', '{}', 'fix1', '2026-06-01T00:00:00.000Z')");
+  eq(await livePointer(h), null, "no live pointer:");
+  const order = (id, at) => sql("INSERT INTO orders (id, email, status, payment_method, total, created_at) VALUES (?, 'snehal@mediastic.in', 'cancelled', 'cod', 100, ?)", [id, at]);
+  await order("OC-FIX1-AFTER", "2026-07-01T00:00:00.000Z");
+  const after = byId(await checks(h, [home.id])).test_order;
+  eq([after.level, after.message], ["warn", Onb.TEST_ORDER_CLOSED_HINT], "only an order after the first release:");
+  await order("OC-FIX1-BEFORE", "2026-05-01T00:00:00.000Z");
+  eq(byId(await checks(h, [home.id])).test_order.level, "ok", "an order before the first release counts:");
+});
+
 // ---- cleanup -------------------------------------------------------------------------------
 for (const h of stores) await h.cleanup().catch(() => {});
 await platform.cleanup().catch(() => {});
