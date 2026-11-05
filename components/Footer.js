@@ -1,5 +1,16 @@
 import Link from "next/link";
 
+// P6-LOGO-RENDER (GEN-04): a documents store's picture logo (logo.image, a
+// library path from the live design document) replaces the text wordmark in
+// both spots. Its words are the founder's alt, else the store's name
+// (logo.name), never text1 (half of a split wordmark). An explicit 48px height
+// keeps an SVG with no size of its own from collapsing or growing.
+export const FOOTER_LOGO_CLASS = "block h-12 max-h-12 w-auto max-w-full object-contain";
+
+const FooterLogo = ({ logo, className = "" }) => (
+  <img src={logo.image.media} alt={logo.image.alt || logo.name || ""} className={className ? `${FOOTER_LOGO_CLASS} ${className}` : FOOTER_LOGO_CLASS} />
+);
+
 // Session 23: brand, support and the Shop column come from tenant config/CMS.
 // `nav` null = top-5 collections (pre-CMS behavior); an array replaces it.
 export default function Footer({
@@ -40,8 +51,14 @@ export default function Footer({
       <footer {...doc} className="mt-20 border-t border-sf-border-soft bg-sf-surface-muted">
         <div className="mx-auto max-w-7xl px-4 py-10 text-center sm:px-6">
           <p className="text-xl font-extrabold">
-            {logo.text1}
-            {logo.text2 ? <span className="text-sf-accent-strong">{logo.text2}</span> : null}
+            {logo.image?.media ? (
+              <FooterLogo logo={logo} className="mx-auto" />
+            ) : (
+              <>
+                {logo.text1}
+                {logo.text2 ? <span className="text-sf-accent-strong">{logo.text2}</span> : null}
+              </>
+            )}
           </p>
           {tagline ? <p className="mx-auto mt-2 max-w-md text-sm text-sf-text-subtle">{tagline}</p> : null}
           <nav className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-sf-text-subtle">
@@ -77,8 +94,14 @@ export default function Footer({
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="text-xl font-extrabold">
-              {logo.text1}
-              {logo.text2 ? <span className="text-sf-accent-strong">{logo.text2}</span> : null}
+              {logo.image?.media ? (
+                <FooterLogo logo={logo} />
+              ) : (
+                <>
+                  {logo.text1}
+                  {logo.text2 ? <span className="text-sf-accent-strong">{logo.text2}</span> : null}
+                </>
+              )}
             </p>
             {tagline ? <p className="mt-3 max-w-sm text-sm text-sf-text-subtle">{tagline}</p> : null}
           </div>

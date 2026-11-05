@@ -14,7 +14,7 @@ import { getCart, emptyCart, shopperCart, CART_COOKIE } from "@/lib/cart";
 import { siteUrl, siteName, siteTitle, siteTagline, siteFooterTagline, siteLogo, siteSupport, siteLegalName } from "@/lib/site";
 import { tenantOwnCfg } from "@/lib/tenant-context";
 import { resolveBrand, brandCssVars } from "@/lib/brand";
-import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolvedContentPageList, resolvedSurfaceTemplates, contentSource, isContentUnavailable, previewFrameRoutes } from "@/lib/content/resolve";
+import { resolvedAnnouncement, resolvedNav, resolvedBrand, resolvedTheme, resolvedLogo, resolvedContentPageList, resolvedSurfaceTemplates, contentSource, isContentUnavailable, previewFrameRoutes } from "@/lib/content/resolve";
 import { kitAttr } from "@/lib/themes/kits";
 import { tfetch, requestResolution } from "@/lib/tenant-request";
 import { isGated } from "@/lib/tenant-gate";
@@ -91,7 +91,7 @@ async function navCollections() {
 async function chromeData() {
   try {
     return await tfetch(async () => {
-      const [announcement, navHeader, navFooter, brand, theme, src, pageList, surfaces, routes] = await Promise.all([
+      const [announcement, navHeader, navFooter, brand, theme, src, pageList, surfaces, routes, logoImage] = await Promise.all([
         resolvedAnnouncement(),
         resolvedNav("header"),
         resolvedNav("footer"),
@@ -101,6 +101,7 @@ async function chromeData() {
         resolvedContentPageList().catch(() => []),
         resolvedSurfaceTemplates(), // S61: header/footer structural variants (release-governed)
         previewFrameRoutes().catch(() => null), // P3-FRAME: documents preview only, else null
+        resolvedLogo(), // P6-LOGO-RENDER: null unless a v4 source's design has a logo
       ]);
       // S39 (MC11): footer links only to pages that EXIST on this store.
       const enabledPages = pageList.filter((p) => p.enabled && (p.family || "page") === "page");
@@ -113,7 +114,11 @@ async function chromeData() {
       };
       return {
         name: siteName(),
-        logo: siteLogo(),
+        // P6-LOGO-RENDER (GEN-04): a documents store (a v4 source) also hands
+        // the chrome its picture logo and the store's name, the logo's words
+        // when the founder gave none. Legacy and migrating stores pass the
+        // text pair exactly as before, with no image key.
+        logo: src.v === DOCUMENTS_RELEASE_VERSION ? { image: logoImage, name: siteName(), ...siteLogo() } : siteLogo(),
         footerTagline: siteFooterTagline(),
         support: siteSupport(),
         legalName: siteLegalName(),
@@ -134,7 +139,9 @@ async function chromeData() {
         kitAttr: kitAttr(theme),
         preview: src.preview,
         // P2-PREVIEW: what a documents preview shows (null on legacy previews)
-        previewOverlay: src.overlay ? { designDirty: src.overlay.designDirty, showDesign: src.overlay.showDesign, otherTab: src.overlay.otherTab } : null,
+        // P6-LOGO-RENDER: designShown too, so the bar never says the new
+        // colours are not shown while they are (a store with no live design)
+        previewOverlay: src.overlay ? { designDirty: src.overlay.designDirty, showDesign: src.overlay.showDesign, designShown: src.overlay.designShown === true, otherTab: src.overlay.otherTab } : null,
         frame: frameOf(src, routes),
         footerPages,
         headerVariant: surfaces.header || "standard",
