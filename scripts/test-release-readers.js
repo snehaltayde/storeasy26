@@ -1,6 +1,6 @@
 // P2-READ suite: the version 4 shopper reader next to the frozen legacy one.
 //   1. A v4 release (built with lib/documents/commit.js and registry bodies)
-//      through all 17 resolved* getters, resolvedJournalEntries,
+//      through all 18 resolved* getters (P6-LOGO-REG: resolvedLogo), resolvedJournalEntries,
 //      resolvedHomePage and contentSource, and the route handlers.
 //   2. v1, v2 and v3 read exactly as at a6d028e, the legacy sitemap and
 //      /journal listing included (outputs recorded inside an a6d028e checkout).
@@ -336,6 +336,8 @@ const GETTERS = [
   ["resolvedContentPageList", []],
   ["resolvedBrand", []],
   ["resolvedTheme", []],
+  // P6-LOGO-REG (GEN-04): the design's picture logo
+  ["resolvedLogo", []],
   ["resolvedSurfaceTemplates", []],
   ["resolvedSurfaceTemplateFor", ["pdp", P(1)]],
   ["resolvedSurfaceTemplateFor", ["collection", COL(2)]],
@@ -540,6 +542,8 @@ const EXPECTED = {
   ],
   'resolvedBrand()': { accent: "#0d9488" },
   'resolvedTheme()': { kit: "glow", version: 1 },
+  // P6-LOGO-REG: this design has no logo
+  'resolvedLogo()': null,
   'resolvedSurfaceTemplates()': { header: "centered", footer: "minimal" },
   [`resolvedSurfaceTemplateFor("pdp","${P(1)}")`]: { template: "editorial", source: "family" },
   [`resolvedSurfaceTemplateFor("collection","${COL(2)}")`]: { template: "sidebar", source: "family" },
@@ -552,7 +556,7 @@ const keyOf = (fn, args) => `${fn}(${args.map((a) => JSON.stringify(a)).join(","
 
 await t("a v4 release built with commit.js: all 17 resolved* getters, resolvedJournalEntries, resolvedHomePage and contentSource return the published content", async () => {
   same(RESOLVED.sort(), [...new Set(GETTERS.map(([fn]) => fn))].sort(), "the getters this suite calls (resolve.js changed: update GETTERS)");
-  eq(RESOLVED.length, 17, "resolved* getters:");
+  eq(RESOLVED.length, 18, "resolved* getters:");
   const src = await inDv(() => Res.contentSource());
   eq(src.mode, "live", "mode:");
   eq(src.v, 4, "v:");
@@ -962,6 +966,7 @@ await t("a list made by emptyList plus one policy page renders every getter at i
     'resolvedContentPageList()': [{ slug: "privacy", title: "Privacy", enabled: true, source: "custom", family: "page" }],
     'resolvedBrand()': null,
     'resolvedTheme()': null,
+    'resolvedLogo()': null,
     'resolvedSurfaceTemplates()': { header: "standard", footer: "columns" },
     [`resolvedSurfaceTemplateFor("pdp","${P(1)}")`]: { template: "classic", source: "platform" },
     [`resolvedSurfaceTemplateFor("collection","${COL(2)}")`]: { template: "standard", source: "platform" },
@@ -1043,6 +1048,8 @@ const CLOSED_NEUTRAL = {
   "resolvedJournalEntries()": [],
   "resolvedBrand()": null,
   "resolvedTheme()": null,
+  // P6-LOGO-REG: a closed store has no picture logo
+  "resolvedLogo()": null,
   "resolvedSurfaceTemplates()": { header: "standard", footer: "columns" },
   [`resolvedSurfaceTemplateFor("pdp","${P(1)}")`]: { template: "classic", source: "platform" },
   [`resolvedSurfaceTemplateFor("collection","${COL(2)}")`]: { template: "standard", source: "platform" },

@@ -308,7 +308,10 @@ console.log("1. every kind has a control, every kind and type a form");
 // the only coverage gaps allowed, and exactly these.
 // P5-SETTING registered bundle and bundle_list (COM-02) in batch 1; P5-EDITOR
 // gave them their controls (fields/BundleControl.js), so they wait no more.
-const WAITING_KINDS = ["overlay", "gallery", "pairs", "product_ids"];
+// P6-LOGO-REG (GEN-04): "logo" (the design document's picture logo) waits
+// too. A P1 follow-up gives the editor a logo control; in phase 6 the
+// founder sets the logo at /admin/start (the brand step), never here.
+const WAITING_KINDS = ["overlay", "gallery", "pairs", "product_ids", "logo"];
 const WAITING_TYPES = ["product_content", "collection_content"];
 // The coverage gaps allowed, worked out when asked: the waiting kinds, the
 // document fields above, and (P5-SETTING) every setting of a waiting kind on
@@ -324,6 +327,8 @@ const waitingProblems = () => [
   ),
   ...["title", "description_html", "gallery", "display_vendor", "display_type", "pairs"].map((k) => `document type "product_content": setting "${k}" has no control`),
   'document type "collection_content": setting "pinned" has no control',
+  // P6-LOGO-REG: the design's logo (a waiting kind, above)
+  'document type "design": setting "logo" has no control',
 ];
 const waitingField = (field) => WAITING_KINDS.includes(field?.setting?.kind);
 // P5-SETTING: the issues a section form can't place yet, because their field
@@ -761,6 +766,54 @@ await t("rendered: the design form shows every token, the look, the default note
   const shown = render(h(SettingsForm, { type: "design", value: bad, issues, onChange: () => {} }));
   checkPlacement(shown, issues, null, "design");
   ok(shown.includes("Go back to the platform"), "a custom brand can go back to the default");
+});
+
+// P6-LOGO-REG (GEN-04): the design form edits the brand and the look only. It
+// writes through setAt on the whole body, so a logo set at /admin/start is
+// kept, untouched, when the founder changes a colour or the look here.
+await t("P6-LOGO-REG: 'logo' is a waiting kind with no inspector control; a DesignForm brand or look change keeps settings.logo", () => {
+  ok(WAITING_KINDS.includes("logo"), "logo waits");
+  eq(M.controlKindOf("logo"), null, "no inspector control yet:");
+  ok(M.inspectorCoverage().includes('document type "design": setting "logo" has no control'), "the coverage names it");
+  const logo = { media: "/api/media/med_logo1", alt: "Acme" };
+  const body = { ...Reg.emptyBody("design"), settings: { brand: null, theme: { kit: "pulse", version: 1 }, logo } };
+  const changes = [];
+  const Host = () => {
+    const tree = DesignForm({ value: body, issues: [], onChange: (next, at) => changes.push([next, at]) });
+    const walk = (node, out = []) => {
+      if (!node || typeof node !== "object") return out;
+      if (Array.isArray(node)) {
+        for (const n of node) walk(n, out);
+        return out;
+      }
+      if (node.props) {
+        if (typeof node.type === "function" && /Control$/.test(node.type.name || "")) out.push(node);
+        walk(node.props.children, out);
+      }
+      return out;
+    };
+    const controls = walk(tree);
+    const brand = controls.find((c) => c.props.field?.key === "brand");
+    const theme = controls.find((c) => c.props.field?.key === "theme");
+    ok(brand && theme, `the brand and theme controls: ${controls.map((c) => c.props.field?.key)}`);
+    ok(!controls.some((c) => c.props.field?.key === "logo"), "no logo control is rendered");
+    brand.props.onChange(M.design.setToken(null, "accent", "#1d4ed8"));
+    theme.props.onChange(M.design.setLook(body.settings.theme, "glow-1"));
+    return null;
+  };
+  render(h(Host));
+  eq(changes.length, 2, "two edits:");
+  const [[afterBrand, at1], [afterLook, at2]] = changes;
+  eq(at1.path, "brand", "the brand edit:");
+  eq(afterBrand.settings.brand.accent, "#1d4ed8", "the new accent:");
+  eq(afterBrand.settings.logo, logo, "the logo is kept after a brand change:");
+  eq(at2.path, "theme", "the look edit:");
+  eq(afterLook.settings.logo, logo, "the logo is kept after a look change:");
+  eq(body.settings.logo, logo, "the stored body is not changed in place:");
+  ok(Reg.validateDocument(afterBrand, { mode: "publish" }).ok, "the saved body still publishes");
+  // and the form renders with a logo in the body, with no note for it
+  const html = render(h(DesignForm, { value: body, issues: [], onChange: () => {} }));
+  ok(html.includes('id="f-doc-brand-accent"') && !html.includes("f-doc-logo"), "brand fields, no logo field");
 });
 
 // ============================== fix round 1 =======================================

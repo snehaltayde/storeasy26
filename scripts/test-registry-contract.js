@@ -1062,6 +1062,9 @@ function badValues(s) {
     // P5-SETTING
     case "bundle":
       return [5, "bun-1", {}, { id: 5 }, { id: "" }, { id: "has space" }, { id: "x".repeat(65) }, { id: "bun-1", price: 100 }, { id: "bun-1", title: "Duo" }];
+    // P6-LOGO-REG
+    case "logo":
+      return [5, "/api/media/med_a", [], { media: 5 }, { media: "https://x/y.png" }, { media: "/other/path" }, { media: "/api/media/med_a?w=1" }, { media: "/api/media/med_a", z: 1 }, { media: "/api/media/med_a", alt: 5 }, { media: "/api/media/med_a", alt: long(121) }];
     case "bundle_list":
       return [5, [5], [{ id: 5 }], [{ id: "bun-1" }, { id: "bun-1" }], [{ id: "bun-1", slug: "duo" }], Array.from({ length: (s.max ?? 12) + 1 }, (_, j) => ({ id: `bun-${j}` }))];
     default:
@@ -1234,6 +1237,74 @@ await t("P5-SETTING: a bundle list refuses the same bundle twice and more than i
   });
 });
 
+// P6-LOGO-REG (GEN-04, TOK-03, MED-03): the logo setting kind on the design
+// document. null or { media, alt? }: media is a library path, alt optional
+// (never incomplete), at most 120 characters once trimmed.
+await t("P6-LOGO-REG: the logo kind takes null and library files with or without alt; refuses other addresses, unknown keys and a long alt; a missing alt is fine at publish; it has a control", async () => {
+  const S = await import("../lib/registry/settings.js");
+  const kind = R.SETTING_KINDS.logo;
+  ok(kind, "the logo kind is registered");
+  ok(kind.control === "logo", `control: ${kind.control}`);
+  const decl = R.documentType("design").settings.find((x) => x.key === "logo");
+  deq([decl?.kind, decl?.label, decl?.default], ["logo", "Logo", null], "the design declares it:");
+  eq(R.controlsForDocument("design").find((c) => c.key === "logo")?.control, "logo", "controlsForDocument:");
+  const design = (logo) => ({ schema: 1, type: "design", meta: {}, settings: { brand: null, theme: { kit: "pulse", version: 1 }, logo } });
+  // accepted, in both modes, with no issue at all
+  for (const logo of [null, { media: "/api/media/abc" }, { media: "/api/media/abc", alt: "" }, { media: "/api/media/abc", alt: "Acme" }, { media: "/api/media/med_x1_Y-2", alt: "x".repeat(120) }]) {
+    for (const mode of ["draft", "publish"]) none(validate(design(logo), { mode }), `${JSON.stringify(logo)} ${mode}:`);
+  }
+  // a missing alt (and one of spaces) is never incomplete, in either mode
+  for (const mode of ["draft", "publish"]) {
+    const r = validate(design({ media: "/api/media/abc" }), { mode });
+    ok(r.ok, `missing alt ${mode}`);
+    eq(r.issues.length, 0, `missing alt ${mode} issues:`);
+    none(validate(design({ media: "/api/media/abc", alt: "   " }), { mode }), `blank alt ${mode}:`);
+  }
+  // refused, in both modes, each with one error on its field
+  const refused = [
+    [{ media: "https://x/y.png" }, "LOGO_INVALID", "logo.media", "invalid"],
+    [{ media: "/other/path" }, "LOGO_INVALID", "logo.media", "invalid"],
+    [{ media: "/api/media/abc?w=4" }, "LOGO_INVALID", "logo.media", "invalid"],
+    [{ media: "//cdn.example/api/media/abc" }, "LOGO_INVALID", "logo.media", "invalid"],
+    [{ media: "/api/media/abc", z: 1 }, "UNKNOWN_FIELD", "logo.z", "structure"],
+    [{ media: "/api/media/abc", alt: "x".repeat(121) }, "TOO_LONG", "logo.alt", "invalid"],
+    [{ media: "/api/media/abc", alt: 5 }, "INVALID_VALUE", "logo.alt", "structure"],
+    [{ media: 5 }, "INVALID_VALUE", "logo.media", "structure"],
+    [{ alt: "Acme" }, "INVALID_VALUE", "logo.media", "structure"],
+    ["/api/media/abc", "INVALID_VALUE", "logo", "structure"],
+  ];
+  for (const [logo, code, field, cls] of refused) {
+    for (const mode of ["draft", "publish"]) {
+      const r = validate(design(logo), { mode });
+      ok(!r.ok, `${JSON.stringify(logo)} ${mode} refused`);
+      const i = one(r, code, { field });
+      eq(VAL.issueClass(i), cls, `${JSON.stringify(logo)} class:`);
+      eq(i.severity, "error", `${JSON.stringify(logo)} ${mode} severity:`);
+    }
+  }
+  // the alt is stored trimmed, and the limit counts the trimmed words
+  eq(validate(design({ media: "/api/media/abc", alt: "  Acme  " }), { mode: "draft" }).body.settings.logo.alt, "Acme", "trimmed:");
+  none(validate(design({ media: "/api/media/abc", alt: ` ${"x".repeat(120)} ` }), { mode: "publish" }), "120 once trimmed:");
+  // the refs: the logo file is a media ref (document_refs, MEDIA_MISSING)
+  deq(S.refsOfSetting(decl, { media: "/api/media/med_logo", alt: "A" }), [{ field: "logo.media", ref: "media", src: "/api/media/med_logo" }], "refsOfSetting:");
+  deq(S.refsOfSetting(decl, null), [], "no logo, no ref:");
+});
+
+await t("P6-LOGO-REG: existing design bodies with only { brand, theme } validate exactly as before (no logo key); emptyBody('design') carries logo: null and validates clean", async () => {
+  const old = (brand, theme) => ({ schema: 1, type: "design", meta: {}, settings: { brand, theme } });
+  for (const [brand, theme] of [[null, null], [null, { kit: "pulse", version: 1 }], [{ accent: "#7c3aed", background: "#ffffff", foreground: "#0a0a0b" }, { kit: "glow", version: 1 }]]) {
+    for (const mode of ["draft", "publish"]) {
+      const r = validate(old(brand, theme), { mode });
+      none(r, `${JSON.stringify(brand)} ${mode}:`);
+      ok(!Object.hasOwn(r.body.settings, "logo"), "no logo key is added to a stored body");
+    }
+  }
+  deq(R.emptyBody("design").settings, { brand: null, theme: null, logo: null }, "emptyBody:");
+  for (const mode of ["draft", "publish"]) none(validate(R.emptyBody("design"), { mode }), `emptyBody ${mode}:`);
+  // the design is still a manifest-1 singleton: nothing about the list changed
+  eq(R.documentType("design").sinceManifest, 1, "sinceManifest:");
+});
+
 // TREE-01: a version body never holds a price or stock value. Every setting
 // kind whose value is (or holds) an object refuses those keys as a structure
 // error, so nothing can be published that carries them. A new kind must be
@@ -1258,6 +1329,8 @@ const OBJECT_KINDS = {
   qa_list: [[{ q: "Is it warm?", a: "<p>Yes.</p>" }], "0"],
   nav_items: [[{ label: "Shop", link: OK_LINK, children: [{ label: "Mugs", link: OK_LINK }] }], "0"],
   gallery: [[{ media: "https://cdn.shopify.com/a.jpg", alt: "A" }], "0"],
+  // P6-LOGO-REG
+  logo: [{ media: "/api/media/med_a", alt: "Acme" }, ""],
 };
 // values with no object to put a key in
 const PLAIN_KINDS = ["text", "number", "boolean", "choice", "rich_text", "paragraphs", "product_ids"];

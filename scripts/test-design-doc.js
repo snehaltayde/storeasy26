@@ -16,8 +16,13 @@
 //      read the LIVE doc_design; the operator screens read theme_pin
 //   7. kits that leave an unpublishable draft say so, naming what to fix
 //   8. the guard: no config.brand / config.theme read outside the allowlist
+//   9. P6-LOGO-REG (GEN-04): designFromBody's logo, resolvedLogo per mode,
+//      and the preview of a design that was never published
 //
 //   pnpm test:design-doc
+// request-cache must load before any app module that imports react
+// (P6-LOGO-REG: the storefront getters run in simulated requests below).
+import "./support/request-cache.js";
 import { readFile, readdir, rm } from "node:fs/promises";
 import { registerHooks } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -26,8 +31,29 @@ import { dirname, join, relative } from "node:path";
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, "..");
 
+// P6-LOGO-REG: next/headers answers for one simulated request at a time (as in
+// test-preview-overlay); outside one, headers() and cookies() throw, as the
+// real module does outside a request.
+const HEADERS_STUB =
+  "data:text/javascript," +
+  encodeURIComponent(`
+const req = () => {
+  const r = globalThis.__readRequest;
+  if (!r) throw new Error("next/headers was called outside a request");
+  return r;
+};
+export async function headers() {
+  const r = req();
+  return { get: (n) => (String(n).toLowerCase() === "host" ? r.host : null) };
+}
+export async function cookies() {
+  const r = req();
+  return { get: (n) => (Object.hasOwn(r.cookies, n) ? { name: n, value: r.cookies[n] } : undefined) };
+}
+`);
 registerHooks({
   resolve(spec, ctx, next) {
+    if (spec === "next/headers") return { url: HEADERS_STUB, shortCircuit: true, format: "module" };
     if (spec.startsWith("@/")) return next(pathToFileURL(join(ROOT, spec.slice(2) + (/\.\w+$/.test(spec) ? "" : ".js"))).href, ctx);
     if (/^next\/(headers|server|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
     return next(spec, ctx);
@@ -44,7 +70,10 @@ process.env.PLATFORM_CACHE_MS = "0";
 process.env.PLATFORM_SITE_HOSTS = "";
 process.env.PLATFORM_ADMIN_PASSWORD = "design-doc-operator-pass";
 
-const dbs = [".test-design-doc-default.db", ".test-design-doc-platform.db", ".test-design-doc-docs.db", ".test-design-doc-legacy.db"];
+// P6-LOGO-REG: four more stores for the logo readers (open with a logo, open
+// without one, closed, moving)
+const LOGO_STORES = ["lgopen", "lgplain", "lgclosed", "lgmoving"];
+const dbs = [".test-design-doc-default.db", ".test-design-doc-platform.db", ".test-design-doc-docs.db", ".test-design-doc-legacy.db", ...LOGO_STORES.map((k) => `.test-design-doc-${k}.db`)];
 const cleanup = async () => {
   for (const f of dbs) await rm(join(ROOT, f), { force: true });
 };
@@ -875,6 +904,152 @@ await t("unit: an agency kit that leaves the home draft unpublishable says so in
   ok(/Your home page was saved as a draft but can't be published yet\. Fix this in the editor first: Banner/.test(k2.body.note || ""), `the theme kit says so: ${k2.body.note}`);
   eq(k2.body.applied.unpublishable?.[0]?.label, "Your home page", "named:");
   ok(K.unpublishableNote([]) === null && K.unpublishableNote([{ label: "X", problems: ["a.", "b.", "c.", "d."] }]).endsWith("(and 1 more)"), "note helper:");
+});
+
+// ======================================================================================
+console.log("— 9. P6-LOGO-REG: the logo in the design document (registry and readers)");
+
+const Reader = await import("../lib/content/documents-reader.js");
+const Res = await import("../lib/content/resolve.js");
+const Pub = await import("../lib/documents/publish.js");
+const PS = await import("../lib/preview-sessions.js");
+const { runRequest } = await import("./support/request-cache.js");
+const LOGO_ACTOR = { kind: "merchant", id: ownerU.id };
+for (const key of LOGO_STORES) {
+  const c = createClient({ url: `file:.test-design-doc-${key}.db` });
+  await c.executeMultiple(schema);
+  await runMigrations(c, MIGRATIONS);
+  raw[key] = c;
+  // every logo store carries an old control-plane brand: no logo reader may use it
+  await C.upsertTenant({ id: key, name: `Logo ${key}`, domains: [`${key}.test`], dbUrl: `file:.test-design-doc-${key}.db`, config: { ...STALE, site: { name: `Logo ${key}` } }, secrets: {} });
+}
+await raw.lgopen.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+await raw.lgplain.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+await raw.lgclosed.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+await raw.lgmoving.execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
+const inS = async (id, fn) => withTenant(await tenant(id), fn);
+// one simulated storefront request on a store's host, with these cookies
+async function asRequest(id, fn, cookies = {}) {
+  globalThis.__readRequest = { host: `${id}.test`, cookies };
+  try {
+    return await runRequest(() => inS(id, fn));
+  } finally {
+    globalThis.__readRequest = null;
+  }
+}
+const LOGO_A = { media: "/api/media/med_logoa1", alt: "Logo open" };
+const LOGO_B = { media: "/api/media/med_logob2", alt: "Logo open, new" };
+const BRAND_A = { accent: "#1d4ed8", background: "#ffffff", foreground: "#0a0a0b" };
+const BRAND_B = { accent: "#047857", background: "#ffffff", foreground: "#0a0a0b" };
+const designWith = (brand, logo) => body("design", { settings: { brand, theme: { kit: "pulse", version: 1 }, logo } });
+async function publishIn(id, ids) {
+  return inS(id, async () => {
+    const items = [];
+    for (const x of ids) {
+      const d = await Docs.getDocument(x);
+      items.push({ id: d.id, revision: d.revision, draftHash: d.draftHash });
+    }
+    return Pub.publish({ ids: items, actor: LOGO_ACTOR });
+  });
+}
+// open, with a logo: a home page and the design published together
+await inS("lgopen", async () => {
+  await Docs.createDocument({ type: "home", body: body("home", { sections: [sec("text", "sec_lgo1", { title: "Hello", body: ["Words."] })] }), actor: LOGO_ACTOR });
+  await Docs.createDocument({ type: "design", body: designWith(BRAND_A, LOGO_A), actor: LOGO_ACTOR });
+});
+await publishIn("lgopen", ["doc_home", "doc_design"]);
+// open, its design published with no logo
+await inS("lgplain", async () => {
+  await Docs.createDocument({ type: "home", body: body("home", { sections: [sec("text", "sec_lgp1", { title: "Hello", body: ["Words."] })] }), actor: LOGO_ACTOR });
+  await Docs.createDocument({ type: "design", body: designWith(BRAND_A, null), actor: LOGO_ACTOR });
+});
+await publishIn("lgplain", ["doc_home", "doc_design"]);
+// closed: never published, a design draft with a logo
+await inS("lgclosed", () => Docs.createDocument({ type: "design", body: designWith(BRAND_B, LOGO_B), actor: LOGO_ACTOR }));
+// legacy (dl) and moving stores keep the text wordmark, whatever their config holds
+const legacyLogoCfg = { ...STALE, brand: { ...STALE.brand, logo: "/api/media/med_cfglogo" } };
+
+await t("P6-LOGO-REG unit: designFromBody returns the logo ({ media, alt? }) or null: no key, null, a broken value and another site's address are all null; brand and theme as before", async () => {
+  eq(Reader.designFromBody(designWith(BRAND_A, LOGO_A)), { brand: BRAND_A, theme: { kit: "pulse", version: 1 }, logo: LOGO_A }, "with a logo:");
+  eq(Reader.designFromBody(designWith(BRAND_A, { media: "/api/media/med_x" })).logo, { media: "/api/media/med_x" }, "no alt:");
+  eq(Reader.designFromBody(designWith(BRAND_A, { media: "/api/media/med_x", alt: "" })).logo, { media: "/api/media/med_x", alt: "" }, "empty alt kept as it is:");
+  const old = { schema: 1, type: "design", meta: {}, settings: { brand: BRAND_A, theme: null } };
+  eq(Reader.designFromBody(old), { brand: BRAND_A, theme: null, logo: null }, "a design from before phase 6:");
+  for (const bad of [null, 5, "/api/media/med_x", { media: "https://elsewhere.example/logo.png" }, { media: "/other/path" }, { alt: "x" }]) eq(Reader.designFromBody(designWith(null, bad)).logo, null, `${JSON.stringify(bad)}:`);
+  eq(Reader.designFromBody(null), { brand: null, theme: null, logo: null }, "no body:");
+});
+
+await t("P6-LOGO-REG unit: resolvedLogo() is the logo for a v4 release with a design logo, and null for a v4 release without one, a closed store, a legacy store and a moving store; resolvedBrand reads as before", async () => {
+  eq(await asRequest("lgopen", () => Res.resolvedLogo()), LOGO_A, "open, with a logo:");
+  eq(await asRequest("lgopen", () => Res.resolvedBrand()), BRAND_A, "open, its brand:");
+  eq(await asRequest("lgplain", () => Res.resolvedLogo()), null, "open, no logo:");
+  eq((await asRequest("lgclosed", () => Res.contentSource())).mode, "closed", "closed mode:");
+  eq(await asRequest("lgclosed", () => Res.resolvedLogo()), null, "closed (a draft logo is never a shopper's):");
+  eq(await asRequest("lgclosed", () => Res.resolvedBrand()), null, "closed brand as before:");
+  await C.patchTenant("dl", { config: legacyLogoCfg });
+  await C.patchTenant("lgmoving", { config: legacyLogoCfg });
+  try {
+    eq((await asRequest("dl", () => Res.contentSource())).mode, "draft", "legacy mode:");
+    eq(await asRequest("dl", () => Res.resolvedLogo()), null, "legacy:");
+    eq(await asRequest("dl", () => Res.resolvedBrand()), legacyLogoCfg.brand, "legacy brand read as before (its config):");
+    eq((await asRequest("lgmoving", () => Res.contentSource())).mode, "draft", "moving mode:");
+    eq(await asRequest("lgmoving", () => Res.resolvedLogo()), null, "moving:");
+    // a legacy release (v3) on a documents-mode-free store: still null
+    await raw.legacy.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES ('rel_lglogo3', ?, 'h', '', NULL, ?, NULL, ?)", args: [JSON.stringify({ v: 3, blocks: {}, brand: { accent: "#7c3aed", logo: "/api/media/med_cfglogo" }, theme: null }), new Date().toISOString(), new Date().toISOString()] });
+    await raw.legacy.execute("UPDATE release_state SET live_release_id = 'rel_lglogo3' WHERE id = 1");
+    const src = await asRequest("dl", () => Res.contentSource());
+    eq([src.mode, src.v ?? null], ["live", null], "a v3 release:");
+    eq(await asRequest("dl", () => Res.resolvedLogo()), null, "a v3 release has no picture logo:");
+  } finally {
+    await raw.legacy.execute("UPDATE release_state SET live_release_id = NULL WHERE id = 1");
+    await raw.legacy.execute("DELETE FROM releases WHERE id = 'rel_lglogo3'");
+    await C.patchTenant("dl", { config: { ...STALE, site: { name: "Design Legacy" } } });
+  }
+  // the getters bound to a source (P4-SEAM) give the same answer
+  const G = Res.contentGettersFor(await asRequest("lgopen", () => Res.contentSource()));
+  eq(await asRequest("lgopen", () => G.resolvedLogo()), LOGO_A, "contentGettersFor:");
+});
+
+await t("P6-LOGO-REG unit: the preview of a store with no live design shows the draft brand and logo without 'Show them'; a store with a live design still needs it", async () => {
+  // closed: no live design entry, so the draft shows at once
+  const closed = await inS("lgclosed", () => PS.createPreviewSession({ actor: LOGO_ACTOR }));
+  const cookies = { [Res.PREVIEW_COOKIE]: closed.token };
+  const src = await asRequest("lgclosed", () => Res.contentSource(), cookies);
+  eq([src.preview, src.overlay.showDesign, src.overlay.designDirty, src.overlay.designShown], [true, false, true, true], "closed preview, toggle off:");
+  eq(await asRequest("lgclosed", () => Res.resolvedLogo(), cookies), LOGO_B, "the draft logo:");
+  eq(await asRequest("lgclosed", () => Res.resolvedBrand(), cookies), BRAND_B, "the draft brand:");
+  eq(await asRequest("lgclosed", () => Res.resolvedLogo()), null, "a shopper still sees nothing:");
+  // the toggle changes nothing here (known limit)
+  await inS("lgclosed", () => PS.setShowDesign({ sid: closed.sid, on: true }));
+  eq(await asRequest("lgclosed", () => Res.resolvedLogo(), cookies), LOGO_B, "toggle on, the same:");
+  await inS("lgclosed", () => PS.setShowDesign({ sid: closed.sid, on: false }));
+
+  // open with a live design: a new draft (brand and logo) waits for the toggle
+  await inS("lgopen", async () => {
+    const d = await Docs.getDocument("doc_design");
+    await Docs.saveDraft({ id: d.id, revision: d.revision, body: designWith(BRAND_B, LOGO_B), actor: LOGO_ACTOR });
+  });
+  const open = await inS("lgopen", () => PS.createPreviewSession({ actor: LOGO_ACTOR }));
+  const oc = { [Res.PREVIEW_COOKIE]: open.token };
+  const off = await asRequest("lgopen", () => Res.contentSource(), oc);
+  eq([off.preview, off.overlay.designDirty, off.overlay.designShown], [true, true, false], "open preview, toggle off:");
+  eq(await asRequest("lgopen", () => Res.resolvedLogo(), oc), LOGO_A, "the live logo until asked:");
+  eq(await asRequest("lgopen", () => Res.resolvedBrand(), oc), BRAND_A, "the live brand until asked:");
+  await inS("lgopen", () => PS.setShowDesign({ sid: open.sid, on: true }));
+  eq((await asRequest("lgopen", () => Res.contentSource(), oc)).overlay.designShown, true, "toggle on: shown:");
+  eq(await asRequest("lgopen", () => Res.resolvedLogo(), oc), LOGO_B, "the draft logo once asked:");
+  eq(await asRequest("lgopen", () => Res.resolvedBrand(), oc), BRAND_B, "the draft brand once asked:");
+  eq(await asRequest("lgopen", () => Res.resolvedLogo()), LOGO_A, "shoppers keep the live logo:");
+
+  // the rule itself (overlayList): a base with no doc_design entry overlays it
+  const rows = [{ id: "doc_design", type: "design", draft: JSON.stringify(designWith(BRAND_B, LOGO_B)), draft_hash: "h1" }];
+  const empty = Reader.previewBaseList();
+  eq(empty.documents.doc_design, null, "the never-published base has no design entry:");
+  eq(Reader.overlayList(empty, rows).documents, ["doc_design"], "no live design: overlaid without the toggle:");
+  const liveBase = { ...empty, documents: { ...empty.documents, doc_design: { version: "ver_live", hash: "h0" } } };
+  eq(Reader.overlayList(liveBase, rows).documents, [], "a live design: not without the toggle:");
+  eq(Reader.overlayList(liveBase, rows, { showDesign: true }).documents, ["doc_design"], "a live design: with it:");
+  eq([Reader.overlayList(empty, rows).designDirty, Reader.overlayList(liveBase, rows).designDirty], [true, true], "designDirty either way:");
 });
 
 // ======================================================================================
