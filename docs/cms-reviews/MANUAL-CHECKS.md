@@ -986,6 +986,24 @@ Packet: [P6-FIX1.md](P6-FIX1.md), "Owner checks" and "Known limits" (From review
 - [ ] CI sqld download: unchanged, and nothing under .github/ was touched. Its source and checksum still need your approval.
 - [ ] Browser drill NOT DONE: every acceptance item is proved by unit tests only; the design-harness Chrome drill belongs to P6-DRILLS.
 
+## Phase 6, batch 3
+
+### The Setup checklist on documents stores (P6-ONBOARD)
+Packet: [P6-ONBOARD.md](P6-ONBOARD.md), "Owner checks" and "Known limits" (From review).
+- [ ] Desktop Chrome and a phone, on a new closed documents store's Setup page: press 'Start a privacy page' and 'Start a returns page', open each with 'Read your … page', press I've read it on one, save the other in the editor, and see the step done. Check that the words make clear an untouched starter keeps the store from opening (P6-DRILLS stage G).
+- [ ] Read the new checklist words as a founder would: 'Start your store', the design hints, the three legal-pages hints, the open-store legal-pages hints and the new Launch hint.
+- [ ] Accept or reject that 'Start your store' ticks as soon as any doc_home exists, including an untouched empty home the editor made (known limit).
+- [ ] Staging throwaway tenant end to end (OQ-4): Setup checklist on a closed store through first publish. Any COD test order goes to snehal@mediastic.in and is cancelled after.
+
+### Batch 2 review fixes (P6-FIX2)
+Packet: [P6-FIX2.md](P6-FIX2.md), "Owner checks" and "Known limits" (From review).
+- [ ] Read the new FIRST_RUN_HALF_WORDS sentences in lib/first-run/generate.js as a founder. They show only through POST /api/admin/first-run's message. The start page, FirstRun.js (not this item's file), keeps its own words.
+- [ ] Accept the '#1' rule line: if only letters follow '#1', it is a claim unless one letter repeats ('#1fff') or it is the 3-digit form ('#1ab'). The alternative is to ask for a word list.
+- [ ] Confirm the P6-NAV deviation the review named: an open documents store with no brand step keeps today's dashboard nudge.
+- [ ] The design-alone race is still narrowed, not closed (P6-FIX1 known limit). Closing it needs a guard inside createFirstRunDocuments in lib/documents/service.js.
+- [ ] CI sqld download: unchanged. Nothing under .github/ was touched, and its source and checksum still need the owner's approval.
+- [ ] Staging end to end on the throwaway tenant (OQ-4): not done.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
