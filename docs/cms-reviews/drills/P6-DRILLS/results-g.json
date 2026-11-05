@@ -1,0 +1,215 @@
+{
+  "id": "P6-DRILLS",
+  "part": "g",
+  "title": "P6-DRILLS — g",
+  "ranAt": "2026-11-05T06:19:42.327Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 15,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the storefront is still the closed page (at the start)",
+      "detail": {
+        "status": 200,
+        "openingSoon": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "/admin/setup shows 'Add your legal pages' with 'Start a privacy page' and 'Start a returns page'",
+      "detail": {
+        "step": {
+          "id": "policies",
+          "label": "Add your legal pages",
+          "kind": "auto",
+          "done": false,
+          "href": "/admin/editor?list=pages",
+          "hint": "Your store can't open without a privacy page and a returns page. Start each from a template, then read it and save it.",
+          "actions": [
+            {
+              "type": "startPolicy",
+              "kind": "privacy",
+              "label": "Start a privacy page"
+            },
+            {
+              "type": "startPolicy",
+              "kind": "returns",
+              "label": "Start a returns page"
+            }
+          ]
+        },
+        "ui": "Add your legal pages Auto Your store can't open without a privacy page and a returns page. Start each from a template, then read it and save it. Start a privacy page Start a returns page These are starting points, not legal advice. Open"
+      }
+    },
+    {
+      "ok": true,
+      "label": "'Start a privacy page' makes a starter draft (marked as the starter's, not published)",
+      "detail": {
+        "id": "doc_iwfi2ato2v2wv3nu",
+        "type": "page",
+        "slug": "privacy-policy",
+        "label": "Privacy policy",
+        "revision": 1,
+        "updated_by": "system:policy-starter",
+        "published_version_id": null,
+        "draft_hash": "d75a87a2378803088dbc4077f21c61cba085ad039ec5819239d7875a970e087e",
+        "published_hash": null,
+        "archived_at": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "the step stays not done and now shows 'Read your privacy page'",
+      "detail": {
+        "done": false,
+        "actions": [
+          "link:Read your privacy page",
+          "markPolicyRead:I've read it",
+          "startPolicy:Start a returns page"
+        ],
+        "ui": "Add your legal pages Auto Your store can't open without a privacy page and a returns page. Start each from a template, then read it and save it. Read your privacy page I've read it Start a returns page These are starting points, not legal advice. Open"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the storefront is still the closed page (after starting the privacy page)",
+      "detail": {
+        "status": 200,
+        "openingSoon": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "replaying the same POST is refused: 'You already have a privacy page…'",
+      "detail": {
+        "status": 409,
+        "code": "POLICY_PAGE_EXISTS",
+        "error": "You already have a privacy page: Privacy policy. Open it to read it."
+      }
+    },
+    {
+      "ok": true,
+      "label": "still exactly one privacy page",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the founder changes one sentence of the privacy page and the editor saves it",
+      "detail": {
+        "updated_by": "merchant:u_e57ab2f89bf8b8f1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "with only the privacy page saved, the step is still not done and offers 'Start a returns page'",
+      "detail": [
+        "startPolicy:Start a returns page"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the returns starter is made; the step is still not done (an unread starter never counts)",
+      "detail": {
+        "done": false,
+        "terms": {
+          "id": "doc_hynljekfjzjqjgro",
+          "type": "page",
+          "slug": "terms",
+          "label": "Terms of service",
+          "revision": 1,
+          "updated_by": "system:policy-starter",
+          "published_version_id": null,
+          "draft_hash": "7eda12aa973266f1a6e0c35b57b813880d536d5d305e8212751baa3d61a27864",
+          "published_hash": null,
+          "archived_at": null
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the checklist shows 'Read your returns page' and 'I've read it'",
+      "detail": "Add your legal pages Auto We started your returns page from a template. It's a starting point, not legal advice: read it, change what you need and save it, or press I've read it if it is right as it is. Read your returns page I've read it These are starting points, not legal advice. Open"
+    },
+    {
+      "ok": true,
+      "label": "after \"I've read it\" (no edit) the step is done; the returns page counts as the founder's and is still a draft",
+      "detail": {
+        "done": true,
+        "terms": {
+          "id": "doc_hynljekfjzjqjgro",
+          "type": "page",
+          "slug": "terms",
+          "label": "Terms of service",
+          "revision": 2,
+          "updated_by": "merchant:u_e57ab2f89bf8b8f1",
+          "published_version_id": null,
+          "draft_hash": "7eda12aa973266f1a6e0c35b57b813880d536d5d305e8212751baa3d61a27864",
+          "published_hash": null,
+          "archived_at": null
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "nothing was published by any of it",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the storefront is still the closed page (at the end)",
+      "detail": {
+        "status": 200,
+        "openingSoon": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "no page errors",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "seeded (--p6 --stage g): the p6 store on p6.localhost (stage g) is a documents store with no live release: 24 products, 6 collections, 0 documents, latest sync complete; the closed store is parked. Login and ids: .design-data/p6-seed.json. 1.5s"
+  ],
+  "screenshots": [
+    {
+      "name": "g-setup-start-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/g-setup-start-1440.png",
+      "bytes": 30926,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/setup"
+    },
+    {
+      "name": "g-setup-privacy-started-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/g-setup-privacy-started-1440.png",
+      "bytes": 34109,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/setup"
+    },
+    {
+      "name": "g-setup-returns-started-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/g-setup-returns-started-1440.png",
+      "bytes": 34642,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/setup"
+    },
+    {
+      "name": "g-setup-done-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/g-setup-done-1440.png",
+      "bytes": 35250,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/setup"
+    }
+  ]
+}

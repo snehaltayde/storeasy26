@@ -1,0 +1,188 @@
+{
+  "steps": [
+    {
+      "id": "connect",
+      "label": "Connect Shopify",
+      "hint": "OAuth connect — the catalog syncs from your store.",
+      "kind": "auto",
+      "href": "/admin/integrations",
+      "done": false,
+      "gated": false,
+      "actions": null
+    },
+    {
+      "id": "catalog",
+      "label": "Bring in your products",
+      "hint": "24 products in",
+      "kind": "auto",
+      "href": "/admin/settings#catalog-sync",
+      "done": true,
+      "gated": false,
+      "actions": null
+    },
+    {
+      "id": "brand",
+      "label": "Pick a theme & brand",
+      "hint": "Apply a kit, set your accent color.",
+      "kind": "auto",
+      "href": "/admin/theme",
+      "done": false,
+      "gated": false,
+      "actions": null
+    },
+    {
+      "id": "policies",
+      "label": "Publish legal pages",
+      "hint": "Privacy + terms/refund — templates scaffold them; checkout links them.",
+      "kind": "auto",
+      "href": "/admin/storefront",
+      "done": false,
+      "gated": false,
+      "actions": null
+    },
+    {
+      "id": "billing",
+      "label": "Activate billing",
+      "hint": "Pick a plan (Free counts) — explicit, never silent.",
+      "kind": "auto",
+      "href": "/admin/billing",
+      "done": false,
+      "gated": false,
+      "actions": null
+    },
+    {
+      "id": "domain",
+      "label": "Point your domain",
+      "hint": "A custom host (operator adds + verifies it).",
+      "kind": "auto",
+      "href": "/admin/settings",
+      "done": false,
+      "gated": false,
+      "actions": null
+    },
+    {
+      "id": "preview",
+      "label": "Review your draft preview",
+      "hint": "Walk the storefront in the preview pane, then mark done.",
+      "kind": "manual",
+      "href": "/admin/storefront",
+      "done": false,
+      "gated": false,
+      "actions": null
+    },
+    {
+      "id": "test_order",
+      "label": "Place a test order",
+      "hint": "One COD test order end-to-end (cancel it after).",
+      "kind": "manual",
+      "href": "/checkout",
+      "done": false,
+      "gated": false,
+      "actions": null
+    },
+    {
+      "id": "launch",
+      "label": "Launch",
+      "hint": "Unlocks when everything above is done.",
+      "kind": "manual",
+      "href": "/admin/releases",
+      "done": false,
+      "gated": true,
+      "actions": null
+    }
+  ],
+  "apiStatus": 200,
+  "doneCount": 1,
+  "total": 9,
+  "setupText": "Setup Everything between here and your first sale. Most steps tick themselves off as the work lands; the last three are your call. Getting your store live 1/9 Connect Shopify Auto OAuth connect — the catalog syncs from your store. Open Bring in your products Auto 24 products in Pick a theme & brand Auto Apply a kit, set your accent color. Open Publish legal pages Auto Privacy + terms/refund — templates scaffold them; checkout links them. Open Activate billing Auto Pick a plan (Free counts) — explicit, never silent. Open Point your domain Auto A custom host (operator adds + verifies it). Open Review your draft preview You confirm Walk the storefront in the preview pane, then mark done. Open Mark done Place a test order You confirm One COD test order end-to-end (cancel it after). Open Mark done Launch You confirm Unlocks when everything above is done. Launch",
+  "setupButtons": [
+    "Mark done",
+    "Mark done",
+    "Launch"
+  ],
+  "startView": {
+    "status": 404,
+    "landed": "/admin/start",
+    "text": "404 This page isn’t on Fernway Goods’s shelves The page you're looking for doesn't exist or may have moved. Back to home Browse collections Search products"
+  },
+  "storefront": {
+    "status": 200,
+    "header": [],
+    "footer": [],
+    "headerText": "Fernway Goods Shop all CreatineOmegaPre-workoutProteinShop allVitamins",
+    "footerText": "Fernway Goods Shop Fernway Goods online. Shop All collections Creatine Omega Pre-workout Protein Shop all Company Contact Support help@p6.test © Fernway Goods",
+    "headerLinks": [
+      [
+        "Fernway Goods",
+        "/"
+      ],
+      [
+        "Shop all",
+        "/collections"
+      ],
+      [
+        "Creatine",
+        "/collections/creatine"
+      ],
+      [
+        "Omega",
+        "/collections/omega"
+      ],
+      [
+        "Pre-workout",
+        "/collections/pre-workout"
+      ],
+      [
+        "Protein",
+        "/collections/protein"
+      ],
+      [
+        "Shop all",
+        "/collections/shop-all"
+      ],
+      [
+        "Vitamins",
+        "/collections/vitamins"
+      ]
+    ],
+    "footerLinks": [
+      [
+        "All collections",
+        "/collections"
+      ],
+      [
+        "Creatine",
+        "/collections/creatine"
+      ],
+      [
+        "Omega",
+        "/collections/omega"
+      ],
+      [
+        "Pre-workout",
+        "/collections/pre-workout"
+      ],
+      [
+        "Protein",
+        "/collections/protein"
+      ],
+      [
+        "Shop all",
+        "/collections/shop-all"
+      ],
+      [
+        "Contact",
+        "/contact"
+      ],
+      [
+        "help@p6.test",
+        "mailto:help@p6.test"
+      ]
+    ],
+    "masked": {
+      "header": "<head></head>\n<header class=\"sticky top-0 z-30 bg-header text-header-fg\">\n  <div class=\"mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6\">\n    <a class=\"shrink-0 text-xl font-extrabold tracking-tight\" href=\"/\">\n      Fernway Goods\n    </a>\n    <div class=\"hidden flex-1 md:block\">\n      <div class=\"relative w-full\">\n        <form class=\"relative\">\n          <span class=\"pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sf-text-faint\">\n            <svg fill=\"none\" height=\"18\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-width=\"2\" viewbox=\"0 0 24 24\" width=\"18\">\n              <circle cx=\"11\" cy=\"11\" r=\"7\"></circle>\n              <path d=\"m20 20-3.2-3.2\"></path>\n            </svg>\n          </span>\n          <input aria-autocomplete=\"list\" aria-expanded=\"false\" aria-label=\"Search products\" class=\"w-full rounded-full border border-sf-border bg-sf-surface-muted py-2.5 pl-11 pr-4 text-sm text-sf-text outline-none transition focus:border-sf-border-hover focus:bg-sf-surface\" placeholder=\"Search products…\" role=\"combobox\" type=\"search\" value>\n        </form>\n      </div>\n    </div>\n    <nav class=\"ml-auto hidden items-center gap-6 text-sm font-medium md:flex\">\n      <a class=\"text-header-muted transition hover:text-header-fg\" href=\"/collections\">\n        Shop all\n      </a>\n    </nav>\n    <a aria-label=\"Wishlist\" class=\"shrink-0 p-1 text-header-muted transition hover:text-header-fg\" href=\"/wishlist\">\n      <svg fill=\"none\" height=\"20\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" viewbox=\"0 0 24 24\" width=\"20\">\n        <path d=\"M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z\"></path>\n      </svg>\n    </a>\n    <a aria-label=\"Your account\" class=\"shrink-0 p-1 text-header-muted transition hover:text-header-fg\" href=\"/account\">\n      <svg fill=\"none\" height=\"20\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" viewbox=\"0 0 24 24\" width=\"20\">\n        <circle cx=\"12\" cy=\"8\" r=\"4\"></circle>\n        <path d=\"M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5\"></path>\n      </svg>\n    </a>\n    <button aria-label=\"Open cart, 0 items\" class=\"relative inline-flex h-10 w-10 items-center justify-center rounded-full text-header-fg transition hover:bg-header-fg/10\" type=\"button\">\n      <svg fill=\"none\" height=\"22\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.8\" viewbox=\"0 0 24 24\" width=\"22\">\n        <path d=\"M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z\"></path>\n        <path d=\"M3 6h18\"></path>\n        <path d=\"M16 10a4 4 0 0 1-8 0\"></path>\n      </svg>\n    </button>\n  </div>\n  <div class=\"px-4 pb-3 md:hidden\">\n    <div class=\"relative w-full\">\n      <form class=\"relative\">\n        <span class=\"pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sf-text-faint\">\n          <svg fill=\"none\" height=\"18\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-width=\"2\" viewbox=\"0 0 24 24\" width=\"18\">\n            <circle cx=\"11\" cy=\"11\" r=\"7\"></circle>\n            <path d=\"m20 20-3.2-3.2\"></path>\n          </svg>\n        </span>\n        <input aria-autocomplete=\"list\" aria-expanded=\"false\" aria-label=\"Search products\" class=\"w-full rounded-full border border-sf-border bg-sf-surface-muted py-2.5 pl-11 pr-4 text-sm text-sf-text outline-none transition focus:border-sf-border-hover focus:bg-sf-surface\" placeholder=\"Search products…\" role=\"combobox\" type=\"search\" value>\n      </form>\n    </div>\n  </div>\n  <nav class=\"border-t border-header-fg/10\">\n    <div class=\"no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto px-3 sm:px-5\">\n      <a class=\"whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg\" href=\"/collections/creatine\">\n        Creatine\n      </a>\n      <a class=\"whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg\" href=\"/collections/omega\">\n        Omega\n      </a>\n      <a class=\"whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg\" href=\"/collections/pre-workout\">\n        Pre-workout\n      </a>\n      <a class=\"whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg\" href=\"/collections/protein\">\n        Protein\n      </a>\n      <a class=\"whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg\" href=\"/collections/shop-all\">\n        Shop all\n      </a>\n      <a class=\"whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg\" href=\"/collections/vitamins\">\n        Vitamins\n      </a>\n    </div>\n  </nav>\n</header>",
+      "footer": "<head></head>\n<footer class=\"mt-20 border-t border-sf-border-soft bg-sf-surface-muted\">\n  <div class=\"mx-auto max-w-7xl px-4 py-12 sm:px-6\">\n    <div class=\"grid gap-8 sm:grid-cols-2 lg:grid-cols-4\">\n      <div>\n        <p class=\"text-xl font-extrabold\">\n          Fernway Goods\n        </p>\n        <p class=\"mt-3 max-w-sm text-sm text-sf-text-subtle\">\n          Shop Fernway Goods online.\n        </p>\n      </div>\n      <div>\n        <p class=\"mb-3 text-sm font-semibold text-sf-text\">\n          Shop\n        </p>\n        <ul class=\"space-y-2 text-sm text-sf-text-subtle\">\n          <li>\n            <a class=\"hover:text-sf-text\" href=\"/collections\">\n              All collections\n            </a>\n          </li>\n          <li>\n            <a class=\"hover:text-sf-text\" href=\"/collections/creatine\">\n              Creatine\n            </a>\n          </li>\n          <li>\n            <a class=\"hover:text-sf-text\" href=\"/collections/omega\">\n              Omega\n            </a>\n          </li>\n          <li>\n            <a class=\"hover:text-sf-text\" href=\"/collections/pre-workout\">\n              Pre-workout\n            </a>\n          </li>\n          <li>\n            <a class=\"hover:text-sf-text\" href=\"/collections/protein\">\n              Protein\n            </a>\n          </li>\n          <li>\n            <a class=\"hover:text-sf-text\" href=\"/collections/shop-all\">\n              Shop all\n            </a>\n          </li>\n        </ul>\n      </div>\n      <div>\n        <p class=\"mb-3 text-sm font-semibold text-sf-text\">\n          Company\n        </p>\n        <ul class=\"space-y-2 text-sm text-sf-text-subtle\">\n          <li>\n            <a class=\"hover:text-sf-text\" href=\"/contact\">\n              Contact\n            </a>\n          </li>\n        </ul>\n      </div>\n      <div>\n        <p class=\"mb-3 text-sm font-semibold text-sf-text\">\n          Support\n        </p>\n        <ul class=\"space-y-2 text-sm text-sf-text-subtle\">\n          <li>\n            <a class=\"hover:text-sf-text\" href=\"mailto:help@p6.test\">\n              help@p6.test\n            </a>\n          </li>\n        </ul>\n      </div>\n    </div>\n    <p class=\"mt-10 border-t border-sf-border pt-6 text-xs text-sf-text-faint\">\n      © Fernway Goods\n    </p>\n  </div>\n</footer>"
+    }
+  },
+  "errors": []
+}

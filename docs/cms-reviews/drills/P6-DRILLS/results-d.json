@@ -1,0 +1,161 @@
+{
+  "id": "P6-DRILLS",
+  "part": "d",
+  "title": "P6-DRILLS — d",
+  "ranAt": "2026-11-05T06:18:16.786Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 10,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the stage seed: checkout off, and a privacy page and a terms page the founder has saved",
+      "detail": {
+        "checkout": "disabled",
+        "privacy": "merchant:u_e57ab2f89bf8b8f1",
+        "returns": "merchant:u_e57ab2f89bf8b8f1",
+        "policies": {
+          "privacy": {
+            "id": "doc_eookt6gmiiwf4poi",
+            "slug": "privacy-policy"
+          },
+          "returns": {
+            "id": "doc_gdy7nwr3jmjvqqxs",
+            "slug": "terms"
+          }
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout off: the panel shows the payment block with 'Open Settings' to /admin/settings#commerce",
+      "detail": {
+        "id": "payment",
+        "level": "block",
+        "text": "Must fix Checkout is turned off Checkout is turned off, so shoppers can't pay. Turn it on in Settings. Open Settings",
+        "buttons": [],
+        "link": "/admin/settings#commerce",
+        "linkText": "Open Settings"
+      }
+    },
+    {
+      "ok": true,
+      "label": "payment is the only block (the saved policy pages go live too)",
+      "detail": {
+        "payment": "block",
+        "privacy": "info",
+        "returns": "info",
+        "test_order": "warn",
+        "catalog": "ok",
+        "contact": "ok",
+        "design": "info"
+      }
+    },
+    {
+      "ok": true,
+      "label": "Open can't be pressed while checkout is off",
+      "detail": {
+        "text": "Open my store anyway",
+        "disabled": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "a direct open (checkOpening and confirmOpen) is refused: 409 STORE_CANNOT_TAKE_PAYMENT, nothing live",
+      "detail": {
+        "status": 409,
+        "code": "STORE_CANNOT_TAKE_PAYMENT",
+        "message": "Your store can't open until shoppers can pay, so nothing was published. Checkout is turned off, so shoppers can't pay. Turn it on in Settings."
+      }
+    },
+    {
+      "ok": true,
+      "label": "Settings > Commerce: checkout mode set to direct and saved",
+      "detail": "direct"
+    },
+    {
+      "ok": true,
+      "label": "Check again: payment is 'Cash on delivery only' (no Razorpay keys), and Open is enabled",
+      "detail": {
+        "payment": {
+          "id": "payment",
+          "level": "info",
+          "text": "Cash on delivery only Add your Razorpay keys to take cards and UPI. Until then shoppers pay cash on delivery. Add your Razorpay keys",
+          "buttons": [],
+          "link": "/admin/settings#payments",
+          "linkText": "Add your Razorpay keys"
+        },
+        "open": {
+          "text": "Open my store anyway",
+          "disabled": false
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "open: the store is live",
+      "detail": {
+        "phase": "done"
+      }
+    },
+    {
+      "ok": true,
+      "label": "a shopper sees the open store, not lime",
+      "detail": {
+        "--accent-500": "#334155",
+        "--sf-accent": "#597194",
+        "--background": "#ffffff",
+        "--sf-text": "#0f172a",
+        "--sf-text-muted": "#585e6b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "no page errors",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "seeded (--p6 --stage d): the p6 store on p6.localhost (stage d) is a documents store with no live release: 24 products, 6 collections, 2 documents, latest sync complete; the closed store is parked. Login and ids: .design-data/p6-seed.json. 1.5s"
+  ],
+  "screenshots": [
+    {
+      "name": "d-panel-checkout-off-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/d-panel-checkout-off-1440.png",
+      "bytes": 31693,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "d-settings-checkout-on-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/d-settings-checkout-on-1440.png",
+      "bytes": 31853,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/settings"
+    },
+    {
+      "name": "d-panel-checkout-on-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/d-panel-checkout-on-1440.png",
+      "bytes": 28871,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "d-live-home-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/d-live-home-1440.png",
+      "bytes": 45942,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

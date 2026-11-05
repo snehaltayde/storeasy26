@@ -1,0 +1,101 @@
+{
+  "id": "P6-DRILLS",
+  "ranAt": "2026-11-05T06:16:08.492Z",
+  "finishedAt": "2026-11-05T06:19:47.188Z",
+  "stages": [
+    "baseline",
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "final"
+  ],
+  "rows": [
+    {
+      "stage": "baseline",
+      "exit": 0,
+      "seconds": 14,
+      "passed": 5,
+      "failed": 0,
+      "known": 0,
+      "results": "results-baseline.json"
+    },
+    {
+      "stage": "a",
+      "exit": 0,
+      "seconds": 15,
+      "passed": 17,
+      "failed": 0,
+      "known": 0,
+      "results": "results-a.json"
+    },
+    {
+      "stage": "b",
+      "exit": 0,
+      "seconds": 31,
+      "passed": 28,
+      "failed": 0,
+      "known": 0,
+      "results": "results-b.json"
+    },
+    {
+      "stage": "c",
+      "exit": 0,
+      "seconds": 42,
+      "passed": 42,
+      "failed": 0,
+      "known": 0,
+      "results": "results-c.json"
+    },
+    {
+      "stage": "d",
+      "exit": 0,
+      "seconds": 26,
+      "passed": 10,
+      "failed": 0,
+      "known": 0,
+      "results": "results-d.json"
+    },
+    {
+      "stage": "e",
+      "exit": 0,
+      "seconds": 33,
+      "passed": 20,
+      "failed": 0,
+      "known": 0,
+      "results": "results-e.json"
+    },
+    {
+      "stage": "f",
+      "exit": 0,
+      "seconds": 35,
+      "passed": 13,
+      "failed": 0,
+      "known": 0,
+      "results": "results-f.json"
+    },
+    {
+      "stage": "g",
+      "exit": 0,
+      "seconds": 17,
+      "passed": 15,
+      "failed": 0,
+      "known": 0,
+      "results": "results-g.json"
+    },
+    {
+      "stage": "final",
+      "exit": 0,
+      "seconds": 5,
+      "passed": 10,
+      "failed": 0,
+      "known": 0,
+      "results": "results-final.json"
+    }
+  ],
+  "passed": 160,
+  "failed": 0
+}

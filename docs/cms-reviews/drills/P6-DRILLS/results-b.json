@@ -1,0 +1,462 @@
+{
+  "id": "P6-DRILLS",
+  "part": "b",
+  "title": "P6-DRILLS — b",
+  "ranAt": "2026-11-05T06:17:09.164Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 28,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the store is made when the founder opens /admin/start",
+      "detail": "ready"
+    },
+    {
+      "ok": true,
+      "label": "the brand step preselects Slate (the generated store's palette)",
+      "detail": "slate"
+    },
+    {
+      "ok": true,
+      "label": "the PNG uploaded through the MediaPicker becomes the logo (a library address)",
+      "detail": {
+        "logoSrc": "/api/media/med_5def212674bbd84c21",
+        "altFromUpload": ""
+      }
+    },
+    {
+      "ok": true,
+      "label": "Save: 'Saved.', the colours and logo show after publish, the description once the store opens",
+      "detail": "Saved. Your description is saved. Shoppers see it once you open your store. Your colours and logo are saved. They show after you publish. See it in the preview Review and open your store"
+    },
+    {
+      "ok": true,
+      "label": "the design draft holds the Forest palette",
+      "detail": {
+        "accent": "#166534",
+        "background": "#fffbf7",
+        "foreground": "#1c1917",
+        "radius": "md",
+        "type_scale": "regular",
+        "button_shape": "pill",
+        "section_spacing": "regular",
+        "accent_label": "#0a0a0b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the design draft holds the logo with no alt (empty alt is left out)",
+      "detail": {
+        "media": "/api/media/med_5def212674bbd84c21"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the brand step is recorded (Forest) and the description saved as the store's tagline",
+      "detail": {
+        "brandStep": {
+          "at": "2026-11-05T06:16:47.457Z",
+          "skipped": false,
+          "paletteId": "forest"
+        },
+        "tagline": "Everyday nutrition, snacks and gym kit, packed with care."
+      }
+    },
+    {
+      "ok": true,
+      "label": "the preview's header shows the logo, alt = the store name (\"Fernway Goods\")",
+      "detail": [
+        {
+          "src": "/api/media/med_5def212674bbd84c21",
+          "alt": "Fernway Goods",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the preview's footer shows the logo, alt = the store name",
+      "detail": [
+        {
+          "src": "/api/media/med_5def212674bbd84c21",
+          "alt": "Fernway Goods",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the preview's accent is Forest (#166534)",
+      "detail": {
+        "--accent-500": "#166534",
+        "--sf-accent": "#29ba60",
+        "--background": "#fffbf7",
+        "--sf-text": "#1c1917",
+        "--sf-text-muted": "#615e5b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "forest: changing the accent in the editor's design settings saves the draft (#7c3aed)",
+      "detail": {
+        "accent": "#7c3aed",
+        "background": "#fffbf7",
+        "foreground": "#1c1917",
+        "radius": "md",
+        "type_scale": "regular",
+        "button_shape": "pill",
+        "section_spacing": "regular",
+        "accent_label": "#0a0a0b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "forest: the reset button says 'Go back to your starting colours (Forest)'",
+      "detail": "Go back to your starting colours (Forest)"
+    },
+    {
+      "ok": true,
+      "label": "forest: after Reset the draft brand equals the Forest palette, key for key",
+      "detail": {
+        "draft": {
+          "accent": "#166534",
+          "background": "#fffbf7",
+          "foreground": "#1c1917",
+          "radius": "md",
+          "type_scale": "regular",
+          "button_shape": "pill",
+          "section_spacing": "regular",
+          "accent_label": "#0a0a0b"
+        },
+        "palette": {
+          "accent": "#166534",
+          "background": "#fffbf7",
+          "foreground": "#1c1917",
+          "radius": "md",
+          "type_scale": "regular",
+          "button_shape": "pill",
+          "section_spacing": "regular",
+          "accent_label": "#0a0a0b"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "forest: the design form's colour inputs and placeholders hold no lime; the accent input says #166534",
+      "detail": {
+        "inputs": [
+          {
+            "id": "",
+            "type": "color",
+            "value": "#166534",
+            "placeholder": "",
+            "label": "Accent colour picker"
+          },
+          {
+            "id": "f-doc-brand-accent",
+            "type": "text",
+            "value": "#166534",
+            "placeholder": "#166534",
+            "label": "Accent colour"
+          },
+          {
+            "id": "",
+            "type": "color",
+            "value": "#fffbf7",
+            "placeholder": "",
+            "label": "Background colour picker"
+          },
+          {
+            "id": "f-doc-brand-background",
+            "type": "text",
+            "value": "#fffbf7",
+            "placeholder": "#166534",
+            "label": "Background colour"
+          },
+          {
+            "id": "",
+            "type": "color",
+            "value": "#1c1917",
+            "placeholder": "",
+            "label": "Text colour picker"
+          },
+          {
+            "id": "f-doc-brand-foreground",
+            "type": "text",
+            "value": "#1c1917",
+            "placeholder": "#166534",
+            "label": "Text colour"
+          }
+        ],
+        "limeIn": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "forest: the stored design draft holds no #84cc16",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "forest: the preview's computed --accent-500 is #166534 (Forest), not lime",
+      "detail": {
+        "--accent-500": "#166534",
+        "--sf-accent": "#29ba60",
+        "--background": "#fffbf7",
+        "--sf-text": "#1c1917",
+        "--sf-text-muted": "#615e5b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "no page errors (Forest run)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "Skip: 'Skipped. You can come back to this any time.'",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "Skip records the step and leaves the design draft on Slate with no logo",
+      "detail": {
+        "brandStep": {
+          "at": "2026-11-05T06:17:01.680Z",
+          "skipped": true
+        },
+        "brand": {
+          "accent": "#334155",
+          "background": "#ffffff",
+          "foreground": "#0f172a",
+          "radius": "md",
+          "type_scale": "regular",
+          "button_shape": "pill",
+          "section_spacing": "regular",
+          "accent_label": "#ffffff"
+        },
+        "logo": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "after Skip the preview shows the text wordmark (no logo picture) in the header and footer",
+      "detail": {
+        "header": "Fernway Goods Creatine Omega Pre-workout Protein Shop all Vi",
+        "imgs": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "after Skip the preview's accent is Slate (#334155)",
+      "detail": {
+        "--accent-500": "#334155",
+        "--sf-accent": "#597194",
+        "--background": "#ffffff",
+        "--sf-text": "#0f172a",
+        "--sf-text-muted": "#585e6b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "skip: changing the accent in the editor's design settings saves the draft (#7c3aed)",
+      "detail": {
+        "accent": "#7c3aed",
+        "background": "#ffffff",
+        "foreground": "#0f172a",
+        "radius": "md",
+        "type_scale": "regular",
+        "button_shape": "pill",
+        "section_spacing": "regular",
+        "accent_label": "#0a0a0b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "skip: the reset button says 'Go back to your starting colours (Slate)'",
+      "detail": "Go back to your starting colours (Slate)"
+    },
+    {
+      "ok": true,
+      "label": "skip: after Reset the draft brand equals the Slate palette, key for key",
+      "detail": {
+        "draft": {
+          "accent": "#334155",
+          "background": "#ffffff",
+          "foreground": "#0f172a",
+          "radius": "md",
+          "type_scale": "regular",
+          "button_shape": "pill",
+          "section_spacing": "regular",
+          "accent_label": "#ffffff"
+        },
+        "palette": {
+          "accent": "#334155",
+          "background": "#ffffff",
+          "foreground": "#0f172a",
+          "radius": "md",
+          "type_scale": "regular",
+          "button_shape": "pill",
+          "section_spacing": "regular",
+          "accent_label": "#ffffff"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "skip: the design form's colour inputs and placeholders hold no lime; the accent input says #334155",
+      "detail": {
+        "inputs": [
+          {
+            "id": "",
+            "type": "color",
+            "value": "#334155",
+            "placeholder": "",
+            "label": "Accent colour picker"
+          },
+          {
+            "id": "f-doc-brand-accent",
+            "type": "text",
+            "value": "#334155",
+            "placeholder": "#334155",
+            "label": "Accent colour"
+          },
+          {
+            "id": "",
+            "type": "color",
+            "value": "#ffffff",
+            "placeholder": "",
+            "label": "Background colour picker"
+          },
+          {
+            "id": "f-doc-brand-background",
+            "type": "text",
+            "value": "#ffffff",
+            "placeholder": "#334155",
+            "label": "Background colour"
+          },
+          {
+            "id": "",
+            "type": "color",
+            "value": "#0f172a",
+            "placeholder": "",
+            "label": "Text colour picker"
+          },
+          {
+            "id": "f-doc-brand-foreground",
+            "type": "text",
+            "value": "#0f172a",
+            "placeholder": "#334155",
+            "label": "Text colour"
+          }
+        ],
+        "limeIn": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "skip: the stored design draft holds no #84cc16",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "skip: the preview's computed --accent-500 is #334155 (Slate), not lime",
+      "detail": {
+        "--accent-500": "#334155",
+        "--sf-accent": "#597194",
+        "--background": "#ffffff",
+        "--sf-text": "#0f172a",
+        "--sf-text-muted": "#585e6b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "no page errors (Skip run)",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "seeded (--p6 --stage b): the p6 store on p6.localhost (stage b) is a documents store with no live release: 24 products, 6 collections, 0 documents, latest sync complete; the closed store is parked. Login and ids: .design-data/p6-seed.json. 1.4s",
+    "seeded (--p6 --stage b): the p6 store on p6.localhost (stage b) is a documents store with no live release: 24 products, 6 collections, 0 documents, latest sync complete; the closed store is parked. Login and ids: .design-data/p6-seed.json. 1.5s"
+  ],
+  "screenshots": [
+    {
+      "name": "b-brand-step-filled-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/b-brand-step-filled-1440.png",
+      "bytes": 27567,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/start"
+    },
+    {
+      "name": "b-brand-step-saved-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/b-brand-step-saved-1440.png",
+      "bytes": 29831,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/start"
+    },
+    {
+      "name": "b-preview-forest-logo-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/b-preview-forest-logo-1440.png",
+      "bytes": 35789,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "b-forest-design-changed-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/b-forest-design-changed-1440.png",
+      "bytes": 37419,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "b-forest-design-reset-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/b-forest-design-reset-1440.png",
+      "bytes": 41387,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "b-skip-preview-slate-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/b-skip-preview-slate-1440.png",
+      "bytes": 36783,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "b-skip-design-changed-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/b-skip-design-changed-1440.png",
+      "bytes": 38081,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "b-skip-design-reset-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/b-skip-design-reset-1440.png",
+      "bytes": 42624,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    }
+  ]
+}

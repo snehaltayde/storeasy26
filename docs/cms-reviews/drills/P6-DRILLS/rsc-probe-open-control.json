@@ -1,0 +1,539 @@
+{
+  "base": "http://localhost:6100/",
+  "contentStrings": 2264,
+  "sample": [
+    "New: the spring edit is coming soon",
+    "Privacy Policy",
+    "Terms Of Service",
+    "Refund Policy",
+    "Shipping Policy",
+    "Cancellation Policy",
+    "Cookie Policy",
+    "Size Guide",
+    "Ingredients Glossary",
+    "Lab Reports",
+    "Skin first. Makeup second.",
+    "Skin first"
+  ],
+  "droppedAsCatalogOrName": 27,
+  "requests": 64,
+  "withLeaks": 44,
+  "statuses": [
+    200,
+    404
+  ],
+  "leaks": [
+    {
+      "path": "/",
+      "kind": "html",
+      "cookies": "none",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/",
+      "kind": "rsc",
+      "cookies": "none",
+      "leaks": [
+        "Skin first. Makeup second.",
+        "Skin first",
+        "Clinically-tested routines for Indian skin — serums, SPF and repair that actually show up in the mirror.",
+        "Shop bestsellers",
+        "This weekend only"
+      ]
+    },
+    {
+      "path": "/",
+      "kind": "html",
+      "cookies": "_admin",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "leaks": [
+        "Skin first. Makeup second.",
+        "Skin first",
+        "Clinically-tested routines for Indian skin — serums, SPF and repair that actually show up in the mirror.",
+        "Shop bestsellers",
+        "This weekend only"
+      ]
+    },
+    {
+      "path": "/",
+      "kind": "html",
+      "cookies": "_platform",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "leaks": [
+        "Skin first. Makeup second.",
+        "Skin first",
+        "Clinically-tested routines for Indian skin — serums, SPF and repair that actually show up in the mirror.",
+        "Shop bestsellers",
+        "This weekend only"
+      ]
+    },
+    {
+      "path": "/",
+      "kind": "html",
+      "cookies": "_mx",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "leaks": [
+        "Skin first. Makeup second.",
+        "Skin first",
+        "Clinically-tested routines for Indian skin — serums, SPF and repair that actually show up in the mirror.",
+        "Shop bestsellers",
+        "This weekend only"
+      ]
+    },
+    {
+      "path": "/contact",
+      "kind": "html",
+      "cookies": "none",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/contact",
+      "kind": "html",
+      "cookies": "_admin",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/contact",
+      "kind": "html",
+      "cookies": "_platform",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/contact",
+      "kind": "html",
+      "cookies": "_mx",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/about",
+      "kind": "html",
+      "cookies": "none",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/about",
+      "kind": "html",
+      "cookies": "_admin",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/about",
+      "kind": "html",
+      "cookies": "_platform",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/about",
+      "kind": "html",
+      "cookies": "_mx",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "html",
+      "cookies": "none",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "rsc",
+      "cookies": "none",
+      "leaks": [
+        "Shipping policy",
+        "Orders dispatch within 24 hours on business days."
+      ]
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "html",
+      "cookies": "_admin",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "leaks": [
+        "Shipping policy",
+        "Orders dispatch within 24 hours on business days."
+      ]
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "html",
+      "cookies": "_platform",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "leaks": [
+        "Shipping policy",
+        "Orders dispatch within 24 hours on business days."
+      ]
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "html",
+      "cookies": "_mx",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/policies/shipping",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "leaks": [
+        "Shipping policy",
+        "Orders dispatch within 24 hours on business days."
+      ]
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "html",
+      "cookies": "none",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "html",
+      "cookies": "_admin",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "html",
+      "cookies": "_platform",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/campaigns/spring",
+      "kind": "html",
+      "cookies": "_mx",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/journal",
+      "kind": "html",
+      "cookies": "none",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/journal",
+      "kind": "rsc",
+      "cookies": "none",
+      "leaks": [
+        "The pack is checked for everyday use with no fillers.",
+        "The pack is tested for steady energy so you can feel the difference in a few weeks.",
+        "Skin Barrier, part 1",
+        "The pack is designed around sensitive skin and ships within 24 hours."
+      ]
+    },
+    {
+      "path": "/journal",
+      "kind": "html",
+      "cookies": "_admin",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/journal",
+      "kind": "rsc",
+      "cookies": "_admin",
+      "leaks": [
+        "The pack is checked for everyday use with no fillers.",
+        "The pack is tested for steady energy so you can feel the difference in a few weeks.",
+        "Skin Barrier, part 1",
+        "The pack is designed around sensitive skin and ships within 24 hours."
+      ]
+    },
+    {
+      "path": "/journal",
+      "kind": "html",
+      "cookies": "_platform",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/journal",
+      "kind": "rsc",
+      "cookies": "_platform",
+      "leaks": [
+        "The pack is checked for everyday use with no fillers.",
+        "The pack is tested for steady energy so you can feel the difference in a few weeks.",
+        "Skin Barrier, part 1",
+        "The pack is designed around sensitive skin and ships within 24 hours."
+      ]
+    },
+    {
+      "path": "/journal",
+      "kind": "html",
+      "cookies": "_mx",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/journal",
+      "kind": "rsc",
+      "cookies": "_mx",
+      "leaks": [
+        "The pack is checked for everyday use with no fillers.",
+        "The pack is tested for steady energy so you can feel the difference in a few weeks.",
+        "Skin Barrier, part 1",
+        "The pack is designed around sensitive skin and ships within 24 hours."
+      ]
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "html",
+      "cookies": "none",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "html",
+      "cookies": "_admin",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "html",
+      "cookies": "_platform",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/journal/first-post",
+      "kind": "html",
+      "cookies": "_mx",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/collections",
+      "kind": "html",
+      "cookies": "none",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/collections",
+      "kind": "html",
+      "cookies": "_admin",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/collections",
+      "kind": "html",
+      "cookies": "_platform",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    },
+    {
+      "path": "/collections",
+      "kind": "html",
+      "cookies": "_mx",
+      "leaks": [
+        "New: the spring edit is coming soon",
+        "Privacy Policy",
+        "Terms Of Service",
+        "Refund Policy",
+        "Shipping Policy"
+      ]
+    }
+  ]
+}

@@ -2,7 +2,7 @@
   "id": "P5-DRILLS",
   "part": "console",
   "title": "P5-DRILLS — console",
-  "ranAt": "2026-11-05T01:13:46.782Z",
+  "ranAt": "2026-11-05T05:27:49.209Z",
   "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 5,
@@ -103,14 +103,14 @@
     }
   ],
   "notes": [
-    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_fa8bc15fb78beebd, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.7s",
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_a13587d168ece992, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s",
     "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)"
   ],
   "screenshots": [
     {
       "name": "console-edit-form-1440",
       "file": "docs/cms-reviews/drills/P5-DRILLS/console-edit-form-1440.png",
-      "bytes": 30500,
+      "bytes": 30846,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -119,7 +119,7 @@
     {
       "name": "console-saved-1440",
       "file": "docs/cms-reviews/drills/P5-DRILLS/console-saved-1440.png",
-      "bytes": 24283,
+      "bytes": 24667,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -128,7 +128,7 @@
     {
       "name": "console-live-new-price-1440",
       "file": "docs/cms-reviews/drills/P5-DRILLS/console-live-new-price-1440.png",
-      "bytes": 24827,
+      "bytes": 22447,
       "width": 720,
       "height": 450,
       "viewport": 1440,

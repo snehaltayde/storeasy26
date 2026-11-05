@@ -1,0 +1,121 @@
+{
+  "id": "P6-DRILLS",
+  "part": "baseline",
+  "title": "P6-DRILLS — baseline",
+  "ranAt": "2026-11-05T06:16:22.834Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "baseline: the probe found content strings in the P3 closed store's drafts (4)",
+      "detail": [
+        "Closed draft: not for shoppers yet",
+        "Drafts never reach shoppers before the first publish.",
+        "About the closed store",
+        "This page is a draft."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "baseline (P3-CLOSED rsc-probe): 64 anonymous requests (8 routes x 4 cookie sets x HTML and RSC: 1) to the P3 closed store carry none of its content strings",
+      "detail": {
+        "base": "http://closed.localhost:6100/",
+        "contentStrings": 4,
+        "sample": [
+          "Closed draft: not for shoppers yet",
+          "Drafts never reach shoppers before the first publish.",
+          "About the closed store",
+          "This page is a draft."
+        ],
+        "droppedAsCatalogOrName": 0,
+        "requests": 64,
+        "withLeaks": 0,
+        "statuses": [
+          200
+        ],
+        "leaks": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "baseline: the closed store's home says 'Opening soon' to every cookie set",
+      "detail": [
+        [
+          "html",
+          "none",
+          true
+        ],
+        [
+          "rsc",
+          "none",
+          true
+        ],
+        [
+          "html",
+          "_admin",
+          true
+        ],
+        [
+          "rsc",
+          "_admin",
+          true
+        ],
+        [
+          "html",
+          "_platform",
+          true
+        ],
+        [
+          "rsc",
+          "_platform",
+          true
+        ],
+        [
+          "html",
+          "_mx",
+          true
+        ],
+        [
+          "rsc",
+          "_mx",
+          true
+        ]
+      ]
+    },
+    {
+      "ok": true,
+      "label": "baseline control: the same probe on the OPEN design store finds its content in 44 of 64 answers (so a 0 above means something)",
+      "detail": {
+        "withLeaks": 44,
+        "sample": [
+          "New: the spring edit is coming soon",
+          "Privacy Policy",
+          "Terms Of Service"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "baseline: in Chrome the closed store shows 'Opening soon'",
+      "detail": null
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_25c8702b066bf218, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.7s"
+  ],
+  "screenshots": [
+    {
+      "name": "baseline-p3-closed-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/baseline-p3-closed-1440.png",
+      "bytes": 6194,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

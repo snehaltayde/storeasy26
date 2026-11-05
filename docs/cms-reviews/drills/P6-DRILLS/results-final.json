@@ -1,0 +1,133 @@
+{
+  "id": "P6-DRILLS",
+  "part": "final",
+  "title": "P6-DRILLS — final",
+  "ranAt": "2026-11-05T06:19:47.164Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 10,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "lib.mjs: assertLocal refuses addresses that are not on this machine (and the owner's port 3017)",
+      "detail": {
+        "https://shop.example.com/": "Refusing https://shop.example.com: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "http://storeasy.in/products/x": "Refusing http://storeasy.in: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "https://staging.example.com/": "Refusing https://staging.example.com: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "http://10.0.0.5:6160/": "Refusing http://10.0.0.5:6160: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "http://localhost.example.com/": "Refusing http://localhost.example.com: phase 4 drills only talk to this machine (localhost, 127.0.0.1 or ::1), never a hosted or real store.",
+        "libsql://shop-x.turso.io": "Refusing libsql:// addresses: phase 4 drills only open http or https pages on this machine.",
+        "file://other-host/x.db": "Refusing file://other-host/x.db: a file on another machine. Only files on this machine are allowed.",
+        "http://localhost:3017/": "Refusing http://localhost:3017: port 3017 is the owner's harness and a drill never uses it.",
+        "not a url": "\"not a url\" is not a full address. Phase 4 drills only use addresses on this machine, like http://localhost:6160."
+      }
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: assertLocal lets addresses on this machine through",
+      "detail": {
+        "http://localhost:6160/": null,
+        "http://127.0.0.1:7160": null,
+        "http://[::1]:6160/": null,
+        "http://closed.localhost:6160/": null,
+        "file:/tmp/x.db": null,
+        "file:.test-x.db": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: p3Ports still refuses 3017 (set or by default) and takes this run's own ports",
+      "detail": {
+        "DESIGN_PORT 3017": "Set DESIGN_PORT (and DESIGN_SQLD_PORT) to this run's own ports, for example DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880. Port 3017 is the owner's harness and a drill never uses it.",
+        "DESIGN_PORT unset (means 3017)": "Set DESIGN_PORT (and DESIGN_SQLD_PORT) to this run's own ports, for example DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880. Port 3017 is the owner's harness and a drill never uses it.",
+        "DESIGN_PORT 6160": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: priced() changes every variant's price and the price range with it",
+      "detail": {
+        "minVariantPrice": {
+          "amount": "50"
+        },
+        "maxVariantPrice": {
+          "amount": "125"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: soldOut() marks the product and every variant unavailable",
+      "detail": {
+        "availableForSale": false,
+        "variants": {
+          "nodes": [
+            {
+              "availableForSale": false
+            }
+          ]
+        },
+        "totalInventory": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: stageEnv blanks every Shopify, payment and AI key and keeps the rest",
+      "detail": {
+        "blanked": 13
+      }
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: a Shopify token in the env is noticed (the stage is refused)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "lib.mjs: the stage plans: c's returns window is 10 days, d's checkout is off, f is legacy, e's refill keeps the store; an unknown stage is refused",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "after the run: seed --p3 again, and check --p3 passes (the design store live, the closed store back on closed.localhost, no release)",
+      "detail": {
+        "mode": "documents",
+        "liveRelease": "rel_cd341c7d2609f287",
+        "closed": {
+          "mode": "documents",
+          "liveRelease": null,
+          "releases": 0,
+          "documents": 2,
+          "published": 0,
+          "publishLog": 0,
+          "domains": [
+            "closed.localhost"
+          ]
+        },
+        "refs": {
+          "publishedVersions": 43,
+          "versionsWithRefs": 25,
+          "mismatched": [],
+          "orphanRefs": 22
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "check --p3: every published version's document_refs match (none missing, none extra)",
+      "detail": {
+        "publishedVersions": 43,
+        "versionsWithRefs": 25,
+        "mismatched": [],
+        "orphanRefs": 22
+      }
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_cd341c7d2609f287, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s",
+    "check --p3 orphanRefs: 22 (checkpoint versions' refs, known since P4-MEDIA)"
+  ],
+  "screenshots": []
+}
