@@ -65,7 +65,11 @@ export const quantityFrom = (text) => {
   const n = Number(t);
   return Number.isFinite(n) ? n : t;
 };
-const emptyQuantity = (q) => q === "" || q == null || (typeof q === "string" && !Number.isFinite(Number(q)));
+// P5-FIX2 (the P5-EDITOR review): a quantity under 1 (0 or negative) counts
+// as empty too. The check and the save would clamp it to 1, so the box would
+// say 0 while the bundle stores 1; instead the row asks for a quantity and
+// nothing is checked or saved until it is 1 or more.
+export const emptyQuantity = (q) => q === "" || q == null || (typeof q === "string" && !Number.isFinite(Number(q))) || (typeof q === "number" && q < 1);
 // A picked product (a variant id from the catalog), as the bundle route
 // takes it. Anything else was stored by a web name and must be picked again.
 const PICKED = /^gid:\/\/[^/]+\/ProductVariant\/\S+$/;

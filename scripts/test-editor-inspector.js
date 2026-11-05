@@ -21,6 +21,11 @@
 //      have controls; each state's status line is the bundle-words sentence
 //      by the blocks' own rule; a pick writes { id } only; a grid keeps its
 //      order and refuses a duplicate; notes land on the control or its row.
+//   7. P5-FIX2: a pending ids= bundle reads "Checking this bundle…"; an old
+//      grid row is picked again in place; a failed read says so once; a full
+//      grid has Create off; and the editor's wiring (DocumentEditor driven
+//      with a stubbed refs fetch, EditorView rendered, editor/page.js called):
+//      the review's mutations MA, MB, MC, MD, ME, MK and ML each fail a test.
 // Everything renders with Next's own SWC and react-dom/server. No database.
 //   pnpm test:editor-inspector
 import { readFile } from "node:fs/promises";
@@ -953,6 +958,7 @@ async function mountControl(name, props) {
     option: (id) => nodes.find((n) => n.type === "button" && n.props["data-bundle-option"] === id),
     button: (label) => nodes.find((n) => n.type === "button" && n.props["aria-label"] === label),
     text: () => nodes.filter((n) => typeof n.type === "string").map((n) => textOfEl(n.props.children)).join(" "),
+    nodesAll: () => nodes,
     refused: () => {
       const n = nodes.find((x) => x.props?.["data-bundle-refused"] === "");
       return n ? textOfEl(n.props.children) : null;
@@ -1146,6 +1152,471 @@ await t("P5-SETTING review: placeableIssues leaves out only the waiting setting 
   } finally {
     Reg.removeSection("zz_waita");
     Reg.removeSection("zz_waitb");
+  }
+});
+
+// ============================== 7. P5-FIX2 =========================================
+console.log("7. P5-FIX2: the batch 2 review findings (pending reads, the grid's old rows, the failed read, the editor's wiring)");
+
+const DELETED = WORDS_OF.missing;
+const CANT_SEE = "You can't see bundles here.";
+const count = (s, w) => s.split(w).length - 1;
+const nodesLabels = (v) => v.text().slice(0, 200);
+
+await t("P5-FIX2 unit+rendered: a picked bundle whose ids= read is still pending reads 'Checking this bundle…', never 'deleted' (card and grid)", () => {
+  eq(M.bundleView("bun-far", undefined, { status: "ready", pending: ["bun-far"] }).line, "Checking this bundle…", "pending");
+  eq(M.bundleView("bun-far", undefined, { status: "ready", pending: ["bun-far"] }).chip, null, "no 'Deleted' chip while pending");
+  eq(M.bundleView("bun-far", undefined, { status: "ready", pending: ["bun-other"] }).line, DELETED, "answered and absent: deleted");
+  // bundlesWithPending: picked, not in the list, not answered
+  const b = { status: "ready", items: [row("bun-a", "available")], answered: ["bun-gone"] };
+  eq(M.bundlesWithPending(b, ["bun-a", "bun-far", "bun-gone"]).pending, ["bun-far"], "only the unanswered id is pending");
+  eq(M.bundlesWithPending({ status: "failed", items: [] }, ["bun-far"]).pending, [], "a failed read has nothing pending");
+  eq(M.bundlesWithPending(null, ["x"]).status, "loading", "no list yet");
+  const ctx = ctxOf([row("bun-a", "available")], "ready", { bundles: M.bundlesWithPending({ status: "ready", items: [row("bun-a", "available")], answered: [] }, ["bun-far", "bun-a"]) });
+  const card = render(h(BC.BundleControl, { field: cardField("sec_pd1"), value: { id: "bun-far" }, onChange: () => {}, issues: [], owner: "sec_pd1", context: ctx }));
+  eq(textIn(card, "data-bundle-status"), "Checking this bundle…", "the card");
+  ok(!card.includes("was deleted") && !card.includes(">Deleted<"), "the card never says deleted");
+  const grid = render(h(BC.BundleListControl, { field: gridField("sec_pd2"), value: [{ id: "bun-a" }, { id: "bun-far" }], onChange: () => {}, issues: [], owner: "sec_pd2", context: ctx }));
+  eq(statusLines(grid), [WORDS_OF.available, "Checking this bundle…"], "the grid's rows");
+  ok(!grid.includes("was deleted"), "no row says deleted");
+});
+
+await t("P5-FIX2 driven: a grid row stored as an old { id, title } is picked again in place (bundleList.replace): it becomes { id } at the same position and its UNKNOWN_FIELD goes", async () => {
+  const sec = { ...Reg.newSection("bundle_grid", { id: "sec_rp1" }), settings: { title: "Bundles", bundles: [{ id: "bun-a" }, { id: "bun-old", title: "Old kit" }, { id: "bun-3" }] } };
+  const before = issuesFor(Reg.fixtureDocument("home", [sec]));
+  ok(before.some((i) => i.sectionId === "sec_rp1" && i.code === "UNKNOWN_FIELD" && i.field.startsWith("bundles.1")), `UNKNOWN_FIELD on row 2: ${JSON.stringify(before.map((i) => `${i.code}@${i.field}`))}`);
+  const stored = [];
+  const v = await mountControl("BundleListControl", { field: gridField("sec_rp1"), value: sec.settings.bundles, onChange: (x) => stored.push(x), issues: before, owner: "sec_rp1", context: ctxOf([...CATALOG.bundles.items, row("bun-3", "available")]) });
+  ok(!v.button("Pick Gym kit again") && !v.button("Pick Kit bun-3 again"), "rows already { id } have no 'Pick again'");
+  const again = v.button("Pick Old kit again");
+  ok(again, `the old row has 'Pick again': ${nodesLabels(v)}`);
+  again.props.onClick();
+  eq(stored, [[{ id: "bun-a" }, { id: "bun-old" }, { id: "bun-3" }]], "written in place as { id }");
+  const after = issuesFor(Reg.fixtureDocument("home", [{ ...sec, settings: { ...sec.settings, bundles: stored[0] } }]));
+  ok(!after.some((i) => i.sectionId === "sec_rp1" && i.code === "UNKNOWN_FIELD"), "UNKNOWN_FIELD is gone");
+  ok(M.isOldBundleChoice({ id: "a", title: "x" }) && !M.isOldBundleChoice({ id: "a" }) && !M.isOldBundleChoice(null), "isOldBundleChoice");
+});
+
+await t("P5-FIX2 rendered: a failed read says 'You can't see bundles here.' once, whatever the value (an old non-{ id } value, junk, nothing, or { id })", () => {
+  for (const value of ["bun-a", 42, { title: "no id" }, null, { id: "bun-a" }]) {
+    const html = render(h(BC.BundleControl, { field: cardField("sec_fo1"), value, onChange: () => {}, issues: [], owner: "sec_fo1", context: ctxOf([], "failed", { canCreateBundles: true }) }));
+    eq(count(unescape(html), CANT_SEE), 1, `value ${JSON.stringify(value)}: the sentence once`);
+  }
+});
+
+await t("P5-FIX2 driven: a full grid turns 'Create a bundle' off and says why; one place left keeps it on", async () => {
+  const twelve = Array.from({ length: 12 }, (_, j) => ({ id: `bun-f${j}` }));
+  const full = await mountControl("BundleListControl", { field: gridField("sec_fg1"), value: twelve, onChange: () => {}, issues: [], owner: "sec_fg1", context: ctxOf([], "ready", { canCreateBundles: true }) });
+  const btn = (v) => v.nodesAll().find((n) => n.type === "button" && textOfEl(n.props.children).trim() === "Create a bundle");
+  ok(btn(full) && btn(full).props.disabled, "off on a full grid");
+  ok(full.text().includes("A grid shows at most 12 bundles."), "and says why");
+  const eleven = await mountControl("BundleListControl", { field: gridField("sec_fg2"), value: twelve.slice(1), onChange: () => {}, issues: [], owner: "sec_fg2", context: ctxOf([], "ready", { canCreateBundles: true }) });
+  ok(btn(eleven) && !btn(eleven).props.disabled && !eleven.text().includes("A grid shows at most"), "on with one place left");
+});
+
+// ---- the editor's wiring: DocumentEditor's bundle reads and context, editor/page.js --------
+// DocumentEditor runs with a one-component hook driver (its children are not
+// rendered; its <EditorView> element's props are read), the real fetchRefs
+// (components/admin/cms/RefPicker.js) over a stubbed fetch for
+// /api/admin/refs, a stubbed documents api and a stubbed document store. The
+// EditorView it hands those props to is then rendered with react-dom/server.
+async function loadWorld(file, react, stubs = {}) {
+  const cache = new Map();
+  async function load(f) {
+    if (cache.has(f)) return cache.get(f);
+    const mod = { exports: {} };
+    cache.set(f, mod.exports);
+    const code = await compile(f);
+    const deps = new Map();
+    for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
+      if (deps.has(id) || id in stubs || id === "react" || id === "react/jsx-runtime") continue;
+      if (id.startsWith("@/") || id.startsWith(".")) {
+        let target = id.startsWith("@/") ? join(ROOT, id.slice(2)) : resolve(dirname(f), id);
+        if (!target.endsWith(".js")) target = (await exists(`${target}.js`)) ? `${target}.js` : join(target, "index.js");
+        deps.set(id, isJsx(target) ? await load(target) : await import(pathToFileURL(target).href));
+      } else deps.set(id, require(id));
+    }
+    new Function("require", "module", "exports", code)((id) => (id in stubs ? stubs[id] : id === "react" ? react : id === "react/jsx-runtime" ? require("react/jsx-runtime") : deps.get(id)), mod, mod.exports);
+    return mod.exports;
+  }
+  return load(file);
+}
+function oneComponent() {
+  const box = {};
+  let cursor = 0;
+  let effects = [];
+  let dirty = false;
+  const hooks = {
+    useState(init) {
+      const k = cursor++;
+      if (!(k in box)) box[k] = typeof init === "function" ? init() : init;
+      return [
+        box[k],
+        (v) => {
+          const nv = typeof v === "function" ? v(box[k]) : v;
+          if (!Object.is(nv, box[k])) {
+            box[k] = nv;
+            dirty = true;
+          }
+        },
+      ];
+    },
+    useRef(init) {
+      const k = cursor++;
+      if (!(k in box)) box[k] = { current: init };
+      return box[k];
+    },
+    useEffect(fn, deps) {
+      const k = cursor++;
+      const prev = box[k];
+      if (prev && deps && prev.deps && deps.length === prev.deps.length && deps.every((d, i) => Object.is(d, prev.deps[i]))) return;
+      const slot = { deps, cleanup: null };
+      box[k] = slot;
+      effects.push(() => {
+        prev?.cleanup?.();
+        const c = fn();
+        slot.cleanup = typeof c === "function" ? c : null;
+      });
+    },
+    useMemo(fn, deps) {
+      const k = cursor++;
+      const prev = box[k];
+      if (prev && deps && deps.length === prev.deps.length && deps.every((d, i) => Object.is(d, prev.deps[i]))) return prev.v;
+      const v = fn();
+      box[k] = { deps, v };
+      return v;
+    },
+    useCallback(fn, deps) {
+      return hooks.useMemo(() => fn, deps);
+    },
+    useSyncExternalStore: (_sub, get) => get(),
+    useContext: () => null,
+  };
+  const react = { ...React, ...hooks, default: { ...React, ...hooks } };
+  return {
+    react,
+    async settle(Comp, props) {
+      let el = null;
+      for (let round = 0; round < 60; round++) {
+        dirty = false;
+        cursor = 0;
+        effects = [];
+        el = Comp(props);
+        for (const e of effects) e();
+        for (let i = 0; i < 8; i++) await new Promise((r) => setImmediate(r));
+        if (!dirty) return el;
+      }
+      throw new Error("DocumentEditor never settled");
+    },
+  };
+}
+
+// The refs read: the first page holds bun-a; bun-far (a card) and bun-g1 (in a
+// grid) are only found by ids=. `mode` changes what the bundle reads answer.
+function refsServer() {
+  const S = { calls: [], mode: "ok", hold: null };
+  const rows = { "bun-a": row("bun-a", "available", { saving: 50, bundle_price: 250 }), "bun-far": row("bun-far", "available", { saving: 20, bundle_price: 280 }), "bun-g1": row("bun-g1", "sold_out", { reasons: [{ kind: "sold_out", index: 0 }] }), "bun-q": row("bun-q", "available", { title: "Quest kit", saving: 5, bundle_price: 95 }) };
+  const answer = (status, body) => ({ ok: status < 400, status, json: async () => body });
+  S.fetch = async (url) => {
+    const u = new URL(String(url), "http://x");
+    ok(u.pathname === "/api/admin/refs", `unexpected fetch ${url}`);
+    const p = Object.fromEntries(u.searchParams);
+    S.calls.push(p);
+    if (p.type !== "bundle") return answer(200, { ok: true, items: [] });
+    if (S.mode === "forbidden") return answer(403, { ok: false, error: "Forbidden" });
+    // only the first page (limit=50, no ids= or q=) is refused: a later ids=
+    // read that succeeds can not hide what the first catch set
+    if (S.mode === "page-forbidden" && !p.ids && !p.q) return answer(403, { ok: false, error: "Forbidden" });
+    if (p.ids) {
+      if (S.mode === "ids-forbidden") return answer(403, { ok: false, error: "Forbidden" });
+      if (S.hold) await S.hold;
+      return answer(200, { ok: true, items: p.ids.split(",").map((id) => rows[id] || { id, missing: true, state: "missing", reasons: [], overlapsWith: [] }) });
+    }
+    if (p.q) return answer(200, { ok: true, items: [rows["bun-q"]] });
+    return answer(200, { ok: true, items: [rows["bun-a"]] });
+  };
+  return S;
+}
+const bundleCalls = (S) => S.calls.filter((c) => c.type === "bundle");
+const HOME_BODY = () => ({
+  ...Reg.fixtureDocument("home", [
+    { ...Reg.newSection("bundle_card", { id: "sec_dc1" }), settings: { title: "", bundle: { id: "bun-far" } } },
+    { ...Reg.newSection("bundle_grid", { id: "sec_dg1" }), settings: { title: "Bundles", bundles: [{ id: "bun-a" }, { id: "bun-g1" }] } },
+  ]),
+});
+// the same two sections with nothing picked: no ids= read is ever asked
+const EMPTY_BODY = () => ({
+  ...Reg.fixtureDocument("home", [
+    { ...Reg.newSection("bundle_card", { id: "sec_dc1" }), settings: { title: "", bundle: null } },
+    { ...Reg.newSection("bundle_grid", { id: "sec_dg1" }), settings: { title: "Bundles", bundles: [] } },
+  ]),
+});
+async function driveEditor({ mode = "ok", hold = null, docHold = null, can = {}, makeBody = HOME_BODY } = {}) {
+  const S = refsServer();
+  S.mode = mode;
+  S.hold = hold;
+  const listeners = new Map();
+  const win = {
+    location: { origin: "http://store.test", pathname: "/admin/editor", search: "", host: "store.test" },
+    addEventListener: (ev, fn) => listeners.set(ev, [...(listeners.get(ev) || []), fn]),
+    removeEventListener: (ev, fn) => listeners.set(ev, (listeners.get(ev) || []).filter((x) => x !== fn)),
+  };
+  const doc = { addEventListener() {}, removeEventListener() {}, getElementById: () => null };
+  const body = makeBody();
+  const docState = { id: "doc_home", type: "home", body, revision: 1, draftHash: "h1", document: { id: "doc_home", type: "home", label: "Home page", publishedVersionId: null, access: { canPublish: true, reason: null } }, status: "saved", statusWords: "Saved", issues: [], ackCount: 0 };
+  const fakeStore = () => ({ subscribe: () => () => {}, getState: () => docState, open: async () => {}, dispose() {}, setField() {}, beforeUnload: () => false });
+  const api = { call: async (op) => (op === "getDocument" && docHold && (await docHold), op === "getDocument" ? { ok: true, data: { document: { id: "doc_home", type: "home", label: "Home page" } } } : op === "listDocuments" ? { ok: true, data: { documents: [{ id: "doc_home", type: "home", label: "Home page", live: false }] } } : op === "listProductContent" ? { ok: true, data: { items: [] } } : { ok: false }) };
+  const d = oneComponent();
+  const saved = { fetch: globalThis.fetch, window: globalThis.window, document: globalThis.document };
+  globalThis.fetch = S.fetch;
+  globalThis.window = win;
+  globalThis.document = doc;
+  const mod = await loadWorld(join(ROOT, "components/admin/editor/DocumentEditor.js"), d.react, {
+    "./store": { createDocumentStore: fakeStore },
+    "next/navigation": { useRouter: () => ({ push() {}, refresh() {}, replace() {} }), usePathname: () => "/admin/editor" },
+  });
+  const props = { document: { id: "doc_home", type: "home", label: "Home page", slug: null }, can, api };
+  const viewProps = (el) => {
+    const kids = React.Children.toArray(el.props.children);
+    const ev = kids.find((k) => k?.type?.name === "EditorView");
+    ok(ev, "DocumentEditor renders EditorView");
+    return ev.props;
+  };
+  const ed = {
+    S,
+    body,
+    docState,
+    props: null,
+    async settle() {
+      ed.props = viewProps(await d.settle(mod.default, props));
+      return ed.props;
+    },
+    async focus() {
+      for (const fn of listeners.get("focus") || []) fn();
+      return ed.settle();
+    },
+    focusListeners: () => (listeners.get("focus") || []).length,
+    restore() {
+      Object.assign(globalThis, saved);
+      if (saved.window === undefined) delete globalThis.window;
+      if (saved.document === undefined) delete globalThis.document;
+    },
+  };
+  await ed.settle();
+  return ed;
+}
+// EditorView (the real React world) with the props DocumentEditor gave it, the
+// given section selected so its inspector renders
+const EditorMod = await loadJsx(join(ROOT, "components/admin/editor/DocumentEditor.js"));
+const inspectorOf = (props, selection) => render(h(EditorMod.EditorView, { ...props, load: { status: "ready" }, preview: null, selection }));
+
+await t("P5-FIX2 wiring (MD, ML): DocumentEditor reads the first 50 bundles at mount, then ids= for the picked card AND grid bundles outside them; while that read is out they read 'Checking this bundle…'", async () => {
+  let release;
+  let open;
+  const hold = new Promise((r) => (release = r));
+  // the first page answers before the document is open, so the ids= read is
+  // the one the open document's picks start (the pickedKey effect)
+  const docHold = new Promise((r) => (open = r));
+  const ed = await driveEditor({ hold, docHold });
+  try {
+    eq(bundleCalls(ed.S), [{ type: "bundle", limit: "50" }], "only the first page before the document is open");
+    eq(ed.props.bundles.status, "ready", "the first page is in");
+    open();
+    await ed.settle();
+    const calls = bundleCalls(ed.S);
+    eq(calls[0], { type: "bundle", limit: "50" }, "the first page at mount");
+    const ids = calls.find((c) => c.ids);
+    ok(ids, `an ids= read for the picked bundles outside the first page: ${JSON.stringify(calls)}`);
+    eq(ids.ids.split(",").sort(), ["bun-far", "bun-g1"], "the card's and the grid's picks (bun-a is already in the page)");
+    // the ids= answer is held: the card and the grid row are checking, not deleted
+    eq(ed.props.bundles.pending.sort(), ["bun-far", "bun-g1"], "pending while the ids= read is out");
+    const card = inspectorOf(ed.props, "sec_dc1");
+    eq(textIn(card, "data-bundle-status"), "Checking this bundle…", "the card while pending");
+    ok(!card.includes("was deleted"), "never 'deleted' while pending");
+    eq(statusLines(inspectorOf(ed.props, "sec_dg1")), [WORDS_OF.available, "Checking this bundle…"], "the grid while pending");
+    release();
+    await ed.settle();
+    eq(ed.props.bundles.status, "ready", "ready");
+    eq(ed.props.bundles.items.map((b) => b.id).sort(), ["bun-a", "bun-far", "bun-g1"], "the ids= rows joined the list");
+    eq(ed.props.bundles.pending, [], "nothing pending");
+    eq(textIn(inspectorOf(ed.props, "sec_dc1"), "data-bundle-status"), WORDS_OF.available, "the card's real state");
+    eq(statusLines(inspectorOf(ed.props, "sec_dg1")), [WORDS_OF.available, WORDS_OF.sold_out], "the grid's real states");
+    eq(bundleCalls(ed.S).filter((c) => c.ids).length, 1, "asked once");
+  } finally {
+    release?.();
+    open?.();
+    ed.restore();
+  }
+  // the other order: the document is open before the first page answers, so
+  // the first read itself asks ids= (the list is still loading: checking)
+  let release2;
+  const ed2 = await driveEditor({ hold: new Promise((r) => (release2 = r)) });
+  try {
+    const ids = bundleCalls(ed2.S).find((c) => c.ids);
+    ok(ids && ids.ids.split(",").sort().join() === "bun-far,bun-g1", `ids= in the first read: ${JSON.stringify(bundleCalls(ed2.S))}`);
+    eq(textIn(inspectorOf(ed2.props, "sec_dc1"), "data-bundle-status"), "Checking this bundle…", "checking while the first read is out");
+    release2();
+    await ed2.settle();
+    eq(ed2.props.bundles.items.map((b) => b.id).sort(), ["bun-a", "bun-far", "bun-g1"], "all in");
+  } finally {
+    release2?.();
+    ed2.restore();
+  }
+});
+
+await t("P5-FIX2 wiring (ME): window focus reads the bundles again, ids= included, so a far bundle never turns 'deleted' after a re-read", async () => {
+  const ed = await driveEditor();
+  try {
+    ok(ed.focusListeners() >= 1, "a focus listener");
+    const n = bundleCalls(ed.S).length;
+    await ed.focus();
+    const after = bundleCalls(ed.S).slice(n);
+    eq(after[0], { type: "bundle", limit: "50" }, "the first page again");
+    ok(after.some((c) => c.ids && c.ids.split(",").sort().join() === "bun-far,bun-g1"), `and ids= again: ${JSON.stringify(after)}`);
+    eq(ed.props.bundles.items.map((b) => b.id).sort(), ["bun-a", "bun-far", "bun-g1"], "the far bundles are still in the list");
+    eq(textIn(inspectorOf(ed.props, "sec_dc1"), "data-bundle-status"), WORDS_OF.available, "the card is not 'deleted'");
+  } finally {
+    ed.restore();
+  }
+});
+
+await t("P5-FIX2 wiring (MC): a 403 on the bundle read (first page, or ids=) gives status 'failed' and the inspector says 'You can't see bundles here.', never 'deleted'", async () => {
+  for (const mode of ["forbidden", "ids-forbidden"]) {
+    const ed = await driveEditor({ mode });
+    try {
+      eq(ed.props.bundles.status, "failed", `${mode}: failed`);
+      const card = unescape(inspectorOf(ed.props, "sec_dc1"));
+      eq(count(card, CANT_SEE), 1, `${mode}: the card says it once`);
+      ok(!card.includes("was deleted"), `${mode}: not 'deleted'`);
+      ok(!card.includes("Create a bundle") && !card.includes('type="search"'), `${mode}: no picking`);
+      const grid = unescape(inspectorOf(ed.props, "sec_dg1"));
+      ok(grid.includes(CANT_SEE) && !grid.includes("was deleted"), `${mode}: the grid says it`);
+    } finally {
+      ed.restore();
+    }
+  }
+});
+
+await t("P5-FIX2 wiring (MC, first catch alone): a 403 on the first page with no ids= read to mask it gives status 'failed' and 'You can't see bundles here.' once, never an empty picker", async () => {
+  const cases = [
+    // a document with nothing picked: the first page is the only bundle read
+    { name: "no picks", mode: "forbidden", makeBody: EMPTY_BODY, idsAsked: false },
+    // picks outside the first page, but only the first page is refused
+    { name: "first page only", mode: "page-forbidden", makeBody: HOME_BODY, idsAsked: null },
+  ];
+  for (const c of cases) {
+    const ed = await driveEditor({ mode: c.mode, makeBody: c.makeBody });
+    try {
+      const calls = bundleCalls(ed.S);
+      ok(calls.length >= 1 && calls[0].limit === "50" && !calls[0].ids, `${c.name}: the first page was asked: ${JSON.stringify(calls)}`);
+      if (c.idsAsked === false) ok(!calls.some((x) => x.ids), `${c.name}: no ids= read: ${JSON.stringify(calls)}`);
+      eq(ed.props.bundles.status, "failed", `${c.name}: failed`);
+      eq(ed.props.bundles.items, [], `${c.name}: no rows`);
+      const card = unescape(inspectorOf(ed.props, "sec_dc1"));
+      eq(count(card, CANT_SEE), 1, `${c.name}: the card says it once`);
+      ok(!card.includes("Create a bundle") && !card.includes('type="search"'), `${c.name}: the card offers no picking`);
+      ok(!card.includes("was deleted"), `${c.name}: not 'deleted'`);
+      const grid = unescape(inspectorOf(ed.props, "sec_dg1"));
+      if (c.makeBody === EMPTY_BODY) eq(count(grid, CANT_SEE), 1, `${c.name}: the empty grid says it once`);
+      else {
+        const g = inspectorOf(ed.props, "sec_dg1");
+        eq(statusLines(g), [CANT_SEE, CANT_SEE], `${c.name}: each picked grid row says it`);
+        ok(!grid.includes("was deleted"), `${c.name}: no grid row is 'deleted'`);
+      }
+      ok(!grid.includes("Create a bundle") && !grid.includes('type="search"'), `${c.name}: the grid offers no picking`);
+    } finally {
+      ed.restore();
+    }
+  }
+});
+
+await t("P5-FIX2 wiring (MC, second catch alone): the first page answers before the document opens, then the picks' ids= read (the pickedKey effect) is refused: status 'failed', 'You can't see bundles here.'", async () => {
+  let open;
+  const docHold = new Promise((r) => (open = r));
+  const ed = await driveEditor({ mode: "ids-forbidden", docHold });
+  try {
+    eq(bundleCalls(ed.S), [{ type: "bundle", limit: "50" }], "only the first page before the document is open");
+    eq(ed.props.bundles.status, "ready", "the first page is in");
+    open();
+    await ed.settle();
+    ok(bundleCalls(ed.S).some((c) => c.ids), `the effect asked ids=: ${JSON.stringify(bundleCalls(ed.S))}`);
+    eq(ed.props.bundles.status, "failed", "failed");
+    const card = unescape(inspectorOf(ed.props, "sec_dc1"));
+    eq(count(card, CANT_SEE), 1, "the card says it once");
+    ok(!card.includes("was deleted") && !card.includes("Create a bundle") && !card.includes('type="search"'), "not 'deleted', no picking");
+    eq(statusLines(inspectorOf(ed.props, "sec_dg1")), [CANT_SEE, CANT_SEE], "each grid row says it");
+  } finally {
+    open?.();
+    ed.restore();
+  }
+});
+
+await t("P5-FIX2 wiring (MK): a search asks the server (q=) and its answer is what the picker offers and what joins the list", async () => {
+  const ed = await driveEditor();
+  try {
+    ok(typeof ed.props.on.searchBundles === "function", "searchBundles is in the context");
+    const rows = await ed.props.on.searchBundles("quest");
+    eq(bundleCalls(ed.S).at(-1), { type: "bundle", q: "quest", limit: "50" }, "q= sent");
+    eq(rows.map((b) => b.id), ["bun-q"], "the server's rows are returned");
+    await ed.settle();
+    ok(ed.props.bundles.items.some((b) => b.id === "bun-q"), "and join the list");
+    // the picker shows the server's answer for the typed words (not only a local filter)
+    const v = await mountControl("BundleControl", { field: cardField("sec_sq1"), value: null, onChange: () => {}, issues: [], owner: "sec_sq1", context: { ...CATALOG, searchBundles: ed.props.on.searchBundles, bundles: { status: "ready", items: [row("bun-a", "available")] } } });
+    const input = v.nodesAll().find((n) => n.props?.type === "search");
+    input.props.onChange({ target: { value: "quest" } });
+    v.draw();
+    await new Promise((r) => setTimeout(r, 320));
+    v.draw();
+    ok(v.option("bun-q"), `the server's bundle is offered: ${v.text().slice(0, 200)}`);
+  } finally {
+    ed.restore();
+  }
+});
+
+await t("P5-FIX2 wiring (MB): canCreateBundles follows `can`: 'Create a bundle' only for can.offersWrite === true, else 'Ask an owner to create bundles.'", async () => {
+  const ed = await driveEditor();
+  try {
+    for (const [can, creates] of [[{ offersWrite: true }, true], [{}, false], [{ offersWrite: false }, false], [{ offersWrite: "yes" }, false], [undefined, false]]) {
+      const html = inspectorOf({ ...ed.props, can }, "sec_dc1");
+      eq([html.includes("Create a bundle"), html.includes("Ask an owner to create bundles.")], [creates, !creates], `can ${JSON.stringify(can)}`);
+    }
+  } finally {
+    ed.restore();
+  }
+  // and DocumentEditor hands its own `can` prop on as it is
+  const ed2 = await driveEditor({ can: { offersWrite: true } });
+  try {
+    eq(ed2.props.can, { offersWrite: true }, "passed on");
+    ok(inspectorOf(ed2.props, "sec_dc1").includes("Create a bundle"), "rendered");
+  } finally {
+    ed2.restore();
+  }
+});
+
+await t("P5-FIX2 wiring (MA): editor/page.js gives can.offersWrite from roleAllows(role, 'offers.write'): owner, admin and staff yes, support no; the currency is read only for a session that may create", async () => {
+  const seen = { currency: 0 };
+  let actor = null;
+  const Stub = (props) => h("div", { "data-stub": "DocumentEditor" }, JSON.stringify(props));
+  const stubs = {
+    "next/link": { __esModule: true, default: ({ href, children }) => h("a", { href }, children) },
+    "next/headers": { cookies: async () => ({ get: () => ({ value: "cookie" }) }) },
+    "next/navigation": { redirect: (to) => { throw new Error(`redirect ${to}`); } },
+    "@/lib/admin-auth": { adminActor: async () => actor, ADMIN_COOKIE: "_admin", PLATFORM_COOKIE: "_platform" },
+    "@/lib/cms-mode": { getCmsMode: async () => "documents" },
+    "@/lib/documents/service": { listDocuments: async () => [{ id: "doc_home", type: "home", label: "Home page", slug: null }] },
+    "@/lib/admin/entity-entry": { entityEntry: async () => ({}), entityForDocument: async () => null, canEdit: () => true, ENTRY_WORDS: { failed: "x", readOnly: "y" } },
+    "@/lib/console-request": { tfetch: (fn) => fn() },
+    "@/lib/bundles": { bundleCurrency: async () => { seen.currency++; return "USD"; } },
+    "@/components/admin/editor/DocumentEditor": { __esModule: true, default: Stub },
+  };
+  const Page = (await loadWorld(join(ROOT, "app/(console)/admin/(authed)/editor/page.js"), React, stubs)).default;
+  for (const [role, may] of [["owner", true], ["admin", true], ["staff", true], ["support", false]]) {
+    actor = { kind: "member", role };
+    seen.currency = 0;
+    const el = await Page({ searchParams: Promise.resolve({}) });
+    ok(el.type === Stub, `${role}: the editor`);
+    eq(el.props.can, { offersWrite: may }, `${role}: can`);
+    eq([el.props.currency, seen.currency], may ? ["USD", 1] : [undefined, 0], `${role}: the currency`);
   }
 });
 
