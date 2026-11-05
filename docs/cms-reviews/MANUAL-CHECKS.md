@@ -818,6 +818,27 @@ Packet: [P5-PANEL.md](P5-PANEL.md), "Owner checks" and "Known limits" (From revi
 - [ ] Check Catalog > Bundles and the bundle form at phone widths (375 and 768) and in Safari.
 - [ ] Carried over: approving the CI sqld download (source and checksum) for .github is still the owner's call. This item did not touch .github.
 
+## Phase 5, batch 2
+
+### The inspector's bundle picker, inline create and bundle form fixes (P5-EDITOR)
+Packet: [P5-EDITOR.md](P5-EDITOR.md), "Owner checks" and "Known limits" (From review).
+- [ ] Decide where the 'confirm Disable and Delete when the home lookup fails (usedOnHome null)' fix goes. It is in components/admin/CommercePanels.js, which has no batch 3 owner.
+- [ ] Sign off the new words that live outside bundle-words.js: the chips (Showing, Sold out, Not ready, Hidden: no saving, Turned off, Turned off not ready, Deleted), the turned-off-but-not-ready line, 'You can't see bundles here.', 'Ask an owner to create bundles.', the Dialog's live-now sentence, and the form's lines 'Enter how many…', 'Pick this product again…' and 'The cart takes off …'.
+- [ ] Decide whether the form should show the saving with cents plus the cart's whole amount (current) or only the engine's whole amount, as the block does.
+- [ ] On staging (OQ-C): an inline create is live at once (its discount and /bundles/<slug>) before publish, and stays if the draft is discarded.
+- [ ] Phone widths (375 and 768) and Safari for the picker, the grid rows and the Create a bundle Dialog.
+- [ ] On staging with a documents-mode tenant: a role without storefront.read sees 'You can't see bundles here.' (today support holds storefront.read, so a real 403 needs such a role).
+- [ ] (Carried) The CI sqld download under .github/ still needs the owner's approval of its source and checksum. Nothing was added under .github/.
+
+### Batch 1 review fixes for bundles (P5-FIX1)
+Packet: [P5-FIX1.md](P5-FIX1.md), "Owner checks" and "Known limits" (From review).
+- [ ] Orchestrator: confirm landing the one-assertion change to scripts/test-bundle-form.js (P5-EDITOR's file) in this branch. Watch for a conflict at lines 417 to 424 when P5-EDITOR merges.
+- [ ] Owner sign-off of the three orchestrator rulings and of the new founder and shopper words (listed in P5-FIX1.md).
+- [ ] Browser check (P5-DRILLS), desktop Chrome: a home card and a grid cell whose bundle lost a product, and /bundles/<slug> for a bundle stored with quantity 1.5.
+- [ ] Phone widths (375, 768) and Safari for the new preview note.
+- [ ] Staging: not done.
+- [ ] The CI sqld download under .github/ still needs the owner's approval of its source and checksum.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
