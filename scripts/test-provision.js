@@ -61,7 +61,7 @@ process.env.PLATFORM_DB_TOKEN = "";
 process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
-const P4_DBS = ["fresh", "keep", "live", "liveorders", "liveprod", "adoptrel", "adoptblk", "adoptdoc", "earlier", "badmode", "sharea", "sharec", "shared", ...Array.from({ length: 8 }, (_, i) => `fa${i}`)].map((n) => `.test-prov-${n}.db`);
+const P4_DBS = ["fresh", "keep", "live", "liveorders", "liveprod", "adoptrel", "adoptblk", "adoptdoc", "earlier", "badmode", "sharea", "sharec", "shared", "onb", "onbui", "onbx", ...Array.from({ length: 8 }, (_, i) => `fa${i}`)].map((n) => `.test-prov-${n}.db`);
 const dbs = [".test-prov-default.db", ".test-prov-platform.db", ".test-prov-t1.db", ".test-prov-beta.db", ...P4_DBS];
 const removeDbs = async () => {
   for (const f of dbs) for (const ext of ["", "-wal", "-shm", "-journal"]) await rm(join(here, "..", f + ext), { force: true });
@@ -649,7 +649,7 @@ await t("unit: on the closed new store an anonymous checkout is refused (403 STO
 });
 
 const FORBIDDEN_HREF = (h) => /^\/admin\/(theme|catalog|home|upsells)(?:[/?#]|$)/.test(h) || /^\/admin\/storefront(?:[?#]|$)/.test(h);
-const CONSOLE_PAGES = { "/admin/integrations": "integrations", "/admin/settings": "settings", "/admin/billing": "billing" };
+const CONSOLE_PAGES = { "/admin/integrations": "integrations", "/admin/settings": "settings", "/admin/billing": "billing", "/admin/start": "start" };
 async function hrefWorks(h) {
   if (h === "/admin/editor" || h.startsWith("/admin/editor?")) return access(join(ROOT, "app/(console)/admin/(authed)/editor/page.js")).then(() => true, () => false);
   const path = h.split(/[?#]/)[0];
@@ -662,17 +662,20 @@ const stepOf = (list, id) => list.items.find((i) => i.id === id);
 await t("unit (ED05 review, pinned): a closed documents store builds the onboarding checklist with editor links; every step's href is an editor or working console destination, never /admin/theme, /admin/catalog, /admin/home, /admin/upsells or a bare /admin/storefront", async () => {
   const list = await checklist();
   eq(list.supported, true);
-  same(list.items.map((i) => i.id), ["connect", "catalog", "brand", "policies", "billing", "domain", "preview", "test_order", "launch"], "steps:");
+  // P6-ONBOARD: 'start' comes first on a documents store
+  same(list.items.map((i) => i.id), ["start", "connect", "catalog", "brand", "policies", "billing", "domain", "preview", "test_order", "launch"], "steps:");
   for (const i of list.items) {
     ok(!FORBIDDEN_HREF(i.href), `${i.id} links to ${i.href}`);
     ok(await hrefWorks(i.href), `${i.id}: ${i.href} is not an editor or working console destination`);
+    for (const a of i.actions || []) if (a.href) ok(await hrefWorks(a.href), `${i.id} action ${a.label}: ${a.href}`);
   }
   same(
     Object.fromEntries(list.items.map((i) => [i.id, i.href])),
     {
+      start: "/admin/start",
       connect: "/admin/integrations",
       catalog: "/admin/settings#catalog-sync",
-      brand: E.editorHref("doc_design"),
+      brand: "/admin/start",
       policies: E.PAGES_LIST_HREF,
       billing: "/admin/billing",
       domain: "/admin/settings",
@@ -799,8 +802,10 @@ await t("unit: a later doc_design publish writes theme_pin (setThemePinWriter sp
   eq(calls[0][0], "fresh", "for this store:");
   eq(calls[0][1]?.kit, "glow", `the published look: ${JSON.stringify(calls[0][1])}`);
   ok(calls[0][1]?.release, "the pin names the live release:");
+  // P6-ONBOARD: an open store's design step links /admin/start too (the logo is changed there)
   const step = stepOf(await checklist(), "brand");
-  same([step.done, step.href], [true, E.editorHref("doc_design")], "design step:");
+  same([step.done, step.href, step.hint], [true, ON.START_HREF, ON.BRAND_HINTS.open], "design step:");
+  ok(!/then publish it/.test(step.hint), step.hint);
 });
 
 await t("unit (ED05 review, pinned): the legal-pages step counts only published PAGE documents: published campaigns and a journal post named privacy and terms don't count; published privacy and terms pages do", async () => {
@@ -846,9 +851,370 @@ await t("unit: a legacy tenant's checklist output is unchanged (every step's lab
     ],
     "legacy items:",
   );
+  // P6-ONBOARD: byte-identical items: the same keys in the same order (no
+  // 'start' step, no actions key) and the same done values
+  same(
+    list.items.map((i) => Object.keys(i).join(",")),
+    [...Array(8).fill("id,label,kind,done,href,hint"), "id,label,kind,done,gated,href,hint"],
+    "legacy item keys:",
+  );
+  same(list.items.map((i) => i.done), Array(9).fill(true), "legacy done values:");
   eq(list.launched, true, "launched by its check-off:");
   ok(list.launchedAt, "launchedAt:");
   same(Object.keys(list).sort(), ["doneCount", "items", "launched", "launchedAt", "provisionedAt", "supported", "total"], "answer keys:");
+});
+
+// ---- P6-ONBOARD: the first-run checklist on a documents store ------------------------------
+// GEN-04, PUB-12, US-01, US-41. A closed documents store with an empty
+// catalog ("onb"), its brand step, its policy starters, and the same rule as
+// "Before you open your store" (policyStatus). Then SetupAdmin rendered with
+// a fetch spy (no network): the buttons, the reload and the refusals.
+console.log("— P6-ONBOARD: 'Start your store', the design step and the legal pages on a documents store");
+const PS6 = await import("../lib/first-run/policy-start.js");
+const BS6 = await import("../lib/first-run/brand-step.js");
+const PP6 = await import("../lib/documents/policy-pages.js");
+const OP6 = await import("../lib/documents/opening.js");
+const PAL6 = await import("../lib/themes/palettes.js");
+const onbRun = await P.runProvision(params("onb"));
+const inO = async (fn) => withTenant(await C.getTenant("onb"), fn);
+const onbU = await createUser({ email: "owner@onb.test", name: "Onb Owner", password: "onb-owner-pass-1" });
+await addMembership(onbU.id, "onb", "owner");
+const OACT = { kind: "merchant", id: onbU.id, role: "owner" };
+const olist = () => inO(() => ON.buildChecklist());
+// no step hint on a documents store may send the founder to add or publish a page "in the editor"
+const EDITOR_PAGE_HINT = (h) => /in the editor/i.test(h) || /\b(add|publish)\b[^.]*\bpages?\b[^.]*\beditor\b/i.test(h);
+async function checkHintsAndLinks(list, label) {
+  for (const i of list.items) {
+    ok(!EDITOR_PAGE_HINT(i.hint), `${label}: ${i.id} hint sends the founder to the editor for a page: ${i.hint}`);
+    ok(await hrefWorks(i.href), `${label}: ${i.id}: ${i.href} is not a console page`);
+    for (const a of i.actions || []) if (a.type === "link") ok(await hrefWorks(a.href), `${label}: ${i.id} action ${a.label}: ${a.href} is not a console page`);
+  }
+}
+// PUB-12 and onboarding agree: each kind counts in onboarding exactly when
+// the opening report does not block on it, and the step is done exactly when
+// neither blocks
+async function agreesWithOpening(step) {
+  const rep = await inO(() => OP6.openingReport());
+  eq(rep.opening, true, "the store is closed:");
+  const st = await inO(async () => PP6.policyStatus(await PP6.readPolicyRows()));
+  const level = (k) => rep.items.find((i) => i.id === k).level;
+  for (const k of PP6.POLICY_KINDS) eq(PP6.policyCounts(st[k].state), level(k) !== "block", `${k}: policyStatus ${st[k].state} vs opening ${level(k)}:`);
+  eq(step.done, level("privacy") !== "block" && level("returns") !== "block", "onboarding done vs opening:");
+}
+
+await t("unit (P6-ONBOARD): a closed documents store's checklist starts with 'Start your store' (/admin/start, a real console page); on an empty catalog it is done once the brand step is recorded; with products it is done once doc_home exists", async () => {
+  same([onbRun.run.status, onbRun.run.refs.contentMode], ["done", "documents"], `onb (${onbRun.error}):`);
+  let list = await olist();
+  const first = list.items[0];
+  same([first.id, first.label, first.kind, first.href, first.done, first.hint], ["start", "Start your store", "auto", "/admin/start", false, ON.START_HINTS.emptyCatalog], "the first step:");
+  ok(await hrefWorks(first.href), "/admin/start is a console page");
+  eq(stepOf(list, "brand").done, false, "brand before the step:");
+  await inO(() => BS6.saveBrandStep({ skip: true }, OACT));
+  list = await olist();
+  same([stepOf(list, "start").done, stepOf(list, "brand").done], [true, true], "the brand step skipped on an empty catalog:");
+  // with products and no home page, the step waits for the home page
+  await inO(() => db.insertInto("products").values({ id: "gid://t/ONB1", handle: "onb-tee", title: "Onb Tee", price_min: 500, price_max: 500, currency: "INR", available: 1, tags: "[]" }).execute());
+  list = await olist();
+  same([stepOf(list, "start").done, stepOf(list, "start").hint], [false, ON.START_HINTS.todo], "products, no home page:");
+  await inO(() => Docs.createDocument({ type: "home", actor: OACT }));
+  list = await olist();
+  same([stepOf(list, "start").done, stepOf(list, "start").hint], [true, ON.START_HINTS.done], "doc_home exists:");
+  await checkHintsAndLinks(list, "onb");
+});
+
+await t("unit (P6-ONBOARD): the design step is done after a brand-step skip or save with nothing live, links /admin/start, and its closed-store hint says the colours go live when the store opens (never 'then publish it')", async () => {
+  // a second store: a brand-step SAVE (no skip before it)
+  const r = await P.runProvision(params("onbui"));
+  eq(r.run.status, "done", `onbui (${r.error}):`);
+  const inU = async (fn) => withTenant(await C.getTenant("onbui"), fn);
+  const before = stepOf(await inU(() => ON.buildChecklist()), "brand");
+  same([before.done, before.href, before.hint], [false, "/admin/start", ON.BRAND_HINTS.closed], "before:");
+  const saved = await inU(() => BS6.saveBrandStep({ paletteId: PAL6.DEFAULT_PALETTE_ID }, OACT));
+  same([saved.ok, saved.skipped], [true, false], `saved: ${JSON.stringify(saved).slice(0, 200)}`);
+  eq(await asRequest(() => inU(() => Res.isStoreClosed())), true, "nothing live:");
+  const after = stepOf(await inU(() => ON.buildChecklist()), "brand");
+  same([after.done, after.href, after.hint], [true, "/admin/start", "Pick your colours and logo. They go live when you open your store."], "after a save:");
+  ok(!/then publish it/.test(after.hint), after.hint);
+  // the skipped store (test above) too
+  const skipped = stepOf(await olist(), "brand");
+  same([skipped.done, skipped.href, skipped.hint], [true, "/admin/start", ON.BRAND_HINTS.closed], "after a skip:");
+});
+
+let starterPrivacy = null;
+await t("unit (P6-ONBOARD, PUB-12 review rule): on a closed documents store the legal-pages step is 'Add your legal pages' with two start buttons; a starter draft does not count and offers 'Read your privacy page' and 'I've read it'; I've read it (body unchanged) counts it; a founder-saved terms draft finishes the step; opening and onboarding agree at every stage", async () => {
+  let step = stepOf(await olist(), "policies");
+  same([step.label, step.done, step.href, step.hint], ["Add your legal pages", false, E.PAGES_LIST_HREF, ON.POLICY_HINTS.missing], "no pages:");
+  eq(step.hint, "Your store can't open without a privacy page and a returns page. Start each from a template, then read it and save it.", "the words:");
+  same(step.actions, [
+    { type: "startPolicy", kind: "privacy", label: "Start a privacy page" },
+    { type: "startPolicy", kind: "returns", label: "Start a returns page" },
+  ], "two start buttons:");
+  await agreesWithOpening(step);
+  // a starter privacy draft, written by the policy starter
+  const made = await inO(() => Docs.createDocument({ type: "page", body: PS6.starterBody("privacy"), actor: PP6.POLICY_STARTER_ACTOR }));
+  starterPrivacy = made.document;
+  step = stepOf(await olist(), "policies");
+  eq(step.done, false, "a starter draft does not count:");
+  same(step.actions, [
+    { type: "link", href: `/admin/editor?doc=${starterPrivacy.id}`, label: "Read your privacy page" },
+    { type: "markPolicyRead", id: starterPrivacy.id, revision: starterPrivacy.revision, label: "I've read it" },
+    { type: "startPolicy", kind: "returns", label: "Start a returns page" },
+  ], "the privacy start button is replaced; the returns one stays:");
+  eq(step.hint, ON.POLICY_HINTS.missing, "a kind is still missing:");
+  await agreesWithOpening(step);
+  // the returns starter through the real op: both are starters now
+  const ret = await inO(() => PS6.startPolicyPage({ kind: "returns", actor: OACT }));
+  eq(ret.status, 200, `returns starter: ${JSON.stringify(ret.body).slice(0, 200)}`);
+  step = stepOf(await olist(), "policies");
+  eq(step.hint, "We started your privacy page and your returns page from a template. It's a starting point, not legal advice: read each, change what you need and save it, or press I've read it if it is right as it is.", "two starters:");
+  eq(ON.policyStarterHint(["privacy"]), "We started your privacy page from a template. It's a starting point, not legal advice: read it, change what you need and save it, or press I've read it if it is right as it is.", "one starter (the brief's words):");
+  eq(ON.policyStarterHint(["returns"]).startsWith("We started your returns page from a template."), true, "returns words:");
+  await agreesWithOpening(step);
+  // I've read it on the privacy starter: body unchanged, it now counts as saved
+  const hashBefore = (await inO(() => Docs.getDocument(starterPrivacy.id))).draftHash;
+  const mark = step.actions.find((a) => a.type === "markPolicyRead" && a.id === starterPrivacy.id);
+  const read = await inO(() => PS6.markPolicyRead({ id: mark.id, revision: mark.revision, actor: OACT }));
+  eq(read.status, 200, `marked: ${JSON.stringify(read.body).slice(0, 200)}`);
+  eq((await inO(() => Docs.getDocument(starterPrivacy.id))).draftHash, hashBefore, "the body is unchanged:");
+  eq((await inO(async () => PP6.policyStatus(await PP6.readPolicyRows()))).privacy.state, "saved", "privacy counts as saved:");
+  step = stepOf(await olist(), "policies");
+  same([step.done, step.hint], [false, ON.policyStarterHint(["returns"])], "returns is still a starter:");
+  same(step.actions.map((a) => [a.type, a.label]), [["link", "Read your returns page"], ["markPolicyRead", "I've read it"]], "only the returns buttons are left:");
+  await agreesWithOpening(step);
+  // a merchant saveDraft of the privacy page, and the founder saves the terms page (an edit)
+  const p = await inO(() => Docs.getDocument(starterPrivacy.id));
+  await inO(() => Docs.saveDraft({ id: p.id, revision: p.revision, body: { ...p.body, meta: { ...p.body.meta, title: "Our privacy" } }, actor: OACT }));
+  const terms = await inO(() => Docs.getDocument(ret.body.document.id));
+  eq(terms.slug, "terms", "the returns starter is the terms page:");
+  await inO(() => Docs.saveDraft({ id: terms.id, revision: terms.revision, body: { ...terms.body, meta: { ...terms.body.meta, title: "Our terms" } }, actor: OACT }));
+  const list = await olist();
+  step = stepOf(list, "policies");
+  same([step.label, step.done, step.hint, step.actions], ["Add your legal pages", true, "Your privacy and returns pages are ready.", []], "both founder-saved:");
+  await agreesWithOpening(step);
+  eq(await asRequest(() => inO(() => Res.isStoreClosed())), true, "nothing was published:");
+  await checkHintsAndLinks(list, "onb, pages ready");
+});
+
+await t("unit (P6-ONBOARD): the Launch hint on a closed documents store says publishing opens the store, first shows what is still missing ('Before you open your store'), and needs a way to pay, a privacy page and a returns page", async () => {
+  const launch = stepOf(await olist(), "launch");
+  eq(launch.hint, ON.LAUNCH_HINTS.closedOpenSteps, "steps are still open:");
+  ok(/Publishing from the editor opens it/.test(launch.hint), launch.hint);
+  ok(/first shows what is still missing/.test(launch.hint) && /Before you open your store/.test(launch.hint), launch.hint);
+  ok(/can't open without a way to pay, a privacy page and a returns page/.test(launch.hint), launch.hint);
+  ok(/private until your first publish/.test(launch.hint), "the pinned words stay:");
+});
+
+// ---- SetupAdmin, rendered (Next's SWC, a small hook driver, a fetch spy) ----
+const React6 = require("react");
+const { renderToStaticMarkup: rsm6 } = require("react-dom/server");
+const swc6 = require("next/dist/build/swc/index.js");
+await swc6.loadBindings();
+const { createHash } = await import("node:crypto");
+const compile6 = async (src, filename) =>
+  (await swc6.transform(src, { filename, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
+// load a component file (or its source) with the console components compiled too
+async function loadComponent(file, stubs, source = null) {
+  const cache = new Map();
+  async function load(f, src) {
+    if (cache.has(f)) return cache.get(f);
+    const mod = { exports: {} };
+    cache.set(f, mod.exports);
+    const code = await compile6(src ?? (await readFile(f, "utf8")), f);
+    const local = new Map();
+    for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
+      if (id in stubs || local.has(id)) continue;
+      const base = id.startsWith("@/") ? join(ROOT, id.slice(2)) : id.startsWith(".") ? join(dirname(f), id) : null;
+      if (!base) continue;
+      const target = base.endsWith(".js") ? base : `${base}.js`;
+      local.set(id, /\/components\//.test(target) ? await load(target) : await import(pathToFileURL(target).href));
+    }
+    new Function("require", "module", "exports", code)((id) => (id in stubs ? stubs[id] : local.has(id) ? local.get(id) : require(id)), mod, mod.exports);
+    cache.set(f, mod.exports);
+    return mod.exports;
+  }
+  return (await load(file, source)).default;
+}
+const toasts6 = [];
+const toastStub6 = { useToast: () => ({ success: (m) => toasts6.push(["success", m]), error: (m) => toasts6.push(["error", m]), info: (m) => toasts6.push(["info", m]) }) };
+const linkStub6 = { __esModule: true, default: function Link({ href, children, ...rest }) { return React6.createElement("a", { href, ...rest }, children); } };
+// the hook driver: function components called with their own hook slots
+function driver6() {
+  const slots = new Map();
+  let cur = null;
+  let cursor = 0;
+  let dirty = false;
+  const hooks = {
+    useState(init) {
+      const box = cur;
+      const k = cursor++;
+      if (!(k in box)) box[k] = typeof init === "function" ? init() : init;
+      return [box[k], (v) => { const nv = typeof v === "function" ? v(box[k]) : v; if (!Object.is(nv, box[k])) { box[k] = nv; dirty = true; } }];
+    },
+    useEffect() {},
+    useMemo: (fn) => fn(),
+    useCallback: (fn) => fn,
+    useRef(init) { const k = cursor++; if (!(k in cur)) cur[k] = { current: init }; return cur[k]; },
+    useContext: () => null,
+  };
+  const react = { ...React6, ...hooks, default: { ...React6, ...hooks } };
+  function render(el) {
+    const nodes = [];
+    const visit = (n, path) => {
+      if (n == null || typeof n === "boolean" || typeof n === "string" || typeof n === "number") return;
+      if (Array.isArray(n)) return n.forEach((c, i) => visit(c, `${path}.${c?.key ?? i}`));
+      if (!React6.isValidElement(n)) return;
+      if (n.type === React6.Fragment) return visit(n.props.children, `${path}F`);
+      if (typeof n.type === "function") {
+        const key = `${path}/${n.type.name}`;
+        if (!slots.has(key)) slots.set(key, {});
+        cur = slots.get(key);
+        cursor = 0;
+        return visit(n.type(n.props), key);
+      }
+      nodes.push(n);
+      visit(n.props.children, `${path}/${typeof n.type === "string" ? n.type : "x"}`);
+    };
+    visit(el, "r");
+    return nodes;
+  }
+  return { react, render, takeDirty: () => { const d = dirty; dirty = false; return d; } };
+}
+const textOf6 = (n) => (n == null || typeof n === "boolean" ? "" : Array.isArray(n) ? n.map(textOf6).join("") : typeof n === "string" || typeof n === "number" ? String(n) : React6.isValidElement(n) ? textOf6(n.props.children) : "");
+async function mountSetup(initial) {
+  const d = driver6();
+  const Setup = await loadComponent(join(ROOT, "components/admin/SetupAdmin.js"), { react: d.react, "@/components/console/Toast": toastStub6, "next/link": linkStub6 });
+  let nodes = [];
+  const draw = () => (nodes = d.render(React6.createElement(Setup, { initial })));
+  const flush = async () => {
+    for (let round = 0; round < 40; round++) {
+      d.takeDirty();
+      draw();
+      for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r));
+      if (!d.takeDirty()) return draw();
+    }
+    throw new Error("SetupAdmin never settled");
+  };
+  await flush();
+  const buttons = () => nodes.filter((n) => n.type === "button");
+  return {
+    all: () => nodes.map((n) => (typeof n.props.children === "string" ? n.props.children : "")).join(" | "),
+    text: () => nodes.map((n) => textOf6(n)).join(" "),
+    buttons: () => buttons().map((b) => textOf6(b.props.children).trim()),
+    links: () => nodes.filter((n) => n.type === "a").map((a) => [textOf6(a.props.children).trim(), a.props.href]),
+    async click(name) {
+      const b = buttons().find((x) => textOf6(x.props.children).trim() === name);
+      ok(b, `no button "${name}"; buttons: ${buttons().map((x) => textOf6(x.props.children).trim()).join(" | ")}`);
+      ok(!b.props.disabled, `"${name}" is disabled`);
+      await b.props.onClick();
+      await flush();
+    },
+  };
+}
+// the fetch spy: records every call and answers from `answer(url, init)`
+function fetchSpy(answer) {
+  const calls = [];
+  const saved = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const call = { url: String(url), method: init.method || "GET", body: init.body ? JSON.parse(init.body) : null };
+    calls.push(call);
+    const { status, body } = await answer(call);
+    return { ok: status >= 200 && status < 300, status, json: async () => body };
+  };
+  return { calls, restore: () => { globalThis.fetch = saved; } };
+}
+
+await t("rendered (P6-ONBOARD, SetupAdmin): the legal-pages step shows 'Start a privacy page' and 'Start a returns page' and the 'not legal advice' line; pressing one POSTs /api/admin/policy-start { kind } then reloads the checklist; a POLICY_PAGE_EXISTS or 403 answer shows its words; 'I've read it' POSTs { markRead: { id, revision } } and reloads", async () => {
+  // a fresh closed documents store with no policy pages: the real checklist
+  const r = await P.runProvision(params("onbx"));
+  eq(r.run.status, "done", `onbx (${r.error}):`);
+  const inX = async (fn) => withTenant(await C.getTenant("onbx"), fn);
+  const real = async () => ({ ok: true, ...(await inX(() => ON.buildChecklist())) });
+  const initial = await real();
+  // the spy answers with the real op and the real checklist
+  const spy = fetchSpy(async (c) => {
+    if (c.url === "/api/admin/setup" && c.method === "GET") return { status: 200, body: await real() };
+    if (c.url === "/api/admin/policy-start" && c.method === "POST") {
+      const out = c.body.kind ? await inX(() => PS6.startPolicyPage({ kind: c.body.kind, actor: OACT })) : await inX(() => PS6.markPolicyRead({ ...c.body.markRead, actor: OACT }));
+      return out;
+    }
+    return { status: 404, body: {} };
+  });
+  try {
+    toasts6.length = 0;
+    const view = await mountSetup(initial);
+    ok(view.buttons().includes("Start a privacy page") && view.buttons().includes("Start a returns page"), `buttons: ${view.buttons().join(" | ")}`);
+    ok(view.text().includes("These are starting points, not legal advice."), "the not-legal-advice line");
+    await view.click("Start a privacy page");
+    same(spy.calls.slice(0, 2).map((c) => [c.method, c.url, c.body]), [["POST", "/api/admin/policy-start", { kind: "privacy" }], ["GET", "/api/admin/setup", null]], "POST then the checklist reload:");
+    same(toasts6, [["success", PS6.startedMessage("privacy")]], "the answer's message in a toast:");
+    ok(!view.buttons().includes("Start a privacy page") && view.buttons().includes("I've read it"), `after: ${view.buttons().join(" | ")}`);
+    const priv = (await inX(async () => PP6.policyStatus(await PP6.readPolicyRows()))).privacy.doc;
+    same(view.links().find((l) => l[0] === "Read your privacy page"), ["Read your privacy page", `/admin/editor?doc=${priv.id}`], "the read link:");
+    // a stale screen (the first checklist) presses Start again: POLICY_PAGE_EXISTS, its own words
+    const stale = await mountSetup(initial);
+    spy.calls.length = 0;
+    await stale.click("Start a privacy page");
+    eq(spy.calls[0].body.kind, "privacy", "posted:");
+    ok(stale.text().includes(PS6.existsMessage("privacy", priv.label)), `the POLICY_PAGE_EXISTS words: ${stale.text().slice(0, 400)}`);
+    // I've read it: { markRead: { id, revision } }, then a reload
+    spy.calls.length = 0;
+    toasts6.length = 0;
+    await view.click("I've read it");
+    same(spy.calls.map((c) => [c.method, c.url, c.body]), [["POST", "/api/admin/policy-start", { markRead: { id: priv.id, revision: priv.revision } }], ["GET", "/api/admin/setup", null]], "markRead then the reload:");
+    same(toasts6, [["success", PS6.READ_MESSAGE]], "marked:");
+    ok(!view.buttons().includes("I've read it"), `after I've read it: ${view.buttons().join(" | ")}`);
+    // the stale screen's I've read it: a 409 with its words
+    const stale2 = await mountSetup(await (async () => { const s = structuredClone(initial); s.items.find((i) => i.id === "policies").actions = [{ type: "markPolicyRead", id: priv.id, revision: priv.revision, label: "I've read it" }]; return s; })());
+    await stale2.click("I've read it");
+    ok(stale2.text().includes(PS6.POLICY_START_WORDS.alreadySaved), `the 409 words: ${stale2.text().slice(0, 400)}`);
+  } finally {
+    spy.restore();
+  }
+  // a 403: the server's plain words
+  const spy403 = fetchSpy(async () => ({ status: 403, body: { error: PS6.POLICY_START_WORDS.readOnly, code: "READ_ONLY" } }));
+  try {
+    const v = await mountSetup(initial);
+    await v.click("Start a returns page");
+    eq(spy403.calls.length, 1, "no reload after a 403:");
+    ok(v.text().includes(PS6.POLICY_START_WORDS.readOnly), "the 403 words");
+  } finally {
+    spy403.restore();
+  }
+});
+
+// The legacy screen: the component at eee9f2d (before this item) and today's
+// render the same markup for a checklist with no actions.
+const LEGACY_LIST6 = Object.freeze({
+  ok: true,
+  supported: true,
+  items: [
+    { id: "connect", label: "Connect Shopify", kind: "auto", done: true, href: "/admin/integrations", hint: "OAuth connect — the catalog syncs from your store." },
+    { id: "policies", label: "Publish legal pages", kind: "auto", done: false, href: "/admin/storefront", hint: "Privacy + terms/refund — templates scaffold them; checkout links them." },
+    { id: "preview", label: "Review your draft preview", kind: "manual", done: false, href: "/admin/storefront", hint: "Walk the storefront in the preview pane, then mark done." },
+    { id: "launch", label: "Launch", kind: "manual", done: false, gated: true, href: "/admin/releases", hint: "Unlocks when everything above is done." },
+  ],
+  doneCount: 1,
+  total: 4,
+  launched: false,
+  launchedAt: null,
+  provisionedAt: null,
+});
+// renderToStaticMarkup of components/admin/SetupAdmin.js at eee9f2d for LEGACY_LIST6
+// (regenerate: render that commit's file through staticSetup(source))
+const SETUP_BEFORE_SHA256 = "549e86bd70d930b5a934accf7ae404152a958bb70b3012193021e14e913616cc";
+async function staticSetup(source = null) {
+  const Setup = await loadComponent(join(ROOT, "components/admin/SetupAdmin.js"), { react: React6, "@/components/console/Toast": toastStub6, "next/link": linkStub6 }, source);
+  return rsm6(React6.createElement(Setup, { initial: LEGACY_LIST6 }));
+}
+
+await t("rendered (P6-ONBOARD, SetupAdmin): a checklist whose steps have no actions renders exactly as before this item (the markup's sha256 is the eee9f2d component's), with no 'not legal advice' line", async () => {
+  const html = await staticSetup();
+  eq(createHash("sha256").update(html).digest("hex"), SETUP_BEFORE_SHA256, "markup:");
+  ok(!html.includes("not legal advice"), "no starter line");
+  // an empty actions list is no actions
+  const Setup = await loadComponent(join(ROOT, "components/admin/SetupAdmin.js"), { react: React6, "@/components/console/Toast": toastStub6, "next/link": linkStub6 });
+  const withEmpty = { ...LEGACY_LIST6, items: LEGACY_LIST6.items.map((i) => ({ ...i, actions: [] })) };
+  eq(rsm6(React6.createElement(Setup, { initial: withEmpty })), html, "actions: [] renders the same:");
 });
 
 // ---- P4-FIX5: the P4-PROVISION review findings -------------------------------------

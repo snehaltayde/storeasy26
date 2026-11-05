@@ -758,7 +758,8 @@ await t("readers + links: onboarding's legal-pages step reads the published page
   const before = await items(docs);
   eq(before.find((i) => i.id === "policies").done, false, "frozen privacy and terms don't count:");
   const hrefs = Object.fromEntries(before.map((i) => [i.id, i.href]));
-  eq([hrefs.policies, hrefs.preview, hrefs.launch, hrefs.brand], ["/admin/editor?list=pages", "/admin/editor", "/admin/editor?doc=doc_home", "/admin/editor?doc=doc_design"], "editor destinations:");
+  // P6-ONBOARD: the design step links /admin/start on a documents store (the logo is changed there)
+  eq([hrefs.policies, hrefs.preview, hrefs.launch, hrefs.brand], ["/admin/editor?list=pages", "/admin/editor", "/admin/editor?doc=doc_home", "/admin/start"], "editor destinations:");
   for (const i of before) ok(!forbidden(i.href) && !i.href.startsWith("/admin/theme"), `${i.id}: ${i.href}`);
   // a draft privacy page is not enough; published privacy and terms are
   const priv = await docs.run(() => Docs.createDocument({ type: "page", body: routeBody("page", "privacy", "Privacy", [sec("text", "sec_p1", { title: "Privacy", body: ["We keep little."] })]), actor: ACTOR }));

@@ -760,7 +760,8 @@ await t("unit: onboarding, Help, the agency kit export and brand readability rea
   // onboarding: done from the live design, linking to the editor
   const ob = await inD(() => ON.buildChecklist());
   const step = ob.items.find((i) => i.id === "brand");
-  eq([step.done, step.href], [true, "/admin/editor?doc=doc_design"], "onboarding:");
+  // P6-ONBOARD: the design step links /admin/start on a documents store
+  eq([step.done, step.href], [true, "/admin/start"], "onboarding:");
   // Help: the live look (the old config pin is moved to glow so the two differ)
   const cfg0 = await cfgOf("dd");
   await C.patchTenant("dd", { config: { theme: { kit: "glow", version: 1 } } });
@@ -819,7 +820,7 @@ await t("unit: onboarding on a documents store with no published design is not d
   await C.upsertTenant({ id: "dn", name: "Design New", domains: ["dn.test"], dbUrl: "file:.test-design-doc-default.db", config: { ...STALE }, secrets: {} });
   const ob = await withTenant(await tenant("dn"), () => ON.buildChecklist());
   const step = ob.items.find((i) => i.id === "brand");
-  eq([step.done, step.href], [false, "/admin/editor?doc=doc_design"], "not done on the old config:");
+  eq([step.done, step.href], [false, "/admin/start"], "not done on the old config:");
   c.close();
 });
 
