@@ -35,6 +35,7 @@
 //   historyRowsOf(versions)          Earlier versions rows
 //   recentGroupsOf(rows)             Recently published rows, grouped by set
 import { documentType, fieldAnchor } from "../../../../lib/registry/index.js"; // relative, so plain node loads it
+import { isLiveRowType } from "../../../../lib/registry/document-types.js";
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const q = (s) => `“${s}”`;
@@ -644,11 +645,16 @@ export function createPublishFlow(deps = {}) {
     if (p.error) return set({ phase: "error", outcome: { phase: "error", title: WORDS.blockedTitle, words: p.error, retry: false }, busy: false });
     const items = p.items;
     const types = { ...state.types, ...Object.fromEntries(items.map((it) => [it.id, it.type])) };
-    // P6-OPEN-UI: "Before you open your store" is asked first, every time
-    // (the flow can't tell a closed store from an open one; the server
-    // answers opening: false on an open store). A refused or failed read
-    // goes on exactly as before: the publish's own 409s are the backstop.
-    const report = await readOpening(items.map((it) => it.id));
+    // P6-OPEN-UI: "Before you open your store" is asked first (the flow
+    // can't tell a closed store from an open one; the server answers
+    // opening: false on an open store). A refused or failed read goes on
+    // exactly as before: the publish's own 409s are the backstop.
+    // Not for a set of product and collection content only: those publish
+    // as live rows and never open the store (lib/documents/publish.js runs
+    // the opening rules only when the set is not rows-only), so they go
+    // straight to the review.
+    const rowsOnly = items.length > 0 && items.every((it) => isLiveRowType(types[it.id]));
+    const report = rowsOnly ? null : await readOpening(items.map((it) => it.id));
     if (mine !== seq) return;
     if (report && report.opening === true) {
       return enterOpening({ phase: "opening", reason: "proactive", message: null, report, offer: report.offer ?? null }, { items, types, fresh: true, mine });

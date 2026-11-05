@@ -21,7 +21,7 @@ All in the plan's list:
 | Stage | Status |
 |---|---|
 | Implemented | Yes, on this branch |
-| Locally tested | Yes. `pnpm test` with `CHECKOUT_MODE` unset, on ports 6120 and 7120 to 7129: 102 of 102 suites passed in 240 s. `pnpm build` passed |
+| Locally tested | Yes. `pnpm test` with `CHECKOUT_MODE` unset, on ports 6120 and 7120 to 7129: 102 of 102 suites passed in 240 s. `pnpm build` passed. Fix round 1: `pnpm test` 102 of 102 again (209 s) |
 | Browser verified | **NOT DONE.** Every acceptance item is proved by a unit or rendered test. The full panel flow in desktop Chrome is P6-DRILLS stage C (owner check below) |
 | Staging verified | **NOT DONE** |
 | Production enabled | **NOT DONE.** Nothing pushed or merged |
@@ -45,7 +45,7 @@ Everything goes through the flow's existing `on.open`, `on.confirm` and `on.act`
 
 1. Staff: nothing opens (unchanged).
 2. Pin each document's revision and hash (unchanged).
-3. **New:** `call("openingChecks", { ids })` for the set. The flow can't tell an open store from a closed one, so it always asks. The server answers `opening: false` on an open store.
+3. **New:** `call("openingChecks", { ids })` for the set. The flow can't tell an open store from a closed one, so it asks. The server answers `opening: false` on an open store. **Fix round 1:** it does not ask when every document in the set is product or collection content (`isLiveRowType`). Those publish as live rows and never open the store: the server runs the opening rules only when the set is not rows-only (`lib/documents/publish.js`), but `openingChecks` answers `opening: true` for any set on a closed store. Without this skip, editing a product description on a closed store showed "Before you open your store", kept Publish off until the policy pages were done, and folded the design into the set so Open went on to open the store. A set with no known type (pinned with a revision but no `type`) still asks.
 4. `opening: true` → the `opening` phase. A refused read (a legacy store), a failed read, a thrown call, or `opening: false` → the review, exactly as before. The publish's own 409s stay the backstop.
 
 ### Folding an offer (`foldOffer`)
@@ -107,11 +107,12 @@ The notice line can carry a link (`noticeLink`, "Open it").
 | Rendered: 'Check again' re-calls openingChecks; 'I placed one' posts the manual test_order check-off and re-checks | DONE | "P6-OPEN-UI rendered: 'Check again' re-reads the report; 'I placed one' POSTs…" (fetch spy: `POST /api/admin/setup { step: 'test_order' }`, then a third read; a 422 shows our words and does not re-read). Fails without the change |
 | Rendered: a done answer with a store-level POLICY_PAGE_MISSING warning shows plain words, not the code | DONE | "P6-OPEN-UI rendered: a done answer with a store-level POLICY_PAGE_MISSING warning…" (the shapes' `okPolicyPageMissing` plus a store-level one with no document: both messages show, the group is named "Your store", and `plain()` finds no code in the markup). Fails without the change: the group was named "This page" |
 | FIRST_PUBLISH_NEEDS_HOME offer, noHome, REPUBLISH_CONFIRM_NEEDED and normal publish still pass; every publish and publishSet sends checkOpening:true top-level through createStoreCall and the store to the API body; ACTION_TYPES unchanged; pnpm test passes | DONE | "P6-OPEN-UI unit: checkOpening reaches the documents API body…" (the real `createDocumentsApi` with a fetch spy, the store and `createStoreCall`: `openingChecks` first, then a `publish` body with top-level `checkOpening` beside `revision`, then the home offer's `publishSet` body with top-level `checkOpening`; the store sends the keys only when set; noHome; republish resends `confirmRepublish` with `checkOpening`). The phase 3 to 5 cases all pass. ACTION_TYPES is pinned in "…'Check again'…" and the old "every action type of the contract" case passes. `pnpm test` 102 of 102. Mutations: reverting editorModel.js alone or store.js alone fails 2 tests each; dropping `checkOpening` from publishRequest fails 9 |
+| Fix round 1: product and collection content on a closed store skip the opening panel and publish with checkOpening only; a set with a page in it still asks | DONE | "P6-OPEN-UI unit (fix round 1): product and collection content on a closed store skip the opening panel…": with the new-store report (privacy missing, design offered) scripted for `openingChecks`, a `product_content` set and a `product_content` plus `collection_content` set never ask it, go to the review with the same set (no design folded in), Publish is on, and the publish goes out with `{ revision: 2, checkOpening: true }` / `publishSet` with `{ checkOpening: true }`, no `confirmOpen`. A product plus home set still asks first and opens the panel. Fails with the round-0 publishModel.js ("openingChecks is not asked") |
 | Browser: the full panel flow in desktop Chrome | NOT DONE | Owner check, covered by P6-DRILLS stage C |
 
 ## Tests
 
-- `node scripts/test-publish-ui.js`: 52 passed (42 before, 10 new). With this branch's four component files put back to `dd9ff01`, 13 fail: the 10 new tests and the 3 changed flag expectations.
+- `node scripts/test-publish-ui.js`: 53 passed (42 before, 11 new; the fix round 1 case is the 11th). With this branch's four component files put back to `dd9ff01`, 13 fail: the 10 new tests and the 3 changed flag expectations.
 - `pnpm test` (`CHECKOUT_MODE` unset; ports 6120 and 7120 to 7129): 102 of 102 suites, 240 s. test-editor-shell (32), test-editor-store and the others pass unchanged.
 - `pnpm build`: passes. Its one warning (next.config.mjs, "unexpected file in NFT list") is there on `dd9ff01` too.
 
@@ -132,6 +133,7 @@ The last three are required by the acceptance (every request carries the flag). 
 - **The shared returns rule (P6-GEN-WRITE) matches any slug with "return" in it.** An unrelated founder-saved draft such as `returning-customers` counts as the returns page. It then shows as "Your returns page … goes live too", named in its link ("Open “Returning customers”") and in "What goes live", and it goes live with the store if the founder presses Open. The panel names it everywhere, but it can't tell that the page is not a returns page. Changing the rule is outside this item (owner check).
 - **The test order check-off needs settings.write.** Only owners and admins can publish, and they have it, so this does not reach staff. A failure shows our own words. The route's 422 text is never shown.
 - **ALREADY_SAVED's words come from the server** ("This page was already saved by you."), which is not always true (batch 1 review of P6-POLICY-START). The panel shows them as they are.
+- **Product and collection content skip the precheck by type** (fix round 1). The client decides from the types in the set; `openingChecks` itself still answers `opening: true` for a rows-only set on a closed store (a lib/ change to make it answer `false` was left out, as it needs the plan's say). Any other caller of `openingChecks` with a rows-only set would see the same report.
 - **The test stub answers `openingChecks` by default** (Tests above). A future case that pins a call list and also scripts `openingChecks` sees the read in `calls`.
 
 ## Owner checks

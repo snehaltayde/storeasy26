@@ -1297,6 +1297,33 @@ await t("P6-OPEN-UI unit: opening:false, a refused read, a failed read and a thr
   }
 });
 
+await t("P6-OPEN-UI unit (fix round 1): product and collection content on a closed store skip the opening panel and publish with checkOpening only; a set with a page in it still asks", async () => {
+  // the report a new store gets: privacy missing (blocks), a design draft offered
+  const closed = () => reportOf([I.paymentOk, I.privacyMissing, I.returnsOk, I.testOrderWarn, I.designInfo], [{ id: "doc_pc1", revision: 2, draftHash: "h_pc", label: "Shirt" }, DESIGN]);
+  const PC = { id: "doc_pc1", label: "Shirt", type: "product_content", revision: 2, draftHash: "h_pc" };
+  const CC = { id: "doc_cc1", label: "Summer", type: "collection_content", revision: 5, draftHash: "h_cc" };
+  for (const [name, set, extra] of [["product content", [PC], { revision: 2, checkOpening: true }], ["product and collection content", [PC, CC], { checkOpening: true }]]) {
+    const call = stub({ openingChecks: closed, listChanges: changes([{ kind: "edited", sectionId: null, words: "Description changed" }]), publish: answer(P.ok), publishSet: answer(P.ok) });
+    const flow = M.createPublishFlow({ call });
+    await flow.open(set);
+    const s = flow.getState();
+    ok(!call.ops().includes("openingChecks"), `${name}: openingChecks is not asked`);
+    eq(s.phase, "review", `${name}: the review:`);
+    eq(s.items.map((i) => i.id), set.map((i) => i.id), `${name}: the same set, no design folded in:`);
+    ok(flow.canConfirm(), `${name}: Publish is on`);
+    ok(!textOf(renderPanel(flow)).includes(M.WORDS.openingTitle), `${name}: no opening panel`);
+    await flow.confirm();
+    const sent = call.calls.at(-1);
+    eq([sent.op, (Array.isArray(sent.args) ? sent.args : [sent.args]).map((x) => x.id ?? x), sent.extra], [set.length > 1 ? "publishSet" : "publish", set.map((i) => i.id), extra], `${name}: published with checkOpening and no confirmOpen:`);
+  }
+  // a page in the set: asked as before
+  const call = stub({ openingChecks: closed, listChanges: firstPubAll() });
+  const flow = M.createPublishFlow({ call });
+  await flow.open([PC, HOME]);
+  eq(call.calls[0].op, "openingChecks", "a set with a page asks first:");
+  eq(flow.getState().phase, "opening", "and opens the panel:");
+});
+
 await t("P6-OPEN-UI unit: the publish's 409s map to the one panel: CONFIRM_NEEDED and NEEDS_DESIGN to 'opening' (design folded, no second dialog), CANNOT_TAKE_PAYMENT to 'cannotOpen' (Open off), NEEDS_POLICIES folds saved drafts or keeps Open off when its offer is null; a starter is never added", async () => {
   // the outcome mapping on its own
   eq(M.outcomeOf(answer(P.openingConfirmNeeded)).phase, "opening", "OPENING_CONFIRM_NEEDED:");
