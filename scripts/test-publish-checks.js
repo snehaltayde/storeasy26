@@ -1210,7 +1210,14 @@ const { bundlesByIds } = await import("../lib/commerce/bundle-read.js");
 const Words = await import("../lib/commerce/bundle-words.js");
 const { formatMoney } = await import("../lib/format.js");
 const { writeProduct } = await import("../lib/sync.js");
-const { actionLabel } = await import("../components/admin/editor/publish/publishModel.js");
+// P5-FIX1: the replays use the editor's own applyAction (imported, not edited)
+const { actionLabel, applyAction } = await import("../components/admin/editor/publish/publishModel.js");
+// the founder's click on a Remove action, as the editor applies it
+const replay = (body, action) => {
+  const r = applyAction(body, action);
+  if (!r.ok) throw new Error(`applyAction refused ${JSON.stringify(action)}: ${r.message}`);
+  return r.body;
+};
 
 const usd = (p) => ({
   ...p,
@@ -1316,9 +1323,12 @@ await t("P5-CHECKS: a card on a deleted bundle is BUNDLE_MISSING naming its id w
   eq(i.actions, [{ type: "removeSection", documentId: BUN_HOME.id, sectionId: "sec_cgone" }], "remove the section:");
   eq(actionLabel(i.actions[0]), "Remove this section and publish", "the button:");
   eq(i.where, "Test bundles · Bundle", "where:");
-  // the founder's click, replayed
+  // the founder's click, replayed through the editor's applyAction
   const d = await current("bun", BUN_HOME.id);
-  await save("bun", BUN_HOME.id, { ...d.body, sections: d.body.sections.filter((s) => s.id !== i.actions[0].sectionId) });
+  const edited = replay(d.body, i.actions[0]);
+  eq(edited.sections.map((s) => s.id).includes("sec_cgone"), false, "the card is gone:");
+  eq(edited.sections.length, d.body.sections.length - 1, "only the card went:");
+  await save("bun", BUN_HOME.id, edited);
   const r2 = published(await publishApi("bun", BUN_HOME.id), "after removing the card");
   eq(r2.issues.filter((x) => x.sectionId === "sec_cgone"), [], "nothing about the removed card:");
   eq(r2.issues.filter((x) => x.code === "BUNDLE_MISSING").map((x) => x.field), ["bundles.0"], "only the grid's deleted entry is left:");
@@ -1338,10 +1348,13 @@ await t("P5-CHECKS: a grid with one deleted and one turned-off bundle gives BUND
   ok(miss.message.includes(`“${BUNS.gridGone}”`) && miss.message.includes(Words.stateLine("missing")), `deleted, by id: ${miss.message}`);
   ok(off.message.includes("“Grid off kit”") && off.message.includes(Words.stateLine("disabled")), `turned off, by name: ${off.message}`);
   eq(miss.where, "Test bundles · Bundles to show · bundle 1", "where:");
-  // replay both clicks, highest index first (as the editor applies one, then reloads)
+  // replay both clicks through the editor's applyAction (its containerFor
+  // finds settings.bundles), highest index first (as the editor applies one,
+  // then reloads)
   const d = await current("bun", BUN_HOME.id);
   let b = d.body;
-  for (const a of [off.actions[0], miss.actions[0]]) b = { ...b, sections: b.sections.map((s) => (s.id === a.sectionId ? { ...s, settings: { ...s.settings, [a.field]: s.settings[a.field].filter((_, j) => j !== a.index) } } : s)) };
+  for (const a of [off.actions[0], miss.actions[0]]) b = replay(b, a);
+  eq(JSON.stringify(b.sections.filter((s) => s.id !== "sec_grid")), JSON.stringify(d.body.sections.filter((s) => s.id !== "sec_grid")), "nothing else changed:");
   eq(b.sections.find((s) => s.id === "sec_grid").settings.bundles, [{ id: BUNS.fine }], "only the available bundle stays:");
   await save("bun", BUN_HOME.id, b);
   const r2 = published(await publishApi("bun", BUN_HOME.id), "after removing the two entries");
@@ -1377,6 +1390,58 @@ await t("P5-CHECKS: two turned-on bundles that share a product give BUNDLE_OVERL
   eq(o[0].actions, [{ type: "openField", documentId: BUN_HOME.id, sectionId: "sec_covl", field: "bundle" }], "open the field only:");
   // the turned-off bundle shares its products with the deleted one: no overlap
   ok(!ALL_FOUR.issues.some((x) => x.code === "BUNDLE_OVERLAP" && x.sectionId === "sec_grid"), "no overlap from a turned-off or deleted bundle");
+});
+
+// P5-FIX1 (the P5-CHECKS review, orchestrator ruling 3): BUNDLE_OVERLAP only
+// for an available bundle. Three more bundles on products 1 to 4 (the
+// statement-count test below makes its own on 1 to 12, so these are deleted
+// at the end): "On overlap kit" {2, 3} is on and available; "Off overlap
+// kit" {1, 2} is turned off and shares product 2 with it; "NR kit" {3, 4} is
+// on but not ready (its offer row is gone) and shares product 3 with it.
+await t("P5-FIX1: a turned-off bundle sharing a product with a turned-on one gets only BUNDLE_DISABLED; a not_ready bundle gets BUNDLE_UNAVAILABLE with removeSection and no overlap; the available one keeps its overlap; replaying removeSection through applyAction clears it", async () => {
+  const K3 = await inT(async () => {
+    const make = (title, items, price) => Bun.createBundle({ title, items, bundle_price: price, enable: true, mustPass: true });
+    const on = await make("On overlap kit", pair(2, 3), 400);
+    const off = await make("Off overlap kit", pair(1, 2), 250);
+    const nr = await make("NR kit", pair(3, 4), 600);
+    await Bun.setBundleEnabled(off.id, false);
+    return { on: on.id, off: off.id, nr: nr.id };
+  }, "bun");
+  await raw.bun.execute({ sql: "DELETE FROM offers WHERE id = ?", args: [`bundle-${K3.nr}`] });
+  try {
+    const st = await inT(() => bundlesByIds([K3.on, K3.off, K3.nr]), "bun");
+    const view = (id) => [st.get(id).state, st.get(id).overlapsWith.map((o) => o.id).sort()];
+    eq(JSON.stringify([view(K3.off), view(K3.nr)]), JSON.stringify([["disabled", [K3.on]], ["not_ready", [K3.on]]]), "both list the turned-on bundle in overlapsWith (so only the checks' own rule keeps the overlap off):");
+    eq(st.get(K3.on).state, "available", "the turned-on one:");
+    const body = homeBody([card("sec_xoff", K3.off), card("sec_xnr", K3.nr), card("sec_xon", K3.on)]);
+    await save("bun", BUN_HOME.id, body);
+    const r = published(await publishApi("bun", BUN_HOME.id), "the overlap cases");
+    checkIssues(r.issues, "overlap cases 200");
+    const got = bunIssues({ body: r }).map((i) => [i.code, i.sectionId, i.field]);
+    eq(JSON.stringify(got), JSON.stringify([
+      ["BUNDLE_DISABLED", "sec_xoff", "bundle"],
+      ["BUNDLE_UNAVAILABLE", "sec_xnr", "bundle"],
+      ["BUNDLE_OVERLAP", "sec_xon", "bundle"],
+    ]), "exactly these, in body order:");
+    // never an overlap next to a BUNDLE_UNAVAILABLE (or any other bundle warning) for the same field
+    for (const i of bunIssues({ body: r }).filter((x) => x.code === "BUNDLE_OVERLAP")) ok(!bunIssues({ body: r }).some((x) => x !== i && x.sectionId === i.sectionId && x.field === i.field), `overlap beside another warning: ${i.sectionId}`);
+    const nr = r.issues.find((x) => x.code === "BUNDLE_UNAVAILABLE" && x.sectionId === "sec_xnr");
+    ok(nr.message.startsWith("“NR kit”: ") && nr.message.includes(Words.stateLine("not_ready")) && /takes this whole section off the page/.test(nr.message), `not ready words: ${nr.message}`);
+    eq(JSON.stringify(nr.actions), JSON.stringify([{ type: "removeSection", documentId: BUN_HOME.id, sectionId: "sec_xnr" }]), "not_ready is removable:");
+    eq(actionLabel(nr.actions[0]), "Remove this section and publish", "the button:");
+    const ovl = r.issues.find((x) => x.code === "BUNDLE_OVERLAP");
+    ok(ovl.message.startsWith("“On overlap kit”: ") && ovl.message.includes("“Off overlap kit”") === false && ovl.message.includes("“NR kit”"), `the available one names the turned-on bundle it shares with: ${ovl.message}`);
+    // the founder's click on the not-ready card, through the editor's applyAction
+    const d = await current("bun", BUN_HOME.id);
+    await save("bun", BUN_HOME.id, replay(d.body, nr.actions[0]));
+    const r2 = published(await publishApi("bun", BUN_HOME.id), "after removing the not-ready card");
+    eq(JSON.stringify(bunIssues({ body: r2 }).map((i) => [i.code, i.sectionId])), JSON.stringify([["BUNDLE_DISABLED", "sec_xoff"], ["BUNDLE_OVERLAP", "sec_xon"]]), "the not-ready card is gone, the rest stays:");
+  } finally {
+    await save("bun", BUN_HOME.id, allFour());
+    await inT(async () => {
+      for (const id of Object.values(K3)) await Bun.deleteBundle(id);
+    }, "bun");
+  }
 });
 
 await t("P5-CHECKS: when the bundles read fails, no BUNDLE_MISSING (or any bundle warning) is reported, the failure is logged as documents_publish_check_unreadable (table bundles), and the publish still succeeds", async () => {

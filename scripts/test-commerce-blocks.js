@@ -545,6 +545,101 @@ await t("worst cases: every lib/registry/fixtures.js case of both kinds renders 
   }
 });
 
+// =====================================================================================
+console.log("— P5-FIX1: a deleted product, and a quantity that is not whole");
+// =====================================================================================
+// A product of a turned-on bundle leaves the catalog (its variant row goes, as
+// a sync that drops it would). 1400 + 1500 = 2900 at 2800; what is left adds
+// up to 1400, below the price, so before P5-FIX1 the bundle also read
+// "saves nothing" and was hidden, with a note telling the founder to lower
+// the price on a false sum.
+async function withDeletedProduct(fn) {
+  const id = await inT(async () => (await B.upsertBundle({ slug: "gone-part", title: "Gone part", items: items(14, 15), bundle_price: 2800, enable: true })).id);
+  const saved = (await raw("SELECT * FROM variants WHERE id = ?", [V(15)])).rows[0];
+  const cols = Object.keys(saved);
+  await raw("DELETE FROM variants WHERE id = ?", [V(15)]);
+  try {
+    return await fn(id);
+  } finally {
+    await raw(`INSERT INTO variants (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`, cols.map((k) => saved[k]));
+    await inT(() => B.deleteBundle(id));
+  }
+}
+
+await t("P5-FIX1: a card whose bundle lost a product to the catalog is shown 'Currently unavailable' with that product marked 'No longer available'; in preview only, a note says to replace the product, never to lower the price", async () => {
+  await withDeletedProduct(async (id) => {
+    const s = card("sec_x1", id);
+    const data = await dataOf([s]);
+    const b = data.get("sec_x1").bundle;
+    same([b.state, b.reasons.map((r) => r.kind)], ["sold_out", ["missing"]], "the read:");
+    const why = BW.stateLine("sold_out", b.reasons, { currency: "USD" });
+    eq(why, "A product in this bundle is no longer in your catalog: shoppers see Currently unavailable and can't add it. Replace it with another product in Catalog > Bundles.", "the words:");
+    const r = await both([s], data);
+    for (const [mode, h] of Object.entries(r)) {
+      const sec = sectionOf(h, "sec_x1");
+      ok(sec, `${mode}: hidden`);
+      const btns = buttonOf(sec);
+      ok(btns.length === 1 && /disabled=""/.test(btns[0]) && btns[0].includes("Currently unavailable"), `${mode}: ${btns}`);
+      ok(/>No longer available</.test(sec), `${mode}: the deleted product is not marked`);
+      ok(!/Lower the price|add up to|hidden from shoppers/.test(words(sec)), `${mode}: no-saving words: ${sec.slice(0, 600)}`);
+    }
+    ok(!/data-founder-note|Replace it/.test(r.live), "live: a founder note");
+    const note = r.preview.match(/<div data-founder-note=""[^>]*data-bundle-note="missing-product"[^>]*>[\s\S]*?<\/div>/)?.[0] || "";
+    ok(words(note).includes(why) && note.includes(NOTE_ONLY), `preview note: ${note || r.preview.slice(0, 900)}`);
+  });
+});
+
+await t("P5-FIX1: in a grid, the bundle that lost a product keeps its cell live (Currently unavailable), and in preview the cell carries the replace-the-product note, not a 'hidden from shoppers' note", async () => {
+  await withDeletedProduct(async (id) => {
+    const s = grid("sec_x2", [K.avail, id]);
+    const data = await dataOf([s]);
+    const r = await both([s], data);
+    same([...r.live.matchAll(/data-bundle-state="([^"]+)"/g)].map((m) => m[1]), ["available", "sold_out"], "live cells:");
+    ok(!/data-founder-note/.test(r.live), "live: no note");
+    same([...r.preview.matchAll(/data-bundle-state="([^"]+)"/g)].map((m) => m[1]), ["available", "sold_out"], "preview cells:");
+    ok(!/hidden from shoppers|data-bundle-cell/.test(r.preview), "preview: the cell is not dropped");
+    const cell = r.preview.match(/<div data-bundle="[^"]+" data-bundle-state="sold_out"[\s\S]*$/)?.[0] || "";
+    ok(/data-bundle-note="missing-product"/.test(cell) && words(cell).includes("Replace it with another product in Catalog > Bundles."), `preview: the note in the cell: ${cell.slice(0, 900)}`);
+  });
+});
+
+// The real bundle page (app/(storefront)/bundles/[slug]/page.js), rendered in
+// this store. Its tenant lookup (tfetch) and closed-store gate need a real
+// request; here tfetch runs the read in the store this suite is in, and the
+// store is open.
+STUBS["@/lib/tenant-request"] = { __esModule: true, tfetch: (fn) => fn() };
+STUBS["@/lib/content/resolve"] = { __esModule: true, closedStoreGate: async () => null };
+const BundlePage = (await loadJsx(join(ROOT, "app/(storefront)/bundles/[slug]/page.js"))).default;
+const renderPage = (slug) => inT(async () => html(await BundlePage({ params: Promise.resolve({ slug }) })));
+
+await t("P5-FIX1: a turned-on bundle stored with a quantity of 1.5 is not_ready on the home card AND on the real bundle page, which says 'This bundle isn't available right now.', never 'A component is out of stock'; a sold-out bundle's page still says out of stock", async () => {
+  const id = await inT(async () => (await B.upsertBundle({ slug: "half-qty", title: "Half qty", items: items(14, 16), bundle_price: 2900, enable: true })).id);
+  // as a pre-P5 write could have left it: the row and its offer agree on 1.5
+  const half = [{ variantId: V(14), quantity: 1.5 }, { variantId: V(16), quantity: 1 }];
+  await raw("UPDATE bundles SET items = ? WHERE id = ?", [JSON.stringify(half), id]);
+  await raw("UPDATE offers SET config = json_set(config, '$.items', json(?)) WHERE id = ?", [JSON.stringify(half), `bundle-${id}`]);
+  try {
+    const s = card("sec_x3", id);
+    const data = await dataOf([s]);
+    const b = data.get("sec_x3").bundle;
+    same([b.state, b.reasons.map((r) => r.kind)], ["not_ready", ["bad_quantity"]], "the home read:");
+    const live = sectionOf(await render([s], data), "sec_x3");
+    ok(live && buttonOf(live).some((x) => /disabled=""/.test(x) && x.includes("Currently unavailable")), `the home card: ${live.slice(0, 400)}`);
+    const page = await inT(() => B.getBundle("half-qty"));
+    same([page.available, page.state], [false, "not_ready"], "getBundle:");
+    const h = words(await renderPage("half-qty"));
+    ok(h.includes("Half qty") && h.includes("This bundle isn't available right now."), `the page: ${h.slice(0, 600)}`);
+    ok(!h.includes("A component is out of stock"), "the page says out of stock");
+    ok(/<button[^>]*disabled=""[^>]*>Currently unavailable<\/button>/.test(h), "the page's add button is off");
+    const sold = words(await renderPage("night-set"));
+    ok(sold.includes("A component is out of stock — the set comes back when it does.") && !sold.includes("This bundle isn't available right now."), "a sold-out bundle's page");
+    const fine = words(await renderPage("gym-kit"));
+    ok(!/out of stock|isn't available right now/.test(fine), "an available bundle's page says neither");
+  } finally {
+    await inT(() => B.deleteBundle(id));
+  }
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 rawClient.close();
 await tn.cleanup();

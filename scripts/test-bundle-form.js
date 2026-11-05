@@ -425,10 +425,11 @@ await t("a failing check renders bundle-words reasons per product row and under 
         return said ? textOf(said.props.children) : "";
       };
       eq([rowReason(0), rowReason(1), rowReason(2)], ["Sold out", "No longer available", ""], "per row");
+      // P5-FIX1 (ruling 1): with a product missing the sum is not the real one,
+      // so there is no "Price must be lower than …" under the price; the
+      // missing row says "No longer available" (replace it)
       const price = v.find((n) => n.props?.["data-bundle-price-reason"] === "");
-      ok(price, "a price reason");
-      // 300 for product 3, plus 100 for the sold-out product 1; the missing one adds nothing
-      eq(textOf(price.props.children), "Price must be lower than $400", "under the price");
+      ok(!price || !/Price must be lower/.test(textOf(price.props.children)), "no price reason on a false sum");
       const all = v.all();
       ok(!/component \d|₹|INR|not in the catalog|doesn't save/i.test(all), `legacy words on screen: ${all}`);
       ok(/Fixture product 3/.test(all), "row titles come from the check");
