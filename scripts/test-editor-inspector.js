@@ -1324,6 +1324,9 @@ function refsServer() {
     S.calls.push(p);
     if (p.type !== "bundle") return answer(200, { ok: true, items: [] });
     if (S.mode === "forbidden") return answer(403, { ok: false, error: "Forbidden" });
+    // only the first page (limit=50, no ids= or q=) is refused: a later ids=
+    // read that succeeds can not hide what the first catch set
+    if (S.mode === "page-forbidden" && !p.ids && !p.q) return answer(403, { ok: false, error: "Forbidden" });
     if (p.ids) {
       if (S.mode === "ids-forbidden") return answer(403, { ok: false, error: "Forbidden" });
       if (S.hold) await S.hold;
@@ -1341,7 +1344,14 @@ const HOME_BODY = () => ({
     { ...Reg.newSection("bundle_grid", { id: "sec_dg1" }), settings: { title: "Bundles", bundles: [{ id: "bun-a" }, { id: "bun-g1" }] } },
   ]),
 });
-async function driveEditor({ mode = "ok", hold = null, docHold = null, can = {} } = {}) {
+// the same two sections with nothing picked: no ids= read is ever asked
+const EMPTY_BODY = () => ({
+  ...Reg.fixtureDocument("home", [
+    { ...Reg.newSection("bundle_card", { id: "sec_dc1" }), settings: { title: "", bundle: null } },
+    { ...Reg.newSection("bundle_grid", { id: "sec_dg1" }), settings: { title: "Bundles", bundles: [] } },
+  ]),
+});
+async function driveEditor({ mode = "ok", hold = null, docHold = null, can = {}, makeBody = HOME_BODY } = {}) {
   const S = refsServer();
   S.mode = mode;
   S.hold = hold;
@@ -1352,7 +1362,7 @@ async function driveEditor({ mode = "ok", hold = null, docHold = null, can = {} 
     removeEventListener: (ev, fn) => listeners.set(ev, (listeners.get(ev) || []).filter((x) => x !== fn)),
   };
   const doc = { addEventListener() {}, removeEventListener() {}, getElementById: () => null };
-  const body = HOME_BODY();
+  const body = makeBody();
   const docState = { id: "doc_home", type: "home", body, revision: 1, draftHash: "h1", document: { id: "doc_home", type: "home", label: "Home page", publishedVersionId: null, access: { canPublish: true, reason: null } }, status: "saved", statusWords: "Saved", issues: [], ackCount: 0 };
   const fakeStore = () => ({ subscribe: () => () => {}, getState: () => docState, open: async () => {}, dispose() {}, setField() {}, beforeUnload: () => false });
   const api = { call: async (op) => (op === "getDocument" && docHold && (await docHold), op === "getDocument" ? { ok: true, data: { document: { id: "doc_home", type: "home", label: "Home page" } } } : op === "listDocuments" ? { ok: true, data: { documents: [{ id: "doc_home", type: "home", label: "Home page", live: false }] } } : op === "listProductContent" ? { ok: true, data: { items: [] } } : { ok: false }) };
@@ -1484,6 +1494,60 @@ await t("P5-FIX2 wiring (MC): a 403 on the bundle read (first page, or ids=) giv
     } finally {
       ed.restore();
     }
+  }
+});
+
+await t("P5-FIX2 wiring (MC, first catch alone): a 403 on the first page with no ids= read to mask it gives status 'failed' and 'You can't see bundles here.' once, never an empty picker", async () => {
+  const cases = [
+    // a document with nothing picked: the first page is the only bundle read
+    { name: "no picks", mode: "forbidden", makeBody: EMPTY_BODY, idsAsked: false },
+    // picks outside the first page, but only the first page is refused
+    { name: "first page only", mode: "page-forbidden", makeBody: HOME_BODY, idsAsked: null },
+  ];
+  for (const c of cases) {
+    const ed = await driveEditor({ mode: c.mode, makeBody: c.makeBody });
+    try {
+      const calls = bundleCalls(ed.S);
+      ok(calls.length >= 1 && calls[0].limit === "50" && !calls[0].ids, `${c.name}: the first page was asked: ${JSON.stringify(calls)}`);
+      if (c.idsAsked === false) ok(!calls.some((x) => x.ids), `${c.name}: no ids= read: ${JSON.stringify(calls)}`);
+      eq(ed.props.bundles.status, "failed", `${c.name}: failed`);
+      eq(ed.props.bundles.items, [], `${c.name}: no rows`);
+      const card = unescape(inspectorOf(ed.props, "sec_dc1"));
+      eq(count(card, CANT_SEE), 1, `${c.name}: the card says it once`);
+      ok(!card.includes("Create a bundle") && !card.includes('type="search"'), `${c.name}: the card offers no picking`);
+      ok(!card.includes("was deleted"), `${c.name}: not 'deleted'`);
+      const grid = unescape(inspectorOf(ed.props, "sec_dg1"));
+      if (c.makeBody === EMPTY_BODY) eq(count(grid, CANT_SEE), 1, `${c.name}: the empty grid says it once`);
+      else {
+        const g = inspectorOf(ed.props, "sec_dg1");
+        eq(statusLines(g), [CANT_SEE, CANT_SEE], `${c.name}: each picked grid row says it`);
+        ok(!grid.includes("was deleted"), `${c.name}: no grid row is 'deleted'`);
+      }
+      ok(!grid.includes("Create a bundle") && !grid.includes('type="search"'), `${c.name}: the grid offers no picking`);
+    } finally {
+      ed.restore();
+    }
+  }
+});
+
+await t("P5-FIX2 wiring (MC, second catch alone): the first page answers before the document opens, then the picks' ids= read (the pickedKey effect) is refused: status 'failed', 'You can't see bundles here.'", async () => {
+  let open;
+  const docHold = new Promise((r) => (open = r));
+  const ed = await driveEditor({ mode: "ids-forbidden", docHold });
+  try {
+    eq(bundleCalls(ed.S), [{ type: "bundle", limit: "50" }], "only the first page before the document is open");
+    eq(ed.props.bundles.status, "ready", "the first page is in");
+    open();
+    await ed.settle();
+    ok(bundleCalls(ed.S).some((c) => c.ids), `the effect asked ids=: ${JSON.stringify(bundleCalls(ed.S))}`);
+    eq(ed.props.bundles.status, "failed", "failed");
+    const card = unescape(inspectorOf(ed.props, "sec_dc1"));
+    eq(count(card, CANT_SEE), 1, "the card says it once");
+    ok(!card.includes("was deleted") && !card.includes("Create a bundle") && !card.includes('type="search"'), "not 'deleted', no picking");
+    eq(statusLines(inspectorOf(ed.props, "sec_dg1")), [CANT_SEE, CANT_SEE], "each grid row says it");
+  } finally {
+    open?.();
+    ed.restore();
   }
 });
 

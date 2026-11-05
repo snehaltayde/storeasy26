@@ -81,8 +81,8 @@ The props it gives are then rendered through the real `EditorView` with react-do
 |---|---|---|---|
 | 1 | unit: Disable/Delete confirm when the home lookup fails; a pending ids= bundle shows 'Checking this bundle…', never 'deleted' | DONE | test-bundle-form "P5-FIX2: when the home page can't be checked (usedOnHome null)…": a real lookup fault (a `documents` column renamed for one `listBundles` read) gives `usedOnHome: null`; Disable opens the confirm with "We couldn't check whether your home page uses this bundle. Turn it off anyway?" and sends nothing; Cancel sends nothing; Delete's confirm has "… Delete it anyway?"; only the Dialog's own Disable sends `{ enable: { id, enabled: false } }`. F1 (Disable goes ahead on null, the code before) and F2 (no Delete sentence) each fail it. test-editor-inspector "a picked bundle whose ids= read is still pending…" (model, card, grid) and "wiring (MD, ML)…" (DocumentEditor with the `ids=` answer held: `pending` is `[bun-far, bun-g1]`, the card and the grid row read "Checking this bundle…", never "was deleted"; then the real states once it answers). F3 (bundleView ignores pending) fails 2; F4 (EditorView gets the list without pending) fails the wiring test |
 | 2 | unit: the create Dialog never names an old slug and is off on a full grid; quantity under 1 is treated as empty; an old grid row is re-picked in place; the failed-read sentence prints once | DONE | test-bundle-form "the create Dialog never names an earlier name's page…" (after a Cancel with "Old Name" typed, and after a real create of "Made Kit", it opens again on `/bundles/bundle`): F5 (no reset, the code before) fails it. "a full grid (12) has 'Create a bundle' off…" and test-editor-inspector "a full grid turns 'Create a bundle' off…": F6 fails one in each. test-bundle-form "a quantity under 1 (0 or negative) is treated as empty…" (0, -2 and 0.5: the box keeps it, no check, Create off, the row asks; 2 is checked as 2; full mode's Save as draft and Save and show off with a 0): F7 fails it. test-editor-inspector "a grid row stored as an old { id, title } is picked again in place…" (UNKNOWN_FIELD on row 2 before; "Pick Old kit again" writes `[{a},{old},{3}]`; UNKNOWN_FIELD gone; no button on `{ id }` rows): F8 fails it. "a failed read says 'You can't see bundles here.' once…" (values `"bun-a"`, `42`, `{ title }`, `null`, `{ id }`): F9 (the old `!view &&` fallback) fails it |
-| 3 | unit: each editor-wiring mutation MA, MB, MC, MD, ME, MK, ML fails a test | DONE | See the mutation table: MA, MB, MC, MD, MD2, ME, MK, MK2 and ML each fail at least one test in test-editor-inspector section 7 |
-| 4 | unit: pnpm test passes | DONE | `98 of 98 suites passed in 191.2s`, exit 0, ports 6120 and 7120 to 7129 |
+| 3 | unit: each editor-wiring mutation MA, MB, MC, MD, ME, MK, ML fails a test | DONE | See the mutation table: MA, MB, MC (each catch alone, MC1 and MC2, and both), MD, MD2, ME, MK, MK2 and ML each fail at least one test in test-editor-inspector section 7. Fix round 1: MC1 (only the `loadBundles` catch) survived the first round, because the stub's `ids=` read also returned 403 and the `pickedKey` effect's catch set "failed" anyway; MC2 (only the effect's catch) survived too, because the old `ids-forbidden` case reached `ids=` inside `loadBundles`. Each now has its own driven test |
+| 4 | unit: pnpm test passes | DONE | Fix round 1: `98 of 98 suites passed in 196.1s`, exit 0, ports 6120 and 7120 to 7129 |
 
 ### Mutation table
 
@@ -100,7 +100,9 @@ The props it gives are then rendered through the real `EditorView` with react-do
 | F9 | the failed-read sentence twice (the old fallback) | test-editor-inspector: 1 failed |
 | MA | `page.js` `offersWrite = true` | test-editor-inspector: 1 failed |
 | MB | `canCreateBundles: true` whatever `can` says | test-editor-inspector: 1 failed |
-| MC | a failed or 403 read (both catches) set to `{ status: "ready", items: [] }` | test-editor-inspector: 1 failed |
+| MC | a failed or 403 read (both catches) set to `{ status: "ready", items: [] }` | test-editor-inspector: 3 failed |
+| MC1 | only the `loadBundles` catch set to `{ status: "ready", items: [], answered: [] }` (the review's form) | test-editor-inspector: 1 failed ("wiring (MC, first catch alone)"); test-bundle-form passes, as expected. Survived before fix round 1 |
+| MC2 | only the `pickedKey` effect's catch set to "ready" | test-editor-inspector: 1 failed ("wiring (MC, second catch alone)"). Survived before fix round 1 |
 | MD | no `ids=` read from the open document's picks (the `pickedKey` effect) | test-editor-inspector: 1 failed |
 | MD2 | the first read asks no `ids=` | test-editor-inspector: 3 failed |
 | ME | no re-read on window focus | test-editor-inspector: 1 failed |
@@ -110,7 +112,7 @@ The props it gives are then rendered through the real `EditorView` with react-do
 
 ## Tests
 
-- `scripts/test-editor-inspector.js` section 7 (10 tests): pending reads (model and rendered), an old grid row picked again, the failed-read sentence once, the full grid, and the wiring: MD/ML in both orders (the first page before the document opens, so the effect asks `ids=`; and the document first, so the first read asks it), ME, MC (403 on the first page, and on `ids=`), MK, MB, MA (owner, admin and staff get `offersWrite: true` and the currency; support gets false and no currency read). It adds a stub-aware loader (`loadWorld`) and a one-component hook driver, and `mountControl` views gained `nodesAll()`.
+- `scripts/test-editor-inspector.js` section 7 (12 tests): pending reads (model and rendered), an old grid row picked again, the failed-read sentence once, the full grid, and the wiring: MD/ML in both orders (the first page before the document opens, so the effect asks `ids=`; and the document first, so the first read asks it), ME, MC (403 on the first page, and on `ids=`), MK, MB, MA (owner, admin and staff get `offersWrite: true` and the currency; support gets false and no currency read). Fix round 1 added two: "MC, first catch alone" (a 403 on the first page with nothing to mask it: a document with no picks, so no `ids=` read is asked, and a `page-forbidden` stub mode where only the `limit=50` read is refused and `ids=` succeeds; each checks status "failed", no rows, the card says "You can't see bundles here." once with no search and no "Create a bundle", and the grid says it once when empty or on each picked row) and "MC, second catch alone" (the first page answers before the document opens, then the effect's `ids=` read is refused). `driveEditor` takes `makeBody` (`EMPTY_BODY` has a card and a grid with nothing picked). It adds a stub-aware loader (`loadWorld`) and a one-component hook driver, and `mountControl` views gained `nodesAll()`.
 - `scripts/test-bundle-form.js` section 7 (4 tests), through the real bundle route on the USD file database.
 - `pnpm test`: 98 of 98. `pnpm build`: passes.
 
@@ -127,7 +129,7 @@ The props it gives are then rendered through the real `EditorView` with react-do
 
 ## From review
 
-(Empty until the review.)
+- Fix round 1 (BLOCK): the claim that MC fails a test was not proven for the review's single-site form. Changing only the `loadBundles` catch to "ready" passed every test, because the follow-up `ids=` 403 masked it. If it came back, a 403 or failed first read on a home with no picked bundles (or whose `ids=` read succeeds) would give the founder an empty picker with search and "Create a bundle" instead of "You can't see bundles here." Fixed in the tests only (no code change was needed: the code was right). MC1 now fails the new test; while checking, MC2 (only the effect's catch) was found to survive as well and got its own test.
 
 ## Owner checks
 
