@@ -1290,6 +1290,47 @@ console.log("— the first-run writer (GEN-01)");
     await unchanged(before, "refusals", "fr");
   });
 
+  // P6-GEN (from the P6-GEN-WRITE review, mutations M1/M1b): the version a
+  // create or a refill writes indexes the library files its body uses, so a
+  // founder can't delete an image the generated home shows.
+  await t("document_refs: the version a create writes, and the version a refill writes, both index the /api/media/<id> files of the body", async () => {
+    await reset();
+    const heroWith = (media) => ({
+      ...R.emptyBody("home"),
+      sections: [{ id: "sec_fr_hero", kind: "hero", v: 1, enabled: true, settings: { title: "Welcome", image: { media, alt: "A jar" } }, blocks: [] }],
+    });
+    const refsOf = async (id) =>
+      (await frSql("SELECT r.ref_type AS t, r.ref_id AS id, v.note AS note FROM document_refs r JOIN document_versions v ON v.id = r.version_id WHERE v.document_id = ? ORDER BY v.created_at, r.ref_id", [id])).map((r) => ({ ...r }));
+    const c = await gen([{ type: "home", id: "doc_home", body: heroWith("/api/media/med_aaaa1111") }]);
+    eq(c.created, ["doc_home"], "created:");
+    const afterCreate = await refsOf("doc_home");
+    ok(afterCreate.some((r) => r.id === "med_aaaa1111" && r.note === "Created"), `the create's version holds the file: ${JSON.stringify(afterCreate)}`);
+    const r = await gen([{ type: "home", id: "doc_home", body: heroWith("/api/media/med_bbbb2222") }]);
+    eq(r.refilled, ["doc_home"], "refilled:");
+    const afterRefill = await refsOf("doc_home");
+    ok(afterRefill.some((x) => x.id === "med_bbbb2222" && x.note !== "Created"), `the refill's version holds the new file: ${JSON.stringify(afterRefill)}`);
+    const types = [...new Set(afterRefill.map((x) => x.t))];
+    eq(types.length, 1, `one ref type for the files: ${JSON.stringify(types)}`);
+  });
+
+  // P6-GEN (from the P6-GEN-WRITE review, mutation M6): the empty-refill rule
+  // needs revision 1. A founder who edited the home and later took it back to
+  // the empty body has worked on it: skipped as 'founder', never refilled.
+  await t("a founder-edited doc_home taken back to the empty body (revision above 1) is skipped as 'founder', even with allowEmptyRefill", async () => {
+    await reset();
+    await frIn(() => Docs.createDocument({ type: "home", body: R.emptyBody("home"), actor: MERCHANT }));
+    await frIn(() => Docs.saveDraft({ id: "doc_home", revision: 1, body: homeOf("My words"), actor: MERCHANT }));
+    await frIn(() => Docs.saveDraft({ id: "doc_home", revision: 2, body: R.emptyBody("home"), actor: MERCHANT }));
+    const row = await rowOf("doc_home");
+    eq(row.revision, 3, "the founder's revision:");
+    const empty = await frIn(async () => (await Docs.getDocument("doc_home")).draftHash);
+    ok(typeof empty === "string" && empty === row.draft_hash, "stored hash read:");
+    const before = await dump("fr");
+    const r = await gen([{ type: "home", id: "doc_home", body: homeOf("Generated") }], { allowEmptyRefill: true });
+    eq(r, { written: false, created: [], refilled: [], unchanged: [], skipped: [{ id: "doc_home", reason: "founder" }] }, "the answer:");
+    await unchanged(before, "a reverted founder home", "fr");
+  });
+
   // --- the shared policy rule (lib/documents/policy-pages.js) ---------------------------------
   const P = await import("../lib/documents/policy-pages.js");
   await t("policy-pages: the slug rule is today's (privacy; terms|refund|return), privacy wins, and the starter actor is system:policy-starter", async () => {

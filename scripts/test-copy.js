@@ -16,7 +16,7 @@ import { dirname, join, relative } from "node:path";
 import { createRequire } from "node:module";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BANNED, CLAIMS, scanText } from "./support/banned-copy.js";
+import { BANNED, CLAIMS, scanText, documentTexts, scanDocumentText } from "./support/banned-copy.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, "..");
@@ -327,6 +327,33 @@ await t("scanText: each CLAIMS rule catches its sample, 'Rated 5 stars by custom
   ok(scanText("Powered by Shopify", { shopper: true }).some((h) => h.rule === "platform: vendor name in visible text"), "shopper text naming Shopify is clean");
   for (const clean of ["Fixture product 1", "Shop the collection", "Free delivery over ₹999", "Starter kit in navy", "Organise your desk", "", null]) eq(scanText(clean).length, 0, `${JSON.stringify(clean)} flagged:`);
   ok(BANNED.length > 40, "BANNED lost its rules");
+});
+
+// P6-GEN (from the P6-FIXTURE review): a hex colour is not a "#1" claim, a
+// product's own name is not a "stars" claim, and a generated document is
+// scanned on its shown words only, with the founder's catalog words left out.
+await t("CLAIMS: '#1a2b3c' and 'Night stars candle' are not claims; scanDocumentText reads only shown text props, never tokens or ids, and skips the catalog's own words", () => {
+  for (const clean of ["#1a2b3c", "Accent colour #1a2b3c", "#1e3a8a", "Night stars candle", "Stars and stripes mug", "#10 pack"]) eq(JSON.stringify(scanText(clean)), "[]", `${clean} flagged:`);
+  for (const [claim, rule] of [["The #1 choice", "claim: #1"], ["#1 in India", "claim: #1"], ["A five-star blend", "claim: stars"], ["4/5 stars", "claim: stars"], ["Star rating 4", "claim: stars"]]) ok(scanText(claim).some((h) => h.rule === rule), `${claim} missed`);
+  const design = { type: "design", v: 1, settings: { brand: { accent: "#1a2b3c", background: "#ffffff", foreground: "#111111" }, theme: { kit: "pulse", version: 1 }, logo: null }, sections: [] };
+  eq(JSON.stringify(documentTexts(design)), "[]", "a design has no shown words:");
+  eq(JSON.stringify(scanDocumentText(design)), "[]", "tokens are never scanned:");
+  const home = {
+    type: "home",
+    v: 1,
+    settings: {},
+    sections: [
+      { id: "sec_1a2b3c", kind: "hero", v: 1, enabled: true, settings: { title: "Night stars candle co", subtitle: "Shop Night stars candle and more.", primary: { label: "Shop all collections", link: { type: "url", href: "/collections" } }, image: { media: "https://cdn.shopify.com/a.jpg", alt: "Night stars candle" } }, blocks: [] },
+      { id: "sec_rail01", kind: "product_rail", v: 1, enabled: true, settings: { title: "Best-selling picks", collection: { handle: "stars-1", id: "gid://shopify/Collection/1" }, limit: 8 }, blocks: [] },
+    ],
+  };
+  eq(
+    JSON.stringify(documentTexts(home).map((x) => x.path)),
+    JSON.stringify(["sections.0.settings.title", "sections.0.settings.subtitle", "sections.0.settings.primary.label", "sections.0.settings.image.alt", "sections.1.settings.title"]),
+    "the shown text props:",
+  );
+  const hits = scanDocumentText(home, { catalogWords: ["Night stars candle"] });
+  eq(JSON.stringify(hits.map((h) => [h.path, h.rule])), JSON.stringify([["sections.1.settings.title", "claim: best-selling"]]), "only the generator's own claim:");
 });
 
 // Plant into a real file. A plant whose target has moved fails loudly here, so it

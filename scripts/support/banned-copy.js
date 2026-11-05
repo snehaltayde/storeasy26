@@ -17,6 +17,8 @@
 //               { claims: false } leaves CLAIMS out, for founder-facing words
 //               that may say "review" as a verb ("Read it and review it").
 
+import { sectionType, documentType } from "../../lib/registry/index.js";
+
 // `only` limits a rule to some files. `literalsOnly` reads just the parser's
 // literal text, so window.Razorpay and comments can't trip it. `visibleOnly` reads
 // less than that (see visibleStrings), so method: "razorpay" can't trip it either.
@@ -72,13 +74,16 @@ export const BANNED = [
 export const CLAIMS = [
   { label: "claim: reviews", re: /\breviews?\b/i },
   { label: "claim: rated", re: /\brated\b/i },
-  { label: "claim: stars", re: /\bstars\b|\b\d+(\.\d+)?[- ]?stars?\b/i },
+  // P6-GEN: a rating, not the word: "5 stars", "4.5-star", "five-star", "star
+  // rating". A lone "stars" is often a product's own name ("Night stars candle").
+  { label: "claim: stars", re: /\b\d+(\.\d+)?\s?(\/\s?\d+\s?)?[- ]?stars?\b|\b(one|two|three|four|five)[- ]stars?\b|\bstar[- ]?rat(ed|ings?)\b/i },
   { label: "claim: certified", re: /\bcertified\b/i },
   { label: "claim: award", re: /\baward(s|ed|-winning)?\b/i },
   { label: "claim: clinically", re: /\bclinically\b/i },
   { label: "claim: guaranteed", re: /\bguaranteed\b/i },
   { label: "claim: best-selling", re: /\bbest[- ]?sell(ing|ers?)\b/i },
-  { label: "claim: #1", re: /#\s?1(?!\d)|\bno\.\s?1\b|\bnumber one\b/i },
+  // P6-GEN: never a hex colour ("#1a2b3c", "#1e3a8a"): no hex digit may follow
+  { label: "claim: #1", re: /#\s?1(?![0-9a-f])|\bno\.\s?1\b|\bnumber one\b/i },
   { label: "claim: organic", re: /\borganic\b/i },
   { label: "claim: dermatologist", re: /\bdermatologi(st|sts|cally|cal)\b/i },
   { label: "claim: lab-tested", re: /\blab[- ]tested\b/i },
@@ -93,4 +98,61 @@ export function scanText(text, { shopper = false, claims = true } = {}) {
     if (m) out.push({ rule: rule.label, match: m[0] });
   }
   return out;
+}
+
+// ---- P6-GEN: the words a generated document shows -----------------------------------------
+//
+// documentTexts(body) -> [{ path, text }]
+//   Only the text a shopper reads: settings whose registry kind is text,
+//   rich_text or paragraphs, a button's label, an image's alt. Never tokens
+//   (a brand's colours, a theme), ids, handles, links or numbers, so a hex
+//   colour or a section id can't trip a rule.
+// scanDocumentText(body, { catalogWords = [], shopper = true }) -> [{ path, rule, match }]
+//   scanText over documentTexts(body), with the founder's own catalog words
+//   (product and collection titles, image alt text from Shopify) blanked out
+//   first: the store's catalog is the founder's, and a product called "Night
+//   stars candle" makes no claim. What is left is the generator's own words.
+
+const TEXT_KINDS = new Set(["text", "rich_text", "paragraphs"]);
+const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+
+function settingTexts(decls, settings, at, out) {
+  if (!isObj(settings)) return;
+  for (const d of decls || []) {
+    const v = settings[d.key];
+    const path = `${at}.${d.key}`;
+    if (v == null) continue;
+    if (TEXT_KINDS.has(d.kind)) {
+      if (typeof v === "string") out.push({ path, text: v });
+      else if (Array.isArray(v)) v.forEach((p, i) => typeof p === "string" && out.push({ path: `${path}.${i}`, text: p }));
+    } else if (d.kind === "cta" && isObj(v) && typeof v.label === "string") out.push({ path: `${path}.label`, text: v.label });
+    else if ((d.kind === "image" || d.kind === "logo") && isObj(v) && typeof v.alt === "string") out.push({ path: `${path}.alt`, text: v.alt });
+  }
+}
+
+export function documentTexts(body) {
+  const out = [];
+  if (!isObj(body)) return out;
+  const t = documentType(body.type);
+  if (t) settingTexts(t.settings, body.settings, "settings", out);
+  if (Array.isArray(body.sections)) {
+    body.sections.forEach((sec, i) => {
+      const d = isObj(sec) ? sectionType(sec.kind) : null;
+      if (d) settingTexts(d.settings, sec.settings, `sections.${i}.settings`, out);
+    });
+  }
+  return out;
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export function scanDocumentText(body, { catalogWords = [], shopper = true } = {}) {
+  const words = [...new Set(catalogWords.filter((w) => typeof w === "string" && w.trim()))].sort((a, b) => b.length - a.length);
+  const blank = words.length ? new RegExp(words.map(escapeRe).join("|"), "gi") : null;
+  const hits = [];
+  for (const { path, text } of documentTexts(body)) {
+    const own = blank ? text.replace(blank, " ") : text;
+    for (const h of scanText(own, { shopper })) hits.push({ path, ...h });
+  }
+  return hits;
 }
