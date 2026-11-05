@@ -1160,6 +1160,108 @@ await t("FIX2 (3, R9): membership rows that point at products that are gone: `li
   eq(Plan.gridCollections([pc("z", { title: "Zero listed", total: 4, listed: 0 })]), [], "listed 0 is no card, whatever total says:");
 });
 
+// =====================================================================================
+console.log("— 8. P6-FIX3: the batch 3 review findings");
+// =====================================================================================
+// the design call loses its race on the FIRST try only (a rival run writes the
+// design first); `then` runs inside that same batch hook, after the rival's write
+async function raceDesignOnce(then = null) {
+  let fired = 0;
+  Docs.firstRunHooks.beforeBatch = async ({ plan: p }) => {
+    if (!p.some((x) => x.id === "doc_design") || fired) return;
+    fired++;
+    await competing({ type: "design", id: "doc_design", body: designOf("navy") });
+    if (then) await then();
+  };
+  return () => fired;
+}
+
+await t("FIX3 (generate, the second try's checks): the home is written, the design loses its race, and the second try finds the catalog being brought in again: reason catalog_not_confirmed with homeWritten: true and the half words", async () => {
+  const fx = await store("halfcatalog", { catalogShape: "few" });
+  let r;
+  let fired;
+  try {
+    fired = await raceDesignOnce(async () => {
+      // a new sync starts between the tries (after the rival's design write)
+      const at = new Date(Date.now() + 2000).toISOString();
+      await libsql.execute({ sql: "INSERT INTO sync_runs (id, kind, status, phase, started_at, updated_at, source, started_by) VALUES ('sr_fix3_again', 'full', 'running', 'products', ?, ?, 'test', 'test')", args: [at, at] });
+    });
+    r = await gen(fx);
+  } finally {
+    Docs.firstRunHooks.beforeBatch = null;
+  }
+  eq(fired(), 1, "the first design call lost:");
+  eq([r.ran, r.reason, r.homeWritten], [false, "catalog_not_confirmed", true], `the answer: ${JSON.stringify(r)}`);
+  eq(r.message, Gen.FIRST_RUN_HALF_WORDS.catalog_not_confirmed, "the half words:");
+  ok(!FALSE_WORDS.test(r.message), `false words: ${r.message}`);
+  const home = (await docRows(fx)).find((d) => d.id === "doc_home");
+  ok(home && home.updated_by === Docs.FIRST_RUN_BY, `the home was written: ${JSON.stringify(home)}`);
+});
+
+await t("FIX3 (generate, the home-skipped re-check): the home is written, the design loses its race, then before the second try's writer the founder saves the home and the store goes back to the current editor: reason legacy with homeWritten: true and the half words", async () => {
+  const fx = await store("halfskip", { catalogShape: "few" });
+  let checks = 0;
+  Gen.firstRunGenerateHooks.afterChecks = async () => {
+    if (++checks !== 2) return;
+    // the second try passed its checks: the founder saves the home, then the mode changes
+    const cur = await Docs.getDocument("doc_home");
+    await Docs.saveDraft({ id: "doc_home", revision: cur.revision, body: { ...cur.body, sections: cur.body.sections.slice(0, 1) }, actor: OWNER });
+    await libsql.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
+  };
+  let r;
+  let fired;
+  try {
+    fired = await raceDesignOnce();
+    r = await gen(fx);
+  } finally {
+    Gen.firstRunGenerateHooks.afterChecks = null;
+    Docs.firstRunHooks.beforeBatch = null;
+  }
+  eq([fired(), checks], [1, 2], "one lost design race, two tries:");
+  eq([r.ran, r.reason, r.homeWritten], [false, "legacy", true], `the answer: ${JSON.stringify(r)}`);
+  eq(r.message, Gen.FIRST_RUN_HALF_WORDS.legacy, "the half words:");
+  ok(!FALSE_WORDS.test(r.message), `false words: ${r.message}`);
+  eq((await docRows(fx)).find((d) => d.id === "doc_home").updated_by, "merchant:u_fr_owner", "the founder's home stands:");
+});
+
+await t("FIX3 (route): a half-finished run answers 200 ran:false with homeWritten: true, generated: true, its reason and the half words; a run that wrote nothing still has no homeWritten", async () => {
+  const fx = await store("routehalf", { catalogShape: "few" });
+  await I.addMembership(ownerU.id, fx.id, "owner");
+  const owner = await tokenOf(ownerU);
+  const rivals = ["forest", "navy"];
+  let fired = 0;
+  const p = await withBatchHook(async ({ plan: pl }) => {
+    if (!pl.some((x) => x.id === "doc_design")) return;
+    await competing({ type: "design", id: "doc_design", body: designOf(rivals[fired++]) });
+  }, () => callRoute("POST", fx, owner));
+  eq(fired, 2, "both design calls lost:");
+  eq([p.status, p.body.ok, p.body.ran, p.body.generated, p.body.homeWritten, p.body.reason], [200, true, false, true, true, "race"], `the answer: ${JSON.stringify(p.body)}`);
+  eq(p.body.message, Gen.FIRST_RUN_HALF_WORDS.race, "the half words:");
+  ok((await docRows(fx)).some((d) => d.id === "doc_home" && d.updated_by === Docs.FIRST_RUN_BY), "the home was written");
+  // a refusal before anything was written: no homeWritten, generated false
+  await rowsOf(fx, "UPDATE release_state SET live_release_id = 'rel_fr_routehalf' WHERE id = 1");
+  const live = await callRoute("POST", fx, owner);
+  eq([live.body.ran, live.body.generated, "homeWritten" in live.body, live.body.message], [false, false, false, Gen.FIRST_RUN_WORDS.live], "nothing written:");
+});
+
+await t("FIX3 (editor page): a half-finished run before render re-lists the documents, so the editor opens the made home page", async () => {
+  const fx = await store("editorhalf", { catalogShape: "few" });
+  const rivals = ["forest", "navy"];
+  let fired = 0;
+  const r = await withBatchHook(async ({ plan: pl }) => {
+    if (!pl.some((x) => x.id === "doc_design")) return;
+    await competing({ type: "design", id: "doc_design", body: designOf(rivals[fired++]) });
+  }, () => openEditor(fx, OWNER));
+  eq(fired, 2, "both design calls lost:");
+  eq([r.genCalls, r.docsReads], [1, 2], "the generator ran, then the documents were read again:");
+  ok(r.html.includes('data-doc="doc_home"'), `the editor opens the made home: ${r.html.slice(0, 200)}`);
+});
+
+await t("FIX3: the start page's own half-finished words (FirstRun.js HALF_WORDS) are the generator's, word for word", async () => {
+  const src = readFileSync(join(ROOT, "components/admin/first-run/FirstRun.js"), "utf8");
+  for (const [k, w] of Object.entries(Gen.FIRST_RUN_HALF_WORDS)) ok(src.includes(`${k}: ${JSON.stringify(w)}`), `FirstRun.js HALF_WORDS.${k} is not "${w}"`);
+});
+
 // ---- cleanup --------------------------------------------------------------------------
 for (const fx of made) await fx.cleanup();
 await platform.cleanup();

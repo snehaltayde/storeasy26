@@ -26,7 +26,12 @@ import BrandStep from "./BrandStep";
 //   3. the catalog isn't in yet, or its      "syncing" / "sync-failed": the
 //      sync failed                           sync's own progress and retry
 //   4. it can be made and isn't yet          "making", then "ready"; a failed
-//                                            POST: "make-failed" with a retry
+//                                            POST: "make-failed" with a retry;
+//                                            a POST that made the home page
+//                                            and stopped before the colours
+//                                            (homeWritten, P6-FIX3): "half",
+//                                            the half-finished words, and a
+//                                            retry where one can help
 //   otherwise                                "blocked": the reason in words
 // The sync's progress is SyncProgress's own (SyncProgressBody, readSync,
 // requestSync), never a second progress UI. Someone who can't edit
@@ -79,6 +84,23 @@ export const REASON_WORDS = Object.freeze({
   home_left_for_founder: "Your home page is open in the editor, so it was left for you.",
   legacy: "This store still uses the current Storefront editor, so no starting store was made here.",
 });
+
+// P6-FIX3: a run that made the home page and stopped before the colours
+// (the POST's ran:false with homeWritten: true), by reason. The same words as
+// lib/first-run/generate.js FIRST_RUN_HALF_WORDS (Node only; test-first-run
+// checks they match). Never "We couldn't make your starting store" or
+// "nothing was saved": the home page was made.
+export const HALF_WORDS = Object.freeze({
+  race: "Your home page was made, but your colours were not, because your store changed at the same time. Try again.",
+  migrating: "Your home page was made, but your colours were not, because your store is being updated. Try again in a few minutes.",
+  legacy: "Your home page was made, but your colours were not, because this store went back to the current Storefront editor. Try again from there.",
+  live: "Your home page was made, but your colours were not, because your store opened at the same time. Your live store hasn't changed.",
+  catalog_not_confirmed: "Your home page was made, but your colours were not, because your products are being brought in again. Try again once they have all arrived.",
+  other: "Your home page was made, but your colours were not. Try again.",
+});
+// the half-finished reasons where pressing Try again here can help
+export const HALF_RETRY = Object.freeze(["race", "migrating", "catalog_not_confirmed", "other"]);
+export const halfWords = (reason) => HALF_WORDS[Object.hasOwn(HALF_WORDS, reason) ? reason : "other"];
 
 async function call(method, url, body) {
   const init = { method, headers: { Accept: "application/json" }, cache: "no-store" };
@@ -240,8 +262,9 @@ function CatalogNotes({ firstRun, sync, canSync, onSettled, pollMs }) {
 
 export default function FirstRun({ canEdit = false, canSync = false, pollMs = POLL_MS }) {
   const [data, setData] = useState(null); // { firstRun, sync }
-  const [phase, setPhase] = useState("loading"); // loading | idle | load-failed | making | make-failed
+  const [phase, setPhase] = useState("loading"); // loading | idle | load-failed | making | make-failed | half
   const [error, setError] = useState(null);
+  const [halfReason, setHalfReason] = useState(null);
   const posted = useRef(false);
 
   async function load() {
@@ -263,6 +286,12 @@ export default function FirstRun({ canEdit = false, canSync = false, pollMs = PO
     if (r.ok && r.body.ok && r.body.ran) {
       setData((d) => ({ ...d, firstRun: afterMake(d?.firstRun, r.body) }));
       setPhase("idle");
+      return;
+    }
+    if (r.ok && r.body.ok && r.body.ran === false && r.body.homeWritten === true) {
+      // P6-FIX3: the home page was made, the colours were not: say so
+      setHalfReason(typeof r.body.reason === "string" ? r.body.reason : "other");
+      setPhase("half");
       return;
     }
     if (r.ok && r.body.ok && r.body.ran === false && r.body.reason !== "race") {
@@ -315,6 +344,21 @@ export default function FirstRun({ canEdit = false, canSync = false, pollMs = PO
       <Banner tone="danger">
         <p>{error}</p>
       </Banner>
+    );
+  } else if (state === "half") {
+    const reason = Object.hasOwn(HALF_WORDS, halfReason) ? halfReason : "other";
+    body = (
+      <div className="space-y-3">
+        <Banner tone="warning">
+          <p>{halfWords(reason)}</p>
+        </Banner>
+        {reason !== "legacy" && <NextLinks />}
+        {canEdit && HALF_RETRY.includes(reason) && (
+          <Button variant="primary" icon={<RotateCcw size={14} aria-hidden />} onClick={() => make()}>
+            {START_WORDS.tryAgain}
+          </Button>
+        )}
+      </div>
     );
   } else if (state === "make-failed") {
     body = (

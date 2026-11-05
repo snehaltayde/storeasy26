@@ -1564,6 +1564,18 @@ await t("a singleton with sinceManifest m+1 missing from an older v4 row reads a
   eq((await inDz(() => Res.contentSource())).list.documents.doc_promo_strip, null, "m 2 with an explicit null:");
 });
 
+await t("P6-FIX3: closedSource fails closed: a missing source (null, undefined, not an object) is closed; the rule on a real source is unchanged", async () => {
+  for (const src of [null, undefined, false, 0, "", "live"]) eq(Res.closedSource(src), true, `closedSource(${JSON.stringify(src)}):`);
+  for (const [src, want] of [
+    [{ mode: "closed" }, true],
+    [{ mode: "live", v: 4, preview: true, releaseId: null }, true],
+    [{ mode: "live", v: 4, preview: true, releaseId: "rel_1" }, false],
+    [{ mode: "live", v: 4, preview: false, releaseId: null }, false],
+    [{ mode: "draft", preview: true, releaseId: null }, false],
+    [{ mode: "live", content: {}, preview: false }, false],
+  ]) eq(Res.closedSource(src), want, `closedSource(${JSON.stringify(src)}):`);
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const f of dbs) await rm(join(ROOT, f), { force: true });
 process.exit(fail ? 1 : 0);

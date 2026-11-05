@@ -61,7 +61,7 @@ process.env.PLATFORM_DB_TOKEN = "";
 process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
-const P4_DBS = ["fresh", "keep", "live", "liveorders", "liveprod", "adoptrel", "adoptblk", "adoptdoc", "earlier", "badmode", "sharea", "sharec", "shared", "onb", "onbui", "onbx", ...Array.from({ length: 8 }, (_, i) => `fa${i}`)].map((n) => `.test-prov-${n}.db`);
+const P4_DBS = ["fresh", "keep", "live", "liveorders", "liveprod", "adoptrel", "adoptblk", "adoptdoc", "earlier", "badmode", "sharea", "sharec", "shared", "onb", "onbui", "onbx", "onbopen", "onbm4", "onbfail", ...Array.from({ length: 8 }, (_, i) => `fa${i}`)].map((n) => `.test-prov-${n}.db`);
 const dbs = [".test-prov-default.db", ".test-prov-platform.db", ".test-prov-t1.db", ".test-prov-beta.db", ...P4_DBS];
 const removeDbs = async () => {
   for (const f of dbs) for (const ext of ["", "-wal", "-shm", "-journal"]) await rm(join(here, "..", f + ext), { force: true });
@@ -1165,8 +1165,13 @@ await t("rendered (P6-ONBOARD, SetupAdmin): the legal-pages step shows 'Start a 
     ok(!view.buttons().includes("I've read it"), `after I've read it: ${view.buttons().join(" | ")}`);
     // the stale screen's I've read it: a 409 with its words
     const stale2 = await mountSetup(await (async () => { const s = structuredClone(initial); s.items.find((i) => i.id === "policies").actions = [{ type: "markPolicyRead", id: priv.id, revision: priv.revision, label: "I've read it" }]; return s; })());
+    spy.calls.length = 0;
     await stale2.click("I've read it");
     ok(stale2.text().includes(PS6.POLICY_START_WORDS.alreadySaved), `the 409 words: ${stale2.text().slice(0, 400)}`);
+    // P6-FIX3 (M2): a 409 also reads the checklist again, so the stale button goes
+    same(spy.calls.map((c) => [c.method, c.url]), [["POST", "/api/admin/policy-start"], ["GET", "/api/admin/setup"]], "the 409 then the checklist reload:");
+    ok(!stale2.buttons().includes("I've read it"), `the stale button after the reload: ${stale2.buttons().join(" | ")}`);
+    ok(stale2.buttons().includes("Start a returns page"), `the fresh checklist: ${stale2.buttons().join(" | ")}`);
   } finally {
     spy.restore();
   }
@@ -1180,6 +1185,105 @@ await t("rendered (P6-ONBOARD, SetupAdmin): the legal-pages step shows 'Start a 
   } finally {
     spy403.restore();
   }
+});
+
+// ---- P6-FIX3: the batch 3 review's onboarding test gaps ----------------------------------
+console.log("— P6-FIX3: the onboarding checklist's untested paths");
+const Pub6 = await import("../lib/documents/publish.js");
+const { currentDatabase } = await import("../lib/db.js");
+const { scanText } = await import("./support/banned-copy.js");
+// one statement made to fail (by pattern) on one store's client, as
+// test-console-fresh's sqlFails does; restored after
+async function withFailingSql(tenantId, pattern, fn) {
+  const client = await withTenant(await C.getTenant(tenantId), () => currentDatabase().libsql);
+  const real = client.execute;
+  client.execute = (stmt, ...rest) => {
+    const sql = typeof stmt === "string" ? stmt : stmt?.sql || "";
+    if (pattern.test(sql)) return Promise.reject(Object.assign(new Error("SQLITE_IOERR: disk I/O error"), { code: "SQLITE_IOERR" }));
+    return real(stmt, ...rest);
+  };
+  try {
+    return await fn();
+  } finally {
+    // the patch is an own property of the store's client: removing it brings back its own execute
+    delete client.execute;
+  }
+}
+
+await t("unit (P6-FIX3, M12 M1 M7 M11): an OPEN documents store keeps 'Publish legal pages'; a missing kind gets its start button and the open-missing hint; a starter draft gets no read link and no I've read it; with no kind missing the hint is the publish hint", async () => {
+  const r = await P.runProvision(params("onbopen"));
+  eq(r.run.status, "done", `onbopen (${r.error}):`);
+  const inOp = async (fn) => withTenant(await C.getTenant("onbopen"), fn);
+  const opened = await inOp(async () => {
+    const home = await Docs.createDocument({ type: "home", body: { ...R.emptyBody("home"), sections: [sec("text", "sec_onbopen", { title: "Open words", body: ["Hello."] })] }, actor: OACT });
+    return Pub6.publish({ ids: [{ id: home.document.id, revision: home.document.revision, draftHash: home.document.draftHash }], actor: OACT });
+  });
+  ok(opened?.release?.id, `published: ${JSON.stringify(opened).slice(0, 200)}`);
+  const ol = () => inOp(() => ON.buildChecklist());
+  let list = await ol();
+  eq(list.launched, true, "the store is open:");
+  let step = stepOf(list, "policies");
+  same([step.label, step.done, step.href, step.hint], ["Publish legal pages", false, E.PAGES_LIST_HREF, ON.POLICY_HINTS.openMissing], "no pages (M7, M11):");
+  eq(step.hint, "Shoppers need a privacy page and a returns page, and checkout links them. Start each from a template, read it, then publish it.", "the open-missing words:");
+  same(step.actions, [
+    { type: "startPolicy", kind: "privacy", label: "Start a privacy page" },
+    { type: "startPolicy", kind: "returns", label: "Start a returns page" },
+  ], "two start buttons on an open store (M12):");
+  // a starter privacy draft: no read link, no I've read it (M1); returns still missing
+  await inOp(() => Docs.createDocument({ type: "page", body: PS6.starterBody("privacy"), actor: PP6.POLICY_STARTER_ACTOR }));
+  step = stepOf(await ol(), "policies");
+  same([step.label, step.done, step.hint], ["Publish legal pages", false, ON.POLICY_HINTS.openMissing], "a starter and a missing kind:");
+  same(step.actions, [{ type: "startPolicy", kind: "returns", label: "Start a returns page" }], "only the returns start button, no read actions (M1):");
+  // a founder-saved terms draft (not published): nothing missing, the publish hint (M11)
+  await inOp(() => Docs.createDocument({ type: "page", body: routeBody("page", "terms", "Terms", [sec("text", "sec_onbopen_terms", { title: "Terms", body: ["Our terms."] })]), actor: OACT }));
+  step = stepOf(await ol(), "policies");
+  same([step.label, step.done, step.hint, step.actions], ["Publish legal pages", false, ON.POLICY_HINTS.openPublish, []], "nothing missing, nothing published (M11):");
+  eq(step.hint, "Publish your privacy page and your returns page so shoppers can read them. Checkout links them.", "the publish words:");
+});
+
+await t("unit (P6-FIX3, M4): the brand step counts as recorded only with its `at`: a brand_step object without `at` leaves 'Start your store' (empty catalog) and the design step open", async () => {
+  const r = await P.runProvision(params("onbm4"));
+  eq(r.run.status, "done", `onbm4 (${r.error}):`);
+  const t4 = async () => C.getTenant("onbm4");
+  const steps = async () => {
+    const list = await withTenant(await t4(), () => ON.buildChecklist());
+    return [stepOf(list, "start").done, stepOf(list, "brand").done];
+  };
+  same(await steps(), [false, false], "nothing recorded:");
+  const ob = (await t4()).config?.onboarding || {};
+  await C.patchTenant("onbm4", { config: { onboarding: { ...ob, brand_step: { skipped: true, paletteId: "slate" } } } });
+  same(await steps(), [false, false], "a brand_step with no `at` (M4):");
+  await C.patchTenant("onbm4", { config: { onboarding: { ...ob, brand_step: ["at"] } } });
+  same(await steps(), [false, false], "a list is not a record:");
+  await C.patchTenant("onbm4", { config: { onboarding: { ...ob, brand_step: { skipped: true, paletteId: "slate", at: new Date().toISOString() } } } });
+  same(await steps(), [true, true], "with `at`:");
+});
+
+await t("unit (P6-FIX3, M8 and the policy read): a failed doc_home read leaves 'Start your store' open; a failed policy read says the pages couldn't be checked (try again), with no buttons and never 'Start each from a template'", async () => {
+  const r = await P.runProvision(params("onbfail"));
+  eq(r.run.status, "done", `onbfail (${r.error}):`);
+  const inFl = async (fn) => withTenant(await C.getTenant("onbfail"), fn);
+  await inFl(() => db.insertInto("products").values({ id: "gid://t/FL1", handle: "fl-tee", title: "Fl Tee", price_min: 500, price_max: 500, currency: "INR", available: 1, tags: "[]" }).execute());
+  await inFl(() => Docs.createDocument({ type: "home", actor: OACT }));
+  const ok1 = await inFl(() => ON.buildChecklist());
+  same([stepOf(ok1, "start").done, stepOf(ok1, "start").hint], [true, ON.START_HINTS.done], "the home exists:");
+  // M8: the doc_home read fails: the step stays open
+  const failedHome = await withFailingSql("onbfail", /FROM documents WHERE id = 'doc_home'/, () => inFl(() => ON.buildChecklist()));
+  same([stepOf(failedHome, "start").done, stepOf(failedHome, "start").hint], [false, ON.START_HINTS.todo], "a failed home read (M8):");
+  // readPolicyRows fails: the legal-pages step says so, offers nothing, stays open
+  const failedPol = await withFailingSql("onbfail", /WHERE type = 'page' AND archived_at IS NULL AND slug IS NOT NULL/, () => inFl(() => ON.buildChecklist()));
+  const pol = stepOf(failedPol, "policies");
+  same([pol.label, pol.done, pol.hint, pol.actions], ["Add your legal pages", false, ON.POLICY_HINTS.unreadable, []], "a failed policy read:");
+  eq(pol.hint, "We couldn't check your privacy and returns pages just now. Reload this page to try again.", "the words:");
+  ok(!/Start each from a template/.test(pol.hint), pol.hint);
+  eq(scanText(pol.hint, { claims: false }).length, 0, "no banned words");
+  // and the read works again afterwards: the start buttons are back
+  const back = stepOf(await inFl(() => ON.buildChecklist()), "policies");
+  same([back.hint, back.actions.map((a) => a.type)], [ON.POLICY_HINTS.missing, ["startPolicy", "startPolicy"]], "after:");
+  // an OPEN store's failed policy read says the same (never 'Start each from a template')
+  const inOp = async (fn) => withTenant(await C.getTenant("onbopen"), fn);
+  const openFail = stepOf(await withFailingSql("onbopen", /WHERE type = 'page' AND archived_at IS NULL AND slug IS NOT NULL/, () => inOp(() => ON.buildChecklist())), "policies");
+  same([openFail.label, openFail.done, openFail.hint, openFail.actions], ["Publish legal pages", false, ON.POLICY_HINTS.unreadable, []], "an open store's failed policy read:");
 });
 
 // The legacy screen: the component at eee9f2d (before this item) and today's
