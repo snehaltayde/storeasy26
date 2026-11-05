@@ -1,6 +1,7 @@
 // P3-INSPECTOR (ED-12, AU-02, TOK-03, AU-01, ED-04): the inspector's logic.
 // Pure: no React, no DOM (applyFocus takes the document as a parameter), no
-// store, no fetch. Edge-safe: it imports only lib/registry and lib/brand.js.
+// store, no fetch. Edge-safe: it imports only lib/registry, lib/brand.js, and
+// (P5-EDITOR) lib/commerce/bundle-words.js and lib/format.js, which are pure.
 // The forms in this folder (SettingsForm, controls, MenuControl, DesignForm,
 // RichTextField) take everything as props and keep their logic here, so node
 // tests drive it without a browser.
@@ -28,12 +29,16 @@
 //   linkTargets, railChoices…   the link and collection pickers' options
 //   focusAnchor / applyFocus    ED-04: turn a focusRequest {path, offset}
 //                               into the field to focus and put the caret
+//   bundleView, bundleList…     P5-EDITOR (COM-01, COM-02): the bundle
+//                               picker's words and edits
 //
 // Words: every label is shown exactly as the registry declares it ("FAQ",
 // never "faq"; the P3-VALIDATE review). Field ids are fieldAnchor ids
 // (lib/registry/issue-words.js): "f-<sectionId|doc>-<path, . as ->".
 import { SETTING_KINDS, sectionType, documentType, sectionKinds, documentTypeNames, singletonTypes, fieldAnchor, anchorFor, pickRailCollection, linkHref, PAGE_FAMILIES } from "../../../../lib/registry/index.js";
-import { controlOf } from "../../../../lib/registry/settings.js";
+import { controlOf, BUNDLE_LIST_MAX } from "../../../../lib/registry/settings.js";
+import { stateLine, reasonSentence, overlapLine, BUNDLES_HREF, BUNDLES_PLACE } from "../../../../lib/commerce/bundle-words.js";
+import { formatMoney } from "../../../../lib/format.js";
 import { DEFAULT_BRAND, KIT_SURFACES, RADIUS_STEPS, TYPE_SCALES, BUTTON_SHAPES, SECTION_SPACING, validateBrand } from "../../../../lib/brand.js";
 
 export { linkHref };
@@ -62,6 +67,9 @@ export const CONTROL_OF_KIND = Object.freeze({
   collection_list: "collections",
   product_list: "products",
   nav_items: "menu",
+  // P5-EDITOR: a bundle by its id, and a grid's ordered list of them
+  bundle: "bundle",
+  bundle_list: "bundle_list",
   brand: "brand",
   theme: "theme",
   // a system document's generated list: shown, never edited
@@ -245,6 +253,7 @@ export function pathsOf(field, value) {
     case "collections":
     case "products":
     case "address_list":
+    case "bundle_list":
       return [p, ...list(value).map((_, j) => `${p}.${j}`)];
     case "qa_list":
       return [p, ...list(value).flatMap((_, j) => [`${p}.${j}`, `${p}.${j}.q`, `${p}.${j}.a`])];
@@ -443,6 +452,186 @@ export function railSuggestion(collections, minItems = 1) {
     .filter((c) => isObj(c) && typeof c.handle === "string")
     .map((c) => ({ handle: c.handle, ...(typeof c.id === "string" ? { id: c.id } : {}), available_count: availableOf(c), product_count: c.product_count ?? null, title: c.title ?? c.handle }));
   return pickRailCollection(rows, minItems);
+}
+
+// ---- bundles (P5-EDITOR: COM-01, COM-02) -------------------------------------------
+//
+// The bundle picker (BundleControl.js) reads the rows of GET
+// /api/admin/refs?type=bundle (lib/admin/refs.js bundleItem: { id, slug,
+// title, state, reasons, enabled, bundle_price, saving, currency,
+// overlapsWith, missing? }), which come from the same bounded read the blocks
+// use, so a chip says what the preview shows. The editor hands them in as
+// context.bundles = { status: "loading" | "ready" | "failed", items }.
+//
+// What a shopper sees follows the blocks' own rule
+// (components/sections/BundleCardSection.js isShown / savesNothing, which
+// this file can't import: it is a server component). A bundle that saves
+// nothing is hidden whatever its state says (OQ-B), and gets the no-saving
+// words, unless it is turned off or deleted (those keep their own). The
+// inspector suite checks this rule against the blocks' for every state.
+// Every state sentence is lib/commerce/bundle-words.js stateLine.
+
+export const BUNDLE_WORDS = Object.freeze({
+  cantSee: "You can't see bundles here.",
+  duplicate: "This bundle is already in the grid.",
+  askOwner: "Ask an owner to create bundles.",
+  checking: "Checking this bundle…",
+  none: "No bundle picked yet.",
+  noMatch: "No bundles match that search.",
+  noBundles: "You have no bundles yet.",
+  full: (max) => `A grid shows at most ${max} bundles.`,
+  // a turned-off draft whose check fails: never offered as ready to turn on
+  // (the P5-BUNDLEREAD review)
+  offNotReady: (said) => `This bundle is turned off, so shoppers don't see it. It can't be turned on yet: ${said}. Fix it in ${BUNDLES_PLACE}, or remove it.`,
+  // OQ-C: inline create turns the bundle on at once
+  liveNow: (slug) =>
+    `The bundle is saved and turned on now: its discount works in the cart and its page /bundles/${slug} opens right away, even if you don't publish. It shows on your home page after you publish.`,
+});
+export { BUNDLES_HREF, BUNDLES_PLACE };
+
+// The chip on a bundle, by the state a founder should read (bundleView).
+export const BUNDLE_CHIPS = Object.freeze({
+  available: { tone: "success", words: "Showing" },
+  sold_out: { tone: "warning", words: "Sold out" },
+  not_ready: { tone: "warning", words: "Not ready" },
+  no_saving: { tone: "danger", words: "Hidden: no saving" },
+  disabled: { tone: "neutral", words: "Turned off" },
+  missing: { tone: "danger", words: "Deleted" },
+});
+
+const SHOWN = new Set(["available", "sold_out", "not_ready"]);
+const reasonsOf = (b) => (isObj(b) && Array.isArray(b.reasons) ? b.reasons : []);
+export const bundleSavesNothing = (b) => reasonsOf(b).some((r) => r?.kind === "no_saving");
+// The blocks' rule: a bundle card shows (and a grid keeps its cell) only for
+// these states, and never when it saves nothing.
+export const bundleShows = (b) => isObj(b) && SHOWN.has(b.state) && !bundleSavesNothing(b);
+// The state whose words the founder reads: the no-saving words for any
+// hidden bundle that saves nothing, unless it is turned off or deleted.
+export function bundleWordsState(b) {
+  if (!isObj(b) || typeof b.state !== "string" || !Object.hasOwn(BUNDLE_CHIPS, b.state)) return "missing";
+  if (b.state !== "disabled" && b.state !== "missing" && bundleSavesNothing(b)) return "no_saving";
+  return b.state;
+}
+
+const reasonText = (r, currency) => reasonSentence(r, { currency }) || (typeof r?.words === "string" ? r.words : "");
+
+// What the picker shows for one picked bundle id.
+//   entry      the refs row for that id (undefined: not read yet)
+//   status     context.bundles.status
+// -> { id, title, chip | null, line, overlap | null, canReplace }
+// `line` may name "Catalog > Bundles"; the control makes that a link.
+export function bundleView(id, entry, { status = "ready" } = {}) {
+  const base = { id: typeof id === "string" ? id : null, title: null, chip: null, line: "", overlap: null, canReplace: true, price: null };
+  if (status === "failed") return { ...base, line: BUNDLE_WORDS.cantSee, canReplace: false };
+  if (!isObj(entry)) return status === "ready" && base.id ? { ...base, chip: BUNDLE_CHIPS.missing, line: stateLine("missing") } : { ...base, line: BUNDLE_WORDS.checking };
+  const currency = entry.currency ?? undefined;
+  const state = bundleWordsState(entry);
+  const reasons = reasonsOf(entry);
+  const title = typeof entry.title === "string" && entry.title ? entry.title : null;
+  const price = entry.bundle_price != null && state !== "missing" ? formatMoney(entry.bundle_price, currency) || null : null;
+  let line = stateLine(state, reasons, { currency });
+  if (state === "disabled" && reasons.length) {
+    const said = [...new Set(reasons.map((r) => reasonText(r, currency)).filter(Boolean))].join("; ");
+    if (said) line = BUNDLE_WORDS.offNotReady(said);
+  }
+  const chip = state === "disabled" && reasons.length ? { tone: "neutral", words: "Turned off, not ready" } : BUNDLE_CHIPS[state];
+  const overlap = bundleShows(entry) && Array.isArray(entry.overlapsWith) && entry.overlapsWith.length ? overlapLine() : null;
+  return { ...base, title, price, chip, line, overlap };
+}
+
+// A line split around "Catalog > Bundles", so that part can be a link.
+export function linkParts(line) {
+  const s = String(line ?? "");
+  const out = [];
+  let at = 0;
+  for (let i = s.indexOf(BUNDLES_PLACE); i >= 0; i = s.indexOf(BUNDLES_PLACE, at)) {
+    if (i > at) out.push({ text: s.slice(at, i) });
+    out.push({ text: BUNDLES_PLACE, href: BUNDLES_HREF });
+    at = i + BUNDLES_PLACE.length;
+  }
+  if (at < s.length) out.push({ text: s.slice(at) });
+  return out;
+}
+
+// The picker's options: the bundles the editor read (or a search's answer),
+// filtered by the typed words. Each says its title, price (formatMoney with
+// the bundle's own currency) and chip; one already picked is marked `picked`
+// (picking it again rewrites it as { id }; a grid refuses it).
+export function bundleOptions(items, q = "", picked = []) {
+  const words = String(q ?? "").trim().toLowerCase();
+  const taken = new Set(picked);
+  const seen = new Set();
+  return (Array.isArray(items) ? items : [])
+    .filter((b) => isObj(b) && typeof b.id === "string" && b.state !== "missing" && !b.missing && !seen.has(b.id) && seen.add(b.id))
+    .filter((b) => !words || String(b.title ?? "").toLowerCase().includes(words))
+    .map((b) => {
+      const v = bundleView(b.id, b);
+      return { id: b.id, title: v.title || b.id, price: v.price, chip: v.chip, picked: taken.has(b.id), label: [v.title || b.id, v.price, v.chip?.words].filter(Boolean).join(" · ") };
+    });
+}
+
+// One bundle picked: the value is { id } and nothing else (a version body never
+// holds a title, price or stock). It replaces whatever was there, an old
+// { id, title } included.
+export const pickBundle = (id) => (typeof id === "string" && id ? { id } : null);
+
+const idOfChoice = (x) => (isObj(x) && typeof x.id === "string" ? x.id : null);
+// The bundles of a grid, in order. Each edit returns { list, error }: the
+// list unchanged and a sentence when it is refused.
+export const bundleList = {
+  ids: (list) => (Array.isArray(list) ? list : []).map(idOfChoice),
+  add(list, id, max = BUNDLE_LIST_MAX) {
+    const cur = Array.isArray(list) ? list : [];
+    if (!pickBundle(id)) return { list: cur, error: null };
+    if (bundleList.ids(cur).includes(id)) return { list: cur, error: BUNDLE_WORDS.duplicate };
+    if (cur.length >= max) return { list: cur, error: BUNDLE_WORDS.full(max) };
+    return { list: [...cur, pickBundle(id)], error: null };
+  },
+  // pick again for one row (an unreadable or deleted one)
+  replace(list, j, id) {
+    const cur = Array.isArray(list) ? list : [];
+    if (!pickBundle(id) || j < 0 || j >= cur.length) return { list: cur, error: null };
+    if (bundleList.ids(cur).some((x, k) => k !== j && x === id)) return { list: cur, error: BUNDLE_WORDS.duplicate };
+    return { list: cur.map((x, k) => (k === j ? pickBundle(id) : x)), error: null };
+  },
+  move: (list, j, d) => ({ list: moveIn(Array.isArray(list) ? list : [], j, d), error: null }),
+  remove: (list, j) => ({ list: removeAt(Array.isArray(list) ? list : [], j), error: null }),
+};
+
+// Every bundle id a document's sections pick (bundle and bundle_list
+// settings), in order, once each: the editor reads these by ids= when its
+// first page of bundles doesn't hold them.
+export function pickedBundleIds(body) {
+  const out = [];
+  const add = (v) => {
+    const id = idOfChoice(v);
+    if (id && !out.includes(id)) out.push(id);
+  };
+  const sections = isObj(body) && Array.isArray(body.sections) ? body.sections : [];
+  for (const s of sections) {
+    const decl = isObj(s) ? sectionType(s.kind) : null;
+    if (!decl || !isObj(s.settings)) continue;
+    for (const st of decl.settings) {
+      const v = s.settings[st.key];
+      if (st.kind === "bundle") add(v);
+      else if (st.kind === "bundle_list" && Array.isArray(v)) v.forEach(add);
+    }
+  }
+  return out;
+}
+
+// The page a new bundle will most likely get: its name in lower-case ASCII
+// letters and digits with hyphens (lib/bundles.js createBundle may add "-2"
+// when that is taken; the Dialog says the page as the name gives it).
+export function bundleSlugGuess(title) {
+  const s = String(title ?? "")
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  // lib/bundles.js slugWithSuffix(slugBase(title), 1): at most 61 characters
+  return (s || "bundle").slice(0, 61).replace(/-+$/g, "") || "bundle";
 }
 
 // ---- the menu (ported from components/admin/cms/NavigationEditor.js) -----------

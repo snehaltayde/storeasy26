@@ -7,6 +7,8 @@ import { listDocuments } from "@/lib/documents/service";
 import { editorEntry, parseEditorTarget } from "@/lib/admin/editor-entry";
 import { entityEntry, entityForDocument, canEdit, ENTRY_WORDS } from "@/lib/admin/entity-entry";
 import { tfetch } from "@/lib/console-request";
+import { roleAllows } from "@/lib/platform/authz";
+import { bundleCurrency } from "@/lib/bundles";
 import { PageHeader } from "@/components/console/PageHeader";
 import { Banner } from "@/components/console/Banner";
 import DocumentEditor from "@/components/admin/editor/DocumentEditor";
@@ -33,11 +35,24 @@ import DocumentEditor from "@/components/admin/editor/DocumentEditor";
 //   migrating  a read-only note: old writes are paused, the new editor isn't
 //              open yet
 // A mode that can't be read is an error page, never a guess.
+// P5-EDITOR (OQ-A): the editor gets can={{ offersWrite }}: the bundle
+// picker's "Create a bundle" is there only for a session that may write
+// offers (anyone else reads "Ask an owner to create bundles."). The store's
+// currency goes with it for that form; when it can't be read the form gets
+// undefined and formatMoney uses its own default (as Catalog > Bundles does).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Editor · Admin", robots: { index: false } };
 
 const ENTITY_TYPES = new Set(["product_content", "collection_content"]);
+
+const currencyForBundles = async () => {
+  try {
+    return await bundleCurrency();
+  } catch {
+    return undefined;
+  }
+};
 
 export default async function EditorPage({ searchParams }) {
   const jar = await cookies();
@@ -64,7 +79,11 @@ export default async function EditorPage({ searchParams }) {
     return { mode, entry: e, entity: await entityForDocument(row), readOnly: editable ? null : ENTRY_WORDS.readOnly };
   });
 
-  if (mode === "documents") return <DocumentEditor document={entry.document} note={entry.note} entity={entity ?? null} readOnly={readOnly ?? null} />;
+  if (mode === "documents") {
+    const offersWrite = roleAllows(actor?.role, "offers.write");
+    const currency = offersWrite ? await tfetch(currencyForBundles) : undefined;
+    return <DocumentEditor document={entry.document} note={entry.note} entity={entity ?? null} readOnly={readOnly ?? null} can={{ offersWrite }} currency={currency} />;
+  }
 
   if (mode === "legacy") {
     return (

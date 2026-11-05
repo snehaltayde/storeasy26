@@ -42,6 +42,7 @@ import {
 } from "./editorModel";
 import { editorHref } from "@/lib/admin/editor-entry";
 import { documentType, sectionType } from "@/lib/registry/index.js";
+import { pickedBundleIds } from "./fields/inspectorModel.js";
 
 // P3-EDITOR (ED-02, ED-03, ED-04, PV-01, PV-02, PUB-02, PUB-04, PUB-06,
 // PUB-11): the new editor. It replaces P3-ROUTES' placeholder and wires the
@@ -94,7 +95,17 @@ import { documentType, sectionType } from "@/lib/registry/index.js";
 //                                        what Shopify sends now (or null)
 //   readOnly                             plain words when this person can
 //                                        look but not change (or null)
+//   can                                  { offersWrite } (P5-EDITOR, OQ-A):
+//                                        the inline "Create a bundle"
+//   currency                             the store's currency, for that form
 //   api                                  documentsApi (tests pass a stub)
+//
+// P5-EDITOR (COM-02, COM-01): the bundle picker's rows. Read once at mount
+// beside products and collections (GET /api/admin/refs?type=bundle, first 50),
+// plus ids= for picked bundles not in that page; again on window focus and
+// after an inline create, so the inspector's chips match the preview. A
+// failed or 403 read is { status: "failed" }: the picker then says "You
+// can't see bundles here." A search goes to q=.
 
 const RICH = "rich_text";
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -136,6 +147,9 @@ export function EditorView({
   lookupProducts = null,
   entity = null,
   readOnly = null,
+  bundles = null,
+  can = {},
+  currency = undefined,
   products = null,
   productsState = { status: "ready", more: false },
   productFilter = "all",
@@ -167,6 +181,12 @@ export function EditorView({
     ...(typeof lookupProducts === "function" ? { lookupProducts } : {}),
     shopify: isObj(entity) && isObj(entity.shopify) ? entity.shopify : null,
     shopifyMissing: isObj(entity) && entity.inShopify === false,
+    // P5-EDITOR: the bundle picker (fields/BundleControl.js)
+    bundles: bundles || { status: "loading", items: [] },
+    ...(typeof on.searchBundles === "function" ? { searchBundles: on.searchBundles } : {}),
+    ...(typeof on.refreshBundles === "function" ? { refreshBundles: on.refreshBundles } : {}),
+    canCreateBundles: can?.offersWrite === true,
+    currency,
   };
   const entityDoc = ENTITY_TYPES.includes(type);
   const entityId = state?.document?.entityId || null;
@@ -408,7 +428,7 @@ export function EditorView({
 
 // ---- the editor ---------------------------------------------------------------------
 
-export default function DocumentEditor({ document: entry, note = null, entity: entityProp = null, readOnly = null, api = documentsApi }) {
+export default function DocumentEditor({ document: entry, note = null, entity: entityProp = null, readOnly = null, can = {}, currency = undefined, api = documentsApi }) {
   const router = useRouter();
   const [docs, setDocs] = useState(null);
   const [catalog, setCatalog] = useState({ products: [], collections: [] });
@@ -433,6 +453,9 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   const [productsState, setProductsState] = useState({ status: "loading", more: false });
   const [productFilter, setProductFilter] = useState("all");
   const [entityBusy, setEntityBusy] = useState(false);
+  const [bundles, setBundles] = useState({ status: "loading", items: [] });
+  const bundleSeq = useRef(0);
+  const bundleAsked = useRef(new Set()); // ids already asked for by ids=
   const productSeq = useRef(0);
   // P4-FIX5: only the latest openEntry may adopt its answer (A to B to C with
   // B answering last must never leave the store on B while the page is on C)
@@ -479,10 +502,38 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
     [api],
   );
 
+  // P5-EDITOR: the bundles (first 50, then ids= for picked ones not in them).
+  // Only the latest read may set the list.
+  const loadBundles = useCallback(async () => {
+    const mine = ++bundleSeq.current;
+    try {
+      const first = await fetchRefs({ type: "bundle", limit: 50 });
+      let items = Array.isArray(first?.items) ? first.items : [];
+      const want = pickedBundleIds(storeRef.current?.getState()?.body).filter((id) => !items.some((b) => b?.id === id));
+      if (want.length) {
+        const more = await fetchRefs({ type: "bundle", ids: want.join(","), limit: want.length });
+        items = [...items, ...(Array.isArray(more?.items) ? more.items : [])];
+      }
+      bundleAsked.current = new Set(items.map((b) => b?.id));
+      if (mine === bundleSeq.current) setBundles({ status: "ready", items });
+    } catch {
+      if (mine === bundleSeq.current) setBundles({ status: "failed", items: [] });
+    }
+  }, []);
+  // a search (q=): its rows join the list, so a bundle picked from them has
+  // its chip at once
+  const searchBundles = useCallback(async (q) => {
+    const r = await fetchRefs({ type: "bundle", q, limit: 50 });
+    const rows = Array.isArray(r?.items) ? r.items : [];
+    setBundles((b) => (b.status === "ready" ? { ...b, items: [...b.items.filter((x) => !rows.some((y) => y?.id === x?.id)), ...rows] } : b));
+    return rows;
+  }, []);
+
   useEffect(() => {
     setMounted(true);
     refreshDocs();
     loadProducts();
+    loadBundles();
     // the pickers' first products and collections: the catalog picker's read
     // (/api/admin/refs), never the 30-row catalog route
     Promise.all([fetchRefs({ type: "product", limit: 50 }).catch(() => null), fetchRefs({ type: "collection", limit: 50 }).catch(() => null)]).then(([p, c]) =>
@@ -556,6 +607,34 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => storeRef.current?.dispose(), []);
+
+  // P5-EDITOR: read the bundles again when the founder comes back to this
+  // tab (a bundle changed in Catalog > Bundles changes the live blocks at
+  // once), and read by ids= any picked bundle the list doesn't hold yet (a
+  // document opened after the first read, or a bundle past the first 50).
+  useEffect(() => {
+    const onFocus = () => loadBundles();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadBundles]);
+  const pickedKey = pickedBundleIds(state?.body).join(",");
+  useEffect(() => {
+    if (bundles.status !== "ready" || !pickedKey) return;
+    const want = pickedKey.split(",").filter((id) => !bundles.items.some((b) => b?.id === id) && !bundleAsked.current.has(id));
+    if (!want.length) return;
+    want.forEach((id) => bundleAsked.current.add(id));
+    const mine = bundleSeq.current;
+    fetchRefs({ type: "bundle", ids: want.join(","), limit: want.length }).then(
+      (r) => {
+        if (mine !== bundleSeq.current) return;
+        const rows = Array.isArray(r?.items) ? r.items : [];
+        setBundles((b) => (b.status === "ready" ? { ...b, items: [...b.items.filter((x) => !rows.some((y) => y?.id === x?.id)), ...rows] } : b));
+      },
+      () => {
+        if (mine === bundleSeq.current) setBundles({ status: "failed", items: [] });
+      },
+    );
+  }, [pickedKey, bundles.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // P4-EDITOR: what Shopify sends now for the open product or collection is
   // the page's (read on the server); this editor never asks for it.
@@ -807,12 +886,17 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
       lookupProducts={lookupProducts}
       entity={entity}
       readOnly={readOnly}
+      bundles={bundles}
+      can={can}
+      currency={currency}
       products={productList}
       productsState={productsState}
       productFilter={productFilter}
       entityBusy={entityBusy}
       on={{
         edit,
+        searchBundles,
+        refreshBundles: loadBundles,
         treeChange,
         treeSelect,
         open: openDocument,

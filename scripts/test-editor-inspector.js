@@ -17,6 +17,10 @@
 //   5. the review notes: labels as written ("FAQ"); a rail's suggested
 //      collection uses real available counts, never product_count; the
 //      design form keeps the accent button text colour in step.
+//   6. P5-EDITOR (COM-01, COM-02): the bundle picker. bundle and bundle_list
+//      have controls; each state's status line is the bundle-words sentence
+//      by the blocks' own rule; a pick writes { id } only; a grid keeps its
+//      order and refuses a duplicate; notes land on the control or its row.
 // Everything renders with Next's own SWC and react-dom/server. No database.
 //   pnpm test:editor-inspector
 import { readFile } from "node:fs/promises";
@@ -230,6 +234,12 @@ function brokenValue(s) {
       return { kit: "nope", version: 9 };
     case "entries":
       return "junk";
+    // P5-EDITOR: an old { id, title } pick (UNKNOWN_FIELD), and a grid with
+    // a duplicate, an unreadable entry and a bad id (INVALID_VALUE by index)
+    case "bundle":
+      return { id: "bun-old", title: "Old name" };
+    case "bundle_list":
+      return [{ id: "bun-a" }, { id: "bun-a" }, "junk", { id: "bad id!" }];
     default:
       return null;
   }
@@ -274,6 +284,14 @@ const CATALOG = {
   ],
   products: [{ handle: "tee", id: "gid://shopify/Product/1", title: "Tee" }],
   pages: [{ slug: "shipping", family: "page", title: "Shipping", document: "doc_abc" }],
+  // P5-EDITOR: the bundle picker's rows (GET /api/admin/refs?type=bundle)
+  bundles: {
+    status: "ready",
+    items: [
+      { id: "bun-a", slug: "gym-kit", title: "Gym kit", state: "available", reasons: [], enabled: true, bundle_price: 250, saving: 50, currency: "USD", componentCount: 2, overlapsWith: [] },
+      { id: "bun-old", slug: "old-kit", title: "Old kit", state: "sold_out", reasons: [{ kind: "sold_out", index: 0 }], enabled: true, bundle_price: 90, saving: 10, currency: "USD", componentCount: 2, overlapsWith: [] },
+    ],
+  },
 };
 
 // ============================== 1. coverage =======================================
@@ -283,9 +301,9 @@ console.log("1. every kind has a control, every kind and type a form");
 // registered, but its controls are P4-EDITOR's (batch 4): the editor UI
 // stays read-only for these until then. These kinds and their two types are
 // the only coverage gaps allowed, and exactly these.
-// P5-SETTING: bundle and bundle_list (COM-02) are registered in batch 1;
-// their controls (the bundle picker) are P5-EDITOR's, which removes them here.
-const WAITING_KINDS = ["overlay", "gallery", "pairs", "product_ids", "bundle", "bundle_list"];
+// P5-SETTING registered bundle and bundle_list (COM-02) in batch 1; P5-EDITOR
+// gave them their controls (fields/BundleControl.js), so they wait no more.
+const WAITING_KINDS = ["overlay", "gallery", "pairs", "product_ids"];
 const WAITING_TYPES = ["product_content", "collection_content"];
 // The coverage gaps allowed, worked out when asked: the waiting kinds, the
 // document fields above, and (P5-SETTING) every setting of a waiting kind on
@@ -314,7 +332,7 @@ const placeableIssues = (issues, s) => {
 };
 
 await t("unit: every registered setting kind maps to a control, and every control name to a component", () => {
-  eq([...M.inspectorCoverage()].sort(), [...waitingProblems()].sort(), "inspectorCoverage() (only P4-EDITOR's and P5-EDITOR's kinds wait)");
+  eq([...M.inspectorCoverage()].sort(), [...waitingProblems()].sort(), "inspectorCoverage() (only P4-EDITOR's kinds wait)");
   for (const kind of Object.keys(SETTING_KINDS)) if (!WAITING_KINDS.includes(kind)) ok(M.controlKindOf(kind), `setting kind ${kind} has no control`);
   eq([...Object.keys(SF.CONTROL_COMPONENTS)].sort(), [...M.CONTROL_NAMES].sort(), "the components are exactly the control names");
   for (const [name, C] of Object.entries(SF.CONTROL_COMPONENTS)) ok(typeof C === "function", `control ${name} is not a component`);
@@ -426,7 +444,7 @@ await t("rendered: a setting kind no registered section uses yet (product) rende
   }
 });
 
-await t("rendered: a throwaway home kind with bundle and bundle-list settings (P5-EDITOR's controls) renders its other fields, and inspectorCoverage() expects its waiting settings", () => {
+await t("P5-EDITOR rendered: a throwaway home kind with bundle and bundle-list settings renders every field, and each note sits on the control or its row", () => {
   Reg.defineSection({
     kind: "zz_bundleprobe",
     version: 1,
@@ -435,26 +453,23 @@ await t("rendered: a throwaway home kind with bundle and bundle-list settings (P
     settings: [
       { key: "title", kind: "text", label: "Title", max: 80, default: "" },
       { key: "pick", kind: "bundle", label: "Bundle", required: true, default: null },
-      { key: "grid", kind: "bundle_list", label: "Bundles to show", default: [] },
+      { key: "grid", kind: "bundle_list", label: "Bundles to show", required: true, max: 12, default: [] },
     ],
   });
   try {
-    const problems = waitingProblems();
-    ok(problems.includes('section kind "zz_bundleprobe": setting "pick" has no control'), "the derived list names pick");
-    ok(problems.includes('section kind "zz_bundleprobe": setting "grid" has no control'), "the derived list names grid");
-    eq([...M.inspectorCoverage()].sort(), [...problems].sort(), "inspectorCoverage() with the probe registered");
+    const problems = M.inspectorCoverage();
+    ok(!problems.some((p) => /bundle/.test(p)), `no bundle problem: ${JSON.stringify(problems)}`);
+    eq([...problems].sort(), [...waitingProblems()].sort(), "inspectorCoverage() with the probe registered");
     const s = Reg.newSection("zz_bundleprobe", { id: "sec_bprobe1" });
     renderAll("home", Reg.fixtureDocument("home", [s]), "bundle probe empty");
-    // a broken one: the title too long (placed), the bundle missing and a
-    // duplicate in the grid (waiting: not placed until the picker exists)
-    s.settings = { title: "x".repeat(90), pick: null, grid: [{ id: "bun-a" }, { id: "bun-a" }] };
+    // a broken one: the title too long, the bundle an old { id, title }, a
+    // duplicate and a bad id in the grid: every note is placed now
+    s.settings = { title: "x".repeat(90), pick: { id: "bun-a", title: "Gym kit" }, grid: [{ id: "bun-a" }, { id: "bun-a" }, { id: "bad id!" }] };
     const body = Reg.fixtureDocument("home", [s]);
     const issues = issuesFor(body).filter((i) => i.sectionId === "sec_bprobe1");
-    ok(issues.some((i) => i.field === "title"), "the title issue is there");
-    ok(issues.some((i) => i.field === "pick") && issues.some((i) => i.field === "grid.1"), "the waiting issues are there");
-    const placeable = placeableIssues(issues, s);
-    ok(placeable.length > 0 && placeable.every((i) => i.field === "title"), `only the title issue is placed: ${JSON.stringify(placeable.map((i) => i.field))}`);
-    eq(placeableIssues(issuesFor(Reg.fixtureDocument("home", [{ ...Reg.newSection("text", { id: "sec_other1" }), settings: { title: 5, body: 3 } }])), { id: "sec_other1", kind: "text" }).length > 0, true, "a kind with no waiting setting keeps every issue");
+    ok(issues.some((i) => i.field === "pick.title" && i.code === "UNKNOWN_FIELD"), "the old title is UNKNOWN_FIELD");
+    ok(issues.some((i) => i.field === "grid.1" && i.code === "INVALID_VALUE"), "the duplicate is INVALID_VALUE on its index");
+    eq(placeableIssues(issues, s).length, issues.length, "no issue is left out");
     renderAll("home", body, "bundle probe broken");
     for (const c of Reg.worstCase("zz_bundleprobe").cases) renderAll("home", Reg.fixtureDocument("home", [{ ...c.section, id: freshId() }]), `bundle probe ${c.name}`);
   } finally {
@@ -809,6 +824,329 @@ await t("P3-FIX3 unit+driven: typing a web name while the link is a Campaign or 
   eq(stored.at(-1), { type: "page", slug: "shipping", family: "journal", document: "doc_jship" }, "a journal post: its kind and its own id, not the page's");
   at({ type: "page", slug: "spring", family: "campaign", document: "doc_spring" })("f-doc-items-0-link-slug").onChange("shipping");
   eq(stored.at(-1), { type: "page", slug: "shipping", family: "campaign" }, "no campaign at that name: the kind stays, the old id is dropped");
+});
+
+// ============================== 6. the bundle picker (P5-EDITOR) ================================
+console.log("6. the bundle picker: controls, words, picks, the grid's order, anchors");
+
+const BC = await loadJsx(join(FIELDS, "BundleControl.js"));
+const Words = await import("../lib/commerce/bundle-words.js");
+const Card = await loadJsx(join(ROOT, "components/sections/BundleCardSection.js"));
+
+// A refs row as GET /api/admin/refs?type=bundle gives it (lib/admin/refs.js).
+const row = (id, state, extra = {}) => ({ id, slug: id, title: `Kit ${id}`, state, reasons: [], enabled: state !== "disabled", bundle_price: 350, saving: 0, currency: "USD", componentCount: 2, overlapsWith: [], ...extra });
+const NO_SAVE = { kind: "no_saving", sum: 300, price: 350 };
+const WORDS_OF = {
+  available: "Showing to shoppers.",
+  sold_out: "A product in this bundle is sold out: shoppers see Currently unavailable and can't add it.",
+  no_saving: "The price no longer saves anything (the products add up to $300), so shoppers don't see it. Lower the price in Catalog > Bundles.",
+  not_ready: "This bundle isn't ready for the cart yet: shoppers can't add it. Open it in Catalog > Bundles and save it again.",
+  disabled: "This bundle is turned off, so shoppers don't see it. Turn it on in Catalog > Bundles, or remove it.",
+  missing: "This bundle was deleted, so shoppers don't see it. Pick another or remove it.",
+};
+const stateRows = {
+  available: row("bun-av", "available", { saving: 50, bundle_price: 250 }),
+  sold_out: row("bun-so", "sold_out", { reasons: [{ kind: "sold_out", index: 0 }] }),
+  no_saving: row("bun-ns", "no_saving", { reasons: [NO_SAVE] }),
+  not_ready: row("bun-nr", "not_ready", { reasons: [{ kind: "not_synced" }] }),
+  disabled: row("bun-of", "disabled"),
+  missing: { id: "bun-gone", missing: true, state: "missing", reasons: [], overlapsWith: [] },
+};
+const ctxOf = (items, status = "ready", more = {}) => ({ ...CATALOG, bundles: { status, items }, ...more });
+const cardField = (sid) => M.formOf({ kind: "bundle_card", sectionId: sid }).fields.find((f) => f.key === "bundle");
+const gridField = (sid) => M.formOf({ kind: "bundle_grid", sectionId: sid }).fields.find((f) => f.key === "bundles");
+const textIn = (html, attr) => {
+  const m = new RegExp(`<p[^>]*${attr}=""[^>]*>([\\s\\S]*?)</p>`).exec(html);
+  return m ? unescape(m[1].replace(/<[^>]+>/g, "")) : null;
+};
+const statusLines = (html) => [...html.matchAll(/<p[^>]*data-bundle-status=""[^>]*>([\s\S]*?)<\/p>/g)].map((m) => unescape(m[1].replace(/<[^>]+>/g, "")));
+
+// A small hook driver (as scripts/test-bundle-form.js): state survives between
+// renders, effects run, and an element tree can be searched for a handler.
+function hookDriver() {
+  const slots = new Map();
+  let cur = null;
+  let cursor = 0;
+  let effects = [];
+  const hooks = {
+    useState(init) {
+      const box = cur;
+      const k = cursor++;
+      if (!(k in box)) box[k] = typeof init === "function" ? init() : init;
+      return [box[k], (v) => (box[k] = typeof v === "function" ? v(box[k]) : v)];
+    },
+    useRef(init) {
+      const k = cursor++;
+      if (!(k in cur)) cur[k] = { current: init };
+      return cur[k];
+    },
+    useEffect(fn, deps) {
+      const box = cur;
+      const k = cursor++;
+      const prev = box[k];
+      if (prev && deps && prev.deps && deps.every((d, i) => Object.is(d, prev.deps[i]))) return;
+      box[k] = { deps };
+      effects.push(fn);
+    },
+    useMemo: (fn) => fn(),
+    useCallback: (fn) => fn,
+    useContext: () => null,
+  };
+  const react = { ...React, ...hooks, default: { ...React, ...hooks } };
+  const SKIP = new Set(["Dialog", "VariantPicker"]);
+  function draw(el) {
+    const nodes = [];
+    effects = [];
+    const visit = (n, path) => {
+      if (n == null || typeof n !== "object") return;
+      if (Array.isArray(n)) return n.forEach((c, i) => visit(c, `${path}.${c?.key ?? i}`));
+      if (!React.isValidElement(n)) return;
+      const ty = n.type;
+      if (ty === React.Fragment) return visit(n.props.children, `${path}F`);
+      if (typeof ty === "function" && !SKIP.has(ty.name)) {
+        const key = `${path}/${ty.name}${n.key != null ? `#${n.key}` : ""}`;
+        if (!slots.has(key)) slots.set(key, {});
+        cur = slots.get(key);
+        cursor = 0;
+        return visit(ty(n.props), key);
+      }
+      nodes.push(n);
+      if (typeof ty === "function" && n.props.open === false) return;
+      for (const [k, v] of Object.entries(n.props)) if (k === "children" || React.isValidElement(v) || Array.isArray(v)) visit(v, `${path}/${typeof ty === "string" ? ty : ty.name}:${k}`);
+    };
+    visit(el, "r");
+    for (const e of effects) e();
+    return nodes;
+  }
+  return { react, draw };
+}
+// BundleControl.js and what it imports, compiled with the driver's hooks.
+async function loadDriven(file, react) {
+  const cache = new Map();
+  async function load(f) {
+    if (cache.has(f)) return cache.get(f);
+    const mod = { exports: {} };
+    cache.set(f, mod.exports);
+    const code = await compile(f);
+    const deps = new Map();
+    for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
+      if (deps.has(id) || id === "react" || id === "react/jsx-runtime") continue;
+      if (id.startsWith("@/") || id.startsWith(".")) {
+        let target = id.startsWith("@/") ? join(ROOT, id.slice(2)) : resolve(dirname(f), id);
+        if (!target.endsWith(".js")) target = (await exists(`${target}.js`)) ? `${target}.js` : join(target, "index.js");
+        deps.set(id, isJsx(target) ? await load(target) : await import(pathToFileURL(target).href));
+      } else deps.set(id, require(id));
+    }
+    new Function("require", "module", "exports", code)((id) => (id === "react" ? react : id === "react/jsx-runtime" ? require("react/jsx-runtime") : deps.get(id)), mod, mod.exports);
+    return mod.exports;
+  }
+  return load(file);
+}
+const textOfEl = (n) => (n == null || typeof n === "boolean" ? "" : Array.isArray(n) ? n.map(textOfEl).join("") : typeof n !== "object" ? String(n) : React.isValidElement(n) ? textOfEl(n.props.children) : "");
+async function mountControl(name, props) {
+  const d = hookDriver();
+  const mod = await loadDriven(join(FIELDS, "BundleControl.js"), d.react);
+  let nodes = [];
+  const view = {
+    props,
+    draw: () => (nodes = d.draw(React.createElement(mod[name], view.props))),
+    option: (id) => nodes.find((n) => n.type === "button" && n.props["data-bundle-option"] === id),
+    button: (label) => nodes.find((n) => n.type === "button" && n.props["aria-label"] === label),
+    text: () => nodes.filter((n) => typeof n.type === "string").map((n) => textOfEl(n.props.children)).join(" "),
+    refused: () => {
+      const n = nodes.find((x) => x.props?.["data-bundle-refused"] === "");
+      return n ? textOfEl(n.props.children) : null;
+    },
+  };
+  view.draw();
+  return view;
+}
+
+await t("P5-EDITOR unit: bundle and bundle_list have controls, are not waiting, and inspectorCoverage() reports no bundle problem (the other waiting kinds stay)", () => {
+  ok(!WAITING_KINDS.includes("bundle") && !WAITING_KINDS.includes("bundle_list"), "WAITING_KINDS still holds a bundle kind");
+  eq([M.controlKindOf("bundle"), M.controlKindOf("bundle_list")], ["bundle", "bundle_list"], "CONTROL_OF_KIND");
+  ok(SF.CONTROL_COMPONENTS.bundle === Controls.CONTROLS.bundle && Controls.CONTROLS.bundle === BC.BundleControl, "controls.js CONTROLS.bundle is BundleControl");
+  ok(Controls.CONTROLS.bundle_list === BC.BundleListControl, "controls.js CONTROLS.bundle_list is BundleListControl");
+  const problems = M.inspectorCoverage();
+  ok(!problems.some((p) => /bundle/.test(p)), `bundle problems: ${JSON.stringify(problems.filter((p) => /bundle/.test(p)))}`);
+  for (const k of ["overlay", "gallery", "pairs", "product_ids"]) ok(problems.includes(`setting kind "${k}" has no control`), `${k} still waits`);
+  for (const kind of ["bundle_card", "bundle_grid"]) ok(M.formOf({ kind }).fields.every((f) => f.control), `${kind}: every field has a control`);
+});
+
+await t("P5-EDITOR rendered: every picked bundle shows the bundle-words sentence for its state, with Catalog > Bundles as a new-tab link", () => {
+  for (const [state, r] of Object.entries(stateRows)) {
+    const v = M.bundleView(r.id, r);
+    eq(v.line, WORDS_OF[state], `${state}: the line`);
+    eq(v.line, Words.stateLine(state, r.reasons, { currency: "USD" }), `${state}: it is bundle-words' sentence`);
+    // the card
+    const html = render(h(BC.BundleControl, { field: cardField("sec_bc1"), value: { id: r.id }, onChange: () => {}, issues: [], owner: "sec_bc1", context: ctxOf(Object.values(stateRows)) }));
+    eq(textIn(html, "data-bundle-status"), WORDS_OF[state], `${state}: the card's rendered line`);
+    ok(html.includes("data-bundle-chip"), `${state}: a chip`);
+    if (/Catalog > Bundles/.test(WORDS_OF[state])) ok(/<a href="\/admin\/catalog#bundles" target="_blank" rel="noopener noreferrer"[^>]*>Catalog &gt; Bundles<\/a>/.test(html), `${state}: the link`);
+    ok(!html.includes("₹") && !/\bINR\b/.test(html), `${state}: no rupee sign`);
+  }
+  // a picked id the ready list doesn't hold reads as deleted
+  eq(M.bundleView("bun-nowhere", undefined, { status: "ready" }).line, WORDS_OF.missing, "absent from a ready list");
+  eq(M.bundleView("bun-x", undefined, { status: "loading" }).line, "Checking this bundle…", "not read yet");
+  // every row of a grid too, in its order
+  const list = Object.values(stateRows).map((r) => ({ id: r.id }));
+  const html = render(h(BC.BundleListControl, { field: gridField("sec_bg1"), value: list, onChange: () => {}, issues: [], owner: "sec_bg1", context: ctxOf(Object.values(stateRows)) }));
+  eq(statusLines(html), Object.keys(stateRows).map((k) => WORDS_OF[k]), "each row's line, in order");
+  eq((html.match(/data-bundle-chip=""/g) || []).length, list.length, "each row's chip");
+  // the options say title, price in the bundle's currency, and chip
+  const opts = M.bundleOptions(Object.values(stateRows), "", ["bun-av"]);
+  eq(opts.map((o) => o.label), ["Kit bun-av · $250 · Showing", "Kit bun-so · $350 · Sold out", "Kit bun-ns · $350 · Hidden: no saving", "Kit bun-nr · $350 · Not ready", "Kit bun-of · $350 · Turned off"], "options (a deleted one is not offered)");
+  eq(opts.map((o) => o.picked), [true, false, false, false, false], "the picked one is marked");
+  eq(M.bundleOptions(Object.values(stateRows), "BUN-NS").map((o) => o.id), ["bun-ns"], "typed words filter the titles");
+});
+
+await t("P5-EDITOR rendered: the overlap line, and 'You can't see bundles here.' when the read failed (the id shows, Remove stays, no picking)", () => {
+  const ov = row("bun-ov", "available", { saving: 20, bundle_price: 280, overlapsWith: [{ id: "bun-other", title: "Pair" }] });
+  const v = M.bundleView(ov.id, ov);
+  eq(v.overlap, "Another bundle uses the same products, so the cart may give a different saving than this block shows.", "the overlap line");
+  eq(v.overlap, Words.overlapLine(), "bundle-words' overlap line");
+  const html = render(h(BC.BundleControl, { field: cardField("sec_ov1"), value: { id: ov.id }, onChange: () => {}, issues: [], owner: "sec_ov1", context: ctxOf([ov]) }));
+  eq(textIn(html, "data-bundle-overlap"), v.overlap, "rendered");
+  eq(M.bundleView(stateRows.disabled.id, { ...stateRows.disabled, overlapsWith: [{ id: "x", title: "X" }] }).overlap, null, "no overlap line for a hidden bundle");
+  // the read failed (a 403 or a fault)
+  const failed = M.bundleView("bun-av", undefined, { status: "failed" });
+  eq([failed.line, failed.canReplace], ["You can't see bundles here.", false], "the can't-see line");
+  const card = render(h(BC.BundleControl, { field: cardField("sec_f1"), value: { id: "bun-av" }, onChange: () => {}, issues: [], owner: "sec_f1", context: ctxOf([], "failed", { canCreateBundles: true }) }));
+  eq(textIn(card, "data-bundle-status"), "You can't see bundles here.", "the card says it");
+  ok(/>bun-av</.test(card), "the picked id is shown");
+  ok(card.includes('aria-label="Remove this bundle"') && !/disabled=""[^>]*aria-label="Remove this bundle"|aria-label="Remove this bundle"[^>]*disabled=""/.test(card), "it can be removed");
+  ok(!card.includes('type="search"') && !card.includes("data-bundle-options") && !card.includes("Create a bundle"), "it can't be replaced");
+  const grid = render(h(BC.BundleListControl, { field: gridField("sec_f2"), value: [{ id: "bun-a" }, { id: "bun-b" }], onChange: () => {}, issues: [], owner: "sec_f2", context: ctxOf([], "failed") }));
+  eq(statusLines(grid), ["You can't see bundles here.", "You can't see bundles here."], "each row says it");
+  ok(grid.includes('aria-label="Remove bun-a"') && !grid.includes('type="search"'), "rows can be removed, none added");
+});
+
+await t("P5-EDITOR unit: the inspector's words follow the blocks' reasons-aware rule (BundleCardSection isShown, bundleReason): a sold-out or not-ready bundle that saves nothing is hidden with the no-saving words", () => {
+  const matrix = [];
+  for (const state of ["available", "sold_out", "not_ready", "no_saving", "disabled", "missing"])
+    for (const reasons of [[], [{ kind: "sold_out", index: 0 }], [NO_SAVE], [{ kind: "not_synced" }, NO_SAVE], [{ kind: "missing", index: 1 }, NO_SAVE]]) matrix.push(row(`bun-${matrix.length}`, state, { reasons }));
+  for (const b of matrix) {
+    const what = `${b.state} ${JSON.stringify(b.reasons.map((r) => r.kind))}`;
+    eq(M.bundleShows(b), Card.isShown(b), `${what}: shown to shoppers`);
+    const v = M.bundleView(b.id, b);
+    if (!Card.isShown(b) && !(b.state === "disabled" && b.reasons.length)) eq(v.line, Card.bundleReason(b), `${what}: the same words as the preview note`);
+    if (Card.isShown(b)) eq(v.line, Words.stateLine(b.state, b.reasons, { currency: "USD" }), `${what}: a shown bundle's own state line`);
+  }
+  // the two cases the review named
+  const soldNoSave = row("bun-sn", "sold_out", { reasons: [{ kind: "sold_out", index: 0 }, NO_SAVE] });
+  const notReadyNoSave = row("bun-rn", "not_ready", { reasons: [{ kind: "not_synced" }, NO_SAVE] });
+  for (const b of [soldNoSave, notReadyNoSave]) {
+    const v = M.bundleView(b.id, b);
+    eq([v.line, v.chip.words, M.bundleShows(b)], [WORDS_OF.no_saving, "Hidden: no saving", false], `${b.state} that saves nothing`);
+  }
+});
+
+await t("P5-EDITOR unit: a turned-off draft whose check fails is never offered as ready to turn on (the P5-BUNDLEREAD review)", () => {
+  const draft = row("bun-dr", "disabled", { reasons: [{ kind: "sold_out", index: 0 }, NO_SAVE] });
+  const v = M.bundleView(draft.id, draft);
+  eq(v.line, "This bundle is turned off, so shoppers don't see it. It can't be turned on yet: Sold out; Price must be lower than $300. Fix it in Catalog > Bundles, or remove it.", "the line");
+  ok(!/Turn it on/.test(v.line), "no 'Turn it on'");
+  eq(v.chip.words, "Turned off, not ready", "the chip");
+  eq(M.bundleOptions([draft])[0].label, "Kit bun-dr · $350 · Turned off, not ready", "the option");
+  // the 1.5 quantity reason carries its own words (lib/bundles.js)
+  const frac = row("bun-fr", "disabled", { reasons: [{ kind: "bad_quantity", index: 0, words: "The quantity must be a whole number, 1 or more" }] });
+  ok(/It can't be turned on yet: The quantity must be a whole number, 1 or more\./.test(M.bundleView(frac.id, frac).line), "bad_quantity");
+  // a passing draft keeps the plain turned-off line
+  eq(M.bundleView("bun-of", stateRows.disabled).line, WORDS_OF.disabled, "a passing draft");
+});
+
+await t("P5-EDITOR driven: a pick writes exactly { id }; picking again over an old { id, title } writes { id } and the UNKNOWN_FIELD issue is gone", async () => {
+  eq(M.pickBundle("bun-a"), { id: "bun-a" }, "pickBundle");
+  const sec = { ...Reg.newSection("bundle_card", { id: "sec_pk1" }), settings: { title: "", bundle: { id: "bun-a", title: "Gym kit" } } };
+  const before = Reg.validateDocument(Reg.fixtureDocument("home", [sec]), { mode: "draft" }).issues;
+  ok(before.some((i) => i.sectionId === "sec_pk1" && i.code === "UNKNOWN_FIELD" && i.field === "bundle.title"), `the old title is UNKNOWN_FIELD: ${JSON.stringify(before.map((i) => `${i.code}@${i.field}`))}`);
+  const stored = [];
+  const v = await mountControl("BundleControl", { field: cardField("sec_pk1"), value: sec.settings.bundle, onChange: (x) => stored.push(x), issues: before, owner: "sec_pk1", context: CATALOG });
+  ok(v.option("bun-a"), "the picked bundle is offered again");
+  v.option("bun-a").props.onClick();
+  eq(stored, [{ id: "bun-a" }], "picking writes { id } only");
+  const after = Reg.validateDocument(Reg.fixtureDocument("home", [{ ...sec, settings: { ...sec.settings, bundle: stored[0] } }]), { mode: "publish" }).issues;
+  ok(!after.some((i) => i.sectionId === "sec_pk1" && i.code === "UNKNOWN_FIELD"), `UNKNOWN_FIELD is gone: ${JSON.stringify(after.map((i) => `${i.code}@${i.field}`))}`);
+  // another bundle replaces it, also as { id }
+  v.option("bun-old").props.onClick();
+  eq(stored.at(-1), { id: "bun-old" }, "a new pick");
+  v.button("Remove this bundle").props.onClick();
+  eq(stored.at(-1), null, "removed");
+});
+
+await t("P5-EDITOR driven: BundleListControl keeps the order, refuses a duplicate with 'This bundle is already in the grid.', moves and removes", async () => {
+  const items = ["bun-1", "bun-2", "bun-3"].map((id) => row(id, "available", { bundle_price: 250 }));
+  const stored = [];
+  const v = await mountControl("BundleListControl", { field: gridField("sec_gl1"), value: [{ id: "bun-2" }], onChange: (x) => stored.push(x), issues: [], owner: "sec_gl1", context: ctxOf(items) });
+  v.option("bun-3").props.onClick();
+  eq(stored.at(-1), [{ id: "bun-2" }, { id: "bun-3" }], "added at the end, the order kept");
+  v.props = { ...v.props, value: stored.at(-1) };
+  v.draw();
+  v.option("bun-1").props.onClick();
+  eq(stored.at(-1), [{ id: "bun-2" }, { id: "bun-3" }, { id: "bun-1" }], "and again");
+  v.props = { ...v.props, value: stored.at(-1) };
+  v.draw();
+  const n = stored.length;
+  v.option("bun-2").props.onClick();
+  v.draw();
+  eq(stored.length, n, "a duplicate is not written");
+  eq(v.refused(), "This bundle is already in the grid.", "it says why");
+  ok(v.text().includes("This bundle is already in the grid."), "on screen");
+  v.button("Move Kit bun-1 up").props.onClick();
+  eq(stored.at(-1), [{ id: "bun-2" }, { id: "bun-1" }, { id: "bun-3" }], "moved up");
+  v.draw();
+  eq(v.refused(), null, "the refusal clears on the next edit");
+  v.button("Remove Kit bun-2").props.onClick();
+  eq(stored.at(-1), [{ id: "bun-3" }, { id: "bun-1" }], "removed");
+  // the model itself
+  eq(M.bundleList.add([{ id: "a" }], "a"), { list: [{ id: "a" }], error: "This bundle is already in the grid." }, "add refuses");
+  eq(M.bundleList.replace([{ id: "a" }, { id: "b", title: "x" }], 1, "a").error, "This bundle is already in the grid.", "replace refuses a duplicate");
+  eq(M.bundleList.replace([{ id: "a" }, { id: "b", title: "x" }], 1, "c").list, [{ id: "a" }, { id: "c" }], "replace writes { id }");
+  eq(M.bundleList.add(Array.from({ length: 12 }, (_, j) => ({ id: `b${j}` })), "new").error, "A grid shows at most 12 bundles.", "full");
+});
+
+await t("P5-EDITOR unit+rendered: anchorsOf maps a bundle's incomplete and UNKNOWN_FIELD notes to the control, and a grid's indexed INVALID_VALUE to its row", () => {
+  const card = { ...Reg.newSection("bundle_card", { id: "sec_an1" }), settings: { title: "", bundle: null } };
+  const grid = { ...Reg.newSection("bundle_grid", { id: "sec_an2" }), settings: { title: "Bundles", bundles: [{ id: "bun-a" }, { id: "bun-a" }, { id: "bun-b", title: "x" }] } };
+  const old = { ...Reg.newSection("bundle_card", { id: "sec_an3" }), settings: { title: "", bundle: { id: "bun-a", title: "Gym kit" } } };
+  const issues = issuesFor(Reg.fixtureDocument("home", [card, grid, old]));
+  const cardKnown = new Set(M.anchorsOf(cardField("sec_an1"), null, "sec_an1"));
+  eq([...cardKnown], ["f-sec_an1-bundle"], "the card's anchors");
+  const incomplete = issues.find((i) => i.sectionId === "sec_an1" && i.field === "bundle" && i.severity === "incomplete");
+  ok(incomplete, `an incomplete note: ${JSON.stringify(issues.filter((i) => i.sectionId === "sec_an1"))}`);
+  eq(Reg.fieldAnchor(incomplete, { known: cardKnown }), "f-sec_an1-bundle", "incomplete lands on the control");
+  const unknown = issues.find((i) => i.sectionId === "sec_an3" && i.code === "UNKNOWN_FIELD");
+  eq(Reg.fieldAnchor(unknown, { known: new Set(M.anchorsOf(cardField("sec_an3"), old.settings.bundle, "sec_an3")) }), "f-sec_an3-bundle", "UNKNOWN_FIELD lands on the control");
+  const gridKnown = new Set(M.anchorsOf(gridField("sec_an2"), grid.settings.bundles, "sec_an2"));
+  eq([...gridKnown], ["f-sec_an2-bundles", "f-sec_an2-bundles-0", "f-sec_an2-bundles-1", "f-sec_an2-bundles-2"], "the grid's anchors: the control and each row");
+  const dup = issues.find((i) => i.sectionId === "sec_an2" && i.code === "INVALID_VALUE" && i.field === "bundles.1");
+  ok(dup, "the duplicate is INVALID_VALUE on index 1");
+  eq(Reg.fieldAnchor(dup, { known: gridKnown }), "f-sec_an2-bundles-1", "it lands on row 2");
+  const rowKey = issues.find((i) => i.sectionId === "sec_an2" && i.code === "UNKNOWN_FIELD");
+  eq(Reg.fieldAnchor(rowKey, { known: gridKnown }), "f-sec_an2-bundles-2", "a row's unknown key lands on that row");
+  // and the rendered forms put each message there
+  for (const s of [card, grid, old]) {
+    const html = render(h(SettingsForm, { kind: s.kind, sectionId: s.id, value: s.settings, issues, onChange: () => {}, context: CATALOG }));
+    ok(checkPlacement(html, issues, s.id, s.kind) > 0, `${s.kind}: notes placed`);
+  }
+});
+
+await t("P5-SETTING review: placeableIssues leaves out only the waiting setting of THAT section (two sections of different kinds share the key 'pick')", () => {
+  Reg.defineSection({ kind: "zz_waita", version: 1, label: "Wait A", documentTypes: ["home"], settings: [{ key: "pick", kind: "product_ids", label: "Picks", default: [] }] });
+  Reg.defineSection({ kind: "zz_waitb", version: 1, label: "Wait B", documentTypes: ["home"], settings: [{ key: "pick", kind: "text", label: "Pick", max: 5, default: "" }] });
+  try {
+    const a = { ...Reg.newSection("zz_waita", { id: "sec_wa1" }), settings: { pick: "junk" } };
+    const b = { ...Reg.newSection("zz_waitb", { id: "sec_wb1" }), settings: { pick: "far too long" } };
+    const issues = issuesFor(Reg.fixtureDocument("home", [a, b]));
+    ok(issues.some((i) => i.sectionId === "sec_wa1" && i.field.startsWith("pick")) && issues.some((i) => i.sectionId === "sec_wb1" && i.field === "pick"), `both sections have a pick issue: ${JSON.stringify(issues.map((i) => `${i.sectionId}:${i.field}`))}`);
+    const forA = placeableIssues(issues, a);
+    ok(!forA.some((i) => i.sectionId === "sec_wa1" && i.field.startsWith("pick")), "A's waiting pick is left out");
+    ok(forA.some((i) => i.sectionId === "sec_wb1" && i.field === "pick"), "B's pick (same key, another section) is kept");
+    eq(placeableIssues(issues, b).length, issues.length, "B has no waiting setting: every issue is kept");
+  } finally {
+    Reg.removeSection("zz_waita");
+    Reg.removeSection("zz_waitb");
+  }
 });
 
 const seconds = ((Date.now() - started) / 1000).toFixed(1);
