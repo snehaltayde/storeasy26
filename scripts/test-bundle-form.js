@@ -18,6 +18,14 @@
 //   5. the panel: card id 'bundles'; a draft that fails the check (a
 //      quantity of 1.5) is not offered Enable; Disable and Delete of a bundle
 //      on the live home say shoppers stop seeing it there
+//   6. P5-EDITOR: the editor's inline create (components/admin/editor/fields/
+//      BundleControl.js): the Dialog holds only Name, Products and Price and
+//      says the bundle goes live now; 'Create bundle' waits for a passing
+//      check; the new bundle is picked as { id }; no 'Create a bundle'
+//      without offers.write. And the form fixes from the P5-PANEL review:
+//      'Save and show to shoppers' waits for the check with a name typed; the
+//      saving keeps its cents; a quantity can be cleared and 1.5 is shown as
+//      a reason; a row stored by a web name is named
 // Components run with Next's own SWC and a small hook driver (copied from
 // scripts/test-media-picker.js). File databases only.
 //   pnpm test:bundle-form
@@ -599,6 +607,180 @@ await t("the panel: Disable and Delete of a bundle on the live home say shoppers
     await raw("DELETE FROM documents WHERE id = 'doc_home'");
     for (const b of [onHome, offHome]) await store.run(() => B.deleteBundle(b.id));
   }
+});
+
+// =====================================================================================
+console.log("— 6. P5-EDITOR: the editor's inline create, and the form fixes");
+
+const CONTROL = "components/admin/editor/fields/BundleControl.js";
+const M = await import("../components/admin/editor/fields/inspectorModel.js");
+const cardField = { key: "bundle", path: "bundle", control: "bundle", label: "Bundle", setting: { key: "bundle", kind: "bundle", required: true } };
+const gridField = { key: "bundles", path: "bundles", control: "bundle_list", label: "Bundles to show", setting: { key: "bundles", kind: "bundle_list", required: true, max: 12 } };
+const LIVE_NOW = (slug) => `The bundle is saved and turned on now: its discount works in the cart and its page /bundles/${slug} opens right away, even if you don't publish. It shows on your home page after you publish.`;
+const qtyInputs = (v) => v.filter((n) => n.type === "input" && /^Quantity of /.test(n.props["aria-label"] || ""));
+const typeQty = async (v, i, value) => {
+  qtyInputs(v)[i].props.onChange({ target: { value } });
+  await v.flush();
+};
+
+await t("the inline-create Dialog shows only Name, Products and Price, says the bundle is turned on now even before publishing, keeps 'Create bundle' off while the check fails, and picks the new bundle as { id }", async () => {
+  const f = storeFetch();
+  let value = null;
+  const refreshed = [];
+  await withFetch(f.fetch, async () => {
+    const v = await mount(CONTROL, "BundleControl", () => ({ field: cardField, value, onChange: (x) => (value = x), issues: [], owner: "sec_ic1", context: { bundles: { status: "ready", items: [] }, canCreateBundles: true, currency: "USD", refreshBundles: () => refreshed.push(1) } }), f);
+    ok(!v.dialogText(), "no Dialog before the click");
+    const labelsBefore = v.labels();
+    const inputsBefore = v.filter((n) => n.type === "input").map((n) => n.props.id);
+    await v.click("Create a bundle");
+    const said = v.dialogText();
+    ok(said.includes(LIVE_NOW("bundle")), `the live-now sentence: ${said}`);
+    ok(/turned on now/.test(said) && /even if you don't publish/.test(said), "turned on now … even if you don't publish");
+    const added = v.labels().slice(labelsBefore.length);
+    eq(added, ["Name", "Price"], "the Dialog's fields are Name and Price (and the Products list)");
+    eq(v.filter((n) => n.type === "input").map((n) => n.props.id).filter((id) => !inputsBefore.includes(id)), ["bundle-name-compact", "bundle-price-compact"], "only the name and price inputs");
+    ok(!v.find((n) => n.type === "textarea"), "no description");
+    ok(/Products/.test(v.all()) && v.hasButton("Add product"), "the Products list");
+    ok(!v.hasButton("Save as draft") && !v.hasButton("Save and show to shoppers"), "compact: no draft");
+    await v.type("bundle-name-compact", "Gym Kit");
+    ok(v.dialogText().includes(LIVE_NOW("gym-kit")), "the page follows the name");
+    await v.click("Add product");
+    await v.pick(V(1), "Fixture product 1");
+    await v.click("Add product");
+    await v.pick(V(2), "Fixture product 2");
+    await v.type("bundle-price-compact", "300");
+    ok(/Price must be lower than \$300/.test(v.all()), "the check fails, in words");
+    ok(v.button("Create bundle").props.disabled, "Create bundle is off while the check fails");
+    eq(f.calls.filter((c) => c.body?.create).length, 0, "nothing created");
+    await v.type("bundle-price-compact", "250");
+    ok(!v.button("Create bundle").props.disabled, "on once it passes");
+    await v.click("Create bundle");
+    const create = f.calls.filter((c) => c.body?.create);
+    eq(create.length, 1, "one create");
+    eq([create[0].body.create.enable, create[0].body.create.mustPass], [true, true], "turned on, must pass");
+    const rowNow = (await raw("SELECT id, slug, enabled FROM bundles WHERE title = 'Gym Kit'"))[0];
+    eq([rowNow.slug, Number(rowNow.enabled)], ["gym-kit", 1], "saved turned on, at the page the Dialog named");
+    eq(value, { id: rowNow.id }, "the new bundle is picked as { id } only");
+    eq(refreshed.length, 1, "the editor's bundles are read again");
+    ok(!v.dialogText(), "the Dialog closed");
+    await store.run(() => B.deleteBundle(rowNow.id));
+  });
+});
+
+await t("a grid's inline create adds the new bundle at the end; without offers.write there is no 'Create a bundle' and the sentence says to ask an owner", async () => {
+  for (const name of ["BundleControl", "BundleListControl"]) {
+    const v = await mount(CONTROL, name, () => ({ field: name === "BundleControl" ? cardField : gridField, value: name === "BundleControl" ? null : [], onChange: () => {}, issues: [], owner: "sec_no1", context: { bundles: { status: "ready", items: [] }, canCreateBundles: false, currency: "USD" } }));
+    ok(!v.hasButton("Create a bundle"), `${name}: no Create a bundle`);
+    ok(v.all().includes("Ask an owner to create bundles."), `${name}: the sentence`);
+  }
+  const f = storeFetch();
+  let value = [{ id: "bun-first" }];
+  await withFetch(f.fetch, async () => {
+    const v = await mount(CONTROL, "BundleListControl", () => ({ field: gridField, value, onChange: (x) => (value = x), issues: [], owner: "sec_ic2", context: { bundles: { status: "ready", items: [] }, canCreateBundles: true, currency: "USD" } }), f);
+    await v.click("Create a bundle");
+    await v.type("bundle-name-compact", "Grid Pair");
+    await v.click("Add product");
+    await v.pick(V(3), "Fixture product 3");
+    await v.click("Add product");
+    await v.pick(V(4), "Fixture product 4");
+    await v.type("bundle-price-compact", "600");
+    await v.click("Create bundle");
+    const made = (await raw("SELECT id FROM bundles WHERE title = 'Grid Pair'"))[0];
+    eq(value, [{ id: "bun-first" }, { id: made.id }], "added at the end as { id }");
+    await store.run(() => B.deleteBundle(made.id));
+  });
+});
+
+await t("the Dialog's page name is the one createBundle derives (lib/bundles.js slugBase)", async () => {
+  for (const title of ["Gym Kit", "  Café  Duo!! ", "💪", "x".repeat(80), "Starter-stack 2"]) eq(M.bundleSlugGuess(title), B.slugWithSuffix(B.slugBase(title), 1), `"${title}"`);
+});
+
+await t("P5-PANEL review: 'Save and show to shoppers' stays off while the check fails, with a name typed", async () => {
+  const f = storeFetch();
+  await withFetch(f.fetch, async () => {
+    const v = await mount(FORM, "BundleForm", () => ({ currency: "USD" }), f);
+    await v.type("bundle-name", "Named kit");
+    await v.click("Add product");
+    await v.pick(V(1), "Fixture product 1");
+    await v.click("Add product");
+    await v.pick(V(2), "Fixture product 2");
+    await v.type("bundle-price", "900");
+    ok(/Price must be lower than \$300/.test(v.all()), "the check fails");
+    ok(v.button("Save and show to shoppers").props.disabled, "off while it fails, though the name is there");
+    await v.type("bundle-price", "250");
+    ok(!v.button("Save and show to shoppers").props.disabled, "on once it passes");
+  });
+});
+
+await t("P5-PANEL review: the saving keeps its cents ($49.48, never $49), and says what the cart takes off", async () => {
+  const f = storeFetch();
+  await withFetch(f.fetch, async () => {
+    const v = await mount(FORM, "BundleForm", () => ({ currency: "USD", compact: true }), f);
+    await v.click("Add product");
+    await v.pick(V(1), "Fixture product 1");
+    await v.click("Add product");
+    await v.pick(V(2), "Fixture product 2");
+    await v.type("bundle-price-compact", "250.52");
+    const saving = textOf(v.find((n) => n.props?.["data-bundle-saving"] === "").props.children);
+    eq(saving, "The products add up to $300. Shoppers save $49.48. The cart takes off $49, as it rounds to a whole amount.", "the saving line");
+    await v.type("bundle-price-compact", "250");
+    eq(textOf(v.find((n) => n.props?.["data-bundle-saving"] === "").props.children), "The products add up to $300. Shoppers save $50.", "a whole saving says nothing more");
+    eq(M.bundleSlugGuess("") , "bundle", "an empty name");
+  });
+});
+
+await t("P5-PANEL review: a quantity can be cleared while typing (no keystroke makes it 1), nothing is checked or saved while it is empty, and a typed 1.5 shows the bad_quantity reason", async () => {
+  const f = storeFetch();
+  await withFetch(f.fetch, async () => {
+    const v = await mount(FORM, "BundleForm", () => ({ currency: "USD", compact: true }), f);
+    await v.type("bundle-name-compact", "Qty kit");
+    await v.click("Add product");
+    await v.pick(V(1), "Fixture product 1");
+    await v.click("Add product");
+    await v.pick(V(2), "Fixture product 2");
+    await v.type("bundle-price-compact", "250");
+    ok(!v.button("Create bundle").props.disabled, "passes first");
+    const checks = () => f.calls.filter((c) => c.body?.check).length;
+    const n = checks();
+    await typeQty(v, 0, "");
+    eq(qtyInputs(v)[0].props.value, "", "the box stays empty");
+    eq(checks(), n, "no check while it is empty");
+    ok(v.button("Create bundle").props.disabled, "nothing can be created while it is empty");
+    ok(/Enter how many of this product, 1 or more\./.test(v.all()), "the row says so");
+    await typeQty(v, 0, "3");
+    eq(qtyInputs(v)[0].props.value, 3, "typing 3 into the cleared box gives 3, not 13");
+    eq(f.calls.filter((c) => c.body?.check).at(-1).body.check.items[0].quantity, 3, "checked with 3");
+    await typeQty(v, 0, "1.5");
+    eq(qtyInputs(v)[0].props.value, 1.5, "1.5 is kept as typed");
+    eq(f.calls.filter((c) => c.body?.check).at(-1).body.check.items[0].quantity, 1.5, "and checked as 1.5");
+    const row0 = v.nodes().indexOf(v.find((n) => n.props?.["data-bundle-row"] === 0));
+    const row1 = v.nodes().indexOf(v.find((n) => n.props?.["data-bundle-row"] === 1));
+    const reason = v.nodes().find((n, i) => i > row0 && i < row1 && n.props?.["data-bundle-row-reason"] === "");
+    ok(reason && /The quantity must be a whole number, 1 or more/.test(textOf(reason.props.children)), `row 1 shows the bad_quantity reason: ${reason ? textOf(reason.props.children) : "none"}`);
+    ok(v.button("Create bundle").props.disabled, "1.5 can't be created");
+  });
+});
+
+await t("P5-PANEL review: a stored row that holds a web name (not a picked product) is named: 'Pick product 1 again', nothing is checked until it is picked", async () => {
+  const f = storeFetch();
+  await withFetch(f.fetch, async () => {
+    const initial = { id: "bun-legacy", slug: "legacy-kit", title: "Legacy kit", description: "", bundle_price: 250, items: [{ variantId: "old-handle", quantity: 1 }, { variantId: V(2), quantity: 1 }] };
+    const v = await mount(FORM, "BundleForm", () => ({ currency: "USD", initial }), f);
+    eq(f.calls.filter((c) => c.body?.check).length, 0, "no check (the route would refuse the whole check)");
+    const banner = v.find((n) => n.props?.["data-bundle-pick-again"] === "");
+    ok(banner, "a banner names the row");
+    eq(textOf(banner.props.children), "Pick product 1 again: it was saved by its web name, not picked from your catalog.", "the banner");
+    ok(/“old-handle”/.test(v.all()) && /Pick this product again with Change: it was saved by its web name\./.test(v.all()), "the row shows what it holds and what to do");
+    ok(!/Checking…/.test(v.all()), "no row waits on a check that can't come");
+    ok(v.button("Save changes").props.disabled, "it can't be saved as it is");
+    eq(M.bundleSlugGuess("Legacy kit"), "legacy-kit", "guess");
+    await v.button("Change").props.onClick();
+    await v.flush();
+    await v.pick(V(1), "Fixture product 1");
+    ok(!v.find((n) => n.props?.["data-bundle-pick-again"] === ""), "picked again: the banner goes");
+    ok(f.calls.some((c) => c.body?.check), "and the check runs");
+    ok(!v.button("Save changes").props.disabled, "and it can be saved");
+  });
 });
 
 // ---- done -------------------------------------------------------------------------------

@@ -11,7 +11,8 @@
 //             each control shows the ones at its own element ids
 //   owner     the section id, or null for the document itself
 //   context   { ownerKey, collections, products, pages, minItems, menuMode,
-//               pickImage, focus: { id, request } }
+//               pickImage, focus: { id, request }, and (P5-EDITOR) bundles,
+//               searchBundles, refreshBundles, canCreateBundles, currency }
 //   readOnly  true: nothing can be changed
 //
 // Element ids: each control's element has the id of its field path
@@ -25,6 +26,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { Input, Textarea, Select } from "../../../console/fields.js";
 import { Button, IconButton } from "../../../console/Button.js";
 import RichTextField from "./RichTextField.js";
+import { BundleControl, BundleListControl } from "./BundleControl.js";
 import {
   idOf,
   notesId,
@@ -713,6 +715,9 @@ export const CONTROLS = Object.freeze({
   product: ProductControl,
   collections: CollectionsControl,
   products: ProductsControl,
+  // P5-EDITOR: the bundle picker (BundleControl.js)
+  bundle: BundleControl,
+  bundle_list: BundleListControl,
   system: SystemControl,
   address: AddressControl,
   datetime: DateTimeControl,
