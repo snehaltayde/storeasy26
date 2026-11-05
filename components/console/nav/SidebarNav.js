@@ -42,6 +42,7 @@ const ICONS = {
   media: ImageIcon,
   storefront: PanelsTopLeft,
   editor: Brush,
+  start: Palette, // P6-NAV: "Logo and colours" (documents stores)
   "cms-home": Home,
   "cms-designer": Brush,
   "cms-pages": FileText,
@@ -120,13 +121,16 @@ export const NAV_GROUPS = [
 // the old content, theme and brand screens (each of them redirects to the
 // editor there anyway); Media and Publishing stay. Every other mode gets
 // NAV_GROUPS exactly as it is.
+// P6-NAV (GEN-04, US-01): after Editor, "Logo and colours" (the brand step at
+// /admin/start), so the logo and palette can be found again after the store
+// opens. For everyone who sees the Editor link (not admin-only).
 const DOCUMENTS_STOREFRONT = new Set(["media", "releases"]);
 export function navGroups(cmsMode) {
   if (cmsMode !== "documents") return NAV_GROUPS;
   return NAV_GROUPS.map((group) =>
     group.label !== "Storefront"
       ? group
-      : { ...group, items: [{ id: "editor", label: "Editor", href: "/admin/editor" }, ...group.items.filter((it) => DOCUMENTS_STOREFRONT.has(it.id))] }
+      : { ...group, items: [{ id: "editor", label: "Editor", href: "/admin/editor" }, { id: "start", label: "Logo and colours", href: "/admin/start" }, ...group.items.filter((it) => DOCUMENTS_STOREFRONT.has(it.id))] }
   );
 }
 

@@ -12,6 +12,10 @@
 // answers at once, through the real /api/admin routes and the real Settings
 // and Publishing pages (compiled with Next's SWC, components stubbed). Shopper
 // reads keep the cache, and are checked to still do so.
+// P6-NAV (GEN-01, GEN-04, US-01): the dashboard's one setup nudge ("Start your
+// store" on a documents store that hasn't started, else today's "Setup: x/y
+// done"), the Settings page's documents prop from getCmsMode, and
+// SettingsAdmin's logo hint (rendered) on each kind of store.
 //   pnpm test:console-fresh
 import { readFile, rm, readdir } from "node:fs/promises";
 import { registerHooks, createRequire } from "node:module";
@@ -130,6 +134,9 @@ async function serve() {
   const nextNavigation = await import(NEXT_NAVIGATION);
   const SettingsAdmin = () => null;
   const ReleasesAdmin = () => null;
+  // P6-NAV: the dashboard's client and console components are stand-ins that
+  // keep their children, so its "Needs attention" list can be read
+  const keep = (props) => React.createElement(React.Fragment, null, props.children);
   const stubs = {
     "next/headers": nextHeaders,
     "next/navigation": nextNavigation,
@@ -137,6 +144,12 @@ async function serve() {
     "@/components/admin/OpsPanels": { __esModule: true, default: () => null },
     "@/components/admin/ReleasesAdmin": { __esModule: true, default: ReleasesAdmin },
     "@/components/console/PageHeader": { PageHeader: () => null },
+    "@/components/admin/SyncProgress": { __esModule: true, default: () => null },
+    "@/components/console/Card": { Card: keep, CardHeader: () => null },
+    "@/components/console/bits": { Stat: () => null, EmptyState: () => null },
+    "@/components/console/Badge": { Badge: keep },
+    "@/components/console/charts": { Bars: () => null },
+    "@/components/console/cx": { cx: (...a) => a.filter(Boolean).join(" ") },
   };
   async function loadPage(rel) {
     const file = join(root, rel);
@@ -158,6 +171,24 @@ async function serve() {
   const pages = {
     settings: { fn: await loadPage("app/(console)/admin/(authed)/settings/page.js"), stub: SettingsAdmin },
     releases: { fn: await loadPage("app/(console)/admin/(authed)/releases/page.js"), stub: ReleasesAdmin },
+    dashboard: { fn: await loadPage("app/(console)/admin/(authed)/dashboard/page.js"), stub: null },
+  };
+  // P6-NAV: a mode read that fails (the tenant database not answering that
+  // one query), for the Settings page's "legacy words, never an error page"
+  // (the store's own cached client, patched once inside its context)
+  const { currentDatabase } = await import("../lib/db.js");
+  let modeFails = false;
+  let patched = false;
+  const patchModeRead = async () => {
+    if (patched) return;
+    patched = true;
+    const client = await withTenant(await C.getTenant("fresh"), () => currentDatabase().libsql);
+    const execute = client.execute.bind(client);
+    client.execute = (stmt, ...rest) => {
+      const sql = typeof stmt === "string" ? stmt : stmt?.sql || "";
+      if (modeFails && /FROM cms_state/.test(sql)) return Promise.reject(Object.assign(new Error("SQLITE_IOERR: disk I/O error"), { code: "SQLITE_IOERR" }));
+      return execute(stmt, ...rest);
+    };
   };
   function* walk(node) {
     if (node == null || typeof node !== "object") return;
@@ -183,11 +214,16 @@ async function serve() {
       const res = await mods[path][method](request(path, { method, body, cookies, host }), { params: Promise.resolve(params || {}) });
       return { status: res.status, body: await res.json().catch(() => null) };
     },
-    async page({ name, cookies }) {
+    async page({ name, cookies, searchParams }) {
       const { fn, stub } = pages[name];
       return inRequest(cookies, async () => {
         try {
-          const tree = await fn();
+          const tree = await fn({ searchParams: Promise.resolve(searchParams || {}) });
+          // P6-NAV: the dashboard's "Needs attention" items, as the founder reads them
+          if (name === "dashboard") {
+            const items = [...walk(tree)].filter((e) => e.type === "li").map((li) => [...walk(li.props.children)].find((e) => e.props?.href));
+            return { nudges: items.map((a) => ({ href: a.props.href, label: [].concat(a.props.children).find((c) => typeof c === "string") ?? null })) };
+          }
           const el = [...walk(tree)].find((e) => e.type === stub);
           return { props: el ? el.props : null };
         } catch (e) {
@@ -211,6 +247,23 @@ async function serve() {
           return { threw: e.digest || e.name || e.code };
         }
       });
+    },
+    // P6-NAV: the starting store's two documents, written by the first-run
+    // writer itself (as P6-BRAND's suite seeds them), in the store's context
+    async seedFirstRun() {
+      const Docs = await import("../lib/documents/service.js");
+      const R = await import("../lib/registry/index.js");
+      const Pal = await import("../lib/themes/palettes.js");
+      const t = await C.getTenant("fresh");
+      const home = { ...R.emptyBody("home"), sections: [{ id: "sec_navhome1", kind: "text", v: 1, enabled: true, settings: { title: "Welcome", body: ["Words for shoppers."] }, blocks: [] }] };
+      const design = { ...R.emptyBody("design"), settings: { ...R.emptyBody("design").settings, ...Pal.designBodyFor("slate") } };
+      const r = await withTenant(t, () => Docs.createFirstRunDocuments({ docs: [{ type: "home", id: "doc_home", body: home }, { type: "design", id: "doc_design", body: design }], actor: Docs.FIRST_RUN_ACTOR }));
+      return { written: r.written };
+    },
+    async modeFails({ on }) {
+      await patchModeRead();
+      modeFails = on;
+      return { ok: true };
     },
     async claimDomain({ host }) {
       await claimDomain({ host, tenantId: "fresh", preVerified: true });
@@ -256,6 +309,36 @@ async function main() {
   const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
   const { platformSessionToken } = await import("../lib/platform/admin-auth.js");
   const { CONSOLE_API_PREFIX } = await import("../lib/tenant-request.js").catch(() => ({}));
+  // P6-NAV: the real SettingsAdmin, compiled with Next's SWC (components/
+  // files and what they import), for its rendered logo hint
+  const swc = require("next/dist/build/swc/index.js");
+  await swc.loadBindings();
+  const React = require("react");
+  const { renderToStaticMarkup } = require("react-dom/server");
+  const jsxSeen = new Map();
+  async function loadJsx(file) {
+    if (jsxSeen.has(file)) return jsxSeen.get(file);
+    const mod = { exports: {} };
+    jsxSeen.set(file, mod.exports);
+    const { code } = await swc.transform(await readFile(file, "utf8"), {
+      filename: file,
+      jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" },
+      module: { type: "commonjs" },
+    });
+    const deps = new Map();
+    for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
+      if (deps.has(id) || id === "react" || id === "react/jsx-runtime") continue;
+      if (id.startsWith("@/") || id.startsWith(".")) {
+        let target = id.startsWith("@/") ? join(root, id.slice(2)) : resolve(dirname(file), id);
+        if (!target.endsWith(".js")) target = `${target}.js`;
+        deps.set(id, target.startsWith(join(root, "components")) ? await loadJsx(target) : await import(pathToFileURL(target).href));
+      } else deps.set(id, require(id));
+    }
+    new Function("require", "module", "exports", code)((id) => (id === "react" ? React : id === "react/jsx-runtime" ? require("react/jsx-runtime") : deps.get(id)), mod, mod.exports);
+    jsxSeen.set(file, mod.exports);
+    return mod.exports;
+  }
+  const SettingsAdminReal = (await loadJsx(join(root, "components/admin/SettingsAdmin.js"))).default;
 
   await C.migratePlatform(await readFile(join(root, "lib/platform/schema.sql"), "utf8"));
   await runMigrations(C.platformDb(), await loadMigrations("platform"), {});
@@ -328,7 +411,7 @@ async function main() {
       name,
       call,
       api: (method, path, body, cookies = OWNER, params, host) => call("api", { method, path, body, cookies, params, host }),
-      page: (pageName, cookies = OWNER) => call("page", { name: pageName, cookies }),
+      page: (pageName, cookies = OWNER, searchParams) => call("page", { name: pageName, cookies, searchParams }),
       storefront: (preview = false) => call("storefront", { preview }),
       stats: (o) => call("stats", o),
     };
@@ -344,6 +427,117 @@ async function main() {
   const shippingOf = (s) => ({ flatRate: s.flatRate, freeThreshold: s.freeThreshold, codFee: s.codFee });
 
   try {
+    // ---- P6-NAV: the dashboard nudge and the Settings logo hint ----------------
+    // (first, while the store has never opened: the checklist's own nudge
+    // shows only then). The store goes to documents mode on this suite's own
+    // local file database, and back to legacy at the end of the section.
+    console.log("— P6-NAV: one dashboard nudge, and the Settings page's documents prop");
+    const setMode = async (mode) => {
+      const c = createClient({ url: `file:${FILES.tenant}` });
+      try {
+        await c.execute({ sql: "UPDATE cms_state SET mode = ? WHERE id = 1", args: [mode] });
+      } finally {
+        c.close();
+      }
+    };
+    const setLive = async (id) => {
+      const c = createClient({ url: `file:${FILES.tenant}` });
+      try {
+        await c.execute({ sql: "UPDATE release_state SET live_release_id = ? WHERE id = 1", args: [id] });
+      } finally {
+        c.close();
+      }
+    };
+    const SETUP = /^Setup: \d+\/\d+ done — not launched yet$/;
+    const setupNudges = (r) => (r.nudges || []).filter((n) => n.href === "/admin/setup" || n.href === "/admin/start");
+
+    await t("P6-NAV: a legacy store's dashboard keeps today's one setup nudge, 'Setup: x/y done', and the Settings page passes documents: false", async () => {
+      const d = await A.page("dashboard");
+      ok(d.nudges, `the dashboard rendered: ${JSON.stringify(d).slice(0, 300)}`);
+      const n = setupNudges(d);
+      eq(n.length, 1, `one setup nudge: ${JSON.stringify(d.nudges)}`);
+      ok(n[0].href === "/admin/setup" && SETUP.test(n[0].label), `today's nudge: ${JSON.stringify(n[0])}`);
+      eq((await A.page("settings")).props?.documents, false, "Settings documents prop:");
+    });
+
+    await t("P6-NAV: on a documents store with no starting store yet, the dashboard's single nudge is 'Start your store' -> /admin/start (no 'Setup: x/y done' beside it), and Settings passes documents: true", async () => {
+      await setMode("documents");
+      for (const X of [A, B]) {
+        const d = await X.page("dashboard");
+        eq(setupNudges(d), [{ href: "/admin/start", label: "Start your store" }], `${X.name}: the nudges ${JSON.stringify(d.nudges)}:`);
+        ok(!d.nudges.some((n) => n.href === "/admin/setup" || /^Setup:/.test(n.label || "")), `${X.name}: a second nudge`);
+        eq((await X.page("settings")).props?.documents, true, `${X.name}: Settings documents prop:`);
+      }
+    });
+
+    await t("P6-NAV: a brand step recorded but no starting store, or a starting store but no brand step, is still 'Start your store'; both is today's setup nudge", async () => {
+      const step = (skipped) => ({ onboarding: { brand_step: { paletteId: "forest", skipped, at: new Date().toISOString() } } });
+      await C.patchTenant("fresh", { config: step(false) });
+      eq(setupNudges(await A.page("dashboard")), [{ href: "/admin/start", label: "Start your store" }], "a brand step, not generated:");
+      await C.patchTenant("fresh", { config: { onboarding: {} } });
+      eq((await A.call("seedFirstRun")).written, true, "the first-run writer wrote the starting store:");
+      eq(setupNudges(await A.page("dashboard")), [{ href: "/admin/start", label: "Start your store" }], "generated, no brand step:");
+      await C.patchTenant("fresh", { config: step(false) });
+      for (const X of [A, B]) {
+        const n = setupNudges(await X.page("dashboard"));
+        eq(n.length, 1, `${X.name}: one nudge:`);
+        ok(n[0].href === "/admin/setup" && SETUP.test(n[0].label), `${X.name}: today's nudge after the brand step: ${JSON.stringify(n)}`);
+      }
+      // a skip is recorded too (P6-BRAND): it counts as done
+      await C.patchTenant("fresh", { config: { onboarding: { brand_step: { paletteId: "forest", skipped: true, at: new Date().toISOString() } } } });
+      eq(setupNudges(await A.page("dashboard")).map((n) => n.href), ["/admin/setup"], "a recorded skip:");
+    });
+
+    await t("P6-NAV: the Settings page on a store whose mode can't be read passes documents: false (legacy words), never an error page; the store's row is still read fresh", async () => {
+      await A.call("modeFails", { on: true });
+      try {
+        await A.stats({ reset: true });
+        const p = await A.page("settings");
+        ok(p.props && !p.threw, `the Settings page: ${JSON.stringify(p).slice(0, 200)}`);
+        eq(p.props.documents, false, "documents when the mode can't be read:");
+        ok((await A.stats({ reset: true })).rowReads >= 1, "the Settings page reads the row");
+        // and the dashboard keeps today's nudge
+        ok(setupNudges(await A.page("dashboard")).every((n) => n.href === "/admin/setup"), "the dashboard when the mode can't be read");
+      } finally {
+        await A.call("modeFails", { on: false });
+      }
+    });
+
+    await t("P6-NAV rendered: SettingsAdmin with documents: true points the logo hint at /admin/start; every other value renders today's markup exactly", async () => {
+      const initial = (await A.page("settings")).props.initial;
+      const html = (props) => renderToStaticMarkup(React.createElement(SettingsAdminReal, { initial, ...props }));
+      const legacy = html({});
+      const OLD = "The storefront logo is text; the second part renders in your accent color";
+      ok(legacy.includes(`>${OLD}</p>`) && !legacy.includes("/admin/start"), "the legacy hint");
+      for (const documents of [false, undefined, "true", 1, null]) eq(html({ documents }), legacy, `documents ${JSON.stringify(documents)}:`);
+      const docs = html({ documents: true });
+      const hint = /<p id="fd-sa-logo-text1"[^>]*>([\s\S]*?)<\/p>/.exec(docs);
+      ok(hint, "the documents hint");
+      ok(/<a href="\/admin\/start"[^>]*>Logo and colours<\/a>/.test(hint[1]), `the link: ${hint[1]}`);
+      eq(hint[1].replace(/<[^>]+>/g, ""), "Your picture logo is set in Logo and colours. This text is used when there is no picture; the second part renders in your accent color.", "the words:");
+      ok(!docs.includes(OLD), "the old words on a documents store");
+      // the rest of the form is unchanged
+      eq(docs.replace(hint[1], OLD), legacy, "only the hint differs:");
+    });
+
+    await t("P6-NAV: an open documents store never gets 'Start your store', even with no brand step recorded (a store opened before phase 6)", async () => {
+      await C.patchTenant("fresh", { config: { onboarding: {} } });
+      eq(setupNudges(await A.page("dashboard")).map((n) => n.href), ["/admin/start"], "closed, no brand step:");
+      await setLive("rel_p6nav_open");
+      try {
+        const d = await A.page("dashboard");
+        ok(d.nudges, `the dashboard rendered: ${JSON.stringify(d).slice(0, 200)}`);
+        ok(!d.nudges.some((n) => n.href === "/admin/start"), `an open store is told to start: ${JSON.stringify(d.nudges)}`);
+      } finally {
+        await setLive(null);
+      }
+    });
+
+    await t("P6-NAV: the store goes back to legacy for the rest of this suite", async () => {
+      await setMode("legacy");
+      eq((await A.page("settings")).props?.documents, false, "documents:");
+    });
+
     console.log("— Settings: saved on one instance, read on another at once");
 
     await t("before any save, both instances show the starter rates and the notice (and have cached the store's row)", async () => {

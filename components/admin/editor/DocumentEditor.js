@@ -98,6 +98,10 @@ import { pickedBundleIds, bundlesWithPending } from "./fields/inspectorModel.js"
 //   can                                  { offersWrite } (P5-EDITOR, OQ-A):
 //                                        the inline "Create a bundle"
 //   currency                             the store's currency, for that form
+//   startingBrand                        P6-NAV (OQ-P6-8): the store's
+//                                        starting palette brand, handed to
+//                                        the design form in the context (its
+//                                        Reset goes back to it), or null
 //   api                                  documentsApi (tests pass a stub)
 //
 // P5-EDITOR (COM-02, COM-01): the bundle picker's rows. Read once at mount
@@ -154,6 +158,7 @@ export function EditorView({
   bundles = null,
   can = {},
   currency = undefined,
+  startingBrand = null,
   products = null,
   productsState = { status: "ready", more: false },
   productFilter = "all",
@@ -191,6 +196,8 @@ export function EditorView({
     ...(typeof on.refreshBundles === "function" ? { refreshBundles: on.refreshBundles } : {}),
     canCreateBundles: can?.offersWrite === true,
     currency,
+    // P6-NAV: the design form's Reset (fields/DesignForm.js)
+    startingBrand: isObj(startingBrand) ? startingBrand : null,
   };
   const entityDoc = ENTITY_TYPES.includes(type);
   const entityId = state?.document?.entityId || null;
@@ -432,7 +439,7 @@ export function EditorView({
 
 // ---- the editor ---------------------------------------------------------------------
 
-export default function DocumentEditor({ document: entry, note = null, entity: entityProp = null, readOnly = null, can = {}, currency = undefined, api = documentsApi }) {
+export default function DocumentEditor({ document: entry, note = null, entity: entityProp = null, readOnly = null, can = {}, currency = undefined, startingBrand = null, api = documentsApi }) {
   const router = useRouter();
   const [docs, setDocs] = useState(null);
   const [catalog, setCatalog] = useState({ products: [], collections: [] });
@@ -460,6 +467,12 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   const [bundles, setBundles] = useState({ status: "loading", items: [], answered: [] });
   const bundleSeq = useRef(0);
   const bundleAsked = useRef(new Set()); // ids already asked for by ids=
+  // P6-NAV (carried from the P5-FIX2 review): the ids= answers of the picks
+  // effect that arrived while a full read (loadBundles) was still out. That
+  // read's answer is merged with them, never put in their place, so a bundle
+  // picked during a focus re-read keeps its row (and never reads "Checking
+  // this bundle…" for good). id -> its row, or null when the answer left it out.
+  const bundleLate = useRef(new Map());
   const productSeq = useRef(0);
   // P4-FIX5: only the latest openEntry may adopt its answer (A to B to C with
   // B answering last must never leave the store on B while the page is on C)
@@ -510,6 +523,7 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   // Only the latest read may set the list.
   const loadBundles = useCallback(async () => {
     const mine = ++bundleSeq.current;
+    bundleLate.current = new Map();
     try {
       const first = await fetchRefs({ type: "bundle", limit: 50 });
       let items = Array.isArray(first?.items) ? first.items : [];
@@ -518,8 +532,13 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
         const more = await fetchRefs({ type: "bundle", ids: want.join(","), limit: want.length });
         items = [...items, ...(Array.isArray(more?.items) ? more.items : [])];
       }
-      bundleAsked.current = new Set([...items.map((b) => b?.id), ...want]);
-      if (mine === bundleSeq.current) setBundles({ status: "ready", items, answered: want });
+      if (mine !== bundleSeq.current) return;
+      // merge the picks effect's answers that came in meanwhile
+      const late = [...bundleLate.current].filter(([id]) => !items.some((b) => b?.id === id) && !want.includes(id));
+      items = [...items, ...late.map(([, r]) => r).filter(Boolean)];
+      const answered = [...want, ...late.map(([id]) => id)];
+      bundleAsked.current = new Set([...items.map((b) => b?.id), ...answered]);
+      setBundles({ status: "ready", items, answered });
     } catch {
       if (mine === bundleSeq.current) setBundles({ status: "failed", items: [], answered: [] });
     }
@@ -632,6 +651,7 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
       (r) => {
         if (mine !== bundleSeq.current) return;
         const rows = Array.isArray(r?.items) ? r.items : [];
+        for (const id of want) bundleLate.current.set(id, rows.find((x) => x?.id === id) || null);
         setBundles((b) => (b.status === "ready" ? { ...b, items: [...b.items.filter((x) => !rows.some((y) => y?.id === x?.id)), ...rows], answered: [...(b.answered || []), ...want] } : b));
       },
       () => {
@@ -894,6 +914,7 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
       bundles={bundlesShown}
       can={can}
       currency={currency}
+      startingBrand={startingBrand}
       products={productList}
       productsState={productsState}
       productFilter={productFilter}

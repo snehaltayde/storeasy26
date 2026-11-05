@@ -776,21 +776,27 @@ export const design = {
     return { usingDefault: !b, values: { ...DEFAULT_BRAND, ...(b || {}) } };
   },
   // One token changed. The first change of a store with no brand starts from
-  // the platform default. accent_label (the text colour on accent buttons) is
-  // worked out from the accent by validateBrand; the storefront uses a stored
-  // one as it is, so it is worked out again here whenever the brand reads,
-  // and dropped while a colour is half typed (the storefront then works it
-  // out itself). A stale one would keep the old button text colour.
-  setToken(brand, key, value) {
-    const base = isObj(brand) ? { ...brand } : { ...DEFAULT_BRAND };
+  // `start`: the platform default unless the caller gives one. P6-NAV (owner
+  // answer OQ-P6-8): DesignForm gives the store's starting palette, so a
+  // first edit never keeps the lime tokens. accent_label (the text colour on
+  // accent buttons) is worked out from the accent by validateBrand; the
+  // storefront uses a stored one as it is, so it is worked out again here
+  // whenever the brand reads, and dropped while a colour is half typed (the
+  // storefront then works it out itself). A stale one would keep the old
+  // button text colour.
+  setToken(brand, key, value, start = DEFAULT_BRAND) {
+    const base = isObj(brand) ? { ...brand } : { ...(isObj(start) ? start : DEFAULT_BRAND) };
     base[key] = value;
     const { accent_label: _old, ...rest } = base;
     const checked = validateBrand(rest);
     return checked.ok ? { ...rest, accent_label: checked.value.accent_label } : rest;
   },
-  // Back to the platform default look: no brand stored.
-  reset() {
-    return null;
+  // P6-NAV (owner answer OQ-P6-8): back to the store's starting colours. With
+  // a brand object (DesignForm gives the store's starting palette brand) a
+  // fresh copy of it; with none, null (no brand stored: the platform
+  // default), as before.
+  reset(start = null) {
+    return isObj(start) ? { ...start } : null;
   },
   setLook(theme, id) {
     const pick = lookChoices().find((l) => l.id === id);

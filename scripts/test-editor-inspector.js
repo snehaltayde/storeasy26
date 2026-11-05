@@ -26,6 +26,12 @@
 //      grid has Create off; and the editor's wiring (DocumentEditor driven
 //      with a stubbed refs fetch, EditorView rendered, editor/page.js called):
 //      the review's mutations MA, MB, MC, MD, ME, MK and ML each fail a test.
+//   8. P6-NAV (GEN-04, GEN-01; owner answer OQ-P6-8): the design form's Reset
+//      goes back to the store's starting palette (context.startingBrand,
+//      slate without one), never the platform's lime default; design.reset
+//      and setToken take that start; the "Change your logo and colours" link;
+//      and three loadBundles mutations the P5-FIX2 review left alive, plus a
+//      focus re-read that merges an ids= answer that came in meanwhile.
 // Everything renders with Next's own SWC and react-dom/server. No database.
 //   pnpm test:editor-inspector
 import { readFile } from "node:fs/promises";
@@ -758,14 +764,17 @@ await t("rendered: the design form shows every token, the look, the default note
   const body = { ...Reg.emptyBody("design"), settings: { brand: null, theme: null } };
   const html = render(h(DesignForm, { value: body, issues: [], onChange: () => {} }));
   for (const k of ["accent", "background", "foreground", "radius", "type_scale", "button_shape", "section_spacing"]) ok(html.includes(`id="f-doc-brand-${k}"`), `no ${k}`);
-  ok(html.includes('id="f-doc-theme"') && html.includes("platform&#x27;s default brand"), "the look and the default note");
+  // P6-NAV: the note says "default colours" and points at the starting
+  // colours (owner answer OQ-P6-8: Reset goes to the starting palette now)
+  ok(html.includes('id="f-doc-theme"') && html.includes("Your store uses the platform&#x27;s default colours. Go back to your starting colours, or change anything below."), "the look and the default note");
   // an unreadable pair on publish lands on the brand group
   const bad = { ...Reg.emptyBody("design"), settings: { brand: { ...M.design.setToken(null, "foreground", "#fefefe") }, theme: { kit: "pulse", version: 1 } } };
   const issues = Reg.validateDocument(bad, { mode: "publish" }).issues;
   ok(issues.some((i) => i.code === "BRAND_UNREADABLE"), `expected a readability issue: ${issues.map((i) => i.code)}`);
   const shown = render(h(SettingsForm, { type: "design", value: bad, issues, onChange: () => {} }));
   checkPlacement(shown, issues, null, "design");
-  ok(shown.includes("Go back to the platform"), "a custom brand can go back to the default");
+  // P6-NAV: back to the starting palette (slate with no startingBrand), not the platform default
+  ok(shown.includes("Go back to your starting colours (Slate)") && !shown.includes("Go back to the platform"), "a custom brand can go back to the starting colours");
 });
 
 // P6-LOGO-REG (GEN-04): the design form edits the brand and the look only. It
@@ -1367,8 +1376,8 @@ function oneComponent() {
 // The refs read: the first page holds bun-a; bun-far (a card) and bun-g1 (in a
 // grid) are only found by ids=. `mode` changes what the bundle reads answer.
 function refsServer() {
-  const S = { calls: [], mode: "ok", hold: null };
-  const rows = { "bun-a": row("bun-a", "available", { saving: 50, bundle_price: 250 }), "bun-far": row("bun-far", "available", { saving: 20, bundle_price: 280 }), "bun-g1": row("bun-g1", "sold_out", { reasons: [{ kind: "sold_out", index: 0 }] }), "bun-q": row("bun-q", "available", { title: "Quest kit", saving: 5, bundle_price: 95 }) };
+  const S = { calls: [], mode: "ok", hold: null, holdNext: null };
+  const rows = (S.rows = { "bun-a": row("bun-a", "available", { saving: 50, bundle_price: 250 }), "bun-far": row("bun-far", "available", { saving: 20, bundle_price: 280 }), "bun-g1": row("bun-g1", "sold_out", { reasons: [{ kind: "sold_out", index: 0 }] }), "bun-q": row("bun-q", "available", { title: "Quest kit", saving: 5, bundle_price: 95 }) });
   const answer = (status, body) => ({ ok: status < 400, status, json: async () => body });
   S.fetch = async (url) => {
     const u = new URL(String(url), "http://x");
@@ -1382,8 +1391,18 @@ function refsServer() {
     if (S.mode === "page-forbidden" && !p.ids && !p.q) return answer(403, { ok: false, error: "Forbidden" });
     if (p.ids) {
       if (S.mode === "ids-forbidden") return answer(403, { ok: false, error: "Forbidden" });
+      // the answer is what the server holds when asked (P6-NAV: a held answer
+      // can be older than a later read's)
+      const ids = p.ids.split(",");
+      // P6-NAV: "omit" leaves an id the server doesn't know out of the answer
+      // (no missing marker), so only the editor's `answered` list can tell it
+      // apart from one not asked about yet
+      const items = S.mode === "omit" ? ids.filter((id) => rows[id]).map((id) => ({ ...rows[id] })) : ids.map((id) => (rows[id] ? { ...rows[id] } : { id, missing: true, state: "missing", reasons: [], overlapsWith: [] }));
+      const once = S.holdNext;
+      S.holdNext = null;
+      if (once) await once;
       if (S.hold) await S.hold;
-      return answer(200, { ok: true, items: p.ids.split(",").map((id) => rows[id] || { id, missing: true, state: "missing", reasons: [], overlapsWith: [] }) });
+      return answer(200, { ok: true, items });
     }
     if (p.q) return answer(200, { ok: true, items: [rows["bun-q"]] });
     return answer(200, { ok: true, items: [rows["bun-a"]] });
@@ -1404,7 +1423,7 @@ const EMPTY_BODY = () => ({
     { ...Reg.newSection("bundle_grid", { id: "sec_dg1" }), settings: { title: "Bundles", bundles: [] } },
   ]),
 });
-async function driveEditor({ mode = "ok", hold = null, docHold = null, can = {}, makeBody = HOME_BODY } = {}) {
+async function driveEditor({ mode = "ok", hold = null, docHold = null, can = {}, makeBody = HOME_BODY, startingBrand = undefined } = {}) {
   const S = refsServer();
   S.mode = mode;
   S.hold = hold;
@@ -1428,7 +1447,7 @@ async function driveEditor({ mode = "ok", hold = null, docHold = null, can = {},
     "./store": { createDocumentStore: fakeStore },
     "next/navigation": { useRouter: () => ({ push() {}, refresh() {}, replace() {} }), usePathname: () => "/admin/editor" },
   });
-  const props = { document: { id: "doc_home", type: "home", label: "Home page", slug: null }, can, api };
+  const props = { document: { id: "doc_home", type: "home", label: "Home page", slug: null }, can, api, ...(startingBrand !== undefined ? { startingBrand } : {}) };
   const viewProps = (el) => {
     const kids = React.Children.toArray(el.props.children);
     const ev = kids.find((k) => k?.type?.name === "EditorView");
@@ -1670,6 +1689,240 @@ await t("P5-FIX2 wiring (MA): editor/page.js gives can.offersWrite from roleAllo
     ok(el.type === Stub, `${role}: the editor`);
     eq(el.props.can, { offersWrite: may }, `${role}: can`);
     eq([el.props.currency, seen.currency], may ? ["USD", 1] : [undefined, 0], `${role}: the currency`);
+  }
+});
+
+// ============================== 8. P6-NAV =========================================
+console.log("8. P6-NAV: Reset goes to the starting palette (OQ-P6-8), the brand step link, and the loadBundles pins");
+const Pal = await import("../lib/themes/palettes.js");
+const { DEFAULT_BRAND } = await import("../lib/brand.js");
+const FOREST = Pal.paletteById("forest").brand;
+const SLATE = Pal.paletteById("slate").brand;
+const DF = await loadJsx(join(FIELDS, "DesignForm.js"));
+const designBody = (brand, extra = {}) => ({ ...Reg.emptyBody("design"), settings: { brand, theme: { kit: "pulse", version: 1 }, ...extra } });
+// Every element of a tree (children only), and the BrandControl's own tree
+// with the onChange DesignForm gave it (the path the colour fields use).
+function elementsOf(node, out = []) {
+  if (!node || typeof node !== "object") return out;
+  if (Array.isArray(node)) {
+    for (const n of node) elementsOf(n, out);
+    return out;
+  }
+  if (node.props) {
+    out.push(node);
+    elementsOf(node.props.children, out);
+  }
+  return out;
+}
+function brandControlOf(props) {
+  const changes = [];
+  let tree = null;
+  // DesignForm has a hook: call it inside a render (as the P6-LOGO-REG test does)
+  const Host = () => {
+    tree = DesignForm({ ...props, issues: [], onChange: (next, at) => changes.push([next, at]) });
+    return null;
+  };
+  render(h(Host));
+  const ctl = elementsOf(tree).find((e) => e.type === DF.BrandControl);
+  ok(ctl, "DesignForm renders a BrandControl");
+  const inner = elementsOf(DF.BrandControl(ctl.props));
+  return { ctl, inner, changes, resetButton: inner.find((e) => e.props?.["data-design-reset"] === "") };
+}
+const sameKeys = (a, b) => JSON.stringify(Object.keys(a).sort().map((k) => [k, a[k]])) === JSON.stringify(Object.keys(b).sort().map((k) => [k, b[k]]));
+
+await t("P6-NAV unit: design.reset() is still null; design.reset(forest) is a copy of forest; setToken starts from the given start; with no start it behaves as before", () => {
+  eq(M.design.reset(), null, "reset() with no start:");
+  eq(M.design.reset(undefined), null, "reset(undefined):");
+  eq(M.design.reset("forest"), null, "reset(a non-object):");
+  const r = M.design.reset(FOREST);
+  ok(sameKeys(r, FOREST), `reset(forest) is forest: ${JSON.stringify(r)}`);
+  ok(r !== FOREST && !Object.isFrozen(r), "reset(forest) is a fresh copy, not the frozen palette brand");
+  r.accent = "#000000";
+  eq(FOREST.accent, "#166534", "changing the copy leaves the palette alone:");
+  const step = M.design.setToken(null, "radius", "lg", SLATE);
+  eq([step.accent, step.background, step.foreground, step.radius, step.accent_label], [SLATE.accent, SLATE.background, SLATE.foreground, "lg", SLATE.accent_label], "setToken(null, 'radius', 'lg', slate):");
+  ok(!Pal.isLimeAccent(step.accent), "a first edit keeps no lime");
+  // no start: today's behaviour, from the platform default
+  const today = M.design.setToken(null, "radius", "lg");
+  eq(today.accent, DEFAULT_BRAND.accent, "setToken(null, ...) with no start still starts from the platform default:");
+  const { accent_label: _l, ...rest } = { ...DEFAULT_BRAND, radius: "lg" };
+  eq(today, { ...rest, accent_label: M.design.setToken({ ...DEFAULT_BRAND }, "radius", "lg").accent_label }, "the same brand as before:");
+  // a stored brand ignores the start
+  eq(M.design.setToken({ ...FOREST }, "radius", "sm", SLATE).accent, FOREST.accent, "a stored brand is edited, not the start:");
+});
+
+await t("P6-NAV rendered (OQ-P6-8): with startingBrand = forest and a changed accent the form offers 'Go back to your starting colours (Forest)', and pressing it sends exactly the forest brand", () => {
+  const context = { startingBrand: FOREST };
+  const changed = { ...FOREST, accent: "#1d4ed8" };
+  const html = unescape(render(h(DesignForm, { value: designBody(changed), issues: [], onChange: () => {}, context })));
+  ok(html.includes("Go back to your starting colours (Forest)"), `the reset label: ${html.slice(0, 300)}`);
+  ok(!html.includes("Go back to the platform") && !html.includes("default brand"), "the old label");
+  const b = brandControlOf({ value: designBody(changed, { logo: { media: "/api/media/med_l1", alt: "Acme" } }), context });
+  ok(b.resetButton, "the reset button");
+  b.resetButton.props.onClick();
+  eq(b.changes.length, 1, "one change:");
+  const [next, at] = b.changes[0];
+  eq(at.path, "brand", "through the brand field's onChange:");
+  ok(next.settings.brand !== null && sameKeys(next.settings.brand, FOREST), `exactly forest: ${JSON.stringify(next.settings.brand)}`);
+  ok(!sameKeys(next.settings.brand, DEFAULT_BRAND), "not the platform default");
+  eq(next.settings.logo, { media: "/api/media/med_l1", alt: "Acme" }, "settings.logo is kept by a brand reset:");
+  ok(Reg.validateDocument(next, { mode: "publish" }).ok, "the reset body publishes");
+  // stored exactly at the starting palette: nothing to go back to
+  ok(!brandControlOf({ value: designBody({ ...FOREST }), context }).resetButton, "no reset button at the starting colours");
+});
+
+await t("P6-NAV rendered (OQ-P6-8): a null stored brand shows the button and gives forest; with no startingBrand the reset gives slate; no reset result is lime", () => {
+  const results = [];
+  const nul = brandControlOf({ value: designBody(null), context: { startingBrand: FOREST } });
+  ok(nul.resetButton, "a null brand shows the button");
+  eq(elementsOf(nul.resetButton.props.children).length, 0, "plain text label");
+  eq(nul.resetButton.props.children, "Go back to your starting colours (Forest)", "the label:");
+  nul.resetButton.props.onClick();
+  results.push(nul.changes[0][0].settings.brand);
+  ok(sameKeys(results[0], FOREST), `null -> forest: ${JSON.stringify(results[0])}`);
+  const nullHtml = unescape(render(h(DesignForm, { value: designBody(null), issues: [], onChange: () => {}, context: { startingBrand: FOREST } })));
+  ok(nullHtml.includes("Your store uses the platform's default colours. Go back to your starting colours, or change anything below."), "the null-brand note");
+  // no startingBrand in the context (a test or an older caller): slate, never null or the default
+  for (const [what, props] of [
+    ["no context", { value: designBody({ ...FOREST, accent: "#1d4ed8" }) }],
+    ["a context without startingBrand", { value: designBody(null), context: { collections: [] } }],
+    ["a junk startingBrand", { value: designBody(null), context: { startingBrand: "slate" } }],
+  ]) {
+    const b = brandControlOf(props);
+    ok(b.resetButton, `${what}: the button`);
+    eq(b.resetButton.props.children, "Go back to your starting colours (Slate)", `${what}: the label:`);
+    b.resetButton.props.onClick();
+    const brand = b.changes[0][0].settings.brand;
+    ok(brand && sameKeys(brand, SLATE), `${what}: slate: ${JSON.stringify(brand)}`);
+    results.push(brand);
+  }
+  for (const r of results) ok(r && !Pal.isLimeAccent(r.accent), `a lime reset result: ${JSON.stringify(r)}`);
+});
+
+await t("P6-NAV rendered: no '#84cc16' placeholder or hint remains (the starting accent instead), a first colour edit starts from the starting palette, and the /admin/start link shows", () => {
+  for (const [context, accent] of [
+    [{ startingBrand: FOREST }, FOREST.accent],
+    [null, SLATE.accent],
+  ]) {
+    for (const brand of [null, { ...FOREST, accent: "#12" }, { ...SLATE, background: "#fff" }]) {
+      const html = render(h(DesignForm, { value: designBody(brand), issues: [], onChange: () => {}, context }));
+      // (a null brand still SHOWS the platform default's real values in the
+      // inputs, as brandView always has; only the placeholder and hint changed)
+      ok(!/placeholder="#84cc16"/.test(html) && !html.includes("like #84cc16"), `a lime placeholder or hint (${JSON.stringify(brand)})`);
+      ok(!/placeholder="[^"]*"/.test(html.replace(new RegExp(`placeholder="${accent}"`, "g"), "")), "another placeholder");
+      ok(html.includes(`placeholder="${accent}"`), `the placeholder is the starting accent ${accent}`);
+      if (brand && brand.accent === "#12") ok(html.includes(`like ${accent}.`), "the hint names the starting accent");
+      ok(/<a href="\/admin\/start"[^>]*>Change your logo and colours<\/a>/.test(html), "the brand step link");
+    }
+  }
+  // a first colour edit on a store with no brand: the starting palette's other tokens, never lime ones
+  const b = brandControlOf({ value: designBody(null), context: { startingBrand: FOREST } });
+  const bg = b.inner.find((e) => e.props?.id === "f-doc-brand-background");
+  bg.props.onChange({ target: { value: "#ffffff" } });
+  const first = b.changes[0][0].settings.brand;
+  eq([first.accent, first.foreground, first.background], [FOREST.accent, FOREST.foreground, "#ffffff"], "the first edit:");
+  const picker = b.inner.find((e) => e.props?.type === "color" && e.props?.["aria-label"] === "Accent colour picker");
+  picker.props.onChange({ target: { value: "#0f766e" } });
+  eq([b.changes[1][0].settings.brand.background, b.changes[1][0].settings.brand.accent], [FOREST.background, "#0f766e"], "the picker's first edit:");
+  const sel = b.inner.find((e) => e.props?.id === "f-doc-brand-radius");
+  sel.props.onChange({ target: { value: "lg" } });
+  eq(b.changes[2][0].settings.brand.accent, FOREST.accent, "a step's first edit:");
+});
+
+await t("P6-NAV wiring: DocumentEditor hands startingBrand to EditorView, whose context carries it to the design form (and null when it has none)", async () => {
+  const ed = await driveEditor({ startingBrand: { ...FOREST } });
+  try {
+    ok(sameKeys(ed.props.startingBrand, FOREST), `EditorView got it: ${JSON.stringify(ed.props.startingBrand)}`);
+    const design = { ...ed.docState, id: "doc_design", type: "design", body: designBody({ ...FOREST, accent: "#1d4ed8" }), document: { ...ed.docState.document, id: "doc_design", type: "design", label: "Brand" } };
+    const html = unescape(render(h(EditorMod.EditorView, { ...ed.props, state: design, entry: { id: "doc_design", type: "design", label: "Brand" }, load: { status: "ready" }, preview: null, selection: null })));
+    ok(html.includes("Go back to your starting colours (Forest)"), `the design form in the editor: ${html.slice(0, 200)}`);
+    const none = unescape(render(h(EditorMod.EditorView, { ...ed.props, startingBrand: undefined, state: design, entry: { id: "doc_design", type: "design", label: "Brand" }, load: { status: "ready" }, preview: null, selection: null })));
+    ok(none.includes("Go back to your starting colours (Slate)"), "no startingBrand: slate");
+  } finally {
+    ed.restore();
+  }
+  const ed2 = await driveEditor();
+  try {
+    eq(ed2.props.startingBrand, null, "the default prop:");
+  } finally {
+    ed2.restore();
+  }
+});
+
+// The three loadBundles mutations the P5-FIX2 review found alive.
+const FAR_GONE_BODY = () => ({
+  ...Reg.fixtureDocument("home", [
+    { ...Reg.newSection("bundle_card", { id: "sec_dc1" }), settings: { title: "", bundle: { id: "bun-gone" } } },
+    { ...Reg.newSection("bundle_grid", { id: "sec_dg1" }), settings: { title: "Bundles", bundles: [{ id: "bun-a" }, { id: "bun-far" }] } },
+  ]),
+});
+await t("P6-NAV pin (a, answered: want): a picked bundle past the first 50 that was really deleted, which the ids= answer leaves out, reads 'was deleted', not 'Checking this bundle…' for good", async () => {
+  const ed = await driveEditor({ mode: "omit", makeBody: FAR_GONE_BODY });
+  try {
+    const ids = bundleCalls(ed.S).filter((c) => c.ids);
+    ok(ids.length >= 1 && ids[0].ids.split(",").includes("bun-gone"), `bun-gone was asked about: ${JSON.stringify(bundleCalls(ed.S))}`);
+    eq(ed.props.bundles.status, "ready", "ready");
+    ok(!ed.props.bundles.items.some((b) => b.id === "bun-gone"), "the answer left it out");
+    eq(ed.props.bundles.pending, [], "nothing pending once answered:");
+    const card = unescape(inspectorOf(ed.props, "sec_dc1"));
+    eq(textIn(inspectorOf(ed.props, "sec_dc1"), "data-bundle-status"), WORDS_OF.missing, "the card's words:");
+    ok(!card.includes("Checking this bundle"), "still checking");
+  } finally {
+    ed.restore();
+  }
+});
+await t("P6-NAV pin (b, bundleAsked includes the picked ids): a deleted pick the answer left out is asked about once, not again by the picks effect", async () => {
+  const ed = await driveEditor({ mode: "omit", makeBody: FAR_GONE_BODY });
+  try {
+    await ed.settle();
+    const ids = bundleCalls(ed.S).filter((c) => c.ids);
+    eq(ids.length, 1, `one ids= read: ${JSON.stringify(ids)}`);
+    eq(ids[0].ids.split(",").sort(), ["bun-far", "bun-gone"], "the picks outside the first page:");
+  } finally {
+    ed.restore();
+  }
+});
+await t("P6-NAV pin (c, the mine === bundleSeq.current guard on the ready set): an older read that answers last never puts back what it saw", async () => {
+  const ed = await driveEditor();
+  try {
+    eq(ed.props.bundles.items.find((b) => b.id === "bun-far")?.state, "available", "bun-far before:");
+    let release;
+    ed.S.holdNext = new Promise((r) => (release = r));
+    await ed.focus(); // read 2: its ids= answer (bun-far available) is held
+    ed.S.rows["bun-far"] = row("bun-far", "disabled", { enabled: false, saving: 20, bundle_price: 280 });
+    await ed.focus(); // read 3: answers at once with bun-far turned off
+    eq(ed.props.bundles.items.find((b) => b.id === "bun-far")?.state, "disabled", "read 3's answer:");
+    release();
+    await ed.settle(); // read 2 answers last, with what it saw before
+    eq(ed.props.bundles.items.find((b) => b.id === "bun-far")?.state, "disabled", "the older read put its answer back:");
+    eq(textIn(inspectorOf(ed.props, "sec_dc1"), "data-bundle-status"), WORDS_OF.disabled, "the card says it is turned off:");
+  } finally {
+    ed.restore();
+  }
+});
+await t("P6-NAV (merge, do not replace): a bundle picked while a focus re-read is out keeps its ids= answer when that re-read lands; it never reads 'Checking this bundle…' for good", async () => {
+  const ed = await driveEditor();
+  try {
+    let release;
+    ed.S.holdNext = new Promise((r) => (release = r));
+    await ed.focus(); // the re-read's ids= (bun-far, bun-g1) is held
+    // the founder picks bun-q (outside the first page) meanwhile
+    ed.docState.body = { ...ed.docState.body, sections: [...ed.docState.body.sections, { ...Reg.newSection("bundle_card", { id: "sec_dc2" }), settings: { title: "", bundle: { id: "bun-q" } } }] };
+    await ed.settle();
+    const asked = bundleCalls(ed.S).filter((c) => c.ids && c.ids === "bun-q");
+    eq(asked.length, 1, `the picks effect asked ids=bun-q: ${JSON.stringify(bundleCalls(ed.S))}`);
+    ok(ed.props.bundles.items.some((b) => b.id === "bun-q"), "the ids= answer is in");
+    release();
+    await ed.settle(); // the re-read lands after it
+    ok(ed.props.bundles.items.some((b) => b.id === "bun-q"), `the re-read dropped bun-q: ${ed.props.bundles.items.map((b) => b.id)}`);
+    eq(ed.props.bundles.pending, [], "nothing pending:");
+    eq(textIn(inspectorOf(ed.props, "sec_dc2"), "data-bundle-status"), Words.stateLine("available", [], { currency: "USD" }), "the new card's real state:");
+    eq(ed.props.bundles.items.map((b) => b.id).sort(), ["bun-a", "bun-far", "bun-g1", "bun-q"], "the merged list:");
+    // and a later re-read, with nothing out, still has it (asked again by the re-read itself)
+    await ed.focus();
+    ok(ed.props.bundles.items.some((b) => b.id === "bun-q") && ed.props.bundles.pending.length === 0, "a later re-read");
+  } finally {
+    ed.restore();
   }
 });
 
