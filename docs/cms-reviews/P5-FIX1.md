@@ -7,18 +7,19 @@ This is the author's own report. Reviewers should re-read the code.
 Files changed (all in the item's list):
 - Code: `lib/commerce/bundle-compat.js`, `lib/bundles.js`, `lib/commerce/bundle-words.js`, `lib/documents/checks.js`, `components/sections/BundleCardSection.js`, `app/(storefront)/bundles/[slug]/page.js` (the unavailable sentence only).
 - Tests: `scripts/test-commerce-exp.js` (3 new), `scripts/test-commerce-blocks.js` (3 new), `scripts/test-publish-checks.js` (1 new, 2 replays changed to the editor's `applyAction`).
+- Fix round 1, at the orchestrator's direction: `scripts/test-bundle-form.js`, one assertion (see "The test-bundle-form conflict"). This file is P5-EDITOR's in batch 3 and was outside this item's list; the orchestrator's fix round told this item to land the change so the merge is green.
 - Docs: this packet.
 
-Not touched: `lib/commerce/bundle-read.js` (it calls `compatFrom`, so it picks up both rulings with no change), `components/admin/bundles/BundleForm.js`, `scripts/test-bundle-form.js` and everything else P5-EDITOR owns, `components/admin/editor/publish/publishModel.js` (imported, not edited), `package.json`, `.github/`, `MANUAL-CHECKS.md`, the untracked `docs/CMS_*.md` files and the two named `.claude/worktrees`. No migration. No new dependency.
+Not touched: `lib/commerce/bundle-read.js` (it calls `compatFrom`, so it picks up both rulings with no change), `components/admin/bundles/BundleForm.js` and everything else P5-EDITOR owns (apart from the one `test-bundle-form.js` assertion above), `components/admin/editor/publish/publishModel.js` (imported, not edited), `package.json`, `.github/`, `MANUAL-CHECKS.md`, the untracked `docs/CMS_*.md` files and the two named `.claude/worktrees`. No migration. No new dependency.
 
-Safety: only file databases were used (the suites' own and `scripts/support/tenant-fixture.js`). No store changed mode except those test files, `--hosted` was never passed, Typesense was not touched, nothing was written to Shopify, no test order was placed. `pnpm test` ran with every port-taking suite pinned to 6120 and 7120 to 7129; nothing was listening on them afterwards. No server was started for this item.
+Safety: only file databases were used (the suites' own and `scripts/support/tenant-fixture.js`). No store changed mode except those test files, `--hosted` was never passed, Typesense was not touched, nothing was written to Shopify, no test order was placed. `pnpm test` ran with every port-taking suite pinned to 6120 and 7120 to 7129 (in both rounds); nothing was listening on them afterwards. No server was started for this item.
 
 ## Stages
 
 | Stage | State |
 |---|---|
 | Implemented | Done |
-| Locally tested | Done, with one known red suite: `pnpm test` 97 of 98 in 186.0 s. The one failure is `test:bundle-form`, an assertion that pins the very behaviour ruling 1 removes, in a file this item may not edit (see "The test-bundle-form conflict"). With that one assertion changed as proposed, `test:bundle-form` passes 9 of 9. `pnpm build` passes |
+| Locally tested | Done. Fix round 1: `pnpm test` **98 of 98 in 185.0 s** (exit 0). Round 0 had `test:bundle-form` red (97 of 98); its one assertion pinned the false sum ruling 1 removes, and it is now changed (see "The test-bundle-form conflict"). `pnpm build` passed in round 0; round 1 changed only a test file |
 | Browser verified | **NOT DONE.** Every acceptance item is proved by unit and rendered tests (the real bundle page is rendered with Next's SWC and react-dom). The desktop Chrome check is an owner check (P5-DRILLS) |
 | Staging | **NOT DONE** |
 
@@ -81,7 +82,7 @@ Mutations were each applied alone with `mut.sh` in the scratch folder (it puts t
 | 1 | A bundle with a deleted product never gets no_saving and its preview says to replace the product | DONE | test-commerce-exp "P5-FIX1: compatFrom gives no no_saving while any product is missing…" (the review's $100 + $100 at $180 case: reasons exactly `[{missing, index 1}]`, state `sold_out`, no "doesn't save" problem; a product gone with its variant still there: the same; every product found: `no_saving` as before; the founder words exactly the new sentence, with no "Lower the price") and "…a turned-on bundle whose product was deleted from the catalog…" (the variant row really deleted: bundlesByIds, listBundles and getBundle all `sold_out` with only `missing`). test-commerce-blocks "a card whose bundle lost a product…" (live and preview: shown, "Currently unavailable" with add off, the product marked "No longer available", no no-saving words; live has no note; the preview note holds the replace sentence and "Only you can see this note in your preview.") and "in a grid, the bundle that lost a product keeps its cell…" (cells `[available, sold_out]` live and in preview, no "hidden from shoppers", the note inside the sold-out cell). Fail without the change: M1 (no `allFound`) fails 2 in each suite; M7 (no note) fails the 2 blocks tests; M8 (no replace words) fails 2 in each |
 | 2 | A non-whole quantity is not_ready on the bundle page and the home blocks, with the bundle page's own sentence | DONE | test-commerce-exp "…stored with a quantity of 1.5 (offer in step)…": the row and its offer agree on 1.5 (so no `not_synced`); bundlesByIds `not_ready` with exactly `[bad_quantity]` naming "Fixture product 7"; getBundle `available: false, state: not_ready`; the page rule and words; a sold-out bundle keeps the out-of-stock rule; a source check of the page. test-commerce-blocks "…is not_ready on the home card AND on the real bundle page…": the home card says "Currently unavailable" with add off; **the real `app/(storefront)/bundles/[slug]/page.js` is rendered** in the store (its `tfetch` and closed-store gate stubbed to run in this store, open) and says "This bundle isn't available right now.", not "A component is out of stock", with "Currently unavailable" off; the sold-out "night-set" page still says the out-of-stock sentence; the available "gym-kit" page says neither. Fail without the change: M2 (no bad_quantity in compatFrom) fails it in both suites (and P5-PANEL's own 1.5 test); M3 (the page's old sentence) fails both; M9 (getBundle without `state`) fails both |
 | 3 | Overlap only for an available bundle; the enabled guard, not_ready -> BUNDLE_UNAVAILABLE and the real applyAction replay are pinned | DONE | test-publish-checks "P5-FIX1: a turned-off bundle sharing a product with a turned-on one gets only BUNDLE_DISABLED…": "Off overlap kit" (off) and "NR kit" (on, offer row deleted, so `not_ready`) each share a product with the available "On overlap kit", and the read lists it in both `overlapsWith` (so only the checks' rule keeps the overlap off). The publish gives exactly `[BUNDLE_DISABLED sec_xoff, BUNDLE_UNAVAILABLE sec_xnr, BUNDLE_OVERLAP sec_xon]`, no overlap beside another bundle warning on the same field; NR's message is the not_ready line with "takes this whole section off the page", its action `removeSection` ("Remove this section and publish"); replaying it through `applyAction` and publishing again leaves `[BUNDLE_DISABLED, BUNDLE_OVERLAP]`. The card replay (BUNDLE_MISSING) and the grid replay (removeItem at index 1, then 0) now call `publishModel.applyAction`; the grid replay also checks nothing else in the body changed. Fail without the change: M4 (overlap for any turned-on bundle, the code at 425b844), M5 (no guard at all, X1) and M6 (`not_ready` dropped from BUNDLE_CODE_OF, X2) each fail it |
-| 4 | pnpm test passes | **NOT DONE (one assertion outside this item's files)** | `97 of 98 suites passed in 186.0s`; failed: `test:bundle-form` "a failing check renders bundle-words reasons per product row and under the price…", which expects "Price must be lower than $400" for a bundle with a missing product: the false sum ruling 1 removes. This item may not edit that file. With the proposed change below applied in the worktree (and reverted, not committed) it passes 9 of 9; every other suite is green. Owner/orchestrator check below |
+| 4 | pnpm test passes | DONE (fix round 1) | `98 of 98 suites passed in 185.0s`, exit 0, ports 6120 and 7120 to 7129, nothing listening afterwards. Round 0 was 97 of 98 (`test:bundle-form`); the one assertion is changed in this branch at the orchestrator's direction (below). The changed assertion fails without ruling 1: M1 (`allFound` dropped, so `no_saving` comes back on the false sum) gives test-bundle-form `8 passed, 1 failed`, the failure being that test; with the fix, 9 passed |
 
 ### Mutation table
 
@@ -96,10 +97,11 @@ Mutations were each applied alone with `mut.sh` in the scratch folder (it puts t
 | M7 | no founder note on a shown bundle with a deleted product | test-commerce-blocks 2 failed |
 | M8 | the sold-out line ignores a missing product | test-commerce-exp 2 failed; test-commerce-blocks 2 failed |
 | M9 | getBundle without `state` | test-commerce-exp 2 failed; test-commerce-blocks 1 failed |
+| M1 (fix round 1) | `allFound` dropped, run against test-bundle-form | test-bundle-form 8 passed, 1 failed ("a failing check renders bundle-words reasons per product row and under the price…") |
 
-## The test-bundle-form conflict (needs the orchestrator)
+## The test-bundle-form conflict (landed in fix round 1)
 
-`scripts/test-bundle-form.js` (P5-PANEL's in batch 2, P5-EDITOR's in batch 3; this item may not edit it) lines 420 to 423 pin "Price must be lower than $400" under the price for a bundle of [sold-out product 1 ($100), a variant not in the catalog, product 3 ($300)] at $1,000. The $400 leaves out the missing product: the false sum ruling 1 says the founder must never be told. After this item the form shows "Sold out" and "No longer available" on the rows and nothing under the price. The proposed change (also saved as `test-bundle-form.proposed.patch` in the scratch folder):
+`scripts/test-bundle-form.js` (P5-PANEL's in batch 2, P5-EDITOR's in batch 3; this item's brief kept it out of its files) lines 420 to 423 pin "Price must be lower than $400" under the price for a bundle of [sold-out product 1 ($100), a variant not in the catalog, product 3 ($300)] at $1,000. The $400 leaves out the missing product: the false sum ruling 1 says the founder must never be told. After this item the form shows "Sold out" and "No longer available" on the rows and nothing under the price. The change (it was proposed in round 0 as `test-bundle-form.proposed.patch` in the scratch folder, and applied as it was in fix round 1):
 
 ```js
       // P5-FIX1 (ruling 1): with a product missing the sum is not the real one,
@@ -109,7 +111,7 @@ Mutations were each applied alone with `mut.sh` in the scratch folder (it puts t
       ok(!price || !/Price must be lower/.test(textOf(price.props.children)), "no price reason on a false sum");
 ```
 
-Either P5-EDITOR takes it in its branch, or it is applied at merge. Until then the gate is 97 of 98.
+Fix round 1: the reviewer's blocker said the merge must carry this change, and the orchestrator's fix round told this item to fix it, so it is committed here: the old two-line check ("a price reason" and "Price must be lower than $400") is replaced by the check above; the rest of that test (the row reasons "Sold out", "No longer available", the legacy-words scan, the titles) is unchanged. **For P5-EDITOR:** this touches lines 417 to 424 of its file; if its branch also edits that test, take this version of those lines at merge.
 
 ## Tests
 
@@ -117,7 +119,8 @@ Either P5-EDITOR takes it in its branch, or it is applied at merge. Until then t
 - `scripts/test-commerce-blocks.js`: 18 passed (15 + 3 new). The new page test adds two loader stubs (`@/lib/tenant-request` `tfetch` runs the read in this suite's store; `@/lib/content/resolve` `closedStoreGate` answers open) after every block test has loaded, so only the bundle page uses them.
 - `scripts/test-publish-checks.js`: 40 passed (39 + 1 new; the card and grid replays now use `applyAction`). The new test's three bundles are deleted at the end and the home body is put back, so the later read-fails and statement-count tests see what they saw before.
 - Unchanged and green: test-effective-read 41 (the getBundle snapshot), test-sections-render 45, test-bundle-form 8 of 9 (see above).
-- `pnpm test`: `97 of 98 suites passed in 186.0s` (ports 6120, 7120 to 7129). `pnpm build`: passes; its 2 Turbopack warnings are the existing `next.config.mjs` NFT-trace ones.
+- `pnpm test`: round 0 `97 of 98 suites passed in 186.0s`; fix round 1 `98 of 98 suites passed in 185.0s` (ports 6120, 7120 to 7129). `pnpm build` (round 0): passes; its 2 Turbopack warnings are the existing `next.config.mjs` NFT-trace ones.
+- `scripts/test-bundle-form.js`: 9 passed (fix round 1; was 8 of 9).
 
 ## Known limits
 
@@ -131,7 +134,7 @@ Either P5-EDITOR takes it in its branch, or it is applied at merge. Until then t
 
 ## Owner checks
 
-- **Orchestrator/merge:** apply the one-assertion change to `scripts/test-bundle-form.js` above (P5-EDITOR's file), or the gate stays 97 of 98.
+- **Orchestrator/merge:** the one-assertion change to `scripts/test-bundle-form.js` (P5-EDITOR's file) is in this branch (fix round 1); confirm it, and watch for a conflict at those lines when P5-EDITOR merges.
 - Sign-off of the three orchestrator rulings above, and of the new words: "A product in this bundle is no longer in your catalog: shoppers see Currently unavailable and can't add it. Replace it with another product in Catalog > Bundles." and the bundle page's "This bundle isn't available right now."
 - **Browser (P5-DRILLS):** desktop Chrome on the design harness: a home card and a grid cell whose bundle lost a product (live: "Currently unavailable", product marked; preview: the replace note), and `/bundles/<slug>` of a bundle stored with quantity 1.5 (only possible by a raw write today).
 - Phone widths (375, 768) and Safari for the new preview note.
@@ -140,4 +143,6 @@ Either P5-EDITOR takes it in its branch, or it is applied at merge. Until then t
 
 ## From review
 
-(Empty until review.)
+### Round 1 (fix round 1)
+
+- **BLOCK: `pnpm test` fails, caused by this branch** (`test:bundle-form` expects "Price must be lower than $400" for a bundle with a missing product, the false sum ruling 1 removes). Accepted. Fixed by committing the proposed one-assertion change to `scripts/test-bundle-form.js`, as the orchestrator's fix round directed (the file is P5-EDITOR's; flagged above for its merge). Proof: the new check fails with ruling 1 undone (M1: 8 passed, 1 failed) and passes with it (9 passed); `pnpm test` 98 of 98, exit 0. No code changed in this round.
