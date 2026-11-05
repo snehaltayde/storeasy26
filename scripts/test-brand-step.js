@@ -730,6 +730,27 @@ async function renderedTests() {
     ok(!o.all().includes("Nothing is public yet.") && o.all().includes("Your store is open."), o.all());
   });
 
+  await t("RENDERED: an OPEN store (generated:false, reason live, the server's real shape) shows the 'already open' view with both links while a later sync runs and after it failed or stalled, never the 'made as soon as your products are in' words", async () => {
+    // describeFirstStore stops at the live check before reading rows
+    const open = { eligible: false, reason: "live", generated: false, byGenerator: [], kept: [], empty: false, noCollections: false, summary: null };
+    const already = "Your store is already open, so the starting store wasn't made again. Your live store hasn't changed.";
+    for (const st of ["running", "retrying", "failed", "stalled", "complete"]) {
+      const v = await mount(FR, { canEdit: true, canSync: true, pollMs: POLL }, { ...firstRunGet(open, syncView(st, { firstSync: false })), ...brandTable({ storeOpen: true }), "POST /api/admin/sync": ok200({ ok: true, sync: syncView("running", { firstSync: false }) }) });
+      eq(v.stateOf("data-first-run"), "blocked", `${st}, state:`);
+      ok(v.all().includes(already), `${st}: ${v.all()}`);
+      ok(!v.all().includes("Your starting store is made as soon as your products are in."), `${st}: no waiting words`);
+      ok(v.links().some(([l]) => l === "Edit the home page") && v.links().some(([l]) => l === "Change colours and logo"), `${st}: ${JSON.stringify(v.links())}`);
+      eq(v.net.posts(), [], `${st}, no POST:`);
+      if (st === "complete") ok(v.stateOf("data-first-run-note") !== "sync", "no sync note once complete");
+      else ok(v.stateOf("data-first-run-note") === "sync", `${st}: the small sync note`);
+      if (st === "failed") {
+        await v.click("Try again");
+        eq(v.net.posts().map((p) => [p.url, p.body]), [["/api/admin/sync", { retry: true }]], "the retry is the sync's own:");
+        eq(v.stateOf("data-first-run"), "blocked", "still the open view:");
+      }
+    }
+  });
+
   await t("RENDERED: a GET that fails says so in plain words", async () => {
     const v = await mount(FR, { canEdit: true, canSync: true, pollMs: POLL }, { "GET /api/admin/first-run": { status: 503, body: { ok: false, error: "x", code: "DB_UNAVAILABLE" } }, ...brandTable() });
     eq(v.stateOf("data-first-run"), "load-failed", "state:");

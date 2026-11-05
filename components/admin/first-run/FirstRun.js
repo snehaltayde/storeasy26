@@ -137,6 +137,11 @@ export function viewOf(firstRun, sync) {
     return "ready";
   }
   if (firstRun.reason === "founder_started") return "kept";
+  // an open store already has its home page: describeFirstStore stops at the
+  // live check before reading rows, so generated is false here. Never the
+  // "made as soon as your products are in" view, even while a later sync runs
+  // or after it failed (the blocked view keeps a small sync note).
+  if (firstRun.reason === "live") return "blocked";
   const state = sync?.state;
   if (firstRun.reason === "catalog_not_confirmed" || LIVE.has(state) || BROKEN.has(state)) return BROKEN.has(state) ? "sync-failed" : "syncing";
   if (firstRun.eligible) return "make";
@@ -364,6 +369,12 @@ export default function FirstRun({ canEdit = false, canSync = false, pollMs = PO
         <div className="space-y-3">
           <p className="text-sm text-fg">{REASON_WORDS[firstRun.reason] || REASON_WORDS.cannot_edit}</p>
           {firstRun.reason !== "cannot_edit" && <NextLinks />}
+          {open && sync && (LIVE.has(sync.state) || BROKEN.has(sync.state)) && (
+            <div className="space-y-2 border-t border-edge pt-3" data-first-run-note="sync">
+              <p className="text-xs font-medium text-fg-muted">{START_WORDS.syncNote}</p>
+              <SyncPanel initial={sync} canRun={canSync} onSettled={reload} pollMs={pollMs} />
+            </div>
+          )}
         </div>
       );
     }
