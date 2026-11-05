@@ -869,6 +869,24 @@ Packet: [P5-DRILLS.md](P5-DRILLS.md), sections "Findings" and "Owner checks".
 - [ ] Not drilled, NOT DONE: the BUNDLE_OVERLAP warning in the publish panel (opens the field only); the 403 "You can't see bundles here." and "Ask an owner to create bundles." paths (every harness login holds the rights); `/bundles/<slug>` of a bundle stored with a quantity of 1.5 (only a raw write makes one, and the drills write through the writers only); a full grid of 12 with Create a bundle.
 - [ ] Optional: run `DESIGN_PORT=<port> DESIGN_SQLD_PORT=<port> node scripts/drills/p5/run.mjs` on your Mac (about 7 minutes) and look at the screenshots in `docs/cms-reviews/drills/P5-DRILLS/`.
 
+### The P5-DRILLS review (P5-DRILLS)
+Packet: [P5-DRILLS.md](P5-DRILLS.md), "Owner checks" and "Known limits" (From review). Several lines repeat the list above; the review asked for each one again.
+- [ ] Staging with a documents-mode tenant: every phase 5 staging check (NOT DONE).
+- [ ] Phone widths 375 and 768 and Safari for the bundle card, grid, notes, picker, Create a bundle Dialog and Catalog > Bundles.
+- [ ] One real test order through a bundle block on staging, to snehal@mediastic.in, then cancelled. Check the discount line on the order pushed to Shopify.
+- [ ] Sign off deviations 3.5, 3.10 (accepted), 3.11 and 3.3.
+- [ ] Bundles are not versioned; inline create is live at once (OQ-C); an exclusive coupon suppresses the saving; stock depth; duplicate-item and overlapping bundles (OQ-D); the non-atomic add (OQ-G).
+- [ ] Batch review items: verb-first diff rows; bundles indexed by id while /bundles/<slug> links are indexed by slug; the source_unknown wording; no home warning for a bundle linked only by /bundles/<slug>; the demo seed can't save bundles; the P5-FIX1 rulings; the bundle page says 'This bundle isn't available right now.' for a no-saving bundle; whole-amount rounding of the cart discount.
+- [ ] Choose an owner for the usedOnHome-null confirm in CommercePanels.js.
+- [ ] Finding P5D-1 (no Mobile preview switch in the editor) and P5D-2 (a deleted bundle is named by its raw id).
+- [ ] Not drilled: BUNDLE_OVERLAP in the publish panel, the 403 and staff paths, a quantity of 1.5 on the bundle page, a full grid of 12.
+- [ ] Approve the source and checksum of the CI sqld download in .github/.
+- [ ] Run pick, create and console again after P5-FIX2 merges.
+
+### Bundle picker and console fixes, round 2 (P5-FIX2)
+Packet: [P5-FIX2.md](P5-FIX2.md), "Owner checks" and "Known limits" (From review).
+- [ ] No new owner checks. The existing P5-FIX2 owner checks still stand, including the browser drill and the CI sqld download approval under .github/ (nothing was added there).
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
