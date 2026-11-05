@@ -141,10 +141,22 @@ const HOME_BODY = {
 
 // call(op, args, extra) answering from `script`: { op: result | (args, extra, n) => result }.
 // Every call is recorded.
+// P6-OPEN-UI: flow.open always asks openingChecks first. A script without an
+// openingChecks entry answers it as an open store does (opening: false, the
+// shapes' `open` outcome), and that read is recorded in fn.checks, not in
+// calls, so the phase 3 to 5 cases keep their call lists and prove the
+// opening: false path goes on exactly as before. A script with an
+// openingChecks entry records it in calls like any other op.
+const OPEN_STORE = () => mapResponse(SHAPES.openingChecks.outcomes.open.status, clone(SHAPES.openingChecks.outcomes.open.body));
 function stub(script = {}) {
   const calls = [];
+  const checks = [];
   const counts = {};
   const fn = async (op, args, extra) => {
+    if (op === "openingChecks" && script.openingChecks === undefined) {
+      checks.push({ op, args: clone(args), before: calls.length });
+      return OPEN_STORE();
+    }
     calls.push({ op, args: clone(args), extra: extra === undefined ? undefined : clone(extra) });
     counts[op] = (counts[op] || 0) + 1;
     const s = script[op];
@@ -152,6 +164,7 @@ function stub(script = {}) {
     return typeof s === "function" ? s(args, extra, counts[op]) : clone(s);
   };
   fn.calls = calls;
+  fn.checks = checks;
   fn.ops = () => calls.map((c) => c.op);
   return fn;
 }
@@ -237,12 +250,14 @@ await t("a fix runs getDocument, saveDraft (edited body, its revision), then pub
   const issue = flow.getState().outcome.issues[0];
   await flow.act(issue.actions[0], issue); // hideSection
   eq(call.ops(), ["listChanges", "publish", "getDocument", "saveDraft", "publish"], "calls:");
+  // P6-OPEN-UI: the one read before them all (fn.checks, see stub())
+  eq(call.checks.map((c) => [c.op, c.args, c.before]), [["openingChecks", { ids: ["doc_home"] }, 0]], "openingChecks first, for the set:");
   const save = call.calls[3];
   eq(save.args.id, "doc_home", "saved document:");
   eq(save.args.body.sections[0].enabled, false, "the hero is hidden in the saved body:");
   eq(save.extra, { revision: 3 }, "saved with the read revision:");
   eq(call.calls[4].args, { id: "doc_home", draftHash: "h_after_fix" }, "published with the saved hash:");
-  eq(call.calls[4].extra, { revision: 4 }, "and the saved revision:");
+  eq(call.calls[4].extra, { revision: 4, checkOpening: true }, "and the saved revision (P6-OPEN-UI: and checkOpening):");
   eq(adopted, [4], "the host adopts the saved document:");
   eq(flow.getState().phase, "done", "then published:");
 });
@@ -287,7 +302,7 @@ await t("publishBoth sends exactly the offer as publishSet, after every offered 
     sent.args.every((i) => !("confirmRepublish" in i)),
     "nothing added",
   );
-  eq(sent.extra, undefined, "no top-level revision on a set:");
+  eq(sent.extra, { checkOpening: true }, "no top-level revision on a set (P6-OPEN-UI: only checkOpening):");
   eq(M.stepsFor({ type: "publishBoth", documentId: SALE.id }, { offer: OFFER }).map((s) => s.kind), ["review", "publish"], "steps:");
 });
 
@@ -473,7 +488,7 @@ await t("Keep the live version calls keepLiveSection with the revision, re-pins 
   ok(!text.includes("Hero: title changed") && text.includes("Text: changed") && text.includes(M.WORDS.keepLiveDone), text);
   await flow.confirm();
   eq(call.calls.at(-1).args, { id: "doc_home", draftHash: "h_kept" }, "publishes the kept draft's hash:");
-  eq(call.calls.at(-1).extra, { revision: 4 }, "and revision:");
+  eq(call.calls.at(-1).extra, { revision: 4, checkOpening: true }, "and revision (P6-OPEN-UI: and checkOpening):");
 });
 
 console.log("— every outcome in plain words (rendered, from documents-api-shapes.js)");
@@ -1184,6 +1199,430 @@ await t("P4-EDITOR: a lost products-only publish answer (release: null) settles 
   eq(r.state.outcome.live, false, "the store's copy can't tell (why the editor passes readDocument):");
   const src = await readFile(join(ROOT, "components/admin/editor/DocumentEditor.js"), "utf8");
   ok(/createPublishFlow\(\{[^}]*readDocument: \(id\) => api\.call\("getDocument", id\)/.test(src), "DocumentEditor passes readDocument to the publish flow");
+});
+
+// =====================================================================================
+console.log("— P6-OPEN-UI: Before you open your store (PUB-12, US-41; unit + rendered)");
+
+const OC = SHAPES.openingChecks.outcomes;
+const DESIGN = { id: "doc_design", revision: 2, draftHash: "h_design", label: "Design" };
+const PRIV = { id: "doc_P1V4C9Y0P4G3E2Q8", revision: 1, draftHash: "h_priv", label: "Privacy policy" };
+const TERMS = { id: "doc_T3R7M5S2X9W4K1Z6", revision: 1, draftHash: "h_terms", label: "Terms of service" };
+// report items in P6-OPEN's words and shapes (lib/documents/opening.js)
+const I = {
+  paymentOk: { id: "payment", level: "ok", title: "Shoppers can pay", message: "Shoppers can pay by card, UPI or cash on delivery.", href: null, who: null },
+  paymentCod: { id: "payment", level: "info", title: "Cash on delivery only", message: "Shoppers can only pay cash on delivery for now.", href: "/admin/settings#payments", who: null, linkLabel: "Add your Razorpay keys" },
+  paymentOff: clone(OC.ok.body.items[0]),
+  maintenance: { id: "maintenance", level: "warn", title: "Your store is in maintenance", message: "Your store is in maintenance mode. Ask Storeasy support to turn it off.", href: null, who: "support" },
+  privacyOk: { id: "privacy", level: "ok", title: "Privacy page", message: "Your privacy page is ready.", href: null, who: null },
+  returnsOk: { id: "returns", level: "ok", title: "Returns page", message: "Your returns page is ready.", href: null, who: null },
+  privacyMissing: clone(OC.ok.body.items[1]),
+  returnsMissing: { id: "returns", level: "block", title: "Returns page", message: "Your store needs a returns page (your terms, returns and refunds) before it opens. Start one from a template, then read it and save it.", href: null, who: null, actions: [{ type: "startPolicy", kind: "returns", label: "Start a returns page" }] },
+  privacyStarter: { id: "privacy", level: "block", title: "Privacy page", message: "We started a privacy page for you from a template. It's a starting point, not legal advice: read it, change what you need and save it before you open.", href: `/admin/editor?doc=${PRIV.id}`, who: null, linkLabel: "Read it", actions: [{ type: "markPolicyRead", id: PRIV.id, revision: 1, label: "I've read it" }] },
+  privacySaved: { id: "privacy", level: "info", title: "Privacy page", message: "Your privacy page goes live too.", href: `/admin/editor?doc=${PRIV.id}`, who: null, linkLabel: "Open “Privacy policy”" },
+  returnsStarter: clone(OC.ok.body.items[2]),
+  returnsSaved: { id: "returns", level: "info", title: "Returns page", message: "Your returns page (your terms, returns and refunds) goes live too.", href: `/admin/editor?doc=${TERMS.id}`, who: null, linkLabel: "Open “Terms of service”" },
+  testOrderWarn: clone(OC.ok.body.items[3]),
+  testOrderOk: { id: "test_order", level: "ok", title: "Test order placed", message: "You placed a test order.", href: null, who: null },
+  catalogOk: { id: "catalog", level: "ok", title: "Products", message: "Your products are in.", href: null, who: null },
+  contactWarn: { id: "contact", level: "warn", title: "No contact details", message: "Shoppers can't see how to reach you. Add a support email or phone.", href: "/admin/settings#store-profile", who: null },
+  designInfo: clone(OC.ok.body.items[4]),
+  designOk: { id: "design", level: "ok", title: "Colours and logo", message: "Your colours and logo are set.", href: null, who: null },
+};
+const reportOf = (items, offer = null) => ({ ok: true, data: { ok: true, opening: true, items: clone(items), offer: offer ? { publishSet: clone(offer) } : null } });
+const openStore = () => OPEN_STORE();
+// a 409 opening refusal through the real client mapper
+const refusalOf = (code, error, { items, offer, withOffer = true }) => mapResponse(409, { error, code, report: { opening: true, items: clone(items), offer: offer ? { publishSet: clone(offer) } : null }, ...(withOffer ? { offer: offer ? { publishSet: clone(offer) } : null } : {}) });
+const firstPubAll = () => firstPub(["Hero", "Product rail"]);
+// a fetch spy for the console POSTs: answers[url] is (json, n) => [status, body]
+function fetchSpy(answers = {}) {
+  const sent = [];
+  const counts = {};
+  const f = async (url, init) => {
+    const json = JSON.parse(init.body);
+    sent.push({ url, method: init.method, json });
+    counts[url] = (counts[url] || 0) + 1;
+    const a = answers[url];
+    if (!a) throw new Error(`unexpected fetch ${url}`);
+    const [status, body] = a(json, counts[url]);
+    return { ok: status >= 200 && status < 300, status, json: async () => clone(body) };
+  };
+  f.sent = sent;
+  return f;
+}
+const buttons = (markup) => [...markup.matchAll(/<button([^>]*)>([\s\S]*?)<\/button>/g)].map((m) => ({ text: textOf(m[2]), disabled: /\sdisabled=""/.test(m[1]) }));
+const buttonOf = (markup, words) => buttons(markup).find((b) => b.text === words) || null;
+const linksOf = (markup) => [...markup.matchAll(/<a([^>]*)>([\s\S]*?)<\/a>/g)].map((m) => ({ text: textOf(m[2]), href: (m[1].match(/href="([^"]*)"/) || [])[1]?.replace(/&amp;/g, "&") ?? null }));
+
+await t("P6-OPEN-UI unit: flow.open asks openingChecks before anything goes out; opening:true enters 'opening' with the report's items and the offered design already in the set", async () => {
+  const items = [I.paymentOk, I.privacyOk, I.returnsOk, I.testOrderWarn, I.catalogOk, I.designInfo];
+  const call = stub({ openingChecks: reportOf(items, [HOME, DESIGN]), listChanges: firstPubAll(), publishSet: answer(P.ok) });
+  const flow = M.createPublishFlow({ call });
+  await flow.open([HOME]);
+  const s = flow.getState();
+  eq(call.calls[0], { op: "openingChecks", args: { ids: ["doc_home"] }, extra: undefined }, "the first call, for the set:");
+  eq(s.phase, "opening", "phase:");
+  eq(s.outcome.report.items.map((i) => i.id), items.map((i) => i.id), "the report's items, in order:");
+  eq(s.items.map(({ id, revision, draftHash }) => ({ id, revision, draftHash })), [{ id: "doc_home", revision: 3, draftHash: "h_draft" }, { id: "doc_design", revision: 2, draftHash: "h_design" }], "the design is in the set, with the offer's revision and hash:");
+  eq(call.calls.filter((c) => c.op === "listChanges").map((c) => c.args.id), ["doc_home", "doc_design"], "what goes live is listed, design included:");
+  ok(!call.ops().some((o) => o === "publish" || o === "publishSet"), "nothing published by opening the panel");
+  ok(flow.canConfirm(), "Open is on: only a warning is left");
+  await flow.confirm();
+  const sent = call.calls.at(-1);
+  eq([sent.op, sent.args.map((x) => x.id), sent.extra], ["publishSet", ["doc_home", "doc_design"], { checkOpening: true, confirmOpen: true }], "one Open sends the set with confirmOpen:");
+  eq(flow.getState().phase, "done", "then done:");
+});
+
+await t("P6-OPEN-UI unit: opening:false, a refused read, a failed read and a thrown read all go on to the review exactly as before", async () => {
+  const cases = {
+    "opening false": () => openStore(),
+    "refused (legacy store)": () => mapResponse(409, { error: "This store still uses the current Storefront editor.", code: "STORE_USES_LEGACY" }),
+    "failed (network)": () => ({ error: true, code: "NETWORK_ERROR", message: "We couldn't reach Storeasy." }),
+    thrown: () => {
+      throw new Error("boom");
+    },
+  };
+  for (const [name, read] of Object.entries(cases)) {
+    const call = stub({ openingChecks: read, listChanges: changes([{ kind: "edited", sectionId: "sec_hero", words: "Hero: title changed" }]), publish: answer(P.ok) });
+    const flow = M.createPublishFlow({ call });
+    await flow.open([HOME]);
+    eq(flow.getState().phase, "review", `${name}: the review:`);
+    eq(flow.getState().items.map((i) => i.id), ["doc_home"], `${name}: the same set:`);
+    ok(flow.canConfirm(), `${name}: Publish on as before`);
+    await flow.confirm();
+    eq(call.ops().slice(-1), ["publish"], `${name}: published:`);
+    eq(call.calls.at(-1).extra, { revision: 3, checkOpening: true }, `${name}: with checkOpening and no confirmOpen:`);
+    ok(textOf(renderPanel(flow)).includes("Published"), `${name}: done`);
+    ok(!textOf(renderPanel(flow)).includes(M.WORDS.openingTitle), `${name}: no opening panel`);
+  }
+});
+
+await t("P6-OPEN-UI unit: the publish's 409s map to the one panel: CONFIRM_NEEDED and NEEDS_DESIGN to 'opening' (design folded, no second dialog), CANNOT_TAKE_PAYMENT to 'cannotOpen' (Open off), NEEDS_POLICIES folds saved drafts or keeps Open off when its offer is null; a starter is never added", async () => {
+  // the outcome mapping on its own
+  eq(M.outcomeOf(answer(P.openingConfirmNeeded)).phase, "opening", "OPENING_CONFIRM_NEEDED:");
+  eq(M.outcomeOf(answer(P.storeCannotTakePayment)).phase, "cannotOpen", "STORE_CANNOT_TAKE_PAYMENT:");
+  eq(M.outcomeOf(answer(P.openingNeedsDesign)).phase, "opening", "OPENING_NEEDS_DESIGN:");
+  eq([M.outcomeOf(answer(P.openingNeedsPolicies)).phase, M.outcomeOf(answer(P.openingNeedsPolicies)).stuck], ["opening", true], "OPENING_NEEDS_POLICIES with offer null:");
+
+  const run = async (first) => {
+    const call = stub({ listChanges: firstPubAll(), publish: (a, x, n) => (n === 1 ? first : answer(P.ok)), publishSet: answer(P.ok) });
+    const flow = M.createPublishFlow({ call });
+    await flow.open([HOME]); // the stub answers openingChecks as an open store would
+    await flow.confirm();
+    await tick();
+    return { call, flow };
+  };
+  // CONFIRM_NEEDED: 'opening' with the report, and Open resends with confirmOpen
+  let r = await run(refusalOf("OPENING_CONFIRM_NEEDED", "Look over what's left before your store opens, then open it. Nothing was published yet.", { items: [I.paymentOk, I.privacyOk, I.returnsOk, I.testOrderWarn, I.designOk], withOffer: false }));
+  eq(r.flow.getState().phase, "opening", "confirm needed:");
+  ok(r.flow.canConfirm(), "Open on");
+  await r.flow.confirm();
+  eq([r.call.calls.at(-1).op, r.call.calls.at(-1).extra], ["publish", { revision: 3, checkOpening: true, confirmOpen: true }], "resent with confirmOpen:");
+
+  // NEEDS_DESIGN: folded into the same panel, never the offer dialog
+  r = await run(refusalOf("OPENING_NEEDS_DESIGN", "Publish your colours and logo with this, so your store opens with them. Nothing was published.", { items: [I.paymentOk, I.privacyOk, I.returnsOk, I.testOrderOk, I.designInfo], offer: [HOME, DESIGN] }));
+  eq(r.flow.getState().phase, "opening", "needs design:");
+  eq(r.flow.getState().items.map((i) => i.id), ["doc_home", "doc_design"], "design added to the set:");
+  ok(!textOf(renderPanel(r.flow)).includes(M.WORDS.offerTitle), "no 'Publish these together' dialog");
+  ok(r.flow.canConfirm(), "Open on once the lists loaded");
+  await r.flow.confirm();
+  eq([r.call.calls.at(-1).op, r.call.calls.at(-1).args.map((x) => x.id), r.call.calls.at(-1).extra], ["publishSet", ["doc_home", "doc_design"], { checkOpening: true, confirmOpen: true }], "the set with the design:");
+
+  // CANNOT_TAKE_PAYMENT: no way to open
+  r = await run(answer(P.storeCannotTakePayment));
+  eq(r.flow.getState().phase, "cannotOpen", "cannot open:");
+  ok(!r.flow.canConfirm(), "Open off");
+  eq(await r.flow.confirm(), null, "a confirm sends nothing:");
+  eq(r.call.ops().filter((o) => o === "publish").length, 1, "only the first publish went out:");
+
+  // NEEDS_POLICIES with an offer of founder-saved drafts: folded in
+  r = await run(refusalOf("OPENING_NEEDS_POLICIES", "Publish your privacy page and returns page with this. Nothing was published.", { items: [I.paymentOk, I.privacySaved, I.returnsSaved, I.testOrderOk, I.designOk], offer: [HOME, PRIV, TERMS] }));
+  eq(r.flow.getState().phase, "opening", "needs policies:");
+  eq(r.flow.getState().items.map((i) => i.id), ["doc_home", PRIV.id, TERMS.id], "the saved policy drafts are in the set:");
+  ok(r.flow.canConfirm(), "Open on");
+
+  // NEEDS_POLICIES with offer null: Open off
+  r = await run(answer(P.openingNeedsPolicies));
+  eq(r.flow.getState().phase, "opening", "needs policies, nothing to offer:");
+  ok(!r.flow.canConfirm(), "Open off");
+  // even if its report had no block left, offer null keeps Open off until a check
+  r = await run(refusalOf("OPENING_NEEDS_POLICIES", "Your store needs a privacy page and a returns page before it opens, so nothing was published.", { items: [I.paymentOk, I.privacyOk, I.returnsOk], offer: null }));
+  ok(!r.flow.canConfirm(), "offer null: Open off");
+
+  // a starter draft is never added, even when an offer names it
+  r = await run(refusalOf("OPENING_NEEDS_POLICIES", "Your store needs a privacy page and a returns page before it opens, so nothing was published.", { items: [I.paymentOk, I.privacyStarter, I.returnsSaved], offer: [HOME, PRIV, TERMS] }));
+  eq(r.flow.getState().items.map((i) => i.id), ["doc_home", TERMS.id], "the starter is left out, the saved returns page is in:");
+  ok(!r.flow.canConfirm(), "the starter still blocks");
+  eq(M.foldOffer([HOME], { publishSet: [HOME, PRIV] }, { items: [I.privacyStarter] }).items.map((i) => i.id), ["doc_home"], "foldOffer never adds a starter:");
+});
+
+await t("P6-OPEN-UI rendered: each item's message, a link only with an href (its linkLabel, else 'Fix this'; none for support), 'Open my store anyway' resends with confirmOpen through the store (spy)", async () => {
+  const items = [I.paymentCod, I.maintenance, I.privacyOk, I.returnsOk, I.testOrderWarn, I.catalogOk, I.contactWarn, I.designInfo];
+  // the editor's path: the real store, createStoreCall, and a spy for the documents api
+  const EM = await import("../components/admin/editor/editorModel.js");
+  const { createDocumentStore } = await import("../components/admin/editor/store.js");
+  const apiCalls = [];
+  const api = {
+    async call(op, args, extra) {
+      apiCalls.push({ op, args: clone(args ?? null), extra: extra === undefined ? undefined : clone(extra) });
+      if (op === "openingChecks") return reportOf(items, [HOME, DESIGN]);
+      if (op === "listChanges") return firstPubAll();
+      if (op === "publishSet") return answer(P.ok);
+      return { error: true, code: "UNKNOWN", message: "no script" };
+    },
+    sendKeepalive: () => true,
+  };
+  const store = createDocumentStore({ api, document: DOC(), tenant: "t1", timers: { setTimeout: () => 0, clearTimeout: () => {} }, storage: null });
+  const call = EM.createStoreCall({ api, getStore: () => store });
+  const flow = M.createPublishFlow({ call });
+  await flow.open([HOME]);
+  eq(flow.getState().phase, "opening", "opening:");
+  const page = renderPanel(flow);
+  const text = plain(page, "opening panel");
+  ok(text.includes(M.WORDS.openingTitle), "titled 'Before you open your store'");
+  for (const it of items) ok(text.includes(it.message), `${it.id} shows its message`);
+  const links = linksOf(page);
+  eq(
+    links.map((l) => [l.text, l.href]),
+    [
+      ["Add your Razorpay keys", "/admin/settings#payments"],
+      ["Open your preview", "/admin/editor"],
+      [M.WORDS.fixThis, "/admin/settings#store-profile"],
+      ["See your colours", "/admin/editor?doc=doc_design"],
+    ],
+    "a link only where there is an href, with its linkLabel (else 'Fix this'); none for support:",
+  );
+  ok(!/Must fix/.test(text), "nothing blocks");
+  const itemMarkup = (id) => (page.match(new RegExp(`<li[^>]*data-opening-item="${id}"[\\s\\S]*?</li>`)) || [""])[0];
+  for (const id of ["payment", "design"]) ok(itemMarkup(id) && !/bg-warning|bg-danger|text-warning|text-danger/.test(itemMarkup(id)), `the info line ${id} has no warning style`);
+  ok(/bg-warning/.test(itemMarkup("maintenance")) && /bg-warning/.test(itemMarkup("contact")), "warnings are marked");
+  ok(/bg-success/.test(itemMarkup("privacy")) && textOf(itemMarkup("privacy")).includes(M.WORDS.levelDone), "an ok item shows as done");
+  ok(!linksOf(itemMarkup("maintenance")).length, "the support item has no link");
+  eq(buttons(page).filter((b) => /Open my store/.test(b.text)).map((b) => [b.text, b.disabled]), [["Open my store anyway", false]], "one 'Open my store anyway':");
+  ok(buttonOf(page, M.WORDS.placedOne) && buttonOf(page, M.WORDS.checkAgain), "'I placed one' and 'Check again'");
+  await flow.confirm(); // what on.confirm does
+  const sent = apiCalls.filter((c) => c.op === "publishSet");
+  eq(sent.length, 1, "one publishSet:");
+  eq(sent[0].extra, { checkOpening: true, confirmOpen: true }, "through createStoreCall and the store, with confirmOpen:");
+  eq(sent[0].args.map((x) => x.id), ["doc_home", "doc_design"], "the set with the design:");
+});
+
+await t("P6-OPEN-UI rendered: with every item ok the panel still shows, all done, with one 'Open my store' button; in 'cannotOpen' there is no open button and the payment message shows", async () => {
+  const allOk = [I.paymentOk, I.privacyOk, I.returnsOk, I.testOrderOk, I.catalogOk, I.designOk];
+  let call = stub({ openingChecks: reportOf(allOk, [HOME]), listChanges: firstPubAll() });
+  let flow = M.createPublishFlow({ call });
+  await flow.open([HOME]);
+  let page = renderPanel(flow);
+  let text = plain(page, "all ok");
+  ok(text.includes(M.WORDS.openingTitle) && text.includes(M.WORDS.openingAllDone), text);
+  eq(buttons(page).filter((b) => /Open my store/.test(b.text)).map((b) => [b.text, b.disabled]), [["Open my store", false]], "one 'Open my store':");
+  eq((text.match(/Done/g) || []).length, allOk.length, "every item shows as done:");
+
+  call = stub({ listChanges: firstPubAll(), publish: answer(P.storeCannotTakePayment) });
+  flow = M.createPublishFlow({ call });
+  await flow.open([HOME]);
+  await flow.confirm();
+  page = renderPanel(flow);
+  text = plain(page, "cannot open");
+  eq(flow.getState().phase, "cannotOpen", "phase:");
+  ok(text.includes(I.paymentOff.message), "the payment message shows");
+  ok(!/data-open-store/.test(page) && !buttons(page).some((b) => /Open my store/.test(b.text)), "no open button");
+  ok(buttonOf(page, M.WORDS.checkAgain), "Check again is there");
+});
+
+await t("P6-OPEN-UI rendered (OQ-P6-1/2): missing policies block Open with 'Start a …' buttons; Start POSTs policy-start { kind } and checks again; a starter shows 'Read it' and \"I've read it\" (POST { markRead }); Open turns on only once both are ok or info", async () => {
+  const reports = [
+    [I.paymentOk, I.privacyMissing, I.returnsMissing, I.testOrderOk, I.designOk],
+    [I.paymentOk, I.privacyStarter, I.returnsMissing, I.testOrderOk, I.designOk],
+    [I.paymentOk, I.privacySaved, I.returnsMissing, I.testOrderOk, I.designOk],
+    [I.paymentOk, I.privacySaved, I.returnsOk, I.testOrderOk, I.designOk],
+  ];
+  const offers = [[HOME], [HOME, PRIV], [HOME, PRIV], [HOME, PRIV]];
+  let n = 0;
+  const call = stub({ openingChecks: () => reportOf(reports[Math.min(n, 3)], offers[Math.min(n++, 3)]), listChanges: firstPubAll(), publishSet: answer(P.ok) });
+  const fetch = fetchSpy({
+    [M.POLICY_START_URL]: (json) =>
+      json.kind
+        ? [200, { ok: true, document: { id: json.kind === "privacy" ? PRIV.id : TERMS.id, revision: 1, slug: "privacy-policy", title: "Privacy policy", kind: json.kind }, href: `/admin/editor?doc=${PRIV.id}`, message: "We started your privacy page from a template. It's a starting point, not legal advice: read it, change what you need and save it." }]
+        : [200, { ok: true, document: { id: PRIV.id, revision: 2, slug: "privacy-policy", title: "Privacy policy", draftHash: "h_priv2" }, href: `/admin/editor?doc=${PRIV.id}`, message: "Marked as read. This page now counts as yours." }],
+  });
+  const flow = M.createPublishFlow({ call, fetch });
+  await flow.open([HOME]);
+  let page = renderPanel(flow);
+  let text = plain(page, "policies missing");
+  ok(buttonOf(page, M.WORDS.startPrivacy) && buttonOf(page, M.WORDS.startReturns), "both Start buttons");
+  eq((text.match(/not legal advice/g) || []).length, 1, "the 'not legal advice' line, once:");
+  ok(text.includes(M.WORDS.notLegalAdvice), "its words");
+  eq(buttonOf(page, "Open my store")?.disabled, true, "Open is off:");
+  ok(text.includes(M.WORDS.openingBlocks), "says what to do");
+  ok(!flow.canConfirm(), "canConfirm off");
+
+  // Start a privacy page
+  const action = flow.getState().outcome.report.items.find((i) => i.id === "privacy").actions[0];
+  await flow.act(action);
+  eq(fetch.sent.at(-1), { url: "/api/admin/policy-start", method: "POST", json: { kind: "privacy" } }, "POSTs { kind }:");
+  eq(call.ops().filter((o) => o === "openingChecks").length, 2, "checked again:");
+  page = renderPanel(flow);
+  text = plain(page, "a starter");
+  ok(text.includes("We started your privacy page from a template."), "the answer's message shows");
+  ok(linksOf(page).some((l) => l.text === "Read it" && l.href === `/admin/editor?doc=${PRIV.id}`), "'Read it' opens the starter in the editor");
+  ok(buttonOf(page, M.WORDS.markRead), "\"I've read it\"");
+  ok(!flow.getState().items.some((i) => i.id === PRIV.id), "a starter is not in the set, even when an offer names it");
+  eq(buttonOf(page, "Open my store")?.disabled, true, "still off:");
+
+  // I've read it
+  const read = flow.getState().outcome.report.items.find((i) => i.id === "privacy").actions[0];
+  await flow.act(read);
+  eq(fetch.sent.at(-1).json, { markRead: { id: PRIV.id, revision: 1 } }, "POSTs { markRead: { id, revision } }:");
+  eq(call.ops().filter((o) => o === "openingChecks").length, 3, "checked again:");
+  ok(flow.getState().items.some((i) => i.id === PRIV.id), "the read page now goes live with the store (saved, offered)");
+  ok(!flow.canConfirm(), "returns still blocks");
+
+  // the returns page appears elsewhere: Check again
+  await flow.act({ type: "checkAgain" });
+  eq(call.ops().filter((o) => o === "openingChecks").length, 4, "checked again:");
+  ok(flow.canConfirm(), "Open on once privacy is info and returns ok");
+  page = renderPanel(flow);
+  eq(buttonOf(page, "Open my store")?.disabled, false, "the rendered Open is on:");
+  await flow.confirm();
+  const sent = call.calls.at(-1);
+  eq([sent.op, sent.args.map((x) => x.id), sent.extra], ["publishSet", ["doc_home", PRIV.id], { checkOpening: true, confirmOpen: true }], "the privacy page goes with the store:");
+});
+
+await t("P6-OPEN-UI rendered: 'Check again' re-reads the report; 'I placed one' POSTs the test order check-off (Setup's route) and re-reads", async () => {
+  let n = 0;
+  const call = stub({ openingChecks: () => reportOf(n++ < 2 ? [I.paymentOk, I.privacyOk, I.returnsOk, I.testOrderWarn] : [I.paymentOk, I.privacyOk, I.returnsOk, I.testOrderOk], [HOME]), listChanges: firstPubAll() });
+  const fetch = fetchSpy({ [M.SETUP_URL]: () => [200, { ok: true, items: [] }] });
+  const flow = M.createPublishFlow({ call, fetch });
+  await flow.open([HOME]);
+  await flow.act({ type: "checkAgain" });
+  eq(call.ops().filter((o) => o === "openingChecks").length, 2, "Check again read it again:");
+  ok(textOf(renderPanel(flow)).includes(M.WORDS.placedOne), "'I placed one' on the test order");
+  await flow.act({ type: "placedTestOrder" });
+  eq(fetch.sent, [{ url: "/api/admin/setup", method: "POST", json: { step: "test_order" } }], "the manual check-off:");
+  eq(call.ops().filter((o) => o === "openingChecks").length, 3, "then read again:");
+  const text = plain(renderPanel(flow), "after test order");
+  ok(text.includes(M.WORDS.testOrderMarked) && !text.includes(M.WORDS.placedOne), text);
+  eq(buttonOf(renderPanel(flow), "Open my store")?.disabled, false, "nothing left to check: 'Open my store':");
+  // a failed check-off leaves the panel as it was
+  const call2 = stub({ openingChecks: reportOf([I.paymentOk, I.testOrderWarn], [HOME]), listChanges: firstPubAll() });
+  const flow2 = M.createPublishFlow({ call: call2, fetch: fetchSpy({ [M.SETUP_URL]: () => [422, { error: 'launch is gated — still open: x' }] }) });
+  await flow2.open([HOME]);
+  await flow2.act({ type: "placedTestOrder" });
+  const t2 = plain(renderPanel(flow2), "check-off failed");
+  ok(t2.includes(M.WORDS.testOrderFailed) && !t2.includes("gated"), t2);
+  eq(call2.ops().filter((o) => o === "openingChecks").length, 1, "not re-read:");
+  // the panel actions are not issue actions
+  eq([...M.ACTION_TYPES], ["hideSection", "removeSection", "removeItem", "publishBoth", "openField"], "ACTION_TYPES unchanged:");
+  ok(M.OPENING_PANEL_ACTIONS.every((a) => !M.ACTION_TYPES.includes(a)), "none of the panel's actions is an issue action");
+});
+
+await t("P6-OPEN-UI rendered: POLICY_PAGE_EXISTS names the page that counts (even an unrelated 'returning-customers' page) with 'Open it'; another failure shows its words and leaves the panel as it was", async () => {
+  let n = 0;
+  const call = stub({ openingChecks: () => reportOf(n++ === 0 ? [I.paymentOk, I.privacyOk, I.returnsMissing] : [I.paymentOk, I.privacyOk, { ...I.returnsSaved, linkLabel: "Open “Returning customers”" }], [HOME]), listChanges: firstPubAll() });
+  const fetch = fetchSpy({
+    [M.POLICY_START_URL]: () => [409, { error: "You already have a returns page: Returning customers. Open it to read it.", code: "POLICY_PAGE_EXISTS", document: { id: "doc_R3T8N1C5U2S7Q4W9", title: "Returning customers", state: "saved" }, href: "/admin/editor?doc=doc_R3T8N1C5U2S7Q4W9" }],
+  });
+  const flow = M.createPublishFlow({ call, fetch });
+  await flow.open([HOME]);
+  await flow.act({ type: "startPolicy", kind: "returns" });
+  let page = renderPanel(flow);
+  let text = plain(page, "exists");
+  ok(text.includes("“Returning customers” already counts as your returns page") && text.includes("Open it to check it's the page you want"), text);
+  ok(linksOf(page).some((l) => l.text === "Open it" && l.href === "/admin/editor?doc=doc_R3T8N1C5U2S7Q4W9"), "'Open it' to that page");
+  eq(call.ops().filter((o) => o === "openingChecks").length, 2, "checked again:");
+  // a failure: its plain words, nothing re-read, the panel as it was
+  const call2 = stub({ openingChecks: reportOf([I.paymentOk, I.privacyMissing], [HOME]), listChanges: firstPubAll() });
+  const f2 = fetchSpy({ [M.POLICY_START_URL]: (j, k) => (k === 1 ? [409, { error: "This store still uses the current Storefront editor, so no page was started here.", code: "STORE_USES_LEGACY" }] : [403, { error: "Your role (staff) can't do that" }]) });
+  const flow2 = M.createPublishFlow({ call: call2, fetch: f2 });
+  await flow2.open([HOME]);
+  const before = clone(flow2.getState().outcome.report);
+  await flow2.act({ type: "startPolicy", kind: "privacy" });
+  text = plain(renderPanel(flow2), "refused");
+  ok(text.includes("This store still uses the current Storefront editor"), text);
+  eq(flow2.getState().outcome.report, before, "the panel as it was:");
+  await flow2.act({ type: "startPolicy", kind: "privacy" });
+  text = plain(renderPanel(flow2), "not allowed");
+  ok(text.includes(M.WORDS.notAllowed) && !text.includes("role"), text);
+  eq(call2.ops().filter((o) => o === "openingChecks").length, 1, "never re-read on a failure:");
+  // a lost answer (fetch rejects)
+  const flow3 = M.createPublishFlow({ call: stub({ openingChecks: reportOf([I.privacyMissing], [HOME]), listChanges: firstPubAll() }), fetch: async () => { throw new Error("offline"); } });
+  await flow3.open([HOME]);
+  await flow3.act({ type: "startPolicy", kind: "privacy" });
+  ok(textOf(renderPanel(flow3)).includes(M.WORDS.actionFailed), "a lost answer: plain words");
+});
+
+await t("P6-OPEN-UI rendered: a done answer with a store-level POLICY_PAGE_MISSING warning shows plain words under 'Your store', never the code", async () => {
+  const body = clone(P.okPolicyPageMissing.body);
+  body.published.push({ id: "doc_home", versionId: "ver_9", hash: "h_draft", liveUrl: "/api/preview?exit=1&to=%2F", undo: { id: "doc_home", revision: 4, logId: "log_9" } });
+  const missing = body.issues[0];
+  // the store-level one: no document
+  body.issues.push({ ...clone(missing), documentId: null, anchor: null, where: null, actions: [], message: "After this publish your store has no live privacy page, and checkout links to it. Publish one soon." });
+  const call = stub({ listChanges: changes([{ kind: "edited", sectionId: "sec_hero", words: "Hero: title changed" }]), publish: mapResponse(200, body) });
+  const flow = M.createPublishFlow({ call });
+  await flow.open([HOME]);
+  await flow.confirm();
+  eq(flow.getState().phase, "done", "done:");
+  const page = renderPanel(flow);
+  const text = plain(page, "done with POLICY_PAGE_MISSING");
+  ok(text.includes(missing.message) && text.includes("no live privacy page"), text);
+  ok(text.includes(M.WORDS.storeWide), "the store-level warning is under 'Your store', not 'This page'");
+  ok(!/POLICY_PAGE_MISSING/.test(page), "never the code");
+});
+
+await t("P6-OPEN-UI unit: checkOpening reaches the documents API body as a top-level key on publish and publishSet, through createStoreCall and the store (fetch spy); FIRST_PUBLISH_NEEDS_HOME, noHome and republish still work", async () => {
+  const EM = await import("../components/admin/editor/editorModel.js");
+  const { createDocumentStore } = await import("../components/admin/editor/store.js");
+  const { createDocumentsApi } = await import("../components/admin/editor/documentsApi.js");
+  const bodies = [];
+  const answers = { publish: [P.firstPublishNeedsHome, P.ok], publishSet: [P.ok] };
+  const fetch = async (url, init) => {
+    const json = JSON.parse(init.body);
+    bodies.push(json);
+    const op = Object.keys(json).find((k) => k !== "revision" && k !== "checkOpening" && k !== "confirmOpen");
+    let out;
+    if (op === "openingChecks") out = OC.open;
+    else if (op === "listChanges") out = { status: 200, body: { ok: true, firstPublish: true, sections: [{ words: "Hero" }] } };
+    else out = (answers[op] || []).shift() || { status: 500, body: { error: "no script", code: "X" } };
+    return { status: out.status, ok: out.status < 300, json: async () => clone(out.body) };
+  };
+  const api = createDocumentsApi({ fetch });
+  const store = createDocumentStore({ api, document: DOC({ id: SALE.id, type: "campaign", label: "Diwali sale", revision: 2, draftHash: "h_draft2" }), tenant: "t1", timers: { setTimeout: () => 0, clearTimeout: () => {} }, storage: null });
+  const call = EM.createStoreCall({ api, getStore: () => store });
+  const flow = M.createPublishFlow({ call });
+  await flow.open([SALE]);
+  eq(bodies[0], { openingChecks: { ids: [SALE.id] } }, "openingChecks first, through the store call to the api:");
+  await flow.confirm();
+  const pub = bodies.find((b) => "publish" in b);
+  eq([pub.checkOpening, pub.revision, "confirmOpen" in pub, "checkOpening" in pub.publish], [true, 2, false, false], "publish: top-level checkOpening, beside the revision:");
+  eq(flow.getState().phase, "offer", "FIRST_PUBLISH_NEEDS_HOME still offers the home page:");
+  await tick();
+  await flow.confirm();
+  const set = bodies.find((b) => "publishSet" in b);
+  eq([set.checkOpening, Array.isArray(set.publishSet), set.publishSet.every((x) => !("checkOpening" in x))], [true, true, true], "publishSet: top-level checkOpening:");
+  eq(flow.getState().phase, "done", "published:");
+  // the store on its own: the keys only when asked
+  const seen = [];
+  const s2 = createDocumentStore({ api: { call: async (op, args, extra) => (seen.push([op, extra]), answer(P.ok)), sendKeepalive: () => true }, document: DOC(), tenant: "t1", timers: { setTimeout: () => 0, clearTimeout: () => {} }, storage: null });
+  await s2.publish({ checkOpening: true, confirmOpen: true });
+  await s2.publishSet([{ id: "doc_design", revision: 1, draftHash: "h" }], { checkOpening: true });
+  await s2.publish();
+  await s2.publishSet([]);
+  eq(seen, [["publish", { revision: 3, checkOpening: true, confirmOpen: true }], ["publishSet", { checkOpening: true }], ["publish", { revision: 3 }], ["publishSet", undefined]], "the store sends the keys only when set:");
+  // noHome and republish, through the stub
+  const nh = stub({ listChanges: changes([{ kind: "edited", sectionId: "sec_x", words: "x" }]), publish: answer({ status: 409, body: { ...P.firstPublishNeedsHome.body, offer: null } }) });
+  const f3 = M.createPublishFlow({ call: nh });
+  await f3.open([SALE]);
+  await f3.confirm();
+  eq(f3.getState().phase, "noHome", "noHome:");
+  const rp = stub({ listChanges: changes([{ kind: "edited", sectionId: "sec_x", words: "x" }]), publish: (a, x, n) => (n === 1 ? answer(P.republishConfirmNeeded) : answer(P.ok)) });
+  const f4 = M.createPublishFlow({ call: rp });
+  await f4.open([SALE]);
+  await f4.confirm();
+  eq(f4.getState().phase, "republish", "republish:");
+  await f4.confirm();
+  eq([rp.calls.at(-1).args.confirmRepublish, rp.calls.at(-1).extra], [true, { revision: 2, checkOpening: true }], "republish resends with confirmRepublish and checkOpening:");
+  eq(f4.getState().phase, "done", "done:");
 });
 
 const secs = ((Date.now() - started) / 1000).toFixed(1);

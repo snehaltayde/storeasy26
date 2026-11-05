@@ -5,7 +5,7 @@ import { Banner } from "@/components/console/Banner";
 import { Badge } from "@/components/console/Badge";
 import { Button } from "@/components/console/Button";
 import UndoNotice from "./UndoNotice";
-import { WORDS, LEVEL_WORDS, actionLabel, allLoaded, createPublishFlow } from "./publishModel";
+import { WORDS, LEVEL_WORDS, actionLabel, allLoaded, createPublishFlow, openingActionLabel, openingBlocks, openingWarns } from "./publishModel";
 
 // P3-PUBLISHUI (PUB-02, PUB-03, PUB-05, PUB-09): the Publish button and the
 // small panel it opens. All props, no store import: the logic is
@@ -123,6 +123,65 @@ function IssueList({ issues, labelOf, offerSize, hidePublishBoth, busy, onAct, o
   );
 }
 
+// P6-OPEN-UI (PUB-12, US-41): one item of "Before you open your store". Its
+// plain message always; a link when it has an href (never for who
+// 'support': the message says to ask us); a button for each of its actions.
+// block and warn are marked, ok shows as done, info has no mark.
+const OPEN_MARK = { block: ["danger", WORDS.levelBlock], warn: ["warning", WORDS.levelWarn], ok: ["success", WORDS.levelDone] };
+const isPolicyAction = (a) => a && (a.type === "startPolicy" || a.type === "markPolicyRead");
+
+function OpeningItem({ item, busy, onAct, legalLine }) {
+  const mark = OPEN_MARK[item.level] || null;
+  const link = item.who !== "support" && typeof item.href === "string" && item.href ? item.href : null;
+  const actions = (Array.isArray(item.actions) ? item.actions : []).filter((a) => a && typeof a.type === "string");
+  const testOrder = item.id === "test_order" && item.level === "warn";
+  const policy = actions.some(isPolicyAction);
+  return (
+    <li className="py-2 text-[13px]" data-opening-item={item.id} data-level={item.level}>
+      <div className="flex flex-wrap items-center gap-2">
+        {mark && <Badge tone={mark[0]}>{mark[1]}</Badge>}
+        {item.title && <span className="font-medium text-fg">{item.title}</span>}
+      </div>
+      {item.message && <p className={item.level === "ok" ? "mt-1 text-fg-muted" : "mt-1"}>{item.message}</p>}
+      {(link || actions.length > 0 || testOrder) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          {link && (
+            <a href={link} className="text-[13px] underline focus-ring" data-opening-link="">
+              {item.linkLabel || WORDS.fixThis}
+            </a>
+          )}
+          {actions.map((a, i) => (
+            <Button key={i} size="sm" variant={a.type === "startPolicy" ? "primary" : "secondary"} disabled={busy} onClick={() => onAct(a)}>
+              {openingActionLabel(a)}
+            </Button>
+          ))}
+          {testOrder && (
+            <Button size="sm" disabled={busy} onClick={() => onAct({ type: "placedTestOrder" })}>
+              {WORDS.placedOne}
+            </Button>
+          )}
+        </div>
+      )}
+      {policy && legalLine && (
+        <p className="mt-1 text-fg-muted" data-not-legal-advice="">
+          {WORDS.notLegalAdvice}
+        </p>
+      )}
+    </li>
+  );
+}
+
+function OpeningItems({ items, busy, onAct }) {
+  const firstPolicy = items.findIndex((i) => (i.actions || []).some(isPolicyAction));
+  return (
+    <ul className="divide-y divide-edge" data-opening-items="">
+      {items.map((item, n) => (
+        <OpeningItem key={item.id || n} item={item} busy={busy} onAct={onAct} legalLine={n === firstPolicy} />
+      ))}
+    </ul>
+  );
+}
+
 function Lists({ state, canKeep, onKeepLive }) {
   const many = state.order.length > 1;
   return (
@@ -144,7 +203,8 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
   const staff = access && access.canPublish === false;
   const trigger = mode === "all" ? "Publish all changes" : WORDS.publish;
   const o = s.outcome || {};
-  const labelOf = (id) => [...(s.items || []), ...(s.offerItems || []), ...(o.documents || [])].find((d) => d?.id === id)?.label || "This page";
+  // P6-OPEN-UI: a store-level issue (no document, e.g. POLICY_PAGE_MISSING) is the store's
+  const labelOf = (id) => (id == null ? WORDS.storeWide : [...(s.items || []), ...(s.offerItems || []), ...(o.documents || [])].find((d) => d?.id === id)?.label || "This page");
   const offerSize = (o.offer?.publishSet || []).length || 2;
 
   if (s.phase === "closed") {
@@ -198,6 +258,49 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
           {o.otherBlocks && <p className="text-[13px] text-warning">{WORDS.offerOtherBlocks}</p>}
           {!loaded && <p className="text-[13px] text-fg-muted">{WORDS.offerWaiting}</p>}
           {footer(confirmLabel)}
+        </>
+      );
+      break;
+    }
+    // P6-OPEN-UI: "Before you open your store", one panel and one Open button
+    case "opening":
+    case "cannotOpen": {
+      const items = Array.isArray(o.report?.items) ? o.report.items : [];
+      const cannot = s.phase === "cannotOpen";
+      const blocks = cannot || o.stuck === true || openingBlocks(o.report);
+      const warns = openingWarns(o.report);
+      const allOk = items.length > 0 && items.every((i) => i.level === "ok");
+      const lead = o.message || (cannot ? WORDS.openingCannot : allOk ? WORDS.openingAllDone : WORDS.openingLead);
+      content = (
+        <>
+          <p className="text-sm font-semibold text-fg">{WORDS.openingTitle}</p>
+          <p className="text-[13px]">{lead}</p>
+          {items.length > 0 && <OpeningItems items={items} busy={s.busy} onAct={h.act} />}
+          {!cannot && blocks && <p className="text-[13px] text-danger">{WORDS.openingBlocks}</p>}
+          {!blocks && warns && <p className="text-[13px] text-fg-muted">{WORDS.openingWarns}</p>}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" disabled={s.busy} onClick={() => h.act({ type: "checkAgain" })}>
+              {WORDS.checkAgain}
+            </Button>
+          </div>
+          {!cannot && s.order.length > 0 && (
+            <div className="space-y-2 border-t border-edge pt-2">
+              <p className="text-[13px] font-semibold text-fg">{WORDS.openingGoesLive}</p>
+              <Lists state={s} canKeep={false} onKeepLive={noop} />
+            </div>
+          )}
+          {cannot ? (
+            closeOnly
+          ) : (
+            <div className="flex justify-end gap-2 pt-2">
+              <Button onClick={h.close} disabled={s.busy}>
+                {WORDS.cancel}
+              </Button>
+              <Button variant="primary" disabled={!canConfirm} busy={s.busy} onClick={h.confirm} data-open-store="">
+                {s.busy ? WORDS.opening : warns ? WORDS.openStoreAnyway : WORDS.openStore}
+              </Button>
+            </div>
+          )}
         </>
       );
       break;
@@ -365,8 +468,20 @@ export function PublishPanelView({ state, canConfirm = false, access = null, mod
   }
 
   return (
-    <section className="w-full max-w-md space-y-3 rounded-card border border-edge bg-surface p-4 text-fg shadow-overlay" aria-label={WORDS.reviewTitle} data-publish="" data-phase={s.phase}>
-      {s.notice && <p className="text-[13px] text-fg-muted" role="status">{s.notice}</p>}
+    <section className="w-full max-w-md space-y-3 rounded-card border border-edge bg-surface p-4 text-fg shadow-overlay" aria-label={s.phase === "opening" || s.phase === "cannotOpen" ? WORDS.openingTitle : WORDS.reviewTitle} data-publish="" data-phase={s.phase}>
+      {s.notice && (
+        <p className="text-[13px] text-fg-muted" role="status">
+          {s.notice}
+          {s.noticeLink && (
+            <>
+              {" "}
+              <a href={s.noticeLink.href} className="underline focus-ring" data-notice-link="">
+                {s.noticeLink.label}
+              </a>
+            </>
+          )}
+        </p>
+      )}
       {content}
     </section>
   );
@@ -387,6 +502,7 @@ export default function PublishPanel(props) {
         onDocument: props.onDocument,
         onFocus: props.onFocus,
         onPublished: props.onPublished,
+        fetch: props.fetch,
       }),
     [given], // eslint-disable-line react-hooks/exhaustive-deps
   );

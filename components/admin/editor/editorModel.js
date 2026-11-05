@@ -275,6 +275,8 @@ export function inspectorPath({ sectionId = null, path }) {
 // ---- the store's call (plan A5, P3-PUBLISHUI review) -----------------------------------
 
 const idOfArgs = (args) => (typeof args === "string" ? args : isObj(args) && typeof args.id === "string" ? args.id : null);
+// P6-OPEN-UI: checkOpening and confirmOpen from a publish request's extra
+const openingFlags = (extra) => ({ checkOpening: isObj(extra) && extra.checkOpening === true, confirmOpen: isObj(extra) && extra.confirmOpen === true });
 export const storeDocument = (s) => ({ ...(s.document || {}), id: s.id, type: s.type, body: s.body, revision: s.revision, draftHash: s.draftHash });
 
 // documentsApi.call for the publish panel, Undo and Earlier versions, with
@@ -336,7 +338,8 @@ export function createStoreCall({ api, getStore, getPinned = () => null, onRepla
         const s = store.getState();
         // synchronous from here to the store's own flush: no typing can land between
         if (s.unacknowledged || s.draftHash !== args.draftHash) return refusal;
-        return store.publish({ confirmRepublish: args.confirmRepublish === true });
+        // P6-OPEN-UI: the opening modifiers travel as top-level keys
+        return store.publish({ confirmRepublish: args.confirmRepublish === true, ...openingFlags(extra) });
       }
       case "publishSet": {
         const items = Array.isArray(args) ? args : [];
@@ -346,7 +349,7 @@ export function createStoreCall({ api, getStore, getPinned = () => null, onRepla
         if (e) return e;
         const s = store.getState();
         if (s.unacknowledged || s.draftHash !== entry.draftHash) return refusal;
-        return store.publishSet(items);
+        return store.publishSet(items, openingFlags(extra));
       }
       case "undo":
         if (!mine) break;

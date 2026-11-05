@@ -116,6 +116,37 @@ export const WORDS = Object.freeze({
   undoCheckedNot: "Your Undo didn't go through. Nothing changed on your store. Try again.",
   undoCheckedUnknown: "We still couldn't confirm the Undo. Reload the page to see what is live.",
   undoSetOfflineTitle: (n, labels) => `Undo all ${n} pages of this publish? ${listWords(labels)} ${labels.length === 1 ? "goes" : "go"} offline.`,
+  // P6-OPEN-UI (PUB-12, US-41): "Before you open your store"
+  openingTitle: "Before you open your store",
+  openingLead: "Your store isn't open yet. Look over these, then open it.",
+  openingCannot: "Your store can't open until shoppers can pay. Fix that first, then check again.",
+  openingAllDone: "Everything is ready.",
+  openingBlocks: "Fix the things marked “Must fix” first. Then your store can open.",
+  openingWarns: "The things marked “Check” don't stop your store opening. You can open it now and fix them later.",
+  openingGoesLive: "What goes live when your store opens:",
+  openStore: "Open my store",
+  openStoreAnyway: "Open my store anyway",
+  opening: "Opening your store…",
+  checkAgain: "Check again",
+  checking2: "Checking…",
+  placedOne: "I placed one",
+  fixThis: "Fix this",
+  openIt: "Open it",
+  notLegalAdvice: "These are starting points, not legal advice.",
+  startPrivacy: "Start a privacy page",
+  startReturns: "Start a returns page",
+  markRead: "I've read it",
+  levelDone: "Done",
+  levelBlock: "Must fix",
+  levelWarn: "Check",
+  checkFailed: "We couldn't check your store just now, so nothing changed. Try again.",
+  actionFailed: "That didn't work, so nothing changed. Try again in a minute.",
+  signedOut: "You're signed out, so nothing changed. Sign in again in another tab, then try again.",
+  notAllowed: "Only the store owner or an admin can do that, so nothing changed.",
+  testOrderMarked: "Marked: you placed a test order.",
+  testOrderFailed: "We couldn't mark your test order, so nothing changed. Try again in a minute.",
+  pageCounts: (kind, title) => `${q(title)} already counts as your ${kind === "returns" ? "returns page" : "privacy page"}, so we didn't start a new one. Open it to check it's the page you want.`,
+  storeWide: "Your store",
 });
 
 // P3-FIX3: Undo needs the same right as Publish (storefront.publish). access
@@ -220,13 +251,100 @@ export function applyAction(body, action) {
 // The request that publishes `items`: one document is `publish` (with its
 // revision at the top level), more are `publishSet`. confirmRepublish only
 // on the items the founder confirmed.
-export function publishRequest(items, { set = false } = {}) {
+// P6-OPEN-UI: every request carries checkOpening: true as a top-level key
+// (P6-OPEN's modifier: the server's opening rules run when the set opens the
+// store, and do nothing on an open store), and confirmOpen: true on "Open my
+// store anyway".
+export function publishRequest(items, { set = false, confirmOpen = false } = {}) {
   const list = (items || []).map((it) => ({ id: it.id, revision: it.revision, draftHash: it.draftHash, ...(it.confirmRepublish === true ? { confirmRepublish: true } : {}) }));
+  const flags = { checkOpening: true, ...(confirmOpen === true ? { confirmOpen: true } : {}) };
   if (list.length === 1 && !set) {
     const [it] = list;
-    return { op: "publish", args: { id: it.id, draftHash: it.draftHash, ...(it.confirmRepublish ? { confirmRepublish: true } : {}) }, extra: { revision: it.revision } };
+    return { op: "publish", args: { id: it.id, draftHash: it.draftHash, ...(it.confirmRepublish ? { confirmRepublish: true } : {}) }, extra: { revision: it.revision, ...flags } };
   }
-  return { op: "publishSet", args: list };
+  return { op: "publishSet", args: list, extra: flags };
+}
+
+// ---- P6-OPEN-UI: "Before you open your store" ------------------------------------------
+
+// The panel's own actions, run through flow.act(). They are not issue actions
+// (ACTION_TYPES stays the server's PUBLISH_ACTION_TYPES): checkAgain and
+// placedTestOrder are the panel's, startPolicy and markPolicyRead are the
+// report's (OPENING_ACTION_TYPES).
+export const OPENING_PANEL_ACTIONS = Object.freeze(["checkAgain", "placedTestOrder", "startPolicy", "markPolicyRead"]);
+export const POLICY_START_URL = "/api/admin/policy-start";
+export const SETUP_URL = "/api/admin/setup";
+
+const reportItems = (report) => (isObj(report) && Array.isArray(report.items) ? report.items.filter(isObj) : []);
+export const openingBlocks = (report) => reportItems(report).some((i) => i.level === "block");
+export const openingWarns = (report) => reportItems(report).some((i) => i.level === "warn");
+// the ids of policy starter drafts: never put into a set by the client
+export const starterIds = (report) =>
+  new Set(
+    reportItems(report)
+      .flatMap((i) => (Array.isArray(i.actions) ? i.actions : []))
+      .filter((a) => isObj(a) && a.type === "markPolicyRead" && typeof a.id === "string")
+      .map((a) => a.id),
+  );
+
+// The words of a report action's button.
+export function openingActionLabel(action) {
+  if (action?.type === "startPolicy") return action.kind === "returns" ? WORDS.startReturns : WORDS.startPrivacy;
+  if (action?.type === "markPolicyRead") return WORDS.markRead;
+  if (action?.type === "placedTestOrder") return WORDS.placedOne;
+  if (action?.type === "checkAgain") return WORDS.checkAgain;
+  return typeof action?.label === "string" && action.label ? action.label : WORDS.fixThis;
+}
+
+// `items` with the offer folded in: every offered document not already in
+// the set (the design, founder-saved policy drafts), never a starter draft.
+// A document folded in earlier takes the offer's revision and hash again (the
+// founder may have saved it since); the founder's own documents keep theirs.
+export function foldOffer(items, offer, report, folded = []) {
+  const skip = starterIds(report);
+  const out = (items || []).map((it) => ({ ...it }));
+  const was = new Set(folded);
+  const added = [...folded];
+  for (const o of offerItems(offer)) {
+    if (!o || typeof o.id !== "string" || skip.has(o.id)) continue;
+    const at = out.findIndex((it) => it.id === o.id);
+    if (at < 0) {
+      out.push({ id: o.id, label: o.label, revision: o.revision, draftHash: o.draftHash });
+      if (!was.has(o.id)) added.push(o.id);
+    } else if (was.has(o.id)) out[at] = { ...out[at], revision: o.revision, draftHash: o.draftHash, label: out[at].label || o.label };
+  }
+  // a starter draft never stays in the set, even if it was folded before
+  return { items: out.filter((it) => !(skip.has(it.id) && was.has(it.id))), folded: added.filter((id) => !skip.has(id)) };
+}
+
+// A POST to a console route, through deps.fetch (or the browser's). Never
+// throws: { ok, status, body } (body null when it couldn't be read).
+async function postJson(doFetch, url, json) {
+  const f = doFetch || globalThis.fetch;
+  if (typeof f !== "function") return { ok: false, status: 0, body: null };
+  let res;
+  try {
+    res = await f(url, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify(json) });
+  } catch {
+    return { ok: false, status: 0, body: null };
+  }
+  let body = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
+  }
+  return { ok: Boolean(res?.ok) && isObj(body) && body.ok === true, status: Number(res?.status) || 0, body: isObj(body) ? body : null };
+}
+
+// The words of a failed console POST. The policy starter's answers carry a
+// code and plain words; the sign-in check's do not (its words are not for
+// founders), so those get ours.
+function failedWords(r, fallback) {
+  if (r.status === 401) return WORDS.signedOut;
+  if (r.status === 403 && !(typeof r.body?.code === "string" && r.body.code)) return WORDS.notAllowed;
+  if (r.status === 0 || r.status >= 500) return typeof r.body?.error === "string" && r.body?.code ? r.body.error : fallback;
+  return typeof r.body?.error === "string" && r.body.error && typeof r.body.code === "string" ? r.body.error : fallback;
 }
 
 // The offer as it is sent back: each document with the revision and draft
@@ -364,6 +482,18 @@ export function outcomeOf(result, ctx = {}) {
       if (isObj(r.offer)) return { phase: "offer", reason: "home", message: r.message, issues: [], offer: r.offer, documents: [], otherBlocks: false };
       return { phase: "noHome", title: WORDS.noHomeTitle, message: r.message };
     }
+    // P6-OPEN-UI: the opening rules (P6-OPEN). Each is the one "Before you
+    // open your store" panel; a design or saved policy offer is folded into
+    // the set by the flow, so there is no second dialog.
+    if (r.code === "STORE_CANNOT_TAKE_PAYMENT") return { phase: "cannotOpen", reason: "payment", message: r.message, report: isObj(r.report) ? r.report : null, offer: null };
+    if (r.code === "OPENING_CONFIRM_NEEDED") return { phase: "opening", reason: "confirm", message: r.message, report: isObj(r.report) ? r.report : null, offer: null };
+    if (r.code === "OPENING_NEEDS_DESIGN") return { phase: "opening", reason: "design", message: r.message, report: isObj(r.report) ? r.report : null, offer: isObj(r.offer) ? r.offer : null };
+    if (r.code === "OPENING_NEEDS_POLICIES") {
+      const offer = isObj(r.offer) ? r.offer : null;
+      // offer null: a policy page is missing or a starter is unread, so Open
+      // stays off until a check says otherwise
+      return { phase: "opening", reason: "policies", message: r.message, report: isObj(r.report) ? r.report : null, offer, stuck: !offer };
+    }
     if (r.code === "SLUG_TAKEN") return { phase: "refused", ...slugTakenWords(r, ctx), message: r.message };
     if (r.code === "NOT_PUBLISHABLE" || r.code === "PUBLISH_NOT_AVAILABLE") {
       const it = named(ctx, r.document, "this part of your store");
@@ -433,14 +563,20 @@ export const hasChanges = (lists, ids) => ids.some((id) => lists[id]?.firstPubli
 //   onDocument(document)         a document the server rewrote (save, keep live)
 //   onFocus({anchor, documentId, sectionId, field})
 //   onPublished(outcome)
+//   fetch(url, init)             P6-OPEN-UI: the panel's console POSTs
+//                                (policy starters, the test order check-off);
+//                                default globalThis.fetch
 // State (getState): {
 //   phase      closed | review | publishing | done | blocked | offer |
 //              republish | checking | checked | refused | conflict | error | noHome
+//              | opening | cannotOpen (P6-OPEN-UI)
 //   items      the documents this publish sends [{id, label, type, revision,
 //              draftHash, confirmRepublish?}]
 //   order      ids whose change lists are shown; lists { [id]: list }
 //   outcome    outcomeOf() of the last answer; offer, offerItems
 //   busy, notice
+//   noticeLink { href, label } beside the notice, or null (P6-OPEN-UI)
+//   folded     ids the opening offer added to items (P6-OPEN-UI)
 // }
 export function createPublishFlow(deps = {}) {
   const call = deps.call;
@@ -450,7 +586,7 @@ export function createPublishFlow(deps = {}) {
   // store's own copy, which still holds what was live before, so the editor
   // passes readDocument (straight to the documents API).
   const readDocument = deps.readDocument || ((id) => call("getDocument", id));
-  let state = { phase: "closed", items: [], order: [], lists: {}, outcome: null, offerItems: [], busy: false, notice: null, firstPublish: {}, types: {} };
+  let state = { phase: "closed", items: [], order: [], lists: {}, outcome: null, offerItems: [], busy: false, notice: null, noticeLink: null, firstPublish: {}, types: {}, folded: [], confirmOpen: false };
   const subs = new Set();
   let seq = 0; // a newer open wins over an older answer
   const set = (patch) => {
@@ -463,10 +599,10 @@ export function createPublishFlow(deps = {}) {
   // list is read (the hash first, then the list), so what is sent is never
   // newer than what was shown: a newer draft gives DRAFT_CHANGED, never an
   // unseen publish.
-  async function loadLists(ids, labels, mine) {
+  async function loadLists(ids, labels, mine, order = ids) {
     const lists = { ...state.lists };
     for (const id of ids) lists[id] = { status: "loading", label: labels[id] || "This page", rows: [], sections: [] };
-    set({ lists, order: ids });
+    set({ lists, order });
     await Promise.all(
       ids.map(async (id) => {
         let res;
@@ -507,10 +643,52 @@ export function createPublishFlow(deps = {}) {
     if (mine !== seq) return;
     if (p.error) return set({ phase: "error", outcome: { phase: "error", title: WORDS.blockedTitle, words: p.error, retry: false }, busy: false });
     const items = p.items;
-    const labels = Object.fromEntries(items.map((it) => [it.id, it.label]));
     const types = { ...state.types, ...Object.fromEntries(items.map((it) => [it.id, it.type])) };
-    set({ phase: "review", items, outcome: null, offerItems: [], notice: null, busy: false, types, lists: {}, order: [] });
+    // P6-OPEN-UI: "Before you open your store" is asked first, every time
+    // (the flow can't tell a closed store from an open one; the server
+    // answers opening: false on an open store). A refused or failed read
+    // goes on exactly as before: the publish's own 409s are the backstop.
+    const report = await readOpening(items.map((it) => it.id));
+    if (mine !== seq) return;
+    if (report && report.opening === true) {
+      return enterOpening({ phase: "opening", reason: "proactive", message: null, report, offer: report.offer ?? null }, { items, types, fresh: true, mine });
+    }
+    const labels = Object.fromEntries(items.map((it) => [it.id, it.label]));
+    set({ phase: "review", items, outcome: null, offerItems: [], notice: null, noticeLink: null, busy: false, types, lists: {}, order: [], folded: [] });
     await loadLists(items.map((it) => it.id), labels, mine);
+  }
+
+  // openingChecks for these ids: the report ({ opening, items, offer }), or
+  // null when it was refused or failed
+  async function readOpening(ids) {
+    let r;
+    try {
+      r = await call("openingChecks", { ids });
+    } catch {
+      r = null;
+    }
+    return r?.ok && isObj(r.data) && typeof r.data.opening === "boolean" ? { opening: r.data.opening, items: reportItems(r.data), offer: isObj(r.data.offer) ? r.data.offer : null } : null;
+  }
+
+  // The opening panel: the report, with its offer folded into the set, and
+  // the change list of every document in the set (a list already loaded for
+  // the same draft is kept).
+  async function enterOpening(outcome, { items = state.items, types = state.types, fresh = false, mine = ++seq } = {}) {
+    const fold = foldOffer(items, outcome.offer, outcome.report, fresh ? [] : state.folded);
+    const ids = fold.items.map((it) => it.id);
+    const keep = {};
+    const toLoad = [];
+    for (const it of fold.items) {
+      const prev = fresh ? null : state.lists[it.id];
+      const before = (fresh ? [] : state.items).find((x) => x.id === it.id);
+      if (prev && prev.status === "loaded" && before && before.draftHash === it.draftHash) keep[it.id] = prev;
+      else toLoad.push(it.id);
+    }
+    // shoppers can't pay: nothing can open, so nothing is listed
+    const listed = outcome.phase === "opening";
+    set({ phase: outcome.phase, outcome, items: fold.items, folded: fold.folded, offerItems: [], busy: false, types, lists: listed ? keep : {}, order: listed ? ids : [], ...(fresh ? { notice: null, noticeLink: null } : {}) });
+    if (listed && toLoad.length) await loadLists(toLoad, Object.fromEntries(fold.items.map((it) => [it.id, it.label])), mine, ids);
+    return outcome;
   }
 
   const canConfirm = (s = state) => {
@@ -518,15 +696,18 @@ export function createPublishFlow(deps = {}) {
     if (s.phase === "review") return allLoaded(s.lists, s.order) && hasChanges(s.lists, s.order);
     if (s.phase === "offer") return allLoaded(s.lists, s.order);
     if (s.phase === "republish") return true;
+    // P6-OPEN-UI: Open stays off while anything blocks, and until every list
+    // of what goes live has loaded
+    if (s.phase === "opening") return !s.outcome?.stuck && !openingBlocks(s.outcome?.report) && allLoaded(s.lists, s.order);
     return false;
   };
 
   // P3-FIX3: closing the panel while a publish (or a fix) runs doesn't stop
   // it (WORDS.keepsRunning says so). The answer then doesn't open the panel
   // again: onPublished still hears a publish that went live.
-  async function send(items, { asSet = false, run = seq } = {}) {
-    set({ busy: true, notice: null });
-    const req = publishRequest(items, { set: asSet });
+  async function send(items, { asSet = false, run = seq, confirmOpen = false } = {}) {
+    set({ busy: true, notice: null, noticeLink: null, confirmOpen });
+    const req = publishRequest(items, { set: asSet, confirmOpen });
     let res;
     try {
       res = await call(req.op, req.args, req.extra);
@@ -541,6 +722,7 @@ export function createPublishFlow(deps = {}) {
     state = { ...state, items };
     const outcome = outcomeOf(res, ctx());
     if (outcome.phase === "offer") return enterOffer(outcome);
+    if (outcome.phase === "opening" || outcome.phase === "cannotOpen") return enterOpening(outcome);
     set({ phase: outcome.phase, outcome, busy: false });
     if (outcome.phase === "done") deps.onPublished?.(outcome);
     if (outcome.phase === "checking") await check(outcome, run);
@@ -591,11 +773,69 @@ export function createPublishFlow(deps = {}) {
       const id = state.outcome.id;
       return send(state.items.map((it) => (it.id === id ? { ...it, confirmRepublish: true } : it)));
     }
+    // P6-OPEN-UI: "Open my store" / "Open my store anyway": the whole set,
+    // design and saved policy pages included, with confirmOpen
+    if (state.phase === "opening") return send(state.items, { asSet: state.items.length > 1, confirmOpen: true });
     return null;
+  }
+
+  // ---- P6-OPEN-UI: the panel's own actions ----
+
+  // "Check again": the report read again for the set as it is now. opening:
+  // false (the store opened meanwhile) goes back to the review; a failed
+  // read says so and leaves the panel as it was.
+  async function checkAgain({ notice = null, noticeLink = null } = {}) {
+    const mine = seq;
+    set({ busy: true });
+    const report = await readOpening(state.items.map((it) => it.id));
+    if (mine !== seq) return null;
+    if (!report) return set({ busy: false, notice: WORDS.checkFailed, noticeLink: null });
+    if (report.opening !== true) {
+      set({ phase: "review", outcome: null, busy: false, notice, noticeLink, folded: [], lists: {}, order: [] });
+      await loadLists(state.items.map((it) => it.id), Object.fromEntries(state.items.map((it) => [it.id, it.label])), mine);
+      return report;
+    }
+    const phase = report.items.some((i) => i.id === "payment" && i.level === "block") && state.phase === "cannotOpen" ? "cannotOpen" : "opening";
+    set({ notice, noticeLink });
+    await enterOpening({ phase, reason: "check", message: phase === "cannotOpen" ? state.outcome?.message ?? null : null, report, offer: report.offer }, { mine });
+    return report;
+  }
+
+  async function panelAction(action) {
+    const doFetch = deps.fetch || globalThis.fetch;
+    if (action.type === "checkAgain") return checkAgain();
+    const mine = seq;
+    set({ busy: true, notice: null, noticeLink: null });
+    if (action.type === "placedTestOrder") {
+      // the manual check-off Setup uses (settings.write)
+      const r = await postJson(doFetch, SETUP_URL, { step: "test_order" });
+      if (mine !== seq) return null;
+      if (!r.ok) return set({ busy: false, notice: r.status === 401 ? WORDS.signedOut : r.status === 403 ? WORDS.notAllowed : WORDS.testOrderFailed });
+      return checkAgain({ notice: WORDS.testOrderMarked });
+    }
+    const json = action.type === "startPolicy" ? { kind: action.kind } : { markRead: { id: action.id, revision: action.revision } };
+    const r = await postJson(doFetch, POLICY_START_URL, json);
+    if (mine !== seq) return null;
+    if (r.ok) return checkAgain({ notice: typeof r.body.message === "string" && r.body.message ? r.body.message : null, noticeLink: typeof r.body.href === "string" && r.body.href ? { href: r.body.href, label: WORDS.openIt } : null });
+    const code = r.body?.code;
+    if (action.type === "startPolicy" && code === "POLICY_PAGE_EXISTS") {
+      // the shared rule counts any page whose address has "return" in it, so
+      // name the page that counts and let the founder open it
+      const title = typeof r.body.document?.title === "string" && r.body.document.title ? r.body.document.title : null;
+      const words = title ? WORDS.pageCounts(action.kind, title) : failedWords(r, WORDS.actionFailed);
+      return checkAgain({ notice: words, noticeLink: typeof r.body.href === "string" && r.body.href ? { href: r.body.href, label: WORDS.openIt } : null });
+    }
+    // any other refusal: its words, and the panel as it was
+    const link = code === "SLUG_TAKEN" && typeof r.body.href === "string" && r.body.href ? { href: r.body.href, label: WORDS.openIt } : null;
+    return set({ busy: false, notice: failedWords(r, WORDS.actionFailed), noticeLink: link });
   }
 
   // An issue action: runs stepsFor(action) with this flow's documents.
   async function act(action, issue = null) {
+    if (isObj(action) && OPENING_PANEL_ACTIONS.includes(action.type)) {
+      if (state.busy || (state.phase !== "opening" && state.phase !== "cannotOpen")) return null;
+      return panelAction(action);
+    }
     const local = deps.documentOf?.(action.documentId) || null; // { body, revision } the host already holds
     const bodies = local && isObj(local.body) && Number.isInteger(local.revision) ? { [action.documentId]: local.body } : null;
     const steps = stepsFor(action, { items: state.items, bodies, offer: state.outcome?.offer, issue });
@@ -657,7 +897,7 @@ export function createPublishFlow(deps = {}) {
 
   const close = () => {
     seq++;
-    set({ phase: "closed", outcome: null, busy: false, notice: null, lists: {}, order: [], offerItems: [] });
+    set({ phase: "closed", outcome: null, busy: false, notice: null, noticeLink: null, lists: {}, order: [], offerItems: [], folded: [] });
   };
   // the publish is still running (a confirm or a fix in flight)
   const running = () => state.busy === true && state.phase !== "closed";
@@ -675,7 +915,8 @@ export function createPublishFlow(deps = {}) {
     keepLive,
     close,
     running,
-    retry: () => send(state.items),
+    // a retry sends what the last send sent, "Open my store anyway" included
+    retry: () => send(state.items, { confirmOpen: state.confirmOpen === true }),
   };
 }
 

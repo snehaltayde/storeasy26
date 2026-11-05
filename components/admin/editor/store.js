@@ -572,16 +572,19 @@ export function createDocumentStore({
   }
   const publishResult = (r) => (r && r.code === "PUBLISH_UNKNOWN" ? { ...r, checkLive: true, message: r.message || WORDS.checkLive } : r);
 
-  const publish = ({ confirmRepublish = false } = {}) =>
+  // P6-OPEN-UI: checkOpening and confirmOpen are sent as top-level keys
+  // (P6-OPEN's modifiers), only when set
+  const openingKeys = ({ checkOpening = false, confirmOpen = false } = {}) => ({ ...(checkOpening === true ? { checkOpening: true } : {}), ...(confirmOpen === true ? { confirmOpen: true } : {}) });
+  const publish = ({ confirmRepublish = false, checkOpening = false, confirmOpen = false } = {}) =>
     held("publish", async () => {
-      const r = await api.call("publish", { id, draftHash, ...(confirmRepublish ? { confirmRepublish: true } : {}) }, rev());
+      const r = await api.call("publish", { id, draftHash, ...(confirmRepublish ? { confirmRepublish: true } : {}) }, { ...rev(), ...openingKeys({ checkOpening, confirmOpen }) });
       markPublished(r);
       return publishResult(r);
     });
 
   // items: [{id, revision, draftHash, confirmRepublish?}] (an offer's
   // publishSet). This document's entry is always the acknowledged one.
-  const publishSet = (items = []) =>
+  const publishSet = (items = [], { checkOpening = false, confirmOpen = false } = {}) =>
     held("publishSet", async () => {
       const list = [];
       let mineIn = false;
@@ -593,7 +596,8 @@ export function createDocumentStore({
         } else list.push({ id: it.id, revision: it.revision, draftHash: it.draftHash, ...(it.confirmRepublish ? { confirmRepublish: true } : {}) });
       }
       if (!mineIn) list.unshift({ id, revision, draftHash });
-      const r = await api.call("publishSet", list);
+      const keys = openingKeys({ checkOpening, confirmOpen });
+      const r = Object.keys(keys).length ? await api.call("publishSet", list, keys) : await api.call("publishSet", list);
       markPublished(r);
       return publishResult(r);
     });
