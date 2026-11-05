@@ -844,6 +844,17 @@ await t("FIX1 (4): a collection whose in-stock count is unknown (null, missing, 
   eq(heroOf(p).subtitle, "Shop Collection k.", "the subtitle:");
 });
 
+await t("P6D-1: the hero subtitle never names a catch-all collection ('Shop all', 'All products', 'Frontpage')", async () => {
+  const products = [pp("p1"), pp("p2")];
+  const titled = (h, title, available) => ({ ...pc(h, { available, total: available, productIds: ["p1", "p2"] }), title });
+  const p = plan({ products, collections: [titled("shop-all", "Shop all", 9), titled("all", "All products", 8), titled("creatine", "Creatine", 2), titled("whey", "Whey", 1)] });
+  eq(heroOf(p).subtitle, "Shop Creatine and Whey.", "the subtitle:");
+  const only = plan({ products, collections: [titled("shop-all", "Shop all", 9), titled("fp", "Frontpage", 3)] });
+  eq(heroOf(only).subtitle, Defaults.DEFAULT_HERO_SUBTITLE, "only catch-alls: the default subtitle:");
+  for (const t of ["Shop all", "SHOP ALL", "All", "all items", "Frontpage", "Home page", "Catalogue"]) ok(Plan.isCatchAllTitle(t), `${t} is a catch-all`);
+  for (const t of ["Creatine", "Allergy care", "Shopping bags", "Alloy wheels"]) ok(!Plan.isCatchAllTitle(t), `${t} is not a catch-all`);
+});
+
 await t("FIX1 (3): the summary names the collections the live grid shows (repo.getFeaturedCollections: sold-out ones included, most products first, then title)", async () => {
   // Zeta big: 10 products, all sold out. Alpha: 3 in stock. Beta and Gamma: 2 in stock each (a tie, by title)
   const sold = (p) => ({ ...p, availableForSale: false, totalInventory: 0, variants: { nodes: p.variants.nodes.map((v) => ({ ...v, availableForSale: false })) } });
