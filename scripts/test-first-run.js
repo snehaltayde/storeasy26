@@ -781,6 +781,232 @@ await t("editor page: a generator failure, or a store that isn't eligible, never
   eq([l.modeReads, l.docsReads, l.genLoads], [1, 0, 0], "legacy: no documents read, no generator:");
 });
 
+// =====================================================================================
+console.log("— 6. P6-FIX1: the batch 1 review findings");
+// =====================================================================================
+// a catalog for the pure planner: products and collections in its own shape
+const pp = (id, o = {}) => ({ id, title: `Product ${id}`, available: true, featured_image: `https://cdn.example.test/${id}.png`, featured_image_alt: `Alt ${id}`, created_at: "2026-01-01T00:00:00Z", ...o });
+const pc = (id, o = {}) => ({ id: `gid://c/${id}`, handle: `col-${id}`, title: `Collection ${id}`, available: 1, total: 1, productIds: [], ...o });
+const plan = (catalog, siteName = SITE) => Plan.planFirstStore({ siteName, catalog });
+const heroOf = (p) => p.home.sections[0].settings;
+// a lone surrogate: half of an emoji, which a shopper sees as a broken character
+const LONE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+await t("FIX1 (1): a cut never splits a character: 'A' + 40 tea emoji gives a hero title of whole emoji (<= 60), an alt over 300 is cut whole, and a family emoji is never split", async () => {
+  const name = "A" + "🍵".repeat(40);
+  const title = heroOf(plan({ products: [], collections: [] }, name)).title;
+  ok(!LONE.test(title), `a lone surrogate in the hero title: ${JSON.stringify(title.slice(-2))}`);
+  eq([title.length, name.startsWith(title), title], [59, true, "A" + "🍵".repeat(29)], "the hero title:");
+  const alt = "B" + "🍵".repeat(200);
+  const img = heroOf(plan({ products: [pp("p1", { featured_image_alt: alt })], collections: [] })).image;
+  ok(img && !LONE.test(img.alt), `a lone surrogate in the alt: ${JSON.stringify(img?.alt.slice(-2))}`);
+  ok(img.alt.length <= Plan.ALT_MAX && img.alt.length >= Plan.ALT_MAX - 1 && alt.startsWith(img.alt), `the alt: ${img.alt.length}`);
+  // a grapheme of several code points (a ZWJ family): whole ones, or none
+  const fam = "👨‍👩‍👧";
+  const cut = Plan.cutWords("A" + fam.repeat(10), 20);
+  eq([cut.replace(new RegExp(fam, "gu"), ""), cut.length <= 20, LONE.test(cut)], ["A", true, false], `the family cut: ${JSON.stringify(cut)}`);
+  // and the generated documents validate in publish mode
+  eq(errorsOf(R.validateDocument(plan({ products: [pp("p1", { featured_image_alt: alt })], collections: [] }, name).home, { mode: "publish" }).issues).map((i) => i.code), [], "validate:");
+});
+
+await t("FIX1 (4): the hero title is cut at a word boundary on a long store name (<= 60); a name with no space near the limit is cut hard", async () => {
+  const name = "Hand poured soy candles and small batch home fragrance from the hills of Pune";
+  ok(name.length > 60, "a long name");
+  const title = heroOf(plan({ products: [], collections: [] }, name)).title;
+  ok(title.length <= Plan.HERO_TITLE_MAX && title.length > 40, `length ${title.length}: ${title}`);
+  eq([name.startsWith(title), name[title.length]], [true, " "], `a word boundary: ${title}`);
+  const solid = "x".repeat(90);
+  eq(heroOf(plan({ products: [], collections: [] }, solid)).title, "x".repeat(60), "hard cut:");
+});
+
+await t("FIX1 (4): the hero image must be https (an http image is passed over), comes from the most stocked collection first, and its alt falls back to the product's title", async () => {
+  // http first in the catalog: passed over for the https one
+  const h = heroOf(plan({ products: [pp("p1", { featured_image: "http://cdn.example.test/p1.png" }), pp("p2")], collections: [] }));
+  eq(h.image, { media: "https://cdn.example.test/p2.png", alt: "Alt p2" }, "https only:");
+  eq(heroOf(plan({ products: [pp("p1", { featured_image: "http://cdn.example.test/p1.png" })], collections: [] })).image, null, "an http image alone gives none:");
+  // the top collection's own order wins over the catalog's
+  const products = [pp("p1"), pp("p2"), pp("p3")];
+  const top = heroOf(plan({ products, collections: [pc("a", { available: 1, productIds: ["p3"] }), pc("b", { available: 2, total: 2, productIds: ["p2", "p1"] })] }));
+  eq(top.image.media, "https://cdn.example.test/p2.png", "the most stocked collection's first product:");
+  // no alt from Shopify: the product's title
+  const fb = heroOf(plan({ products: [pp("p1", { featured_image_alt: null, title: "Rose candle" })], collections: [] }));
+  eq(fb.image, { media: "https://cdn.example.test/p1.png", alt: "Rose candle" }, "the alt falls back to the title:");
+  eq(heroOf(plan({ products: [pp("p1", { featured_image_alt: "   " })], collections: [] })).image.alt, "Product p1", "a blank alt falls back too:");
+});
+
+await t("FIX1 (4): a collection whose in-stock count is unknown (null, missing, '') never gets a rail, a grid place or the subtitle", async () => {
+  const products = [pp("p1"), pp("p2")];
+  const collections = [pc("n", { available: null, total: 9 }), pc("u", { available: undefined, total: 9 }), pc("e", { available: "", total: 9 }), pc("k", { available: 2, total: 2, productIds: ["p1", "p2"] })];
+  const p = plan({ products, collections });
+  const rails = p.home.sections.filter((s) => s.kind === "product_rail").map((s) => s.settings.collection.handle);
+  eq(rails, ["col-k"], "rails:");
+  eq(p.home.sections.map((s) => s.kind), ["hero", "product_rail", "new"], "no grid (one known collection):");
+  eq(heroOf(p).subtitle, "Shop Collection k.", "the subtitle:");
+});
+
+await t("FIX1 (3): the summary names the collections the live grid shows (repo.getFeaturedCollections: sold-out ones included, most products first, then title)", async () => {
+  // Zeta big: 10 products, all sold out. Alpha: 3 in stock. Beta and Gamma: 2 in stock each (a tie, by title)
+  const sold = (p) => ({ ...p, availableForSale: false, totalInventory: 0, variants: { nodes: p.variants.nodes.map((v) => ({ ...v, availableForSale: false })) } });
+  const list = Array.from({ length: 17 }, (_, i) => (i < 10 ? sold(F.fixtureProduct(i + 1)) : F.fixtureProduct(i + 1)));
+  const ids = list.map((p) => p.id);
+  const fx = await store("grid", {
+    catalogShape: null,
+    products: list,
+    collections: [
+      { handle: "zeta-big", title: "Zeta big", productIds: ids.slice(0, 10) },
+      { handle: "alpha", title: "Alpha", productIds: ids.slice(10, 13) },
+      { handle: "gamma", title: "Gamma", productIds: ids.slice(13, 15) },
+      { handle: "beta", title: "Beta", productIds: ids.slice(15, 17) },
+    ],
+  });
+  const r = await gen(fx);
+  eq([r.ran, r.written], [true, true], "made:");
+  const home = await bodyOf(fx, "doc_home");
+  const grid = home.sections.find((s) => s.kind === "collections");
+  ok(grid, `a grid: ${home.sections.map((s) => s.kind)}`);
+  const live = await asRequest(fx, () => Repo.getFeaturedCollections(grid.settings.limit));
+  eq(live.map((c) => c.title), ["Zeta big", "Alpha", "Beta", "Gamma"], "the grid's own read:");
+  eq(r.summary.collections, live.map((c) => c.title), "the summary at generation:");
+  const d = await fx.run(() => Gen.describeFirstStore({ actor: OWNER }));
+  eq(d.summary.collections, live.map((c) => c.title), "the summary the start page reads:");
+  // the pure helper, on the planner's own shape: a sold-out large one first
+  eq(Plan.gridCollections([pc("a", { title: "B", total: 3, available: 3 }), pc("z", { title: "Z", total: 10, available: 0 }), pc("x", { title: "A", total: 3, available: 1 }), pc("e", { title: "E", total: 0 })]).map((c) => c.title), ["Z", "A", "B"], "gridCollections:");
+});
+
+await t("FIX1 (4): describeFirstStore.noCollections is true when no collection has a product in stock (all sold out), and false otherwise", async () => {
+  const sold = await SHAPES.all_sold_out.run(() => Gen.describeFirstStore({ actor: OWNER }));
+  eq([sold.empty, sold.noCollections], [false, true], "all sold out:");
+  ok((await rowsOf(SHAPES.all_sold_out, "SELECT COUNT(*) AS n FROM collections"))[0].n > 0, "the store has a collection");
+  const none = await SHAPES.no_collections.run(() => Gen.describeFirstStore({ actor: OWNER }));
+  eq([none.empty, none.noCollections], [false, true], "no collections:");
+  const few = await SHAPES.many.run(() => Gen.describeFirstStore({ actor: OWNER }));
+  eq(few.noCollections, false, "many:");
+});
+
+await t("FIX1 (4): an archived generator-made doc_home counts as the founder's: nothing is written, and describe says founder_started with the home kept", async () => {
+  const fx = await store("archived", { catalogShape: "few" });
+  await gen(fx);
+  await rowsOf(fx, "UPDATE documents SET archived_at = '2026-11-01T00:00:00.000Z' WHERE id = 'doc_home'");
+  const before = await dump(fx);
+  const r = await gen(fx);
+  eq([r.ran, r.reason], [false, "founder_started"], "refused:");
+  eq(await dump(fx), before, "nothing written:");
+  const d = await fx.run(() => Gen.describeFirstStore({ actor: OWNER }));
+  eq([d.eligible, d.reason, d.kept, d.byGenerator], [false, "founder_started", ["doc_home"], ["doc_design"]], "describe:");
+});
+
+await t("FIX1 (4, G18): a founder home taken back to the empty body at revision > 1 is the founder's: the console trigger writes NOTHING, not even doc_design; describe agrees", async () => {
+  const fx = await store("g18", { catalogShape: "few" });
+  const made1 = await fx.run(() => Docs.createDocument({ type: "home", body: R.emptyBody("home"), actor: OWNER }));
+  const withText = { ...R.emptyBody("home"), sections: [{ ...R.newSection("text"), settings: { title: "Mine", body: ["My words."] } }] };
+  const s2 = await fx.run(() => Docs.saveDraft({ id: "doc_home", revision: made1.document.revision, body: withText, actor: OWNER }));
+  const s3 = await fx.run(() => Docs.saveDraft({ id: "doc_home", revision: s2.document.revision, body: R.emptyBody("home"), actor: OWNER }));
+  const row = (await docRows(fx)).find((x) => x.id === "doc_home");
+  eq([row.revision, s3.document.revision], [3, 3], "revision 3:");
+  const fresh = await store("g18ref", { catalogShape: "few" });
+  await fresh.run(() => Docs.createDocument({ type: "home", body: R.emptyBody("home"), actor: OWNER }));
+  eq(row.draft_hash, (await docRows(fresh)).find((x) => x.id === "doc_home").draft_hash, "the empty body's hash:");
+  const before = await dump(fx);
+  const r = await gen(fx, "console", OWNER);
+  eq([r.ran, r.reason], [false, "founder_started"], "refused:");
+  eq(await dump(fx), before, "nothing written:");
+  eq((await docRows(fx)).map((d) => d.id), ["doc_home"], "no design:");
+  const d = await fx.run(() => Gen.describeFirstStore({ actor: OWNER }));
+  eq([d.eligible, d.reason, d.kept], [false, "founder_started", ["doc_home"]], "describe:");
+});
+
+await t("FIX1 (4): a lost race (FIRST_RUN_RACE) is tried once more from the checks, and the second try writes", async () => {
+  const fx = await store("retry", { catalogShape: "few" });
+  let fired = 0;
+  Docs.firstRunHooks.beforeBatch = async () => {
+    Docs.firstRunHooks.beforeBatch = null;
+    fired++;
+    // another first run lands first, with a different body
+    await Docs.createFirstRunDocuments({ docs: [{ type: "home", id: "doc_home", body: R.emptyBody("home") }], actor: Docs.FIRST_RUN_ACTOR });
+  };
+  let r;
+  try {
+    r = await gen(fx);
+  } finally {
+    Docs.firstRunHooks.beforeBatch = null;
+  }
+  eq(fired, 1, "the race was staged:");
+  eq([r.ran, r.written, r.refilled, r.created], [true, true, ["doc_home"], ["doc_design"]], `the second try: ${JSON.stringify(r).slice(0, 200)}`);
+  eq((await bodyOf(fx, "doc_home")).sections.map((s) => s.kind), ["hero", "collections", "product_rail", "product_rail", "new"], "the planned home:");
+});
+
+await t("FIX1 (4): a founder save between the checks and the writer never lets doc_design be written alone: nothing is written at all", async () => {
+  const fx = await store("gap", { catalogShape: "few" });
+  let fired = 0;
+  Gen.firstRunGenerateHooks.afterChecks = async () => {
+    Gen.firstRunGenerateHooks.afterChecks = null;
+    fired++;
+    await Docs.createDocument({ type: "home", body: { ...R.emptyBody("home"), sections: [{ ...R.newSection("text"), settings: { title: "Mine", body: ["My words."] } }] }, actor: OWNER });
+  };
+  let r;
+  try {
+    r = await gen(fx);
+  } finally {
+    Gen.firstRunGenerateHooks.afterChecks = null;
+  }
+  eq(fired, 1, "the founder's save landed in the gap:");
+  eq([r.ran, r.reason], [false, "founder_started"], "refused:");
+  eq((await docRows(fx)).map((d) => [d.id, d.updated_by]), [["doc_home", "merchant:u_fr_owner"]], "only the founder's home, no design:");
+  // the same on a generator-owned home the founder saves in the gap (a refill)
+  const fx2 = await store("gap2", { catalogShape: "few" });
+  await gen(fx2);
+  await rowsOf(fx2, "DELETE FROM documents WHERE id = 'doc_design'");
+  await rowsOf(fx2, "DELETE FROM document_versions WHERE document_id = 'doc_design'");
+  Gen.firstRunGenerateHooks.afterChecks = async () => {
+    Gen.firstRunGenerateHooks.afterChecks = null;
+    const cur = await Docs.getDocument("doc_home");
+    await Docs.saveDraft({ id: "doc_home", revision: cur.revision, body: { ...cur.body, sections: cur.body.sections.slice(0, 1) }, actor: OWNER });
+  };
+  let r2;
+  try {
+    r2 = await gen(fx2);
+  } finally {
+    Gen.firstRunGenerateHooks.afterChecks = null;
+  }
+  eq([r2.ran, r2.reason], [false, "founder_started"], "refused:");
+  eq((await docRows(fx2)).map((d) => d.id), ["doc_home"], "no design:");
+  // and a founder save after the writer read the home (inside its batch's gap):
+  // the guarded statement changes no row, the batch aborts, the retry sees the founder
+  const fx3 = await store("gap3", { catalogShape: "few" });
+  Docs.firstRunHooks.beforeBatch = async ({ plan: p }) => {
+    if (!p.some((x) => x.id === "doc_home")) return;
+    Docs.firstRunHooks.beforeBatch = null;
+    await Docs.createDocument({ type: "home", body: { ...R.emptyBody("home"), sections: [{ ...R.newSection("text"), settings: { title: "Mine", body: ["My words."] } }] }, actor: OWNER });
+  };
+  let r3;
+  try {
+    r3 = await gen(fx3);
+  } finally {
+    Docs.firstRunHooks.beforeBatch = null;
+  }
+  eq([r3.ran, r3.reason], [false, "founder_started"], "refused after the batch lost:");
+  eq((await docRows(fx3)).map((d) => d.id), ["doc_home"], "no design:");
+});
+
+const ManifestRoute = await import("../app/manifest.webmanifest/route.js");
+const manifestOf = async (fx) =>
+  asRequest(fx, async () => {
+    const res = await ManifestRoute.GET({ headers: { get: (k) => (k.toLowerCase() === "host" ? `${fx.id}.test` : null) }, url: `http://${fx.id}.test/manifest.webmanifest`, nextUrl: new URL(`http://${fx.id}.test/manifest.webmanifest`) });
+    return { status: res.status, body: await res.json(), closed: await Res.isStoreClosed() };
+  });
+
+await t("FIX1 (2): the manifest of a closed store has the neutral description 'Opening soon.', never the founder's tagline; once the store opens it says the tagline", async () => {
+  const TAGLINE = "Hand-poured candles from the hills of Pune";
+  const fx = await store("manifest", { catalogShape: "few", config: { site: { name: SITE, tagline: TAGLINE } } });
+  const closed = await manifestOf(fx);
+  eq([closed.status, closed.closed, closed.body.description, closed.body.name], [200, true, "Opening soon.", SITE], "closed:");
+  ok(!JSON.stringify(closed.body).includes("Pune"), `the tagline leaks: ${JSON.stringify(closed.body)}`);
+  await gen(fx);
+  ok((await publishSet(fx, ["doc_home", "doc_design"]))?.release?.id, "published");
+  const open = await manifestOf(fx);
+  eq([open.status, open.closed, open.body.description], [200, false, TAGLINE], "open:");
+});
+
 // ---- cleanup --------------------------------------------------------------------------
 for (const fx of made) await fx.cleanup();
 await platform.cleanup();

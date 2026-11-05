@@ -356,6 +356,46 @@ await t("CLAIMS: '#1a2b3c' and 'Night stars candle' are not claims; scanDocument
   eq(JSON.stringify(hits.map((h) => [h.path, h.rule])), JSON.stringify([["sections.1.settings.title", "claim: best-selling"]]), "only the generator's own claim:");
 });
 
+// P6-FIX1 (from the P6-GEN review): each of these inputs WOULD hit without the
+// rule it pins, so taking the rule out fails the test.
+await t("CLAIMS '#1': '#1Best', '#1Brand' and '#1 brand' are claims; hex colours of 3, 4, 6 and 8 digits and '#10 pack' are not", () => {
+  for (const claim of ["#1Best", "Our #1Brand candle", "#1 brand", "#1", "(#1)", "#1f", "#1abcdefgh"]) ok(scanText(claim).some((h) => h.rule === "claim: #1"), `${claim} missed`);
+  for (const clean of ["#1a2b3c", "#1e3a8a", "#1ab", "#1a2b", "#1a2b3c4d", "#123456", "#10 pack", "#12 pack", "colour #1E3A8A;"]) eq(JSON.stringify(scanText(clean).filter((h) => h.rule === "claim: #1")), "[]", `${clean} flagged:`);
+});
+
+await t("scanDocumentText (B3): the founder's catalog words are blanked before the scan, so a product called 'Organic cotton tee' makes no claim, while the same body without the catalog words is a hit", () => {
+  const body = {
+    type: "home",
+    v: 1,
+    settings: {},
+    sections: [
+      { id: "sec_b3hero", kind: "hero", v: 1, enabled: true, settings: { title: "Award winners candle co", subtitle: "Shop Organic cotton tee.", image: { media: "https://cdn.shopify.com/a.jpg", alt: "Organic cotton tee" } }, blocks: [] },
+    ],
+  };
+  const raw = scanDocumentText(body).map((h) => [h.path, h.rule]);
+  ok(raw.some(([p, r]) => p === "sections.0.settings.subtitle" && r === "claim: organic") && raw.some(([p, r]) => p === "sections.0.settings.title" && r === "claim: award"), `without catalog words: ${JSON.stringify(raw)}`);
+  eq(JSON.stringify(scanDocumentText(body, { catalogWords: ["Organic cotton tee", "Award winners candle co"] })), "[]", "with the founder's words left out:");
+  // blanking is whole words of the catalog, any case, and leaves the generator's own words
+  const own = scanDocumentText({ ...body, sections: [{ ...body.sections[0], settings: { ...body.sections[0].settings, subtitle: "Shop organic COTTON TEE. Certified." } }] }, { catalogWords: ["Organic cotton tee", "Award winners candle co"] });
+  eq(JSON.stringify(own.map((h) => h.rule)), JSON.stringify(["claim: certified"]), "the generator's own claim stays:");
+});
+
+await t("documentTexts (B4): only shown text props are read; claim words in handles, links, ids, numbers, undeclared keys and tokens are never scanned (each would hit if read)", () => {
+  const body = {
+    type: "home",
+    v: 1,
+    settings: { note: "Award-winning" },
+    sections: [
+      { id: "sec_organic1", kind: "hero", v: 1, enabled: true, settings: { title: "Hello", primary: { label: "Shop now", link: { type: "url", href: "/collections/organic-certified" } }, image: { media: "https://cdn.shopify.com/best-sellers.jpg", alt: "A candle" }, note: "Clinically proven", style: "guaranteed" }, blocks: [] },
+      { id: "sec_rail01", kind: "product_rail", v: 1, enabled: true, settings: { title: "Picks", collection: { handle: "best-sellers", id: "gid://shopify/Collection/award" }, limit: 8 }, blocks: [] },
+    ],
+  };
+  eq(JSON.stringify(documentTexts(body).map((x) => x.text)), JSON.stringify(["Hello", "Shop now", "A candle", "Picks"]), "the shown words:");
+  eq(JSON.stringify(scanDocumentText(body)), "[]", "nothing else is scanned:");
+  // the same words in a shown prop are hits (so the inputs above are real claims)
+  for (const w of ["Award-winning", "Clinically proven", "guaranteed", "organic-certified", "best-sellers"]) ok(scanText(w).length > 0, `${w} is not a claim on its own`);
+});
+
 // Plant into a real file. A plant whose target has moved fails loudly here, so it
 // can't turn into a test of nothing.
 const plant = (file, from, to) => {

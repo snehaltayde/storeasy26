@@ -111,11 +111,11 @@ Before this item, `scripts/test-first-run.js` was P6-FIXTURE's placeholder. None
   - A sync-time refill bumps the revision of an open, generator-owned draft, so the founder's next save gets the "changed somewhere else" conflict. This only happens when the catalog really changed.
   - The console's inline slices, the CLI's `runCatalogSync` and the connect callback are not hooked. Those stores generate on the founder's first visit to `/admin/start` or the editor.
   - The fixed lime `--sf-success*` status colours (acceptance 2).
-  - A founder save in the millisecond window between the checks and the writer's read can leave a system design draft beside the founder's home. The home itself is never overwritten.
+  - ~~A founder save in the millisecond window between the checks and the writer's read can leave a system design draft beside the founder's home.~~ Closed by P6-FIX1: the home is written first, on its own, and the design only after the writer did not skip it (P6-GEN-01.md, Eligibility).
 - test-product-editor's store has no `doc_home`, so its owner render takes the generate branch, the suite's loader can't load the module, and it logs `editor_first_run_failed` once. The page opens and the suite passes unchanged.
 - **CLAIMS still matches words, not meaning.** It now leaves out the founder's catalog words, which reduces false hits but doesn't make it understand meaning.
 
-From review:
+From review (each item's P6-FIX1 outcome is in docs/cms-reviews/P6-FIX1.md):
 
 - The 'what was made' summary can name different collections from the ones the grid shows. summarizeFirstStore (lib/first-run/plan.js ~l.228) lists collections with stock, most stocked first. The live grid comes from repo.getFeaturedCollections (lib/repo.js l.38), which orders by total product count, then title, and includes sold-out collections. Example: A has 10 products and 0 in stock, B has 3 in stock, C has 2. The grid shows A, B, C (A is a sold-out card), but the summary says B, C. P6-GEN-01.md l.56 says the summary is 'the grid's collections', which is not true. Every fixture collection is fully in stock, so no test sees this. Fix: build the summary from the grid's own read, or correct the packet before the start page uses it.
 - Acceptance item 2 ('brandCssVars contains no lime-family hex') is met only with an exception. The fixed --sf-success* status colours (lib/brand.js l.247-250) are lime-700/800/50/100 for every brand. The builder reported this openly and the test excludes those variables. The brand accent is slate and no brand-derived variable is lime. This stays an owner decision as the builder listed it.

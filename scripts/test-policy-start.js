@@ -121,22 +121,69 @@ const rowOf = async (key, id) => (await raw(key, "SELECT * FROM documents WHERE 
 // =========================================================================================
 console.log("— 1. templates.js: the returns sentence, bound, with no number written down");
 
-await t("returnsSentence: a whole number 1..365 says that many days of your order ('1 day' for 1); anything else is the sentence with no number", async () => {
+await t("returnsSentence: 1..365 says that many days of your order ('1 day' for 1); 0 or below says no returns; a fraction is rounded down (hours under a day); anything else is the sentence with no number", async () => {
   eq(T.returnsSentence(10), "Unopened products can be returned within 10 days of your order.", "10:");
   eq(T.returnsSentence(1), "Unopened products can be returned within 1 day of your order.", "1:");
   eq(T.returnsSentence(365), "Unopened products can be returned within 365 days of your order.", "365:");
+  // P6-FIX1: what the engine does with the number
+  for (const v of [0, -3, -0.5, -Number.MAX_VALUE, 0.01]) eq(T.returnsSentence(v), T.NO_RETURNS, `${String(v)}:`);
+  eq(T.NO_RETURNS, "We don't accept returns on orders.", "the no-returns words:");
+  eq(T.returnsSentence(10.5), T.returnsSentence(10), "10.5 rounds down:");
+  eq(T.returnsSentence(1.99), T.returnsSentence(1), "1.99 rounds down:");
+  eq(T.returnsSentence(0.5), "Unopened products can be returned within 12 hours of your order.", "half a day:");
+  eq(T.returnsSentence(1 / 24), "Unopened products can be returned within 1 hour of your order.", "one hour:");
   const none = "Unopened products can be returned within our return window, counted from the day you order.";
-  for (const v of [0, -3, 366, 400, 10.5, NaN, Infinity, "10", "x", null, undefined, {}, [14]]) eq(T.returnsSentence(v), none, `${String(v)}:`);
+  for (const v of [366, 400, 365.5 + 1, NaN, Infinity, -Infinity, "10", "x", null, undefined, {}, [14]]) eq(T.returnsSentence(v), none, `${String(v)}:`);
+});
+
+await t("P6-FIX1: for a negative, zero, fractional or odd returns_window_days, the returns starter says what lib/returns.js does (returnsWindowDays, then returnEligibility): never a return the engine refuses", async () => {
+  const { returnEligibility } = await import("../lib/returns.js");
+  const DAY = 86_400_000;
+  const now = Date.parse("2026-11-05T12:00:00.000Z");
+  const order = (ageMs) => ({ status: "paid", created_at: new Date(now - ageMs).toISOString(), total: 100, refunded_total: 0 });
+  const st = stores.main;
+  const base = st.tenant.config;
+  try {
+    for (const [setting, said] of [
+      [-3, T.NO_RETURNS],
+      [-0.5, T.NO_RETURNS],
+      [0, T.returnsSentence(14)], // the engine reads 0 as unset: its default
+      ["abc", T.returnsSentence(14)],
+      [10.5, T.returnsSentence(10)],
+      [0.5, "Unopened products can be returned within 12 hours of your order."],
+      [10, T.returnsSentence(10)],
+    ]) {
+      st.tenant.config = { ...base, returns_window_days: setting };
+      const days = await st.run(() => returnsWindowDays());
+      const body = await st.run(() => PS.starterBody("returns"));
+      const text = body.sections.find((x) => x.settings.title === "Refunds & returns").settings.body[0];
+      ok(text.startsWith(said + " "), `${setting}: ${text}`);
+      // the engine's answer just inside what the page promises
+      const m = /within (\d+) (day|days|hour|hours) of your order/.exec(said);
+      if (!m) {
+        eq(returnEligibility(order(1000), { now, windowDays: days }).ok, false, `${setting}: the page says no returns, the engine:`);
+      } else {
+        const span = Number(m[1]) * (m[2].startsWith("day") ? DAY : DAY / 24);
+        eq(returnEligibility(order(span - 1000), { now, windowDays: days }).ok, true, `${setting}: the engine refuses a return the page promises:`);
+      }
+    }
+  } finally {
+    st.tenant.config = base;
+  }
+  // the FAQ's "Start a return" line is left out when no returns are taken
+  const faqAnswer = (list) => list.find((x) => x.id === "faq").page.sections.flatMap((x) => x.items).find((i) => i.q === "What's the return policy?").a;
+  eq(faqAnswer(T.templatesFor({ returnsWindowDays: -3 })), `<p>${T.NO_RETURNS}</p>`, "the FAQ with no returns:");
+  ok(faqAnswer(T.templatesFor({ returnsWindowDays: 10 })).includes("Start a return"), "the FAQ with returns keeps it");
 });
 
 const termsOf = (list) => list.find((x) => x.id === "terms").page.sections.find((s) => s.heading === "Refunds & returns").body.join(" ");
 const faqOf = (list) => list.find((x) => x.id === "faq").page.sections.flatMap((s) => s.items).find((i) => i.q === "What's the return policy?").a;
 
-await t("templatesFor binds both returns sentences (terms 'Refunds & returns', FAQ 'What's the return policy?'); 0, 'x' and 400 give the no-number sentence", async () => {
+await t("templatesFor binds both returns sentences (terms 'Refunds & returns', FAQ 'What's the return policy?'); 'x', 400 and NaN give the no-number sentence", async () => {
   const ten = T.templatesFor({ returnsWindowDays: 10 });
   ok(termsOf(ten).startsWith("Unopened products can be returned within 10 days of your order. "), `terms: ${termsOf(ten)}`);
   ok(faqOf(ten).startsWith("<p>Unopened products can be returned within 10 days of your order. "), `faq: ${faqOf(ten)}`);
-  for (const v of [0, "x", 400]) {
+  for (const v of ["x", 400, NaN]) {
     const l = T.templatesFor({ returnsWindowDays: v });
     ok(termsOf(l).includes(T.returnsSentence(null)) && faqOf(l).includes(T.returnsSentence(null)), `${v}: ${termsOf(l)} / ${faqOf(l)}`);
     ok(!/\d+ days? of/.test(JSON.stringify(l)), `${v}: a number of days is left`);
@@ -381,6 +428,26 @@ await t("on a founder-saved page: 409 'This page was already saved by you.', not
   eq(await snapshot("main"), before, "storage:");
 });
 
+await t("P6-FIX1: ALREADY_SAVED says 'by you' only when this actor wrote the page last; a page another merchant or the cutover wrote last gets words that name no one; nothing changes", async () => {
+  const other = { kind: "merchant", id: "u_ps_other", role: "owner" };
+  const body = { ...R.emptyBody("page"), meta: { ...R.emptyBody("page").meta, slug: "privacy-notes", title: "Privacy notes" } };
+  const page = (await stores.block.run(() => Docs.createDocument({ type: "page", body, actor: other }))).document;
+  const before = await snapshot("block");
+  const r = await stores.block.run(() => PS.markPolicyRead({ id: page.id, revision: page.revision, actor: OWNER }));
+  eq(r, { status: 409, body: { error: PS.POLICY_START_WORDS.alreadySavedOther, code: "ALREADY_SAVED" } }, "another merchant:");
+  ok(!/by you/.test(r.body.error), r.body.error);
+  await raw("block", "UPDATE documents SET updated_by = 'system:cutover' WHERE id = ?", [page.id]);
+  const mid = await snapshot("block");
+  const c = await stores.block.run(() => PS.markPolicyRead({ id: page.id, revision: page.revision, actor: OWNER }));
+  eq([c.status, c.body.code, c.body.error], [409, "ALREADY_SAVED", PS.POLICY_START_WORDS.alreadySavedOther], "the cutover:");
+  eq(await snapshot("block"), mid, "storage:");
+  // the same actor: "by you" (a staff session of the same person is the same writer)
+  await raw("block", "UPDATE documents SET updated_by = ? WHERE id = ?", [MERCHANT_BY, page.id]);
+  for (const actor of [OWNER, STAFF]) eq((await stores.block.run(() => PS.markPolicyRead({ id: page.id, revision: page.revision, actor }))).body.error, "This page was already saved by you.", `${actor.role}:`);
+  eq((await snapshot("block")).documents.length, before.documents.length, "documents:");
+  for (const w of [PS.POLICY_START_WORDS.alreadySavedOther]) eq(scanText(w, { claims: false }), [], w);
+});
+
 await t("with a stale revision: 409 in the words documents-api uses (the service's DOCUMENT_CHANGED), nothing changes; a missing revision is 428", async () => {
   const before = await snapshot("main");
   const r = await stores.main.run(() => PS.markPolicyRead({ id: made.returns.id, revision: 7, actor: OWNER }));
@@ -461,6 +528,36 @@ await t("anything else is 400 in plain words; a support session is 403 and no se
   eq([u.status, u.body.code], [400, "UNKNOWN_POLICY_KIND"], "unknown kind:");
   eq((await post({ kind: "privacy" }, tokSupport)).status, 403, "support:");
   eq((await post({ kind: "privacy" }, null)).status, 401, "no session:");
+  eq(await snapshot("route"), before, "storage:");
+});
+
+await t("P6-FIX1: a database fault inside the work answers a retryable 503 through infraResponse (never 500 INTERNAL, never a 4xx), for both actions; nothing written", async () => {
+  const { currentDatabase } = await import("../lib/db.js");
+  const client = await stores.route.run(() => currentDatabase().libsql);
+  const before = await snapshot("route");
+  const real = client.execute;
+  let hits = 0;
+  client.execute = function (stmt, ...rest) {
+    const sql = typeof stmt === "string" ? stmt : String(stmt?.sql ?? "");
+    if (/\bFROM documents\b/i.test(sql)) {
+      hits++;
+      throw Object.assign(new Error("SQLITE_BUSY: database is locked"), { name: "LibsqlError", code: "SQLITE_BUSY" });
+    }
+    return real.call(this, stmt, ...rest);
+  };
+  let start;
+  let mark;
+  try {
+    start = await post({ kind: "privacy" });
+    mark = await post({ markRead: { id: "doc_anything", revision: 1 } });
+  } finally {
+    client.execute = real;
+  }
+  ok(hits >= 2, `the fault was reached (${hits})`);
+  for (const [label, r] of [["start", start], ["markRead", mark]]) {
+    eq([r.status, r.body.code, r.body.retryable], [503, "DATABASE_UNAVAILABLE", true], `${label}: ${JSON.stringify(r.body)}`);
+    ok(!/SQLITE|locked/i.test(r.body.error), `${label}: the database's own words: ${r.body.error}`);
+  }
   eq(await snapshot("route"), before, "storage:");
 });
 
