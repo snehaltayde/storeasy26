@@ -1039,6 +1039,14 @@ Found by this drill (decide or accept):
 - [ ] P6D-4: the brand step takes any /api/media/<id> address as the logo, but the media route serves only med_ plus 18 hex digits. An upload always gives a valid id, so founders can't hit this; the drill's first seeded logo did (fixed in the drill's seed). Owner may want the brand step to check the id shape.
 - [ ] P6D-5: the closed page computes the platform's lime as its accent variable (--accent-500 #84cc16). Nothing on the page draws in it today (a-storefront-closed-1440.png), so shoppers see no lime. Keep it in mind if the closed page ever uses the accent.
 
+### Batch 3 review fixes (P6-FIX3)
+Packet: [P6-FIX3.md](P6-FIX3.md), "Owner checks" and "Known limits" (From review).
+- [ ] Read the half-finished start-page words (HALF_WORDS in components/admin/first-run/FirstRun.js) and which reasons offer Try again, as a founder would. Not drilled in desktop Chrome, because it needs a staged race between two writer calls.
+- [ ] Read the Setup checklist's failed-read words: 'We couldn't check your privacy and returns pages just now. Reload this page to try again.'
+- [ ] After a page reload the half view is gone: the start page shows the store as it is, with no note that the colours were not made. Accept this or ask for a note.
+- [ ] CI sqld download under .github/ is unchanged: its source and checksum still need the owner's approval.
+- [ ] Staging run on a throwaway tenant: NOT DONE.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
