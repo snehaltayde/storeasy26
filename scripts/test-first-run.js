@@ -1007,6 +1007,159 @@ await t("FIX1 (2): the manifest of a closed store has the neutral description 'O
   eq([open.status, open.closed, open.body.description], [200, false, TAGLINE], "open:");
 });
 
+// =====================================================================================
+console.log("— 7. P6-FIX2: the batch 2 review findings");
+// =====================================================================================
+const designOf = (id) => ({ ...R.emptyBody("design"), settings: { ...R.emptyBody("design").settings, ...Pal.designBodyFor(id) } });
+// a writer call for one document, outside the hook (a competing first run)
+async function competing(doc) {
+  const h = Docs.firstRunHooks.beforeBatch;
+  Docs.firstRunHooks.beforeBatch = null;
+  try {
+    return await Docs.createFirstRunDocuments({ docs: [doc], actor: Docs.FIRST_RUN_ACTOR });
+  } finally {
+    Docs.firstRunHooks.beforeBatch = h;
+  }
+}
+async function withBatchHook(hook, fn) {
+  Docs.firstRunHooks.beforeBatch = hook;
+  try {
+    return await fn();
+  } finally {
+    Docs.firstRunHooks.beforeBatch = null;
+  }
+}
+const FALSE_WORDS = /nothing was saved|no starting store was made|nothing changed/i;
+
+await t("FIX2 (1, R11): the home page is written and the design loses its race on both tries: ran:false, reason race, homeWritten: true, and the words say the home was made and the colours were not, never 'nothing was saved'", async () => {
+  const fx = await store("halfrace", { catalogShape: "few" });
+  const rivals = ["forest", "navy"];
+  let fired = 0;
+  const r = await withBatchHook(async ({ plan: p }) => {
+    if (!p.some((x) => x.id === "doc_design")) return;
+    // another first run writes the design first, with other colours each time
+    await competing({ type: "design", id: "doc_design", body: designOf(rivals[fired++]) });
+  }, () => gen(fx));
+  eq(fired, 2, "both design calls lost a race:");
+  eq([r.ran, r.reason, r.homeWritten], [false, "race", true], `the answer: ${JSON.stringify(r)}`);
+  eq(r.message, Gen.FIRST_RUN_HALF_WORDS.race, "the half-finished words:");
+  ok(!FALSE_WORDS.test(r.message), `false words: ${r.message}`);
+  ok(/home page was made/.test(r.message) && /colours were not/.test(r.message) && /Try again/.test(r.message), `the words: ${r.message}`);
+  // and the home really is there, the generator's
+  const home = (await docRows(fx)).find((d) => d.id === "doc_home");
+  ok(home && home.updated_by === Docs.FIRST_RUN_BY, `the home was written: ${JSON.stringify(home)}`);
+  eq((await bodyOf(fx, "doc_home")).sections[0].kind, "hero", "the planned home:");
+});
+
+await t("FIX2 (1): the store leaves documents mode between the home call and the design call: reason legacy with homeWritten, the half-finished words, never 'no starting store was made'", async () => {
+  const fx = await store("halflegacy", { catalogShape: "few" });
+  const r = await withBatchHook(async ({ plan: p }) => {
+    if (!p.some((x) => x.id === "doc_design")) return;
+    await libsql.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
+  }, () => gen(fx));
+  eq([r.ran, r.reason, r.homeWritten], [false, "legacy", true], `the answer: ${JSON.stringify(r)}`);
+  eq(r.message, Gen.FIRST_RUN_HALF_WORDS.legacy, "the words:");
+  ok(!FALSE_WORDS.test(r.message), `false words: ${r.message}`);
+  eq((await docRows(fx)).map((d) => d.id), ["doc_home"], "the home was written, the design was not:");
+});
+
+await t("FIX2 (1): a race the home itself loses on both tries still says 'nothing was saved' (true there) and carries no homeWritten; every half-finished sentence is plain and claim-free", async () => {
+  const fx = await store("fullrace", { catalogShape: "few" });
+  const rivals = [R.emptyBody("home"), { ...R.emptyBody("home"), sections: [{ ...R.newSection("text"), settings: { title: "Other run", body: ["Words."] } }] }];
+  let fired = 0;
+  const r = await withBatchHook(async ({ plan: p }) => {
+    if (!p.some((x) => x.id === "doc_home")) return;
+    await competing({ type: "home", id: "doc_home", body: rivals[fired++] });
+  }, () => gen(fx));
+  eq(fired, 2, "both home calls lost:");
+  eq([r.ran, r.reason, "homeWritten" in r], [false, "race", false], `the answer: ${JSON.stringify(r)}`);
+  eq(r.message, Gen.FIRST_RUN_WORDS.race, "today's words:");
+  eq((await docRows(fx)).map((d) => [d.id, d.updated_by]), [["doc_home", Docs.FIRST_RUN_BY]], "only the rival's home, no design:");
+  for (const [k, w] of Object.entries(Gen.FIRST_RUN_HALF_WORDS)) {
+    ok(Object.hasOwn(Gen.FIRST_RUN_WORDS, k), `${k} is a reason`);
+    ok(!FALSE_WORDS.test(w) && /^Your home page was made, but your colours were not/.test(w), `${k}: ${w}`);
+    eq(scanText(w, { shopper: true }), [], `${k} banned words:`);
+  }
+});
+
+const previewManifest = async (fx, token) =>
+  runRequest(async () => {
+    globalThis.__frRequest = { host: `${fx.id}.test`, cookies: { [Res.PREVIEW_COOKIE]: token } };
+    try {
+      return await fx.run(async () => {
+        const res = await ManifestRoute.GET({ headers: { get: (k) => (k.toLowerCase() === "host" ? `${fx.id}.test` : null) }, url: `http://${fx.id}.test/manifest.webmanifest`, nextUrl: new URL(`http://${fx.id}.test/manifest.webmanifest`) });
+        const src = await Res.contentSource();
+        return { status: res.status, body: await res.json(), closed: await Res.isStoreClosed(), preview: src.preview, mode: src.mode };
+      });
+    } finally {
+      globalThis.__frRequest = null;
+    }
+  });
+
+await t("FIX2 (2, R1): the founder's own preview of a closed store gets the closed manifest ('Opening soon.'), as isStoreClosed says; once open, the preview gets the tagline; the rule is resolve.js's closedSource, not a copy", async () => {
+  const PS = await import("../lib/preview-sessions.js");
+  const TAGLINE = "Small batch soaps from Goa";
+  const fx = await store("mfpreview", { catalogShape: "few", config: { site: { name: SITE, tagline: TAGLINE } } });
+  await gen(fx);
+  const s1 = await fx.run(() => PS.createPreviewSession({ actor: OWNER }));
+  const closed = await previewManifest(fx, s1.token);
+  // a real preview: drafts laid over, so the source is not mode 'closed'
+  eq([closed.preview, closed.mode, closed.closed], [true, "live", true], "a founder preview of a closed store:");
+  eq([closed.status, closed.body.description], [200, "Opening soon."], "the preview's manifest:");
+  ok(!JSON.stringify(closed.body).includes("Goa"), `the tagline in a closed preview: ${JSON.stringify(closed.body)}`);
+  ok((await publishSet(fx, ["doc_home", "doc_design"]))?.release?.id, "published");
+  const s2 = await fx.run(() => PS.createPreviewSession({ actor: OWNER }));
+  const open = await previewManifest(fx, s2.token);
+  eq([open.preview, open.closed, open.body.description], [true, false, TAGLINE], "a preview of the open store:");
+  // the one rule: the route imports it from resolve.js and has no copy of it
+  eq(typeof Res.closedSource, "function", "resolve.js exports closedSource:");
+  for (const [src, want] of [
+    [{ mode: "closed" }, true],
+    [{ mode: "live", v: 4, preview: true, releaseId: null }, true],
+    [{ mode: "live", v: 4, preview: true, releaseId: "rel_1" }, false],
+    [{ mode: "live", v: 4, preview: false, releaseId: null }, false],
+    [{ mode: "draft", preview: true, releaseId: null }, false],
+    [{ mode: "live", content: {}, preview: false }, false],
+  ]) eq(Res.closedSource(src), want, `closedSource(${JSON.stringify(src)}):`);
+  const route = readFileSync(join(ROOT, "app/manifest.webmanifest/route.js"), "utf8");
+  ok(/import \{[^}]*\bclosedSource\b[^}]*\} from "@\/lib\/content\/resolve"/.test(route), "the route imports closedSource");
+  ok(!/src\.mode === "closed"|releaseId == null/.test(route), "the route keeps its own copy of the rule");
+});
+
+await t("FIX2 (3, R9): membership rows that point at products that are gone: `listed` counts them as the live grid does, `total` does not, and the summary follows `listed`", async () => {
+  const list = Array.from({ length: 6 }, (_, i) => F.fixtureProduct(i + 1));
+  const ids = list.map((p) => p.id);
+  // Alpha: 3 real products. Beta: 2 real ones, plus 3 rows for products since removed
+  const fx = await store("gone", {
+    catalogShape: null,
+    products: list,
+    collections: [
+      { handle: "alpha", title: "Alpha", productIds: ids.slice(0, 3) },
+      { handle: "beta", title: "Beta", productIds: ids.slice(3, 5) },
+    ],
+  });
+  const beta = (await rowsOf(fx, "SELECT id FROM collections WHERE handle = 'beta'"))[0].id;
+  for (const [i, gone] of ["gid://shopify/Product/9001", "gid://shopify/Product/9002", "gid://shopify/Product/9003"].entries()) {
+    await rowsOf(fx, "INSERT INTO collection_products (collection_id, product_id, position) VALUES (?, ?, ?)", [beta, gone, 100 + i]);
+  }
+  const cat = await fx.run(() => Gen.readFirstRunCatalog());
+  const byHandle = Object.fromEntries(cat.collections.map((c) => [c.handle, [c.listed, c.total, c.available]]));
+  eq(byHandle, { alpha: [3, 3, 3], beta: [5, 2, 2] }, "listed, total, available:");
+  const r = await gen(fx);
+  eq([r.ran, r.written], [true, true], "made:");
+  const home = await bodyOf(fx, "doc_home");
+  const grid = home.sections.find((s) => s.kind === "collections");
+  ok(grid, `a grid: ${home.sections.map((s) => s.kind)}`);
+  const live = await asRequest(fx, () => Repo.getFeaturedCollections(grid.settings.limit));
+  eq(live.map((c) => c.title), ["Beta", "Alpha"], "the live grid counts every membership row:");
+  eq(r.summary.collections, ["Beta", "Alpha"], "the summary at generation:");
+  eq((await fx.run(() => Gen.describeFirstStore({ actor: OWNER }))).summary.collections, ["Beta", "Alpha"], "the summary the start page reads:");
+  // the pure helper: listed wins over total; total only when listed is absent
+  eq(Plan.gridCollections([pc("a", { title: "Alpha", total: 3, listed: 3 }), pc("b", { title: "Beta", total: 2, listed: 5 })]).map((c) => c.title), ["Beta", "Alpha"], "gridCollections by listed:");
+  eq(Plan.gridCollections([pc("a", { title: "Alpha", total: 3 }), pc("b", { title: "Beta", total: 2 })]).map((c) => c.title), ["Alpha", "Beta"], "gridCollections falls back to total:");
+  eq(Plan.gridCollections([pc("z", { title: "Zero listed", total: 4, listed: 0 })]), [], "listed 0 is no card, whatever total says:");
+});
+
 // ---- cleanup --------------------------------------------------------------------------
 for (const fx of made) await fx.cleanup();
 await platform.cleanup();

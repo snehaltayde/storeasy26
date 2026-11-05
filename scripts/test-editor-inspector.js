@@ -1926,6 +1926,50 @@ await t("P6-NAV (merge, do not replace): a bundle picked while a focus re-read i
   }
 });
 
+// ---- P6-FIX2: the P6-NAV review's test gaps (mutations R9 and R3) ----------
+await t("P6-FIX2 (R9, the bundleLate reset): two focus re-reads; the first merges a late ids= row for a bundle picked meanwhile, the bundle is then unpicked, and the second re-read never brings that row back", async () => {
+  const ed = await driveEditor();
+  try {
+    let release;
+    ed.S.holdNext = new Promise((r) => (release = r));
+    await ed.focus(); // re-read 1: its ids= (bun-far, bun-g1) is held
+    // the founder picks bun-q meanwhile: the picks effect's ids= answer comes in late
+    const base = ed.docState.body;
+    ed.docState.body = { ...base, sections: [...base.sections, { ...Reg.newSection("bundle_card", { id: "sec_dc2" }), settings: { title: "", bundle: { id: "bun-q" } } }] };
+    await ed.settle();
+    eq(bundleCalls(ed.S).filter((c) => c.ids === "bun-q").length, 1, "the picks effect asked ids=bun-q:");
+    release();
+    await ed.settle(); // re-read 1 lands and merges the late bun-q row
+    ok(ed.props.bundles.items.some((b) => b.id === "bun-q"), "re-read 1 kept the late row");
+    // the founder takes bun-q out again, and it is deleted from Catalog > Bundles
+    ed.docState.body = base;
+    delete ed.S.rows["bun-q"];
+    await ed.settle();
+    await ed.focus(); // re-read 2: asks only for what is picked now
+    const last = bundleCalls(ed.S).filter((c) => c.ids).at(-1);
+    eq(last.ids.split(",").sort(), ["bun-far", "bun-g1"], "re-read 2 asks for the picks it has:");
+    eq(ed.props.bundles.items.map((b) => b.id).sort(), ["bun-a", "bun-far", "bun-g1"], "re-read 2's list has no row from re-read 1's late answer:");
+    ok(!(ed.props.bundles.answered || []).includes("bun-q"), `bun-q is still counted as answered: ${JSON.stringify(ed.props.bundles.answered)}`);
+  } finally {
+    ed.restore();
+  }
+});
+
+await t("P6-FIX2 (R3, sameBrand both ways): a stored brand with an extra key beside the starting palette's is not the starting brand, so Reset still shows; the same keys in another order are", () => {
+  const context = { startingBrand: FOREST };
+  const extra = { ...FOREST, button_style: "outline" };
+  eq([DF.sameBrand(extra, FOREST), DF.sameBrand(FOREST, extra)], [false, false], "an extra key on either side:");
+  const reordered = Object.fromEntries(Object.entries(FOREST).reverse());
+  eq(DF.sameBrand(reordered, FOREST), true, "the same keys in another order:");
+  eq(DF.sameBrand({ ...FOREST, accent: undefined }, FOREST), false, "a key set to undefined:");
+  const b = brandControlOf({ value: designBody(extra), context });
+  ok(b.resetButton, "a stored brand with an extra key shows the reset button");
+  eq(b.resetButton.props.children, "Go back to your starting colours (Forest)", "its label:");
+  b.resetButton.props.onClick();
+  ok(sameKeys(b.changes[0][0].settings.brand, FOREST), `Reset gives exactly forest, the extra key gone: ${JSON.stringify(b.changes[0][0].settings.brand)}`);
+  ok(!brandControlOf({ value: designBody(reordered), context }).resetButton, "no button when the keys match in another order");
+});
+
 const seconds = ((Date.now() - started) / 1000).toFixed(1);
 console.log(`\n${pass} passed, ${failures.length} failed in ${seconds} s`);
 if (failures.length) {
