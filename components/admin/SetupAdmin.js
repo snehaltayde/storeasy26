@@ -15,6 +15,21 @@ import { cx } from "@/components/console/cx";
 // test order, launch) are explicit check-offs — launch stays gated until
 // everything above it is done (server-enforced too). Errors are persistent
 // Banners; check-offs are toasts; the launched state is a success Banner.
+// P6-ONBOARD (PUB-12, US-41): a step may carry `actions` (documents stores
+// only, the policies step): "Start a privacy page" / "Start a returns page"
+// POST /api/admin/policy-start { kind }; "I've read it" POSTs { markRead:
+// { id, revision } }; a link action is a link. After each answer the
+// checklist is read again (GET /api/admin/setup). A refusal shows its own
+// plain words. Items with no actions render as before.
+export const POLICY_START_URL = "/api/admin/policy-start";
+export const SETUP_URL = "/api/admin/setup";
+export const SETUP_WORDS = Object.freeze({
+  notLegalAdvice: "These are starting points, not legal advice.",
+  failed: "That didn't work, so nothing changed. Try again in a minute.",
+  notAllowed: "Only the store owner or an admin can do that, so nothing changed.",
+  markedRead: "Marked as read. This page now counts as yours.",
+});
+const actionKey = (a) => (a.type === "startPolicy" ? `start:${a.kind}` : a.type === "markPolicyRead" ? `read:${a.id}` : `link:${a.href}`);
 const launchedOn = (iso) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null);
 
 export default function SetupAdmin({ initial }) {
@@ -42,6 +57,42 @@ export default function SetupAdmin({ initial }) {
         toast.success(step === "launch" && done ? "Launched — congratulations!" : done ? "Marked done." : "Undone.");
       } else {
         setError(json.error || `Failed (${res.status})`);
+      }
+    } finally {
+      setBusyStep(null);
+    }
+  }
+
+  // reads the checklist again; a failed read keeps what is on screen
+  async function reload() {
+    try {
+      const res = await fetch(SETUP_URL, { method: "GET", headers: { Accept: "application/json" } });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json && json.ok) setData(json);
+    } catch {}
+  }
+
+  async function act(action) {
+    const key = actionKey(action);
+    setBusyStep(key);
+    setError(null);
+    try {
+      const body = action.type === "startPolicy" ? { kind: action.kind } : { markRead: { id: action.id, revision: action.revision } };
+      let res = null;
+      let json = {};
+      try {
+        res = await fetch(POLICY_START_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        json = (await res.json().catch(() => ({}))) || {};
+      } catch {
+        res = null;
+      }
+      if (res && res.ok && json.ok) {
+        await reload();
+        toast.success(json.message || (action.type === "markPolicyRead" ? SETUP_WORDS.markedRead : "Done."));
+      } else {
+        // POLICY_PAGE_EXISTS, a 403 or a 409: the server's own plain words
+        setError(typeof json.error === "string" && json.error ? json.error : res?.status === 403 ? SETUP_WORDS.notAllowed : SETUP_WORDS.failed);
+        if (res && res.status === 409) await reload();
       }
     } finally {
       setBusyStep(null);
@@ -88,6 +139,28 @@ export default function SetupAdmin({ initial }) {
                   <Badge tone={item.kind === "manual" ? "info" : "neutral"}>{item.kind === "manual" ? "You confirm" : "Auto"}</Badge>
                 </p>
                 <p className="mt-0.5 text-xs text-fg-muted">{item.hint}</p>
+                {Array.isArray(item.actions) && item.actions.length > 0 && (
+                  <div className="mt-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {item.actions.map((a) =>
+                        a.type === "link" ? (
+                          <Link
+                            key={actionKey(a)}
+                            href={a.href}
+                            className="inline-flex items-center justify-center rounded-ctl border border-edge-strong bg-surface px-2.5 py-1.5 text-xs font-medium text-fg focus-ring hover:bg-surface-muted motion-safe:transition-colors"
+                          >
+                            {a.label}
+                          </Link>
+                        ) : (
+                          <Button key={actionKey(a)} size="sm" variant="secondary" busy={busyStep === actionKey(a)} disabled={busy && busyStep !== actionKey(a)} onClick={() => act(a)}>
+                            {a.label}
+                          </Button>
+                        ),
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-xs text-fg-muted">{SETUP_WORDS.notLegalAdvice}</p>
+                  </div>
+                )}
               </div>
               <span className="flex shrink-0 items-center gap-2">
                 {!item.done && !item.gated && (
