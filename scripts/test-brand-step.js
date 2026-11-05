@@ -694,6 +694,43 @@ async function renderedTests() {
     ok(s.buttons().includes("Try again"), s.buttons().join("|"));
   });
 
+  await t("RENDERED (P6-FIX3): a half-finished first run (the POST's ran:false with homeWritten) says the home page was made and the colours were not, with Try again where it helps, never 'We couldn't make your starting store'", async () => {
+    const eligible = { eligible: true, reason: null, generated: false, byGenerator: [], kept: [], empty: false, noCollections: false, summary: null };
+    // the route's real half-finished shape (scripts/test-first-run.js pins it)
+    const half = (reason, message) => ok200({ ok: true, ran: false, generated: true, homeWritten: true, reason, message });
+    const RACE = "Your home page was made, but your colours were not, because your store changed at the same time. Try again.";
+    const made = ok200({ ok: true, ran: true, generated: true, created: ["doc_design"], refilled: [], unchanged: ["doc_home"], skipped: [], products: 3, collections: 2, summary: SUMMARY });
+    const v = await mount(FR, { canEdit: true, canSync: true, pollMs: POLL }, { ...firstRunGet(eligible, syncView("complete", { firstSync: false })), "POST /api/admin/first-run": [half("race", RACE), made], ...brandTable() });
+    eq(v.stateOf("data-first-run"), "half", `state: ${v.all()}`);
+    const text = v.all();
+    ok(text.includes(RACE), `the half-finished words: ${text}`);
+    ok(/home page was made/.test(text) && /colours were not/.test(text), text);
+    ok(!text.includes("We couldn't make your starting store") && !/nothing was saved/i.test(text), `false words: ${text}`);
+    ok(v.buttons().includes("Try again"), v.buttons().join("|"));
+    ok(v.links().some(([l, h]) => l === "Edit the home page" && h === "/admin/editor?doc=doc_home"), `the made home is linked: ${JSON.stringify(v.links())}`);
+    eq(v.net.posts().length, 1, "no retry by itself:");
+    states.half = text;
+    await v.click("Try again");
+    eq(v.net.posts().length, 2, "Try again posts once more:");
+    eq(v.stateOf("data-first-run"), "ready", "then ready:");
+    // every reason has its own words; only the ones a retry can help get Try again
+    for (const [reason, retry, editLink] of [["migrating", true, true], ["catalog_not_confirmed", true, true], ["live", false, true], ["legacy", false, false], ["something_new", true, true]]) {
+      const w = await mount(FR, { canEdit: true, canSync: true, pollMs: POLL }, { ...firstRunGet(eligible, syncView("complete", { firstSync: false })), "POST /api/admin/first-run": half(reason, "x"), ...brandTable() });
+      eq(w.stateOf("data-first-run"), "half", `${reason}, state:`);
+      ok(w.all().includes("Your home page was made, but your colours were not"), `${reason}: ${w.all()}`);
+      ok(!w.all().includes("We couldn't make your starting store"), `${reason}: false words`);
+      eq(w.buttons().includes("Try again"), retry, `${reason}, Try again:`);
+      eq(w.links().some(([l]) => l === "Edit the home page"), editLink, `${reason}, the edit link:`);
+      noBanned(`half ${reason}`, w.all());
+    }
+    // the live words say the shoppers' store hasn't changed
+    const lv = await mount(FR, { canEdit: true, canSync: true, pollMs: POLL }, { ...firstRunGet(eligible, syncView("complete", { firstSync: false })), "POST /api/admin/first-run": half("live", "x"), ...brandTable() });
+    ok(lv.all().includes("because your store opened at the same time. Your live store hasn't changed."), lv.all());
+    // a race that wrote nothing (no homeWritten) still fails with today's words
+    const r = await mount(FR, { canEdit: true, canSync: true, pollMs: POLL }, { ...firstRunGet(eligible, syncView("complete", { firstSync: false })), "POST /api/admin/first-run": ok200({ ok: true, ran: false, generated: false, reason: "race", message: "x" }), ...brandTable() });
+    eq(r.stateOf("data-first-run"), "make-failed", "a race with nothing written:");
+  });
+
   await t("RENDERED (US-04): an empty catalog says 'Add products in Shopify', has SyncProgress's start button and the conditional refill note", async () => {
     const empty = generated({ empty: true, noCollections: true, summary: { heroImage: null, collections: [], rails: [], paletteId: "slate" } });
     const v = await mount(FR, { canEdit: true, canSync: true, pollMs: POLL }, { ...firstRunGet(empty, syncView("complete", { firstSync: false })), ...brandTable(), "POST /api/admin/sync": ok200({ ok: true, sync: syncView("running", { firstSync: false }) }) });
@@ -761,7 +798,7 @@ async function renderedTests() {
 
   await t("RENDERED: banned-copy scanText finds no BANNED string (pnpm, migrate, a sync command) on any state", async () => {
     ok(BANNED.length > 10, "the rules loaded");
-    const want = ["ready", "readySyncing", "kept", "syncing", "syncFailed", "makeFailed", "empty", "noCollections", "readOnly", "loadFailed"];
+    const want = ["ready", "readySyncing", "kept", "syncing", "syncFailed", "makeFailed", "half", "empty", "noCollections", "readOnly", "loadFailed"];
     for (const k of want) {
       ok(typeof states[k] === "string" && states[k].length > 20, `state ${k} was not rendered`);
       noBanned(k, states[k]);

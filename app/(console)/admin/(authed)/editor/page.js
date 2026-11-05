@@ -86,7 +86,9 @@ async function firstStoreThen(actor, docs) {
   try {
     const { generateFirstStore } = await import(`@/lib/first-run/generate`);
     const r = await generateFirstStore({ trigger: "editor", actor });
-    return r?.ran && r.written ? await listDocuments() : docs;
+    // P6-FIX3: a run that stopped half way (homeWritten: the home page was
+    // made, the colours were not) re-lists too, so the made home opens
+    return (r?.ran && r.written) || r?.homeWritten ? await listDocuments() : docs;
   } catch (e) {
     slog("editor_first_run_failed", { error: String(e?.message || e).slice(0, 200) });
     return docs;

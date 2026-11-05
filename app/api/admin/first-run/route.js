@@ -14,7 +14,10 @@ import { tenantHandler } from "@/lib/tenant-request";
 //          who can edit the store (storefront.write); anyone else gets 403 in
 //          plain words. A store that isn't eligible answers 200 with ran:false,
 //          its reason and plain words, and nothing written. `generated` is true
-//          only when something was stored (the writer's `written`).
+//          only when something was stored (the writer's `written`). P6-FIX3:
+//          a run that wrote the home page and then stopped before the colours
+//          answers ran:false with homeWritten: true, generated: true and the
+//          half-finished words (FIRST_RUN_HALF_WORDS), never "nothing was saved".
 // It never publishes: the founder's first Publish opens the store.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +49,10 @@ export const POST = tenantHandler(async (request) => {
     const r = await generateFirstStore({ trigger: "console", actor: auth.actor });
     if (!r.ran) {
       if (r.reason === "cannot_edit") return NextResponse.json({ ok: false, reason: "cannot_edit", error: READ_ONLY_WORDS }, { status: 403 });
+      // P6-FIX3: a run that stopped half way (the home page was written, the
+      // colours were not) says so: homeWritten and generated are true, and
+      // the message is the generator's half-finished words
+      if (r.homeWritten) return NextResponse.json({ ok: true, ran: false, generated: true, homeWritten: true, reason: r.reason, message: r.message });
       return NextResponse.json({ ok: true, ran: false, generated: false, reason: r.reason, message: r.message });
     }
     if (r.written) await audit({ actor: auth.actor, action: "storefront.write", resource: "first-run", diff: { created: r.created, refilled: r.refilled, products: r.products, collections: r.collections } }); // best-effort, never throws
