@@ -42,7 +42,7 @@ import {
 } from "./editorModel";
 import { editorHref } from "@/lib/admin/editor-entry";
 import { documentType, sectionType } from "@/lib/registry/index.js";
-import { pickedBundleIds } from "./fields/inspectorModel.js";
+import { pickedBundleIds, bundlesWithPending } from "./fields/inspectorModel.js";
 
 // P3-EDITOR (ED-02, ED-03, ED-04, PV-01, PV-02, PUB-02, PUB-04, PUB-06,
 // PUB-11): the new editor. It replaces P3-ROUTES' placeholder and wires the
@@ -106,6 +106,10 @@ import { pickedBundleIds } from "./fields/inspectorModel.js";
 // after an inline create, so the inspector's chips match the preview. A
 // failed or 403 read is { status: "failed" }: the picker then says "You
 // can't see bundles here." A search goes to q=.
+// P5-FIX2 (the P5-EDITOR review): the list also keeps `answered`, the ids an
+// ids= read answered, and the view gets `pending` (inspectorModel
+// bundlesWithPending): a picked id that is neither in the list nor answered
+// yet reads "Checking this bundle…", never "deleted".
 
 const RICH = "rich_text";
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -453,7 +457,7 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
   const [productsState, setProductsState] = useState({ status: "loading", more: false });
   const [productFilter, setProductFilter] = useState("all");
   const [entityBusy, setEntityBusy] = useState(false);
-  const [bundles, setBundles] = useState({ status: "loading", items: [] });
+  const [bundles, setBundles] = useState({ status: "loading", items: [], answered: [] });
   const bundleSeq = useRef(0);
   const bundleAsked = useRef(new Set()); // ids already asked for by ids=
   const productSeq = useRef(0);
@@ -514,10 +518,10 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
         const more = await fetchRefs({ type: "bundle", ids: want.join(","), limit: want.length });
         items = [...items, ...(Array.isArray(more?.items) ? more.items : [])];
       }
-      bundleAsked.current = new Set(items.map((b) => b?.id));
-      if (mine === bundleSeq.current) setBundles({ status: "ready", items });
+      bundleAsked.current = new Set([...items.map((b) => b?.id), ...want]);
+      if (mine === bundleSeq.current) setBundles({ status: "ready", items, answered: want });
     } catch {
-      if (mine === bundleSeq.current) setBundles({ status: "failed", items: [] });
+      if (mine === bundleSeq.current) setBundles({ status: "failed", items: [], answered: [] });
     }
   }, []);
   // a search (q=): its rows join the list, so a bundle picked from them has
@@ -628,13 +632,14 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
       (r) => {
         if (mine !== bundleSeq.current) return;
         const rows = Array.isArray(r?.items) ? r.items : [];
-        setBundles((b) => (b.status === "ready" ? { ...b, items: [...b.items.filter((x) => !rows.some((y) => y?.id === x?.id)), ...rows] } : b));
+        setBundles((b) => (b.status === "ready" ? { ...b, items: [...b.items.filter((x) => !rows.some((y) => y?.id === x?.id)), ...rows], answered: [...(b.answered || []), ...want] } : b));
       },
       () => {
-        if (mine === bundleSeq.current) setBundles({ status: "failed", items: [] });
+        if (mine === bundleSeq.current) setBundles({ status: "failed", items: [], answered: [] });
       },
     );
   }, [pickedKey, bundles.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bundlesShown = useMemo(() => bundlesWithPending(bundles, pickedKey ? pickedKey.split(",") : []), [bundles, pickedKey]);
 
   // P4-EDITOR: what Shopify sends now for the open product or collection is
   // the page's (read on the server); this editor never asks for it.
@@ -886,7 +891,7 @@ export default function DocumentEditor({ document: entry, note = null, entity: e
       lookupProducts={lookupProducts}
       entity={entity}
       readOnly={readOnly}
-      bundles={bundles}
+      bundles={bundlesShown}
       can={can}
       currency={currency}
       products={productList}

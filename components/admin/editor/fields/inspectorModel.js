@@ -461,7 +461,14 @@ export function railSuggestion(collections, minItems = 1) {
 // title, state, reasons, enabled, bundle_price, saving, currency,
 // overlapsWith, missing? }), which come from the same bounded read the blocks
 // use, so a chip says what the preview shows. The editor hands them in as
-// context.bundles = { status: "loading" | "ready" | "failed", items }.
+// context.bundles = { status: "loading" | "ready" | "failed", items,
+// pending? }.
+//
+// P5-FIX2 (the P5-EDITOR review): `pending` lists the picked ids the editor
+// has not had an answer for yet (bundlesWithPending: not in the list and not
+// answered by an ids= read). Such an id reads "Checking this bundle…", never
+// "deleted": only an id the server was asked about, and that is still not in
+// the list, is a deleted bundle.
 //
 // What a shopper sees follows the blocks' own rule
 // (components/sections/BundleCardSection.js isShown / savesNothing, which
@@ -518,12 +525,16 @@ const reasonText = (r, currency) => reasonSentence(r, { currency }) || (typeof r
 // What the picker shows for one picked bundle id.
 //   entry      the refs row for that id (undefined: not read yet)
 //   status     context.bundles.status
+//   pending    context.bundles.pending: ids still being read (P5-FIX2)
 // -> { id, title, chip | null, line, overlap | null, canReplace }
 // `line` may name "Catalog > Bundles"; the control makes that a link.
-export function bundleView(id, entry, { status = "ready" } = {}) {
+export function bundleView(id, entry, { status = "ready", pending = [] } = {}) {
   const base = { id: typeof id === "string" ? id : null, title: null, chip: null, line: "", overlap: null, canReplace: true, price: null };
   if (status === "failed") return { ...base, line: BUNDLE_WORDS.cantSee, canReplace: false };
-  if (!isObj(entry)) return status === "ready" && base.id ? { ...base, chip: BUNDLE_CHIPS.missing, line: stateLine("missing") } : { ...base, line: BUNDLE_WORDS.checking };
+  if (!isObj(entry)) {
+    const waiting = Array.isArray(pending) && pending.includes(base.id);
+    return status === "ready" && base.id && !waiting ? { ...base, chip: BUNDLE_CHIPS.missing, line: stateLine("missing") } : { ...base, line: BUNDLE_WORDS.checking };
+  }
   const currency = entry.currency ?? undefined;
   const state = bundleWordsState(entry);
   const reasons = reasonsOf(entry);
@@ -597,6 +608,27 @@ export const bundleList = {
   move: (list, j, d) => ({ list: moveIn(Array.isArray(list) ? list : [], j, d), error: null }),
   remove: (list, j) => ({ list: removeAt(Array.isArray(list) ? list : [], j), error: null }),
 };
+
+// P5-FIX2: the editor's bundles with `pending`: the picked ids (in order)
+// that are neither in the list nor answered by an ids= read yet
+// (bundles.answered). While the list itself is loading every id is pending
+// anyway; a failed read has none (it says "You can't see bundles here.").
+export function bundlesWithPending(bundles, picked = []) {
+  const b = isObj(bundles) ? bundles : { status: "loading", items: [] };
+  const items = Array.isArray(b.items) ? b.items : [];
+  const answered = Array.isArray(b.answered) ? b.answered : [];
+  const ids = (Array.isArray(picked) ? picked : []).filter((id) => typeof id === "string" && id);
+  const pending = b.status === "ready" ? ids.filter((id) => !items.some((x) => x?.id === id) && !answered.includes(id)) : [];
+  return { ...b, items, pending };
+}
+
+// P5-FIX2: a grid row (or a card's value) stored in an older shape, such as
+// { id, title }: it can be picked again in place (bundleList.replace with its
+// own id), which writes { id } and keeps its position.
+// The most bundles a grid setting takes (the registry's own default).
+export const bundleGridMax = (setting) => (Number.isInteger(setting?.max) ? setting.max : BUNDLE_LIST_MAX);
+
+export const isOldBundleChoice = (x) => isObj(x) && typeof x.id === "string" && x.id !== "" && Object.keys(x).some((k) => k !== "id");
 
 // Every bundle id a document's sections pick (bundle and bundle_list
 // settings), in order, once each: the editor reads these by ids= when its

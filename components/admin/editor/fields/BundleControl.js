@@ -26,6 +26,17 @@
 // failed or 403 read), a picked bundle shows its id with "You can't see
 // bundles here." and can be removed, not replaced.
 //
+// P5-FIX2 (the P5-EDITOR review):
+// - a picked id whose ids= read has not answered yet (context.bundles.pending)
+//   reads "Checking this bundle…", never "deleted";
+// - the Dialog's page name starts empty each time it opens or closes, so the
+//   live-now sentence never names the page of an earlier name;
+// - a full grid turns "Create a bundle" off and says why (a bundle made
+//   there would be live and not placed);
+// - a grid row stored in an older shape ({ id, title }) has "Pick again",
+//   which rewrites that row as { id } in place (bundleList.replace);
+// - a failed read says "You can't see bundles here." once.
+//
 // Element ids are the anchors inspectorModel.pathsOf lists: the setting's
 // path for the control, and "<path>.<j>" for each row of a grid, so a
 // validation note (incomplete, UNKNOWN_FIELD, INVALID_VALUE on an index)
@@ -38,7 +49,7 @@ import { Button, IconButton } from "../../../console/Button.js";
 import { Badge } from "../../../console/Badge.js";
 import { Dialog } from "../../../console/Dialog.js";
 import { BundleForm } from "../../bundles/BundleForm.js";
-import { idOf, notesId, notesAt, noteTone, bundleView, bundleOptions, pickBundle, bundleList, linkParts, bundleSlugGuess, BUNDLE_WORDS } from "./inspectorModel.js";
+import { idOf, notesId, notesAt, noteTone, bundleView, bundleOptions, pickBundle, bundleList, linkParts, bundleSlugGuess, isOldBundleChoice, bundleGridMax, BUNDLE_WORDS } from "./inspectorModel.js";
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const TONE = { danger: "text-danger", warning: "text-warning", muted: "text-fg-muted" };
@@ -161,11 +172,20 @@ export function BundleSearch({ id, label, context, picked = [], onPick, disabled
 // a retry never makes a second bundle.
 export function CreateBundleDialog({ open, currency, onClose, onCreated }) {
   const [title, setTitle] = useState("");
+  // the name typed belongs to one opening: reset it as the Dialog opens or
+  // closes (during render, so not even one frame names an old page)
+  const [openedAs, setOpenedAs] = useState(open);
+  const changed = openedAs !== open;
+  if (changed) {
+    setOpenedAs(open);
+    setTitle("");
+  }
+  const name = changed ? "" : title;
   return (
     <Dialog open={open} onClose={onClose} title="Create a bundle" size="lg">
       <div className="space-y-3" data-bundle-create="">
         <p className="text-[13px] text-fg" data-bundle-live-now="">
-          {BUNDLE_WORDS.liveNow(bundleSlugGuess(title))}
+          {BUNDLE_WORDS.liveNow(bundleSlugGuess(name))}
         </p>
         {open && <BundleForm compact currency={currency} onTitleChange={setTitle} onSaved={onCreated} onCancel={onClose} />}
       </div>
@@ -173,8 +193,9 @@ export function CreateBundleDialog({ open, currency, onClose, onCreated }) {
   );
 }
 
-// "Create a bundle", or why it isn't there.
-function CreateBundle({ context, onCreated, readOnly }) {
+// "Create a bundle", or why it isn't there. `full`: the sentence why a full
+// grid can't take one more (the button is off).
+function CreateBundle({ context, onCreated, readOnly, full = null }) {
   const [open, setOpen] = useState(false);
   if (!context?.canCreateBundles) {
     return (
@@ -185,9 +206,14 @@ function CreateBundle({ context, onCreated, readOnly }) {
   }
   return (
     <>
-      <Button size="sm" variant="ghost" icon={<Plus size={13} aria-hidden />} disabled={readOnly} onClick={() => setOpen(true)}>
+      <Button size="sm" variant="ghost" icon={<Plus size={13} aria-hidden />} disabled={readOnly || !!full} onClick={() => !full && setOpen(true)}>
         Create a bundle
       </Button>
+      {full && (
+        <p className="text-xs text-fg-subtle" data-bundle-full="">
+          {full}
+        </p>
+      )}
       <CreateBundleDialog
         open={open}
         currency={context?.currency}
@@ -216,15 +242,19 @@ function Group({ id, label, notes, required, hint, children }) {
   );
 }
 
-const bundlesOf = (context) => ({ status: context?.bundles?.status ?? "loading", items: Array.isArray(context?.bundles?.items) ? context.bundles.items : [] });
+const bundlesOf = (context) => ({
+  status: context?.bundles?.status ?? "loading",
+  items: Array.isArray(context?.bundles?.items) ? context.bundles.items : [],
+  pending: Array.isArray(context?.bundles?.pending) ? context.bundles.pending : [],
+});
 const entryOf = (items, id) => (id ? items.find((b) => isObj(b) && b.id === id) : undefined);
 
 export function BundleControl({ field, value, onChange, issues = [], owner = null, context = {}, readOnly = false }) {
   const id = idOf(owner, field.path);
   const notes = notesAt(issues, id);
-  const { status, items } = bundlesOf(context);
+  const { status, items, pending } = bundlesOf(context);
   const cur = isObj(value) && typeof value.id === "string" && value.id ? value.id : null;
-  const view = cur ? bundleView(cur, entryOf(items, cur), { status }) : null;
+  const view = cur ? bundleView(cur, entryOf(items, cur), { status, pending }) : null;
   const canSee = status !== "failed";
   return (
     <Group id={id} label={field.label} notes={notes} required={field.setting?.required} hint={field.setting?.help}>
@@ -244,7 +274,8 @@ export function BundleControl({ field, value, onChange, issues = [], owner = nul
           <CreateBundle context={context} readOnly={readOnly} onCreated={(bid) => onChange(pickBundle(bid))} />
         </>
       ) : (
-        !view && <p className="text-xs text-fg-subtle">{BUNDLE_WORDS.cantSee}</p>
+        // the line above already says it for a picked or unreadable value
+        value == null && <p className="text-xs text-fg-subtle">{BUNDLE_WORDS.cantSee}</p>
       )}
     </Group>
   );
@@ -253,7 +284,7 @@ export function BundleControl({ field, value, onChange, issues = [], owner = nul
 export function BundleListControl({ field, value, onChange, issues = [], owner = null, context = {}, readOnly = false }) {
   const id = idOf(owner, field.path);
   const notes = notesAt(issues, id);
-  const { status, items } = bundlesOf(context);
+  const { status, items, pending } = bundlesOf(context);
   const list = Array.isArray(value) ? value : [];
   const max = field.setting?.max ?? undefined;
   const [refused, setRefused] = useState(null);
@@ -272,7 +303,8 @@ export function BundleListControl({ field, value, onChange, issues = [], owner =
             const rid = idOf(owner, `${field.path}.${j}`);
             const rnotes = notesAt(issues, rid);
             const bid = ids[j];
-            const view = bid ? bundleView(bid, entryOf(items, bid), { status }) : null;
+            const view = bid ? bundleView(bid, entryOf(items, bid), { status, pending }) : null;
+            const old = isOldBundleChoice(x);
             const name = view?.title || bid || `bundle ${j + 1}`;
             return (
               <li key={`${j}:${bid ?? ""}`} className="px-2.5 py-1.5" data-bundle-row={j}>
@@ -281,6 +313,11 @@ export function BundleListControl({ field, value, onChange, issues = [], owner =
                     {view ? <BundleSummary view={view} index={j} /> : <p className="text-sm text-fg">{`${j + 1}. This bundle couldn't be read`}</p>}
                   </div>
                   <span className="flex shrink-0 items-center">
+                    {old && (
+                      <Button size="sm" variant="ghost" aria-label={`Pick ${name} again`} disabled={readOnly} onClick={() => apply(bundleList.replace(list, j, bid))} data-bundle-repick={j}>
+                        Pick again
+                      </Button>
+                    )}
                     <IconButton label={`Move ${name} up`} icon={<ArrowUp size={14} aria-hidden />} disabled={readOnly || j === 0} onClick={() => apply(bundleList.move(list, j, -1))} />
                     <IconButton label={`Move ${name} down`} icon={<ArrowDown size={14} aria-hidden />} disabled={readOnly || j === list.length - 1} onClick={() => apply(bundleList.move(list, j, 1))} />
                     <IconButton label={`Remove ${name}`} icon={<Trash2 size={14} aria-hidden />} disabled={readOnly} onClick={() => apply(bundleList.remove(list, j))} />
@@ -300,7 +337,7 @@ export function BundleListControl({ field, value, onChange, issues = [], owner =
       {canSee ? (
         <>
           <BundleSearch id={`${id}--search`} label="Add a bundle" context={context} picked={ids.filter(Boolean)} disabled={readOnly} onPick={(bid) => apply(bundleList.add(list, bid, max))} />
-          <CreateBundle context={context} readOnly={readOnly} onCreated={(bid) => apply(bundleList.add(list, bid, max))} />
+          <CreateBundle context={context} readOnly={readOnly} full={list.length >= bundleGridMax(field.setting) ? BUNDLE_WORDS.full(bundleGridMax(field.setting)) : null} onCreated={(bid) => apply(bundleList.add(list, bid, max))} />
         </>
       ) : (
         <p className="text-xs text-fg-subtle">{BUNDLE_WORDS.cantSee}</p>

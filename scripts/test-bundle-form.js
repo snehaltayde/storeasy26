@@ -26,6 +26,9 @@
 //      'Save and show to shoppers' waits for the check with a name typed; the
 //      saving keeps its cents; a quantity can be cleared and 1.5 is shown as
 //      a reason; a row stored by a web name is named
+//   7. P5-FIX2: Disable and Delete ask first when the home lookup failed;
+//      the create Dialog never names an earlier name's page; a full grid has
+//      no 'Create a bundle'; a quantity under 1 counts as empty
 // Components run with Next's own SWC and a small hook driver (copied from
 // scripts/test-media-picker.js). File databases only.
 //   pnpm test:bundle-form
@@ -781,6 +784,146 @@ await t("P5-PANEL review: a stored row that holds a web name (not a picked produ
     ok(!v.find((n) => n.props?.["data-bundle-pick-again"] === ""), "picked again: the banner goes");
     ok(f.calls.some((c) => c.body?.check), "and the check runs");
     ok(!v.button("Save changes").props.disabled, "and it can be saved");
+  });
+});
+
+// =====================================================================================
+console.log("— 7. P5-FIX2: the batch 2 review findings");
+
+await t("P5-FIX2: when the home page can't be checked (usedOnHome null), Disable asks first in neutral words and Delete says the same; nothing is sent before Confirm", async () => {
+  const b1 = await store.run(() => B.createBundle({ title: "Unk kit", items: [{ variantId: V(1) }, { variantId: V(2) }], bundle_price: 250, enable: true }));
+  const UNKNOWN = "We couldn't check whether your home page uses this bundle.";
+  const HOME = "Shoppers will stop seeing this bundle on your home page right away.";
+  // a real fault in the live-home lookup (a missing table reads as "not
+  // migrated yet", so a column is renamed for the length of one read)
+  await raw("ALTER TABLE documents RENAME COLUMN archived_at TO archived_at_gone");
+  let list;
+  try {
+    list = await store.run(() => B.listBundles());
+  } finally {
+    await raw("ALTER TABLE documents RENAME COLUMN archived_at_gone TO archived_at");
+  }
+  try {
+    const mine = list.find((b) => b.id === b1.id);
+    eq(mine.usedOnHome, null, "listBundles says it could not read the home");
+    const f = storeFetch();
+    await withFetch(f.fetch, async () => {
+      const v = await mount(PANEL, "BundlesPanel", () => ({ initial: list, currency: "USD" }), f);
+      const btn = (name) => {
+        let found = null;
+        const walk = (n) => {
+          if (found) return;
+          if (Array.isArray(n)) return n.forEach(walk);
+          if (!React.isValidElement(n)) return;
+          if (typeof n.type === "function" && n.type.name === "Button" && textOf(n.props.children).trim() === name) found = n;
+          walk(n.props.children);
+        };
+        walk(v.find((n) => n.type === "li" && n.props["data-bundle-id"] === b1.id).props.children);
+        ok(found, name);
+        return found;
+      };
+      await btn("Disable").props.onClick();
+      await v.flush();
+      eq(f.calls.filter((c) => c.method === "POST").length, 0, "nothing sent on Disable");
+      ok(v.dialogText().includes(`${UNKNOWN} Turn it off anyway?`), `the Disable confirm: ${v.dialogText()}`);
+      ok(!v.dialogText().includes(HOME), "no claim that the home page shows it");
+      await v.click("Cancel");
+      eq(f.calls.filter((c) => c.method === "POST").length, 0, "Cancel sends nothing");
+      await btn("Delete").props.onClick();
+      await v.flush();
+      ok(v.dialogText().includes(`${UNKNOWN} Delete it anyway?`) && /Removes Unk kit permanently/.test(v.dialogText()), `the Delete confirm: ${v.dialogText()}`);
+      await v.click("Cancel");
+      await btn("Disable").props.onClick();
+      await v.flush();
+      const confirmBtn = v.filter((n) => n.type === "button" && nameOf(n) === "Disable").at(-1);
+      ok(confirmBtn && confirmBtn !== v.button("Disable"), "the Dialog's own Disable");
+      await confirmBtn.props.onClick();
+      await v.flush();
+      eq(f.calls.filter((c) => c.method === "POST").map((c) => c.body), [{ enable: { id: b1.id, enabled: false } }], "turned off only after Confirm");
+    });
+  } finally {
+    await store.run(() => B.deleteBundle(b1.id));
+  }
+});
+
+await t("P5-FIX2: the create Dialog never names an earlier name's page: after a Cancel with a name typed, and after a create, it opens again on /bundles/bundle", async () => {
+  const f = storeFetch();
+  let value = null;
+  await withFetch(f.fetch, async () => {
+    const v = await mount(CONTROL, "BundleControl", () => ({ field: cardField, value, onChange: (x) => (value = x), issues: [], owner: "sec_rs1", context: { bundles: { status: "ready", items: [] }, canCreateBundles: true, currency: "USD", refreshBundles: () => {} } }), f);
+    await v.click("Create a bundle");
+    await v.type("bundle-name-compact", "Old Name");
+    ok(v.dialogText().includes(LIVE_NOW("old-name")), "the page follows the name");
+    await v.click("Cancel");
+    ok(!v.dialogText(), "closed");
+    await v.click("Create a bundle");
+    ok(v.dialogText().includes(LIVE_NOW("bundle")) && !v.dialogText().includes("/bundles/old-name"), `opened again: ${v.dialogText()}`);
+    // and after a create
+    await v.type("bundle-name-compact", "Made Kit");
+    await v.click("Add product");
+    await v.pick(V(1), "Fixture product 1");
+    await v.click("Add product");
+    await v.pick(V(2), "Fixture product 2");
+    await v.type("bundle-price-compact", "250");
+    await v.click("Create bundle");
+    const made = (await raw("SELECT id FROM bundles WHERE title = 'Made Kit'"))[0];
+    ok(made && value?.id === made.id, "created and picked");
+    ok(!v.dialogText(), "closed after the create");
+    await v.click("Create a bundle");
+    ok(v.dialogText().includes(LIVE_NOW("bundle")) && !v.dialogText().includes("/bundles/made-kit"), `opened again after a create: ${v.dialogText()}`);
+    await store.run(() => B.deleteBundle(made.id));
+  });
+});
+
+await t("P5-FIX2: a full grid (12) has 'Create a bundle' off with 'A grid shows at most 12 bundles.', so no bundle is made live and left unplaced", async () => {
+  const twelve = Array.from({ length: 12 }, (_, j) => ({ id: `bun-x${j}` }));
+  const f = storeFetch();
+  await withFetch(f.fetch, async () => {
+    const v = await mount(CONTROL, "BundleListControl", () => ({ field: gridField, value: twelve, onChange: () => {}, issues: [], owner: "sec_full", context: { bundles: { status: "ready", items: [] }, canCreateBundles: true, currency: "USD" } }), f);
+    ok(v.button("Create a bundle").props.disabled, "off");
+    ok(v.all().includes("A grid shows at most 12 bundles."), "says why");
+    ok(!v.dialogText(), "no Dialog");
+    const v11 = await mount(CONTROL, "BundleListControl", () => ({ field: gridField, value: twelve.slice(1), onChange: () => {}, issues: [], owner: "sec_11", context: { bundles: { status: "ready", items: [] }, canCreateBundles: true, currency: "USD" } }), f);
+    ok(!v11.button("Create a bundle").props.disabled && !v11.all().includes("A grid shows at most"), "on with one place left");
+  });
+});
+
+await t("P5-FIX2: a quantity under 1 (0 or negative) is treated as empty: the row asks for a quantity, nothing is checked or saved, and the box never disagrees with what is stored", async () => {
+  const f = storeFetch();
+  await withFetch(f.fetch, async () => {
+    const v = await mount(FORM, "BundleForm", () => ({ currency: "USD", compact: true }), f);
+    await v.type("bundle-name-compact", "Zero kit");
+    await v.click("Add product");
+    await v.pick(V(1), "Fixture product 1");
+    await v.click("Add product");
+    await v.pick(V(2), "Fixture product 2");
+    await v.type("bundle-price-compact", "250");
+    ok(!v.button("Create bundle").props.disabled, "passes first");
+    const checks = () => f.calls.filter((c) => c.body?.check).length;
+    for (const typed of ["0", "-2", "0.5"]) {
+      const n = checks();
+      await typeQty(v, 0, typed);
+      eq(qtyInputs(v)[0].props.value, Number(typed), `${typed}: the box keeps what was typed`);
+      eq(checks(), n, `${typed}: no check (it would be clamped to 1)`);
+      ok(v.button("Create bundle").props.disabled, `${typed}: nothing can be created`);
+      ok(/Enter how many of this product, 1 or more\./.test(v.all()), `${typed}: the row asks for a quantity`);
+    }
+    await typeQty(v, 0, "2");
+    eq(f.calls.filter((c) => c.body?.check).at(-1).body.check.items[0].quantity, 2, "checked with 2 once it is 1 or more");
+    ok(!/Enter how many of this product/.test(v.all()), "the ask goes");
+  });
+  // full mode: Save as draft waits too
+  const f2 = storeFetch();
+  await withFetch(f2.fetch, async () => {
+    const v = await mount(FORM, "BundleForm", () => ({ currency: "USD" }), f2);
+    await v.type("bundle-name", "Zero draft");
+    await v.click("Add product");
+    await v.pick(V(1), "Fixture product 1");
+    await v.click("Add product");
+    await v.pick(V(2), "Fixture product 2");
+    await typeQty(v, 1, "0");
+    ok(v.button("Save as draft").props.disabled && v.button("Save and show to shoppers").props.disabled, "no save with a 0");
+    eq(f2.calls.filter((c) => c.body?.create).length, 0, "nothing created");
   });
 });
 

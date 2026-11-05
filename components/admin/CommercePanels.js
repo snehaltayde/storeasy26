@@ -39,8 +39,16 @@ async function postJson(url, body) {
 // the #bundles anchor the editor links to (/admin/catalog#bundles). A draft
 // that would not pass the check is never offered Enable. Turning off or
 // deleting a bundle the live home page shows says so first.
+// P5-FIX2 (the P5-EDITOR review): when the home page could not be checked
+// (usedOnHome null: listBundles could not read the live home), Disable asks
+// first too, in neutral words, instead of turning the bundle off at once; the
+// Delete confirm says the same. Only usedOnHome === false goes ahead at once.
 
 const HOME_GOES = "Shoppers will stop seeing this bundle on your home page right away.";
+export const HOME_UNKNOWN = "We couldn't check whether your home page uses this bundle.";
+const homeUnknown = (b) => b != null && b.usedOnHome == null;
+// Disable asks first unless the home page was read and does not use it.
+export const disableAsksFirst = (b) => b?.usedOnHome !== false;
 
 const reasonList = (reasons, currency) => (reasons || []).map((r) => reasonWords(r, currency)).filter(Boolean);
 
@@ -121,7 +129,7 @@ export function BundlesPanel({ initial, currency }) {
                 )}
                 <div className="mt-2.5 flex flex-wrap gap-2">
                   {b.enabled ? (
-                    <Button size="sm" busy={toggling === b.id} disabled={!!toggling && toggling !== b.id} onClick={() => (b.usedOnHome ? setConfirmOff(b) : setEnabled(b, false))}>
+                    <Button size="sm" busy={toggling === b.id} disabled={!!toggling && toggling !== b.id} onClick={() => (disableAsksFirst(b) ? setConfirmOff(b) : setEnabled(b, false))}>
                       Disable
                     </Button>
                   ) : ready ? (
@@ -157,7 +165,7 @@ export function BundlesPanel({ initial, currency }) {
         body={
           confirmOff && (
             <>
-              <strong>{confirmOff.title}</strong> stops being sold as a bundle. {HOME_GOES}
+              <strong>{confirmOff.title}</strong> stops being sold as a bundle. {homeUnknown(confirmOff) ? `${HOME_UNKNOWN} Turn it off anyway?` : HOME_GOES}
             </>
           )
         }
@@ -178,7 +186,7 @@ export function BundlesPanel({ initial, currency }) {
           confirmDelete && (
             <>
               Removes <strong>{confirmDelete.title}</strong> permanently. Its linked cart offer goes too, so shoppers can no longer buy it as a bundle.
-              {confirmDelete.usedOnHome ? ` ${HOME_GOES}` : ""}
+              {confirmDelete.usedOnHome ? ` ${HOME_GOES}` : homeUnknown(confirmDelete) ? ` ${HOME_UNKNOWN} Delete it anyway?` : ""}
             </>
           )
         }
