@@ -942,6 +942,9 @@ await t("PALETTES: six frozen full brands in order, with the probed colours, pla
     eq(p.brand.accent, PROBED[p.id][0], `${p.id} accent:`);
     eq(p.brand.background, PROBED[p.id][1], `${p.id} background:`);
     ok(KIT_KEYS.includes(p.kit), `${p.id} kit ${p.kit} is not a KIT_SURFACES key`);
+    // P6-BRAND (P6-PALETTE review): every palette, not only slate, is on pulse-1
+    eq(p.kit, "pulse-1", `${p.id} kit:`);
+    eq(JSON.stringify(Pal.designBodyFor(p.id).theme), JSON.stringify({ kit: "pulse", version: 1 }), `${p.id} designBodyFor theme:`);
   }
   eq(Pal.DEFAULT_PALETTE_ID, "slate", "default:");
   eq(Pal.paletteById("slate").kit, "pulse-1", "slate's kit:");
@@ -1022,7 +1025,35 @@ await t("isLimeAccent: true for the platform default and the lime family, false 
   for (const hex of ["#16a34a", "#eab308", "#ffffff", "#000000", "#e11d48", "not a colour", null]) eq(Pal.isLimeAccent(hex), false, `${hex}:`);
 });
 
-await t("paletteIdOfBrand: each palette finds itself (with or without accent_label); the lime default, an edited palette and junk are null", () => {
+// P6-BRAND (P6-PALETTE review): the 65 and 105 degree edges are pinned. Each
+// colour below is hsl(h, 80%, 45%) rounded to hex; its real hue is checked
+// here too, so a rounding change can't move a case to the other side.
+await t("isLimeAccent: hue edges pinned just inside and just outside 65 and 105 degrees; olive (#808000, hue 60) is not lime", () => {
+  needPal();
+  const hueOf = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255);
+    const max = Math.max(r, g, b);
+    const d = max - Math.min(r, g, b);
+    const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return h * 60;
+  };
+  const EDGES = [
+    ["#c1cf17", 64, 65, false], // 64.57: just outside 65
+    ["#becf17", 65, 66, true], // 65.54: just inside 65
+    ["#46cf17", 104, 105, true], // 104.67: just inside 105
+    ["#43cf17", 105, 106, false], // 105.65: just outside 105
+  ];
+  for (const [hex, lo, hi, want] of EDGES) {
+    const h = hueOf(hex);
+    ok(h > lo && h < hi, `${hex} has hue ${h}, not between ${lo} and ${hi}`);
+    eq(Pal.isLimeAccent(hex), want, `${hex} (hue ${h.toFixed(2)}):`);
+  }
+  eq(hueOf("#808000"), 60, "olive's hue:");
+  eq(Pal.isLimeAccent("#808000"), false, "#808000 (olive) is a yellow-brown, not lime:");
+});
+
+await t("paletteIdOfBrand: each palette finds itself as it draws (validateBrand's value): with or without accent_label, upper-case hex, a partial brand that fills in to it; the lime default, an edited palette and junk are null", () => {
   needPal();
   eq(Pal.paletteIdOfBrand(Pal.paletteById("forest").brand), "forest", "forest:");
   eq(Pal.paletteIdOfBrand(B.DEFAULT_BRAND), null, "DEFAULT_BRAND:");
@@ -1032,11 +1063,44 @@ await t("paletteIdOfBrand: each palette finds itself (with or without accent_lab
     eq(Pal.paletteIdOfBrand(noLabel), p.id, `${p.id} without accent_label:`);
     eq(Pal.paletteIdOfBrand({ ...p.brand, accent: p.brand.accent.toUpperCase() }), p.id, `${p.id} upper-case hex:`);
     eq(Pal.paletteIdOfBrand(B.validateBrand(p.brand).value), p.id, `${p.id} as the editor stores it:`);
+    // P6-BRAND (P6-PALETTE review): a partial stored brand that draws exactly
+    // like the palette (the shape keys fill in to the platform's, which are
+    // the palette's) is that palette
+    const partial = { accent: p.brand.accent, background: p.brand.background, foreground: p.brand.foreground };
+    eq(Pal.paletteIdOfBrand(partial), p.id, `${p.id} colours only:`);
+    eq(Pal.paletteIdOfBrand({ ...partial, radius: "md" }), p.id, `${p.id} colours and one shape key:`);
+    // a stored accent_label is recomputed by validateBrand, so it draws the same
+    eq(Pal.paletteIdOfBrand({ ...p.brand, accent_label: p.brand.accent_label === "#ffffff" ? "#0a0a0b" : "#ffffff" }), p.id, `${p.id} with another stored accent_label (recomputed):`);
     eq(Pal.paletteIdOfBrand({ ...p.brand, radius: "xl" }), null, `${p.id} with another radius:`);
-    eq(Pal.paletteIdOfBrand({ ...p.brand, accent_label: p.brand.accent_label === "#ffffff" ? "#0a0a0b" : "#ffffff" }), null, `${p.id} with another accent_label:`);
-    eq(Pal.paletteIdOfBrand({ ...p.brand, extra: 1 }), null, `${p.id} with an extra key:`);
+    eq(Pal.paletteIdOfBrand({ ...partial, button_shape: "square" }), null, `${p.id} colours with another button shape:`);
+    eq(Pal.paletteIdOfBrand({ ...p.brand, accent: "#123456" }), null, `${p.id} with another accent:`);
+    eq(Pal.paletteIdOfBrand({ ...p.brand, radius: "huge" }), null, `${p.id} with a value validateBrand refuses:`);
+    eq(Pal.paletteIdOfBrand({ ...p.brand, accent: "lime" }), null, `${p.id} with a broken colour:`);
   }
+  // a partial brand missing the background fills in white: slate and navy are on white
+  eq(Pal.paletteIdOfBrand({ accent: "#334155", foreground: "#0f172a" }), "slate", "slate without its (white) background:");
+  // a missing foreground fills in #0a0a0b, which no palette uses
+  eq(Pal.paletteIdOfBrand({ accent: "#334155", background: "#ffffff" }), null, "slate without its own text colour draws differently:");
   for (const junk of [null, undefined, "slate", [], {}]) eq(Pal.paletteIdOfBrand(junk), null, `${JSON.stringify(junk)}:`);
+});
+
+// P6-BRAND (P6-PALETTE review): paletteById(...).brand is frozen. Changing it
+// throws (strict mode, as every module is), so a caller must build its own
+// copy: designBodyFor or a spread.
+await t("the frozen palette brand can't be changed in place: an assignment throws and the palette stays", () => {
+  needPal();
+  const forest = Pal.paletteById("forest");
+  let threw = false;
+  try {
+    forest.brand.accent = "#000000";
+  } catch (e) {
+    threw = e instanceof TypeError;
+  }
+  ok(threw, "assigning to a palette brand must throw");
+  eq(forest.brand.accent, "#166534", "forest accent unchanged:");
+  const copy = { ...forest.brand, accent: "#000000" };
+  eq(copy.accent, "#000000", "a spread is a free copy:");
+  eq(forest.brand.accent, "#166534", "forest accent still unchanged:");
 });
 
 await t("startingPaletteId: the recorded brand-step palette (saved or skipped), else slate; never null, never lime", () => {
@@ -1090,12 +1154,13 @@ await t("designBodyFor('slate') is the design settings in the brand and theme ki
   }
 });
 
-await t("palettes.js imports nothing outside lib/brand.js (static import scan)", () => {
+await t("palettes.js imports nothing outside lib/brand.js (static import scan), and does import it (paletteIdOfBrand uses validateBrand)", () => {
   needPal();
   const src = readFileSync(join(ROOT, "lib/themes/palettes.js"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   const specs = [...src.matchAll(/\bimport\s*(?:[\w*{}\s,]+from\s*)?["']([^"']+)["']|\bexport\s+[\w*{}\s,]+from\s*["']([^"']+)["']|\bimport\s*\(\s*["'`]?([^"'`)]*)|\brequire\s*\(/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? "require(");
   const outside = specs.filter((s) => s !== "../brand.js" && s !== "@/lib/brand.js" && s !== "../brand");
   ok(!outside.length, `palettes.js imports ${outside.join(", ")}`);
+  ok(specs.includes("../brand.js"), "palettes.js should import ../brand.js");
   ok(!/\bprocess\.|\bnode:/.test(src), "palettes.js must stay edge-safe (no process, no node: APIs)");
 });
 
