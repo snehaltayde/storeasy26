@@ -1,0 +1,138 @@
+{
+  "id": "P5-DRILLS",
+  "part": "console",
+  "title": "P5-DRILLS — console",
+  "ranAt": "2026-11-05T01:13:46.782Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "console: the live card shows ₹2,508 first",
+      "detail": [
+        "2-piece set Console pair Onion Hair Oil ×1 Training Tee ×1 ₹2,508₹2,608You save ₹100 Add the set to cart See the set →"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "console: Catalog > Bundles has no slug or GID inputs (New bundle and Edit)",
+      "detail": {
+        "newInputs": [
+          {
+            "id": "bundle-name",
+            "name": "",
+            "type": "text",
+            "placeholder": "Starter stack",
+            "label": "Name"
+          },
+          {
+            "id": "bundle-price",
+            "name": "",
+            "type": "number",
+            "placeholder": "",
+            "label": "Price"
+          },
+          {
+            "id": "bundle-desc",
+            "name": "",
+            "type": "textarea",
+            "placeholder": "",
+            "label": "Description"
+          }
+        ],
+        "editInputs": [
+          {
+            "id": "bundle-name",
+            "name": "",
+            "type": "text",
+            "placeholder": "Starter stack",
+            "label": "Name"
+          },
+          {
+            "id": "",
+            "name": "",
+            "type": "number",
+            "placeholder": "",
+            "label": "Quantity of Onion Hair Oil — 100ml"
+          },
+          {
+            "id": "",
+            "name": "",
+            "type": "number",
+            "placeholder": "",
+            "label": "Quantity of Training Tee — Black / S"
+          },
+          {
+            "id": "bundle-price",
+            "name": "",
+            "type": "number",
+            "placeholder": "",
+            "label": "Price"
+          },
+          {
+            "id": "bundle-desc",
+            "name": "",
+            "type": "textarea",
+            "placeholder": "",
+            "label": "Description"
+          }
+        ],
+        "bad": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "console: editing the live bundle's price saves it and keeps it turned on",
+      "detail": {
+        "price": 2483,
+        "enabled": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "console: the live card shows the new price ₹2,483 at once, with add on (no publish)",
+      "detail": "2-piece set Console pair Onion Hair Oil ×1 Training Tee ×1 ₹2,483₹2,608You save ₹125 Add the set to cart See the set →"
+    },
+    {
+      "ok": true,
+      "label": "console: no page errors",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_fa8bc15fb78beebd, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.7s",
+    "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)"
+  ],
+  "screenshots": [
+    {
+      "name": "console-edit-form-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/console-edit-form-1440.png",
+      "bytes": 30500,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/catalog"
+    },
+    {
+      "name": "console-saved-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/console-saved-1440.png",
+      "bytes": 24283,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/catalog"
+    },
+    {
+      "name": "console-live-new-price-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/console-live-new-price-1440.png",
+      "bytes": 24827,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "id": "<cart>",
+  "coupon": null,
+  "items": [
+    {
+      "variantId": "gid://shopify/ProductVariant/90000000",
+      "productId": "gid://shopify/Product/8000000",
+      "variantNumericId": "90000000",
+      "handle": "whey-protein-isolate-1",
+      "title": "Whey Protein Isolate",
+      "variantTitle": "Chocolate / 500g",
+      "image": "/api/media/med_c12b0a48887ebb6162",
+      "price": 4279,
+      "currency": "INR",
+      "quantity": 1,
+      "lineTotal": 4279,
+      "available": true,
+      "discount": 642
+    },
+    {
+      "variantId": "gid://shopify/ProductVariant/90000010",
+      "productId": "gid://shopify/Product/8000001",
+      "variantNumericId": "90000010",
+      "handle": "creatine-monohydrate-2",
+      "title": "Creatine Monohydrate",
+      "variantTitle": "Unflavoured / 100g",
+      "image": "/api/media/med_db4c43f623b0f0943a",
+      "price": 769,
+      "currency": "INR",
+      "quantity": 1,
+      "lineTotal": 769,
+      "available": true,
+      "discount": 115
+    },
+    {
+      "variantId": "gid://shopify/ProductVariant/90000090",
+      "productId": "gid://shopify/Product/8000009",
+      "variantNumericId": "90000090",
+      "handle": "shaker-bottle-10",
+      "title": "Shaker Bottle",
+      "variantTitle": "Black / Standard",
+      "image": "/api/media/med_f52c3ff9e74dcb858b",
+      "price": 1449,
+      "currency": "INR",
+      "quantity": 1,
+      "lineTotal": 1449,
+      "available": true,
+      "discount": 218
+    }
+  ],
+  "changes": [],
+  "subtotal": 6497,
+  "count": 3,
+  "currency": "INR",
+  "appliedOffers": [
+    {
+      "id": "bundle-bun-fa5c7d2cd946b48dfb",
+      "type": "BUNDLE",
+      "label": "Gym starter kit",
+      "amount": 975
+    },
+    {
+      "id": "gift-shaker",
+      "type": "FREE_GIFT",
+      "label": "Free shaker over ₹3,999",
+      "amount": 0,
+      "gift": true
+    }
+  ],
+  "gifts": [
+    {
+      "variantId": "gid://shopify/ProductVariant/90000090",
+      "title": "Shaker Bottle",
+      "offerId": "gift-shaker"
+    }
+  ],
+  "discountTotal": 975,
+  "total": 5522,
+  "shipping": {
+    "method": "free",
+    "label": "Free shipping (₹999+)",
+    "base": 0,
+    "codFee": 0,
+    "total": 0,
+    "free": true,
+    "freeThreshold": 999,
+    "remainingForFree": 0,
+    "zone": null
+  },
+  "shippingRatesSet": false,
+  "grandTotal": 5522,
+  "couponStatus": null
+}

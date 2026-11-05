@@ -1,0 +1,148 @@
+{
+  "id": "P5-DRILLS",
+  "part": "disabled",
+  "title": "P5-DRILLS — disabled",
+  "ranAt": "2026-11-05T01:12:15.657Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 10,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "disabled: the card is live first",
+      "detail": {
+        "cards": [
+          "bun-db6da11145ba093e6e"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "disabled: Catalog > Bundles says the bundle is on the live home ('On your home page')",
+      "detail": "Weekend set /bundles/weekend-set Live On your home page ₹2,528 ₹2,608 Disable Edit Delete"
+    },
+    {
+      "ok": true,
+      "label": "disabled: Disable asks first, saying shoppers stop seeing it on the home page right away",
+      "detail": "Disable bundle Weekend set stops being sold as a bundle. Shoppers will stop seeing this bundle on your home page right away. Cancel Disable"
+    },
+    {
+      "ok": true,
+      "label": "disabled: the live home hides the card at once (first look, 7.2 s after the click; no publish)",
+      "detail": {
+        "tries": 1,
+        "secs": 7.2
+      }
+    },
+    {
+      "ok": true,
+      "label": "disabled: the preview shows the turned-off reason in the founder note",
+      "detail": "Bundle card: hidden from shoppers This bundle is turned off, so shoppers don't see it. Turn it on in Catalog > Bundles, or remove it. Only you can see this note in your preview."
+    },
+    {
+      "ok": true,
+      "label": "disabled: the inspector says the same",
+      "detail": "This bundle is turned off, so shoppers don't see it. Turn it on in Catalog > Bundles, or remove it."
+    },
+    {
+      "ok": true,
+      "label": "disabled: a click on the founder note in the preview selects that section in the editor",
+      "detail": {
+        "selected": "sec_p5off"
+      }
+    },
+    {
+      "ok": true,
+      "label": "disabled: publish shows BUNDLE_DISABLED with 'Remove this section and publish'",
+      "detail": {
+        "codes": [
+          [
+            "BUNDLE_DISABLED",
+            [
+              "removeSection"
+            ]
+          ]
+        ],
+        "issue": {
+          "text": "Check\nBundle card · Bundle\n\n“Weekend set”: This bundle is turned off, so shoppers don't see it. Turn it on in Catalog > Bundles, or remove it. Removing it takes this whole section off the page.\n\nRemove this section and publish\nGo to this field",
+          "buttons": [
+            "Remove this section and publish"
+          ]
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "disabled: 'Remove this section and publish' takes only that section out and publishes again",
+      "detail": {
+        "phase": "done",
+        "sections": [
+          "sec_hero",
+          "sec_p3camp",
+          "sec_pfcollect",
+          "sec_pfrail1",
+          "sec_pfban1",
+          "sec_pfrail2",
+          "sec_pfimg1",
+          "sec_pfnew",
+          "sec_pfrail3",
+          "sec_pfrich",
+          "sec_pfrail4",
+          "sec_pfimg2",
+          "sec_pfban2",
+          "sec_pfrail5"
+        ],
+        "live": "ver_10f7be5fee5a165a"
+      }
+    },
+    {
+      "ok": true,
+      "label": "disabled: no page errors",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_64bf453b03659a09, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.7s",
+    "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)"
+  ],
+  "screenshots": [
+    {
+      "name": "disabled-confirm-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/disabled-confirm-1440.png",
+      "bytes": 40560,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/catalog"
+    },
+    {
+      "name": "disabled-live-home-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/disabled-live-home-1440.png",
+      "bytes": 22459,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "disabled-preview-note-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/disabled-preview-note-1440.png",
+      "bytes": 41618,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "disabled-publish-warning-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/disabled-publish-warning-1440.png",
+      "bytes": 39595,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    }
+  ]
+}

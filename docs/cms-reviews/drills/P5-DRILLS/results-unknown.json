@@ -1,0 +1,66 @@
+{
+  "id": "P5-DRILLS",
+  "part": "unknown",
+  "title": "P5-DRILLS — unknown",
+  "ranAt": "2026-11-05T01:14:01.366Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 5,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "unknown: two shopper fetches of the live home (fixed unit) are byte-identical after the P4 comparison's mask, so the comparison means something",
+      "detail": {
+        "rawSame": false,
+        "maskedBytes": 103894
+      }
+    },
+    {
+      "ok": true,
+      "label": "unknown: a draft save carrying a binding with source 'no_such_source' is refused 422 (BINDING_INVALID) with the plain message",
+      "detail": {
+        "status": 422,
+        "body": "{\"error\":\"There's 1 thing to fix\",\"code\":\"VALIDATION_FAILED\",\"issues\":[{\"documentId\":\"doc_home\",\"sectionId\":\"sec_p5bad\",\"blockId\":null,\"field\":\"bindings.bundle\",\"code\":\"BINDING_INVALID\",\"severity\":\"error\",\"message\":\"This bundle card section is set up in a way the editor can't fix. Remove it and add it again.\",\"autoFix\":null}],\"errors\":[\"This bundle card section is set up in a way the editor can't fix. Remove it and add it again.\"],\"warnings\":[]}"
+      }
+    },
+    {
+      "ok": true,
+      "label": "unknown: nothing is stored (same revision and draft, no version holds the source)",
+      "detail": {
+        "revision": [
+          3,
+          3
+        ],
+        "draft": {
+          "draft_hash": "25d822b3f2660beff1ff5dfb759fc42848f91172e5592ce057489f77ee02cb07",
+          "revision": 3
+        },
+        "versions": 0,
+        "issues": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "unknown: the live home is byte-identical (after the P4 mask) after the refused save",
+      "detail": {
+        "maskedBytes": [
+          103894,
+          103894
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "unknown: no page errors",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_46e8d1d86897cd1a, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.7s",
+    "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)",
+    "unknown: a draft can't hold an unknown body source (the writer refuses it), so the runtime source_unknown path (bindingFailed, the 'Remove it and add it again' preview note, the section_binding_failed log) is proved only in test-sections and test-sections-render, as the plan says."
+  ],
+  "screenshots": []
+}

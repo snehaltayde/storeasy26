@@ -1,0 +1,152 @@
+{
+  "id": "P5-DRILLS",
+  "part": "nosaving",
+  "title": "P5-DRILLS — nosaving",
+  "ranAt": "2026-11-05T01:11:34.177Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 10,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "nosaving: the card is live and available first",
+      "detail": {
+        "phase": "done",
+        "cards": [
+          [
+            "bun-99ec4c129e9b8ea184",
+            "available"
+          ]
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "nosaving: raising a live bundle's price above its products' sum in Catalog > Bundles is refused with the reason, and nothing is saved (an edit that breaks a live bundle is refused: deviation 3.10)",
+      "detail": {
+        "priceReason": "Price must be lower than ₹2,608",
+        "stored": [
+          2508,
+          1
+        ],
+        "said": "Name Products Onion Hair Oil — 100ml Change Training Tee — Black / S Change Add product Price Price must be lower than ₹2,608 Description Shown on the bundle page. Shoppers' link: /bundles/value-pair This bundle is on, and with this change shoppers couldn't buy it, so nothing was saved. Fix what is "
+      }
+    },
+    {
+      "ok": true,
+      "label": "nosaving: both products' prices drop through the sync writer; the products now add up to ₹1,044, under the bundle's ₹2,508: state no_saving",
+      "detail": {
+        "state": "no_saving",
+        "sum": 1044,
+        "price": 2508,
+        "reasons": [
+          {
+            "kind": "no_saving",
+            "sum": 1044,
+            "price": 2508
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "nosaving: the founder's words are the owner's OQ-B sentence, naming the sum",
+      "detail": "The price no longer saves anything (the products add up to ₹1,044), so shoppers don't see it. Lower the price in Catalog > Bundles."
+    },
+    {
+      "ok": true,
+      "label": "nosaving: the live home has no card (hidden for shoppers, at once: bundles are not versioned)",
+      "detail": {
+        "cards": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "nosaving: the preview shows the founder note 'Bundle card: hidden from shoppers' with the reason (no card)",
+      "detail": {
+        "note": "Bundle card: hidden from shoppers The price no longer saves anything (the products add up to ₹1,044), so shoppers don't see it. Lower the price in Catalog > Bundles. Only you can see this note in your preview."
+      }
+    },
+    {
+      "ok": true,
+      "label": "nosaving: the inspector's status line gives the same reason",
+      "detail": "The price no longer saves anything (the products add up to ₹1,044), so shoppers don't see it. Lower the price in Catalog > Bundles."
+    },
+    {
+      "ok": true,
+      "label": "nosaving: publish warns BUNDLE_UNAVAILABLE naming the sum, and still publishes",
+      "detail": {
+        "phase": "done",
+        "issues": [
+          {
+            "code": "BUNDLE_UNAVAILABLE",
+            "level": "warns",
+            "sectionId": "sec_p5save",
+            "field": "bundle",
+            "actions": [
+              "removeSection"
+            ],
+            "message": "“Value pair”: The price no longer saves anything (the products add up to ₹1,044), so shoppers don't see it. Lower the price in Catalog > Bundles. Removing it takes this whole section off the page."
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "nosaving: after publish the live home still has no card (and no heading for it)",
+      "detail": {
+        "cards": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "nosaving: no page errors",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_c36f6c144bd42900, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.1s",
+    "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)",
+    "nosaving: a live bundle's price can't be raised above its sum through any writer (refused, deviation 3.10). So the drill makes the price stop saving the way it happens in a real store: the products get cheaper in a sync (lib/sync.js writeProduct), until they add up to less than the bundle's price."
+  ],
+  "screenshots": [
+    {
+      "name": "nosaving-console-raise-refused-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/nosaving-console-raise-refused-1440.png",
+      "bytes": 26565,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/catalog"
+    },
+    {
+      "name": "nosaving-live-home-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/nosaving-live-home-1440.png",
+      "bytes": 24907,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "nosaving-preview-note-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/nosaving-preview-note-1440.png",
+      "bytes": 41921,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "nosaving-publish-warning-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/nosaving-publish-warning-1440.png",
+      "bytes": 41029,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    }
+  ]
+}

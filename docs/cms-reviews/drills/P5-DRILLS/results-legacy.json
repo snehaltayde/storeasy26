@@ -1,0 +1,212 @@
+{
+  "id": "P5-DRILLS",
+  "part": "legacy",
+  "title": "P5-DRILLS — legacy",
+  "ranAt": "2026-11-05T01:09:17.438Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 9,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "legacy: the same legacy store, the same bundle",
+      "detail": {
+        "mode": "legacy",
+        "bundle": "gym-starter-kit"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: / is byte-identical to afd7881's after the P4 mask (home)",
+      "detail": {
+        "status": [
+          200,
+          200
+        ],
+        "masked": [
+          "cb9330a7542cc6b1",
+          "cb9330a7542cc6b1"
+        ],
+        "rawSame": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: /products/micronised-creatine-12 is byte-identical to afd7881's after the P4 mask (product)",
+      "detail": {
+        "status": [
+          200,
+          200
+        ],
+        "masked": [
+          "f6b92dc11db3e290",
+          "f6b92dc11db3e290"
+        ],
+        "rawSame": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: /collections/protein is byte-identical to afd7881's after the P4 mask (collection)",
+      "detail": {
+        "status": [
+          200,
+          200
+        ],
+        "masked": [
+          "6877ab2d5e50ca3a",
+          "6877ab2d5e50ca3a"
+        ],
+        "rawSame": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: /bundles/gym-starter-kit is byte-identical to afd7881's after the P4 mask (bundle-page)",
+      "detail": {
+        "status": [
+          200,
+          200
+        ],
+        "masked": [
+          "d7d0415d9b6474cf",
+          "d7d0415d9b6474cf"
+        ],
+        "rawSame": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: the cart JSON after adding the bundle is byte-identical to afd7881's (only the random cart id and date-times masked)",
+      "detail": {
+        "base": {
+          "posts": [
+            200,
+            200,
+            200
+          ],
+          "status": 200,
+          "sha256": "34ee905ab9588db701a26361a878fa8eacb3da0797cf94cf0d3b8f9c9bdc556d",
+          "items": 3,
+          "discountTotal": 975
+        },
+        "now": {
+          "posts": [
+            200,
+            200,
+            200
+          ],
+          "status": 200,
+          "sha256": "34ee905ab9588db701a26361a878fa8eacb3da0797cf94cf0d3b8f9c9bdc556d",
+          "items": 3,
+          "discountTotal": 975
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: the old home Designer and Home page editor offer the same section types as afd7881, and no bundle kinds",
+      "detail": {
+        "now": {
+          "path": "/admin/storefront/designer",
+          "kinds": [
+            "Collections grid",
+            "Newest products",
+            "Banner / CTA",
+            "Rich text",
+            "Image with text",
+            "Product rail"
+          ],
+          "homeEditor": {
+            "adds": [
+              "Collections grid",
+              "Newest products",
+              "Banner / CTA",
+              "Rich text"
+            ],
+            "mentionsBundleKinds": false
+          }
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: this tree's a6d028e-style home render equals afd7881's: every state's home page byte for byte, every content page byte for byte once the recorder's freshly minted section ids are masked",
+      "detail": {
+        "vsBase": {
+          "homes": 10,
+          "homesSame": 10,
+          "pages": 36,
+          "pagesRawSame": 12,
+          "pagesMaskedSame": 36,
+          "sameStates": true
+        },
+        "tail": "{\"ts\":\"2026-11-05T01:09:16.824Z\",\"evt\":\"experiment_started\",\"tenant\":\"hr\",\"experiment\":\"hero-words\"}"
+      }
+    },
+    {
+      "ok": true,
+      "label": "legacy: two runs of the recorder on this same tree differ only in those minted page section ids (so the mask hides run-to-run noise, not a change)",
+      "detail": {
+        "homes": 10,
+        "homesSame": 10,
+        "pages": 36,
+        "pagesRawSame": 12,
+        "pagesMaskedSame": 36,
+        "sameStates": true
+      }
+    }
+  ],
+  "notes": [
+    "the same legacy store (snapshot /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p5-b3/P5-DRILLS/run/legacy-snapshot) served by this tree's harness"
+  ],
+  "screenshots": [
+    {
+      "name": "legacy-designer-add-section-legacy-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/legacy-designer-add-section-legacy-1440.png",
+      "bytes": 42593,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "legacy-home-legacy-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/legacy-home-legacy-1440.png",
+      "bytes": 31558,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "legacy-product-legacy-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/legacy-product-legacy-1440.png",
+      "bytes": 135980,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "legacy-collection-legacy-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/legacy-collection-legacy-1440.png",
+      "bytes": 70651,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/protein"
+    },
+    {
+      "name": "legacy-bundle-page-legacy-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/legacy-bundle-page-legacy-1440.png",
+      "bytes": 26237,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/bundles/gym-starter-kit"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "tree": "phase 5",
+  "capturedAt": "2026-11-05T01:09:16.310Z",
+  "routes": {
+    "home": {
+      "path": "/",
+      "status": 200,
+      "rawBytes": 724318,
+      "rawSha256": "308761769f64a6abad8b991a2fae1f79939291072bb3791b83c43d09945a1edd",
+      "maskedSha256": "cb9330a7542cc6b19c5b437cb42aa90603f8fd7f8180f29dc631cb54095285b4"
+    },
+    "product": {
+      "path": "/products/micronised-creatine-12",
+      "status": 200,
+      "rawBytes": 347775,
+      "rawSha256": "1f60ba911f4ac4e02d45dec5a66788b40adb8dbb5473596777e5dac7171463f0",
+      "maskedSha256": "f6b92dc11db3e290fd874059ff5f4aead382348f41c40f7ea855269ec0df30fb"
+    },
+    "collection": {
+      "path": "/collections/protein",
+      "status": 200,
+      "rawBytes": 589623,
+      "rawSha256": "b0ce1c4c40575fe3ce4bcb4b8cffed695a10e3fe2f1783a5105d63a8a3fcb2f2",
+      "maskedSha256": "6877ab2d5e50ca3a51c9963deb70fb0cb5011458c43e897d4b0dd37854b34ab6"
+    },
+    "bundle-page": {
+      "path": "/bundles/gym-starter-kit",
+      "status": 200,
+      "rawBytes": 275755,
+      "rawSha256": "75775e63d000d65a3f49e5af7c90f54746430abc99e832632a83fdaba7111f86",
+      "maskedSha256": "d7d0415d9b6474cfa628f617722a44ce00affa819671c83c36c93e2338f5e24a"
+    }
+  },
+  "cart": {
+    "posts": [
+      200,
+      200,
+      200
+    ],
+    "status": 200,
+    "sha256": "34ee905ab9588db701a26361a878fa8eacb3da0797cf94cf0d3b8f9c9bdc556d",
+    "items": 3,
+    "discountTotal": 975
+  },
+  "designer": {
+    "path": "/admin/storefront/designer",
+    "kinds": [
+      "Collections grid",
+      "Newest products",
+      "Banner / CTA",
+      "Rich text",
+      "Image with text",
+      "Product rail"
+    ],
+    "homeEditor": {
+      "adds": [
+        "Collections grid",
+        "Newest products",
+        "Banner / CTA",
+        "Rich text"
+      ],
+      "mentionsBundleKinds": false
+    }
+  }
+}

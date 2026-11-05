@@ -1,0 +1,638 @@
+<html class="geist_2ae47f08-module__h69qWW__variable geist_mono_eb58308d-module__w_p2Lq__variable fraunces_d7a68ca2-module__TWljPG__variable h-full" data-kit="pulse-1" lang="en">
+  <head>
+    <link as="image" fetchpriority="high" href="/api/media/med_ae5f4af4b10aec0b01" rel="preload">
+    <link href="/icon.svg" rel="icon" type="image/svg+xml">
+    <link href="/icons/icon-192.png" rel="apple-touch-icon">
+    <link href="/manifest.webmanifest" rel="manifest">
+    <link href="<origin>/products/micronised-creatine-12" rel="canonical">
+    <meta charset="utf-8">
+    <meta content name="next-size-adjust">
+    <meta content="#0a0a0b" name="theme-color">
+    <meta content="<origin>/api/media/med_ae5f4af4b10aec0b01" name="twitter:image">
+    <meta content="<origin>/api/media/med_ae5f4af4b10aec0b01" property="og:image">
+    <meta content="<origin>/products/micronised-creatine-12" property="og:url">
+    <meta content="Design Demo Co" name="apple-mobile-web-app-title">
+    <meta content="Design Demo Co" name="application-name">
+    <meta content="Micronised Creatine" name="twitter:title">
+    <meta content="Micronised Creatine" property="og:title">
+    <meta content="Your first week supports Indian summers so you can feel the difference in a few weeks. Our team is tested for daily training from sources we can trace. This rou" name="description">
+    <meta content="Your first week supports Indian summers so you can feel the difference in a few weeks. Our team is tested for daily training from sources we can trace. This rou" name="twitter:description">
+    <meta content="Your first week supports Indian summers so you can feel the difference in a few weeks. Our team is tested for daily training from sources we can trace. This rou" property="og:description">
+    <meta content="black-translucent" name="apple-mobile-web-app-status-bar-style">
+    <meta content="summary_large_image" name="twitter:card">
+    <meta content="website" property="og:type">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta content="yes" name="mobile-web-app-capable">
+    <title>
+      Micronised Creatine · Design Demo Co
+    </title>
+    <style data-href="brand-vars">
+      :root{--accent-50:#dffcfa;--accent-100:#c6faf5;--accent-200:#9bf6ee;--accent-300:#5ef1e4;--accent-400:#15ead7;--accent-500:#0d9488;--accent-600:#087c72;--accent-700:#06645c;--accent-800:#054f48;--accent-900:#043d38;--background:#fffdf8;--foreground:#1c1917;--accent-label:#0a0a0b;--brand-radius:1.5rem;--type-scale:1.08;--btn-radius:9999px;--section-pad-y:3.5rem;--sf-surface-muted:#faf8f3;--sf-surface-sunken:#f5f3ee;--sf-surface-strong:#e7e5e0;--sf-surface-disabled:#d8d6d2;--sf-text:#1c1917;--sf-text-soft:#373432;--sf-text-body:#4f4c4a;--sf-text-muted:#615f5c;--sf-text-subtle:#666461;--sf-text-faint:#706d6a;--sf-placeholder:#72706d;--sf-mark:#777471;--sf-border-soft:#f5f3ee;--sf-border:#e7e5e0;--sf-border-strong:#d8d6d2;--sf-border-hover:#a9a6a2;--sf-inverse:#1c1917;--sf-inverse-hover:#373432;--sf-on-inverse:#fffdf8;--sf-on-inverse-muted:#d8d6d2;--sf-success:#497d00;--sf-success-strong:#3c6300;--sf-success-surface:#f7fee7;--sf-success-soft:#ecfcca;--sf-warning:#973c00;--sf-warning-strong:#973c00;--sf-warning-surface:#fffbeb;--sf-warning-soft:#fef3c6;--sf-warning-border:#fee685;--sf-danger:#c10007;--sf-danger-surface:#fef2f2;--sf-danger-border:#ffc9c9;}
+    </style>
+  </head>
+  <body class="flex min-h-full flex-col bg-background text-foreground antialiased">
+    <div hidden></div>
+    <header class="sticky top-0 z-30 bg-header text-header-fg">
+      <div class="bg-sf-accent px-4 py-1.5 text-center text-xs font-semibold text-sf-on-accent" data-sec="announcement">
+        <a class="hover:underline" href="/collections">
+          Festive sale — free shipping over ₹1,499
+        </a>
+      </div>
+      <div class="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
+        <a class="shrink-0 text-xl font-extrabold tracking-tight" href="/">
+          Design Demo Co
+        </a>
+        <div class="hidden flex-1 md:block">
+          <div class="relative w-full">
+            <form class="relative">
+              <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sf-text-faint">
+                <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="18">
+                  <circle cx="11" cy="11" r="7"></circle>
+                  <path d="m20 20-3.2-3.2"></path>
+                </svg>
+              </span>
+              <input aria-autocomplete="list" aria-expanded="false" aria-label="Search products" class="w-full rounded-full border border-sf-border bg-sf-surface-muted py-2.5 pl-11 pr-4 text-sm text-sf-text outline-none transition focus:border-sf-border-hover focus:bg-sf-surface" placeholder="Search products…" role="combobox" type="search" value>
+            </form>
+          </div>
+        </div>
+        <nav class="ml-auto hidden items-center gap-6 text-sm font-medium md:flex">
+          <a class="text-header-muted transition hover:text-header-fg" href="/collections">
+            Shop all
+          </a>
+        </nav>
+        <a aria-label="Wishlist" class="shrink-0 p-1 text-header-muted transition hover:text-header-fg" href="/wishlist">
+          <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="20">
+            <path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"></path>
+          </svg>
+        </a>
+        <a aria-label="Your account" class="shrink-0 p-1 text-header-muted transition hover:text-header-fg" href="/account">
+          <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="20">
+            <circle cx="12" cy="8" r="4"></circle>
+            <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>
+          </svg>
+        </a>
+        <button aria-label="Open cart, 0 items" class="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-header-fg transition hover:bg-header-fg/10" type="button">
+          <svg fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24" width="22">
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path>
+            <path d="M3 6h18"></path>
+            <path d="M16 10a4 4 0 0 1-8 0"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="px-4 pb-3 md:hidden">
+        <div class="relative w-full">
+          <form class="relative">
+            <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sf-text-faint">
+              <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="18">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="m20 20-3.2-3.2"></path>
+              </svg>
+            </span>
+            <input aria-autocomplete="list" aria-expanded="false" aria-label="Search products" class="w-full rounded-full border border-sf-border bg-sf-surface-muted py-2.5 pl-11 pr-4 text-sm text-sf-text outline-none transition focus:border-sf-border-hover focus:bg-sf-surface" placeholder="Search products…" role="combobox" type="search" value>
+          </form>
+        </div>
+      </div>
+      <nav class="border-t border-header-fg/10">
+        <div class="no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto px-3 sm:px-5">
+          <a class="whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg" href="/collections/shop-all">
+            Shop all
+          </a>
+          <details class="group relative">
+            <summary class="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg [&amp;::-webkit-details-marker]:hidden">
+              Protein
+              <span aria-hidden="true" class="text-xs transition group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div class="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-sf-control border border-sf-border bg-sf-surface py-1 shadow-xl">
+              <a class="block px-4 py-2 text-sm font-semibold text-sf-text-soft hover:bg-sf-surface-muted" href="/collections/protein">
+                Protein
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/new-launches">
+                New Launches
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/under-999">
+                Under 999
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/gifting">
+                Gifting
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/vegan">
+                Vegan
+              </a>
+            </div>
+          </details>
+          <details class="group relative">
+            <summary class="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg [&amp;::-webkit-details-marker]:hidden">
+              Skincare
+              <span aria-hidden="true" class="text-xs transition group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div class="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-sf-control border border-sf-border bg-sf-surface py-1 shadow-xl">
+              <a class="block px-4 py-2 text-sm font-semibold text-sf-text-soft hover:bg-sf-surface-muted" href="/collections/skincare">
+                Skincare
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/combos-and-kits">
+                Combos And Kits
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/summer-essentials">
+                Summer Essentials
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/gym-starter">
+                Gym Starter
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/skin-routine">
+                Skin Routine
+              </a>
+            </div>
+          </details>
+          <details class="group relative">
+            <summary class="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg [&amp;::-webkit-details-marker]:hidden">
+              Vitamins
+              <span aria-hidden="true" class="text-xs transition group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div class="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-sf-control border border-sf-border bg-sf-surface py-1 shadow-xl">
+              <a class="block px-4 py-2 text-sm font-semibold text-sf-text-soft hover:bg-sf-surface-muted" href="/collections/vitamins">
+                Vitamins
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/vegan">
+                Vegan
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/sugar-free">
+                Sugar Free
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/combos-and-kits">
+                Combos And Kits
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/summer-essentials">
+                Summer Essentials
+              </a>
+            </div>
+          </details>
+          <details class="group relative">
+            <summary class="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg [&amp;::-webkit-details-marker]:hidden">
+              Snacks
+              <span aria-hidden="true" class="text-xs transition group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div class="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-sf-control border border-sf-border bg-sf-surface py-1 shadow-xl">
+              <a class="block px-4 py-2 text-sm font-semibold text-sf-text-soft hover:bg-sf-surface-muted" href="/collections/snacks">
+                Snacks
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/gym-starter">
+                Gym Starter
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/skin-routine">
+                Skin Routine
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/immunity">
+                Immunity
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/travel-size">
+                Travel Size
+              </a>
+            </div>
+          </details>
+          <a class="whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg" href="/journal">
+            Journal
+          </a>
+        </div>
+      </nav>
+    </header>
+    <main class="flex-1">
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <nav class="mb-5 text-sm text-sf-text-faint">
+          <a class="hover:text-sf-text-muted" href="/">
+            Home
+          </a>
+          /
+          <span class="text-sf-text-subtle">
+            Creatine
+          </span>
+          /
+          <span class="text-sf-text-muted">
+            Micronised Creatine
+          </span>
+        </nav>
+        <div data-pdp-template="editorial">
+          <img alt="Micronised Creatine, photo 1" class="aspect-[16/7] w-full rounded-brand object-cover" fetchpriority="high" src="/api/media/med_ae5f4af4b10aec0b01">
+          <div class="mx-auto mt-8 max-w-2xl text-center">
+            <p class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-sf-accent-text justify-center">
+              Perf Nutrition Co
+              <span class="rounded-full bg-sf-accent-soft px-2.5 py-0.5 text-sf-2xs font-bold normal-case tracking-normal text-sf-on-accent-soft">
+                Bestseller
+              </span>
+            </p>
+            <h1 class="mt-1 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
+              Micronised Creatine
+            </h1>
+          </div>
+          <div class="mt-10 grid gap-10 lg:grid-cols-3">
+            <div class="lg:col-span-2">
+              <div class="mt-8 border-t border-sf-border-soft pt-8">
+                <h2 class="mb-3 text-lg font-bold">
+                  Details
+                </h2>
+                <div class="rte">
+                  <p>
+                    Our lab partner supports honest labels and ships within 24 hours. The blend is balanced for third-party lab results and ships within 24 hours. The recipe keeps to honest labels without added sugar. The pack is mixed for slow, even absorption. Our team is packed for slow, even absorption with no fillers.
+                  </p>
+                  <ul>
+                    <li>
+                      The texture supports everyday use from sources we can trace.
+                    </li>
+                    <li>
+                      The blend is balanced for sensitive skin so it fits the routine you already have.
+                    </li>
+                    <li>
+                      This routine brings together slow, even absorption with no fillers.
+                    </li>
+                    <li>
+                      Every order supports a light finish in small batches.
+                    </li>
+                  </ul>
+                  <p>
+                    Our lab partner is packed for steady energy without added sugar. Our lab partner keeps to sensitive skin so it fits the routine you already have. Each serving brings together clean ingredients without added sugar. The blend is tested for clean ingredients in small batches.
+                  </p>
+                </div>
+              </div>
+              <div class="mt-6 divide-y divide-sf-border-soft border-t border-sf-border-soft" data-sec="pdp-modules">
+                <details class="group py-3">
+                  <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-sf-text-soft [&amp;::-webkit-details-marker]:hidden">
+                    How to use
+                    <span class="text-sf-text-faint transition group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <div class="rte mt-2 text-sm text-sf-text-muted">
+                    <p>
+                      Module 1: words the founder wrote for this product.
+                    </p>
+                  </div>
+                </details>
+                <details class="group py-3">
+                  <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-sf-text-soft [&amp;::-webkit-details-marker]:hidden">
+                    Ingredients
+                    <span class="text-sf-text-faint transition group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <div class="rte mt-2 text-sm text-sf-text-muted">
+                    <p>
+                      Module 2: words the founder wrote for this product.
+                    </p>
+                  </div>
+                </details>
+                <details class="group py-3">
+                  <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-sf-text-soft [&amp;::-webkit-details-marker]:hidden">
+                    Lab report
+                    <span class="text-sf-text-faint transition group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <div class="rte mt-2 text-sm text-sf-text-muted">
+                    <p>
+                      Tested by a third-party lab.
+                    </p>
+                    <p>
+                      <img alt="The lab report for this batch" src="/api/media/med_8b12cb9ce9374ed033">
+                    </p>
+                  </div>
+                </details>
+                <details class="group py-3">
+                  <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-sf-text-soft [&amp;::-webkit-details-marker]:hidden">
+                    Taste notes
+                    <span class="text-sf-text-faint transition group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <div class="rte mt-2 text-sm text-sf-text-muted">
+                    <p>
+                      Module 4: words the founder wrote for this product.
+                    </p>
+                  </div>
+                </details>
+                <details class="group py-3">
+                  <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-sf-text-soft [&amp;::-webkit-details-marker]:hidden">
+                    Storage
+                    <span class="text-sf-text-faint transition group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <div class="rte mt-2 text-sm text-sf-text-muted">
+                    <p>
+                      Module 5: words the founder wrote for this product.
+                    </p>
+                  </div>
+                </details>
+                <details class="group py-3">
+                  <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-sf-text-soft [&amp;::-webkit-details-marker]:hidden">
+                    Who it is for
+                    <span class="text-sf-text-faint transition group-open:rotate-45">
+                      +
+                    </span>
+                  </summary>
+                  <div class="rte mt-2 text-sm text-sf-text-muted">
+                    <p>
+                      Module 6: words the founder wrote for this product.
+                    </p>
+                  </div>
+                </details>
+              </div>
+              <div class="mt-10 grid grid-cols-2 gap-4">
+                <img alt="Micronised Creatine, photo 2" class="w-full rounded-brand object-cover" loading="lazy" src="/api/media/med_81f5305783e0365e88">
+                <img alt="Micronised Creatine, photo 3" class="w-full rounded-brand object-cover" loading="lazy" src="/api/media/med_db4c43f623b0f0943a">
+                <img alt="Micronised Creatine, photo 4" class="w-full rounded-brand object-cover" loading="lazy" src="/api/media/med_071151cca28a37d069">
+                <img alt="Micronised Creatine, photo 5" class="w-full rounded-brand object-cover" loading="lazy" src="/api/media/med_ae137168a308647587">
+              </div>
+            </div>
+            <aside class="lg:sticky lg:top-24 lg:self-start">
+              <div class="rounded-brand border border-sf-border p-5 shadow-sm">
+                <div class="mt-5">
+                  <div class="flex flex-wrap items-baseline gap-3">
+                    <span class="text-3xl font-bold text-sf-text">
+                      ₹1,789
+                    </span>
+                  </div>
+                  <p class="mt-2 text-sm font-medium text-sf-accent-text">
+                    ● In stock
+                  </p>
+                  <div class="mt-6 space-y-5">
+                    <div>
+                      <p class="mb-2 text-sm font-semibold text-sf-text-body">
+                        Flavour
+                        <span class="ml-2 font-normal text-sf-text-faint">
+                          Unflavoured
+                        </span>
+                      </p>
+                      <div class="flex flex-wrap gap-2">
+                        <button aria-pressed="true" class="rounded-sf-small border px-3.5 py-2 text-sm font-medium transition border-sf-inverse bg-sf-inverse text-sf-on-inverse" type="button">
+                          Unflavoured
+                        </button>
+                        <button aria-pressed="false" class="rounded-sf-small border px-3.5 py-2 text-sm font-medium transition border-sf-border bg-sf-surface text-sf-text-body hover:border-sf-border-hover" type="button">
+                          Lemon
+                        </button>
+                        <button aria-pressed="false" class="rounded-sf-small border px-3.5 py-2 text-sm font-medium transition border-sf-border bg-sf-surface text-sf-text-body hover:border-sf-border-hover" type="button">
+                          Watermelon
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <p class="mb-2 text-sm font-semibold text-sf-text-body">
+                        Size
+                        <span class="ml-2 font-normal text-sf-text-faint">
+                          100g
+                        </span>
+                      </p>
+                      <div class="flex flex-wrap gap-2">
+                        <button aria-pressed="true" class="rounded-sf-small border px-3.5 py-2 text-sm font-medium transition border-sf-inverse bg-sf-inverse text-sf-on-inverse" type="button">
+                          100g
+                        </button>
+                        <button aria-pressed="false" class="rounded-sf-small border px-3.5 py-2 text-sm font-medium transition border-sf-border bg-sf-surface text-sf-text-body hover:border-sf-border-hover" type="button">
+                          250g
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-6 flex items-center gap-3">
+                    <div class="inline-flex items-center rounded-sf-control border border-sf-border">
+                      <button aria-label="Decrease quantity" class="px-3.5 py-3 text-sf-text-muted hover:text-sf-text" type="button">
+                        −
+                      </button>
+                      <span class="min-w-8 text-center text-sm font-medium">
+                        1
+                      </span>
+                      <button aria-label="Increase quantity" class="px-3.5 py-3 text-sf-text-muted hover:text-sf-text" type="button">
+                        +
+                      </button>
+                    </div>
+                    <button class="flex-1 rounded-sf-control bg-sf-accent px-6 py-3.5 text-sm font-bold text-sf-on-accent transition enabled:hover:bg-sf-accent-hover disabled:cursor-not-allowed disabled:bg-sf-surface-strong disabled:text-sf-text-faint" type="button">
+                      Add to cart
+                    </button>
+                  </div>
+                </div>
+                <div class="mt-3"></div>
+              </div>
+            </aside>
+          </div>
+          <section class="mt-16 border-t border-sf-border-soft pt-10" data-sec="pdp-pairs">
+            <h2 class="mb-6 text-2xl font-bold tracking-tight">
+              Goes well with your routine
+            </h2>
+            <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <a class="group block" href="/products/vegan-omega-25">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Vegan Omega, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c12b0a48887ebb6162" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Vegan Omega
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹979
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/muesli-38">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Muesli, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c9c2be2448e7b12824" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Muesli
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹619
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹774
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/protein-coffee-51">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Protein Coffee, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_a90b5569b19cf92f5e" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Protein Coffee
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹3,919
+                    </span>
+                  </p>
+                </div>
+              </a>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+    <footer class="mt-20 border-t border-sf-border-soft bg-sf-surface-muted">
+      <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p class="text-xl font-extrabold">
+              Design Demo Co
+            </p>
+            <p class="mt-3 max-w-sm text-sm text-sf-text-subtle">
+              Realistic data for the console redesign
+            </p>
+          </div>
+          <div>
+            <p class="mb-3 text-sm font-semibold text-sf-text">
+              Shop
+            </p>
+            <ul class="space-y-2 text-sm text-sf-text-subtle">
+              <li>
+                <a class="hover:text-sf-text" href="/collections">
+                  All collections
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/privacy-policy">
+                  Privacy Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/terms-of-service">
+                  Terms Of Service
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/refund-policy">
+                  Refund Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/shipping-policy">
+                  Shipping Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/cancellation-policy">
+                  Cancellation Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/cookie-policy">
+                  Cookie Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/faq">
+                  Faq
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/size-guide">
+                  Size Guide
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/ingredients-glossary">
+                  Ingredients Glossary
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/lab-reports">
+                  Lab Reports
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <p class="mb-3 text-sm font-semibold text-sf-text">
+              Company
+            </p>
+            <ul class="space-y-2 text-sm text-sf-text-subtle">
+              <li>
+                <a class="hover:text-sf-text" href="/contact">
+                  Contact
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/affiliate-program">
+                  Affiliate Program
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/bulk-orders">
+                  Bulk Orders
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/cancellation-policy">
+                  Cancellation Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/careers">
+                  Careers
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/contact-details">
+                  Contact Details
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/cookie-policy">
+                  Cookie Policy
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <p class="mb-3 text-sm font-semibold text-sf-text">
+              Support
+            </p>
+            <ul class="space-y-2 text-sm text-sf-text-subtle">
+              <li>
+                <a class="hover:text-sf-text" href="mailto:support@design.test">
+                  support@design.test
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <p class="mt-10 border-t border-sf-border pt-6 text-xs text-sf-text-faint">
+          © Design Demo Co
+        </p>
+      </div>
+    </footer>
+    <div aria-hidden="true" class="fixed inset-0 z-40 bg-sf-overlay/40 transition-opacity duration-300 pointer-events-none opacity-0"></div>
+    <aside aria-label="Shopping cart" class="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-sf-surface shadow-xl transition-transform duration-300 translate-x-full" role="dialog">
+      <header class="flex items-center justify-between border-b border-sf-border-soft px-5 py-4">
+        <h2 class="text-lg font-bold">
+          Your cart
+        </h2>
+        <button aria-label="Close cart" class="rounded-full p-1.5 text-sf-text-subtle hover:bg-sf-surface-sunken">
+          <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="20">
+            <path d="M18 6 6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+      </header>
+      <div class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sf-text-subtle">
+        <p class="font-medium text-sf-text-body">
+          Your cart is empty
+        </p>
+        <p class="text-sm">
+          Add something you like and it’ll show up here.
+        </p>
+      </div>
+    </aside>
+  </body>
+</html>

@@ -1,0 +1,119 @@
+{
+  "ranAt": "2026-11-05T01:07:57.476Z",
+  "finishedAt": "2026-11-05T01:14:01.530Z",
+  "stages": [
+    "baseline",
+    "legacy",
+    "pick",
+    "create",
+    "states",
+    "nosaving",
+    "disabled",
+    "grid",
+    "cart",
+    "console",
+    "unknown"
+  ],
+  "rows": [
+    {
+      "stage": "baseline",
+      "exit": 0,
+      "seconds": 47,
+      "passed": 12,
+      "failed": 0,
+      "known": 0,
+      "results": "results-baseline.json"
+    },
+    {
+      "stage": "legacy",
+      "exit": 0,
+      "seconds": 33,
+      "passed": 9,
+      "failed": 0,
+      "known": 0,
+      "results": "results-legacy.json"
+    },
+    {
+      "stage": "pick",
+      "exit": 0,
+      "seconds": 30,
+      "passed": 8,
+      "failed": 0,
+      "known": 0,
+      "results": "results-pick.json"
+    },
+    {
+      "stage": "create",
+      "exit": 0,
+      "seconds": 32,
+      "passed": 11,
+      "failed": 0,
+      "known": 0,
+      "results": "results-create.json"
+    },
+    {
+      "stage": "states",
+      "exit": 0,
+      "seconds": 32,
+      "passed": 11,
+      "failed": 0,
+      "known": 0,
+      "results": "results-states.json"
+    },
+    {
+      "stage": "nosaving",
+      "exit": 0,
+      "seconds": 44,
+      "passed": 10,
+      "failed": 0,
+      "known": 0,
+      "results": "results-nosaving.json"
+    },
+    {
+      "stage": "disabled",
+      "exit": 0,
+      "seconds": 42,
+      "passed": 10,
+      "failed": 0,
+      "known": 0,
+      "results": "results-disabled.json"
+    },
+    {
+      "stage": "grid",
+      "exit": 0,
+      "seconds": 34,
+      "passed": 12,
+      "failed": 0,
+      "known": 0,
+      "results": "results-grid.json"
+    },
+    {
+      "stage": "cart",
+      "exit": 0,
+      "seconds": 27,
+      "passed": 9,
+      "failed": 0,
+      "known": 0,
+      "results": "results-cart.json"
+    },
+    {
+      "stage": "console",
+      "exit": 0,
+      "seconds": 30,
+      "passed": 5,
+      "failed": 0,
+      "known": 0,
+      "results": "results-console.json"
+    },
+    {
+      "stage": "unknown",
+      "exit": 0,
+      "seconds": 15,
+      "passed": 5,
+      "failed": 0,
+      "known": 0,
+      "results": "results-unknown.json"
+    }
+  ],
+  "failed": 0
+}
