@@ -132,6 +132,16 @@ Fix round 1: the reviewer's blocker said the merge must carry this change, and t
 - **Reason order** from `compatFrom` is now product order, with a `bad_quantity` reason next to its product (it was all `bad_quantity` reasons first).
 - Carried: the bundle page's hard-coded INR; getBundle and the bundle page don't check the offer sync (`not_synced`), so a bundle whose offer is gone is still sold there; `/bundles/<slug>` links are keyed by slug and unchecked; bundles are not versioned.
 
+From review:
+
+- The earlier blocker is fixed. I ran `pnpm test` at fbf40b1 in a detached worktree (rv1) with my ports: 6320, and 7320 to 7329 through the MIGRATE_DOCUMENTS/TEST_MIGRATE_MAP/TEST_PRODUCT_CONTENT/TEST_PUBLISH*/UNDO port env vars. Result: '98 of 98 suites passed in 194.2s', exit 0. Log: /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p5-b2/P5-FIX1/rv1-pnpm-test.log. Fix round 1 changed only scripts/test-bundle-form.js (one assertion) and the packet. No product code changed since 6690d43.
+- The new assertion catches the bug it is meant to catch. I put the false sum back by dropping `allFound &&` in lib/commerce/bundle-compat.js. test-bundle-form then gives 8 passed, 1 failed, and the failing test is the one the fix changed. I reverted the mutation.
+- The new check is looser than it could be. `ok(!price || !/Price must be lower/.test(...))` also passes if the price line says some other wrong sentence, such as a no-saving line in different words. A stricter version would assert that no price-reason node exists at all. This does not block: the row reasons ('Sold out', 'No longer available') and the legacy-words scan are still pinned.
+- P5-EDITOR conflict risk is checked. cms/p5-editor (80c1668) merges into cms/p5-fix1 with no conflicts (git merge-tree, and a real --no-commit merge in the worktree). On the merged tree these suites all pass: test-bundle-form 16 of 16, test-editor-inspector 46, test-commerce-blocks 18, test-commerce-exp 44, test-publish-checks 40, test-sections-render 45. The merge was aborted afterwards. Even so, the orchestrator should merge P5-EDITOR after P5-FIX1 and re-run test-bundle-form, as the packet asks.
+- Scope note for the record: scripts/test-bundle-form.js belongs to P5-EDITOR and the item brief forbade editing it. The change landed in this branch because the fix round directed it, and the packet says so. The orchestrator should confirm this is accepted.
+- Edge check: the code diff since 425b844 adds no `node:` imports and no require calls. Cleanup: the review worktree is removed and pruned, and nothing is listening on 6320 or 7320 to 7329.
+- Carried owner checks, unchanged: sign-off of rulings 1 to 3 and the new words (the bundle page's 'This bundle isn't available right now.' now also shows for a no_saving bundle); the browser check on the design harness; phone widths and Safari for the preview note; staging NOT DONE; the CI sqld download under .github/ still needs the owner to approve its source and checksum.
+
 ## Owner checks
 
 - **Orchestrator/merge:** the one-assertion change to `scripts/test-bundle-form.js` (P5-EDITOR's file) is in this branch (fix round 1); confirm it, and watch for a conflict at those lines when P5-EDITOR merges.
