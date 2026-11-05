@@ -821,6 +821,77 @@ await t("P5-PANEL: createBundle's pre-check: mustPass with enable: false and a 2
   });
 });
 
+// =============================================================================
+// P5-FIX1 (orchestrator rulings 1 and 2, after the batch 1 review)
+// =============================================================================
+console.log("— P5-FIX1: a deleted product never reads as 'saves nothing'; a quantity that is not whole agrees on both paths");
+
+await t("P5-FIX1: compatFrom gives no no_saving while any product is missing (variant gone, or its product gone); with every product found, no_saving still comes", async () => {
+  const vs = new Map([["a", { id: "a", product_id: "pa", price: 100, available: 1 }], ["b", { id: "b", product_id: "pb", price: 100, available: 1 }]]);
+  const ps = new Map([["pa", { id: "pa", title: "A", available: true }], ["pb", { id: "pb", title: "B", available: true }]]);
+  // the review's case: A ($100) + B ($100) at $180, B deleted: the sum left is $100
+  const gone = BC.compatFrom({ items: [{ variantId: "a" }, { variantId: "b" }], bundle_price: 180, variantsById: new Map([["a", vs.get("a")]]), productsById: ps });
+  same([gone.state, gone.reasons], ["sold_out", [{ kind: "missing", index: 1, title: null }]], "variant gone: missing only, never no_saving");
+  ok(!gone.problems.some((p) => p.includes("doesn't save")), `no legacy no-saving problem: ${gone.problems}`);
+  const noProduct = BC.compatFrom({ items: [{ variantId: "a" }, { variantId: "b" }], bundle_price: 500, variantsById: vs, productsById: new Map([["pa", ps.get("pa")]]) });
+  same([noProduct.state, noProduct.reasons.map((r) => r.kind)], ["sold_out", ["missing"]], "product gone: missing only");
+  const all = BC.compatFrom({ items: [{ variantId: "a" }, { variantId: "b" }], bundle_price: 250, variantsById: vs, productsById: ps });
+  same([all.state, all.reasons], ["no_saving", [{ kind: "no_saving", sum: 200, price: 250 }]], "every product found: no_saving as before");
+  // the founder's words: replace the product, never lower the price
+  const line = BW.stateLine(gone.state, gone.reasons, { currency: "USD" });
+  eq(line, "A product in this bundle is no longer in your catalog: shoppers see Currently unavailable and can't add it. Replace it with another product in Catalog > Bundles.", "the words:");
+  ok(!/Lower the price|add up to/.test(line), line);
+  eq(BW.stateLine("sold_out", [{ kind: "sold_out", index: 0 }]), "A product in this bundle is sold out: shoppers see Currently unavailable and can't add it.", "a sold-out product keeps its words:");
+});
+
+await t("P5-FIX1: a turned-on bundle whose product was deleted from the catalog reads sold_out with that product missing and no no_saving, on the home read, the console and the bundle page alike", async () => {
+  // 1500 + 1600 = 3100 at 3000; then product 16's variant leaves the catalog (the sum left, 1500, is below the price)
+  const b = await inB(() => B.upsertBundle({ slug: "fix-gone", title: "Fix gone", items: it2(15, 16), bundle_price: 3000, enable: true }));
+  const saved = (await raw("SELECT * FROM variants WHERE id = ?", [V(16)])).rows[0];
+  const cols = Object.keys(saved);
+  await raw("DELETE FROM variants WHERE id = ?", [V(16)]);
+  try {
+    const read = (await inB(() => BR.bundlesByIds([b.id]))).get(b.id);
+    same([read.state, read.reasons.map((r) => r.kind), read.components.map((c) => c.state)], ["sold_out", ["missing"], ["ok", "missing"]], "home read");
+    const listed = (await inB(() => B.listBundles())).find((x) => x.id === b.id);
+    same([listed.compat.state, listed.compat.reasons.map((r) => r.kind)], ["sold_out", ["missing"]], "console list");
+    const page = await inB(() => B.getBundle("fix-gone"));
+    same([page.available, page.state, page.problems.some((p) => p.includes("doesn't save"))], [false, "sold_out", false], "bundle page");
+    ok(BW.stateLine(read.state, read.reasons).includes("Replace it with another product"), "the founder is told to replace it");
+  } finally {
+    await raw(`INSERT INTO variants (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`, cols.map((k) => saved[k]));
+    await inB(() => B.deleteBundle(b.id));
+  }
+});
+
+await t("P5-FIX1: a turned-on bundle stored with a quantity of 1.5 (offer in step) is not_ready with bad_quantity on the home read AND on the bundle page, and the page's sentence is 'This bundle isn't available right now.', never out of stock", async () => {
+  const b = await inB(() => B.upsertBundle({ slug: "fix-half", title: "Fix half", items: it2(7, 8), bundle_price: 1400, enable: true }));
+  // as a pre-P5 write could have left it: row and offer agree on 1.5
+  const half = [{ variantId: V(7), quantity: 1.5 }, { variantId: V(8), quantity: 1 }];
+  await raw("UPDATE bundles SET items = ? WHERE id = ?", [JSON.stringify(half), b.id]);
+  await raw("UPDATE offers SET config = json_set(config, '$.items', json(?)) WHERE id = ?", [JSON.stringify(half), `bundle-${b.id}`]);
+  try {
+    const read = (await inB(() => BR.bundlesByIds([b.id]))).get(b.id);
+    same([read.state, read.reasons.map((r) => r.kind)], ["not_ready", ["bad_quantity"]], "home read (the offer is in step: no not_synced)");
+    eq(read.reasons[0].title, "Fixture product 7", "the reason names the product:");
+    const page = await inB(() => B.getBundle("fix-half"));
+    same([page.available, page.state], [false, "not_ready"], "bundle page");
+    same([BW.bundlePageSaysOutOfStock(page), BW.BUNDLE_PAGE_UNAVAILABLE], [false, "This bundle isn't available right now."], "the page's rule and words");
+    eq(BW.reasonSentence(read.reasons[0]), "The quantity must be a whole number, 1 or more", "bundle-words names the reason:");
+    // and a sold-out bundle keeps the out-of-stock sentence
+    await raw("UPDATE variants SET available = 0 WHERE id = ?", [V(8)]);
+    await raw("UPDATE bundles SET items = ? WHERE id = ?", [JSON.stringify(it2(7, 8)), b.id]);
+    const sold = await inB(() => B.getBundle("fix-half"));
+    same([sold.available, sold.state, BW.bundlePageSaysOutOfStock(sold)], [false, "sold_out", true], "sold out");
+    const src = await readFile(join(ROOT, "app/(storefront)/bundles/[slug]/page.js"), "utf8");
+    ok(/bundlePageSaysOutOfStock\(b\) \? "A component is out of stock — the set comes back when it does\." : BUNDLE_PAGE_UNAVAILABLE/.test(src), "the page picks its sentence by that rule");
+    ok(!/\{!b\.available && <p[^>]*>A component is out of stock/.test(src), "the page never says out of stock for every unavailable bundle");
+  } finally {
+    await raw("UPDATE variants SET available = 1 WHERE id = ?", [V(8)]);
+    await inB(() => B.deleteBundle(b.id));
+  }
+});
+
 rawClient.close();
 await tn.cleanup();
 

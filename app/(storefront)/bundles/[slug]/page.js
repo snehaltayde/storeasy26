@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getBundle } from "@/lib/bundles";
 import { formatMoney } from "@/lib/format";
 import BundleAddButton from "@/components/BundleAddButton";
+import { BUNDLE_PAGE_UNAVAILABLE, bundlePageSaysOutOfStock } from "@/lib/commerce/bundle-words";
 import { tfetch } from "@/lib/tenant-request";
 import { closedStoreGate } from "@/lib/content/resolve";
 import { siteName } from "@/lib/site";
@@ -95,7 +96,9 @@ export default async function BundlePage({ params }) {
           <div className="mt-5">
             <BundleAddButton components={b.components} disabled={!b.available} />
           </div>
-          {!b.available && <p className="mt-2 text-xs text-sf-text-faint">A component is out of stock — the set comes back when it does.</p>}
+          {/* P5-FIX1: "out of stock" only when a product is; a bundle that is not
+              ready or saves nothing gets its own plain sentence */}
+          {!b.available && <p className="mt-2 text-xs text-sf-text-faint">{bundlePageSaysOutOfStock(b) ? "A component is out of stock — the set comes back when it does." : BUNDLE_PAGE_UNAVAILABLE}</p>}
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@ import Image from "@/components/StoreImage";
 import BundleAddButton from "@/components/BundleAddButton";
 import { formatMoney } from "@/lib/format";
 import { stateLine } from "@/lib/commerce/bundle-words";
-import { settingsOf, MediaFallback } from "./parts";
+import { settingsOf, MediaFallback, FounderNote } from "./parts";
 
 // P5-BLOCKS (COM-01, COM-02): one bundle on the home page (registry kind
 // "bundle_card"). Server component, edge-safe. Its data is the bundle entry
@@ -48,6 +48,14 @@ export function bundleReason(b) {
   return stateLine(b.state, reasonsOf(b), opts) || stateLine("missing");
 }
 
+// P5-FIX1: a shown bundle with a product deleted from the catalog. Shoppers
+// see it "Currently unavailable" with that product marked "No longer
+// available"; the founder, in a documents preview only, also gets a note
+// saying to replace the product (bundle-words' sold_out line for a missing
+// product). It never says to lower the price: compatFrom gives no no_saving
+// while a product is missing, since the sum would be false.
+export const hasDeletedProduct = (b) => isShown(b) && reasonsOf(b).some((r) => r?.kind === "missing");
+
 // What BundleAddButton gets for each product: the bundle page's props, no more.
 export const addProps = (components) =>
   (Array.isArray(components) ? components : []).map((c) => ({ variantId: c?.variantId ?? null, quantity: Math.max(1, Number(c?.quantity) || 1), available: c?.available === true }));
@@ -56,7 +64,9 @@ const isText = (v) => typeof v === "string" && v.trim() !== "";
 
 // One bundle: its products, price, saving, add button and link. The grid
 // renders one per cell.
-export function BundleBox({ bundle, Heading = "h3" }) {
+// ctx: the section's render context; the grid passes none, and FounderNote
+// then asks the request whether it is a documents preview.
+export function BundleBox({ bundle, Heading = "h3", ctx }) {
   const cur = bundle.currency ?? undefined;
   const components = Array.isArray(bundle.components) ? bundle.components : [];
   const href = isText(bundle.slug) ? `/bundles/${bundle.slug}` : null;
@@ -105,6 +115,9 @@ export function BundleBox({ bundle, Heading = "h3" }) {
             See the set →
           </Link>
         ) : null}
+        {hasDeletedProduct(bundle) ? (
+          <FounderNote ctx={ctx} className="mt-4" text={stateLine(bundle.state, reasonsOf(bundle), { currency: cur })} attrs={{ "data-bundle-note": "missing-product" }} />
+        ) : null}
       </div>
     </div>
   );
@@ -117,7 +130,7 @@ function BundleCardSection({ section, data = {}, ctx = {}, attrs = {} }) {
     <section data-sec={ctx.secKey} {...attrs} className="py-sf-section">
       {isText(s.title) ? <h2 className="mb-6 text-2xl font-bold tracking-tight">{s.title}</h2> : null}
       <div className="max-w-xl">
-        <BundleBox bundle={data.bundle} />
+        <BundleBox bundle={data.bundle} ctx={ctx} />
       </div>
     </section>
   );
