@@ -18,6 +18,8 @@
 //      BEFORE_CONTENT_LIVE, column for column, and re-run; the phase 4 tenant
 //      fixture (scripts/support/tenant-fixture.js) at each stage; and
 //      `--check --include-env`, which also checks the env store's ledger.
+//      P6-FIXTURE: the fixture's documents mode, real syncs (complete,
+//      partial, failed), catalog shapes, and phase 6's registered placeholders.
 //   pnpm test:schema-compat
 import { readFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -1085,7 +1087,8 @@ console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LI
         c.close();
       }
     };
-    const newestOf = { "0017": "0017_cms_approvals", "0020": "0020_sync_runs_resumable", "0022": "0022_preview_sessions", "0023": "0023_document_refs", "0024": "0024_content_live", latest: NEWEST };
+    const newestOf = { "0017": "0017_cms_approvals", "0020": "0020_sync_runs_resumable", "0022": "0022_preview_sessions", "0023": "0023_document_refs", "0024": "0024_content_live", "0025": "0025_media_archived", latest: NEWEST };
+    same(Object.keys(newestOf), [...F.STAGES], "every fixture stage is checked here:");
     for (const stage of F.STAGES) {
       const fx = await F.makeTenant({ name: `compat-p4-s${stage}`, stage, products: [{ title: `Stage ${stage} shirt` }, {}] });
       try {
@@ -1189,6 +1192,211 @@ console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LI
     console.log(`    (${stubs} of ${OPS.length} still stubs)`);
     const SUITES = ["legacy-write-guard", "media-refs", "legacy-fixtures", "content-seam", "effective-read", "product-content", "migrate-map", "search-effective", "entity-content", "media-picker", "product-editor", "legacy-routes", "migrate-render", "migrate-documents", "migrate-reverse"];
     for (const s of SUITES) eq(scripts[`test:${s}`], `node scripts/test-${s}.js`, `test:${s}:`);
+  });
+
+  // ---------------------------------------------------------------------------
+  // P6-FIXTURE (GEN-01, GEN-04, PUB-12): the fixture's documents mode, its real
+  // syncs and its catalog shapes. Nothing here may depend on CHECKOUT_MODE.
+  // ---------------------------------------------------------------------------
+  console.log("— P6-FIXTURE: documents-mode fixtures, real catalog syncs, catalog shapes, phase 6 placeholders");
+  delete process.env.CHECKOUT_MODE;
+  const SYNC = await import("../lib/sync.js");
+  const ADAPTER = await import("../lib/commerce/adapter.js");
+  const CART = await import("../lib/cart.js");
+  const one = async (c, sql, args = []) => (await c.execute({ sql, args })).rows[0];
+  const count = async (c, table) => Number((await one(c, `SELECT count(*) AS n FROM ${table}`)).n);
+  // What a fixture store holds, read from its own file
+  const stateOf = async (fx) => {
+    const c = fx.client();
+    try {
+      return {
+        mode: String((await one(c, "SELECT mode FROM cms_state WHERE id = 1"))?.mode ?? "none"),
+        liveRelease: (await one(c, "SELECT live_release_id FROM release_state WHERE id = 1"))?.live_release_id ?? null,
+        releases: await count(c, "releases"),
+        documents: await count(c, "documents"),
+        products: await count(c, "products"),
+        variants: await count(c, "variants"),
+        collections: await count(c, "collections"),
+        members: await count(c, "collection_products"),
+        runs: (await c.execute("SELECT status FROM sync_runs ORDER BY started_at")).rows.map((r) => String(r.status)),
+      };
+    } finally {
+      c.close();
+    }
+  };
+
+  await t("P6-FIXTURE: makeTenant({ mode: 'documents', sync: 'complete', catalogShape: 'few' }) is a confirmed, unopened documents store with direct checkout, CHECKOUT_MODE unset", async () => {
+    ok(process.env.CHECKOUT_MODE === undefined, "CHECKOUT_MODE is set");
+    const fx = await F.makeTenant({ name: "compat-p6-few", mode: "documents", sync: "complete", catalogShape: "few" });
+    try {
+      const conf = await fx.run(() => SYNC.confirmedCatalogSync());
+      eq(conf.confirmed, true, `confirmedCatalogSync (${JSON.stringify(conf)}):`);
+      same([conf.products, conf.collections], [4, 2], "confirmed counts:");
+      const s = await stateOf(fx);
+      same(s, { mode: "documents", liveRelease: null, releases: 0, documents: 0, products: 4, variants: 4, collections: 2, members: 4, runs: ["complete"] }, "the store:");
+      eq(fx.tenant.config.checkout_mode, "direct", "tenant config checkout_mode:");
+      ok(fx.tenant.config.maintenance === undefined && fx.tenant.config.billing === undefined, `maintenance or billing in the config: ${JSON.stringify(fx.tenant.config)}`);
+      eq(await fx.run(() => ADAPTER.checkoutMode()), "direct", "checkoutMode:");
+      const cap = await fx.run(() => ADAPTER.checkoutCapability());
+      same([cap.available, cap.cod], [true, true], `checkoutCapability (${JSON.stringify(cap)}):`);
+      // the run is the real one: injected source, prune and index reached
+      const run = fx.syncResult.run;
+      same([run.source, run.phase, Number(run.products), Number(run.collections)], ["injected", "done", 4, 2], "the sync_runs row:");
+      same([fx.mode, fx.sync, fx.collections.length], ["documents", "complete", 2], "the handle:");
+    } finally {
+      await fx.cleanup();
+    }
+  });
+
+  await t("P6-FIXTURE: the documents fixture's checkout_mode is its own: CHECKOUT_MODE=disabled in the env changes nothing, and a caller's checkout_mode still wins", async () => {
+    process.env.CHECKOUT_MODE = "disabled";
+    const fx = await F.makeTenant({ name: "compat-p6-env", mode: "documents", sync: "complete", catalogShape: "one" });
+    const off = await F.makeTenant({ name: "compat-p6-off", mode: "documents", catalogShape: "one", config: { checkout_mode: "disabled" } });
+    try {
+      eq((await fx.run(() => ADAPTER.checkoutCapability())).available, true, "documents fixture with env disabled:");
+      eq((await off.run(() => ADAPTER.checkoutCapability())).available, false, "caller's checkout_mode disabled:");
+    } finally {
+      delete process.env.CHECKOUT_MODE;
+      await fx.cleanup();
+      await off.cleanup();
+    }
+  });
+
+  await t("P6-FIXTURE: a 'few' product synced by the fixture goes into a cart (its variant is in the catalog, priced and available)", async () => {
+    const fx = await F.makeTenant({ name: "compat-p6-cart", mode: "documents", sync: "complete", catalogShape: "few" });
+    try {
+      const [p] = fx.products;
+      const vid = p.variants.nodes[0].id;
+      const cart = await fx.run(async () => {
+        await CART.createCart("fixture-cart");
+        await CART.addItem("fixture-cart", vid, 2);
+        return CART.getCart("fixture-cart");
+      });
+      eq(cart.items.length, 1, "lines:");
+      const [line] = cart.items;
+      same([line.variantId, line.productId, line.handle, line.sku, line.price, line.quantity, line.lineTotal, line.available], [vid, p.id, "fixture-product-1", "FX-1", 100, 2, 200, true], "the line:");
+    } finally {
+      await fx.cleanup();
+    }
+  });
+
+  await t("P6-FIXTURE: sync 'partial' and 'failed' leave a latest run that is not complete, so the catalog is not confirmed; the first page is kept", async () => {
+    for (const [sync, status, reason] of [
+      ["partial", "running", "running"],
+      ["failed", "failed", "failed"],
+    ]) {
+      const fx = await F.makeTenant({ name: `compat-p6-${sync}`, mode: "documents", sync, catalogShape: "few" });
+      try {
+        const conf = await fx.run(() => SYNC.confirmedCatalogSync());
+        same([conf.confirmed, conf.reason], [false, reason], `${sync} confirmedCatalogSync:`);
+        const s = await stateOf(fx);
+        same([s.mode, s.runs, s.products, s.collections], ["documents", [status], 2, 0], `${sync} store:`);
+        eq(fx.syncResult.run.status, status, `${sync} handle run:`);
+      } finally {
+        await fx.cleanup();
+      }
+    }
+  });
+
+  await t("P6-FIXTURE: catalogShape 'empty' with sync 'complete' is confirmed with 0 products; every shape lands as described", async () => {
+    const empty = await F.makeTenant({ name: "compat-p6-empty", mode: "documents", sync: "complete", catalogShape: "empty" });
+    try {
+      const conf = await empty.run(() => SYNC.confirmedCatalogSync());
+      same([conf.confirmed, conf.products, conf.collections], [true, 0, 0], "empty confirmed:");
+      same(await stateOf(empty), { mode: "documents", liveRelease: null, releases: 0, documents: 0, products: 0, variants: 0, collections: 0, members: 0, runs: ["complete"] }, "empty store:");
+    } finally {
+      await empty.cleanup();
+    }
+    const expect = { one: [1, 1], few: [4, 2], many: [40, 4], all_sold_out: [4, 1], no_images: [4, 1], long_titles: [3, 1], empty: [0, 0], no_collections: [4, 0] };
+    same(Object.keys(expect), [...F.CATALOG_SHAPES], "every shape is checked:");
+    for (const shape of F.CATALOG_SHAPES) {
+      const fx = await F.makeTenant({ name: `compat-p6-shape-${shape.replace(/_/g, "-")}`, mode: "documents", sync: "complete", catalogShape: shape });
+      const c = fx.client();
+      try {
+        const [np, nc] = expect[shape];
+        same([await count(c, "products"), await count(c, "collections"), await count(c, "variants"), await count(c, "collection_products")], [np, nc, np, nc ? np : 0], `${shape} counts:`);
+        ok((await fx.run(() => SYNC.confirmedCatalogSync())).confirmed, `${shape} not confirmed`);
+        const rows = (await c.execute("SELECT p.title, p.available, p.featured_image, (SELECT count(*) FROM product_images i WHERE i.product_id = p.id) AS imgs, (SELECT min(v.available) FROM variants v WHERE v.product_id = p.id) AS vavail FROM products p")).rows;
+        if (shape === "all_sold_out") ok(rows.every((r) => Number(r.available) === 0 && Number(r.vavail) === 0), "a sold-out product is available");
+        else ok(rows.every((r) => Number(r.available) === 1 && Number(r.vavail) === 1), `${shape}: a product is sold out`);
+        if (shape === "no_images") ok(rows.every((r) => r.featured_image == null && Number(r.imgs) === 0), "no_images has an image");
+        else ok(rows.every((r) => r.featured_image && Number(r.imgs) === 1), `${shape}: a product has no image`);
+        if (shape === "long_titles") {
+          ok(rows.every((r) => String(r.title).length > 200 && String(r.featured_image).length > 500), "long_titles: a title of 200 or fewer characters, or an image URL of 500 or fewer");
+          const col = await one(c, "SELECT title, image FROM collections");
+          ok(String(col.title).length > 200 && String(col.image).length > 500, "long_titles: the collection's title or image is short");
+        } else ok(rows.every((r) => String(r.title).length < 200), `${shape}: a long title`);
+      } finally {
+        c.close();
+        await fx.cleanup();
+      }
+    }
+    // without a sync the same shape is written as before (writeProduct, writeCollection), on legacy
+    const plain = await F.makeTenant({ name: "compat-p6-plain", catalogShape: "few" });
+    try {
+      same(await stateOf(plain), { mode: "legacy", liveRelease: null, releases: 0, documents: 0, products: 4, variants: 4, collections: 2, members: 4, runs: [] }, "few without a sync:");
+    } finally {
+      await plain.cleanup();
+    }
+    const mine = F.fixtureCollection(3, { title: "Mine", updatedAt: "2026-02-02T00:00:00Z" });
+    same([mine.id, mine.handle, mine.title, mine.description, mine.updatedAt], ["gid://shopify/Collection/9203", "fixture-collection-3", "Mine", "Mine description", "2026-02-02T00:00:00Z"], "fixtureCollection(i, over):");
+    same(F.fixtureCollection(1, { productIds: ["a"] }).products, { nodes: [{ id: "a" }] }, "fixtureCollection productIds:");
+  });
+
+  await t("P6-FIXTURE: with no new option makeTenant is what it was (legacy, no sync_runs, no collections, the caller's config object); bad options are refused before any file is made", async () => {
+    const config = { site: { name: "Plain" } };
+    const fx = await F.makeTenant({ name: "compat-p6-old", products: 2, config });
+    try {
+      same(await stateOf(fx), { mode: "legacy", liveRelease: null, releases: 0, documents: 0, products: 2, variants: 2, collections: 0, members: 0, runs: [] }, "default store:");
+      ok(fx.tenant.config === config, "the default path copied the caller's config");
+      same([fx.mode, fx.sync, fx.collections, fx.syncResult], ["legacy", "none", [], null], "the handle's new fields:");
+    } finally {
+      await fx.cleanup();
+    }
+    const refusals = [
+      [{ mode: "documents", stage: "0023" }, /needs stage 0024/],
+      [{ sync: "complete", stage: "0017" }, /needs stage 0020/],
+      [{ mode: "documentz" }, /unknown mode/],
+      [{ sync: "done" }, /unknown sync/],
+      [{ catalogShape: "huge" }, /unknown catalogShape/],
+      [{ catalogShape: "few", products: 2 }, /not both/],
+    ];
+    for (const [opts, re] of refusals) {
+      let e = null;
+      try {
+        await F.makeTenant({ name: "compat-p6-bad", ...opts });
+      } catch (err) {
+        e = err;
+      }
+      ok(e && re.test(e.message), `${JSON.stringify(opts)} was accepted (${e?.message})`);
+      ok(!existsSync(join(ROOT, ".test-compat-p6-bad-tenant.db")), `${JSON.stringify(opts)} left a database file`);
+    }
+  });
+
+  // P6-FIXTURE registers phase 6's gate suites and drill once, here (package.json
+  // is its only in phase 6). A placeholder is run only while it still is one:
+  // its owner replaces the file and its tests.
+  await t("P6-FIXTURE: the four phase 6 suites and drill:p6 are registered; each one still a placeholder prints its line and exits 0", async () => {
+    const { scripts } = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
+    const P6 = [
+      ["test:first-run", "scripts/test-first-run.js", "P6-GEN"],
+      ["test:brand-step", "scripts/test-brand-step.js", "P6-BRAND"],
+      ["test:open-checks", "scripts/test-open-checks.js", "P6-OPEN"],
+      ["test:policy-start", "scripts/test-policy-start.js", "P6-POLICY-START"],
+      ["drill:p6", "scripts/drills/p6/run.mjs", "P6-DRILLS"],
+    ];
+    let placeholders = 0;
+    for (const [name, file, owner] of P6) {
+      eq(scripts[name], `node ${file}`, `${name}:`);
+      const src = await readFile(join(ROOT, file), "utf8");
+      if (!src.includes(`placeholder: filled by ${owner}`)) continue;
+      placeholders++;
+      const r = spawnSync(process.execPath, [file], { cwd: ROOT, encoding: "utf8", timeout: 30_000, env: { PATH: process.env.PATH } });
+      eq(r.status, 0, `${name} exit:`);
+      eq(`${r.stdout}${r.stderr}`, `placeholder: filled by ${owner}\n`, `${name} output:`);
+    }
+    console.log(`    (${placeholders} of ${P6.length} still placeholders)`);
+    eq(scripts["drill:p4"], "node scripts/drills/p4/run.mjs", "drill:p4 kept:");
   });
 
   // Last in this suite: makePlatform moves this process's control plane.
