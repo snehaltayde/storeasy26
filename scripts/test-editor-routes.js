@@ -7,7 +7,8 @@
 //      compiled with Next's own SWC and called as server components with
 //      their data stubbed: /admin/editor in each mode, and each old screen's
 //      redirect (documents only) or its unchanged render (legacy, migrating);
-//   3. rendered: ConsoleShell and SidebarNav with and without documents mode;
+//   3. rendered: ConsoleShell and SidebarNav with and without documents mode
+//      (P6-NAV: "Logo and colours" after Editor on a documents store);
 //   4. rendered + behaviour: the Designer with a stubbed api, its candidate
 //      push failing in each way, through stand-in hooks (no browser).
 // The browser proof is scripts/drills/p3/routes.mjs on the design harness.
@@ -269,7 +270,10 @@ const pageStubs = {
   "@/lib/experiments": { runningTestsBySection: async () => ({ hero: { slug: "t1", name: "Hero test" } }) },
   "@/lib/db": { db: { selectFrom: () => ({ select: () => ({ execute: async () => [{ slug: "about", window_start: null, window_end: null }] }) }) } },
   "@/lib/schema-shape": { notMigratedYet: () => false },
-  "@/lib/tenant-context": { currentTenant: () => ({ config: { brand: { accent: "#112233" } } }), tenantOwnCfg: () => ({ kit: "pulse" }) },
+  "@/lib/tenant-context": { currentTenant: () => ({ config: S.config ?? { brand: { accent: "#112233" } } }), tenantOwnCfg: () => ({ kit: "pulse" }) },
+  // P6-NAV: the editor page's starting-brand modules (a template-literal
+  // import there, so this loader doesn't follow it: given here)
+  "@/lib/themes/palettes": await import("../lib/themes/palettes.js"),
   "@/lib/brand": { resolveBrand: (b) => ({ accent: b?.accent || "#000000" }), accentShades: () => ({ 500: "#112233" }), DEFAULT_BRAND: { accent: "#000000" } },
   "@/lib/admin/brand-readability": { brandReadability: async () => ({ warnings: [], notes: [] }) },
   "@/lib/themes/kits": { KITS: { pulse: { id: "pulse", version: 1, label: "Pulse", vertical: "beauty", description: "d", fonts: {}, brand: {}, swatch: [] } }, kitUpgradeAvailable: () => false },
@@ -341,6 +345,71 @@ await t("rendered: /admin/editor with a mode that can't be read is an error, nev
     threw = e;
   }
   ok(threw && threw.code === "CMS_MODE_UNAVAILABLE", `no error: ${threw}`);
+});
+
+// P6-NAV (owner answer OQ-P6-8): the editor page hands DocumentEditor the
+// store's starting palette brand (startingPaletteId of the tenant's
+// config.onboarding), read from the tenant already in context: no extra mode
+// read and no extra documents read. DocumentEditor is a marker here, so its
+// props can be read.
+const Palettes = await import("../lib/themes/palettes.js");
+async function runEditorWith(config, { mode = "documents", query = {}, overrides = {} } = {}) {
+  Object.assign(S, { mode, modeThrows: false, modeReads: 0, docsReads: 0, config });
+  try {
+    // (descriptors copied, so an override that throws when read stays a getter)
+    const ov = Object.defineProperties({ "@/components/admin/editor/DocumentEditor": { __esModule: true, default: marker("DocumentEditor") } }, Object.getOwnPropertyDescriptors(overrides));
+    const Page = (await loadPage(join(AUTHED, "editor/page.js"), { overrides: ov })).default;
+    const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve(query) }));
+    const m = /data-stub="DocumentEditor" data-props="([^"]*)"/.exec(html);
+    const props = m ? JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&#x27;/g, "'")) : null;
+    return { html, props, modeReads: S.modeReads, docsReads: S.docsReads };
+  } finally {
+    S.config = undefined;
+  }
+}
+await t("P6-NAV rendered: on a documents store the editor page passes startingBrand = the brand step's palette (forest after a recorded forest pick; slate with no record, an unknown id, or a skip with no earlier pick), with one mode read and one documents read", async () => {
+  const forest = { ...Palettes.paletteById("forest").brand };
+  const slate = { ...Palettes.paletteById("slate").brand };
+  const cases = [
+    ["a recorded forest pick", { onboarding: { brand_step: { paletteId: "forest", skipped: false, at: "2026-11-05T10:00:00.000Z" } } }, forest],
+    ["a skip that kept an earlier forest pick", { onboarding: { brand_step: { paletteId: "forest", skipped: true } } }, forest],
+    ["no onboarding record", { brand: { accent: "#112233" } }, slate],
+    ["a skip with no earlier pick", { onboarding: { brand_step: { skipped: true } } }, slate],
+    ["an unknown palette id", { onboarding: { brand_step: { paletteId: "lime" } } }, slate],
+    ["no config at all", {}, slate],
+  ];
+  for (const [what, config, want] of cases) {
+    const r = await runEditorWith(config);
+    ok(r.props, `${what}: DocumentEditor did not render: ${r.html.slice(0, 300)}`);
+    eq(r.props.startingBrand, want, `${what}: startingBrand`);
+    ok(!Palettes.isLimeAccent(r.props.startingBrand.accent), `${what}: a lime accent`);
+    eq([r.modeReads, r.docsReads], [1, 1], `${what}: reads`);
+  }
+  // the other entries (a product's content, ?doc=) carry it too
+  const design = await runEditorWith({ onboarding: { brand_step: { paletteId: "forest" } } }, { query: { doc: "doc_design" } });
+  eq(design.props.startingBrand, forest, "?doc=doc_design:");
+  eq([design.modeReads, design.docsReads], [1, 1], "?doc=doc_design reads:");
+  // the modules can't load: the editor still opens, with null (the form then
+  // uses slate), and the failure is logged
+  const logged = [];
+  const broken = { "@/lib/log": { slog: (ev) => logged.push(ev) } };
+  Object.defineProperty(broken, "@/lib/themes/palettes", { enumerable: true, get: () => { throw new Error("chunk failed"); } });
+  const r = await runEditorWith({ onboarding: { brand_step: { paletteId: "forest" } } }, { overrides: broken });
+  ok(r.props, "the editor still opens");
+  eq(r.props.startingBrand, null, "startingBrand when its modules can't load:");
+  eq(logged, ["editor_starting_brand_failed"], "logged:");
+});
+await t("P6-NAV rendered: legacy and migrating editor renders are unchanged (no startingBrand, no documents read), and the page never imports the generator statically", async () => {
+  for (const mode of ["legacy", "migrating"]) {
+    const plain = await run("editor/page.js", { mode });
+    const withRecord = await runEditorWith({ onboarding: { brand_step: { paletteId: "forest" } } }, { mode });
+    eq(withRecord.html, plain.html, `${mode}: the markup`);
+    ok(!withRecord.html.includes("startingBrand") && !withRecord.html.includes("DocumentEditor"), `${mode}: the editor showed`);
+    eq([withRecord.modeReads, withRecord.docsReads], [1, 0], `${mode}: reads`);
+  }
+  const src = await readFile(join(AUTHED, "editor/page.js"), "utf8");
+  ok(!/^import [^\n]*first-run\/generate/m.test(src), "editor/page.js imports lib/first-run/generate.js statically");
+  ok(src.includes("import(`@/lib/tenant-context`)") && src.includes("import(`@/lib/themes/palettes`)") && !/^import [^\n]*(themes\/palettes|tenant-context)/m.test(src), "the starting-brand modules are template-literal imports (test-first-run pins the files the page compiles)");
 });
 
 await t("rendered: a signed-out visitor goes to the sign-in page first", async () => {
@@ -521,6 +590,27 @@ await t("rendered: the (authed) layout passes the mode it reads to the shell, be
     ok(html.includes(`data-shell="${want}"`) && html.includes("<p>page</p>"), `${mode}${throws ? " (read fails)" : ""}: ${html}`);
   }
   S.modeThrows = false;
+});
+
+// P6-NAV (GEN-04, US-01): the logo and colours can be found after the store
+// opens. Documents only; the legacy nav is pinned unchanged just above.
+await t("P6-NAV rendered: the documents nav has 'Logo and colours' -> /admin/start right after Editor, for owners and staff; the legacy nav has no such link", () => {
+  pathname = "/admin/start";
+  const html = renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "owner", cmsMode: "documents", badges: {} }));
+  const links = hrefs(html);
+  const at = links.indexOf("/admin/editor");
+  eq(links.slice(at, at + 4), ["/admin/editor", "/admin/start", "/admin/media", "/admin/releases"], "the storefront group in order:");
+  ok(/<a [^>]*href="\/admin\/start"[^>]*aria-current="page"[^>]*>[\s\S]*?Logo and colours/.test(html), `the link, marked current on /admin/start: ${html.slice(0, 200)}`);
+  const store = Nav.navGroups("documents").find((g) => g.label === "Storefront").items;
+  eq(store[1], { id: "start", label: "Logo and colours", href: "/admin/start" }, "the item (not admin-only):");
+  ok(hrefs(renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "staff", cmsMode: "documents" }))).includes("/admin/start"), "staff see it");
+  for (const cmsMode of [null, "legacy", "migrating"]) {
+    const l = renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "owner", cmsMode, badges: {} }));
+    ok(!hrefs(l).includes("/admin/start") && !l.includes("Logo and colours"), `${cmsMode}: the legacy nav links to /admin/start`);
+  }
+  ok(!Nav.NAV_GROUPS.some((g) => g.items.some((it) => it.id === "start")), "NAV_GROUPS itself changed");
+  // both sidebars of the shell (the drawer open)
+  eq(hrefs(shell({ cmsMode: "documents", drawerOpen: true })).filter((h) => h === "/admin/start").length, 2, "desktop and drawer:");
 });
 
 // ---- 4. the Designer: a failed candidate push --------------------------------------

@@ -41,11 +41,32 @@ import DocumentEditor from "@/components/admin/editor/DocumentEditor";
 // offers (anyone else reads "Ask an owner to create bundles."). The store's
 // currency goes with it for that form; when it can't be read the form gets
 // undefined and formatMoney uses its own default (as Catalog > Bundles does).
+// P6-NAV (owner answer OQ-P6-8): the editor also gets startingBrand, the
+// store's starting palette brand (startingPaletteId of the tenant's
+// config.onboarding: the brand step's palette, else slate), which the design
+// form's Reset goes back to. It comes from the tenant already in context (no
+// extra mode or documents read), and never the platform's lime default. Its
+// two modules are loaded the way the generator is (a template literal), so
+// the suites that compile this page alone (test-first-run pins the files it
+// compiles) don't follow them; they are pure and small. If they can't load,
+// the editor gets null and the design form uses the default palette (slate),
+// still never lime; the failure is logged.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Editor · Admin", robots: { index: false } };
 
 const ENTITY_TYPES = new Set(["product_content", "collection_content"]);
+
+async function startingBrandHere() {
+  try {
+    const [{ currentTenant }, { paletteById, startingPaletteId }] = await Promise.all([import(`@/lib/tenant-context`), import(`@/lib/themes/palettes`)]);
+    const onboarding = currentTenant()?.config?.onboarding ?? null;
+    return { ...paletteById(startingPaletteId(onboarding)).brand };
+  } catch (e) {
+    slog("editor_starting_brand_failed", { error: String(e?.message || e).slice(0, 200) });
+    return null;
+  }
+}
 
 const currencyForBundles = async () => {
   try {
@@ -80,9 +101,13 @@ export default async function EditorPage({ searchParams }) {
   const query = (await searchParams) || {};
   const target = parseEditorTarget(query);
   const editable = canEdit(actor);
-  const { mode, entry, entity, readOnly } = await tfetch(async () => {
+  const { mode, entry, entity, readOnly, startingBrand } = await tfetch(async () => {
     const mode = await getCmsMode();
     if (mode !== "documents") return { mode, entry: null };
+    // P6-NAV: read inside the store's context (the tenant tfetch resolved)
+    return { ...(await documentsEntry(mode)), startingBrand: await startingBrandHere() };
+  });
+  async function documentsEntry(mode) {
     if (target.product || target.collection) {
       const type = target.product ? "product_content" : "collection_content";
       const out = await entityEntry({ type, entityId: target.product || target.collection, actor });
@@ -100,12 +125,12 @@ export default async function EditorPage({ searchParams }) {
     // ?doc= of a product's or collection's content: read what Shopify sends now
     const row = docs.find((d) => d.id === e.document.id);
     return { mode, entry: e, entity: await entityForDocument(row), readOnly: editable ? null : ENTRY_WORDS.readOnly };
-  });
+  }
 
   if (mode === "documents") {
     const offersWrite = roleAllows(actor?.role, "offers.write");
     const currency = offersWrite ? await tfetch(currencyForBundles) : undefined;
-    return <DocumentEditor document={entry.document} note={entry.note} entity={entity ?? null} readOnly={readOnly ?? null} can={{ offersWrite }} currency={currency} />;
+    return <DocumentEditor document={entry.document} note={entry.note} entity={entity ?? null} readOnly={readOnly ?? null} can={{ offersWrite }} currency={currency} startingBrand={startingBrand} />;
   }
 
   if (mode === "legacy") {
