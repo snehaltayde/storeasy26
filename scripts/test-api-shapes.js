@@ -94,7 +94,7 @@ try {
 } catch (e) {
   failures.push(`the shapes file doesn't load: ${e.message}`);
 }
-const { SHAPES, COMMON, SHAPES_VERSION } = Sh;
+const { SHAPES, COMMON, SHAPES_VERSION, FIRST_RUN } = Sh;
 
 
 const read = (p) => readFile(join(ROOT, p), "utf8");
@@ -127,7 +127,11 @@ const EMITTERS = { "lib/admin/documents-api.js": apiSource, "lib/cms/issues.js":
 // P4-LIVEROW: the codes phase 4 adds ("p4" outcomes), each emitted now, with
 // its outcome's status.
 const P4_CODES = ["SHOPIFY_OWNED", "TITLE_NOT_EDITABLE", "TITLE_NOT_PUBLISHABLE", "STORE_MIGRATING", "CANNOT_TAKE_OFFLINE_CONTENT", "NOT_PRODUCT_CONTENT", "PRODUCT_NOT_IN_SHOPIFY", "PRODUCT_IN_SHOPIFY"];
-const BUILT_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "CANNOT_TAKE_OFFLINE", "TOO_MANY_KEPT", ...P4_CODES]);
+// P6-GEN-WRITE: the codes phase 6 adds ("p6" outcomes), each emitted now
+// (lib/documents/service.js createFirstRunDocuments). P6-OPEN adds its codes
+// to this same list in batch 2.
+const P6_CODES = ["FIRST_RUN_ACTOR", "FIRST_RUN_STORE_LIVE", "FIRST_RUN_RACE"];
+const BUILT_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "CANNOT_TAKE_OFFLINE", "TOO_MANY_KEPT", ...P4_CODES, ...P6_CODES]);
 const NEW_CODES = new Set([...BUILT_CODES]);
 
 // ---- walking the shapes ------------------------------------------------------------
@@ -139,6 +143,9 @@ for (const [opName, op] of Object.entries(SHAPES || {})) {
   if (op.sameOutcomesAs) continue;
   for (const [name, o] of Object.entries(op.outcomes || {})) allOutcomes.push({ where: `${opName}.${name}`, o });
 }
+// P6-GEN-WRITE: the first-run writer's answers (not an operation of the
+// documents API: P6-GEN's route gives them)
+for (const [name, o] of Object.entries(FIRST_RUN?.outcomes || {})) allOutcomes.push({ where: `FIRST_RUN.${name}`, o });
 
 // "rows[].note" -> does the example have it? ("[]" = the first element)
 function hasPath(value, path) {
@@ -198,7 +205,7 @@ check("every operation of today and of phase 3 has its entry", () => {
 check("every outcome has a status, since, a body, and paths that exist", () => {
   for (const { where, o } of allOutcomes) {
     if (!Number.isInteger(o.status) || o.status < 200 || o.status > 599) fail(`${where}: status ${o.status}`);
-    if (o.since !== "p2" && o.since !== "p3" && o.since !== "p4") fail(`${where}: since is ${o.since}`);
+    if (o.since !== "p2" && o.since !== "p3" && o.since !== "p4" && o.since !== "p6") fail(`${where}: since is ${o.since}`);
     if (!o.body || typeof o.body !== "object" || Array.isArray(o.body)) fail(`${where}: no body`);
     if (o.status === 200) {
       if (o.body.ok !== true) fail(`${where}: a 200 without ok: true`);
@@ -209,7 +216,7 @@ check("every outcome has a status, since, a body, and paths that exist", () => {
       if (o.status !== 401 && o.status !== 403 && !/^[A-Z][A-Z_]+$/.test(o.body.code || "")) fail(`${where}: code ${o.body.code}`);
     }
     for (const p of [...(o.optional || []), ...(o.addedInPhase3 || [])]) if (!hasPath(o.body, p)) fail(`${where}: ${p} is listed but the example has no such key`);
-    if ((o.since === "p3" || o.since === "p4") && o.addedInPhase3) fail(`${where}: a ${o.since} outcome lists addedInPhase3 (it is new as a whole)`);
+    if ((o.since === "p3" || o.since === "p4" || o.since === "p6") && o.addedInPhase3) fail(`${where}: a ${o.since} outcome lists addedInPhase3 (it is new as a whole)`);
   }
 });
 
@@ -268,6 +275,22 @@ check("every code the API gives today is copied exactly, with its status", () =>
       fail(`${where}: ${code} is ${o.status} here, the code says ${[...statuses].join(" or ")}`);
     }
   }
+});
+
+// P6-GEN-WRITE: the first-run writer's outcomes exist, each refusal's words
+// are the service's own (copied, not paraphrased), and each p6 code is used.
+check("the first-run writer's outcomes carry the service's words and the p6 codes", () => {
+  if (!FIRST_RUN || !FIRST_RUN.outcomes) fail("FIRST_RUN is missing from the shapes file");
+  const outs = Object.values(FIRST_RUN?.outcomes || {});
+  for (const c of P6_CODES) if (!outs.some((o) => o.body.code === c && o.since === "p6")) fail(`${c} has no p6 first-run outcome`);
+  for (const o of outs) {
+    if (o.status === 200 || o.body.code === "VALIDATION_FAILED") continue;
+    // MIGRATING_MESSAGE is lib/cms-mode.js's, which the service imports
+    const src = o.body.code === "STORE_MIGRATING" ? extraSources["lib/cms-mode.js"] : serviceSource;
+    if (!src.includes(JSON.stringify(o.body.error))) fail(`the first-run words for ${o.body.code} aren't in service.js: ${o.body.error}`);
+  }
+  const okBody = FIRST_RUN?.outcomes?.ok?.body || {};
+  sameList(Object.keys(okBody).filter((k) => k !== "ok"), ["written", "created", "refilled", "unchanged", "skipped"], "first-run ok keys");
 });
 
 check("the new phase 3 codes are each used by an outcome", () => {

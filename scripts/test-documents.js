@@ -30,7 +30,7 @@ process.env.PLATFORM_DB_TOKEN = "";
 process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
-const dbs = [".test-documents-default.db", ".test-documents-platform.db", ".test-documents-docs.db", ".test-documents-legacy.db"];
+const dbs = [".test-documents-default.db", ".test-documents-platform.db", ".test-documents-docs.db", ".test-documents-legacy.db", ".test-documents-firstrun.db"];
 const cleanup = async () => {
   for (const f of dbs) await rm(join(ROOT, f), { force: true });
 };
@@ -77,16 +77,19 @@ await C.migratePlatform(await readFile(join(here, "../lib/platform/schema.sql"),
 const schema = await readFile(join(here, "../lib/schema.sql"), "utf8");
 const migrations = await loadMigrations("tenant");
 const raw = {};
-for (const [key, file] of [["docs", ".test-documents-docs.db"], ["legacy", ".test-documents-legacy.db"]]) {
+for (const [key, file] of [["docs", ".test-documents-docs.db"], ["legacy", ".test-documents-legacy.db"], ["fr", ".test-documents-firstrun.db"]]) {
   const c = createClient({ url: `file:${file}` });
   await c.executeMultiple(schema);
   await runMigrations(c, migrations);
   raw[key] = c;
 }
 await raw.docs.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+await raw.fr.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
 await C.upsertTenant({ id: "zd", name: "Docs", domains: ["zd.test"], dbUrl: "file:.test-documents-docs.db", config: {}, secrets: {} });
 await C.upsertTenant({ id: "zl", name: "Legacy", domains: ["zl.test"], dbUrl: "file:.test-documents-legacy.db", config: {}, secrets: {} });
-const TEN = { docs: await C.getTenant("zd"), legacy: await C.getTenant("zl") };
+// P6-GEN-WRITE: a fresh documents store of its own for the first-run writer
+await C.upsertTenant({ id: "zf", name: "First run", domains: ["zf.test"], dbUrl: "file:.test-documents-firstrun.db", config: {}, secrets: {} });
+const TEN = { docs: await C.getTenant("zd"), legacy: await C.getTenant("zl"), fr: await C.getTenant("zf") };
 
 const ownerU = await I.createUser({ email: "asha@zd.test", name: "Asha Rao", password: "owner-pass-docs" });
 const staffU = await I.createUser({ email: "ravi@zd.test", password: "staff-pass-docs" }); // no name: the email is shown
@@ -992,6 +995,366 @@ await t("P5-SETTING: a section's bundle and bundle-list settings write document_
     await raw.docs.execute({ sql: "DELETE FROM document_refs WHERE version_id = ?", args: [versionId] });
   }
 });
+
+// --- P6-GEN-WRITE (GEN-01): the first-run writer ---------------------------------------------
+console.log("— the first-run writer (GEN-01)");
+{
+  const FR = Docs.FIRST_RUN_ACTOR;
+  const MERCHANT = { kind: "merchant", id: ownerU.id };
+  const frSql = (q, args = []) => sql(q, args, "fr");
+  const frIn = (fn) => inT(fn, "fr");
+  const gen = (docs, opts = {}) => frIn(() => Docs.createFirstRunDocuments({ docs, actor: FR, ...opts }));
+  const homeOf = (title) => ({ ...R.emptyBody("home"), sections: [textSection("sec_fr_text", title)] });
+  const designOf = (accent) => ({ ...R.emptyBody("design"), settings: { brand: { accent }, theme: { kit: "pulse", version: 1 } } });
+  const both = (h, d) => [
+    { type: "home", id: "doc_home", body: h },
+    { type: "design", id: "doc_design", body: d },
+  ];
+  const reset = async () => {
+    for (const q of ["DELETE FROM document_refs", "DELETE FROM document_versions", "DELETE FROM documents", "UPDATE release_state SET live_release_id = NULL WHERE id = 1", "UPDATE cms_state SET mode = 'documents' WHERE id = 1"]) await raw.fr.execute(q);
+  };
+  const rowOf = async (id) => (await frSql("SELECT * FROM documents WHERE id = ?", [id]))[0] ?? null;
+  const versionCount = async (id) => Number((await frSql("SELECT count(*) AS n FROM document_versions WHERE document_id = ?", [id]))[0].n);
+  const refusal = async (p) => {
+    try {
+      await p;
+    } catch (e) {
+      return e;
+    }
+    throw new Error("expected a refusal");
+  };
+  // counts the batches the writer sends, and lets a test act just before one
+  const spyBatches = async (before = null) => {
+    const inst = await frIn(() => currentDatabase());
+    const send = inst.libsql.batch;
+    const seen = [];
+    inst.libsql.batch = async (stmts, mode) => {
+      seen.push(stmts.length);
+      if (before) await before();
+      return send.call(inst.libsql, stmts, mode);
+    };
+    return { seen, restore: () => delete inst.libsql.batch };
+  };
+
+  await t("on a fresh documents store it creates doc_home and doc_design in ONE batch, with 'Created' version rows by system:first-run (shown as Storeasy)", async () => {
+    await reset();
+    const spy = await spyBatches();
+    let r;
+    try {
+      r = await gen(both(homeOf("Welcome"), designOf("#334155")));
+    } finally {
+      spy.restore();
+    }
+    eq(r, { written: true, created: ["doc_home", "doc_design"], refilled: [], unchanged: [], skipped: [] }, "the answer:");
+    eq(spy.seen.length, 1, "batches sent:");
+    for (const id of ["doc_home", "doc_design"]) {
+      const row = await rowOf(id);
+      eq([row.revision, row.updated_by, row.published_version_id, row.archived_at], [1, "system:first-run", null, null], `${id} row:`);
+      const vs = await frSql("SELECT kind, note, created_by FROM document_versions WHERE document_id = ?", [id]);
+      eq(vs.map((v) => ({ ...v })), [{ kind: "checkpoint", note: "Created", created_by: "system:first-run" }], `${id} versions:`);
+      const hist = await frIn(() => Docs.listHistory(id, { tenant: "zf" }));
+      eq(hist.map((h) => h.by), ["Storeasy"], `${id} history names it:`);
+    }
+    eq(V.plainName(Docs.FIRST_RUN_BY, new Map()), "Storeasy", "plainName:");
+    eq(Docs.actorString(FR), Docs.FIRST_RUN_BY, "the actor's string:");
+    eq(JSON.parse((await rowOf("doc_home")).draft).sections[0].settings.title, "Welcome", "the stored home:");
+  });
+
+  await t("a second call with different bodies refills both (revision + 1, a new version row each); a third with the same bodies is unchanged: no revision bump, no new version row", async () => {
+    await reset();
+    await gen(both(homeOf("Welcome"), designOf("#334155")));
+    const r2 = await gen(both(homeOf("Welcome back"), designOf("#14532d")));
+    eq(r2, { written: true, created: [], refilled: ["doc_home", "doc_design"], unchanged: [], skipped: [] }, "second answer:");
+    for (const id of ["doc_home", "doc_design"]) {
+      eq([(await rowOf(id)).revision, await versionCount(id)], [2, 2], `${id} after the refill:`);
+    }
+    eq(JSON.parse((await rowOf("doc_design")).draft).settings.brand.accent, "#14532d", "the refilled design:");
+    const before = await dump("fr");
+    const spy = await spyBatches();
+    let r3;
+    try {
+      r3 = await gen(both(homeOf("Welcome back"), designOf("#14532d")));
+    } finally {
+      spy.restore();
+    }
+    eq(r3, { written: false, created: [], refilled: [], unchanged: ["doc_home", "doc_design"], skipped: [] }, "third answer:");
+    eq(spy.seen.length, 0, "no batch for an unchanged refill:");
+    await unchanged(before, "an unchanged refill", "fr");
+  });
+
+  await t("refills prune old version rows the way saveDraft does (at most the checkpoint cap are kept)", async () => {
+    await reset();
+    await gen(both(homeOf("Title 0"), designOf("#334155")));
+    for (let i = 1; i <= V.CHECKPOINT_CAP + 3; i++) await gen([{ type: "home", id: "doc_home", body: homeOf(`Title ${i}`) }]);
+    eq((await rowOf("doc_home")).revision, V.CHECKPOINT_CAP + 4, "every refill bumped the revision:");
+    eq(await versionCount("doc_home"), V.CHECKPOINT_CAP, "versions kept:");
+    // the newest is kept, the oldest went
+    const notes = await frSql("SELECT note FROM document_versions WHERE document_id = 'doc_home' AND note = 'Created'");
+    eq(notes.length, 0, "the oldest checkpoint was pruned:");
+  });
+
+  await t("a founder-saved doc_home is skipped with reason 'founder': its revision, body and versions don't change, and the design is still written", async () => {
+    await reset();
+    await gen(both(homeOf("Welcome"), designOf("#334155")));
+    const h = await frIn(() => Docs.getDocument("doc_home"));
+    await frIn(() => Docs.saveDraft({ id: "doc_home", revision: h.revision, body: homeOf("My own words"), actor: MERCHANT }));
+    const before = await rowOf("doc_home");
+    const nBefore = await versionCount("doc_home");
+    const r = await gen(both(homeOf("Generated again"), designOf("#14532d")));
+    eq(r, { written: true, created: [], refilled: ["doc_design"], unchanged: [], skipped: [{ id: "doc_home", reason: "founder" }] }, "the answer:");
+    eq({ ...(await rowOf("doc_home")) }, { ...before }, "doc_home row:");
+    eq(await versionCount("doc_home"), nBefore, "doc_home versions:");
+  });
+
+  await t("an empty doc_home made by createDocument under a merchant (revision 1, emptyBody) is refilled; with a section added it is skipped; with allowEmptyRefill:false the empty one is skipped too", async () => {
+    await reset();
+    await frIn(() => Docs.createDocument({ type: "home", body: R.emptyBody("home"), actor: MERCHANT }));
+    eq([(await rowOf("doc_home")).revision, (await rowOf("doc_home")).updated_by], [1, `merchant:${ownerU.id}`], "the founder's empty home:");
+    // allowEmptyRefill: false (the sync trigger) leaves it alone
+    const before = await dump("fr");
+    const off = await gen([{ type: "home", id: "doc_home", body: homeOf("Welcome") }], { allowEmptyRefill: false });
+    eq(off, { written: false, created: [], refilled: [], unchanged: [], skipped: [{ id: "doc_home", reason: "founder" }] }, "allowEmptyRefill false:");
+    await unchanged(before, "allowEmptyRefill false", "fr");
+    const on = await gen([{ type: "home", id: "doc_home", body: homeOf("Welcome") }]);
+    eq(on.refilled, ["doc_home"], "refilled:");
+    eq([(await rowOf("doc_home")).revision, (await rowOf("doc_home")).updated_by], [2, "system:first-run"], "after the refill:");
+    // the same empty home with one section added: the founder's
+    await reset();
+    await frIn(() => Docs.createDocument({ type: "home", body: { ...R.emptyBody("home"), sections: [R.newSection("text")] }, actor: MERCHANT }));
+    const before2 = await dump("fr");
+    const r = await gen([{ type: "home", id: "doc_home", body: homeOf("Welcome") }]);
+    eq(r.skipped, [{ id: "doc_home", reason: "founder" }], "one section added:");
+    await unchanged(before2, "a home with a section", "fr");
+    // emptyBody's hash, not a deep-equal: two empty bodies with different
+    // random section ids would hash alike (ids stripped)
+    const a = await R.documentHash(R.ensureIds({ ...R.emptyBody("home"), sections: [R.newSection("text")] }));
+    const b = await R.documentHash(R.ensureIds({ ...R.emptyBody("home"), sections: [R.newSection("text")] }));
+    eq(a, b, "ids don't change a hash:");
+  });
+
+  await t("a published document is skipped ('published') and an archived row ('archived', set by hand: singletons can't be archived); nothing of a skipped document changes, no version row", async () => {
+    await reset();
+    await gen(both(homeOf("Welcome"), designOf("#334155")));
+    const v = (await frSql("SELECT id FROM document_versions WHERE document_id = 'doc_home'"))[0].id;
+    await raw.fr.execute({ sql: "UPDATE documents SET published_version_id = ?, published_hash = draft_hash WHERE id = 'doc_home'", args: [v] });
+    await raw.fr.execute("UPDATE documents SET archived_at = '2026-01-01T00:00:00.000Z' WHERE id = 'doc_design'");
+    const before = await dump("fr");
+    const r = await gen(both(homeOf("Again"), designOf("#14532d")));
+    eq(r, { written: false, created: [], refilled: [], unchanged: [], skipped: [{ id: "doc_home", reason: "published" }, { id: "doc_design", reason: "archived" }] }, "the answer:");
+    await unchanged(before, "skipped documents", "fr");
+  });
+
+  await t("a live store gets 409 FIRST_RUN_STORE_LIVE, nothing written; also after a take-offline set published_version_id back to NULL (the guard, not the column)", async () => {
+    await reset();
+    await raw.fr.execute("UPDATE release_state SET live_release_id = 'rel_fr_live' WHERE id = 1");
+    let before = await dump("fr");
+    let e = await refusal(gen(both(homeOf("Welcome"), designOf("#334155"))));
+    eq([e.status, e.code], [409, "FIRST_RUN_STORE_LIVE"], "on a fresh live store:");
+    ok(!/[A-Z]{2,}_[A-Z_]+/.test(e.message) && /already open/.test(e.message), `plain words: ${e.message}`);
+    await unchanged(before, "a live store", "fr");
+    // generator-owned, unpublished drafts on a live store (a take-offline
+    // cleared published_version_id): still refused
+    await reset();
+    await gen(both(homeOf("Welcome"), designOf("#334155")));
+    await raw.fr.execute("UPDATE release_state SET live_release_id = 'rel_fr_live' WHERE id = 1");
+    before = await dump("fr");
+    e = await refusal(gen(both(homeOf("Again"), designOf("#14532d"))));
+    eq([e.status, e.code], [409, "FIRST_RUN_STORE_LIVE"], "a refill on a live store:");
+    await unchanged(before, "a refill on a live store", "fr");
+  });
+
+  await t("a legacy store gets 409 STORE_USES_LEGACY and a migrating store 409 STORE_MIGRATING, nothing written", async () => {
+    for (const [mode, code, words] of [["legacy", "STORE_USES_LEGACY", /current Storefront editor/], ["migrating", "STORE_MIGRATING", /being updated/]]) {
+      await reset();
+      await raw.fr.execute({ sql: "UPDATE cms_state SET mode = ? WHERE id = 1", args: [mode] });
+      const before = await dump("fr");
+      const e = await refusal(gen(both(homeOf("Welcome"), designOf("#334155"))));
+      eq([e.status, e.code], [409, code], `${mode}:`);
+      ok(words.test(e.message), `${mode} words: ${e.message}`);
+      await unchanged(before, mode, "fr");
+    }
+    await reset();
+  });
+
+  await t("a revision race (a founder save between classify and batch) aborts the whole batch: neither document changes, 409 FIRST_RUN_RACE", async () => {
+    await reset();
+    await gen(both(homeOf("Welcome"), designOf("#334155")));
+    let snap = null;
+    Docs.firstRunHooks.beforeBatch = async ({ plan }) => {
+      Docs.firstRunHooks.beforeBatch = null;
+      eq(plan, [{ id: "doc_home", kind: "refill", rule: "owned" }, { id: "doc_design", kind: "refill", rule: "owned" }], "the plan:");
+      const h = await frIn(() => Docs.getDocument("doc_home"));
+      await frIn(() => Docs.saveDraft({ id: "doc_home", revision: h.revision, body: homeOf("The founder's words"), actor: MERCHANT }));
+      snap = await dump("fr");
+    };
+    let e;
+    try {
+      e = await refusal(gen(both(homeOf("Generated again"), designOf("#14532d"))));
+    } finally {
+      Docs.firstRunHooks.beforeBatch = null;
+    }
+    eq([e.status, e.code], [409, "FIRST_RUN_RACE"], "the refusal:");
+    await unchanged(snap, "a lost race", "fr");
+    eq(JSON.parse((await rowOf("doc_design")).draft).settings.brand.accent, "#334155", "the design kept its draft:");
+  });
+
+  await t("the SQL repeats each classified predicate: another writer at the same revision, an edited revision-1 empty home, or a home made meanwhile all abort the batch (FIRST_RUN_RACE)", async () => {
+    const raceWith = async (sqlText, args = []) => {
+      let snap = null;
+      Docs.firstRunHooks.beforeBatch = async () => {
+        Docs.firstRunHooks.beforeBatch = null;
+        await raw.fr.execute({ sql: sqlText, args });
+        snap = await dump("fr");
+      };
+      try {
+        const e = await refusal(gen(both(homeOf("Generated"), designOf("#14532d"))));
+        eq([e.status, e.code], [409, "FIRST_RUN_RACE"], `${sqlText.slice(0, 40)}:`);
+      } finally {
+        Docs.firstRunHooks.beforeBatch = null;
+      }
+      await unchanged(snap, sqlText.slice(0, 40), "fr");
+    };
+    // generator-owned at classify; then another writer, same revision
+    await reset();
+    await gen(both(homeOf("Welcome"), designOf("#334155")));
+    await raceWith("UPDATE documents SET updated_by = ? WHERE id = 'doc_home'", [`merchant:${ownerU.id}`]);
+    // untouched empty at classify; then the founder's words land at revision 1
+    await reset();
+    await frIn(() => Docs.createDocument({ type: "home", body: R.emptyBody("home"), actor: MERCHANT }));
+    const edited = await R.documentHash(homeOf("The founder's words"));
+    await raceWith("UPDATE documents SET draft = ?, draft_hash = ? WHERE id = 'doc_home'", [JSON.stringify(homeOf("The founder's words")), edited]);
+    // and the real thing: a founder save on the empty home (revision 2)
+    await reset();
+    await frIn(() => Docs.createDocument({ type: "home", body: R.emptyBody("home"), actor: MERCHANT }));
+    let snap = null;
+    Docs.firstRunHooks.beforeBatch = async ({ plan }) => {
+      Docs.firstRunHooks.beforeBatch = null;
+      eq(plan[0], { id: "doc_home", kind: "refill", rule: "empty" }, "classified empty:");
+      await frIn(() => Docs.saveDraft({ id: "doc_home", revision: 1, body: homeOf("Mine"), actor: MERCHANT }));
+      snap = await dump("fr");
+    };
+    try {
+      const e = await refusal(gen(both(homeOf("Generated"), designOf("#14532d"))));
+      eq(e.code, "FIRST_RUN_RACE", "a founder save on the empty home:");
+    } finally {
+      Docs.firstRunHooks.beforeBatch = null;
+    }
+    await unchanged(snap, "the empty-hash race", "fr");
+    // absent at classify; the founder's editor makes the home meanwhile
+    await reset();
+    snap = null;
+    Docs.firstRunHooks.beforeBatch = async () => {
+      Docs.firstRunHooks.beforeBatch = null;
+      await frIn(() => Docs.createDocument({ type: "home", body: homeOf("Mine"), actor: MERCHANT }));
+      snap = await dump("fr");
+    };
+    try {
+      const e = await refusal(gen(both(homeOf("Generated"), designOf("#14532d"))));
+      eq(e.code, "FIRST_RUN_RACE", "a home made meanwhile:");
+    } finally {
+      Docs.firstRunHooks.beforeBatch = null;
+    }
+    await unchanged(snap, "an insert race", "fr");
+    eq(await rowOf("doc_design"), null, "no design either:");
+  });
+
+  await t("a lost answer (the batch committed, then the call threw) is our own write: success, not a race", async () => {
+    await reset();
+    const inst = await frIn(() => currentDatabase());
+    const send = inst.libsql.batch;
+    inst.libsql.batch = async (stmts, mode) => {
+      delete inst.libsql.batch;
+      await send.call(inst.libsql, stmts, mode);
+      throw Object.assign(new Error("fetch failed"), { code: "ECONNRESET" });
+    };
+    let r;
+    try {
+      r = await gen(both(homeOf("Welcome"), designOf("#334155")));
+    } finally {
+      delete inst.libsql.batch;
+    }
+    eq(r.created, ["doc_home", "doc_design"], "success:");
+    eq(await versionCount("doc_home"), 1, "one version:");
+  });
+
+  await t("any other actor is refused with 400 FIRST_RUN_ACTOR in plain words, nothing written; a body that doesn't validate refuses the whole call (422)", async () => {
+    await reset();
+    const before = await dump("fr");
+    for (const actor of [MERCHANT, null, "system:first-run", { kind: "system", id: "policy-starter" }, { kind: "system" }]) {
+      const e = await refusal(frIn(() => Docs.createFirstRunDocuments({ docs: both(homeOf("x"), designOf("#334155")), actor })));
+      eq([e.status, e.code], [400, "FIRST_RUN_ACTOR"], `${JSON.stringify(actor)}:`);
+      ok(!/[A-Z]{2,}_[A-Z_]+|first-run|system/.test(e.message), `plain words: ${e.message}`);
+    }
+    const bad = await refusal(gen(both(homeOf("Fine"), { ...R.emptyBody("design"), settings: { brand: { colors: {} }, theme: null } })));
+    eq([bad.status, bad.code], [422, "VALIDATION_FAILED"], "a bad design:");
+    await unchanged(before, "refusals", "fr");
+  });
+
+  // --- the shared policy rule (lib/documents/policy-pages.js) ---------------------------------
+  const P = await import("../lib/documents/policy-pages.js");
+  await t("policy-pages: the slug rule is today's (privacy; terms|refund|return), privacy wins, and the starter actor is system:policy-starter", async () => {
+    for (const s of ["terms", "refund-policy", "returns"]) eq(P.isReturnsSlug(s), true, `${s}:`);
+    eq([P.isReturnsSlug("about"), P.isPrivacySlug("about"), P.kindOfSlug("about")], [false, false, null], "about:");
+    eq(P.kindOfSlug("privacy-terms"), "privacy", "privacy-terms:");
+    eq([P.kindOfSlug("privacy-policy"), P.kindOfSlug("terms")], ["privacy", "returns"], "kinds:");
+    eq(P.POLICY_KINDS, ["privacy", "returns"], "POLICY_KINDS:");
+    eq(Docs.actorString(P.POLICY_STARTER_ACTOR), P.POLICY_STARTER_BY, "POLICY_STARTER_BY:");
+    eq(P.POLICY_STARTER_BY, "system:policy-starter", "the mark:");
+    ok(Object.isFrozen(P.POLICY_STARTER_ACTOR), "frozen:");
+    // the same rule onboarding and the legacy release check use today
+    const onboarding = await readFile(join(ROOT, "lib/admin/onboarding.js"), "utf8");
+    const releases = await readFile(join(ROOT, "lib/releases.js"), "utf8");
+    for (const src of [onboarding, releases]) ok(src.includes("/privacy/") && src.includes("/terms|refund|return/"), "today's rule is still the same:");
+  });
+
+  await t("policyStatus (pure): best state per kind, live > inSet > saved > starter > missing, ties to the newest; archived, slugless and non-page rows are ignored", async () => {
+    const row = (id, slug, extra = {}) => ({ id, type: "page", slug, label: id, revision: 1, draftHash: "h", publishedVersionId: null, archivedAt: null, updatedBy: `merchant:${ownerU.id}`, updatedAt: "2026-01-01T00:00:00.000Z", ...extra });
+    eq(P.policyStatus([]), { privacy: { state: "missing", doc: null }, returns: { state: "missing", doc: null } }, "nothing:");
+    const s1 = P.policyStatus([row("a", "privacy", { updatedBy: P.POLICY_STARTER_BY }), row("b", "privacy-policy", { publishedVersionId: "ver_1" }), row("c", "terms", { updatedBy: P.POLICY_STARTER_BY })]);
+    eq([s1.privacy.state, s1.privacy.doc.id, s1.returns.state, s1.returns.doc.id], ["live", "b", "starter", "c"], "live wins:");
+    eq(P.policyStatus([row("c", "terms", { updatedBy: P.POLICY_STARTER_BY })], ["c"]).returns.state, "inSet", "a starter in the set:");
+    eq(P.policyStatus([row("c", "terms", { updatedBy: "system:cutover" })]).returns.state, "saved", "the cutover's text:");
+    const tie = P.policyStatus([row("old", "terms", { updatedAt: "2026-01-01T00:00:00.000Z" }), row("new", "refund", { updatedAt: "2026-02-01T00:00:00.000Z" })]);
+    eq(tie.returns.doc.id, "new", "ties go to the newest:");
+    const ignored = P.policyStatus([row("x", "privacy", { archivedAt: "2026-01-01" }), row("y", null), row("z", "privacy", { type: "campaign" }), row("w", "")]);
+    eq([ignored.privacy.state, ignored.returns.state], ["missing", "missing"], "ignored rows:");
+    eq(P.COUNTING_STATES, ["live", "inSet", "saved"], "the review rule:");
+    eq(["live", "inSet", "saved", "starter", "missing"].map(P.policyCounts), [true, true, true, false, false], "what counts:");
+  });
+
+  await t("policyStatus on real rows (readPolicyRows): a starter draft is 'starter' ('inSet' in the set), 'saved' after a merchant saveDraft, 'live' once published; a cutover draft is 'saved'; archived and slugless pages are ignored", async () => {
+    await reset();
+    const page = (slug, title = "Policy") => ({ ...R.emptyBody("page"), meta: { ...R.emptyBody("page").meta, slug, title } });
+    const starter = (await frIn(() => Docs.createDocument({ type: "page", body: page("privacy-policy", "Privacy policy"), actor: P.POLICY_STARTER_ACTOR }))).document;
+    let rows = await frIn(() => P.readPolicyRows());
+    eq(rows.map((r) => [r.id, r.slug, r.updatedBy]), [[starter.id, "privacy-policy", "system:policy-starter"]], "readPolicyRows carries updatedBy:");
+    eq(Object.keys(rows[0]).sort(), ["archivedAt", "draftHash", "id", "label", "publishedVersionId", "revision", "slug", "type", "updatedAt", "updatedBy"], "the row shape:");
+    eq(P.policyStatus(rows).privacy.state, "starter", "a starter draft:");
+    eq(P.policyStatus(rows, [starter.id]).privacy.state, "inSet", "the starter in the set:");
+    await frIn(() => Docs.saveDraft({ id: starter.id, revision: 1, body: starter.body, actor: MERCHANT }));
+    rows = await frIn(() => P.readPolicyRows());
+    eq([P.policyStatus(rows).privacy.state, rows[0].updatedBy], ["saved", `merchant:${ownerU.id}`], "after a merchant save:");
+    const v = (await frSql("SELECT id FROM document_versions WHERE document_id = ?", [starter.id]))[0].id;
+    await raw.fr.execute({ sql: "UPDATE documents SET published_version_id = ? WHERE id = ?", args: [v, starter.id] });
+    eq(P.policyStatus(await frIn(() => P.readPolicyRows())).privacy.state, "live", "published:");
+    // the cutover's own text
+    const cut = (await frIn(() => Docs.createDocument({ type: "page", body: page("refund-policy"), actor: { kind: "system", id: "cutover" } }))).document;
+    eq(P.policyStatus(await frIn(() => P.readPolicyRows())).returns, { state: "saved", doc: (await frIn(() => P.readPolicyRows())).find((r) => r.id === cut.id) }, "a cutover draft:");
+    // archived, and no slug: not counted
+    await reset();
+    const arch = (await frIn(() => Docs.createDocument({ type: "page", body: page("returns"), actor: MERCHANT }))).document;
+    await frIn(() => Docs.archive({ id: arch.id, revision: 1, actor: MERCHANT }));
+    await frIn(() => Docs.createDocument({ type: "page", body: page(""), actor: MERCHANT }));
+    rows = await frIn(() => P.readPolicyRows());
+    eq(rows, [], "readPolicyRows leaves them out:");
+    eq(P.policyStatus(rows).returns.state, "missing", "archived page:");
+    // and the pure rule ignores them even when handed them
+    const all = (await frSql("SELECT id, type, slug, archived_at, updated_by FROM documents")).map((d) => ({ id: d.id, type: d.type, slug: d.slug, archivedAt: d.archived_at, updatedBy: d.updated_by, publishedVersionId: null }));
+    eq(all.length, 2, "both rows exist:");
+    eq([P.policyStatus(all).privacy.state, P.policyStatus(all).returns.state], ["missing", "missing"], "the pure rule ignores them:");
+    await reset();
+  });
+}
 
 // --- the write guard -----------------------------------------------------------------------
 console.log("— one writer");
