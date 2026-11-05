@@ -331,6 +331,45 @@ await t("a doc_design token change gives one 'Colours' or 'Fonts' row", async ()
   eq(diffBodies("design", live, look), [{ kind: "settings", words: "Look: chosen" }]);
 });
 
+// P6-LOGO-REG (GEN-04): the logo on the design document gives one plain row,
+// never "other settings changed", never "some details changed", never the
+// file's address.
+await t("P6-LOGO-REG: a doc_design draft that only adds, changes or removes the logo gives exactly one plain row naming the logo", async () => {
+  const live = R.emptyBody("design");
+  live.settings.brand = { accent: "#84cc16", background: "#ffffff", foreground: "#0a0a0b" };
+  live.settings.theme = { kit: "pulse", version: 1 };
+  const withLogo = (logo) => ({ ...clone(live), settings: { ...clone(live.settings), logo } });
+  const A = { media: "/api/media/med_logoA", alt: "Acme" };
+  const B = { media: "/api/media/med_logoB", alt: "Acme" };
+  eq(diffBodies("design", live, withLogo(A)), [{ kind: "settings", words: "Brand: logo added" }], "added:");
+  eq(diffBodies("design", withLogo(A), withLogo(B)), [{ kind: "settings", words: "Brand: logo changed" }], "another file:");
+  eq(diffBodies("design", withLogo(A), withLogo({ ...A, alt: "Acme shop" })), [{ kind: "settings", words: "Brand: logo changed" }], "new words for it:");
+  eq(diffBodies("design", withLogo(A), withLogo(null)), [{ kind: "settings", words: "Brand: logo removed" }], "removed:");
+  // a design saved before phase 6 has no logo key at all: the same as null
+  const old = clone(live);
+  delete old.settings.logo;
+  ok(!Object.hasOwn(old.settings, "logo"), "the old body has no logo key");
+  eq(diffBodies("design", old, withLogo(null)), [], "no key vs null: no change:");
+  eq(diffBodies("design", withLogo(null), old), [], "null vs no key: no change:");
+  eq(diffBodies("design", old, withLogo(A)), [{ kind: "settings", words: "Brand: logo added" }], "added to an old body:");
+  eq(diffBodies("design", withLogo(A), old), [{ kind: "settings", words: "Brand: logo removed" }], "removed back to an old body:");
+  // an old, untouched empty design against today's emptyBody (logo: null)
+  eq(diffBodies("design", { schema: 1, type: "design", meta: {}, settings: { brand: null, theme: null } }, R.emptyBody("design")), [], "old empty vs new empty:");
+  // with a colour change too: the colour row and the logo row, one each
+  const both = withLogo(A);
+  both.settings.brand.accent = "#e11d48";
+  eq(diffBodies("design", live, both), [{ kind: "settings", words: "Colours: accent changed" }, { kind: "settings", words: "Brand: logo added" }], "colour and logo:");
+  // the words never carry the file, its address or the setting's key
+  for (const [a, b] of [[live, withLogo(A)], [withLogo(A), withLogo(B)], [withLogo(A), withLogo(null)]]) {
+    for (const r of diffBodies("design", a, b)) {
+      ok(!/api\/media|med_|other settings|some details/.test(r.words), `plain words: ${r.words}`);
+      ok(!ID_LIKE.test(r.words) && !HASH.test(r.words), `no id: ${r.words}`);
+    }
+  }
+  // a logo-only draft on a design that was never published: one row naming the brand
+  eq(firstPublishRows("design", withLogo(A)), [{ words: "Brand" }], "first publish:");
+});
+
 await t("firstPublishRows lists the title and the visible sections only", async () => {
   const body = home([sec("hero", "sec_hero"), sec("banner", "sec_ban", { title: "Sale" }, { enabled: false }), sec("text", "sec_txt", { title: "Hi" }), sec("text", "sec_tx2", { title: "Bye" })]);
   eq(firstPublishRows("home", body), [{ words: "Hero" }, { words: "Text 1" }, { words: "Text 2" }]);

@@ -311,6 +311,8 @@ const RECORDED = [
 const CALLS = [
   ...RECORDED,
   ["resolvedHomePage", []],
+  // P6-LOGO-REG (GEN-04): a getter a6d028e did not have
+  ["resolvedLogo", []],
   ["resolvedJournalEntries", []],
   ["resolvedContentPage", ["first-post"]],
   ["resolvedContentPage", ["shipping"]],

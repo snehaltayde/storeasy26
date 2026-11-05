@@ -338,6 +338,57 @@ await t("on a documents store a counted client shows usage issues no statement r
   for (const s of del.statements) ok(!/\bbody\b|\bcontent\b/i.test(s), `the delete path reads a body or content: ${s}`);
 });
 
+// P6-LOGO-REG (MED-03, GEN-04): the design document's logo is a library file,
+// indexed through the registry (refsOfSetting case "logo"), so usage, the
+// delete guard and the publish checks see it.
+const designBody = (logo) => ({ ...R.emptyBody("design"), settings: { brand: null, theme: { kit: "pulse", version: 1 }, logo } });
+await t("P6-LOGO-REG: a doc_design draft with a logo indexes one document_refs row for that file; a draft without it has none; deleting the file is refused while that design is live, and allowed once nothing keeps it", async () => {
+  // pure: the registry gives the logo as a media ref (not only the belt)
+  const L = await upload(docs);
+  const decl = R.documentType("design").settings.find((s) => s.key === "logo");
+  eq(Set_.refsOfSetting(decl, { media: M.mediaUrl(L.id), alt: "Shop" }, "logo", { text: true }), [{ field: "logo.media", ref: "media", src: M.mediaUrl(L.id) }], "the registry's ref:");
+  eq(Refs.refRows("ver_lg", designBody({ media: M.mediaUrl(L.id) })), [{ version_id: "ver_lg", ref_type: "media", ref_id: L.id }], "refRows with the logo:");
+  eq(Refs.refRows("ver_lg", designBody(null)), [], "refRows without:");
+  // the real store: the design's first checkpoint holds exactly one row for it
+  V.setCheckpointInterval(0);
+  let d = (await docs.run(() => Docs.createDocument({ type: "design", body: designBody({ media: M.mediaUrl(L.id), alt: "Shop" }), actor: ACTOR }))).document;
+  eq(d.id, "doc_design", "the design singleton:");
+  const first = await sql(docs, "SELECT id FROM document_versions WHERE document_id = 'doc_design' ORDER BY created_at, rowid");
+  eq(first.length, 1, "one checkpoint:");
+  eq(await refsOfVersion(docs, first[0].id), [{ ref_type: "media", ref_id: L.id }], "its refs:");
+  eq(Number((await sql(docs, "SELECT count(*) AS n FROM document_refs WHERE ref_id = ?", [L.id]))[0].n), 1, "one row for the logo file:");
+  eq(await usage(docs, L.id), [["draft", "doc_design"], ["older version", "doc_design"]].sort(), "the draft uses it:");
+  // published: the live version holds the row, and a delete (forced too) is refused
+  const pub = await docs.run(() => Pub.publish({ ids: [{ id: d.id, revision: d.revision, draftHash: d.draftHash }], actor: ACTOR }));
+  const live = pub.published[0].versionId;
+  eq(await refsOfVersion(docs, live), [{ ref_type: "media", ref_id: L.id }], "the live version's refs:");
+  // the founder removes the logo: the new draft's version holds no row for it
+  d = await docs.run(() => Docs.getDocument(d.id));
+  d = (await docs.run(() => Docs.saveDraft({ id: d.id, revision: d.revision, body: designBody(null), actor: ACTOR }))).document;
+  const latest = (await sql(docs, "SELECT id FROM document_versions WHERE document_id = 'doc_design' AND kind = 'checkpoint' ORDER BY created_at DESC, rowid DESC LIMIT 1"))[0].id;
+  eq(await refsOfVersion(docs, latest), [], "the logo-less draft's version has no row:");
+  ok(!(await usage(docs, L.id)).some(([label]) => label === "draft"), "the draft no longer uses it");
+  for (const force of [false, true]) {
+    const e = await docs.run(() => M.deleteMedia(L.id, { force }).then(() => null, (x) => x));
+    eq(e?.code, "MEDIA_IN_USE", `force ${force}, refused while the design is live:`);
+    ok(!/med_|doc_|ver_|document_/.test(e.message), `plain words: ${e.message}`);
+  }
+  eq(await stored(docs, L.id), 1, "the logo file stays:");
+  // a second, unused file deletes (the guard is about this file, not every file)
+  const U2 = await upload(docs);
+  eq((await docs.run(() => M.deleteMedia(U2.id))).deleted, U2.id, "an unused file deletes:");
+});
+
+await t("P6-LOGO-REG: the publish checks see the logo: a design whose logo file was deleted warns MEDIA_MISSING on logo.media; a present file is silent", async () => {
+  const Checks = await import("../lib/documents/checks.js");
+  const there = await upload(docs);
+  const doc = { id: "doc_design", type: "design" };
+  const run = (src) => docs.run(() => Checks.referenceChecks({ items: [{ doc, body: designBody({ media: src }) }], list: { pages: [], redirects: [] } }));
+  eq((await run(M.mediaUrl(there.id))).issues.filter((i) => i.code === Checks.MEDIA_MISSING), [], "the file is there:");
+  const gone = (await run("/api/media/med_logo_gone")).issues.filter((i) => i.code === Checks.MEDIA_MISSING);
+  eq(gone.map((i) => [i.code, i.severity, i.field, i.sectionId]), [["MEDIA_MISSING", "warning", "logo.media", null]], "a deleted logo warns:");
+});
+
 // =============================================================================
 // 3. deletes
 // =============================================================================
