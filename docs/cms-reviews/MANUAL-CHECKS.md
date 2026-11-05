@@ -955,6 +955,37 @@ Packet: [P6-LOGO-RENDER.md](P6-LOGO-RENDER.md), "Owner checks" and "Known limits
 - [ ] The checkout page keeps the text wordmark on a store with a picture logo (known limit). Confirm that is acceptable for now.
 - [ ] Browser drill NOT DONE: every acceptance item is proved by rendered tests; desktop Chrome verification on the design harness is still owed.
 
+## Phase 6, batch 2
+
+### The Start your store page and brand step (P6-START-UI)
+Packet: [P6-START-UI.md](P6-START-UI.md), "Owner checks" and "Known limits" (From review).
+- [ ] Open-store view in Chrome: start 'Refresh from Shopify' on an open store and check that /admin/start keeps the 'already open' words and both links, with the small sync note.
+- [ ] Accept the 'already open' words on open stores, or ask for a summary view (known limit 3).
+- [ ] CI sqld download source and checksum still need your approval; nothing under .github/ was touched.
+
+### The editor's Before you open your store panel (P6-OPEN-UI)
+Packet: [P6-OPEN-UI.md](P6-OPEN-UI.md), "Owner checks" and "Known limits" (From review).
+- [ ] In desktop Chrome on a closed documents store: edit a product description and press Publish. It should show the normal review (no 'Before you open your store'), publish, and leave the store closed.
+- [ ] Decide whether openingChecks itself should answer opening:false for a rows-only set (a lib/documents/opening.js change). Today only the editor flow skips it.
+
+### Logo and colours link, Reset to the starting palette, one start nudge (P6-NAV)
+Packet: [P6-NAV.md](P6-NAV.md), "Owner checks" and "Known limits" (From review).
+- [ ] After P6-START-UI merges (design harness or staging, phone and desktop): 'Logo and colours' appears after Editor in the sidebar and the phone drawer and opens the brand step.
+- [ ] In the editor's design settings, change a colour and press 'Go back to your starting colours (…)': the palette name matches the brand-step pick and the colours come back. A store that skipped the brand step with no pick says '(Slate)'.
+- [ ] Settings on a documents store: the logo text hint reads well and its 'Logo and colours' link works; on a legacy store the hint is unchanged.
+- [ ] Dashboard on the staging throwaway tenant (OQ-4): one 'Start your store' nudge before the brand step; 'Setup: x/y done' after the brand step and generation; no 'Start your store' after opening.
+- [ ] Browser verification and staging for P6-NAV are NOT DONE; every acceptance item is proved by tests only.
+
+### Batch 1 review fixes (P6-FIX1)
+Packet: [P6-FIX1.md](P6-FIX1.md), "Owner checks" and "Known limits" (From review).
+- [ ] The grapheme cut on real screens: on a phone and in desktop Safari, generate a store whose long name is emoji only, or a script with combining marks such as Devanagari, with no spaces. Check that the hero title and the image alt end on a whole character.
+- [ ] The closed manifest on a hosted store: open /manifest.webmanifest directly while the store is closed. It should say 'Opening soon.', not the brand-step description. After the first publish it should show the description.
+- [ ] Returns starter wording (OQ-25 legal review): a negative returns_window_days gives 'We don't accept returns on orders.' Confirm that wording, and that rounding 10.5 down to '10 days' and 0.5 to '12 hours' is acceptable.
+- [ ] Accept that the first run is now two writer calls (home, then design) instead of one batch. A database failure between them leaves a generated home with no design until the next run, and the first-publish design rule covers that state. Or ask for a guard inside createFirstRunDocuments in lib/documents/service.js, which is P6-GEN-WRITE's file.
+- [ ] The new ALREADY_SAVED words, shown once P6-OPEN-UI and P6-ONBOARD use markPolicyRead: 'This page was already saved, so it already counts as reviewed. Open it in the editor to read it.'
+- [ ] CI sqld download: unchanged, and nothing under .github/ was touched. Its source and checksum still need your approval.
+- [ ] Browser drill NOT DONE: every acceptance item is proved by unit tests only; the design-harness Chrome drill belongs to P6-DRILLS.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
