@@ -16,6 +16,7 @@ import { dirname, join, relative } from "node:path";
 import { createRequire } from "node:module";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { BANNED, CLAIMS, scanText } from "./support/banned-copy.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, "..");
@@ -55,56 +56,8 @@ const eq = (a, b, m = "") => {
 
 // ---- layer 1: the banned-string scan -----------------------------------------
 
-// `only` limits a rule to some files. `literalsOnly` reads just the parser's
-// literal text, so window.Razorpay and comments can't trip it. `visibleOnly` reads
-// less than that (see visibleStrings), so method: "razorpay" can't trip it either.
-const SHOPPER_UI = (file) => /^(app\/\(storefront\)|components)\//.test(file);
-const BANNED = [
-  // Known leaks named by the spec
-  { label: "gym voice: dropped the weights", re: /dropped the weights/i },
-  { label: "developer: catalog sync footer", re: /catalog synced from/i },
-  { label: "developer: live Shopify store", re: /live shopify store/i },
-  { label: "gym voice: ludicrous speed", re: /ludicrous/i },
-  { label: "developer: pnpm command", re: /\bpnpm\b/i },
-  { label: "gym voice: gains", re: /\bgains\b/i },
-  // Found by the GEN-03 sweep
-  { label: "developer: catalog not synced", re: /catalog not synced/i },
-  { label: "developer: connect Shopify account", re: /shopify account/i },
-  { label: "developer: storefront ready", re: /storefront ready/i },
-  { label: "developer: npm command", re: /\bnpm (run|install)\b/i },
-  { label: "developer: yarn command", re: /\byarn (run|install|add|sync|migrate|build|dev)\b/i },
-  { label: "developer: npx command", re: /\bnpx \S/i },
-  { label: "developer: bun command", re: /\bbun (run|install|add|sync|migrate|build|dev)\b/i },
-  { label: "developer: localhost", re: /\blocalhost\b/i, only: SHOPPER_UI, literalsOnly: true },
-  { label: "developer: node script", re: /\bnode scripts\//i },
-  { label: "developer: sync script", re: /\bsync script\b/i },
-  { label: "developer: connect Shopify", re: /\bconnect shopify\b/i },
-  { label: "developer: setup note", re: /light up automatically/i },
-  { label: "developer: no store configured", re: /no store is configured/i },
-  { label: "developer: env file", re: /\.env\.local/i },
-  { label: "developer: env instruction", re: /set NEXT_PUBLIC_/i },
-  { label: "developer: test mode", re: /\(test mode\)/i },
-  { label: "developer: HTTP status in copy", re: /\(HTTP \$\{/ },
-  { label: "developer: status code in copy", re: /\(\$\{[\w.]*status\}\)/, only: SHOPPER_UI },
-  { label: "developer: automation rule name", re: /automated rule/i },
-  { label: "platform: by the platform", re: /by the platform/i },
-  { label: "platform: Razorpay in copy", re: /(via Razorpay|load Razorpay|Razorpay is not configured|"Razorpay"\})/ },
-  { label: "platform: vendor name in visible text", re: /\b(Razorpay|Shopify|Storeasy)\b/, only: SHOPPER_UI, literalsOnly: true },
-  { label: "platform: hosting vendor in visible text", re: /\b(Vercel|Turso)\b/i, only: SHOPPER_UI, literalsOnly: true },
-  { label: "platform: vendor name, any case, in visible text", re: /\b(razorpay|shopify|storeasy)\b/i, only: SHOPPER_UI, literalsOnly: true, visibleOnly: true },
-  { label: "developer: env or key name in text", re: /NEXT_PUBLIC_|[A-Z]+_DB_URL|_API_KEY|\.env\b/, only: SHOPPER_UI, literalsOnly: true },
-  { label: "developer: test mode, any wording", re: /test mode/i, only: SHOPPER_UI, literalsOnly: true },
-  { label: "wrong brand: BeastLife", re: /beastlife/i },
-  { label: "wrong brand: Beast", re: /\bbeast\b/i },
-  { label: "wrong brand: coupon code", re: /\b(BEAST10|FLAT200|SOLO25)\b/ },
-  { label: "wrong voice: fresh drops", re: /fresh drops/i },
-  { label: "wrong voice: old hero promise", re: /live offers and fast checkout/i },
-  { label: "wrong vertical: nutrition word", re: /\b(whey|pre-workouts?|proteins?|creatine)\b/i },
-  { label: "unset promise: delivery or refund days", re: /\d+\s*[–-]\s*\d+ (business|working) days/i },
-  { label: "unset promise: tax claim", re: /incl\. GST/i },
-  { label: "unset promise: review time", re: /within a working day/i },
-  { label: "unset promise: returns", re: /stays returnable/i },
-];
+// The rules live in scripts/support/banned-copy.js (P6-FIXTURE), shared with
+// phase 6's suites; this file's scan and its checks below are unchanged.
 
 // Each entry names one file and the exact text allowed there, with the reason.
 // An entry that stops matching fails the suite, so this list can't go stale.
@@ -341,6 +294,39 @@ await t("the scan fails: each banned rule catches planted text", async () => {
     const found = await scanFile("components/Footer.js", `export const x = "${samples[label].replace(/"/g, "'")}";`);
     ok(found.some((f) => f.label === label), `rule "${label}" missed its sample`);
   }
+});
+
+// P6-FIXTURE: scanText reads plain text (generated or founder-facing copy) with
+// the same BANNED rules plus the CLAIMS lexicon.
+await t("scanText: each CLAIMS rule catches its sample, 'Rated 5 stars by customers' is a claim, and plain shop copy is clean", () => {
+  const samples = {
+    "claim: reviews": "Read the reviews",
+    "claim: rated": "Top rated",
+    "claim: stars": "Rated 4.5-star",
+    "claim: certified": "Certified safe",
+    "claim: award": "Award-winning blend",
+    "claim: clinically": "Clinically proven",
+    "claim: guaranteed": "Results guaranteed",
+    "claim: best-selling": "Our best-selling mug",
+    "claim: #1": "The #1 choice",
+    "claim: organic": "Organic cotton",
+    "claim: dermatologist": "Dermatologist approved",
+    "claim: lab-tested": "Lab-tested every batch",
+    "claim: money-back": "Money-back promise",
+  };
+  eq(Object.keys(samples).length, CLAIMS.length, "one sample per claim rule:");
+  for (const { label } of CLAIMS) ok(scanText(samples[label]).some((h) => h.rule === label), `claim rule "${label}" missed its sample`);
+  const hits = scanText("Rated 5 stars by customers");
+  ok(hits.some((h) => CLAIMS.some((c) => c.label === h.rule)), `no CLAIMS hit: ${JSON.stringify(hits)}`);
+  eq(JSON.stringify(hits), JSON.stringify([{ rule: "claim: rated", match: "Rated" }, { rule: "claim: stars", match: "5 stars" }]), "hits:");
+  // the BANNED rules too, file-limited ones only on request
+  eq(JSON.stringify(scanText("run pnpm sync")), JSON.stringify([{ rule: "developer: pnpm command", match: "pnpm" }]), "a BANNED rule:");
+  eq(scanText("Ask Storeasy support").length, 0, "founder copy may name Storeasy:");
+  eq(scanText("Review your privacy page", { claims: false }).length, 0, "claims: false leaves CLAIMS out:");
+  eq(scanText("Review your privacy page")[0]?.rule, "claim: reviews", "and CLAIMS is on by default:");
+  ok(scanText("Powered by Shopify", { shopper: true }).some((h) => h.rule === "platform: vendor name in visible text"), "shopper text naming Shopify is clean");
+  for (const clean of ["Fixture product 1", "Shop the collection", "Free delivery over ₹999", "Starter kit in navy", "Organise your desk", "", null]) eq(scanText(clean).length, 0, `${JSON.stringify(clean)} flagged:`);
+  ok(BANNED.length > 40, "BANNED lost its rules");
 });
 
 // Plant into a real file. A plant whose target has moved fails loudly here, so it
