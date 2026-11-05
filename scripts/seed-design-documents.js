@@ -33,12 +33,23 @@
 //     release made with createRelease (no takeOver): the fresh perf seed plus
 //     the phase 4 content (see "P4-HARNESS" below). Re-running it resets
 //     everything. Logins and ids go to .design-data/p4-seed.json.
-//   node scripts/seed-design-documents.js check [--p3 | --p4]
+//   node scripts/seed-design-documents.js --p6 --stage <a..g> [--variant V]
+//     P6-DRILLS: one stage of the phase 6 drill (scripts/drills/p6/run.mjs).
+//     Leaves the design store as it is (seed --p3 first), parks the P3 closed
+//     store (its domain row taken off), wipes the harness's third database and
+//     provisions a fresh tenant 'p6' there (p6.localhost): documents mode
+//     (legacy for stage f), the founder's login, and the perf fixture's
+//     catalog through a real sync with injected fetchers (no Shopify). Stage
+//     e takes --variant empty | refill | no-collections. What each stage adds
+//     is in scripts/drills/p6/seed-p6.mjs. Login and ids go to
+//     .design-data/p6-seed.json (mode 600), never to the screen.
+//   node scripts/seed-design-documents.js check [--p3 | --p4 | --p6]
 //     prints what the store holds (mode, live release, documents); writes
 //     nothing, and works with the harness running too. --p3 adds row counts,
 //     the document_refs check, the logins and the closed store; --p4 counts
 //     every line of the phase 4 seed list (P4_SEED_LIST) and what the live
-//     release froze
+//     release froze; --p6 the p6 store (P6_SEED_LIST, its documents, the
+//     latest sync) and whether the closed store is parked
 //
 // The store is moved to documents mode with its seeded v3 pointer cleared, as
 // perf-docs-fixture's publish does. Documents are only ever written through
@@ -690,8 +701,23 @@ export function writeSeedFile(dataDir, name, config) {
 // CLI
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// P6-DRILLS: one phase 6 drill stage (--p6 --stage <a..g>)
+// ---------------------------------------------------------------------------
+//
+// The writes are in scripts/drills/p6/seed-p6.mjs (with the drills, as --p4's
+// are). What check --p6 must find after a stage seed (the "seed list"):
+export const P6_SEED_FILE = "p6-seed.json";
+export const P6_SEED_LIST = Object.freeze({
+  tenant: "p6",
+  host: "p6.localhost",
+  latestSync: "complete",
+  closedStoreParked: true,
+  liveRelease: null,
+});
+
 export function parseArgs(argv) {
-  const out = { cmd: "seed", posts: 3, draftsOnly: false, worstCase: false, p3: false, p4: false };
+  const out = { cmd: "seed", posts: 3, draftsOnly: false, worstCase: false, p3: false, p4: false, p6: false, stage: null, variant: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "check" && i === 0) out.cmd = "check";
@@ -699,20 +725,29 @@ export function parseArgs(argv) {
     else if (a === "--worst-case") out.worstCase = true;
     else if (a === "--p3") out.p3 = true;
     else if (a === "--p4") out.p4 = true;
-    else if (a === "--posts") {
+    else if (a === "--p6") out.p6 = true;
+    else if (a === "--stage" || a === "--variant") {
+      const v = argv[++i];
+      if (!v || v.startsWith("--")) throw new Error(`${a} needs a value`);
+      out[a.slice(2)] = v;
+    } else if (a === "--posts") {
       const v = Number(argv[++i]);
       if (!Number.isInteger(v) || v < 0 || v > 1000) throw new Error("--posts needs a whole number from 0 to 1000");
       out.posts = v;
-    } else throw new Error(`Unknown option "${a}". Use: node scripts/seed-design-documents.js [check] [--posts N] [--drafts-only] [--worst-case] [--p3 | --p4]`);
+    } else throw new Error(`Unknown option "${a}". Use: node scripts/seed-design-documents.js [check] [--posts N] [--drafts-only] [--worst-case] [--p3 | --p4 | --p6 --stage <a..g> [--variant V]]`);
   }
   if (out.p3 && out.draftsOnly) throw new Error("--p3 publishes its drill content, so it can't be used with --drafts-only");
   if (out.p4 && out.p3) throw new Error("--p3 makes a documents store and --p4 a legacy one: use one of them");
   if (out.p4 && (out.draftsOnly || out.worstCase || out.posts !== 3)) throw new Error("--p4 is the perf store as it is, live on the old releases: it takes no --drafts-only, --worst-case or --posts");
+  if (out.p6 && (out.p3 || out.p4 || out.draftsOnly || out.worstCase || out.posts !== 3)) throw new Error("--p6 seeds only the p6 store: it takes --stage and --variant, nothing else");
+  if (out.p6 && out.cmd === "seed" && !out.stage) throw new Error("--p6 needs --stage <a..g>");
+  if (!out.p6 && (out.stage || out.variant)) throw new Error("--stage and --variant go with --p6");
   return out;
 }
 
 async function main(argv) {
   const opts = parseArgs(argv);
+  if (opts.p6) return opts.cmd === "check" ? checkP6() : seedP6(opts);
   if (opts.cmd === "check" && opts.p4) {
     const state = await withHarnessStore(async ({ libsql }) => ({ ...(await storeState({ libsql })), p4: await p4State({ libsql }) }), { write: false });
     console.log(JSON.stringify(state));
@@ -814,6 +849,41 @@ async function seedP4() {
   console.log(
     `✓ the harness store is a legacy store live on a version ${c.liveVersion} release (${out.p4.liveRelease}): ${c.productOverrides} product overrides, ${c.pdpPairs} pairs (${c.pdpPairsDisabled} switched off), ${c.pinnedCollections} pinned collections, ${c.media} photos, a running hero experiment, ${c.pageRedirects} redirect, ${c.cmsTemplates} saved templates, an owner and a staff login. Logins and ids: ${H.DATA_DIR_NAME}/${P4_SEED_FILE}. ${((Date.now() - started) / 1000).toFixed(1)}s`,
   );
+  return 0;
+}
+
+// --p6: one phase 6 drill stage on the harness's third database. The design
+// store is left as the last seed made it (seed --p3 first: the harness data
+// must be the perf fixture).
+async function seedP6(opts) {
+  const started = Date.now();
+  const H = await import("./design-harness.js");
+  const { seedP6Stage, stagePlan } = await import("./drills/p6/seed-p6.mjs");
+  stagePlan(opts.stage, opts.variant); // refuse a bad stage before any server starts
+  const dataDir = join(H.ROOT, H.DATA_DIR_NAME);
+  const out = await withHarnessStore(async ({ urls }) => seedP6Stage({ urls, stage: opts.stage, variant: opts.variant, H }), { databases: ALL_DATABASES });
+  const config = { seededAt: new Date().toISOString(), seed: "p6", stage: opts.stage, variant: out.plan.variant, plan: out.plan, store: out.store, parked: out.parked, logins: out.logins, logoMedia: out.logoMedia ?? null, policies: out.policies ?? null, sync: out.sync, state: out.state, seedList: P6_SEED_LIST };
+  writeSeedFile(dataDir, P6_SEED_FILE, config);
+  const s = out.state;
+  console.log(
+    `✓ the p6 store on ${out.store.host} (stage ${opts.stage}${out.plan.variant ? `, ${out.plan.variant}` : ""}) is a ${s.mode} store with no live release: ${s.products} products, ${s.collections} collections, ${s.documents} documents, latest sync ${s.latestSync.status}; the closed store is parked. Login and ids: ${H.DATA_DIR_NAME}/${P6_SEED_FILE}. ${((Date.now() - started) / 1000).toFixed(1)}s`,
+  );
+  return 0;
+}
+
+async function checkP6() {
+  const H = await import("./design-harness.js");
+  const { p6State } = await import("./drills/p6/seed-p6.mjs");
+  const state = await withHarnessStore(async ({ urls }) => p6State({ urls, H }), { write: false, databases: ALL_DATABASES });
+  const got = {
+    tenant: state.tenant?.id ?? null,
+    host: state.tenant?.domains?.[0] ?? null,
+    latestSync: state.store?.latestSync?.status ?? null,
+    closedStoreParked: !state.closedStore || (state.closedStore.domains || []).length === 0,
+    liveRelease: state.store?.liveRelease ?? null,
+  };
+  const mismatched = Object.entries(P6_SEED_LIST).filter(([k, v]) => got[k] !== v).map(([k, v]) => ({ what: k, want: v, got: got[k] }));
+  console.log(JSON.stringify({ p6: { ...state, seedList: got, mismatched } }));
   return 0;
 }
 

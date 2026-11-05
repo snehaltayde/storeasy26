@@ -1004,6 +1004,41 @@ Packet: [P6-FIX2.md](P6-FIX2.md), "Owner checks" and "Known limits" (From review
 - [ ] CI sqld download: unchanged. Nothing under .github/ was touched, and its source and checksum still need the owner's approval.
 - [ ] Staging end to end on the throwaway tenant (OQ-4): not done.
 
+## Phase 6, batch 4
+
+### Every owner step for phase 6, in one list (P6-DRILLS)
+Packet: [P6-DRILLS.md](P6-DRILLS.md), "Owner checks". The drill ran on cms/phase-1 at 60a37b8 (batches 0 to 3 merged). P6-FIX3 ran beside it and had not merged, so its fixes (half-finished first run words, failed policy read words, closedSource(null)) were not drilled.
+
+Not drillable here (staging, phone, Safari, a real key, a decision):
+- [ ] Staging throwaway tenant end to end (OQ-4): connect, sync, /admin/start (inline syncs are not hooked, so check the page makes the store), brand step, the "Before you open your store" panel, a COD test order to snehal@mediastic.in cancelled after, first publish. The drill did all of this on the local harness only (stages A to D).
+- [ ] Phone logo upload: a PNG, a large JPEG and an SVG. HEIC must be refused in plain words. Then the logo in the header and footer on a phone and in Safari. The drill uploaded one PNG in desktop Chrome.
+- [ ] P3-CLOSED RSC probe on a local production build (next build && next start) against a generated, unpublished store. The drill ran it on next dev only (0 leaks, 64 requests, on both the P3 closed store and the generated p6 store).
+- [ ] A real Razorpay-key tenant shows the payment item as "Shoppers can pay", with no "Cash on delivery only" line. Never enter card details.
+- [ ] The P4-PROVISION Setup page check, before and after first publish, on staging.
+- [ ] CI sqld download: approve its source and checksum. Nothing under .github/ was touched in phase 6.
+- [ ] Legal review of the privacy and returns starters (OQ-25, GEN-06): read both as a founder on a store with a non-default returns_window_days. The drill saw "within 10 days of your order" on a store set to 10. Also the privacy template's "30 days" and "cookie settings" promises, and that the returns starter drops the "5–7 working days" refund line.
+- [ ] Read every word of the panel, the start page and the checklist on a phone, as a founder. Confirm an untouched starter page clearly keeps the store from opening.
+- [ ] Confirm the 13-word CLAIMS lexicon, especially "organic" and "guaranteed".
+- [ ] Decide on the fixed lime --sf-success* status colours (lib/brand.js) on a generated store. The drill saw no lime in the brand variables of a generated, Forest or opened store, but those status colours are fixed.
+- [ ] A deleted logo uses image wording ("plain colour block… Choose another image"). Confirm or ask for logo words.
+- [ ] test-product-editor leaves .test-pe-*.db files at the repo root after pnpm test.
+- [ ] Inline, CLI and connect-callback syncs do not trigger generation (the start page or the editor does, and only for a store with no home page). See P6D-2 below for what that means for a refill.
+- [ ] The gap between the P6-OPEN and P6-OPEN-UI merges (both are merged now; nothing to do unless a branch is replayed).
+- [ ] An open store shows "already open" words on /admin/start, not a summary. Accept, or ask for a summary view.
+- [ ] "Review and open your store" opens the editor, not the publish panel directly. Accept, or ask for a deep link.
+- [ ] An open documents store with no brand step keeps today's dashboard nudge (a deviation from the P6-NAV brief).
+- [ ] test:schema-compat "a tenant migrated while the instance is warm" flaked once under load in batch 2 (passes alone). Watch for it.
+- [ ] On an OPEN store, an unreviewed policy starter draft gets "Publish your privacy page and your returns page" with no read step. Product question: should open stores also require reading a starter?
+- [ ] The test-only "#1" claim rule flags some letter-only hex colours ("#1abc"). Accept or ask for a word list.
+- [ ] P5D-1: the editor has no phone-width preview switch (backlog, not P0).
+
+Found by this drill (decide or accept):
+- [ ] P6D-1, shopper-visible words: the generated hero subtitle reads "Shop Shop all and Creatine." when the store has a Shopify collection called "Shop all" (lib/first-run/plan.js fills "Shop {a} and {b}." with the top collections' titles). Many real stores have a "Shop all" or "All products" collection. Seen in the editor preview (a-editor-preview-1440.png); it goes live when the founder opens without editing the hero. Ask for the planner to skip catch-all collections in the subtitle, or accept.
+- [ ] P6D-2: the empty-catalog note says "product rows appear after your next sync". That is true only when the queued worker runs the sync (it calls the generator after a completed sync). After an inline, CLI or connect-callback sync, or when the worker defers the step (less than 5 s left in its slice), neither /admin/start nor the editor refills the hero-only home: both make a store only when there is no home page. Drilled in stage E. Decide whether /admin/start should refill an untouched generator-made home, or accept.
+- [ ] P6D-3: with checkout off, the panel shows the payment block and an Open button that is disabled, not "no open button". The server refuses a direct open (409 STORE_CANNOT_TAKE_PAYMENT, drilled in stage D), and the "no Open button" panel only appears after that 409, which the founder can't trigger from the disabled button. Accept the disabled button, or ask for the proactive panel to drop it while payment blocks.
+- [ ] P6D-4: the brand step takes any /api/media/<id> address as the logo, but the media route serves only med_ plus 18 hex digits. An upload always gives a valid id, so founders can't hit this; the drill's first seeded logo did (fixed in the drill's seed). Owner may want the brand step to check the id shape.
+- [ ] P6D-5: the closed page computes the platform's lime as its accent variable (--accent-500 #84cc16). Nothing on the page draws in it today (a-storefront-closed-1440.png), so shoppers see no lime. Keep it in mind if the closed page ever uses the accent.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.

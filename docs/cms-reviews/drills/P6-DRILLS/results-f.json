@@ -1,0 +1,422 @@
+{
+  "id": "P6-DRILLS",
+  "part": "f",
+  "title": "P6-DRILLS — f",
+  "ranAt": "2026-11-05T06:19:25.292Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 13,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the stage seed: a fresh LEGACY p6 store (provisioned on the old editor) with 24 products, complete sync",
+      "detail": {
+        "mode": "legacy",
+        "liveRelease": null,
+        "documents": 0,
+        "products": 24,
+        "collections": 6,
+        "media": 32,
+        "latestSync": {
+          "id": "sync_a8bbac723ee7eada",
+          "status": "complete",
+          "source": "injected",
+          "products": 24,
+          "collections": 6,
+          "finished_at": "2026-11-05T06:18:52.062Z"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "b063753 is an ancestor of this tree and holds no phase 6 merge (P6-FIXTURE's merge 536935f is not in it)",
+      "detail": {
+        "ancestor": true,
+        "hasP6Fixture": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "a throwaway detached worktree at b063753",
+      "detail": "Preparing worktree (detached HEAD b063753)"
+    },
+    {
+      "ok": true,
+      "label": "its own pnpm install --frozen-lockfile --prefer-offline (no symlinked node_modules)",
+      "detail": "Done in 2.2s using pnpm v11.5.0"
+    },
+    {
+      "ok": true,
+      "label": "the throwaway worktree is removed",
+      "detail": ""
+    },
+    {
+      "ok": true,
+      "label": "both trees answer the checklist (GET /api/admin/setup 200)",
+      "detail": {
+        "base": 200,
+        "now": 200,
+        "steps": 9
+      }
+    },
+    {
+      "ok": true,
+      "label": "/admin/setup on the legacy store: every step's label, hint, kind, link, state and actions are the same as at b063753",
+      "detail": {
+        "base": [
+          [
+            "connect",
+            "Connect Shopify"
+          ],
+          [
+            "catalog",
+            "Bring in your products"
+          ],
+          [
+            "brand",
+            "Pick a theme & brand"
+          ],
+          [
+            "policies",
+            "Publish legal pages"
+          ],
+          [
+            "billing",
+            "Activate billing"
+          ],
+          [
+            "domain",
+            "Point your domain"
+          ],
+          [
+            "preview",
+            "Review your draft preview"
+          ],
+          [
+            "test_order",
+            "Place a test order"
+          ],
+          [
+            "launch",
+            "Launch"
+          ]
+        ],
+        "now": [
+          [
+            "connect",
+            "Connect Shopify"
+          ],
+          [
+            "catalog",
+            "Bring in your products"
+          ],
+          [
+            "brand",
+            "Pick a theme & brand"
+          ],
+          [
+            "policies",
+            "Publish legal pages"
+          ],
+          [
+            "billing",
+            "Activate billing"
+          ],
+          [
+            "domain",
+            "Point your domain"
+          ],
+          [
+            "preview",
+            "Review your draft preview"
+          ],
+          [
+            "test_order",
+            "Place a test order"
+          ],
+          [
+            "launch",
+            "Launch"
+          ]
+        ],
+        "diff": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "the setup page's words and buttons are the same",
+      "detail": {
+        "same": true,
+        "base": "Setup Everything between here and your first sale. Most steps tick themselves off as the work lands; the last three are your call. Getting your store live 1/9 Connect Shopify Auto OAuth connect — the ",
+        "now": "Setup Everything between here and your first sale. Most steps tick themselves off as the work lands; the last three are your call. Getting your store live 1/9 Connect Shopify Auto OAuth connect — the "
+      }
+    },
+    {
+      "ok": true,
+      "label": "no phase 6 step or button on the legacy checklist (no 'Start your store', no policy starters)",
+      "detail": [
+        "Connect Shopify",
+        "Bring in your products",
+        "Pick a theme & brand",
+        "Publish legal pages",
+        "Activate billing",
+        "Point your domain",
+        "Review your draft preview",
+        "Place a test order",
+        "Launch"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the storefront's header and footer: the same words, links and text wordmark (no logo picture) as at b063753",
+      "detail": {
+        "base": {
+          "status": 200,
+          "headerText": "Fernway Goods Shop all CreatineOmegaPre-workoutProteinShop allVitamins",
+          "footerText": "Fernway Goods Shop Fernway Goods online. Shop All collections Creatine Omega Pre-workout Protein Shop all Company Contact Support help@p6.test © Fernway Goods",
+          "headerLinks": [
+            [
+              "Fernway Goods",
+              "/"
+            ],
+            [
+              "Shop all",
+              "/collections"
+            ],
+            [
+              "Creatine",
+              "/collections/creatine"
+            ],
+            [
+              "Omega",
+              "/collections/omega"
+            ],
+            [
+              "Pre-workout",
+              "/collections/pre-workout"
+            ],
+            [
+              "Protein",
+              "/collections/protein"
+            ],
+            [
+              "Shop all",
+              "/collections/shop-all"
+            ],
+            [
+              "Vitamins",
+              "/collections/vitamins"
+            ]
+          ],
+          "footerLinks": [
+            [
+              "All collections",
+              "/collections"
+            ],
+            [
+              "Creatine",
+              "/collections/creatine"
+            ],
+            [
+              "Omega",
+              "/collections/omega"
+            ],
+            [
+              "Pre-workout",
+              "/collections/pre-workout"
+            ],
+            [
+              "Protein",
+              "/collections/protein"
+            ],
+            [
+              "Shop all",
+              "/collections/shop-all"
+            ],
+            [
+              "Contact",
+              "/contact"
+            ],
+            [
+              "help@p6.test",
+              "mailto:help@p6.test"
+            ]
+          ],
+          "logos": [
+            0,
+            0
+          ]
+        },
+        "now": {
+          "status": 200,
+          "headerText": "Fernway Goods Shop all CreatineOmegaPre-workoutProteinShop allVitamins",
+          "footerText": "Fernway Goods Shop Fernway Goods online. Shop All collections Creatine Omega Pre-workout Protein Shop all Company Contact Support help@p6.test © Fernway Goods",
+          "headerLinks": [
+            [
+              "Fernway Goods",
+              "/"
+            ],
+            [
+              "Shop all",
+              "/collections"
+            ],
+            [
+              "Creatine",
+              "/collections/creatine"
+            ],
+            [
+              "Omega",
+              "/collections/omega"
+            ],
+            [
+              "Pre-workout",
+              "/collections/pre-workout"
+            ],
+            [
+              "Protein",
+              "/collections/protein"
+            ],
+            [
+              "Shop all",
+              "/collections/shop-all"
+            ],
+            [
+              "Vitamins",
+              "/collections/vitamins"
+            ]
+          ],
+          "footerLinks": [
+            [
+              "All collections",
+              "/collections"
+            ],
+            [
+              "Creatine",
+              "/collections/creatine"
+            ],
+            [
+              "Omega",
+              "/collections/omega"
+            ],
+            [
+              "Pre-workout",
+              "/collections/pre-workout"
+            ],
+            [
+              "Protein",
+              "/collections/protein"
+            ],
+            [
+              "Shop all",
+              "/collections/shop-all"
+            ],
+            [
+              "Contact",
+              "/contact"
+            ],
+            [
+              "help@p6.test",
+              "mailto:help@p6.test"
+            ]
+          ],
+          "logos": [
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the header's and footer's HTML is the same as at b063753 after the P4 comparison's mask",
+      "detail": {
+        "header": true,
+        "footer": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "/admin/start on the legacy store redirects to /admin/setup",
+      "detail": {
+        "now": {
+          "status": 200,
+          "landed": "/admin/setup",
+          "text": "Setup Everything between here and your first sale. Most steps tick themselves off as the work lands; the last three are your call. Getting your store live 1/9 Connect Shopify Auto OAuth connect — the "
+        },
+        "atBase": {
+          "status": 404,
+          "landed": "/admin/start",
+          "text": "404 This page isn’t on Fernway Goods’s shelves The page you're looking for doesn't exist or may have moved. Back to home Browse collections Search products"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "no page errors on this tree",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "seeded (--p6 --stage f): the p6 store on p6.localhost (stage f) is a legacy store with no live release: 24 products, 6 collections, 0 documents, latest sync complete; the closed store is parked. Login and ids: .design-data/p6-seed.json. 1.4s",
+    "at b063753 /admin/start answered 404 and stayed at /admin/start (the page didn't exist yet)",
+    "store: p6.localhost; captures in docs/cms-reviews/drills/P6-DRILLS/legacy-f/"
+  ],
+  "screenshots": [
+    {
+      "name": "f-b063753-setup-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/f-b063753-setup-1440.png",
+      "bytes": 29404,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/setup"
+    },
+    {
+      "name": "f-b063753-admin-start-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/f-b063753-admin-start-1440.png",
+      "bytes": 22283,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/start"
+    },
+    {
+      "name": "f-b063753-storefront-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/f-b063753-storefront-1440.png",
+      "bytes": 46555,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "f-phase6-setup-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/f-phase6-setup-1440.png",
+      "bytes": 29404,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/setup"
+    },
+    {
+      "name": "f-phase6-admin-start-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/f-phase6-admin-start-1440.png",
+      "bytes": 29404,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/setup"
+    },
+    {
+      "name": "f-phase6-storefront-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/f-phase6-storefront-1440.png",
+      "bytes": 47232,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

@@ -1,0 +1,264 @@
+{
+  "id": "P6-DRILLS",
+  "part": "e",
+  "title": "P6-DRILLS — e",
+  "ranAt": "2026-11-05T06:18:50.245Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 20,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the stage seed: a complete sync of an empty catalog (0 products)",
+      "detail": {
+        "mode": "documents",
+        "liveRelease": null,
+        "documents": 0,
+        "products": 0,
+        "collections": 0,
+        "media": 32,
+        "latestSync": {
+          "id": "sync_a9254f84e11dd5a2",
+          "status": "complete",
+          "source": "injected",
+          "products": 0,
+          "collections": 0,
+          "finished_at": "2026-11-05T06:18:18.681Z"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "/admin/start explains 'Add products in Shopify, then sync again' and that rows come after the next sync",
+      "detail": {
+        "state": "ready",
+        "note": "Your Shopify store has no products yet. Add products in Shopify, then sync again. If you haven't changed your home page, product rows appear after your next sync. Otherwise add them in the editor. Your products are in 0 products and 0 collections, brought in just now."
+      }
+    },
+    {
+      "ok": true,
+      "label": "the made store never says 'opening soon'",
+      "detail": "Your starting store is ready A home page with your store name and the Slate colours. Nothing is public yet. Edit the home page Change colours and logo Your Shopify store has no products yet. Add produ"
+    },
+    {
+      "ok": true,
+      "label": "the home draft is the hero only (made by the generator)",
+      "detail": [
+        "hero"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the preview shows the hero-only home",
+      "detail": "You're seeing your unpublished changes. See the live storeYour new colours are shown here.\nFernway Goods\n\nComing soon\n\nFernway Goods\nNew products are on the way\n\nWe’re getting things ready. Please che"
+    },
+    {
+      "ok": true,
+      "label": "no page errors (empty catalog)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "a second seeded sync (the store kept): 24 products, complete",
+      "detail": {
+        "mode": "documents",
+        "liveRelease": null,
+        "documents": 2,
+        "products": 24,
+        "collections": 6,
+        "media": 32,
+        "latestSync": {
+          "id": "sync_30bbdf242e9deb46",
+          "status": "complete",
+          "source": "injected",
+          "products": 24,
+          "collections": 6,
+          "finished_at": "2026-11-05T06:18:28.088Z"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "before the founder comes back, the home is still the hero only (syncs don't make pages by themselves here)",
+      "detail": [
+        "hero"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "as built (finding P6D-2, an owner check): after a sync that is not the worker's (the seeded one, like the console's inline, the CLI's or the connect callback's), opening /admin/start or the editor leaves the hero-only home as it is: both only make a store that has no home yet, so only the worker's post-sync step refills it",
+      "detail": {
+        "kinds": [
+          "hero"
+        ],
+        "revision": 1
+      }
+    },
+    {
+      "ok": true,
+      "label": "the worker's post-sync step refills the untouched home from the new catalog (rows added, still the generator's, still a draft)",
+      "detail": {
+        "before": {
+          "kinds": [
+            "hero"
+          ],
+          "revision": 1
+        },
+        "after": {
+          "kinds": [
+            "hero",
+            "collections",
+            "product_rail",
+            "product_rail",
+            "new"
+          ],
+          "revision": 2
+        },
+        "refilled": [
+          "doc_home"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the preview shows the refilled rows (Shop all, Creatine)",
+      "detail": "You're seeing your unpublished changes. See the live storeYour new colours are shown here.\nFernway Goods\nCreatine\nOmega\nPre-workout\nProtein\nShop all\nVitamins\n\n24 products · 6 collections\n\nFernway Goods\n\nShop Shop all and Creatine.\n\nShop all collections\nShop by collection\nView all →\nShop all\n\n24 prod"
+    },
+    {
+      "ok": true,
+      "label": "/admin/start now names the rows and no longer says the catalog is empty",
+      "detail": "Your starting store is ready A home page with your store name, rows for Shop all and Creatine, a grid of your collections, a row of your newest products, and the Slate colours. Nothing is public yet. Edit the home page Change colours and logo"
+    },
+    {
+      "ok": true,
+      "label": "still closed: nothing published",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "no page errors (refill)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "the stage seed: 24 products and no collections",
+      "detail": {
+        "mode": "documents",
+        "liveRelease": null,
+        "documents": 0,
+        "products": 24,
+        "collections": 0,
+        "media": 32,
+        "latestSync": {
+          "id": "sync_b132e4aa5111eec7",
+          "status": "complete",
+          "source": "injected",
+          "products": 24,
+          "collections": 0,
+          "finished_at": "2026-11-05T06:18:41.701Z"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "/admin/start: 'Your products have no collections in Shopify yet, so your home page shows your newest products…'",
+      "detail": "Your products have no collections in Shopify yet, so your home page shows your newest products. Add collections in Shopify to get collection rows."
+    },
+    {
+      "ok": true,
+      "label": "the home: a hero and the newest products (a \"new\" section), no collection rows or grid",
+      "detail": [
+        "hero",
+        "new"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the preview is a valid home with products (8 product links)",
+      "detail": "You're seeing your unpublished changes. See the live storeYour new colours are shown here.\nFernway Goods\n\n24 products · 0 collections\n\nFernway Goods\n\nBrowse the full catalog and check out in a few eas"
+    },
+    {
+      "ok": true,
+      "label": "the header still shows the store (no collection menu needed)",
+      "detail": [
+        [
+          "Fernway Goods",
+          "/"
+        ],
+        [
+          "Shop all",
+          "/collections"
+        ]
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no page errors (no collections)",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "seeded (--p6 --stage e --variant empty): the p6 store on p6.localhost (stage e, empty) is a documents store with no live release: 0 products, 0 collections, 0 documents, latest sync complete; the closed store is parked. Login and ids: .design-data/p6-seed.json. 1.4s",
+    "seeded (--p6 --stage e --variant refill): the p6 store on p6.localhost (stage e, refill) is a documents store with no live release: 24 products, 6 collections, 2 documents, latest sync complete; the closed store is parked. Login and ids: .design-data/p6-seed.json. 1.3s",
+    "the worker's post-sync step: {\"ran\":true,\"written\":true,\"refilled\":[\"doc_home\"]}",
+    "seeded (--p6 --stage e --variant no-collections): the p6 store on p6.localhost (stage e, no-collections) is a documents store with no live release: 24 products, 0 collections, 0 documents, latest sync complete; the closed store is parked. Login and ids: .design-data/p6-seed.json. 1.6s"
+  ],
+  "screenshots": [
+    {
+      "name": "e-empty-start-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/e-empty-start-1440.png",
+      "bytes": 30579,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/start"
+    },
+    {
+      "name": "e-empty-preview-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/e-empty-preview-1440.png",
+      "bytes": 32109,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "e-refilled-preview-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/e-refilled-preview-1440.png",
+      "bytes": 36748,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "e-refilled-start-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/e-refilled-start-1440.png",
+      "bytes": 29439,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/start"
+    },
+    {
+      "name": "e-nocollections-start-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/e-nocollections-start-1440.png",
+      "bytes": 29237,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/start"
+    },
+    {
+      "name": "e-nocollections-preview-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/e-nocollections-preview-1440.png",
+      "bytes": 36649,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    }
+  ]
+}

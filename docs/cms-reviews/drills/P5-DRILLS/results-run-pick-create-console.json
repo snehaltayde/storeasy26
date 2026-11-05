@@ -1,0 +1,39 @@
+{
+  "ranAt": "2026-11-05T05:26:05.165Z",
+  "finishedAt": "2026-11-05T05:27:49.395Z",
+  "stages": [
+    "pick",
+    "create",
+    "console"
+  ],
+  "rows": [
+    {
+      "stage": "pick",
+      "exit": 0,
+      "seconds": 41,
+      "passed": 8,
+      "failed": 0,
+      "known": 0,
+      "results": "results-pick.json"
+    },
+    {
+      "stage": "create",
+      "exit": 0,
+      "seconds": 32,
+      "passed": 11,
+      "failed": 0,
+      "known": 0,
+      "results": "results-create.json"
+    },
+    {
+      "stage": "console",
+      "exit": 0,
+      "seconds": 31,
+      "passed": 5,
+      "failed": 0,
+      "known": 0,
+      "results": "results-console.json"
+    }
+  ],
+  "failed": 0
+}

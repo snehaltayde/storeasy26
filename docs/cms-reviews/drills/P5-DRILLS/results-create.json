@@ -2,7 +2,7 @@
   "id": "P5-DRILLS",
   "part": "create",
   "title": "P5-DRILLS — create",
-  "ranAt": "2026-11-05T01:10:18.577Z",
+  "ranAt": "2026-11-05T05:27:17.718Z",
   "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 11,
@@ -70,23 +70,23 @@
       "label": "create: its cart offer is written and on (the discount works now)",
       "detail": [
         [
-          "bundle-bun-02dc93b4bdc70b07a9",
+          "bundle-bun-51b2b1be872b83984d",
+          1
+        ],
+        [
+          "bundle-bun-6c4cce368ba4e613f0",
+          1
+        ],
+        [
+          "bundle-bun-bcec779fa0650fbbf3",
           0
         ],
         [
-          "bundle-bun-0b4e92cb94ef4c1307",
+          "bundle-bun-c94149ddde644245d7",
           1
         ],
         [
-          "bundle-bun-13762a4162ce099958",
-          1
-        ],
-        [
-          "bundle-bun-28222e7a4d617a9de8",
-          1
-        ],
-        [
-          "bundle-bun-d1be1d3ef43f7e3929",
+          "bundle-bun-fdfc542c1cc9e6470d",
           1
         ]
       ]
@@ -96,7 +96,7 @@
       "label": "create: the new bundle is picked in the section, saved as { id } only",
       "detail": {
         "pickedNow": {
-          "id": "bun-28222e7a4d617a9de8"
+          "id": "bun-6c4cce368ba4e613f0"
         }
       }
     },
@@ -126,14 +126,14 @@
     }
   ],
   "notes": [
-    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_bd61e6860eb86144, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.0s",
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_c0449ebf0ec5b3f1, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s",
     "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)"
   ],
   "screenshots": [
     {
       "name": "create-failing-price-1440",
       "file": "docs/cms-reviews/drills/P5-DRILLS/create-failing-price-1440.png",
-      "bytes": 33253,
+      "bytes": 33783,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -142,7 +142,7 @@
     {
       "name": "create-passing-price-1440",
       "file": "docs/cms-reviews/drills/P5-DRILLS/create-passing-price-1440.png",
-      "bytes": 34107,
+      "bytes": 34643,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -151,7 +151,7 @@
     {
       "name": "create-picked-1440",
       "file": "docs/cms-reviews/drills/P5-DRILLS/create-picked-1440.png",
-      "bytes": 35316,
+      "bytes": 35920,
       "width": 720,
       "height": 450,
       "viewport": 1440,
@@ -160,7 +160,7 @@
     {
       "name": "create-bundle-page-before-publish-1440",
       "file": "docs/cms-reviews/drills/P5-DRILLS/create-bundle-page-before-publish-1440.png",
-      "bytes": 22080,
+      "bytes": 22057,
       "width": 720,
       "height": 450,
       "viewport": 1440,

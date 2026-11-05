@@ -2,7 +2,7 @@
   "id": "P5-DRILLS",
   "part": "pick",
   "title": "P5-DRILLS — pick",
-  "ranAt": "2026-11-05T01:09:47.002Z",
+  "ranAt": "2026-11-05T05:26:45.854Z",
   "harness": "http://localhost:6100",
   "chrome": "156.0.8078.80",
   "passed": 8,
@@ -28,7 +28,7 @@
       "ok": true,
       "label": "pick: Add a section > Bundle card, search 'gym', pick 'Gym duo': saved, the preview shows it, the inspector says 'Showing to shoppers.'",
       "detail": {
-        "secId": "sec_c5013306",
+        "secId": "sec_a23abf17",
         "line": "Showing to shoppers."
       }
     },
@@ -36,7 +36,7 @@
       "ok": true,
       "label": "pick: the draft holds the bundle as { id } only (no price, title or stock)",
       "detail": {
-        "id": "bun-2a11e4efbe468a1b1d"
+        "id": "bun-a434a620ac23f42ffb"
       }
     },
     {
@@ -65,17 +65,17 @@
     },
     {
       "ok": true,
-      "label": "pick: from opening the editor to the live home showing the card took 15.1 s (target under 2 minutes)",
+      "label": "pick: from opening the editor to the live home showing the card took 16.5 s (target under 2 minutes)",
       "detail": {
-        "seconds": 15.1,
+        "seconds": 16.5,
         "laps": {
-          "editor open": 4.1,
-          "Bundle card added": 5.2,
-          "bundle picked and saved": 6.3,
-          "preview shows the card": 6.7,
-          "phone preview checked": 13.4,
-          "published": 14.3,
-          "live home shows the card": 15.1
+          "editor open": 5.3,
+          "Bundle card added": 6.4,
+          "bundle picked and saved": 7.5,
+          "preview shows the card": 7.9,
+          "phone preview checked": 14.7,
+          "published": 15.6,
+          "live home shows the card": 16.5
         },
         "clicks": 7,
         "typedWords": "gym"
@@ -88,15 +88,15 @@
     }
   ],
   "notes": [
-    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_a1f676d3324c448b, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.1s",
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_6659f2ae351bc289, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.8s",
     "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)",
-    "pick timing (seconds from opening the editor): {\"editor open\":4.1,\"Bundle card added\":5.2,\"bundle picked and saved\":6.3,\"preview shows the card\":6.7,\"phone preview checked\":13.4,\"published\":14.3,\"live home shows the card\":15.1}; clicks after sign-in: 7 (Add a section | Bundle card Pick a bundle to show its pr | Gym duo ₹2,508 Showing | No thanks | Publish | Publish | Close); typed: \"gym\". The time includes this machine's next dev compiles and the drill's own waits; the phone preview check is a second tab, as the new editor has no device switch (finding P5D-1)."
+    "pick timing (seconds from opening the editor): {\"editor open\":5.3,\"Bundle card added\":6.4,\"bundle picked and saved\":7.5,\"preview shows the card\":7.9,\"phone preview checked\":14.7,\"published\":15.6,\"live home shows the card\":16.5}; clicks after sign-in: 7 (Add a section | Bundle card Pick a bundle to show its pr | Gym duo ₹2,508 Showing | No thanks | Publish | Publish | Close); typed: \"gym\". The time includes this machine's next dev compiles and the drill's own waits; the phone preview check is a second tab, as the new editor has no device switch (finding P5D-1)."
   ],
   "screenshots": [
     {
       "name": "pick-editor-1440",
       "file": "docs/cms-reviews/drills/P5-DRILLS/pick-editor-1440.png",
-      "bytes": 34978,
+      "bytes": 34804,
       "width": 720,
       "height": 450,
       "viewport": 1440,

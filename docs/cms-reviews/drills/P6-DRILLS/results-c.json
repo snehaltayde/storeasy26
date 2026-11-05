@@ -1,0 +1,580 @@
+{
+  "id": "P6-DRILLS",
+  "part": "c",
+  "title": "P6-DRILLS — c",
+  "ranAt": "2026-11-05T06:17:50.674Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 42,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the stage seed sets returns_window_days 10 and no support email",
+      "detail": {
+        "returns_window_days": 10,
+        "support": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "the store is made on /admin/start",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the brand step: Slate kept, the library logo saved into the design draft",
+      "detail": {
+        "media": "/api/media/med_bad998b5f514fa6058"
+      }
+    },
+    {
+      "ok": true,
+      "label": "Publish shows 'Before you open your store' first",
+      "detail": {
+        "phase": "opening",
+        "text": "Before you open your store Your store isn't open yet. Look over these, then open it. Cash on delivery only Add your Razo"
+      }
+    },
+    {
+      "ok": true,
+      "label": "nothing went live by opening the panel",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "doc_design (\"Brand\") is in the set beside the home page",
+      "detail": [
+        "Home page This goes live for the first time, with: Hero Coll",
+        "Brand Colours: accent and text colour changed Every page: he"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "privacy and returns are 'Must fix', with 'Start a privacy page' and 'Start a returns page'",
+      "detail": {
+        "privacy": {
+          "id": "privacy",
+          "level": "block",
+          "text": "Must fix Privacy page Your store needs a privacy page before it opens. Start one from a template, then read it and save it. Start a privacy page These are starting points, not legal advice.",
+          "buttons": [
+            "Start a privacy page"
+          ],
+          "link": null,
+          "linkText": null
+        },
+        "returns": {
+          "id": "returns",
+          "level": "block",
+          "text": "Must fix Returns page Your store needs a returns page (your terms, returns and refunds) before it opens. Start one from a template, then read it and save it. Start a returns page",
+          "buttons": [
+            "Start a returns page"
+          ],
+          "link": null,
+          "linkText": null
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "with no policy page, Open is disabled",
+      "detail": {
+        "text": "Open my store anyway",
+        "disabled": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "the test order and contact details are warnings ('Check')",
+      "detail": {
+        "payment": "info",
+        "privacy": "block",
+        "returns": "block",
+        "test_order": "warn",
+        "catalog": "ok",
+        "contact": "warn",
+        "design": "info"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the panel says the starters are not legal advice",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "'Start a returns page' makes a 'Terms of service' draft at slug terms, marked as the starter's (not the founder's)",
+      "detail": {
+        "id": "doc_5ssd4qpqsqcdzf7u",
+        "type": "page",
+        "slug": "terms",
+        "label": "Terms of service",
+        "revision": 1,
+        "updated_by": "system:policy-starter",
+        "published_version_id": null,
+        "draft_hash": "f3651afc594f9073a18a95b4b75b0335294034c4643f426b4bc8615015ebb6c3",
+        "published_hash": null,
+        "archived_at": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "nothing went live",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the returns item is still 'Must fix', now with 'Read it' and 'I've read it'",
+      "detail": {
+        "id": "returns",
+        "level": "block",
+        "text": "Must fix Returns page We started a returns page (your terms, returns and refunds) for you from a template. It's a starting point, not legal advice: read it, change what you need and save it before you open. Read it I've read it",
+        "buttons": [
+          "I've read it"
+        ],
+        "link": "/admin/editor?doc=doc_5ssd4qpqsqcdzf7u",
+        "linkText": "Read it"
+      }
+    },
+    {
+      "ok": true,
+      "label": "with only the returns starter, Open is disabled",
+      "detail": {
+        "text": "Open my store anyway",
+        "disabled": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "'Read it': the returns starter says 'within 10 days of your order' (the seeded window), never 7 or 14",
+      "detail": {
+        "days": [
+          "10",
+          "10"
+        ],
+        "line": "Unopened products can be returned within 10 days of your order. Refunds go back to the original payment method."
+      }
+    },
+    {
+      "ok": true,
+      "label": "the stored starter draft holds the same sentence, and no 7 or 14 days",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "Check again: an untouched starter still blocks, and it is not in the set",
+      "detail": {
+        "returns": "block",
+        "goesLive": [
+          "Home page This goes live for the first t",
+          "Brand Colours: accent and text colour ch"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "Check again: Open still disabled (privacy is missing too)",
+      "detail": {
+        "open": {
+          "text": "Open my store anyway",
+          "disabled": true
+        },
+        "privacy": "block"
+      }
+    },
+    {
+      "ok": true,
+      "label": "\"I've read it\": returns turns to 'goes live too' (the founder's now)",
+      "detail": {
+        "returns": {
+          "id": "returns",
+          "level": "info",
+          "text": "Returns page Your returns page (your terms, returns and refunds) goes live too. Open “Terms of service”",
+          "buttons": [],
+          "link": "/admin/editor?doc=doc_5ssd4qpqsqcdzf7u",
+          "linkText": "Open “Terms of service”"
+        },
+        "updated_by": "merchant:u_e57ab2f89bf8b8f1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the read returns page is now in the set",
+      "detail": [
+        "Home page This goes live for the first t",
+        "Brand Colours: accent and text colour ch",
+        "Terms of service This goes live for the "
+      ]
+    },
+    {
+      "ok": true,
+      "label": "returns read but privacy missing: Open still disabled",
+      "detail": {
+        "open": {
+          "text": "Open my store anyway",
+          "disabled": true
+        },
+        "privacy": "block"
+      }
+    },
+    {
+      "ok": true,
+      "label": "still nothing live",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "'Start a privacy page' makes a starter draft; privacy still blocks until it is read or saved; Open disabled",
+      "detail": {
+        "priv": {
+          "id": "doc_2shnzbluudnwyqub",
+          "type": "page",
+          "slug": "privacy-policy",
+          "label": "Privacy policy",
+          "revision": 1,
+          "updated_by": "system:policy-starter",
+          "published_version_id": null,
+          "draft_hash": "d75a87a2378803088dbc4077f21c61cba085ad039ec5819239d7875a970e087e",
+          "published_hash": null,
+          "archived_at": null
+        },
+        "privacy": {
+          "id": "privacy",
+          "level": "block",
+          "text": "Must fix Privacy page We started a privacy page for you from a template. It's a starting point, not legal advice: read it, change what you need and save it before you open. Read it I've read it These are starting points, not legal advice.",
+          "buttons": [
+            "I've read it"
+          ],
+          "link": "/admin/editor?doc=doc_2shnzbluudnwyqub",
+          "linkText": "Read it"
+        },
+        "open": {
+          "text": "Open my store anyway",
+          "disabled": true
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "the founder opens the privacy page, changes one sentence and the editor saves it",
+      "detail": {
+        "before": "Order details (name, address, phone, email) to deliver your purchase.",
+        "after": "We only ask for what we need to send your order, and we keep it safe.",
+        "updated_by": "merchant:u_e57ab2f89bf8b8f1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "Check again: privacy is 'goes live too'",
+      "detail": {
+        "id": "privacy",
+        "level": "info",
+        "text": "Privacy page Your privacy page goes live too. Open “Privacy policy”",
+        "buttons": [],
+        "link": "/admin/editor?doc=doc_2shnzbluudnwyqub",
+        "linkText": "Open “Privacy policy”"
+      }
+    },
+    {
+      "ok": true,
+      "label": "both policy pages are in the set (home, design, privacy, terms)",
+      "detail": [
+        "Home page This goes live for the first t",
+        "Brand Colours: accent and text colour ch",
+        "Terms of service This goes live for the ",
+        "Privacy policy This goes live for the fi"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "only now is Open enabled ('Open my store anyway': the test order and contact still warn)",
+      "detail": {
+        "text": "Open my store anyway",
+        "disabled": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "before the test order: the p6 store's row and this run's env hold no Shopify store, no payment secret and no AI key",
+      "detail": {
+        "found": [],
+        "env": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "a cash on delivery order placed in the founder's preview (anti-dandruff-shampoo-17); no card details entered",
+      "detail": {
+        "orderId": "P6-7B173B7A",
+        "cod": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "the order is to snehal@mediastic.in, cash on delivery",
+      "detail": {
+        "id": "P6-7B173B7A",
+        "status": "sync_failed",
+        "email": "snehal@mediastic.in",
+        "payment_method": "cod",
+        "total": 1117,
+        "sync_error": "No SHOPIFY_ADMIN_TOKEN, and SHOPIFY_CLIENT_ID/SECRET not set either",
+        "sync_attempts": 1,
+        "shopify_order_id": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "the order's Shopify push (draftOrderCreate) failed harmlessly: the blank keys stop it before any request, no Shopify order id",
+      "detail": {
+        "status": "sync_failed",
+        "sync_attempts": 1,
+        "sync_error": "No SHOPIFY_ADMIN_TOKEN, and SHOPIFY_CLIENT_ID/SECRET not set either",
+        "shopify_order_id": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "the test order is cancelled at once",
+      "detail": {
+        "cancel": 200,
+        "status": "cancelled"
+      }
+    },
+    {
+      "ok": true,
+      "label": "Check again: the test order is done",
+      "detail": {
+        "id": "test_order",
+        "level": "ok",
+        "text": "Done Test order You placed a test order. Thank you for checking.",
+        "buttons": [],
+        "link": null,
+        "linkText": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "'Open my store anyway': the store is live (a release)",
+      "detail": {
+        "phase": "done",
+        "release": "rel_c1f6f88e7868a8a1"
+      }
+    },
+    {
+      "ok": true,
+      "label": "home, design, privacy and terms all went live together",
+      "detail": {
+        "doc_2shnzbluudnwyqub": true,
+        "doc_5ssd4qpqsqcdzf7u": true,
+        "doc_design": true,
+        "doc_home": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "a shopper now sees the store, not the closed page",
+      "detail": "Shop all Creatine Omega Pre-workout Protein Shop all Vitamins 24 products · 6 collections Fernway Goods Shop Shop all and Creatine. Shop all collections Shop by"
+    },
+    {
+      "ok": true,
+      "label": "the live accent is Slate (#334155) in the computed CSS variables, not lime",
+      "detail": {
+        "--accent-500": "#334155",
+        "--sf-accent": "#597194",
+        "--background": "#ffffff",
+        "--sf-text": "#0f172a",
+        "--sf-text-muted": "#585e6b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the logo shows in the live header and footer (alt = the store name)",
+      "detail": {
+        "header": [
+          {
+            "src": "/api/media/med_bad998b5f514fa6058",
+            "alt": "Fernway Goods",
+            "ok": true
+          }
+        ],
+        "footer": [
+          {
+            "src": "/api/media/med_bad998b5f514fa6058",
+            "alt": "Fernway Goods",
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "Privacy policy is live at /policies/privacy-policy with the founder's text",
+      "detail": {
+        "status": 200,
+        "has": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "Terms of service is live at /policies/terms with the founder's text",
+      "detail": {
+        "status": 200,
+        "has": true
+      }
+    },
+    {
+      "ok": true,
+      "label": "checkout links both live policy pages",
+      "detail": [
+        [
+          "Privacy policy",
+          "/policies/privacy-policy"
+        ],
+        [
+          "Terms of service",
+          "/policies/terms"
+        ]
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no page errors in the console pages",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "seeded (--p6 --stage c): the p6 store on p6.localhost (stage c) is a documents store with no live release: 24 products, 6 collections, 0 documents, latest sync complete; the closed store is parked. Login and ids: .design-data/p6-seed.json. 1.5s",
+    "test order P6-7B173B7A (snehal@mediastic.in, cash on delivery) placed in the preview and cancelled: cancelled",
+    "seed: {\"mode\":\"documents\",\"liveRelease\":null,\"documents\":0,\"products\":24,\"collections\":6,\"media\":33,\"latestSync\":{\"id\":\"sync_1892651a0c436cbc\",\"status\":\"complete\",\"source\":\"injected\",\"products\":24,\"collections\":6,\"finished_at\":\"2026-11-05T06:17:11.144Z\"}}"
+  ],
+  "screenshots": [
+    {
+      "name": "c-panel-first-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-panel-first-1440.png",
+      "bytes": 33709,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "c-panel-returns-started-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-panel-returns-started-1440.png",
+      "bytes": 34426,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "c-returns-starter-read-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-returns-starter-read-1440.png",
+      "bytes": 32693,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "c-panel-returns-read-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-panel-returns-read-1440.png",
+      "bytes": 28061,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "c-privacy-edited-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-privacy-edited-1440.png",
+      "bytes": 39480,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "c-panel-both-ready-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-panel-both-ready-1440.png",
+      "bytes": 29025,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "c-test-order-payment-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-test-order-payment-1440.png",
+      "bytes": 22219,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "c-test-order-confirmation-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-test-order-confirmation-1440.png",
+      "bytes": 19410,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/P6-7B173B7A"
+    },
+    {
+      "name": "c-panel-before-open-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-panel-before-open-1440.png",
+      "bytes": 27799,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "c-panel-opened-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-panel-opened-1440.png",
+      "bytes": 32951,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "c-live-home-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-live-home-1440.png",
+      "bytes": 45519,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "c-live-privacy-policy-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-live-privacy-policy-1440.png",
+      "bytes": 21914,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/privacy-policy"
+    },
+    {
+      "name": "c-live-terms-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-live-terms-1440.png",
+      "bytes": 20409,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/policies/terms"
+    },
+    {
+      "name": "c-live-checkout-links-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/c-live-checkout-links-1440.png",
+      "bytes": 14129,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    }
+  ]
+}

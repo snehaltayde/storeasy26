@@ -1,0 +1,247 @@
+{
+  "id": "P6-DRILLS",
+  "part": "a",
+  "title": "P6-DRILLS — a",
+  "ranAt": "2026-11-05T06:16:38.107Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 17,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "the harness runs with ANTHROPIC_API_KEY blank (no AI key at all)",
+      "detail": {
+        "harness": "blank",
+        "here": "blank"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the stage seed: a documents store with no documents, no live release, and a complete sync of 24 products",
+      "detail": {
+        "mode": "documents",
+        "liveRelease": null,
+        "documents": 0,
+        "products": 24,
+        "collections": 6,
+        "media": 32,
+        "latestSync": {
+          "id": "sync_d60922170eda0d6a",
+          "status": "complete",
+          "source": "injected",
+          "products": 24,
+          "collections": 6,
+          "finished_at": "2026-11-05T06:16:24.622Z"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "/admin/start: the store is made (1.9 s from opening the page) and the page says what was made, in Slate, and that nothing is public",
+      "detail": "Your starting store is ready A home page with your store name, rows for Shop all and Creatine, a grid of your collections, a row of your newest products, and the Slate colours. Nothing is public yet. Edit the home page Change colours and logo"
+    },
+    {
+      "ok": true,
+      "label": "the generator made doc_home and doc_design as drafts (updated_by system:first-run, nothing published)",
+      "detail": [
+        [
+          "doc_design",
+          "system:first-run",
+          null
+        ],
+        [
+          "doc_home",
+          "system:first-run",
+          null
+        ]
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no header or footer document: they stay on the automatic menus from the catalog",
+      "detail": [
+        "doc_design",
+        "doc_home"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "no live release: the store is still closed",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the home draft: a hero first, then product rows and more",
+      "detail": [
+        "hero",
+        "collections",
+        "product_rail",
+        "product_rail",
+        "new"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the preview shows the hero (the store name) and the rows (Shop all, Creatine)",
+      "detail": "You're seeing your unpublished changes. See the live storeYour new colours are shown here.\nFernway Goods\nCreatine\nOmega\nPre-workout\nProtein\nShop all\nVitamins\n\n24 products · 6 collections\n\nFernway Goods\n\nShop Shop all and Creatine.\n\nShop all collections\nShop by collection\nView all →\nShop all\n\n24 prod"
+    },
+    {
+      "ok": true,
+      "label": "the preview's header menu is the catalog's collections",
+      "detail": {
+        "header": [
+          [
+            "Fernway Goods",
+            "/"
+          ],
+          [
+            "Shop all",
+            "/collections"
+          ],
+          [
+            "Creatine",
+            "/collections/creatine"
+          ],
+          [
+            "Omega",
+            "/collections/omega"
+          ],
+          [
+            "Pre-workout",
+            "/collections/pre-workout"
+          ],
+          [
+            "Protein",
+            "/collections/protein"
+          ],
+          [
+            "Shop all",
+            "/collections/shop-all"
+          ],
+          [
+            "Vitamins",
+            "/collections/vitamins"
+          ]
+        ],
+        "collections": [
+          "creatine",
+          "omega",
+          "pre-workout",
+          "protein",
+          "shop-all",
+          "vitamins"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the preview has a footer (store name and links)",
+      "detail": "Fernway Goods Shop Fernway Goods online. Shop All collections Creatine Omega Pre-workout Protein Shop all Company Contact Support help@p6.test © Fernway Goods"
+    },
+    {
+      "ok": true,
+      "label": "the preview's accent is Slate (#334155), not lime",
+      "detail": {
+        "--accent-500": "#334155",
+        "--sf-accent": "#597194",
+        "--background": "#ffffff",
+        "--sf-text": "#0f172a",
+        "--sf-text-muted": "#585e6b"
+      }
+    },
+    {
+      "ok": true,
+      "label": "p6.localhost for a shopper is still the closed page ('Opening soon'), with none of the draft's words",
+      "detail": {
+        "text": "Fernway Goods Opening soon We're getting the shop ready. Check back soon.",
+        "draftWords": [
+          "Shop Shop all and Creatine.",
+          "Shop all collections",
+          "Shop all",
+          "Creatine"
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "the raw HTML of / carries none of the draft's words either",
+      "detail": {
+        "status": 200,
+        "bytes": 86409
+      }
+    },
+    {
+      "ok": true,
+      "label": "the browser's network log: 0 requests to api.anthropic.com (181 requests, hosts: p6.localhost)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "no page errors in the console pages",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "probe: the generated drafts hold 2 content strings to look for",
+      "detail": [
+        "Shop by collection",
+        "New arrivals"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "probe (P3-CLOSED rsc-probe) on the generated, unpublished p6 store: 64 anonymous HTML and RSC: 1 answers carry none of the drafts' strings",
+      "detail": {
+        "base": "http://p6.localhost:6100/",
+        "contentStrings": 2,
+        "sample": [
+          "Shop by collection",
+          "New arrivals"
+        ],
+        "droppedAsCatalogOrName": 3,
+        "requests": 64,
+        "withLeaks": 0,
+        "statuses": [
+          200
+        ],
+        "leaks": []
+      }
+    }
+  ],
+  "notes": [
+    "seeded (--p6 --stage a): the p6 store on p6.localhost (stage a) is a documents store with no live release: 24 products, 6 collections, 0 documents, latest sync complete; the closed store is parked. Login and ids: .design-data/p6-seed.json. 1.4s",
+    "after sign-in the founder lands on /admin/dashboard",
+    "the closed page's accent: #84cc16"
+  ],
+  "screenshots": [
+    {
+      "name": "a-start-ready-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/a-start-ready-1440.png",
+      "bytes": 29470,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/start"
+    },
+    {
+      "name": "a-editor-preview-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/a-editor-preview-1440.png",
+      "bytes": 36748,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "a-storefront-closed-1440",
+      "file": "docs/cms-reviews/drills/P6-DRILLS/a-storefront-closed-1440.png",
+      "bytes": 6188,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}
