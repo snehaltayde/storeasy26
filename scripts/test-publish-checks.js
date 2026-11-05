@@ -1316,10 +1316,11 @@ await t("P5-CHECKS: publishing a home carrying all four bundle warnings (missing
   for (const code of ["BUNDLE_MISSING", "BUNDLE_DISABLED", "BUNDLE_UNAVAILABLE", "BUNDLE_OVERLAP"]) ok(!Pub.__publishInternals.STRUCTURE_CODES.has(code), `${code} is not a structure code`);
 });
 
-await t("P5-CHECKS: a card on a deleted bundle is BUNDLE_MISSING naming its id with removeSection ('Remove this section and publish'); replaying it removes the section and the next publish has no BUNDLE_MISSING for it", async () => {
+await t("P5-CHECKS: a card on a deleted bundle is BUNDLE_MISSING with removeSection ('Remove this section and publish'); replaying it removes the section and the next publish has no BUNDLE_MISSING for it", async () => {
   ok(ALL_FOUR, "needs the all-four publish");
   const i = ALL_FOUR.issues.find((x) => x.code === "BUNDLE_MISSING" && x.sectionId === "sec_cgone");
-  ok(i.message.includes(`“${BUNS.gone}”`) && i.message.includes(Words.stateLine("missing")) && /takes this whole section off the page/.test(i.message), `words: ${i.message}`);
+  // P6-OPEN (finding P5D-2): named "A deleted bundle", never by its raw id
+  ok(i.message.startsWith(`${Checks.DELETED_BUNDLE_NAME}: `) && i.message.includes(Words.stateLine("missing")) && /takes this whole section off the page/.test(i.message), `words: ${i.message}`);
   eq(i.actions, [{ type: "removeSection", documentId: BUN_HOME.id, sectionId: "sec_cgone" }], "remove the section:");
   eq(actionLabel(i.actions[0]), "Remove this section and publish", "the button:");
   eq(i.where, "Test bundles · Bundle", "where:");
@@ -1345,7 +1346,7 @@ await t("P5-CHECKS: a grid with one deleted and one turned-off bundle gives BUND
     eq(actionLabel(i.actions[0]), "Remove it and publish", "the button:");
     ok(i.message.includes("Remove this bundle from the grid"), `says what goes: ${i.message}`);
   }
-  ok(miss.message.includes(`“${BUNS.gridGone}”`) && miss.message.includes(Words.stateLine("missing")), `deleted, by id: ${miss.message}`);
+  ok(miss.message.startsWith(`${Checks.DELETED_BUNDLE_NAME}: `) && miss.message.includes(Words.stateLine("missing")), `deleted, named "A deleted bundle": ${miss.message}`);
   ok(off.message.includes("“Grid off kit”") && off.message.includes(Words.stateLine("disabled")), `turned off, by name: ${off.message}`);
   eq(miss.where, "Test bundles · Bundles to show · bundle 1", "where:");
   // replay both clicks through the editor's applyAction (its containerFor
@@ -1360,6 +1361,21 @@ await t("P5-CHECKS: a grid with one deleted and one turned-off bundle gives BUND
   const r2 = published(await publishApi("bun", BUN_HOME.id), "after removing the two entries");
   eq(r2.issues.filter((x) => x.sectionId === "sec_grid"), [], "the grid is clean:");
   await save("bun", BUN_HOME.id, allFour());
+});
+
+// P6-OPEN (finding P5D-2 of P5-DRILLS): a deleted bundle's warning never
+// shows its raw id, in a card or in a grid, nor anywhere in the issue.
+await t("P6-OPEN (P5D-2): BUNDLE_MISSING never shows a raw bundle id: both deleted bundles (a card and a grid entry) are 'A deleted bundle', and no part of either issue holds the id", async () => {
+  ok(ALL_FOUR, "needs the all-four publish");
+  const missing = ALL_FOUR.issues.filter((x) => x.code === "BUNDLE_MISSING");
+  eq(missing.length, 2, "two deleted bundles:");
+  for (const i of missing) {
+    ok(i.message.startsWith("A deleted bundle: "), `named "A deleted bundle": ${i.message}`);
+    for (const id of [BUNS.gone, BUNS.gridGone]) ok(!JSON.stringify(i).includes(id), `no raw id ${id} in ${JSON.stringify(i)}`);
+    ok(!/bun-[0-9a-f]/.test(i.message), `no bun-… id in the words: ${i.message}`);
+  }
+  // the other bundles keep their names
+  ok(ALL_FOUR.issues.find((x) => x.code === "BUNDLE_DISABLED").message.startsWith("“Grid off kit”: "), "a turned-off bundle keeps its name");
 });
 
 await t("P5-CHECKS: a sold-out component gives BUNDLE_UNAVAILABLE saying shoppers see 'Currently unavailable'; no_saving names the live sum through formatMoney in the bundle's currency (USD) and says to lower the price in Catalog > Bundles, never 'Currently unavailable'", async () => {

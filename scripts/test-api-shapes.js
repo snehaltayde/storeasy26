@@ -131,8 +131,13 @@ const P4_CODES = ["SHOPIFY_OWNED", "TITLE_NOT_EDITABLE", "TITLE_NOT_PUBLISHABLE"
 // (lib/documents/service.js createFirstRunDocuments). P6-OPEN adds its codes
 // to this same list in batch 2.
 const P6_CODES = ["FIRST_RUN_ACTOR", "FIRST_RUN_STORE_LIVE", "FIRST_RUN_RACE"];
-const BUILT_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "CANNOT_TAKE_OFFLINE", "TOO_MANY_KEPT", ...P4_CODES, ...P6_CODES]);
-const NEW_CODES = new Set([...BUILT_CODES]);
+// P6-OPEN (PUB-12): the refusals of "Before you open your store" (publish.js,
+// each a DocumentError with its status), and POLICY_PAGE_MISSING, a warning
+// that rides on a 200 (an issue's code, never a body's)
+const P6_OPEN_CODES = ["STORE_CANNOT_TAKE_PAYMENT", "OPENING_NEEDS_DESIGN", "OPENING_NEEDS_POLICIES", "OPENING_CONFIRM_NEEDED"];
+const P6_ISSUE_CODES = ["POLICY_PAGE_MISSING"];
+const BUILT_CODES = new Set(["REPUBLISH_CONFIRM_NEEDED", "FIRST_PUBLISH_NEEDS_HOME", "LINKS_TO_UNPUBLISHED", "CANNOT_TAKE_OFFLINE", "TOO_MANY_KEPT", ...P4_CODES, ...P6_CODES, ...P6_OPEN_CODES]);
+const NEW_CODES = new Set([...BUILT_CODES, ...P6_ISSUE_CODES]);
 
 // ---- walking the shapes ------------------------------------------------------------
 
@@ -196,6 +201,8 @@ check("every operation of today and of phase 3 has its entry", () => {
     "openEntityContent", "resolveShopifyChange", "discardOrphanEdits",
     // P4-SEARCH
     "listProductContent",
+    // P6-OPEN
+    "openingChecks",
   ];
   sameList(Object.keys(SHAPES), want, "operations");
 });
@@ -294,7 +301,8 @@ check("the first-run writer's outcomes carry the service's words and the p6 code
 });
 
 check("the new phase 3 codes are each used by an outcome", () => {
-  const used = new Set(allOutcomes.map(({ o }) => o.body.code).filter(Boolean));
+  // P6-OPEN: a code that rides on a 200 is an issue's (issues[].code)
+  const used = new Set(allOutcomes.flatMap(({ o }) => [o.body.code, ...(Array.isArray(o.body.issues) ? o.body.issues.map((i) => i?.code) : [])]).filter(Boolean));
   for (const c of NEW_CODES) if (!used.has(c)) fail(`${c} has no outcome`);
 });
 
@@ -728,6 +736,99 @@ check("P4-LIVEROW: openEntityContent's 200 is the service's answer; the words of
   if (!gate.includes(JSON.stringify(SHAPES.saveDraft.outcomes.titleNotEditable.body.error))) fail("the title gate's words are not title-gate.js's");
   if (!readFileSyncText("lib/cms-mode.js").includes(JSON.stringify(SHAPES.publish.outcomes.storeMigrating.body.error))) fail("the migrating words are not lib/cms-mode.js's");
   if (!all.includes("Product content can't be taken offline. To go back to what Shopify sends, choose Use Shopify's on each field and publish.")) fail("the take-offline words are not in the code");
+});
+
+// ---- P6-OPEN (PUB-12): "Before you open your store" -----------------------------------------
+
+check("P6-OPEN: the opening refusals carry { report } (and offer where the code sends it), each code is publish.js's with its status, and their words are the code's", () => {
+  const o = SHAPES.publish.outcomes;
+  const want = {
+    storeCannotTakePayment: ["STORE_CANNOT_TAKE_PAYMENT", ["error", "code", "report"]],
+    openingNeedsDesign: ["OPENING_NEEDS_DESIGN", ["error", "code", "offer", "report"]],
+    openingNeedsPolicies: ["OPENING_NEEDS_POLICIES", ["error", "code", "report", "offer"]],
+    openingConfirmNeeded: ["OPENING_CONFIRM_NEEDED", ["error", "code", "report"]],
+  };
+  for (const [name, [code, keys]] of Object.entries(want)) {
+    if (!o[name]) fail(`publish.${name} is missing`);
+    if (o[name].body.code !== code || o[name].since !== "p6" || o[name].status !== 409) fail(`publish.${name}: ${o[name].body.code} ${o[name].since} ${o[name].status}`);
+    sameList(Object.keys(o[name].body), keys, name);
+  }
+  if (!/"STORE_CANNOT_TAKE_PAYMENT", `\$\{PAYMENT_LEAD\} \$\{pay\.message\}`, \{ report: st\.report \}/.test(publishSource)) fail("STORE_CANNOT_TAKE_PAYMENT extra changed");
+  if ((publishSource.match(/"OPENING_NEEDS_DESIGN", NEEDS_DESIGN_MESSAGE, \{ offer: st\.report\.offer, report: st\.report \}/g) || []).length !== 2) fail("OPENING_NEEDS_DESIGN extra changed (rules b and c)");
+  if (!/"OPENING_NEEDS_POLICIES", policiesMessage\(left, !!offer\), \{ report: st\.report, offer \}/.test(publishSource)) fail("OPENING_NEEDS_POLICIES extra changed");
+  if (!/"OPENING_CONFIRM_NEEDED", CONFIRM_MESSAGE, \{ report: st\.report \}/.test(publishSource)) fail("OPENING_CONFIRM_NEEDED extra changed");
+  for (const [name, c] of [["openingNeedsDesign", "NEEDS_DESIGN_MESSAGE"], ["openingConfirmNeeded", "CONFIRM_MESSAGE"]]) {
+    if (!publishSource.includes(`export const ${c} = ${JSON.stringify(o[name].body.error)};`)) fail(`${name}: "${o[name].body.error}" is not ${c} in publish.js`);
+  }
+  const lead = /export const PAYMENT_LEAD = ("[^"]*");/.exec(publishSource);
+  if (!lead || !o.storeCannotTakePayment.body.error.startsWith(JSON.parse(lead[1]))) fail("STORE_CANNOT_TAKE_PAYMENT does not lead with PAYMENT_LEAD");
+  if (!o.openingNeedsDesign.body.offer || o.openingNeedsPolicies.body.offer !== null) fail("the offers of the examples");
+  // the POLICY_PAGE_MISSING warning: a 200 carrying it as a publish issue
+  const pm = o.okPolicyPageMissing;
+  if (!pm || pm.status !== 200 || pm.since !== "p6") fail("publish.okPolicyPageMissing");
+  const w = pm.body.issues.find((i) => i.code === "POLICY_PAGE_MISSING");
+  if (!w || w.severity !== "warning" || w.level !== "warns") fail("the POLICY_PAGE_MISSING example");
+  sameList(Object.keys(w), Object.keys(Sh.PUBLISH_ISSUE), "POLICY_PAGE_MISSING issue keys");
+  sameList(Object.keys(pm.body), Object.keys(o.ok.body), "the 200 keys");
+  if (!/code: "POLICY_PAGE_MISSING", severity: "warning"/.test(publishSource)) fail("publish.js does not emit POLICY_PAGE_MISSING as a warning");
+  if (!publishSource.includes(JSON.stringify(w.message))) fail(`the POLICY_PAGE_MISSING words are not publish.js's: ${w.message}`);
+});
+
+check("P6-OPEN: the report example is opening.js's: its levels, item ids in order, action types and keys; every non-ok item has a fix", () => {
+  const src = docSources["opening.js"];
+  if (!src) fail("lib/documents/opening.js is missing");
+  sameList(Sh.OPENING_LEVELS, ["block", "warn", "info", "ok"], "levels");
+  if (!src.includes(`export const OPENING_ITEM_IDS = Object.freeze(${JSON.stringify(Sh.OPENING_ITEM_IDS).replace(/,/g, ", ")});`)) fail("OPENING_ITEM_IDS differs from opening.js");
+  if (!src.includes(`export const OPENING_ACTION_TYPES = Object.freeze(${JSON.stringify(Sh.OPENING_ACTION_TYPES).replace(/,/g, ", ")});`)) fail("OPENING_ACTION_TYPES differs from opening.js");
+  sameList(Object.keys(Sh.OPENING_REPORT), ["opening", "items", "offer"], "report keys");
+  const order = Sh.OPENING_REPORT.items.map((i) => Sh.OPENING_ITEM_IDS.indexOf(i.id));
+  if (order.some((n, k) => n < 0 || (k && n <= order[k - 1]))) fail("the example's items are not in the fixed order");
+  const base = ["id", "level", "title", "message", "href", "who"];
+  for (const it of Sh.OPENING_REPORT.items) {
+    keysBetween([...base, "linkLabel", "actions"], Object.keys(it), ["linkLabel", "actions"], `item ${it.id}`);
+    if (it.level !== "ok" && !it.href && it.who !== "support" && !(Array.isArray(it.actions) && it.actions.length)) fail(`item ${it.id} has no fix`);
+    for (const a of it.actions || []) if (!Sh.OPENING_ACTION_TYPES.includes(a.type)) fail(`action ${a.type}`);
+  }
+  // the item maker's keys
+  const at = src.indexOf("const item = (");
+  if (at < 0) fail("can't find opening.js item()");
+  for (const k of [...base, "linkLabel", "actions"]) if (!src.slice(at, at + 400).includes(k)) fail(`opening.js item() has no ${k}`);
+  sameList(Object.keys(Sh.OPENING_REPORT.offer.publishSet[0]), Object.keys(Sh.OFFER.publishSet[0]), "the opening offer items are OFFER's");
+  if (!/const offerItem = \(d\) => \(\{ id: d\.id, revision: d\.revision, draftHash: d\.draftHash, label: d\.label \}\);/.test(src)) fail("opening.js offerItem changed");
+  // openingChecks: a mode read, its 200 the dispatcher's
+  if (SHAPES.openingChecks.access !== "storefront.read") fail("openingChecks access");
+  if (!/const MODE_READS = new Set\(\[[^\]]*"openingChecks"/.test(apiSource)) fail("openingChecks is not a mode read in documents-api.js");
+  if (!/body: \{ ok: true, opening: r\.opening, items: r\.items, offer: r\.offer \}/.test(apiSource)) fail("the openingChecks 200 changed");
+  sameList(Object.keys(SHAPES.openingChecks.outcomes.ok.body), ["ok", "opening", "items", "offer"], "openingChecks 200");
+  sameList(Object.keys(SHAPES.openingChecks.outcomes.open.body), ["ok", "opening", "items", "offer"], "openingChecks 200, open store");
+});
+
+check("P6-OPEN: checkOpening and confirmOpen are top-level booleans on publish and publishSet only; openingChecks parses; the checkOpening contract is pinned", () => {
+  const p = (b) => parseDocumentsOperation(b);
+  const a = p(SHAPES.publish.request).op;
+  if (a.checkOpening !== true || a.confirmOpen !== false) fail(`publish flags: ${JSON.stringify(a)}`);
+  const b = p(SHAPES.publishSet.request).op;
+  if (b.checkOpening !== true || b.confirmOpen !== true || b.items.length !== 2) fail(`publishSet flags: ${JSON.stringify(b)}`);
+  const none = p({ publish: { id: "doc_home", draftHash: "h" }, revision: 1 }).op;
+  if (none.checkOpening !== false || none.confirmOpen !== false) fail("absent flags are false");
+  for (const bad of [
+    { publish: { id: "doc_home", draftHash: "h" }, revision: 1, checkOpening: "yes" },
+    { publishSet: [{ id: "doc_home", revision: 1, draftHash: "h" }], confirmOpen: 1 },
+    { saveDraft: { id: "doc_home", body: {} }, revision: 1, checkOpening: true },
+    { unpublish: { id: "doc_x" }, revision: 1, confirmOpen: false },
+    { getDocument: "doc_home", checkOpening: true },
+    { openingChecks: { ids: [] }, confirmOpen: true },
+    { openingChecks: { ids: "doc_home" } },
+    { openingChecks: { ids: [3] } },
+    { openingChecks: { ids: [] }, revision: 1 },
+  ]) {
+    if (p(bad).code !== "MALFORMED") fail(`not refused: ${JSON.stringify(bad)}`);
+  }
+  // flags with no operation are still NO_OPERATION
+  if (p({ checkOpening: true }).code !== "NO_OPERATION") fail("a flag alone");
+  if (JSON.stringify(p(SHAPES.openingChecks.request).op.ids) !== '["doc_home"]' || p({ openingChecks: true }).op.ids.length !== 0) fail("openingChecks ids");
+  if (!/a client that opens a store must send\s*\/\/\s*checkOpening: true; without it neither the slate design nor the policy\s*\/\/\s*pages are checked/.test(shapesSource)) fail("the checkOpening contract note is gone from the shapes");
+  for (const op of ["publish", "publishSet"]) for (const k of ["checkOpening", "confirmOpen"]) if (!SHAPES[op].requestOptional.includes(k)) fail(`${op}: ${k} is not optional`);
 });
 
 console.log(`${passed} passed, ${failures.length} failed (${((Date.now() - started) / 1000).toFixed(1)}s)`);

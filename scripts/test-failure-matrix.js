@@ -77,6 +77,9 @@ const FILES = {
   // P2-DOCS: a store on the new editor (cms_state 'documents'), for the
   // documents API rows
   docs: ".test-failmatrix-docs.db",
+  // P6-OPEN: a documents store that was never published (closed), for the
+  // "Before you open your store" rows
+  closed: ".test-failmatrix-closed.db",
 };
 const dbs = [".test-failmatrix-default.db", ".test-failmatrix-platform.db", ...Object.values(FILES)];
 const cleanup = async () => {
@@ -263,6 +266,10 @@ const breakColumn = async (c, table, column, { drop = null } = {}) => {
   // P2-DOCS: documents mode
   const dc = await build(FILES.docs);
   await dc.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+  // P6-OPEN: closed, documents mode, one product
+  const cl = await build(FILES.closed);
+  await cl.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+  await cl.execute("INSERT INTO products (id, handle, title, available) VALUES ('gid://shopify/Product/61', 'fm-sixty-one', 'Product 61', 1)");
 }
 
 const TENANTS = {
@@ -291,6 +298,7 @@ const TENANTS = {
   offers: `file:${FILES.offers}`,
   nooffers: `file:${FILES.nooffers}`,
   docs: `file:${FILES.docs}`,
+  closed: `file:${FILES.closed}`,
   // nothing answers here (undici refuses port 9 at once, then lib/db.js retries)
   down: "http://127.0.0.1:9",
 };
@@ -754,6 +762,76 @@ row("publish", "documents: the publish goes through after all that", () => publi
   const live = await withTenant(T.docs, async () => (await (await import("../lib/db.js")).libsql.execute("SELECT live_release_id FROM release_state WHERE id = 1")).rows[0]);
   eq(live?.live_release_id, r.body.release.id, "the release really is live:");
 });
+
+// --- P6-OPEN (PUB-12): "Before you open your store" ----------------------------------------
+// A closed documents store (never published). Each row is one rule; nothing
+// goes live in any of them.
+const FOUNDER_FM = { kind: "merchant", id: owner.id };
+const closedRun = (fn) => withTenant(T.closed, fn);
+const closedPage = (slug, title) =>
+  closedRun(async () => (await DocsService.createDocument({ type: "page", body: { schema: 1, type: "page", meta: { slug, title, description: "", enabled: true, effective_at: null, window_start: null, window_end: null, redirect_from: [] }, sections: [{ id: `sec_fm${slug.replace(/[^a-z]/g, "").slice(0, 8)}`, kind: "text", v: 1, enabled: true, settings: { title, body: ["Words."] }, blocks: [] }] }, actor: FOUNDER_FM })).document);
+const CLOSED_HOME = await closedRun(async () => (await DocsService.createDocument({ type: "home", body: { schema: 1, type: "home", meta: {}, sections: [{ id: "sec_fmclosed", kind: "hero", v: 1, enabled: true, settings: { title: "Closed home" }, blocks: [] }] }, actor: FOUNDER_FM })).document);
+const closedItem = async (id) => {
+  const d = await closedRun(() => DocsService.getDocument(id));
+  return { id: d.id, revision: d.revision, draftHash: d.draftHash };
+};
+const closedLive = () => closedRun(async () => (await (await import("../lib/db.js")).libsql.execute("SELECT live_release_id FROM release_state WHERE id = 1")).rows[0]?.live_release_id ?? null);
+const stillClosed = async (label) => eq(await closedLive(), null, `${label}: the store stays closed:`);
+row("publish", "documents: opening a store whose checkout is turned off", async () => {
+  const base = T.closed.config;
+  T.closed.config = { ...base, checkout_mode: "disabled" };
+  try {
+    return await documents("closed", { publishSet: [await closedItem(CLOSED_HOME.id)], checkOpening: true, confirmOpen: true });
+  } finally {
+    T.closed.config = base;
+  }
+}, { status: 409, code: "STORE_CANNOT_TAKE_PAYMENT", cls: "refusal" }, async (r) => {
+  eq(r.body.report.items.find((i) => i.id === "payment").href, "/admin/settings#commerce", "the fix link:");
+  await stillClosed("payment");
+});
+row("publish", "documents: opening a store and leaving out its design draft", async () => {
+  const { designBodyFor } = await import("../lib/themes/palettes.js");
+  const R = await import("../lib/registry/index.js");
+  await closedRun(() => DocsService.createFirstRunDocuments({ docs: [{ type: "design", id: "doc_design", body: { ...R.emptyBody("design"), settings: designBodyFor("slate") } }], actor: DocsService.FIRST_RUN_ACTOR }));
+  return documents("closed", { publishSet: [await closedItem(CLOSED_HOME.id)] });
+}, { status: 409, code: "OPENING_NEEDS_DESIGN", cls: "refusal" }, async (r) => {
+  eq(r.body.offer.publishSet.map((o) => o.id), [CLOSED_HOME.id, "doc_design"], "the offer adds the design:");
+  await stillClosed("design");
+});
+row("publish", "documents: opening a store with no privacy or returns page", async () => documents("closed", { publishSet: [await closedItem(CLOSED_HOME.id), await closedItem("doc_design")], checkOpening: true, confirmOpen: true }), { status: 409, code: "OPENING_NEEDS_POLICIES", cls: "refusal" }, async (r) => {
+  eq(r.body.report.items.filter((i) => i.level === "block").map((i) => [i.id, i.actions?.[0]?.type]), [["privacy", "startPolicy"], ["returns", "startPolicy"]], "the policy blocks and their fix:");
+  eq(r.body.offer, null, "no page offered:");
+  await stillClosed("policies");
+});
+row("publish", "documents: opening a store without confirming what is left to look at", async () => {
+  const pv = await closedPage("privacy", "Privacy");
+  const tm = await closedPage("terms", "Terms");
+  return documents("closed", { publishSet: [await closedItem(CLOSED_HOME.id), await closedItem("doc_design"), await closedItem(pv.id), await closedItem(tm.id)], checkOpening: true });
+}, { status: 409, code: "OPENING_CONFIRM_NEEDED", cls: "refusal" }, async (r) => {
+  eq(r.body.report.items.filter((i) => i.level === "warn").map((i) => i.id), ["test_order", "contact"], "the warnings:");
+  for (const i of r.body.report.items) readable(i.message, `item ${i.id}`);
+  await stillClosed("confirm");
+});
+row("load", "documents: Before you open your store (openingChecks) on a closed store", () => documents("closed", { openingChecks: { ids: [CLOSED_HOME.id] } }), { status: 200 }, async (r) => {
+  eq(r.body.opening, true, "closed:");
+  for (const i of r.body.items) readable(i.message, `item ${i.id}`);
+  await stillClosed("openingChecks");
+});
+row("load", "documents: openingChecks on a store still on the current editor", () => documents("ok", { openingChecks: { ids: [] } }), { status: 409, code: "STORE_USES_LEGACY", cls: "refusal" });
+row("publish", "documents: checkOpening sent with an operation that doesn't take it", () => documents("closed", { saveDraft: { id: CLOSED_HOME.id, body: CLOSED_HOME.body }, revision: CLOSED_HOME.revision, checkOpening: true }), { status: 400, code: "MALFORMED", cls: "refusal" });
+// a live store: a publish that leaves no live returns page warns, and still goes live
+row("publish", "documents: moving the last returns page off its address on a live store (a warning, not a refusal)", () =>
+  withTenant(T.docs, async () => {
+    const made = (await DocsService.createDocument({ type: "page", body: { schema: 1, type: "page", meta: { slug: "fm-returns", title: "Returns", description: "", enabled: true, effective_at: null, window_start: null, window_end: null, redirect_from: [] }, sections: [{ id: "sec_fmret", kind: "text", v: 1, enabled: true, settings: { title: "Returns", body: ["Words."] }, blocks: [] }] }, actor: FOUNDER_FM })).document;
+    const first = await publishDoc({}, made);
+    if (first.status !== 200) throw new Error(`the returns page didn't publish: ${JSON.stringify(first.body).slice(0, 300)}`);
+    const cur = await DocsService.getDocument(made.id);
+    const moved = (await DocsService.saveDraft({ id: cur.id, revision: cur.revision, body: { ...cur.body, meta: { ...cur.body.meta, slug: "fm-shipping" } }, actor: FOUNDER_FM })).document;
+    return publishDoc({}, moved);
+  }),
+  { status: 200 },
+  (r) => eq(r.body.issues.filter((i) => i.code === "POLICY_PAGE_MISSING").map((i) => i.severity), ["warning"], "the warning rides along:"),
+);
 
 // --- run the matrix ------------------------------------------------------------------
 for (const area of ["save", "load", "preview", "publish"]) {
@@ -1352,6 +1430,13 @@ await t("every infrastructure code the module can produce appears in the matrix"
   for (const area of ["save", "preview", "publish"]) {
     for (const cls of ["validation", "refusal", "infrastructure"]) ok(MATRIX.some((m) => m.area === area && m.expect.cls === cls), `${area} has a ${cls} row:`);
   }
+});
+// P6-OPEN: every refusal of "Before you open your store" has its row
+await t("P6-OPEN: each opening refusal (and POLICY_PAGE_MISSING's 200) has a row", () => {
+  const codes = new Set(MATRIX.map((m) => m.expect.code).filter(Boolean));
+  for (const code of ["STORE_CANNOT_TAKE_PAYMENT", "OPENING_NEEDS_DESIGN", "OPENING_NEEDS_POLICIES", "OPENING_CONFIRM_NEEDED"]) ok(codes.has(code), `${code} has a row:`);
+  ok(MATRIX.some((m) => m.expect.status === 200 && /returns page/.test(m.name)), "the POLICY_PAGE_MISSING row:");
+  ok(MATRIX.some((m) => m.area === "load" && /openingChecks/.test(m.name)), "the openingChecks row:");
 });
 await t("each infrastructure message says what happened to the founder's work, in plain words", () => {
   for (const kind of ["schema", "unavailable", "database", "conflict", "internal"]) {
