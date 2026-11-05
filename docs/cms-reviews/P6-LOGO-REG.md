@@ -154,6 +154,14 @@ Gate results:
 7. **Legacy stores:** `config.brand.logo` and `config.site.logo` are not read or moved. `resolvedLogo` is `null` there, and a migration does not carry a picture logo into `doc_design`.
 8. **The trimmed alt is written back.** A save sent with `"  Acme  "` stores `"Acme"`. The editor has no logo field, so no typing is disturbed today. A future control should trim on blur, not on every key.
 
+From review:
+
+- The preview bar says something false on a closed store, and the packet's Known limit 1 leaves this out. On a closed store, or a live store whose list has doc_design: null, with the toggle off, the design draft is now shown (overlay.designShown is true, as test-design-doc line 1018 asserts). But app/(storefront)/layout.js passes only designDirty and showDesign to components/PreviewBanner.js. So the bar says 'Your new colours are not shown here. Show them' while the colours are shown. The founder sees this, shoppers never do. The packet only says the toggle 'changes nothing' and 'the bar still shows the toggle'. Fix: add this sentence to Known limit 1 and the owner check. A later fix would be for documentsPreview to report showDesign as session.showDesign || !liveDesign, or for the layout to pass designShown to the banner.
+- In logoFrom (lib/content/resolve.js), the src.mode === 'closed' check is never needed: a closed source's list is emptyList() with no doc_design, so the logo is null anyway. Mutation M3 removed the check and test-design-doc and test-release-readers still passed. It is harmless defence, but the 'null for closed' test passes because the list is empty, not because of that line.
+- withNullDefaults in lib/documents/diff.js reaches beyond design. It also applies to every setting whose default is null on announcement (link) and on product_content and collection_content, though those two usually go through describeChanges and not diffBodies. For these settings a missing key and a null mean the same thing, and pnpm test passes, so nothing breaks now. The packet presents the change as being about design only.
+- test-editor-inspector did not catch mutation M9 (the logo kind's control set to null). test-registry-contract did catch it, so the acceptance item is still covered by one suite.
+- The MEDIA_MISSING wording ('plain colour block… Choose another image') for a deleted logo is image wording. The builder already lists it as a founder-only known limit and an owner check. I agree it does not block.
+
 ## Owner checks
 
 - **The "Show them" toggle on a closed store** now changes nothing: the design draft always shows in the founder's preview there. Confirm that is acceptable, or ask for the bar to hide the toggle until the store opens (a DocumentEditor / bar change).
