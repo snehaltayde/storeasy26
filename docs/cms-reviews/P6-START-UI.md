@@ -94,6 +94,15 @@ Mutation pass: 21 mutations of the new code and of brand-step.js; 19 were caught
 - **Swatch radios are visually hidden inputs inside labels**, with `aria-label` set to the palette's name. Keyboard focus shows as a ring on the card. Not checked with a screen reader.
 - **Remove logo needs Save**, like every other change on the step. The plan says "a 'Remove logo' action (logo:null)"; the request is sent on the next Save, not at once.
 
+From review:
+
+- The earlier blocker is fixed at d045649. viewOf (components/admin/first-run/FirstRun.js, line 144) now returns 'blocked' for reason 'live' before it looks at the sync. I checked the server: describeFirstStore (lib/first-run/generate.js, lines 240-248) keeps reason 'live' for every actor and returns generated:false on an open store, so this branch is the real path. The blocked view on an open store shows the 'already open' words and both links, plus a small sync note through SyncPanel (SyncProgress's own body and retry) while a sync runs or after it failed. No second progress UI was added.
+- Mutation check, all caught by the new test 'RENDERED: an OPEN store…' (50 passed, 1 failed each time): (1) removing the live line in viewOf; (2) removing the sync note from the blocked view; (3) narrowing the fix to `reason === 'live' && !BROKEN.has(sync?.state)`. The test covers running, retrying, failed, stalled and complete, with no POST, and clicking the failed state's 'Try again' sends only {retry:true} to /api/admin/sync.
+- node scripts/test-brand-step.js: 51 passed. pnpm test on my ports (6300, 7300-7309, CHECKOUT_MODE unset): 102 of 102 suites, exit 0. The fix changes only FirstRun.js, test-brand-step.js and the packet. It adds no import (still client-only, no node: modules) and touches nothing under .github/, no route, no lib file and no editor file.
+- Packet Known limit 3 and the Fix round 1 section now describe the open-store behaviour correctly.
+- Still open from before (owner decisions, not blockers): an open store shows 'already open' words, not a summary; the collection grid is not named by collection; 'Review and open your store' opens the editor, not its publish panel directly; the CI sqld download still needs the owner's approval of its source and checksum.
+- Clean-up: the worktree /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p6-b2/P6-START-UI/rv1 is removed, and ports 6300 and 7300-7309 are free.
+
 ## Owner checks
 
 - **The page end to end in Chrome on a fresh closed store** (P6-DRILLS stages A, B and E): generated ready view with the real summary, the sync note during a refresh, the empty and no-collections words, Save with no change, Remove logo, Skip.
