@@ -363,6 +363,14 @@ await t("CLAIMS '#1': '#1Best', '#1Brand' and '#1 brand' are claims; hex colours
   for (const clean of ["#1a2b3c", "#1e3a8a", "#1ab", "#1a2b", "#1a2b3c4d", "#123456", "#10 pack", "#12 pack", "colour #1E3A8A;"]) eq(JSON.stringify(scanText(clean).filter((h) => h.rule === "claim: #1")), "[]", `${clean} flagged:`);
 });
 
+// P6-FIX2 (from the P6-FIX1 review): an English word made only of hex letters
+// after "#1" is a claim, not a colour; a real colour (a digit in it, one
+// letter repeated, or the 3 digit form) is not.
+await t("CLAIMS '#1' (P6-FIX2): '#1bad', '#1add', '#1fab', '#1dea' and '#1faced' are claims; '#1a2b3c', '#1e3a8a', '#1ab', '#1fff' and '#1eeeee' are not", () => {
+  for (const claim of ["#1bad", "Our #1add-on", "#1fab", "The #1dea of the year", "#1BAD", "#1Fab", "#1faced", "#1ffff", "#1decade"]) ok(scanText(claim).some((h) => h.rule === "claim: #1"), `${claim} missed`);
+  for (const clean of ["#1a2b3c", "Accent colour #1a2b3c", "#1e3a8a", "#1E3A8A", "#1ab", "#1a2b", "#1b2c", "#1a2b3c4d", "#1fff", "#1FFF", "#1eeeee", "#1aaaaaaa", "#123456", "#10 pack"]) eq(JSON.stringify(scanText(clean).filter((h) => h.rule === "claim: #1")), "[]", `${clean} flagged:`);
+});
+
 await t("scanDocumentText (B3): the founder's catalog words are blanked before the scan, so a product called 'Organic cotton tee' makes no claim, while the same body without the catalog words is a hit", () => {
   const body = {
     type: "home",

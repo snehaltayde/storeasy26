@@ -587,6 +587,34 @@ await t("openingChecks: with no doc_design row it writes nothing (no design draf
   eq(rep.offer, null, "nothing to add:");
   eq(await dump(h), before, "nothing was written:");
 });
+// P6-FIX2 (from the P6-OPEN-UI review): openingChecks itself answers "nothing
+// to open" for a set of product and collection content alone on a closed
+// store, the publish's own rowsOnly rule, so no caller sees a report that
+// does not apply. A mixed set, an empty one, or an unknown id still reports.
+await t("openingChecks (P6-FIX2): a set of only product and collection content on a CLOSED store answers opening:false with no items and no offer; a mixed set, an empty set and an unknown id still get the report; nothing is written", async () => {
+  const h = await store("ocrows", { config: { checkout_mode: "disabled" } });
+  const home = await makeHome(h);
+  await makeDesign(h);
+  const collectionId = await h.run(async () => String((await libsql.execute("SELECT id FROM collections ORDER BY id LIMIT 1")).rows[0].id));
+  const pc = await h.run(async () => (await Docs.openEntityContent({ type: "product_content", entityId: h.products[0].id, actor: FOUNDER })).document);
+  const cc = await h.run(async () => (await Docs.openEntityContent({ type: "collection_content", entityId: collectionId, actor: FOUNDER })).document);
+  const before = await dump(h);
+  for (const set of [[pc.id], [cc.id], [pc.id, cc.id]]) {
+    const rep = await checks(h, set);
+    eq([rep.opening, rep.items, rep.offer], [false, [], null], `rows only ${JSON.stringify(set)}:`);
+  }
+  ok((await livePointer(h)) == null, "the store is closed");
+  // the report still applies when the set holds anything else
+  for (const set of [[pc.id, home.id], [home.id], [], [pc.id, "doc_nosuch"]]) {
+    const rep = await checks(h, set);
+    eq(rep.opening, true, `${JSON.stringify(set)} opens:`);
+    eq(byId(rep).payment.level, "block", `${JSON.stringify(set)}: checkout off blocks:`);
+  }
+  // the mixed set's offer keeps the product content in it, with its shape
+  const mixed = await checks(h, [pc.id, home.id]);
+  eq(mixed.offer.publishSet.slice(0, 2), [pc, home].map((d) => ({ id: d.id, revision: d.revision, draftHash: d.draftHash, label: d.label })), "the mixed offer:");
+  eq(await dump(h), before, "nothing was written:");
+});
 await t("openingChecks: a legacy store answers 409 STORE_USES_LEGACY (it checks the mode itself)", async () => {
   const h = await F.makeTenant({ name: "oc-legacy", id: "oclegacy", products: 1 });
   stores.push(h);

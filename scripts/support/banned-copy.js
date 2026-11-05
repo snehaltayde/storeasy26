@@ -70,6 +70,11 @@ export const BANNED = [
   { label: "unset promise: returns", re: /stays returnable/i },
 ];
 
+// What may follow "#1" as a hex colour (see the "#1" claim rule below): two
+// hex digits (a 3 digit colour), or 3, 5 or 7 with a digit among them, or one
+// letter repeated 3, 5 or 7 times; then the token ends.
+const HEX_COLOUR_TAIL = String.raw`(?:[0-9a-f]{2}|(?=[a-f]*[0-9])(?:[0-9a-f]{7}|[0-9a-f]{5}|[0-9a-f]{3})|([a-f])(?:\1{6}|\1{4}|\1{2}))(?![0-9a-z_])`;
+
 // Each label starts with "claim:", so a hit says which list it came from.
 export const CLAIMS = [
   { label: "claim: reviews", re: /\breviews?\b/i },
@@ -82,11 +87,15 @@ export const CLAIMS = [
   { label: "claim: clinically", re: /\bclinically\b/i },
   { label: "claim: guaranteed", re: /\bguaranteed\b/i },
   { label: "claim: best-selling", re: /\bbest[- ]?sell(ing|ers?)\b/i },
-  // P6-GEN, P6-FIX1: never a hex colour ("#1a2b3c", "#1e3a8a", "#1ab", "#1a2b3c4d":
-  // a 3, 4, 6 or 8 digit token), but "#1Best", "#1Brand" and "#1 brand" are
-  // claims: after "#1", only a digit ("#10 pack") or a whole hex colour token
-  // is let through
-  { label: "claim: #1", re: /#1(?![0-9])(?!(?:[0-9a-f]{7}|[0-9a-f]{5}|[0-9a-f]{2,3})(?![0-9a-z_]))|#\s1\b|\bno\.\s?1\b|\bnumber one\b/i },
+  // P6-GEN, P6-FIX1, P6-FIX2: never a hex colour ("#1a2b3c", "#1e3a8a", "#1ab",
+  // "#1a2b3c4d": a 3, 4, 6 or 8 digit token), but "#1Best", "#1Brand" and
+  // "#1 brand" are claims: after "#1", only a digit ("#10 pack") or a whole hex
+  // colour token is let through. A 4, 6 or 8 digit token whose part after the
+  // "1" is letters only reads as a word ("#1bad", "#1add", "#1fab", "#1dea",
+  // "#1faced"), so it counts as a colour only when that part has a digit
+  // ("#1e3a8a") or is one letter repeated ("#1fff", "#1eeeee"); the 3 digit
+  // "#1ab" stays a colour.
+  { label: "claim: #1", re: new RegExp(String.raw`#1(?![0-9])(?!${HEX_COLOUR_TAIL})|#\s1\b|\bno\.\s?1\b|\bnumber one\b`, "i") },
   { label: "claim: organic", re: /\borganic\b/i },
   { label: "claim: dermatologist", re: /\bdermatologi(st|sts|cally|cal)\b/i },
   { label: "claim: lab-tested", re: /\blab[- ]tested\b/i },

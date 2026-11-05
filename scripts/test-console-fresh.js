@@ -178,6 +178,9 @@ async function serve() {
   // (the store's own cached client, patched once inside its context)
   const { currentDatabase } = await import("../lib/db.js");
   let modeFails = false;
+  // P6-FIX2: any one statement made to fail (a RegExp source), for the
+  // dashboard's describeFirstStore read failing on its own
+  let failPattern = null;
   let patched = false;
   const patchModeRead = async () => {
     if (patched) return;
@@ -186,7 +189,7 @@ async function serve() {
     const execute = client.execute.bind(client);
     client.execute = (stmt, ...rest) => {
       const sql = typeof stmt === "string" ? stmt : stmt?.sql || "";
-      if (modeFails && /FROM cms_state/.test(sql)) return Promise.reject(Object.assign(new Error("SQLITE_IOERR: disk I/O error"), { code: "SQLITE_IOERR" }));
+      if ((modeFails && /FROM cms_state/.test(sql)) || (failPattern && failPattern.test(sql))) return Promise.reject(Object.assign(new Error("SQLITE_IOERR: disk I/O error"), { code: "SQLITE_IOERR" }));
       return execute(stmt, ...rest);
     };
   };
@@ -264,6 +267,23 @@ async function serve() {
       await patchModeRead();
       modeFails = on;
       return { ok: true };
+    },
+    async sqlFails({ pattern = null }) {
+      await patchModeRead();
+      failPattern = pattern ? new RegExp(pattern) : null;
+      return { ok: true };
+    },
+    // P6-FIX2: what describeFirstStore says right now (its read, in this
+    // instance), or what it threw
+    async describe() {
+      const Gen = await import("../lib/first-run/generate.js");
+      const t = await C.getTenant("fresh");
+      try {
+        const d = await withTenant(t, () => Gen.describeFirstStore({ actor: null }));
+        return { generated: d.generated, reason: d.reason };
+      } catch (e) {
+        return { threw: String(e?.code || e?.message || e).slice(0, 120) };
+      }
     },
     async claimDomain({ host }) {
       await claimDomain({ host, tenantId: "fresh", preVerified: true });
@@ -467,6 +487,32 @@ async function main() {
         eq(setupNudges(d), [{ href: "/admin/start", label: "Start your store" }], `${X.name}: the nudges ${JSON.stringify(d.nudges)}:`);
         ok(!d.nudges.some((n) => n.href === "/admin/setup" || /^Setup:/.test(n.label || "")), `${X.name}: a second nudge`);
         eq((await X.page("settings")).props?.documents, true, `${X.name}: Settings documents prop:`);
+      }
+    });
+
+    // P6-FIX2 (mutation R7 of the P6-NAV review): the brand step is recorded and
+    // no starting store is made, so the nudge would be "Start your store"; when
+    // describeFirstStore's own read fails, the dashboard keeps today's nudge
+    // (never "Start your store" on a read error, never an error page)
+    await t("P6-FIX2: when describeFirstStore throws (its catalog read fails) on a closed documents store with the brand step recorded, the dashboard keeps today's 'Setup: x/y done' nudge, not 'Start your store'", async () => {
+      await C.patchTenant("fresh", { config: { onboarding: { brand_step: { paletteId: "forest", skipped: false, at: new Date().toISOString() } } } });
+      try {
+        eq(setupNudges(await A.page("dashboard")), [{ href: "/admin/start", label: "Start your store" }], "before the failure, not generated:");
+        // describeFirstStore's catalog read alone (readFirstRunCatalog), no other read
+        await A.call("sqlFails", { pattern: "featured_image_alt, created_at FROM products" });
+        try {
+          ok((await A.call("describe")).threw, "describeFirstStore throws");
+          const d = await A.page("dashboard");
+          ok(d.nudges && !d.threw, `the dashboard rendered: ${JSON.stringify(d).slice(0, 300)}`);
+          const n = setupNudges(d);
+          eq(n.length, 1, `one setup nudge: ${JSON.stringify(d.nudges)}`);
+          ok(n[0].href === "/admin/setup" && SETUP.test(n[0].label), `today's nudge when describeFirstStore throws: ${JSON.stringify(n)}`);
+        } finally {
+          await A.call("sqlFails", { pattern: null });
+        }
+        eq(setupNudges(await A.page("dashboard")).map((x) => x.href), ["/admin/start"], "after the failure ends:");
+      } finally {
+        await C.patchTenant("fresh", { config: { onboarding: {} } });
       }
     });
 
