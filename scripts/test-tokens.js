@@ -14,6 +14,8 @@
 // 4. A brand with its own colours derives every role from them, readable.
 // 5. Pair coverage: every role a component uses as a text colour, or as a
 //    background under text, is in the pairing matrix (PAIRS).
+// 6. P6-PALETTE: every curated palette (lib/themes/palettes.js) on every kit
+//    passes the whole matrix as rendered, and none is lime.
 // Plain node, no database, no browser. The pixel comparison and the
 // measured contrast are browser drills (scripts/drills/p1/tok.mjs).
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -914,6 +916,187 @@ await t("a mid-tone background where no text colour reads gets a background sugg
   ok(/Try (text|background) colour #[0-9a-f]{6}\./.test(i.message), i.message);
   const fixed = { ...brand, [i.suggestion.token]: i.suggestion.value };
   ok(!B.checkBrand(fixed).failing.some((f) => f.severity === "error" && f.fix === "foreground"), `${i.suggestion.value} leaves text pairs failing`);
+});
+
+// ---------------------------------------------------------------------------
+// P6-PALETTE (GEN-01, GEN-04, TOK-02): the curated palettes
+// ---------------------------------------------------------------------------
+console.log("— P6-PALETTE: every curated palette on every kit");
+
+const Pal = await import("../lib/themes/palettes.js").catch((e) => ({ missing: e.message }));
+const needPal = () => ok(!Pal.missing, `lib/themes/palettes.js can't be loaded: ${Pal.missing}`);
+const KIT_KEYS = Object.keys(B.KIT_SURFACES);
+const PALETTE_IDS = ["ink", "slate", "navy", "stone", "forest", "clay"];
+// The probed values the plan fixed (accent, background).
+const PROBED = { ink: ["#18181b", "#ffffff"], slate: ["#334155", "#ffffff"], navy: ["#1e3a8a", "#ffffff"], stone: ["#44403c", "#fafaf9"], forest: ["#166534", "#fffbf7"], clay: ["#9a3412", "#fffbf7"] };
+const LIME_FAMILY = ["#84cc16", "#a3e635", "#a8eb43", "#588a0c", "#456c09"];
+
+await t("PALETTES: six frozen full brands in order, with the probed colours, plain labels and the default slate on pulse-1", () => {
+  needPal();
+  ok(Object.isFrozen(Pal.PALETTES) && Pal.PALETTES.every((p) => Object.isFrozen(p) && Object.isFrozen(p.brand)), "PALETTES and each palette and brand must be frozen");
+  eq(JSON.stringify(Pal.PALETTES.map((p) => p.id)), JSON.stringify(PALETTE_IDS), "ids in order:");
+  eq(JSON.stringify(Pal.PALETTES.map((p) => p.label)), JSON.stringify(["Ink", "Slate", "Navy", "Stone", "Forest", "Clay"]), "labels:");
+  const brandKeys = [...Object.keys(B.DEFAULT_BRAND), "accent_label"].sort();
+  for (const p of Pal.PALETTES) {
+    eq(JSON.stringify(Object.keys(p.brand).sort()), JSON.stringify(brandKeys), `${p.id} brand keys:`);
+    eq(p.brand.accent, PROBED[p.id][0], `${p.id} accent:`);
+    eq(p.brand.background, PROBED[p.id][1], `${p.id} background:`);
+    ok(KIT_KEYS.includes(p.kit), `${p.id} kit ${p.kit} is not a KIT_SURFACES key`);
+  }
+  eq(Pal.DEFAULT_PALETTE_ID, "slate", "default:");
+  eq(Pal.paletteById("slate").kit, "pulse-1", "slate's kit:");
+  eq(Pal.paletteById("nope"), null, "unknown id:");
+  eq(Pal.paletteById(null), null, "null id:");
+});
+
+await t("every palette: validateBrand has no errors and stores exactly the palette (its accent_label is the worked-out one)", () => {
+  needPal();
+  for (const p of Pal.PALETTES) {
+    const v = B.validateBrand(p.brand);
+    eq(v.errors.length, 0, `${p.id} errors ${JSON.stringify(v.errors)}:`);
+    eq(JSON.stringify(v.value), JSON.stringify({ ...p.brand }), `${p.id} validateBrand value:`);
+  }
+});
+
+await t("every palette on every kit: the full pairMatrix has no enforced pair below PAIR_NEEDS, checkBrand has 0 errors and 0 issues, publishBlocked is false", () => {
+  needPal();
+  let checked = 0;
+  for (const p of Pal.PALETTES)
+    for (const kit of KIT_KEYS) {
+      const m = B.pairMatrix(p.brand, kit);
+      eq(m.length, B.PAIRS.length, `${p.id} on ${kit} matrix size:`);
+      const bad = m.filter((x) => x.enforced && x.ratio < B.PAIR_NEEDS[x.kind]);
+      ok(!bad.length, `${p.id} on ${kit}: ${bad.map((x) => `${x.id} ${x.fgHex}/${x.bgHex} ${x.ratio}<${x.need}`).join(", ")}`);
+      const c = B.checkBrand(p.brand, { kit });
+      eq(c.errors.length, 0, `${p.id} on ${kit} checkBrand errors ${JSON.stringify(c.errors.map((e) => e.message))}:`);
+      eq(c.issues.length, 0, `${p.id} on ${kit} checkBrand issues:`);
+      eq(c.failing.length, 0, `${p.id} on ${kit} failing pairs:`);
+      eq(B.publishBlocked(p.brand, { kit }), false, `${p.id} on ${kit} publishBlocked:`);
+      // the Reset and palette switch: over any other palette live, still clean
+      for (const q of Pal.PALETTES) eq(B.publishBlocked(p.brand, { kit, live: q.brand, liveKit: q.kit }), false, `${p.id} on ${kit} over live ${q.id}:`);
+      checked++;
+    }
+  eq(checked, 6 * KIT_KEYS.length, "palette x kit cases:");
+});
+
+await t("every palette derives its greys from its own colours (brandRoles' neutralDerived branch), and the rendered roles are the measured ones", () => {
+  needPal();
+  // neutralDerived is the branch a brand takes when its background or text
+  // differ from the platform's white and #0a0a0b. A palette outside it keeps
+  // the platform's greys, whose faint text fails (PLATFORM_DEFAULT_FAILS).
+  const neutralDerived = (brand) => !(brand.background === B.DEFAULT_BRAND.background && brand.foreground === B.DEFAULT_BRAND.foreground);
+  const notDerived = Pal.PALETTES.filter((p) => !neutralDerived(p.brand)).map((p) => p.id);
+  ok(!notDerived.length, `palettes on the platform's own white and #0a0a0b keep the platform greys: ${notDerived.join(", ")}`);
+  const used = new Set(B.PAIRS.flatMap((x) => [x.fg, x.bg]));
+  for (const p of Pal.PALETTES)
+    for (const kit of KIT_KEYS) {
+      const { roles, derived } = B.brandRoles(p.brand, kit);
+      eq(derived, true, `${p.id} on ${kit} derived:`);
+      // the greys really are the palette's: text is its foreground, not zinc-900
+      eq(roles.text, p.brand.foreground, `${p.id} on ${kit} text role:`);
+      eq(roles["text-faint"] !== B.PALETTE["zinc-400"].hex, true, `${p.id} on ${kit} faint text is still the platform's zinc-400`);
+      // what the page renders from brandCssVars is exactly what the matrix measures
+      const shown = renderedRoles(p.brand, kit);
+      const off = [...used].filter((id) => shown[id] !== roles[id]).map((id) => `${id} page ${shown[id]} vs matrix ${roles[id]}`);
+      ok(!off.length, `${p.id} on ${kit}: ${off.join(", ")}`);
+      // and every enforced pair, measured from the rendered roles, passes
+      const fails = B.PAIRS.filter((x) => B.PAIR_NEEDS[x.kind] > 0 && B.contrastRatio(shown[x.fg], shown[x.bg]) < B.PAIR_NEEDS[x.kind]).map((x) => x.id);
+      ok(!fails.length, `${p.id} on ${kit} rendered pairs fail: ${fails.join(", ")}`);
+    }
+});
+
+await t("NEGATIVE: the same accent on the platform's own white and #0a0a0b is not derived and fails the matrix (why every palette sets its own text colour)", () => {
+  const ink = { ...B.DEFAULT_BRAND, accent: "#18181b" };
+  const bad = B.pairMatrix(ink, "pulse-1").filter((x) => x.enforced && !x.pass).map((x) => x.id);
+  ok(bad.includes("text-faint"), `expected the platform greys to fail: ${bad.join(", ")}`);
+});
+
+await t("isLimeAccent: true for the platform default and the lime family, false for every palette accent and its button shade", () => {
+  needPal();
+  eq(Pal.isLimeAccent(B.DEFAULT_BRAND.accent), true, "DEFAULT_BRAND.accent:");
+  for (const hex of [...LIME_FAMILY, ...Object.values(B.DEFAULT_ACCENT_LADDER).filter((h) => !["#f7fee7", "#ecfccb"].includes(h)), "#84CC16", "#7ccf00", "#9ae600"]) eq(Pal.isLimeAccent(hex), true, `${hex}:`);
+  for (const p of Pal.PALETTES) {
+    eq(Pal.isLimeAccent(p.brand.accent), false, `${p.id} accent:`);
+    for (const [step, hex] of Object.entries(B.accentShades(p.brand.accent))) eq(Pal.isLimeAccent(hex), false, `${p.id} ladder ${step} ${hex}:`);
+  }
+  for (const hex of ["#16a34a", "#eab308", "#ffffff", "#000000", "#e11d48", "not a colour", null]) eq(Pal.isLimeAccent(hex), false, `${hex}:`);
+});
+
+await t("paletteIdOfBrand: each palette finds itself (with or without accent_label); the lime default, an edited palette and junk are null", () => {
+  needPal();
+  eq(Pal.paletteIdOfBrand(Pal.paletteById("forest").brand), "forest", "forest:");
+  eq(Pal.paletteIdOfBrand(B.DEFAULT_BRAND), null, "DEFAULT_BRAND:");
+  for (const p of Pal.PALETTES) {
+    eq(Pal.paletteIdOfBrand({ ...p.brand }), p.id, `${p.id}:`);
+    const { accent_label: _l, ...noLabel } = p.brand;
+    eq(Pal.paletteIdOfBrand(noLabel), p.id, `${p.id} without accent_label:`);
+    eq(Pal.paletteIdOfBrand({ ...p.brand, accent: p.brand.accent.toUpperCase() }), p.id, `${p.id} upper-case hex:`);
+    eq(Pal.paletteIdOfBrand(B.validateBrand(p.brand).value), p.id, `${p.id} as the editor stores it:`);
+    eq(Pal.paletteIdOfBrand({ ...p.brand, radius: "xl" }), null, `${p.id} with another radius:`);
+    eq(Pal.paletteIdOfBrand({ ...p.brand, accent_label: p.brand.accent_label === "#ffffff" ? "#0a0a0b" : "#ffffff" }), null, `${p.id} with another accent_label:`);
+    eq(Pal.paletteIdOfBrand({ ...p.brand, extra: 1 }), null, `${p.id} with an extra key:`);
+  }
+  for (const junk of [null, undefined, "slate", [], {}]) eq(Pal.paletteIdOfBrand(junk), null, `${JSON.stringify(junk)}:`);
+});
+
+await t("startingPaletteId: the recorded brand-step palette (saved or skipped), else slate; never null, never lime", () => {
+  needPal();
+  const cases = [
+    [null, "slate"],
+    [undefined, "slate"],
+    [{}, "slate"],
+    [{ brand_step: { skipped: true } }, "slate"],
+    [{ brand_step: { paletteId: "forest", skipped: false } }, "forest"],
+    [{ brand_step: { paletteId: "forest", skipped: true } }, "forest"],
+    [{ brand_step: { paletteId: "lime", skipped: false } }, "slate"],
+    [{ brand_step: { paletteId: "toString" } }, "slate"],
+    [{ brand_step: { paletteId: 7 } }, "slate"],
+    [{ brand_step: null }, "slate"],
+    [{ brand_step: "forest" }, "slate"],
+    ["forest", "slate"],
+  ];
+  for (const p of Pal.PALETTES) cases.push([{ brand_step: { paletteId: p.id } }, p.id]);
+  for (const [x, want] of cases) {
+    const got = Pal.startingPaletteId(x);
+    eq(got, want, `startingPaletteId(${JSON.stringify(x)}):`);
+    eq(Pal.isLimeAccent(Pal.paletteById(got).brand.accent), false, `${JSON.stringify(x)} gives a lime palette:`);
+  }
+  // pure: the argument is not changed
+  const onb = Object.freeze({ brand_step: Object.freeze({ paletteId: "navy", skipped: true }) });
+  eq(Pal.startingPaletteId(onb), "navy", "frozen input:");
+});
+
+await t("designBodyFor('slate') is the design settings in the brand and theme kinds' shapes, and validates as a design document in draft and publish mode with no issues", async () => {
+  needPal();
+  const { KITS } = await import("../lib/themes/kits.js");
+  const R = await import("../lib/registry/index.js");
+  const s = Pal.designBodyFor("slate");
+  eq(JSON.stringify(Object.keys(s).sort()), JSON.stringify(["brand", "theme"]), "keys:");
+  eq(JSON.stringify(s.theme), JSON.stringify({ kit: "pulse", version: 1 }), "theme:");
+  eq(s.theme.kit, KITS.pulse.id, "theme kit is KITS.pulse.id:");
+  eq(s.theme.version, KITS.pulse.version, "theme version is KITS.pulse.version:");
+  eq(JSON.stringify(s.brand), JSON.stringify({ ...Pal.paletteById("slate").brand }), "brand:");
+  s.brand.accent = "#000000";
+  eq(Pal.paletteById("slate").brand.accent, "#334155", "designBodyFor hands out a copy:");
+  eq(Pal.designBodyFor("nope"), null, "unknown id:");
+  for (const p of Pal.PALETTES) {
+    const body = { ...R.emptyBody("design"), settings: Pal.designBodyFor(p.id) };
+    ok(B.KIT_SURFACES[`${body.settings.theme.kit}-${body.settings.theme.version}`], `${p.id} theme is no kit`);
+    for (const mode of ["draft", "publish"]) {
+      const r = R.validateDocument(body, { mode });
+      eq(r.ok, true, `${p.id} ${mode} ok:`);
+      eq(r.issues.length, 0, `${p.id} ${mode} issues ${JSON.stringify(r.issues)}:`);
+    }
+  }
+});
+
+await t("palettes.js imports nothing outside lib/brand.js (static import scan)", () => {
+  needPal();
+  const src = readFileSync(join(ROOT, "lib/themes/palettes.js"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const specs = [...src.matchAll(/\bimport\s*(?:[\w*{}\s,]+from\s*)?["']([^"']+)["']|\bexport\s+[\w*{}\s,]+from\s*["']([^"']+)["']|\bimport\s*\(\s*["'`]?([^"'`)]*)|\brequire\s*\(/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? "require(");
+  const outside = specs.filter((s) => s !== "../brand.js" && s !== "@/lib/brand.js" && s !== "../brand");
+  ok(!outside.length, `palettes.js imports ${outside.join(", ")}`);
+  ok(!/\bprocess\.|\bnode:/.test(src), "palettes.js must stay edge-safe (no process, no node: APIs)");
 });
 
 // ---------------------------------------------------------------------------
