@@ -913,6 +913,48 @@ Packet: [P6-GEN-WRITE.md](P6-GEN-WRITE.md), "Owner checks" and "Known limits" (F
 - [ ] A sync-time refill while the editor has the generated draft open shows the 'changed somewhere else' conflict. Confirm the wording is acceptable.
 - [ ] Hosted Turso: check on a staging tenant that the one batch is all or none and that the lost-answer read-back reports success. Local file databases can't show replica behaviour.
 
+## Phase 6, batch 1
+
+### The first-run generator and its triggers (P6-GEN)
+Packet: [P6-GEN.md](P6-GEN.md), "Owner checks" and "Known limits" (From review).
+- [ ] Staging end to end (OQ-4): connect, then sync. Inline, CLI and connect-callback syncs are not hooked, so check that /admin/start or the editor makes the store. Check the home and design are made together and a later sync never overwrites a founder edit.
+- [ ] Open editor plus a sync-time refill of a generator-owned draft: confirm the 'newer version elsewhere' conflict wording is acceptable.
+- [ ] Decide whether the fixed lime --sf-success* status colours (lib/brand.js) are acceptable on a generated store, or ask for a lib/brand.js change.
+- [ ] A queued catalog_sync on hosted Turso either generates within the slice (first_run in the logs) or logs first_run_deferred, and the start page then makes the store.
+- [ ] CI sqld download: approval of its source and checksum is still the owner's; nothing under .github/ was touched.
+
+### The brand step, server side (P6-BRAND)
+Packet: [P6-BRAND.md](P6-BRAND.md), "Owner checks" and "Known limits" (From review).
+- [ ] Brand step end to end in desktop Chrome and on a phone once P6-START-UI exists (P6-DRILLS stage B): six palettes, one-click Save with no change, Remove logo, Skip, and the 'Your description shows now. Colours and logo show after you publish.' line on an open store.
+- [ ] Decide the closed-store manifest leak: app/manifest.webmanifest/route.js answers description: siteTagline() on a closed store, so a directly opened /manifest.webmanifest shows the founder's description before opening. Fix it in a later item (neutral description while isStoreClosed()), or accept it.
+- [ ] Confirm that staff may change colours and the logo in the brand step but not the description (it needs settings.write, as Settings does).
+- [ ] Confirm that #808000 (olive, hue 60) is not treated as lime, or ask for the lime window to start lower.
+- [ ] Phone logo upload (PNG, a large JPEG, an SVG; HEIC must be refused in plain words), and the logo in header and footer on a phone and in Safari (plan owner check, unchanged).
+- [ ] On Glow, Slate, Stone, Forest and Clay show checkBrand readability notes (never warnings or errors). Confirm a founder seeing them after switching kit is acceptable.
+- [ ] CI sqld download: its source and checksum still need your approval (nothing under .github/ was touched).
+
+### Before you open your store (P6-OPEN)
+Packet: [P6-OPEN.md](P6-OPEN.md), "Owner checks" and "Known limits" (From review).
+- [ ] Accept the test-provision choice (option 1: rule b kept, and the suite opens with [doc_home, doc_design]), or ask for rule b to be narrowed.
+- [ ] Between batch 2 and batch 3, a founder with a saved design draft who publishes only the home page of a closed store sees a refusal with no button. Accept this, or merge P6-OPEN together with P6-OPEN-UI.
+- [ ] P6-ONBOARD (which owns test-provision in batch 4) must keep the first publish carrying doc_design.
+- [ ] Owner checks carried over from the first run: the checkOpening contract, the POLICY_PAGE_MISSING scope, the founder words, a staging tenant with real Razorpay keys (never enter card details), re-running drills p2, p3 and p4, and approving the source and checksum of the CI sqld download (nothing under .github/ was touched).
+
+### Start a privacy or returns page (P6-POLICY-START)
+Packet: [P6-POLICY-START.md](P6-POLICY-START.md), "Owner checks" and "Known limits" (From review).
+- [ ] Legal review of the privacy and returns starters is an owner action (OQ-25). Read both as a founder would, on a store with a non-default returns_window_days; the copy says they are starting points, not legal advice.
+- [ ] Confirm the returns starter's refund wording: 'Refunds go back to the original payment method.' with no day count, instead of the unset 'within 5–7 working days'. This was changed so the starter passes the banned-copy rule; the legacy PageEditor list keeps the old sentence.
+- [ ] Once P6-OPEN-UI and P6-ONBOARD land, check on a phone that a starter page left untouched clearly keeps the store from opening until it is saved or marked 'I've read it'.
+- [ ] Not yet tied to a setting (GEN-06): the FAQ's delivery days, its payment methods, its 'reply to your order confirmation email' return hint, and the legacy list's refund timing. 'Refunds go back to the original payment method' may need changing for cash on delivery stores.
+
+### The picture logo in the storefront (P6-LOGO-RENDER)
+Packet: [P6-LOGO-RENDER.md](P6-LOGO-RENDER.md), "Owner checks" and "Known limits" (From review).
+- [ ] The logo on real screens: on a documents store with a logo (a PNG, a large JPEG and an SVG with no width or height), check the header on a phone (32px tall) and on desktop (40px, never wider than 180px), and both footer variants (48px), in Chrome and Safari. Nothing should be cut off or squashed.
+- [ ] A screen reader reads the header logo as the home link, using the founder's alt, or the store's name when the alt is empty.
+- [ ] The preview bar on a closed store now says 'Your new colours are shown here.' with no button. Confirm the wording is acceptable.
+- [ ] The checkout page keeps the text wordmark on a store with a picture logo (known limit). Confirm that is acceptable for now.
+- [ ] Browser drill NOT DONE: every acceptance item is proved by rendered tests; desktop Chrome verification on the design harness is still owed.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
