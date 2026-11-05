@@ -740,8 +740,25 @@ await t("unit: the founder publishes a first home page (open doc_home, save a se
   const saved = await api({ saveDraft: { id: "doc_home", body }, revision: home.revision });
   eq(saved.status, 200, `save home: ${JSON.stringify(saved.body).slice(0, 300)}`);
   eq(await asRequest(() => inF(() => Res.isStoreClosed())), true, "a saved draft is still private:");
-  const p = await publishOne("doc_home");
+  // P6-OPEN rule b: the founder saved a design draft above, so publishing the
+  // home page alone is refused and offers the design with it (never a lime
+  // first open). Publishing the offer opens the store.
+  const alone = await publishOne("doc_home");
+  same([alone.status, alone.body.code], [409, "OPENING_NEEDS_DESIGN"], `home alone: ${JSON.stringify(alone.body).slice(0, 300)}`);
+  same(alone.body.offer.publishSet.map((x) => x.id), ["doc_home", "doc_design"], "the offer adds the design:");
+  eq(await asRequest(() => inF(() => Res.isStoreClosed())), true, "the refusal opens nothing:");
+  const pins = [];
+  After.setThemePinWriter(async (tenantId, pin) => {
+    pins.push([tenantId, pin]);
+  });
+  let p;
+  try {
+    p = await api({ publishSet: alone.body.offer.publishSet });
+  } finally {
+    After.setThemePinWriter(null);
+  }
   eq(p.status, 200, `publish: ${JSON.stringify(p.body).slice(0, 300)}`);
+  eq(pins.length, 1, "the design went live with it (one pin write):");
   eq(await asRequest(() => inF(() => Res.isStoreClosed())), false, "isStoreClosed after the first publish:");
   const src = await asRequest(() => inF(() => Res.contentSource()));
   same([src.mode, src.v], ["live", 4], "contentSource:");
@@ -756,10 +773,17 @@ await t("unit: the founder publishes a first home page (open doc_home, save a se
   same([launch.done, launch.hint, list.launched], [true, ON.LAUNCH_HINTS.open, true], "launch done from the live state:");
   ok(list.launchedAt, "launchedAt (the first release):");
   same([stepOf(list, "test_order").href, stepOf(list, "test_order").hint], ["/checkout", "One COD test order end-to-end (cancel it after)."], "an open store's checkout:");
-  eq(stepOf(list, "brand").done, false, "the design is not published yet:");
+  eq(stepOf(list, "brand").done, true, "the design opened with the store:");
 });
 
 await t("unit: a later doc_design publish writes theme_pin (setThemePinWriter spy) and completes the design step", async () => {
+  // the design went live with the first publish (P6-OPEN rule b); the founder
+  // changes it again and publishes that on the open store
+  const d = await doc("doc_design");
+  const next = structuredClone(d.body);
+  next.settings.brand = { ...(next.settings.brand || {}), accent: "#1d4ed8" };
+  const saved = await api({ saveDraft: { id: "doc_design", body: next }, revision: d.revision });
+  eq(saved.status, 200, `saveDraft doc_design: ${JSON.stringify(saved.body).slice(0, 300)}`);
   const calls = [];
   After.setThemePinWriter(async (tenantId, pin) => {
     calls.push([tenantId, pin]);

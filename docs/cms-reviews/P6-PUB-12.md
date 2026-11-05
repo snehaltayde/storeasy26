@@ -21,7 +21,11 @@ Companion note of P6-OPEN (the item packet is `P6-OPEN.md`). It holds the two li
 
 ## Every suite that first-publishes a documents store
 
-The gate ran with `CHECKOUT_MODE` unset. With no `checkout_mode` on the tenant, `checkoutMode()` answers `direct` (its default), so rule a passes. None of them sends `checkOpening`, so rules c, d and e do not run. Rule b fires only when an unpublished `doc_design` draft is left out of the opening set; a suite that did that would now fail with OPENING_NEEDS_DESIGN, and none did. So each is unchanged apart from the payment block, and the payment block cannot fire for any of them. Each passed unchanged (see `P6-OPEN.md`, Tests).
+The gate ran with `CHECKOUT_MODE` unset. With no `checkout_mode` on the tenant, `checkoutMode()` answers `direct` (its default), so rule a passes. None of them sends `checkOpening`, so rules c, d and e do not run. Rule b fires when an unpublished `doc_design` draft is left out of the opening set.
+
+**One suite hit rule b: test-provision.** It saves a founder `doc_design` draft on its closed store, then published `[doc_home]` alone. On the first run of this branch that publish got 409 OPENING_NEEDS_DESIGN and four tests failed (see `P6-OPEN.md`, fix round 1). It was changed in fix round 1: that test now checks the refusal and its offer (`[doc_home, doc_design]`), then opens the store with the offer; the theme_pin test that follows saves a new design change and publishes it on the open store. So test-provision is **not** unchanged: its first publish now carries the design.
+
+Every other suite below has no `doc_design` draft left out at its first publish, so rule b does not fire for it, and the payment block cannot fire for any of them. Those passed unchanged (see `P6-OPEN.md`, Tests).
 
 | Suite | How it publishes | `checkout_mode` on its tenants |
 |---|---|---|
@@ -33,7 +37,7 @@ The gate ran with `CHECKOUT_MODE` unset. With no `checkout_mode` on the tenant, 
 | test-editor-store | the documents API | none |
 | test-doc-changes | the documents API | none |
 | test-legacy-routes | the documents API and the publish service | none |
-| test-provision | the documents API | none |
+| test-provision | the documents API | none. **Changed in fix round 1**: its first publish hit rule b, and now opens with `[doc_home, doc_design]` (above) |
 | test-schema-compat | the documents API (`pre23`) | none on `pre23`. Its fixture stores (`direct`, and its `disabled` case) check the capability only and never publish |
 | test-failure-matrix | the documents API (`docs`) | none. The new `closed` rows set `disabled` inside their own row only |
 | test-media-refs | the publish service | none |

@@ -4,29 +4,24 @@ Branch `cms/p6-open`, cut from `7506c9e` (`cms/phase-1`, which holds both P5-FIX
 
 This is the author's own report. Reviewers should re-read the code.
 
-## STOPPED: one existing suite breaks on rule b
+## Fix round 1: test-provision now opens with the design
 
-**The gate is 101 of 102.** `test:provision` fails 4 tests. The brief says: "Existing first-publish suites have no doc_design row; if any suite breaks, stop and report rather than editing it." So I stopped. test-provision was **not** edited.
+**First run (`7d58d54`): the gate was 101 of 102.** `test:provision` failed 4 tests. Its test "legacy brand and old-editor writes … saving doc_design through the documents API works" saves a founder doc_design draft (accent `#0f766e`) on the closed documents store. The next test, "the founder publishes a first home page", published `[doc_home]` alone. Rule b (always on) refused it: 409 OPENING_NEEDS_DESIGN, offering `[doc_home, doc_design]`. The store never opened, so three later tests failed too (the later design publish got FIRST_PUBLISH_NEEDS_HOME, the ED05 legal-pages test, and the `--force` re-provision live-release test). I stopped and did not edit the suite then. A reviewer confirmed that rule b alone causes it.
 
-What happens. test-provision's test "legacy brand and old-editor writes … saving doc_design through the documents API works" saves a founder doc_design draft (accent `#0f766e`) on the closed documents store. The next test, "the founder publishes a first home page", publishes `[doc_home]` alone. Rule b (always on) now refuses it: 409 OPENING_NEEDS_DESIGN, with an offer of `[doc_home, doc_design]`. The store never opens, so three later tests fail too:
-- "a later doc_design publish writes theme_pin …" (FIRST_PUBLISH_NEEDS_HOME, because the store is still closed);
-- "the legal-pages step counts only published PAGE documents …" (FIRST_PUBLISH_NEEDS_HOME);
-- "a --force re-provision of the published documents store keeps it … with its live release" (no live release).
+**The choice made (option 1 of the two the first run offered):** rule b stays exactly as the plan asks (a left-out design draft is always refused, plan mustFix 2). Narrowing it would need the owner's word and would let a store open without the founder's own colours, the bug this rule fixes. Instead test-provision was changed, by this fix round, outside this item's file list (P6-ONBOARD owns test-provision in batch 4, so there is no clash in batch 2):
+- "the founder publishes a first home page": publishing `[doc_home]` alone now expects 409 OPENING_NEEDS_DESIGN, an offer of `[doc_home, doc_design]`, and a store that is still closed. Then it publishes the offer (with the theme_pin writer spy, so nothing writes to the control plane) and checks the store opens with one pin write. Its old last line "the design is not published yet" now reads "the design opened with the store" (brand step done).
+- "a later doc_design publish writes theme_pin": the design is already live, so it first saves a new accent (`#1d4ed8`) on doc_design, then publishes that on the open store. Its checks are unchanged.
 
-This is rule b doing what the plan asks: a store must not open on lime while the founder's own design draft waits. But the plan assumed no first-publish suite had a design draft, and test-provision does.
+**Fails before, passes after:** `env -u CHECKOUT_MODE pnpm test:provision` on `7d58d54` (test-provision as it was): 29 passed, 4 failed. With the change: 33 passed, 0 failed. No library code changed in this round.
 
-**The orchestrator has to choose one:**
-1. Let test-provision's owner (it is not in this item's files) change that test to open with `[doc_home, doc_design]` (or with the offer), and move the theme_pin check to a later design publish. The three tests that follow would then pass, because they only need an open store. This is my suggestion.
-2. Or narrow rule b (for example to generator-owned design drafts only, `updated_by = 'system:first-run'`). That goes against the brief's "ALWAYS enforced" and the plan's mustFix 2, so it needs the owner's word.
-
-Everything else is built and tested. The work is committed so it is not lost; it must not be merged until this is settled.
+**P6-PUB-12.md corrected.** Its first-publish section said no suite left out a design draft and every suite passed unchanged, and listed test-provision as unchanged. That was false. It now names test-provision as the suite that hit rule b and says how it was changed.
 
 ## Status by stage
 
 | Stage | Status |
 |---|---|
 | Implemented | Yes, on this branch |
-| Locally tested | **Partly.** `pnpm test` with `CHECKOUT_MODE` unset: 101 of 102 (test:provision fails, above). `pnpm build` passes |
+| Locally tested | Yes. `pnpm test` with `CHECKOUT_MODE` unset: 102 of 102 suites passed in 200 s (fix round 1). `pnpm build` passed on the first run; no library code changed since |
 | Browser verified | **NOT DONE, not needed for this item.** No screen changed: the panel is P6-OPEN-UI (batch 3). Every acceptance item is a unit test |
 | Staging verified | **NOT DONE** |
 | Production enabled | **NOT DONE.** Nothing pushed or merged |
@@ -90,12 +85,13 @@ A deleted bundle is named "A deleted bundle" (`DELETED_BUNDLE_NAME`). The sectio
 | live store: moving the last returns page warns POLICY_PAGE_MISSING and succeeds; a set touching no policy page has none; rowsOnly on a closed store runs no checks | DONE | test-open-checks "live: …" and "rowsOnly: …" (checkout off, product content still publishes, store stays closed); test-failure-matrix row "moving the last returns page off its address on a live store" |
 | openingChecks: design info, privacy info, offer with revisions and draftHashes; no design row writes nothing; live store opening false | DONE | test-open-checks "openingChecks: …" (three tests) and the "live" test |
 | parser: flags are top-level booleans on publish and publishSet only; refused elsewhere and as non-booleans; test-documents' parser table passes | DONE | test-open-checks "API: …" (real handler, nothing written) and "the editor's flags travel"; test-api-shapes "P6-OPEN: checkOpening and confirmOpen …"; test-documents 58 of 58 |
-| test-publish-checks, -service, -undo, -ui, test-design-doc pass unchanged; test-api-shapes and test-failure-matrix cover every new code; pnpm test passes with CHECKOUT_MODE unset | **NOT DONE** | Those five suites pass. test-publish-checks is changed only for P5D-2 (two assertions that pinned the raw id, and one new test), as the brief allows. api-shapes and failure-matrix cover every new code (their new checks). **pnpm test is 101 of 102: test:provision fails on rule b** (see the top) |
+| test-publish-checks, -service, -undo, -ui, test-design-doc pass unchanged; test-api-shapes and test-failure-matrix cover every new code; pnpm test passes with CHECKOUT_MODE unset | DONE (fix round 1) | Those five suites pass. test-publish-checks is changed only for P5D-2 (two assertions that pinned the raw id, and one new test), as the brief allows. api-shapes and failure-matrix cover every new code (their new checks). pnpm test with CHECKOUT_MODE unset: 102 of 102 suites passed in 200 s. test-provision was changed to open with the design (see the top), so it is not one of the unchanged suites |
 | BUNDLE_MISSING never shows a raw bundle id | DONE | test-publish-checks "P6-OPEN (P5D-2): BUNDLE_MISSING never shows a raw bundle id …" (no part of either issue holds the id). Fails on the old checks.js |
 
 ## Tests
 
-- **`pnpm test`** (CHECKOUT_MODE unset; ports 6140 and 7140 to 7149): 101 of 102 passed in 203 s. Failed: test:provision (4 tests, the rule b stop above).
+- **`pnpm test`** (CHECKOUT_MODE unset; ports 6140 and 7140 to 7149), fix round 1: 102 of 102 suites passed in 200 s. First run: 101 of 102 (test:provision, fixed above).
+- **test-provision** (fix round 1): 33 passed (29 passed, 4 failed before the change).
 - **`pnpm build`**: passes.
 - **test-open-checks** (new, replaces the placeholder): 26 passed. Without this branch's lib changes it cannot run (opening.js is missing); every test also checks a code or behaviour that only exists with them.
 - **test-api-shapes**: 37 passed (three new P6-OPEN checks; `openingChecks` in the operations list; the four refusal codes in BUILT_CODES and POLICY_PAGE_MISSING in NEW_CODES; "used by an outcome" now also reads `issues[].code`, because a 200 cannot carry a top-level code).
@@ -104,7 +100,8 @@ A deleted bundle is named "A deleted bundle" (`DELETED_BUNDLE_NAME`). The sectio
 
 ## Known limits
 
-- **Rule b breaks test-provision** (top of this note). Not edited; awaiting a decision.
+- **Today's editor has no button for OPENING_NEEDS_DESIGN until P6-OPEN-UI (batch 3) ships.** A founder who has saved a design draft and presses Publish on the home page of a closed store is refused (nothing is published or lost). `publishModel.outcomeOf` has no branch for this code, so the editor shows its generic refused panel with the server's words ("Publish your colours and logo with this, so your store opens with them. Nothing was published.") and no button. The founder can open the store by publishing the design document instead, which gets the FIRST_PUBLISH_NEEDS_HOME offer to publish both. publishModel.js is not this item's file; P6-OPEN-UI adds the 'needsDesign' fold. If batch 2 merges well before batch 3, this is what a founder sees in between.
+- **test-provision was edited outside this item's file list** (fix round 1, top of this note). P6-ONBOARD, which owns it in batch 4, must keep the first publish carrying the design.
 - **The checkOpening contract.** A client that opens a store without `checkOpening` opens on the platform's default (lime) brand when there is no design row, and with no policy pages. Pinned in the shapes and in test-open-checks. The editor (P6-OPEN-UI) must always send it.
 - **POLICY_PAGE_MISSING is scoped to the kinds the set touches** (see Design), so a refunds page published on a store with no privacy page stays quiet.
 - **Unpublish and Undo give no POLICY_PAGE_MISSING.** Taking a policy page offline gives no warning.
@@ -116,7 +113,8 @@ A deleted bundle is named "A deleted bundle" (`DELETED_BUNDLE_NAME`). The sectio
 
 ## Owner checks
 
-- **Decide the test-provision stop** (option 1 or 2 above).
+- **Accept the test-provision choice** (option 1: rule b kept, the suite opens with `[doc_home, doc_design]`), or ask for rule b to be narrowed.
+- **Between batch 2 and batch 3:** a founder with a saved design draft who publishes only the home page of a closed store sees a refusal with no button (Known limits). Accept it, or merge P6-OPEN together with P6-OPEN-UI.
 - **The checkOpening contract** (plan owner check): accept that a non-editor first publish without the flag opens on lime and with no policy pages, or ask for full enforcement.
 - **POLICY_PAGE_MISSING scope:** accept warning only for the kinds a set touches.
 - **The words** of every item and refusal (`WORDS` and `policyWords` in opening.js, the four messages in publish.js), read as a founder on a phone once P6-OPEN-UI shows them.
