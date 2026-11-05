@@ -887,6 +887,32 @@ Packet: [P5-DRILLS.md](P5-DRILLS.md), "Owner checks" and "Known limits" (From re
 Packet: [P5-FIX2.md](P5-FIX2.md), "Owner checks" and "Known limits" (From review).
 - [ ] No new owner checks. The existing P5-FIX2 owner checks still stand, including the browser drill and the CI sqld download approval under .github/ (nothing was added there).
 
+## Phase 6, batch 0
+
+### Test fixtures and banned-copy rules (P6-FIXTURE)
+Packet: [P6-FIXTURE.md](P6-FIXTURE.md), "Owner checks" and "Known limits" (From review).
+- [ ] CI sqld download: unchanged; approving its source and checksum is still the owner's job (nothing under .github/ was touched).
+- [ ] CLAIMS lexicon: confirm the 13 words (reviews, rated, stars, certified, award, clinically, guaranteed, best-selling, #1, organic, dermatologist, lab-tested, money-back) are the ones a generated store must never say, in particular 'organic' and 'guaranteed'. A founder's own words are never scanned.
+- [ ] Later phase 6 items: scanText flags 'review' used as a verb. Founder-facing report copy (P6-OPEN) should pass { claims: false } or avoid the word, and shopper text should pass { shopper: true }.
+
+### The six curated palettes (P6-PALETTE)
+Packet: [P6-PALETTE.md](P6-PALETTE.md), "Owner checks" and "Known limits" (From review).
+- [ ] Look at the six palettes (Ink, Slate, Navy, Stone, Forest, Clay) on a phone and on desktop once P6-BRAND's brand step exists (P6-DRILLS stage B). Are the labels and colours the ones founders should see? Only the text colours of Ink (#09090b), Slate and Navy (#0f172a) were chosen in this item.
+- [ ] Forest and Clay buttons have near-black text on a lighter shade of the accent (validateBrand's choice). Check you are happy with how that looks.
+- [ ] On the Pulse kit, the dark accents' hero highlight (and, for Ink, the header wordmark) is switched to a lighter shade, and checkBrand returns a plain note that may show in the editor on a generated store. Decide whether that note should be shown there (P6-NAV / P6-BRAND).
+- [ ] Browser check (desktop Chrome) and staging: NOT DONE for this item, because nothing shows the palettes yet.
+
+### The logo in the design document (P6-LOGO-REG)
+Packet: [P6-LOGO-REG.md](P6-LOGO-REG.md), "Owner checks" and "Known limits" (From review).
+- [ ] On a closed store, the editor's 'Show them' toggle now changes nothing, because the design draft always shows in the founder's preview there. The same happens on an open store whose live list has no design. Confirm this is acceptable, or ask for a later change that hides the toggle until the store opens (a DocumentEditor or preview bar change).
+- [ ] For a deleted logo, the MEDIA_MISSING publish warning says 'shoppers see a plain colour block instead. Choose another image.' That is image wording. Confirm that a logo-specific sentence in lib/documents/checks.js should come in a later item.
+
+### The first-run writer and the policy-page rule (P6-GEN-WRITE)
+Packet: [P6-GEN-WRITE.md](P6-GEN-WRITE.md), "Owner checks" and "Known limits" (From review).
+- [ ] Staging (OQ-4), once P6-GEN has landed: on a throwaway documents tenant, the first generation makes doc_home and doc_design together, and a later sync never overwrites a founder's edit to the home.
+- [ ] A sync-time refill while the editor has the generated draft open shows the 'changed somewhere else' conflict. Confirm the wording is acceptable.
+- [ ] Hosted Turso: check on a staging tenant that the one batch is all or none and that the lost-answer read-back reports success. Local file databases can't show replica behaviour.
+
 ## Bug-fix branches (not yet merged to main)
 - [ ] **Payment confirmation when the database blips** (`claude/gallant-keller-7d3213`). Covered by tests with a simulated database. A real Turso run and a real Razorpay payment are yours.
   - On hosted Turso, check that a refused connection and a lost response give the error shapes the retry code expects. Only Node and a local sqld were tested.
