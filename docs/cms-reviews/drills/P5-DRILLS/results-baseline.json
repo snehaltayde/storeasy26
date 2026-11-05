@@ -1,0 +1,167 @@
+{
+  "id": "P5-DRILLS",
+  "part": "baseline",
+  "title": "P5-DRILLS — baseline",
+  "ranAt": "2026-11-05T01:08:44.709Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 12,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "baseline: a throwaway detached worktree at afd7881 (/private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p5-b3/P5-DRILLS/run/baseline-wt)",
+      "detail": "Preparing worktree (detached HEAD afd7881)"
+    },
+    {
+      "ok": true,
+      "label": "baseline: its HEAD is afd7881 (phase 5's base)",
+      "detail": "afd7881"
+    },
+    {
+      "ok": true,
+      "label": "baseline: its own pnpm install --frozen-lockfile --prefer-offline (no symlinked node_modules)",
+      "detail": " | Done in 1.9s using pnpm v11.5.0"
+    },
+    {
+      "ok": true,
+      "label": "baseline: the store is a legacy store, with a turned-on bundle for /bundles/<slug>",
+      "detail": {
+        "mode": "legacy",
+        "bundle": "gym-starter-kit"
+      }
+    },
+    {
+      "ok": true,
+      "label": "baseline: / answers 200 on afd7881 (home)",
+      "detail": {
+        "status": 200,
+        "rawBytes": 744749
+      }
+    },
+    {
+      "ok": true,
+      "label": "baseline: /products/micronised-creatine-12 answers 200 on afd7881 (product)",
+      "detail": {
+        "status": 200,
+        "rawBytes": 363073
+      }
+    },
+    {
+      "ok": true,
+      "label": "baseline: /collections/protein answers 200 on afd7881 (collection)",
+      "detail": {
+        "status": 200,
+        "rawBytes": 624860
+      }
+    },
+    {
+      "ok": true,
+      "label": "baseline: /bundles/gym-starter-kit answers 200 on afd7881 (bundle-page)",
+      "detail": {
+        "status": 200,
+        "rawBytes": 290933
+      }
+    },
+    {
+      "ok": true,
+      "label": "baseline: the cart after adding the bundle holds its products with the bundle discount",
+      "detail": {
+        "posts": [
+          200,
+          200,
+          200
+        ],
+        "items": 3,
+        "discountTotal": 975
+      }
+    },
+    {
+      "ok": true,
+      "label": "baseline: the old home Designer and Home page editor list their section types, none of them bundles",
+      "detail": {
+        "path": "/admin/storefront/designer",
+        "kinds": [
+          "Collections grid",
+          "Newest products",
+          "Banner / CTA",
+          "Rich text",
+          "Image with text",
+          "Product rail"
+        ],
+        "homeEditor": {
+          "adds": [
+            "Collections grid",
+            "Newest products",
+            "Banner / CTA",
+            "Rich text"
+          ],
+          "mentionsBundleKinds": false
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "baseline: afd7881's own a6d028e-style home render (scripts/support/home-render-outputs.js) runs",
+      "detail": "{\"ts\":\"2026-11-05T01:08:42.609Z\",\"evt\":\"experiment_started\",\"tenant\":\"hr\",\"experiment\":\"hero-words\"}"
+    },
+    {
+      "ok": true,
+      "label": "baseline: the throwaway worktree is removed",
+      "detail": ""
+    }
+  ],
+  "notes": [
+    "re-seeded fresh (--p4): the harness store is a legacy store live on a version 3 release (rel_b7124c471cf4c75f): 24 product overrides, 40 pairs (1 switched off), 5 pinned collections, 32 photos, a running hero experiment, 1 redirect, 2 saved templates, an owner and a staff login. Logins and ids: .design-data/p4-seed.json. 3.6s",
+    "legacy store: a fresh --p4 seed (the P4 legacy store, live on a version 3 release; the perf seed's bundles), snapshot in /private/tmp/claude-501/-Users-snehal-Documents-Projects-2026-storeasy26/5153dcf1-8283-4e2a-96c1-8fc578250bf7/scratchpad/p5-b3/P5-DRILLS/run/legacy-snapshot",
+    "baseline captures: {\"home\":\"cb9330a7542c\",\"product\":\"f6b92dc11db3\",\"collection\":\"6877ab2d5e50\",\"bundle-page\":\"d7d0415d9b64\"}"
+  ],
+  "screenshots": [
+    {
+      "name": "legacy-designer-add-section-baseline-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/legacy-designer-add-section-baseline-1440.png",
+      "bytes": 42853,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/storefront/designer"
+    },
+    {
+      "name": "legacy-home-baseline-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/legacy-home-baseline-1440.png",
+      "bytes": 44587,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "legacy-product-baseline-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/legacy-product-baseline-1440.png",
+      "bytes": 135980,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/products/micronised-creatine-12"
+    },
+    {
+      "name": "legacy-collection-baseline-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/legacy-collection-baseline-1440.png",
+      "bytes": 70651,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/collections/protein"
+    },
+    {
+      "name": "legacy-bundle-page-baseline-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/legacy-bundle-page-baseline-1440.png",
+      "bytes": 26569,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/bundles/gym-starter-kit"
+    }
+  ]
+}

@@ -1,0 +1,1672 @@
+<html class="geist_2ae47f08-module__h69qWW__variable geist_mono_eb58308d-module__w_p2Lq__variable fraunces_d7a68ca2-module__TWljPG__variable h-full" data-kit="pulse-1" lang="en">
+  <head>
+    <link as="image" href="/api/media/med_1ae84a2745d034909a" rel="preload">
+    <link as="image" href="/api/media/med_75768f3b65781d963d" rel="preload">
+    <link as="image" href="/api/media/med_8b9f1aeffff0a92bee" rel="preload">
+    <link as="image" href="/api/media/med_e219b3ef874156c3dc" rel="preload">
+    <link href="/icon.svg" rel="icon" type="image/svg+xml">
+    <link href="/icons/icon-192.png" rel="apple-touch-icon">
+    <link href="/manifest.webmanifest" rel="manifest">
+    <meta charset="utf-8">
+    <meta content name="next-size-adjust">
+    <meta content="#0a0a0b" name="theme-color">
+    <meta content="Design Demo Co" name="apple-mobile-web-app-title">
+    <meta content="Design Demo Co" name="application-name">
+    <meta content="Realistic data for the console redesign" name="description">
+    <meta content="black-translucent" name="apple-mobile-web-app-status-bar-style">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta content="yes" name="mobile-web-app-capable">
+    <title>
+      Design Demo Co
+    </title>
+    <style data-href="brand-vars">
+      :root{--accent-50:#dffcfa;--accent-100:#c6faf5;--accent-200:#9bf6ee;--accent-300:#5ef1e4;--accent-400:#15ead7;--accent-500:#0d9488;--accent-600:#087c72;--accent-700:#06645c;--accent-800:#054f48;--accent-900:#043d38;--background:#fffdf8;--foreground:#1c1917;--accent-label:#0a0a0b;--brand-radius:1.5rem;--type-scale:1.08;--btn-radius:9999px;--section-pad-y:3.5rem;--sf-surface-muted:#faf8f3;--sf-surface-sunken:#f5f3ee;--sf-surface-strong:#e7e5e0;--sf-surface-disabled:#d8d6d2;--sf-text:#1c1917;--sf-text-soft:#373432;--sf-text-body:#4f4c4a;--sf-text-muted:#615f5c;--sf-text-subtle:#666461;--sf-text-faint:#706d6a;--sf-placeholder:#72706d;--sf-mark:#777471;--sf-border-soft:#f5f3ee;--sf-border:#e7e5e0;--sf-border-strong:#d8d6d2;--sf-border-hover:#a9a6a2;--sf-inverse:#1c1917;--sf-inverse-hover:#373432;--sf-on-inverse:#fffdf8;--sf-on-inverse-muted:#d8d6d2;--sf-success:#497d00;--sf-success-strong:#3c6300;--sf-success-surface:#f7fee7;--sf-success-soft:#ecfcca;--sf-warning:#973c00;--sf-warning-strong:#973c00;--sf-warning-surface:#fffbeb;--sf-warning-soft:#fef3c6;--sf-warning-border:#fee685;--sf-danger:#c10007;--sf-danger-surface:#fef2f2;--sf-danger-border:#ffc9c9;}
+    </style>
+  </head>
+  <body class="flex min-h-full flex-col bg-background text-foreground antialiased">
+    <div hidden></div>
+    <header class="sticky top-0 z-30 bg-header text-header-fg">
+      <div class="bg-sf-accent px-4 py-1.5 text-center text-xs font-semibold text-sf-on-accent" data-sec="announcement">
+        <a class="hover:underline" href="/collections">
+          Festive sale — free shipping over ₹1,499
+        </a>
+      </div>
+      <div class="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
+        <a class="shrink-0 text-xl font-extrabold tracking-tight" href="/">
+          Design Demo Co
+        </a>
+        <div class="hidden flex-1 md:block">
+          <div class="relative w-full">
+            <form class="relative">
+              <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sf-text-faint">
+                <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="18">
+                  <circle cx="11" cy="11" r="7"></circle>
+                  <path d="m20 20-3.2-3.2"></path>
+                </svg>
+              </span>
+              <input aria-autocomplete="list" aria-expanded="false" aria-label="Search products" class="w-full rounded-full border border-sf-border bg-sf-surface-muted py-2.5 pl-11 pr-4 text-sm text-sf-text outline-none transition focus:border-sf-border-hover focus:bg-sf-surface" placeholder="Search products…" role="combobox" type="search" value>
+            </form>
+          </div>
+        </div>
+        <nav class="ml-auto hidden items-center gap-6 text-sm font-medium md:flex">
+          <a class="text-header-muted transition hover:text-header-fg" href="/collections">
+            Shop all
+          </a>
+        </nav>
+        <a aria-label="Wishlist" class="shrink-0 p-1 text-header-muted transition hover:text-header-fg" href="/wishlist">
+          <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="20">
+            <path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"></path>
+          </svg>
+        </a>
+        <a aria-label="Your account" class="shrink-0 p-1 text-header-muted transition hover:text-header-fg" href="/account">
+          <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="20">
+            <circle cx="12" cy="8" r="4"></circle>
+            <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>
+          </svg>
+        </a>
+        <button aria-label="Open cart, 0 items" class="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-header-fg transition hover:bg-header-fg/10" type="button">
+          <svg fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24" width="22">
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path>
+            <path d="M3 6h18"></path>
+            <path d="M16 10a4 4 0 0 1-8 0"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="px-4 pb-3 md:hidden">
+        <div class="relative w-full">
+          <form class="relative">
+            <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sf-text-faint">
+              <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="18">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="m20 20-3.2-3.2"></path>
+              </svg>
+            </span>
+            <input aria-autocomplete="list" aria-expanded="false" aria-label="Search products" class="w-full rounded-full border border-sf-border bg-sf-surface-muted py-2.5 pl-11 pr-4 text-sm text-sf-text outline-none transition focus:border-sf-border-hover focus:bg-sf-surface" placeholder="Search products…" role="combobox" type="search" value>
+          </form>
+        </div>
+      </div>
+      <nav class="border-t border-header-fg/10">
+        <div class="no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto px-3 sm:px-5">
+          <a class="whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg" href="/collections/shop-all">
+            Shop all
+          </a>
+          <details class="group relative">
+            <summary class="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg [&amp;::-webkit-details-marker]:hidden">
+              Protein
+              <span aria-hidden="true" class="text-xs transition group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div class="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-sf-control border border-sf-border bg-sf-surface py-1 shadow-xl">
+              <a class="block px-4 py-2 text-sm font-semibold text-sf-text-soft hover:bg-sf-surface-muted" href="/collections/protein">
+                Protein
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/new-launches">
+                New Launches
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/under-999">
+                Under 999
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/gifting">
+                Gifting
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/vegan">
+                Vegan
+              </a>
+            </div>
+          </details>
+          <details class="group relative">
+            <summary class="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg [&amp;::-webkit-details-marker]:hidden">
+              Skincare
+              <span aria-hidden="true" class="text-xs transition group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div class="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-sf-control border border-sf-border bg-sf-surface py-1 shadow-xl">
+              <a class="block px-4 py-2 text-sm font-semibold text-sf-text-soft hover:bg-sf-surface-muted" href="/collections/skincare">
+                Skincare
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/combos-and-kits">
+                Combos And Kits
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/summer-essentials">
+                Summer Essentials
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/gym-starter">
+                Gym Starter
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/skin-routine">
+                Skin Routine
+              </a>
+            </div>
+          </details>
+          <details class="group relative">
+            <summary class="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg [&amp;::-webkit-details-marker]:hidden">
+              Vitamins
+              <span aria-hidden="true" class="text-xs transition group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div class="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-sf-control border border-sf-border bg-sf-surface py-1 shadow-xl">
+              <a class="block px-4 py-2 text-sm font-semibold text-sf-text-soft hover:bg-sf-surface-muted" href="/collections/vitamins">
+                Vitamins
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/vegan">
+                Vegan
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/sugar-free">
+                Sugar Free
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/combos-and-kits">
+                Combos And Kits
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/summer-essentials">
+                Summer Essentials
+              </a>
+            </div>
+          </details>
+          <details class="group relative">
+            <summary class="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg [&amp;::-webkit-details-marker]:hidden">
+              Snacks
+              <span aria-hidden="true" class="text-xs transition group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div class="absolute left-0 top-full z-40 mt-1 min-w-44 rounded-sf-control border border-sf-border bg-sf-surface py-1 shadow-xl">
+              <a class="block px-4 py-2 text-sm font-semibold text-sf-text-soft hover:bg-sf-surface-muted" href="/collections/snacks">
+                Snacks
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/gym-starter">
+                Gym Starter
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/skin-routine">
+                Skin Routine
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/immunity">
+                Immunity
+              </a>
+              <a class="block px-4 py-2 text-sm text-sf-text-muted hover:bg-sf-surface-muted hover:text-sf-text" href="/collections/travel-size">
+                Travel Size
+              </a>
+            </div>
+          </details>
+          <a class="whitespace-nowrap rounded-full px-3 py-2 text-sm text-header-muted transition hover:text-header-fg" href="/journal">
+            Journal
+          </a>
+        </div>
+      </nav>
+    </header>
+    <main class="flex-1">
+      <div>
+        <section class="relative overflow-hidden bg-hero text-hero-fg" data-sec="hero" data-section-id="sec_hero" data-section-kind="hero">
+          <div class="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-sf-hero-glow/20 blur-3xl"></div>
+          <div class="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
+            <p class="mb-4 inline-flex items-center gap-2 rounded-full border border-hero-fg/15 px-3 py-1 text-xs font-medium text-sf-hero-accent">
+              <span class="h-1.5 w-1.5 rounded-full bg-sf-hero-accent"></span>
+              400 products · 30 collections
+            </p>
+            <h1 class="max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
+              Visibly brighter in
+              <span class="text-sf-hero-accent">
+                14 days
+              </span>
+            </h1>
+            <p class="mt-5 max-w-xl text-lg text-hero-muted">
+              Or your money back.
+            </p>
+            <div class="mt-8 flex flex-wrap gap-3">
+              <a class="rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover" href="/collections">
+                Shop night routine
+              </a>
+              <a class="rounded-sf-button border border-hero-fg/20 px-6 py-3 text-sm font-semibold text-hero-fg transition hover:bg-hero-fg/10" href="#new">
+                See what’s new
+              </a>
+            </div>
+          </div>
+        </section>
+        <div class="mx-auto max-w-7xl px-4 sm:px-6">
+          <section class="py-sf-section" data-sec="sec_pfcollect" data-section-id="sec_pfcollect" data-section-kind="collections">
+            <div class="mb-6 flex items-end justify-between">
+              <h2 class="text-2xl font-bold tracking-tight">
+                Shop by category
+              </h2>
+              <a class="text-sm font-medium text-sf-accent-text hover:underline" href="/collections">
+                View all →
+              </a>
+            </div>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <a class="group relative block aspect-[4/3] overflow-hidden rounded-sf-card bg-sf-media" href="/collections/shop-all">
+                <img alt="Shop all" class="object-cover opacity-85 transition duration-500 group-hover:scale-105 group-hover:opacity-100" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_1a674bf3736b8437aa" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                <div class="absolute inset-0 bg-gradient-to-t from-sf-overlay/75 via-sf-overlay/10 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 p-4">
+                  <h3 class="text-lg font-bold text-sf-on-overlay">
+                    Shop all
+                  </h3>
+                  <p class="text-xs text-sf-on-overlay/70">
+                    400 products
+                  </p>
+                </div>
+              </a>
+              <a class="group relative block aspect-[4/3] overflow-hidden rounded-sf-card bg-sf-media" href="/collections/under-999">
+                <img alt="Under 999" class="object-cover opacity-85 transition duration-500 group-hover:scale-105 group-hover:opacity-100" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_bac7d9594de8dc2c9b" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                <div class="absolute inset-0 bg-gradient-to-t from-sf-overlay/75 via-sf-overlay/10 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 p-4">
+                  <h3 class="text-lg font-bold text-sf-on-overlay">
+                    Under 999
+                  </h3>
+                  <p class="text-xs text-sf-on-overlay/70">
+                    72 products
+                  </p>
+                </div>
+              </a>
+              <a class="group relative block aspect-[4/3] overflow-hidden rounded-sf-card bg-sf-media" href="/collections/top-rated">
+                <img alt="Top Rated" class="object-cover opacity-85 transition duration-500 group-hover:scale-105 group-hover:opacity-100" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_e987d4358218801ca4" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                <div class="absolute inset-0 bg-gradient-to-t from-sf-overlay/75 via-sf-overlay/10 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 p-4">
+                  <h3 class="text-lg font-bold text-sf-on-overlay">
+                    Top Rated
+                  </h3>
+                  <p class="text-xs text-sf-on-overlay/70">
+                    60 products
+                  </p>
+                </div>
+              </a>
+              <a class="group relative block aspect-[4/3] overflow-hidden rounded-sf-card bg-sf-media" href="/collections/new-launches">
+                <img alt="New Launches" class="object-cover opacity-85 transition duration-500 group-hover:scale-105 group-hover:opacity-100" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_6ff6b329953b97992f" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                <div class="absolute inset-0 bg-gradient-to-t from-sf-overlay/75 via-sf-overlay/10 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 p-4">
+                  <h3 class="text-lg font-bold text-sf-on-overlay">
+                    New Launches
+                  </h3>
+                  <p class="text-xs text-sf-on-overlay/70">
+                    48 products
+                  </p>
+                </div>
+              </a>
+              <a class="group relative block aspect-[4/3] overflow-hidden rounded-sf-card bg-sf-media" href="/collections/creatine">
+                <img alt="Creatine" class="object-cover opacity-85 transition duration-500 group-hover:scale-105 group-hover:opacity-100" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_1bdab88f2cb2a7afbd" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                <div class="absolute inset-0 bg-gradient-to-t from-sf-overlay/75 via-sf-overlay/10 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 p-4">
+                  <h3 class="text-lg font-bold text-sf-on-overlay">
+                    Creatine
+                  </h3>
+                  <p class="text-xs text-sf-on-overlay/70">
+                    40 products
+                  </p>
+                </div>
+              </a>
+              <a class="group relative block aspect-[4/3] overflow-hidden rounded-sf-card bg-sf-media" href="/collections/protein">
+                <img alt="Protein" class="object-cover opacity-85 transition duration-500 group-hover:scale-105 group-hover:opacity-100" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_194a107989db40261d" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                <div class="absolute inset-0 bg-gradient-to-t from-sf-overlay/75 via-sf-overlay/10 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 p-4">
+                  <h3 class="text-lg font-bold text-sf-on-overlay">
+                    Protein
+                  </h3>
+                  <p class="text-xs text-sf-on-overlay/70">
+                    40 products
+                  </p>
+                </div>
+              </a>
+              <a class="group relative block aspect-[4/3] overflow-hidden rounded-sf-card bg-sf-media" href="/collections/accessories">
+                <img alt="Accessories" class="object-cover opacity-85 transition duration-500 group-hover:scale-105 group-hover:opacity-100" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_1bdab88f2cb2a7afbd" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                <div class="absolute inset-0 bg-gradient-to-t from-sf-overlay/75 via-sf-overlay/10 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 p-4">
+                  <h3 class="text-lg font-bold text-sf-on-overlay">
+                    Accessories
+                  </h3>
+                  <p class="text-xs text-sf-on-overlay/70">
+                    39 products
+                  </p>
+                </div>
+              </a>
+              <a class="group relative block aspect-[4/3] overflow-hidden rounded-sf-card bg-sf-media" href="/collections/apparel">
+                <img alt="Apparel" class="object-cover opacity-85 transition duration-500 group-hover:scale-105 group-hover:opacity-100" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_194a107989db40261d" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                <div class="absolute inset-0 bg-gradient-to-t from-sf-overlay/75 via-sf-overlay/10 to-transparent"></div>
+                <div class="absolute bottom-0 left-0 p-4">
+                  <h3 class="text-lg font-bold text-sf-on-overlay">
+                    Apparel
+                  </h3>
+                  <p class="text-xs text-sf-on-overlay/70">
+                    39 products
+                  </p>
+                </div>
+              </a>
+            </div>
+          </section>
+          <section class="py-sf-section" data-sec="sec_pfrail1" data-section-id="sec_pfrail1" data-section-kind="product_rail">
+            <div class="mb-6 flex items-end justify-between">
+              <h2 class="text-2xl font-bold tracking-tight">
+                Top rated
+              </h2>
+              <a class="text-sm font-medium text-sf-accent-text hover:underline" href="/collections/top-rated">
+                View all →
+              </a>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+              <a class="group block" href="/products/whey-protein-isolate-1">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Whey Protein Isolate, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c12b0a48887ebb6162" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Whey Protein Isolate
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹4,279
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/micronised-creatine-12">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Micronised Creatine, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_ae5f4af4b10aec0b01" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Creatine
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Micronised Creatine
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹1,789
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/vitamin-b12-34">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Vitamin B12, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_f52c3ff9e74dcb858b" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Vitamins
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Vitamin B12
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹1,049
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹1,311
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/omega-3-6-9-45">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Omega 3-6-9, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_e3feda25d495d07b90" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Omega
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Omega 3-6-9
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹919
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/retinol-night-cream-56">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Retinol Night Cream, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_9db6f4e8468684cf14" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Skincare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Retinol Night Cream
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹499
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/pro-onion-hair-oil-67">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Pro Onion Hair Oil, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_81f5305783e0365e88" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Haircare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Pro Onion Hair Oil
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹449
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/pro-peanut-butter-78">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Pro Peanut Butter, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_1ae84a2745d034909a" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Pro Peanut Butter
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹839
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹1,049
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/stim-free-pre-workout-23">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Stim-free Pre-workout, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_1bf5a2b4a539209813" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-inverse/85 px-2.5 py-1 text-sf-2xs font-semibold uppercase tracking-wide text-sf-on-inverse">
+                    Sold out
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Pre-workout
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Stim-free Pre-workout
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹2,809
+                    </span>
+                  </p>
+                </div>
+              </a>
+            </div>
+          </section>
+          <section class="py-sf-section" data-sec="sec_pfban1" data-section-id="sec_pfban1" data-section-kind="banner">
+            <div class="rounded-brand bg-sf-accent-soft px-6 py-10 text-center sm:px-10">
+              <h2 class="font-display text-2xl font-bold tracking-tight text-sf-on-accent-soft-strong">
+                Free shipping over ₹999
+              </h2>
+              <p class="mx-auto mt-2 max-w-xl text-sf-on-accent-soft">
+                The texture keeps to slow, even absorption and ships within 24 hours.
+              </p>
+              <a class="mt-5 inline-block rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover" href="/collections/shop-all">
+                Shop all
+              </a>
+            </div>
+          </section>
+          <section class="py-sf-section" data-sec="sec_pfrail2" data-section-id="sec_pfrail2" data-section-kind="product_rail">
+            <div class="mb-6 flex items-end justify-between">
+              <h2 class="text-2xl font-bold tracking-tight">
+                Protein
+              </h2>
+              <a class="text-sm font-medium text-sf-accent-text hover:underline" href="/collections/protein">
+                View all →
+              </a>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+              <a class="group block" href="/products/max-mass-gainer-391">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Mass Gainer, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_75768f3b65781d963d" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Mass Gainer
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹1,629
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-plant-protein-blend-381">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Plant Protein Blend, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_e3feda25d495d07b90" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Plant Protein Blend
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹4,619
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-whey-protein-concentrate-371">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Whey Protein Concentrate, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c45b4710f1135e4736" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Whey Protein Concentrate
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹2,169
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-whey-protein-isolate-361">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Whey Protein Isolate, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c12b0a48887ebb6162" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Whey Protein Isolate
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹2,219
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/whey-protein-isolate-1">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Whey Protein Isolate, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c12b0a48887ebb6162" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Whey Protein Isolate
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹4,279
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/whey-protein-concentrate-11">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Whey Protein Concentrate, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c45b4710f1135e4736" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Whey Protein Concentrate
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹3,009
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/plant-protein-blend-21">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Plant Protein Blend, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_e3feda25d495d07b90" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Plant Protein Blend
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹1,929
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/mass-gainer-31">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Mass Gainer, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_75768f3b65781d963d" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Mass Gainer
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹3,789
+                    </span>
+                  </p>
+                </div>
+              </a>
+            </div>
+          </section>
+          <section class="py-sf-section" data-sec="sec_pfimg1" data-section-id="sec_pfimg1" data-section-kind="image_with_text">
+            <div class="grid items-center gap-8 md:grid-cols-2">
+              <img alt="A shaker bottle on a gym bench" class="w-full rounded-brand object-cover" loading="lazy" src="/api/media/med_1a674bf3736b8437aa">
+              <div class>
+                <h2 class="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                  Made in small batches
+                </h2>
+                <p class="mt-3 max-w-prose text-base text-foreground/75">
+                  The blend keeps to steady energy with no fillers. Every order is designed around honest labels and ships within 24 hours. The pack is balanced for honest labels from sources we can trace.
+                </p>
+                <a class="mt-6 inline-block rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover" href="/policies/our-story">
+                  Our story
+                </a>
+              </div>
+            </div>
+          </section>
+          <section class="scroll-mt-24 py-sf-section" data-sec="sec_pfnew" data-section-id="sec_pfnew" data-section-kind="new">
+            <div class="mb-6 flex items-end justify-between">
+              <h2 class="text-2xl font-bold tracking-tight">
+                New arrivals
+              </h2>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+              <a class="group block" href="/products/max-mass-gainer-391">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Mass Gainer, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" src="/api/media/med_75768f3b65781d963d" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Mass Gainer
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹1,629
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-lifting-straps-390">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Lifting Straps, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" src="/api/media/med_1ae84a2745d034909a" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Accessories
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Lifting Straps
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹1,079
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹1,349
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-hoodie-389">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Hoodie, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" src="/api/media/med_8b9f1aeffff0a92bee" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Apparel
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Hoodie
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹939
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-rolled-oats-388">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Rolled Oats, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" src="/api/media/med_e219b3ef874156c3dc" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Rolled Oats
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹369
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-keratin-conditioner-387">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Keratin Conditioner, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_a90b5569b19cf92f5e" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Haircare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Keratin Conditioner
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹929
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-hyaluronic-moisturiser-386">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Hyaluronic Moisturiser, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_db4c43f623b0f0943a" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Skincare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Hyaluronic Moisturiser
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹569
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹711
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-vegan-omega-385">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Vegan Omega, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c12b0a48887ebb6162" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Omega
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Vegan Omega
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹1,289
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-vitamin-d3-k2-384">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Vitamin D3 + K2, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_4c3fa2441e5d251422" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Vitamins
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Vitamin D3 + K2
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹469
+                    </span>
+                  </p>
+                </div>
+              </a>
+            </div>
+          </section>
+          <section class="py-sf-section" data-sec="sec_pfrail3" data-section-id="sec_pfrail3" data-section-kind="product_rail">
+            <div class="mb-6 flex items-end justify-between">
+              <h2 class="text-2xl font-bold tracking-tight">
+                Skincare
+              </h2>
+              <a class="text-sm font-medium text-sf-accent-text hover:underline" href="/collections/skincare">
+                View all →
+              </a>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+              <a class="group block" href="/products/vitamin-c-face-serum-6">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Vitamin C Face Serum, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_1ae84a2745d034909a" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Skincare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Vitamin C Face Serum
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹749
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹936
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/niacinamide-serum-16">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Niacinamide Serum, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_ae137168a308647587" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Skincare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Niacinamide Serum
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹589
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/hyaluronic-moisturiser-26">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Hyaluronic Moisturiser, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_db4c43f623b0f0943a" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Skincare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Hyaluronic Moisturiser
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹1,269
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹1,586
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/spf-50-sunscreen-36">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="SPF 50 Sunscreen, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_ae5f4af4b10aec0b01" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Skincare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    SPF 50 Sunscreen
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹919
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/gentle-face-wash-46">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Gentle Face Wash, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_34792eae1d0d7e34d7" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Skincare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Gentle Face Wash
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹769
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹961
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/retinol-night-cream-56">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Retinol Night Cream, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_9db6f4e8468684cf14" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Skincare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Retinol Night Cream
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹499
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/pro-vitamin-c-face-serum-66">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Pro Vitamin C Face Serum, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c45b4710f1135e4736" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Skincare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Pro Vitamin C Face Serum
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹1,039
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹1,299
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/pro-niacinamide-serum-76">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Pro Niacinamide Serum, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_e219b3ef874156c3dc" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Skincare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Pro Niacinamide Serum
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹1,019
+                    </span>
+                  </p>
+                </div>
+              </a>
+            </div>
+          </section>
+          <section class="py-sf-section" data-sec="sec_pfrich" data-section-id="sec_pfrich" data-section-kind="rich_text">
+            <h2 class="mb-4 text-2xl font-bold tracking-tight">
+              Why lab tested matters
+            </h2>
+            <div class="rte max-w-3xl">
+              <p>
+                Every order is made for clean ingredients without added sugar. This formula keeps to sensitive skin without added sugar. This routine brings together a light finish so you can feel the difference in a few weeks.
+              </p>
+              <p>
+                Each serving is made for third-party lab results. Every order is checked for Indian summers from sources we can trace. Every batch is mixed for sensitive skin so you can feel the difference in a few weeks. Every order is designed around quick recovery in small batches. Every order is mixed for clean ingredients so it fits the routine you already have. The pack is tested for steady energy from sources we can trace.
+              </p>
+            </div>
+          </section>
+          <section class="py-sf-section" data-sec="sec_pfrail4" data-section-id="sec_pfrail4" data-section-kind="product_rail">
+            <div class="mb-6 flex items-end justify-between">
+              <h2 class="text-2xl font-bold tracking-tight">
+                Snacks
+              </h2>
+              <a class="text-sm font-medium text-sf-accent-text hover:underline" href="/collections/snacks">
+                View all →
+              </a>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+              <a class="group block" href="/products/protein-bar-8">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Protein Bar, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_9db6f4e8468684cf14" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Protein Bar
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹819
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/peanut-butter-18">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Peanut Butter, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c45b4710f1135e4736" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Peanut Butter
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹389
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹486
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/rolled-oats-28">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Rolled Oats, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_e219b3ef874156c3dc" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Rolled Oats
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹509
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/muesli-38">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Muesli, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c9c2be2448e7b12824" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Muesli
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹619
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹774
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/protein-cookies-48">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Protein Cookies, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_4c3fa2441e5d251422" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Protein Cookies
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹609
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/energy-bites-58">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Energy Bites, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_f52c3ff9e74dcb858b" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Energy Bites
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹599
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹749
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/pro-peanut-butter-78">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Pro Peanut Butter, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_1ae84a2745d034909a" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Pro Peanut Butter
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹839
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹1,049
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/pro-protein-bar-68">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Pro Protein Bar, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_e9450a1c88da28a21b" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-inverse/85 px-2.5 py-1 text-sf-2xs font-semibold uppercase tracking-wide text-sf-on-inverse">
+                    Sold out
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Pro Protein Bar
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹299
+                    </span>
+                  </p>
+                </div>
+              </a>
+            </div>
+          </section>
+          <section class="py-sf-section" data-sec="sec_pfimg2" data-section-id="sec_pfimg2" data-section-kind="image_with_text">
+            <div class="grid items-center gap-8 md:grid-cols-2">
+              <img alt="Serum bottles on a shelf" class="w-full rounded-brand object-cover md:order-2" loading="lazy" src="/api/media/med_194a107989db40261d">
+              <div class="md:order-1">
+                <h2 class="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                  A routine that fits
+                </h2>
+                <p class="mt-3 max-w-prose text-base text-foreground/75">
+                  The pack is checked for everyday use without added sugar. The recipe supports honest labels in small batches.
+                </p>
+                <a class="mt-6 inline-block rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover" href="/journal">
+                  Read the journal
+                </a>
+              </div>
+            </div>
+          </section>
+          <section class="py-sf-section" data-sec="sec_pfban2" data-section-id="sec_pfban2" data-section-kind="banner">
+            <div class="rounded-brand bg-sf-accent-soft px-6 py-10 text-center sm:px-10">
+              <h2 class="font-display text-2xl font-bold tracking-tight text-sf-on-accent-soft-strong">
+                Bundles save up to 20%
+              </h2>
+              <p class="mx-auto mt-2 max-w-xl text-sf-on-accent-soft">
+                This formula is designed around third-party lab results so you can feel the difference in a few weeks.
+              </p>
+              <a class="mt-5 inline-block rounded-sf-button bg-sf-accent px-6 py-3 text-sm font-bold text-sf-on-accent transition hover:bg-sf-accent-hover" href="/collections/combos-and-kits">
+                See bundles
+              </a>
+            </div>
+          </section>
+          <section class="py-sf-section" data-sec="sec_pfrail5" data-section-id="sec_pfrail5" data-section-kind="product_rail">
+            <div class="mb-6 flex items-end justify-between">
+              <h2 class="text-2xl font-bold tracking-tight">
+                Gym starter
+              </h2>
+              <a class="text-sm font-medium text-sf-accent-text hover:underline" href="/collections/gym-starter">
+                View all →
+              </a>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+              <a class="group block" href="/products/elite-hair-gummies-297">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Elite Hair Gummies, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_071151cca28a37d069" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Haircare
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Elite Hair Gummies
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹689
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/essentials-protein-bar-308">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Essentials Protein Bar, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_e9450a1c88da28a21b" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Snacks
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Essentials Protein Bar
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹639
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/essentials-joggers-319">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Essentials Joggers, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_75768f3b65781d963d" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Apparel
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Essentials Joggers
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹1,159
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/essentials-lifting-straps-330">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Essentials Lifting Straps, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c45b4710f1135e4736" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-sale px-2.5 py-1 text-sf-2xs font-bold text-sf-on-sale">
+                    -20%
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Accessories
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Essentials Lifting Straps
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹1,549
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹1,936
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/essentials-casein-night-protein-341">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Essentials Casein Night Protein, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_8b9f1aeffff0a92bee" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Protein
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Essentials Casein Night Protein
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹3,509
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/essentials-buffered-creatine-352">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Essentials Buffered Creatine, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_ae137168a308647587" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Creatine
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Essentials Buffered Creatine
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹929
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-pre-workout-363">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Pre-workout, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_a90b5569b19cf92f5e" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Pre-workout
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Pre-workout
+                  </h3>
+                  <p class="text-sm">
+                    <span class="font-semibold text-sf-text">
+                      ₹2,809
+                    </span>
+                  </p>
+                </div>
+              </a>
+              <a class="group block" href="/products/max-multivitamin-women-374">
+                <div class="relative aspect-square overflow-hidden rounded-sf-card bg-sf-surface-sunken">
+                  <img alt="Max Multivitamin Women, photo 1" class="object-cover group-hover:scale-105 transition duration-500 opacity-0" data-nimg="fill" decoding="async" loading="lazy" src="/api/media/med_c9c2be2448e7b12824" style="position:absolute;height:100%;width:100%;left:0;top:0;right:0;bottom:0;color:transparent">
+                  <span class="absolute left-3 top-3 rounded-full bg-sf-inverse/85 px-2.5 py-1 text-sf-2xs font-semibold uppercase tracking-wide text-sf-on-inverse">
+                    Sold out
+                  </span>
+                </div>
+                <div class="mt-3 space-y-1">
+                  <p class="text-sf-2xs font-medium uppercase tracking-wide text-sf-text-faint">
+                    Vitamins
+                  </p>
+                  <h3 class="line-clamp-2 text-sm font-medium leading-snug text-sf-text transition-colors group-hover:text-sf-accent-text">
+                    Max Multivitamin Women
+                  </h3>
+                  <p class="text-sm">
+                    <span class="text-sf-text-subtle">
+                      from
+                    </span>
+                    <span class="font-semibold text-sf-text">
+                      ₹679
+                    </span>
+                    <span class="ml-2 text-xs text-sf-text-faint line-through">
+                      ₹849
+                    </span>
+                  </p>
+                </div>
+              </a>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+    <footer class="mt-20 border-t border-sf-border-soft bg-sf-surface-muted">
+      <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p class="text-xl font-extrabold">
+              Design Demo Co
+            </p>
+            <p class="mt-3 max-w-sm text-sm text-sf-text-subtle">
+              Realistic data for the console redesign
+            </p>
+          </div>
+          <div>
+            <p class="mb-3 text-sm font-semibold text-sf-text">
+              Shop
+            </p>
+            <ul class="space-y-2 text-sm text-sf-text-subtle">
+              <li>
+                <a class="hover:text-sf-text" href="/collections">
+                  All collections
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/privacy-policy">
+                  Privacy Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/terms-of-service">
+                  Terms Of Service
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/refund-policy">
+                  Refund Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/shipping-policy">
+                  Shipping Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/cancellation-policy">
+                  Cancellation Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/cookie-policy">
+                  Cookie Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/faq">
+                  Faq
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/size-guide">
+                  Size Guide
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/ingredients-glossary">
+                  Ingredients Glossary
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/lab-reports">
+                  Lab Reports
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <p class="mb-3 text-sm font-semibold text-sf-text">
+              Company
+            </p>
+            <ul class="space-y-2 text-sm text-sf-text-subtle">
+              <li>
+                <a class="hover:text-sf-text" href="/contact">
+                  Contact
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/affiliate-program">
+                  Affiliate Program
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/bulk-orders">
+                  Bulk Orders
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/cancellation-policy">
+                  Cancellation Policy
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/careers">
+                  Careers
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/contact-details">
+                  Contact Details
+                </a>
+              </li>
+              <li>
+                <a class="hover:text-sf-text" href="/policies/cookie-policy">
+                  Cookie Policy
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <p class="mb-3 text-sm font-semibold text-sf-text">
+              Support
+            </p>
+            <ul class="space-y-2 text-sm text-sf-text-subtle">
+              <li>
+                <a class="hover:text-sf-text" href="mailto:support@design.test">
+                  support@design.test
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <p class="mt-10 border-t border-sf-border pt-6 text-xs text-sf-text-faint">
+          © Design Demo Co
+        </p>
+      </div>
+    </footer>
+    <div aria-hidden="true" class="fixed inset-0 z-40 bg-sf-overlay/40 transition-opacity duration-300 pointer-events-none opacity-0"></div>
+    <aside aria-label="Shopping cart" class="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-sf-surface shadow-xl transition-transform duration-300 translate-x-full" role="dialog">
+      <header class="flex items-center justify-between border-b border-sf-border-soft px-5 py-4">
+        <h2 class="text-lg font-bold">
+          Your cart
+        </h2>
+        <button aria-label="Close cart" class="rounded-full p-1.5 text-sf-text-subtle hover:bg-sf-surface-sunken">
+          <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-width="2" viewbox="0 0 24 24" width="20">
+            <path d="M18 6 6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+      </header>
+      <div class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sf-text-subtle">
+        <p class="font-medium text-sf-text-body">
+          Your cart is empty
+        </p>
+        <p class="text-sm">
+          Add something you like and it’ll show up here.
+        </p>
+      </div>
+    </aside>
+  </body>
+</html>

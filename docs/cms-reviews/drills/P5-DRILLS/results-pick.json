@@ -1,0 +1,124 @@
+{
+  "id": "P5-DRILLS",
+  "part": "pick",
+  "title": "P5-DRILLS — pick",
+  "ranAt": "2026-11-05T01:09:47.002Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 8,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "seed: two turned-on bundles that pass ('Gym duo' and 'Morning stack', createBundle in this process)",
+      "detail": {
+        "duo": [
+          "gym-duo",
+          1,
+          "available"
+        ],
+        "other": [
+          "morning-stack",
+          1
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "pick: Add a section > Bundle card, search 'gym', pick 'Gym duo': saved, the preview shows it, the inspector says 'Showing to shoppers.'",
+      "detail": {
+        "secId": "sec_c5013306",
+        "line": "Showing to shoppers."
+      }
+    },
+    {
+      "ok": true,
+      "label": "pick: the draft holds the bundle as { id } only (no price, title or stock)",
+      "detail": {
+        "id": "bun-2a11e4efbe468a1b1d"
+      }
+    },
+    {
+      "ok": true,
+      "label": "pick: the founder's preview at 375 wide (the phone width) shows the Bundle card, with no sideways scroll",
+      "detail": {
+        "bar": true,
+        "card": "2-PIECE SET Gym duo Onion Hair Oil ×1 Training Tee ×1 ₹2,508 ₹2,608 You save ₹100 Add the set to cart See the set →",
+        "overflowX": false
+      }
+    },
+    {
+      "ok": true,
+      "label": "pick: Publish, review, Publish: published",
+      "detail": {
+        "phase": "done",
+        "issues": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "pick: a fresh browser sees the Bundle card on the live home (title, add button)",
+      "detail": {
+        "liveText": "2-PIECE SET Gym duo Onion Hair Oil ×1 Training Tee ×1 ₹2,508 ₹2,608 You save ₹100 Add the set to cart See the set →"
+      }
+    },
+    {
+      "ok": true,
+      "label": "pick: from opening the editor to the live home showing the card took 15.1 s (target under 2 minutes)",
+      "detail": {
+        "seconds": 15.1,
+        "laps": {
+          "editor open": 4.1,
+          "Bundle card added": 5.2,
+          "bundle picked and saved": 6.3,
+          "preview shows the card": 6.7,
+          "phone preview checked": 13.4,
+          "published": 14.3,
+          "live home shows the card": 15.1
+        },
+        "clicks": 7,
+        "typedWords": "gym"
+      }
+    },
+    {
+      "ok": true,
+      "label": "pick: no page errors in the editor",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_a1f676d3324c448b, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.1s",
+    "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)",
+    "pick timing (seconds from opening the editor): {\"editor open\":4.1,\"Bundle card added\":5.2,\"bundle picked and saved\":6.3,\"preview shows the card\":6.7,\"phone preview checked\":13.4,\"published\":14.3,\"live home shows the card\":15.1}; clicks after sign-in: 7 (Add a section | Bundle card Pick a bundle to show its pr | Gym duo ₹2,508 Showing | No thanks | Publish | Publish | Close); typed: \"gym\". The time includes this machine's next dev compiles and the drill's own waits; the phone preview check is a second tab, as the new editor has no device switch (finding P5D-1)."
+  ],
+  "screenshots": [
+    {
+      "name": "pick-editor-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/pick-editor-1440.png",
+      "bytes": 34978,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "pick-mobile-preview-375",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/pick-mobile-preview-375.png",
+      "bytes": 16929,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/"
+    },
+    {
+      "name": "pick-live-home-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/pick-live-home-1440.png",
+      "bytes": 17277,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

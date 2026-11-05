@@ -1,0 +1,180 @@
+{
+  "id": "P5-DRILLS",
+  "part": "cart",
+  "title": "P5-DRILLS — cart",
+  "ranAt": "2026-11-05T01:13:16.716Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 9,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "cart: the cart from the live card equals the cart from /bundles/<slug> (lines, discount, totals, offers)",
+      "detail": {
+        "fromCard": {
+          "items": [
+            {
+              "variantId": "gid://shopify/ProductVariant/90000060",
+              "quantity": 1,
+              "price": 549,
+              "title": "Onion Hair Oil"
+            },
+            {
+              "variantId": "gid://shopify/ProductVariant/90000080",
+              "quantity": 1,
+              "price": 2059,
+              "title": "Training Tee"
+            }
+          ],
+          "subtotal": 2608,
+          "discountTotal": 150,
+          "total": 2458,
+          "offers": [
+            {
+              "id": "bundle-bun-b252517603b1e3b8b9",
+              "amount": 150,
+              "kind": "BUNDLE"
+            }
+          ]
+        },
+        "fromPage": {
+          "items": [
+            {
+              "variantId": "gid://shopify/ProductVariant/90000060",
+              "quantity": 1,
+              "price": 549,
+              "title": "Onion Hair Oil"
+            },
+            {
+              "variantId": "gid://shopify/ProductVariant/90000080",
+              "quantity": 1,
+              "price": 2059,
+              "title": "Training Tee"
+            }
+          ],
+          "subtotal": 2608,
+          "discountTotal": 150,
+          "total": 2458,
+          "offers": [
+            {
+              "id": "bundle-bun-b252517603b1e3b8b9",
+              "amount": 150,
+              "kind": "BUNDLE"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "cart: the cart takes off the saving the card shows (₹150)",
+      "detail": {
+        "discountTotal": 150,
+        "saving": 150
+      }
+    },
+    {
+      "ok": true,
+      "label": "before the test order: the store's row and the harness env hold no Shopify domain or token and no payment secret (nothing can reach Shopify or a payment)",
+      "detail": {
+        "found": [],
+        "env": []
+      }
+    },
+    {
+      "ok": true,
+      "label": "cart: the checkout's review shows the saving ('You save ₹150')",
+      "detail": "Design Demo Co 1 Address → 2 Review → 3 Payment Review your order SHIP TO P5 Drill Test Order 1 Test Street, Mumbai, Maharashtra 400001 snehal@mediastic.in · 9999999999 Edit Onion Hair Oil Qty 1 ₹549 Training Tee Qty 1 ₹2,059 Back Continue to payment Order summary Subtotal ₹2,608 Cart pair −₹150 Shipping (incl. COD fee) ₹49 Total ₹2,507 You save ₹150"
+    },
+    {
+      "ok": true,
+      "label": "cart: cash on delivery is chosen (no card details are ever entered)",
+      "detail": {
+        "codValue": null
+      }
+    },
+    {
+      "ok": true,
+      "label": "cart: one cash on delivery test order to snehal@mediastic.in goes through",
+      "detail": {
+        "order": {
+          "id": "DES-09CD2788",
+          "status": "sync_failed",
+          "email": "snehal@mediastic.in",
+          "payment_method": "cod",
+          "discount_total": 150,
+          "total": 2507
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "cart: the order carries the bundle's saving as its discount",
+      "detail": {
+        "discount": 150,
+        "saving": 150
+      }
+    },
+    {
+      "ok": true,
+      "label": "cart: the test order is cancelled at once",
+      "detail": {
+        "cancel": {
+          "status": 200
+        },
+        "status": "cancelled"
+      }
+    },
+    {
+      "ok": true,
+      "label": "cart: no page errors in the editor",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_f296b654d2111103, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.7s",
+    "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)",
+    "cart JSON keys: id, coupon, items, changes, subtotal, count, currency, appliedOffers, gifts, discountTotal, total, shipping, shippingRatesSet, grandTotal, couponStatus",
+    "test order DES-09CD2788 (snehal@mediastic.in, cash on delivery) placed and cancelled: cancelled"
+  ],
+  "screenshots": [
+    {
+      "name": "cart-drawer-from-card-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/cart-drawer-from-card-1440.png",
+      "bytes": 20992,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "cart-drawer-from-bundle-page-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/cart-drawer-from-bundle-page-1440.png",
+      "bytes": 26699,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/bundles/cart-pair"
+    },
+    {
+      "name": "cart-checkout-review-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/cart-checkout-review-1440.png",
+      "bytes": 22715,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout"
+    },
+    {
+      "name": "cart-confirmation-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/cart-confirmation-1440.png",
+      "bytes": 19793,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/checkout/confirmation/DES-09CD2788"
+    }
+  ]
+}

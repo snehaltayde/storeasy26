@@ -1,0 +1,216 @@
+{
+  "id": "P5-DRILLS",
+  "part": "states",
+  "title": "P5-DRILLS — states",
+  "ranAt": "2026-11-05T01:10:50.529Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 11,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "states: 'Training Tee' goes sold out through the sync writer (lib/sync.js writeProduct; writing its unchanged shape first changed nothing)",
+      "detail": {
+        "roundTrip": true,
+        "product": 0
+      }
+    },
+    {
+      "ok": true,
+      "label": "states: the bundle read says sold_out",
+      "detail": {
+        "state": "sold_out",
+        "reasons": [
+          {
+            "kind": "sold_out",
+            "index": 1,
+            "title": "Training Tee"
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "states: the preview card says 'Currently unavailable' and marks the sold-out product 'Sold out'",
+      "detail": {
+        "marked": [
+          [
+            "ok",
+            "Onion Hair Oil ×1"
+          ],
+          [
+            "sold_out",
+            "Training Tee ×1SOLD OUT"
+          ]
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "states: the inspector's status line says so",
+      "detail": "A product in this bundle is sold out: shoppers see Currently unavailable and can't add it."
+    },
+    {
+      "ok": true,
+      "label": "states: publish shows BUNDLE_UNAVAILABLE (Check: the sold-out sentence, 'Remove this section and publish') and still publishes",
+      "detail": {
+        "phase": "done",
+        "codes": [
+          "BUNDLE_UNAVAILABLE"
+        ],
+        "issue": {
+          "text": "Check\nBundle card · Bundle\n\n“Recovery pair”: A product in this bundle is sold out: shoppers see Currently unavailable and can't add it. Removing it takes this whole section off the page.\n\nRemove this section and publish\nGo to this field",
+          "buttons": [
+            "Remove this section and publish"
+          ]
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "states: the live card shows with add disabled ('Currently unavailable') and the product marked",
+      "detail": {
+        "section": "sec_p5state",
+        "id": "bun-526d9f39240e9a96d5",
+        "state": "sold_out",
+        "button": {
+          "text": "Currently unavailable",
+          "disabled": true
+        },
+        "items": [
+          [
+            "ok",
+            "Onion Hair Oil ×1"
+          ],
+          [
+            "sold_out",
+            "Training Tee ×1Sold out"
+          ]
+        ],
+        "text": "2-piece set Recovery pair Onion Hair Oil ×1 Training Tee ×1Sold out ₹2,508₹2,608You save ₹100 Currently unavailable See the set →"
+      }
+    },
+    {
+      "ok": true,
+      "label": "states (lost product): after the sync writer deletes one of its products the bundle reads sold_out with a missing product, never no_saving (P5-FIX1 ruling 1)",
+      "detail": {
+        "state": "sold_out",
+        "reasons": [
+          {
+            "kind": "missing",
+            "index": 1,
+            "title": null
+          }
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "states (lost product): the preview card says 'Currently unavailable', marks the product 'No longer available', and its founder note says to replace it",
+      "detail": {
+        "text": "Our lost pick 2-PIECE SET Lost pair Whey Protein Concentrate ×1 Unavailable item ×1NO LONGER AVAILABLE ₹4,708 Currently unavailable See the set → A product in this bundle is no longer in your catalog: shoppers see Currently unavailable and can't add it. Replace it with another product in Catalog > Bundles. Only you can see this note in your preview.",
+        "note": "A product in this bundle is no longer in your catalog: shoppers see Currently unavailable and can't add it. Replace it with another product in Catalog > Bundles. Only you can see this note in your preview.",
+        "items": [
+          [
+            "ok",
+            "Whey Protein Concentrate ×1"
+          ],
+          [
+            "missing",
+            "Unavailable item ×1NO LONGER AVAILABLE"
+          ]
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "states (lost product): the inspector says the same (replace it in Catalog > Bundles)",
+      "detail": "A product in this bundle is no longer in your catalog: shoppers see Currently unavailable and can't add it. Replace it with another product in Catalog > Bundles."
+    },
+    {
+      "ok": true,
+      "label": "states (lost product): live, the card shows 'Currently unavailable' with the product marked 'No longer available', and no founder note",
+      "detail": {
+        "phase": "done",
+        "card": {
+          "section": "sec_p5lost",
+          "id": "bun-c640e3a6c8987f19c5",
+          "state": "sold_out",
+          "button": {
+            "text": "Currently unavailable",
+            "disabled": true
+          },
+          "items": [
+            [
+              "ok",
+              "Whey Protein Concentrate ×1"
+            ],
+            [
+              "missing",
+              "Unavailable item ×1No longer available"
+            ]
+          ],
+          "text": "2-piece set Lost pair Whey Protein Concentrate ×1 Unavailable item ×1No longer available ₹4,708 Currently unavailable See the set →"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "states: no page errors",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_14c965cc0d6eb447, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 3.8s",
+    "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)"
+  ],
+  "screenshots": [
+    {
+      "name": "states-preview-inspector-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/states-preview-inspector-1440.png",
+      "bytes": 42196,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "states-publish-warning-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/states-publish-warning-1440.png",
+      "bytes": 36722,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "states-live-card-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/states-live-card-1440.png",
+      "bytes": 22420,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    },
+    {
+      "name": "states-lost-product-preview-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/states-lost-product-preview-1440.png",
+      "bytes": 41578,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "states-lost-product-live-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/states-lost-product-live-1440.png",
+      "bytes": 23705,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/"
+    }
+  ]
+}

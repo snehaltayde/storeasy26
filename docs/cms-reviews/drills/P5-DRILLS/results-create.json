@@ -1,0 +1,170 @@
+{
+  "id": "P5-DRILLS",
+  "part": "create",
+  "title": "P5-DRILLS — create",
+  "ranAt": "2026-11-05T01:10:18.577Z",
+  "harness": "http://localhost:6100",
+  "chrome": "156.0.8078.80",
+  "passed": 11,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "create: the Dialog says the bundle goes live at once, its page /bundles/drill-trio too, before publishing (the live-now sentence)",
+      "detail": "The bundle is saved and turned on now: its discount works in the cart and its page /bundles/drill-trio opens right away, even if you don't publish. It shows on your home page after you publish."
+    },
+    {
+      "ok": true,
+      "label": "create: the Dialog asks only for a name, products and a price (two inputs, no description, no slug)",
+      "detail": {
+        "inputs": 2
+      }
+    },
+    {
+      "ok": true,
+      "label": "create: a price above the products' sum keeps 'Create bundle' off, with the plain reason under the price",
+      "detail": {
+        "disabled": true,
+        "reason": "Price must be lower than ₹1,188"
+      }
+    },
+    {
+      "ok": true,
+      "label": "create: a passing price turns 'Create bundle' on and says what shoppers save",
+      "detail": {
+        "saving": "The products add up to ₹1,188. Shoppers save ₹40."
+      }
+    },
+    {
+      "ok": true,
+      "label": "create: exactly one new bundles row, turned on, at /bundles/drill-trio (no drill-trio-2)",
+      "detail": {
+        "before": 4,
+        "after": [
+          [
+            "gym-starter-kit",
+            1
+          ],
+          [
+            "morning-skin-routine",
+            1
+          ],
+          [
+            "recovery-stack",
+            1
+          ],
+          [
+            "snack-box",
+            0
+          ],
+          [
+            "drill-trio",
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "label": "create: its cart offer is written and on (the discount works now)",
+      "detail": [
+        [
+          "bundle-bun-02dc93b4bdc70b07a9",
+          0
+        ],
+        [
+          "bundle-bun-0b4e92cb94ef4c1307",
+          1
+        ],
+        [
+          "bundle-bun-13762a4162ce099958",
+          1
+        ],
+        [
+          "bundle-bun-28222e7a4d617a9de8",
+          1
+        ],
+        [
+          "bundle-bun-d1be1d3ef43f7e3929",
+          1
+        ]
+      ]
+    },
+    {
+      "ok": true,
+      "label": "create: the new bundle is picked in the section, saved as { id } only",
+      "detail": {
+        "pickedNow": {
+          "id": "bun-28222e7a4d617a9de8"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "label": "create: the inspector reads it again: 'Showing to shoppers.'",
+      "detail": [
+        "Showing to shoppers."
+      ]
+    },
+    {
+      "ok": true,
+      "label": "create: /bundles/drill-trio opens for a shopper before publish (OQ-C), and can be added",
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "ok": true,
+      "label": "create: the live home has no card yet (it shows after publish)",
+      "detail": []
+    },
+    {
+      "ok": true,
+      "label": "create: no page errors",
+      "detail": []
+    }
+  ],
+  "notes": [
+    "re-seeded fresh: the harness store is in documents mode with the phase 3 drill content: 39 documents, live release rel_bd61e6860eb86144, 42 publish_log rows, 125 document_refs rows, an owner and a staff login, and the closed store on closed.localhost (no release). Logins and ids: .design-data/p3-seed.json. 4.0s",
+    "store: the phase 3 seed (seed-design-documents.js --p3): the design store seeded straight into documents mode (a new documents-mode tenant, not a moved store)"
+  ],
+  "screenshots": [
+    {
+      "name": "create-failing-price-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/create-failing-price-1440.png",
+      "bytes": 33253,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "create-passing-price-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/create-passing-price-1440.png",
+      "bytes": 34107,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "create-picked-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/create-picked-1440.png",
+      "bytes": 35316,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/admin/editor"
+    },
+    {
+      "name": "create-bundle-page-before-publish-1440",
+      "file": "docs/cms-reviews/drills/P5-DRILLS/create-bundle-page-before-publish-1440.png",
+      "bytes": 22080,
+      "width": 720,
+      "height": 450,
+      "viewport": 1440,
+      "path": "/bundles/drill-trio"
+    }
+  ]
+}
