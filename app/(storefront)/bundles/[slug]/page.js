@@ -5,7 +5,7 @@ import { getBundle } from "@/lib/bundles";
 import { formatMoney } from "@/lib/format";
 import BundleAddButton from "@/components/BundleAddButton";
 import { BUNDLE_PAGE_UNAVAILABLE, bundlePageSaysOutOfStock } from "@/lib/commerce/bundle-words";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 import { closedStoreGate } from "@/lib/content/resolve";
 import { siteName } from "@/lib/site";
 import StoreClosed from "@/components/StoreClosed";

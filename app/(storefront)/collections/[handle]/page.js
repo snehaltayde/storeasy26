@@ -6,7 +6,7 @@ import TrackEvent from "@/components/analytics/TrackEvent";
 import { getCollectionByHandle, getProductsInCollection, getCollectionTypeFacets, COLLECTION_SORTS } from "@/lib/repo";
 import { numericId } from "@/lib/ids";
 import { abs } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 export const dynamic = "force-dynamic";
 

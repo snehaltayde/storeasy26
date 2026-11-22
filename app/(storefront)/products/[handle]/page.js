@@ -7,7 +7,7 @@ import { resolvedPdpExtras, resolvedPdpPairs, resolvedProductOverride, resolvedS
 import { productPage } from "@/lib/catalog/effective";
 import { numericId } from "@/lib/ids";
 import { abs, siteName } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 export const dynamic = "force-dynamic";
 

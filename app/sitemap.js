@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { siteUrl } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 import { resolvedContentPageList, resolvedJournalEntries, isStoreClosed } from "@/lib/content/resolve";
 
 // Full-catalog sitemap (Session 16): every product + collection from Turso,

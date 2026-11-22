@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { resolvedJournalEntries } from "@/lib/content/resolve";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Journal index (S46 / SF20): published, release-governed journal posts —
 // scheduled ones (window_start in the future) stay invisible until their

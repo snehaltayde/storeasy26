@@ -7,6 +7,7 @@ import { PREVIEW_COOKIE } from "@/lib/cms/candidates";
 import { endPreviewsAtLogout } from "@/lib/preview-sessions";
 import { tenantHandler } from "@/lib/tenant-request";
 import { sameOrigin } from "@/lib/origin-check";
+import { MAINTENANCE_PASS_COOKIE } from "@/lib/maintenance";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,7 @@ export const POST = tenantHandler(
     const res = NextResponse.json({ ok: true });
     res.cookies.set(ADMIN_COOKIE, "", CLEAR);
     res.cookies.set(PREVIEW_COOKIE, "", CLEAR);
+    res.cookies.set(MAINTENANCE_PASS_COOKIE, "", CLEAR);
     return res;
   },
   { allowUnresolved: true },

@@ -1,7 +1,7 @@
 import { typesenseSearch } from "@/lib/typesense-search";
 import { searchProductsInDb, displayHits } from "@/lib/repo";
 import { rateLimit } from "@/lib/rate-limit";
-import { tenantHandler } from "@/lib/tenant-request";
+import { storefrontHandler } from "@/lib/storefront-request";
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 // search works even before Typesense is configured.
 // P4-EFFECTIVE (OVL-05): hits carry display_type, the type label the store
 // shows (the SQL path reads effective values; P4-SEARCH indexes them).
-export const GET = tenantHandler(async (request) => {
+export const GET = storefrontHandler(async (request) => {
   const limited = rateLimit(request, { name: "search", limit: 30 });
   if (limited) return limited;
 

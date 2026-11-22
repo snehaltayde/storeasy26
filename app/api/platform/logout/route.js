@@ -3,6 +3,7 @@ import { PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 import { revokeSessionByToken } from "@/lib/platform/sessions";
 import { sameOrigin } from "@/lib/origin-check";
 import { PREVIEW_COOKIE } from "@/lib/cms/candidates";
+import { MAINTENANCE_PASS_COOKIE } from "@/lib/maintenance";
 
 export const runtime = "nodejs";
 
@@ -19,5 +20,6 @@ export async function POST(request) {
   // store's own database and are not revoked here: they end within the hour
   // (known limit, P3-SESSION.md).
   res.cookies.set(PREVIEW_COOKIE, "", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 0 });
+  res.cookies.set(MAINTENANCE_PASS_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
   return res;
 }

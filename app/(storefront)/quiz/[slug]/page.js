@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getQuiz } from "@/lib/quiz";
 import QuizRunner from "@/components/QuizRunner";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 import { closedStoreGate } from "@/lib/content/resolve";
 import { siteName } from "@/lib/site";
 import StoreClosed from "@/components/StoreClosed";

@@ -232,7 +232,7 @@ that needs Shopify, a real payment or real email stays on 3007 or hosted.
 - **Consent:** decline analytics in the cookie banner → no analytics events fire (check the network tab); accept → events flow.
 - **Experiments:** with a running experiment, the hero varies by visitor (`_unit` cookie); clearing the cookie can re-bucket you.
 - **PWA/perf:** the site installs as a PWA; navigation feels instant; no console errors on key pages.
-- **Maintenance:** (operator) enable maintenance on a tenant → storefront shows the maintenance message, `/admin/login` still works; disable afterwards.
+- **Maintenance:** (operator) enable maintenance on a tenant → storefront shows the maintenance message, `/admin/login` still works; disable afterwards. View source on a product page while signed out: no product title or description anywhere in the HTML. Automated version on the edge runtime: `pnpm drill:maintenance-edge` (needs `sqld` and a checkout with no `.env` files).
 
 ---
 

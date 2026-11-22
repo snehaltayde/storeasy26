@@ -6,7 +6,7 @@ import { checkoutCapability } from "@/lib/commerce/adapter";
 import { siteName, siteLogo } from "@/lib/site";
 import { resolvedContentPageList } from "@/lib/content/resolve";
 import CheckoutFlow from "@/components/checkout/CheckoutFlow";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // S38 (SF14): the store's own legal pages, linked next to the pay button.
 // Only ENABLED pages link (never another tenant's text — the list is already

@@ -2,7 +2,7 @@ import { NextResponse, after } from "next/server";
 import { getQuiz, scoreQuiz, recommendProducts } from "@/lib/quiz";
 import { rateLimit } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
-import { tenantHandler } from "@/lib/tenant-request";
+import { storefrontHandler } from "@/lib/storefront-request";
 import { closedStoreGate, STORE_CLOSED_CODE, STORE_CLOSED_MESSAGE } from "@/lib/content/resolve";
 
 // Quiz results (S46 / SF19). Deterministic scoring + catalog recommendation.
@@ -12,7 +12,7 @@ import { closedStoreGate, STORE_CLOSED_CODE, STORE_CLOSED_MESSAGE } from "@/lib/
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const POST = tenantHandler(async (request, { params }) => {
+export const POST = storefrontHandler(async (request, { params }) => {
   const limited = rateLimit(request, { name: "quiz", limit: 30 });
   if (limited) return limited;
   // PUB-06: a store that has never published takes no quiz answers (they can

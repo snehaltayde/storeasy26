@@ -5,7 +5,7 @@ import LeadForm from "@/components/site/LeadForm";
 import { isPlatformSiteHost } from "@/lib/platform-site";
 import { resolvedContentPage } from "@/lib/content/resolve";
 import { siteLegalName, siteName } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Session 23: CMS-aware — the default template injects the tenant's own
 // support contacts; an override replaces the page wholesale. S39 (SF15):

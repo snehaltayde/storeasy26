@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requestResolution, tfetch } from "@/lib/tenant-request";
 import { siteName } from "@/lib/site";
+import ReloadOnSoftNotFound from "@/components/ReloadOnSoftNotFound";
 
 export const metadata = { title: "Page not found" };
 
@@ -45,6 +46,7 @@ export default async function NotFound() {
   }
   return (
     <div className="mx-auto max-w-2xl px-4 py-24 text-center sm:px-6">
+      <ReloadOnSoftNotFound />
       <p className="text-6xl font-extrabold tracking-tight text-accent-200">404</p>
       <h1 className="mt-4 text-2xl font-bold">This page isn’t on {name ? `${name}’s` : "the"} shelves</h1>
       <p className="mt-2 text-zinc-500">

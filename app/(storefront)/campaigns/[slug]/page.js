@@ -5,7 +5,7 @@ import { resolvedContentPage } from "@/lib/content/resolve";
 import { campaignVisible } from "@/lib/cms/store";
 import { pickUtmParams, appendUtmToHtml } from "@/lib/content/utm";
 import { siteLegalName } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Campaign landing pages (S39 / SF17): cms_pages rows with family='campaign',
 // release-governed like every page, served ONLY inside their UTC visibility

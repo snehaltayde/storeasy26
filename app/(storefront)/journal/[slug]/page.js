@@ -4,7 +4,7 @@ import { resolvedContentPage } from "@/lib/content/resolve";
 import { campaignVisible } from "@/lib/cms/store";
 import { resolvedSlugRedirect } from "@/lib/content/resolve";
 import { siteLegalName } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Journal post (S46 / SF20): family-guarded, scheduled via window_start,
 // release-governed; a renamed slug 301s from its old URL (page_redirects).

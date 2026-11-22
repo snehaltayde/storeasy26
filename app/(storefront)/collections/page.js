@@ -2,7 +2,7 @@ import Link from "next/link";
 import CollectionCard from "@/components/CollectionCard";
 import { getAllCollections, getCollectionsByHandles } from "@/lib/repo";
 import { resolvedCollectionsIndex } from "@/lib/content/resolve";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 export const metadata = { title: "All collections" };
 export const dynamic = "force-dynamic";

@@ -5,7 +5,7 @@ import TrackEvent from "@/components/analytics/TrackEvent";
 import { getOrder, orderStatusPath, verifyOrderStatusToken } from "@/lib/orders";
 import { formatMoney } from "@/lib/format";
 import { numericId } from "@/lib/ids";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Order confirmed", robots: { index: false, follow: false }, referrer: "no-referrer" };

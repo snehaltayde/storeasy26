@@ -14,7 +14,7 @@ import { resolvedHomePage, resolvedCollectionsIndex } from "@/lib/content/resolv
 import { DOCUMENTS_RELEASE_VERSION } from "@/lib/releases";
 import { legacyHeroToSettings } from "@/lib/registry/legacy";
 import { siteName } from "@/lib/site";
-import { tfetch } from "@/lib/tenant-request";
+import { tfetch } from "@/lib/storefront-request";
 
 // Catalog reflects the latest sync — render per request (sub-ms SQLite reads).
 // Session 23: hero + section layout come from the tenant's CMS (defaults when
