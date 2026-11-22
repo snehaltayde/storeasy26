@@ -23,42 +23,47 @@ export default async function ConfirmationPage({ params, searchParams }) {
 
   const cod = order.payment_method === "cod";
   const paid = order.payment_status === "paid";
+  // The checkout sends a customer here when it couldn't yet record their payment.
+  const confirming = !cod && !paid;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
       {/* Browser copy of the purchase event: SAME event_id (= order id) as the
           server-enqueued copy, so both collapse into one stored event — this
           one contributes the browser's first-party cookies. */}
-      <TrackEvent
-        name="purchase"
-        data={{
-          event_id: order.id,
-          value: order.total,
-          currency: order.currency || "INR",
-          items: order.items.map((it) => ({
-            id: numericId(it.variant_id) || it.variant_id,
-            name: it.title,
-            price: it.unit_price,
-            quantity: it.quantity,
-          })),
-          params: { transaction_id: order.id, payment_type: order.payment_method },
-        }}
-      />
+      {confirming ? null : (
+        <TrackEvent
+          name="purchase"
+          data={{
+            event_id: order.id,
+            value: order.total,
+            currency: order.currency || "INR",
+            items: order.items.map((it) => ({
+              id: numericId(it.variant_id) || it.variant_id,
+              name: it.title,
+              price: it.unit_price,
+              quantity: it.quantity,
+            })),
+            params: { transaction_id: order.id, payment_type: order.payment_method },
+          }}
+        />
+      )}
       <div className="rounded-sf-card border border-sf-border p-6 sm:p-8">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sf-accent-soft text-lg font-bold text-sf-accent-text">
             ✓
           </span>
           <div>
-            <h1 className="text-xl font-bold">Order confirmed</h1>
+            <h1 className="text-xl font-bold">{confirming ? "Confirming your payment" : "Order confirmed"}</h1>
             <p className="text-sm text-sf-text-subtle">Order {order.id}</p>
           </div>
         </div>
 
         <p className="mt-4 text-sm text-sf-text-muted">
           Thanks {order.name ? order.name.split(" ")[0] : "there"}!{" "}
-          {cod ? "You'll pay cash on delivery." : paid ? "Payment received." : "Payment is pending."} A
-          confirmation was sent to {order.email}. Keep your{" "}
+          {cod ? "You'll pay cash on delivery." : paid ? "Payment received." : "If you've paid, please don't pay again."}{" "}
+          {confirming ? "We'll email" : "A confirmation was sent to"} {order.email}
+          {confirming ? " once it's confirmed." : "."} Keep your{" "}
           <Link href={await tfetch(() => orderStatusPath(order.id))} className="font-semibold text-sf-accent-text underline">
             order-status link
           </Link>{" "}

@@ -28,7 +28,8 @@ cod ───────▶ cod_pending ─────────────
   (`… WHERE id = ? AND status = <read status>`). A lost race re-reads: if the order is
   already at the target status it returns `{ already: true }` — no duplicate event.
 - Every real transition appends to **`order_events`** (`from_status`, `to_status`,
-  JSON `meta` — payment ids, sync attempt, errors). `from_status NULL` = creation.
+  JSON `meta` — payment ids, sync attempt, errors, and the `write_id` described under
+  Durability). `from_status NULL` = creation.
 - `cod_pending → paid` (collection on delivery) is deliberately not modelled yet.
 
 Sync helpers for Session 12: `beginShopifySync` (increments `sync_attempts`),
@@ -68,9 +69,40 @@ the source of truth for reproduction.
 
 ## Durability
 
-All order reads/writes go through `lib/db.js`, whose libSQL client retry-wraps
-transient Turso connection failures (bounded backoff). Retried writes are safe by
-construction: creation dedups on the key, transitions are CAS.
+All order reads/writes go through `lib/db.js`, whose libSQL client retries with
+bounded backoff. Reads retry on any transient failure. Writes retry only when the
+request never reached Turso (DNS or TCP connect failed). A write whose outcome is
+unknown (timeout, reset, HTTP 500/502/503/504) throws, because it may already have
+committed.
+
+`createOrder` and `transitionOrder` reconcile that themselves. Each writes in one atomic
+batch (an order always has its lines and first event, a status flip always has its event
+row), and after an unknown outcome each re-reads before doing anything else. The CAS means
+a resent transition can't apply twice.
+
+Finding the order at the target status after an unknown outcome doesn't say whose write
+put it there: a concurrent caller can win the CAS while ours applies nothing and loses its
+response. So each `transitionOrder` call stamps its event rows with a random
+`meta.write_id`, and only that row existing makes the result `already: false`. This is
+what stops two Shopify pushers both going on after `beginShopifySync`. If our write landed
+and the order has already moved on, the call still reports it as ours.
+
+`markOrderPaid` treats an order that's paid or further along as a repeat (`already: true`),
+unless it holds a different payment id, which throws "already paid with a different
+payment" (a 400 on verify, a flagged dead receipt on the webhook). It checks once before
+writing, and again whenever `transitionOrder` finds someone else got there first. That can
+be an `already: true` (the other path paid it) or a refused move (it paid it and started
+the Shopify push, `paid → syncing_shopify`). Either way the second check decides, so a
+second captured payment is refused however far the order has got.
+
+If the database stays down during `razorpay_verify`, the customer has paid, so the route
+answers `202 {pending:true}` rather than an error. The browser retries (see
+`lib/checkout/confirm-payment.js`), and in platform mode a durable `payment_confirm` job
+finishes it if the browser never comes back. Legacy mode has no job queue, so a customer
+who leaves mid-outage depends on the webhook.
+
+"Already paid" doesn't prove the follow-up work ran, so `runOrderEffects` in
+`lib/payment-settle.js` runs on replays too, and every step is safe to repeat.
 
 Legacy Phase-0 rows (`status='confirmed'`) were mapped by `pnpm migrate`:
 razorpay → `paid`, cod → `cod_pending`.

@@ -8,6 +8,7 @@ import { computeShipping } from "@/lib/shipping";
 import { friendlyCheckoutError } from "@/lib/shopper-errors";
 import { PRICE_CHANGED } from "@/lib/checkout-price";
 import { track } from "@/lib/track/client";
+import { confirmPayment } from "@/lib/checkout/confirm-payment";
 
 const STEPS = ["Address", "Review", "Payment"];
 
@@ -212,21 +213,28 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
         prefill: { name: form.name, email: form.email, contact: form.phone },
         theme: { color: "#0a0a0b" },
         handler: async (response) => {
-          const v = await fetch("/api/checkout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "razorpay_verify",
-              orderId: data.orderId,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          }).then((r) => r.json());
-          if (v.ok) goConfirmation(v);
+          const result = await confirmPayment(async () => {
+            const r = await fetch("/api/checkout", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "razorpay_verify",
+                orderId: data.orderId,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            return { status: r.status, data: await r.json().catch(() => ({})) };
+          });
+          if (result.state === "confirmed") goConfirmation(result.data);
+          else if (result.state === "pending" && result.confirmationPath) goConfirmation(result);
           else {
-            // GEN-03: the verify error is technical; say what to do instead.
-            setError(`We couldn't confirm your payment for order ${data.orderId}. If money left your account, please don't pay again — contact the store with this order number.`);
+            setError(
+              result.state === "rejected"
+                ? result.error
+                : `Your payment went through and we're confirming order ${data.orderId}. Please don't pay again. We'll email you once it's confirmed.`,
+            );
             setPlacing(false);
           }
         },

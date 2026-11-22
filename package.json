@@ -23,6 +23,8 @@
     "order:trace": "node --env-file=.env.local scripts/trace-order.js",
     "test:hardening": "node scripts/test-hardening.js",
     "test:offers": "node scripts/test-offers.js",
+    "test:db-retry": "node scripts/test-db-retry.js",
+    "test:payment-recovery": "node scripts/test-payment-recovery.js",
     "test:offers-admin": "node scripts/test-offers-admin.js",
     "test:offer-form": "node scripts/test-offer-form.js",
     "test:events": "node scripts/test-events.js",
