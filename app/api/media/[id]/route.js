@@ -20,6 +20,18 @@ export const GET = tenantHandler(async (request, { params }) => {
   }
   if (!file) return new Response("Not found", { status: 404 });
 
+  if (file.storageUrl && file.storageUrl.startsWith("https://") && file.mime !== "image/svg+xml" && file.data.length === 0) {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: file.storageUrl,
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
+        ETag: `"${file.sha256.slice(0, 16)}"`,
+      },
+    });
+  }
+
   return new Response(file.data, {
     headers: {
       "Content-Type": file.mime,

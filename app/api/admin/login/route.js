@@ -6,7 +6,7 @@ import { platformConfigured } from "@/lib/platform/control";
 import { currentTenant, tenantId } from "@/lib/tenant-context";
 import { sameOrigin } from "@/lib/origin-check";
 import { audit } from "@/lib/platform/audit";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimitAsync } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import { tenantHandler } from "@/lib/tenant-request";
 
@@ -30,7 +30,7 @@ export const POST = tenantHandler(async (request) => {
   if (!sameOrigin(request)) return fail(403, "Cross-origin request rejected");
   // fast per-isolate guard stays; the control-plane throttle below is the
   // distributed one (BE02: limits survive multiple instances)
-  const limited = rateLimit(request, { name: "admin", limit: 5 });
+  const limited = await rateLimitAsync(request, { name: "admin", limit: 5 });
   if (limited) return limited;
 
   const { email, password } = await request.json().catch(() => ({}));

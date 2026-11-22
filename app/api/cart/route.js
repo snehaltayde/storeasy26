@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimitAsync } from "@/lib/rate-limit";
 import { storefrontHandler } from "@/lib/storefront-request";
 import {
   CART_COOKIE,
@@ -8,6 +8,7 @@ import {
   shopperCart,
   createCart,
   addItem,
+  addItems,
   setItemQty,
   removeItem,
   setCoupon,
@@ -36,7 +37,7 @@ export const GET = storefrontHandler(async (request) => {
 });
 
 export const POST = storefrontHandler(async (request) => {
-  const limited = rateLimit(request, { name: "cart", limit: 60 });
+  const limited = await rateLimitAsync(request, { name: "cart", limit: 60 });
   if (limited) return limited;
   let id = request.cookies.get(CART_COOKIE)?.value;
   const isNew = !id;
@@ -56,6 +57,9 @@ export const POST = storefrontHandler(async (request) => {
     switch (body.action) {
       case "add":
         await addItem(id, body.variantId, body.quantity ?? 1);
+        break;
+      case "add_many":
+        await addItems(id, body.items, { requireAvailable: Boolean(body.requireAvailable) });
         break;
       case "setQty":
         await setItemQty(id, body.variantId, body.quantity);

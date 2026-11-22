@@ -3,7 +3,7 @@ import { CART_COOKIE, getCart, clearCart, shopperCart } from "@/lib/cart";
 import { computeShipping } from "@/lib/shipping";
 import { tenantShippingConfig } from "@/lib/tenant-context";
 import { CONSENT_COOKIE } from "@/lib/track/names";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimitAsync } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import {
   createOrder,
@@ -161,7 +161,7 @@ export const POST = tenantHandler(async (request) => {
       );
     }
   }
-  const limited = rateLimit(request, { name: "checkout", limit: 10 });
+  const limited = await rateLimitAsync(request, { name: "checkout", limit: 10 });
   if (limited) return limited;
 
   const cartId = cartIdFrom(request);

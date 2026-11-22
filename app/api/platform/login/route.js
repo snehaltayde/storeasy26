@@ -19,7 +19,7 @@ import { createSession, operatorsExist, OPERATOR_SESSION_TTL_MS } from "@/lib/pl
 import { platformConfigured } from "@/lib/platform/control";
 import { sameOrigin } from "@/lib/origin-check";
 import { audit } from "@/lib/platform/audit";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimitAsync } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 
 // Operator sign-in (S26 / OP01): individual operator users, MANDATORY TOTP,
@@ -54,7 +54,7 @@ const sessionResponse = async (user, request) => {
 
 export async function POST(request) {
   if (!sameOrigin(request)) return fail(403, "Cross-origin request rejected");
-  const limited = rateLimit(request, { name: "platform-login", limit: 5 });
+  const limited = await rateLimitAsync(request, { name: "platform-login", limit: 5 });
   if (limited) return limited;
 
   const { email, password, totp } = await request.json().catch(() => ({}));

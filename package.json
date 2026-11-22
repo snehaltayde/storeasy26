@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "typecheck": "tsc --noEmit",
     "start": "next start",
     "migrate": "node --env-file=.env.local scripts/migrate.js",
     "sync": "node --env-file=.env.local scripts/sync.js",
@@ -117,6 +118,7 @@
     "test:brand-step": "node scripts/test-brand-step.js",
     "test:open-checks": "node scripts/test-open-checks.js",
     "test:policy-start": "node scripts/test-policy-start.js",
+    "test:phase1-core": "node scripts/test-phase1-core.js",
     "seed:design": "node scripts/dev-design.js seed",
     "dev:design": "node scripts/dev-design.js",
     "drill:smoke": "node scripts/drill.js smoke",
@@ -138,7 +140,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "playwright-core": "1.64.1",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "typescript": "^5.9.3"
   }
 }

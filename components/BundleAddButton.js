@@ -3,20 +3,25 @@
 import { useState } from "react";
 import { useCart } from "@/components/cart/CartContext";
 
-// Add-the-set button (S46 / SF18): adds every component through the normal
-// cart API — the BUNDLE offer prices the set server-side, so the drawer
-// shows the saving the moment the last component lands.
+// Add-the-set button (S46 / SF18 + Phase 1.2 atomic batch): adds every component
+// in one atomic `add_many` cart mutation so a bundle never lands half-added.
 export default function BundleAddButton({ components, disabled }) {
-  const { addItem, setOpen } = useCart();
+  const { addItems, setOpen } = useCart();
   const [state, setState] = useState("idle");
 
   async function addAll() {
+    const items = (components || [])
+      .filter((c) => c.available && c.variantId)
+      .map((c) => ({ variantId: c.variantId, quantity: c.quantity ?? 1 }));
+    if (!items.length) return;
     setState("adding");
-    for (const c of components) {
-      if (c.available) await addItem(c.variantId, c.quantity);
+    const res = await addItems(items, { requireAvailable: true });
+    if (res) {
+      setState("done");
+      setOpen(true);
+    } else {
+      setState("idle");
     }
-    setState("done");
-    setOpen(true);
   }
 
   if (disabled) {

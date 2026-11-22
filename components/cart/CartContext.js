@@ -60,6 +60,29 @@ export function CartProvider({ children, initialCart }) {
     },
     [mutate],
   );
+  const addItems = useCallback(
+    async (items, { requireAvailable = false } = {}) => {
+      if (!Array.isArray(items) || items.length === 0) return null;
+      const next = await mutate({ action: "add_many", items, requireAvailable }, { openDrawer: true });
+      if (next?.items) {
+        const added = items
+          .map((req) => {
+            const it = next.items.find((i) => i.variantId === req.variantId);
+            return it ? { id: it.variantNumericId, name: it.title, price: it.price, quantity: req.quantity ?? 1 } : null;
+          })
+          .filter(Boolean);
+        if (added.length) {
+          track("add_to_cart", {
+            value: added.reduce((s, x) => s + x.price * x.quantity, 0),
+            currency: next.currency || "INR",
+            items: added,
+          });
+        }
+      }
+      return next;
+    },
+    [mutate],
+  );
   const setQty = useCallback(
     (variantId, quantity) => mutate({ action: "setQty", variantId, quantity }),
     [mutate],
@@ -87,6 +110,7 @@ export function CartProvider({ children, initialCart }) {
     setOpen,
     pending,
     addItem,
+    addItems,
     setQty,
     removeItem,
     setCoupon,

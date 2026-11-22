@@ -2,7 +2,7 @@ import { NextResponse, after } from "next/server";
 import { requestOtp, verifyOtp, customerFromToken, revokeCustomerSession, updateCustomerProfile, customerOrders, buildReorder, validEmail, CUSTOMER_COOKIE } from "@/lib/customers";
 import { requestReturn } from "@/lib/returns";
 import { mergeWishlist, accountWishlist, removeWishlistItem } from "@/lib/wishlist";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimitAsync } from "@/lib/rate-limit";
 import { slog } from "@/lib/log";
 import { shopperErrorMessage } from "@/lib/shopper-errors";
 import { tenantHandler } from "@/lib/tenant-request";
@@ -43,7 +43,7 @@ export const POST = tenantHandler(async (request) => {
   const body = await request.json().catch(() => ({}));
   try {
     if (body.action === "request_otp") {
-      const limited = rateLimit(request, { name: "account_otp", limit: 5, windowMs: 15 * 60 * 1000 });
+      const limited = await rateLimitAsync(request, { name: "account_otp", limit: 5, windowMs: 15 * 60 * 1000 });
       if (limited) return limited;
       if (String(body.website || "").trim()) return NextResponse.json({ ok: true, sent: true }); // honeypot
       if (!validEmail(body.email)) return NextResponse.json({ error: "That email doesn't look right." }, { status: 422 });
@@ -57,7 +57,7 @@ export const POST = tenantHandler(async (request) => {
       return NextResponse.json({ ok: true, sent: true });
     }
     if (body.action === "verify") {
-      const limited = rateLimit(request, { name: "account_verify", limit: 10, windowMs: 15 * 60 * 1000 });
+      const limited = await rateLimitAsync(request, { name: "account_verify", limit: 10, windowMs: 15 * 60 * 1000 });
       if (limited) return limited;
       const r = await verifyOtp(body.email, body.code);
       const res = NextResponse.json({ ok: true, customer: r.customer, claimedOrders: r.claimedOrders });
@@ -73,7 +73,7 @@ export const POST = tenantHandler(async (request) => {
     if (body.action === "request_return") {
       const customer = await me(request);
       if (!customer) return NextResponse.json({ error: "sign in first" }, { status: 401 });
-      const limited = rateLimit(request, { name: "account_return", limit: 5, windowMs: 60 * 60 * 1000 });
+      const limited = await rateLimitAsync(request, { name: "account_return", limit: 5, windowMs: 60 * 60 * 1000 });
       if (limited) return limited;
       const r = await requestReturn({ customerId: customer.id, orderId: String(body.orderId || ""), reason: body.reason });
       // merchant notification rides the jobs fast path, like the contact form
