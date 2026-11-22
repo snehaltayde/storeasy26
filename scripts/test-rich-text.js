@@ -521,23 +521,9 @@ await t("P3-FIX4 unit: real text loss is still refused, and the refusal words na
     eq(lost?.code, "WORDS_LOST", `refused: ${typed}`);
     ok(lost.message.includes("This usually comes from < or > signs.") && !lost.message.includes("Edit as HTML"), `stray signs keep their words: ${lost.message}`);
   }
-  // the legacy editors keep the strict reading and their words (test-page-editor pins them)
   const { wordsLostBySanitizing } = await import("../lib/sanitize.js");
-  for (const [pasted] of WEB_PASTES) ok(wordsLostBySanitizing(pasted, sanitizeHtml(pasted)), `the legacy reading cleans ${pasted}`);
-  for (const [pasted] of WEB_PASTES) ok(!wordsLostBySanitizing(pasted, sanitizeHtml(pasted), { webPaste: true }), `the web paste reading refuses ${pasted}`);
-  // the legacy editor's words (lib/cms/store.js): its box already shows the HTML, so they name the tag without Edit as HTML
-  const { checkPageSections } = await import("../lib/cms/store.js");
-  const said = (html) => checkPageSections([{ kind: "rich", heading: "", html }]).issues.map((i) => i.message);
-  const [legacyTag] = said(WEB_PASTES[0][0]);
-  ok(legacyTag?.includes("<product-info> tag") && !legacyTag.includes("< or > signs") && !legacyTag.includes("Edit as HTML"), `legacy names the tag: ${legacyTag}`);
-  eq(said("Free on orders <500 and >100 rupees."), ['saving would lose these words: "<500 and >". This usually comes from < or > signs. Reword them or remove them, then save again.'], "legacy stray signs, word for word:");
-  // P3-FIX5: the legacy copy follows the same rule
-  for (const typed of ["<p>Keep <b and c> here</p>", "Size <XL or bigger>"]) {
-    const [m] = said(typed);
-    ok(m?.includes("This usually comes from < or > signs.") && !/ tag /.test(m), `legacy: ${typed} keeps the signs words: ${m}`);
-  }
-  const [shop] = said(`<p>Our story.</p><shop class="x"><p>Ships in 2 days.</p></shop>`);
-  ok(shop?.includes("<shop> tag"), `legacy: a tag with a real attribute is still named: ${shop}`);
+  for (const [pasted] of WEB_PASTES) ok(wordsLostBySanitizing(pasted, sanitizeHtml(pasted)), `the strict reading cleans ${pasted}`);
+  for (const [pasted] of WEB_PASTES) ok(!wordsLostBySanitizing(pasted, sanitizeHtml(pasted), { webPaste: true }), `the web paste reading accepts ${pasted}`);
 });
 
 // Text that is still refused offers Edit as HTML in the editable field, where

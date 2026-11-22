@@ -210,8 +210,8 @@ const SHOPIFY_ADMIN_ENDPOINT = /^\/admin\/(?:api\/(?:\$\{[^}]*\}|[\w.-]+)\/graph
 // This app's own console pages, always built on a store's own origin, which is a
 // variable. A URL that spells out http(s):// and its host gets no such allowance.
 const CONSOLE_PAGE = /^\/admin(?:\/(?:login|accept-invite|reset))?(?:\?.*)?$/;
-// Not Shopify: a line the design seed prints to the terminal.
-const NOT_SHOPIFY_URLS = ["http://localhost:3017/admin/login"];
+// Not Shopify: test/seed console login URLs.
+const NOT_SHOPIFY_URLS = ["http://localhost:3017/admin/login", "http://ma.test/admin/login"];
 
 // There is no way to read the HTTP method reliably from source, so any Admin API
 // URL other than graphql.json counts as a REST write until someone reviews it. So
@@ -485,9 +485,9 @@ await t("SHOP-01: the allowed write scopes are exactly write_orders and write_dr
   eq(sorted(scopes.filter((s) => s.includes("write"))), ["write_draft_orders", "write_orders"], "write scopes:");
 });
 
-// Not Shopify scopes: an audit field (lib/platform/rotate.js) and the placeholder
-// comments use for "the write scope of x" (lib/platform/oauth.js).
-const NOT_SCOPES = ["write_key_fp", "write_x"];
+// Not Shopify scopes: an audit field (lib/platform/rotate.js), placeholder
+// comments (lib/platform/oauth.js), and the order CAS write_id (lib/orders.js).
+const NOT_SCOPES = ["write_key_fp", "write_x", "write_id"];
 
 await t("SHOP-01: no other write_* scope is named anywhere in the source", async () => {
   const bad = [];

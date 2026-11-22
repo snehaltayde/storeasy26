@@ -21,7 +21,7 @@
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, ListPlus, Trash2 } from "lucide-react";
 import { Button, IconButton } from "../../../console/Button.js";
-import { ProductPicker, fetchRefs } from "../../cms/RefPicker.js";
+import { ProductPicker, fetchRefs } from "../../shared/RefPicker.js";
 import { Notes } from "./controls.js";
 import { idOf, notesId, notesAt, moveIn, removeAt } from "./inspectorModel.js";
 

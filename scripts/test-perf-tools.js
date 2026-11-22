@@ -372,16 +372,6 @@ await t("the fixture is internally whole: unique ids and handles, every link and
 });
 
 await t("the fixture passes the same validators a founder's saves pass", async () => {
-  const { validateBlock } = await import("../lib/cms/validate.js");
-  for (const [key, value] of [["home_sections", fx.homeSections], ["nav_header", fx.navHeader], ["nav_footer", fx.navFooter]]) {
-    const v = validateBlock(key, value);
-    ok(v.ok, `${key}: ${(v.errors || []).join(" · ")}`);
-  }
-  const { checkPageSections } = await import("../lib/cms/store.js");
-  for (const p of [...fx.pages, ...fx.posts, ...fx.campaigns]) {
-    const { issues } = checkPageSections(p.sections);
-    ok(!issues.some((i) => i.severity !== "warning"), `${p.slug}: ${issues.map((i) => i.message).join(" · ")}`);
-  }
   const { validateOffer } = await import("../lib/offers/validate.js");
   for (const o of fx.offers) eq(validateOffer(o.offer), [], o.offer.id);
   const { validateQuiz } = await import("../lib/quiz.js");

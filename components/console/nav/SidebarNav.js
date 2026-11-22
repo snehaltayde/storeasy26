@@ -79,20 +79,11 @@ export const NAV_GROUPS = [
     label: "Catalog",
     items: [{ id: "catalog", label: "Catalog", href: "/admin/catalog" }],
   },
-  // S52: the one overloaded Storefront screen became a CMS with dedicated
-  // areas. Media moved here from Catalog (it's content, and the pickers live
-  // in these editors); Releases reads as "Publishing".
   {
     label: "Storefront",
     items: [
-      { id: "storefront", label: "Overview", href: "/admin/storefront", exact: true },
-      { id: "cms-home", label: "Home page", href: "/admin/storefront/home" },
-      { id: "cms-designer", label: "Designer", href: "/admin/storefront/designer" },
-      { id: "cms-pages", label: "Pages", href: "/admin/storefront/pages" },
-      { id: "cms-nav", label: "Navigation", href: "/admin/storefront/navigation" },
-      { id: "cms-pdp", label: "Product pages", href: "/admin/storefront/product-pages" },
-      { id: "theme", label: "Theme", href: "/admin/theme" },
-      { id: "brand", label: "Brand", href: "/admin/brand" },
+      { id: "editor", label: "Editor", href: "/admin/editor" },
+      { id: "start", label: "Logo and colours", href: "/admin/start" },
       { id: "media", label: "Media", href: "/admin/media" },
       { id: "releases", label: "Publishing", href: "/admin/releases", badgeKey: "publish" },
     ],
@@ -101,7 +92,6 @@ export const NAV_GROUPS = [
     label: "Growth",
     items: [
       { id: "offers", label: "Offers", href: "/admin/offers" },
-      { id: "upsells", label: "Upsells", href: "/admin/upsells" },
       { id: "experiments", label: "Experiments", href: "/admin/experiments" },
       { id: "insights", label: "Insights", href: "/admin/insights" },
       { id: "automations", label: "Automations", href: "/admin/automations", adminOnly: true },
@@ -117,21 +107,9 @@ export const NAV_GROUPS = [
   },
 ];
 
-// P3-ROUTES (ED-02, US-38): on a documents store one "Editor" link replaces
-// the old content, theme and brand screens (each of them redirects to the
-// editor there anyway); Media and Publishing stay. Every other mode gets
-// NAV_GROUPS exactly as it is.
-// P6-NAV (GEN-04, US-01): after Editor, "Logo and colours" (the brand step at
-// /admin/start), so the logo and palette can be found again after the store
-// opens. For everyone who sees the Editor link (not admin-only).
-const DOCUMENTS_STOREFRONT = new Set(["media", "releases"]);
-export function navGroups(cmsMode) {
-  if (cmsMode !== "documents") return NAV_GROUPS;
-  return NAV_GROUPS.map((group) =>
-    group.label !== "Storefront"
-      ? group
-      : { ...group, items: [{ id: "editor", label: "Editor", href: "/admin/editor" }, { id: "start", label: "Logo and colours", href: "/admin/start" }, ...group.items.filter((it) => DOCUMENTS_STOREFRONT.has(it.id))] }
-  );
+// Documents is the sole CMS mode; keep navGroups(cmsMode) export for compatibility.
+export function navGroups() {
+  return NAV_GROUPS;
 }
 
 const ADMIN_ROLES = new Set(["admin", "owner"]);

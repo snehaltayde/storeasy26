@@ -50,19 +50,27 @@ await inA(async () => {
     sql: "INSERT INTO orders (id, email, total, currency, status, snapshot, created_at, updated_at, sync_attempts, refunded_total) VALUES ('AA-1','buyer-a@x.test',11111,'INR','paid',?, ?, ?,0,0)",
     args: [JSON.stringify({ items: [{ title: "Alpha Serum", quantity: 1, price: 11111 }] }), new Date().toISOString(), new Date().toISOString()],
   });
-  const { setBlock } = await import("../lib/cms/store.js");
-  await setBlock("hero", {
-    title: "Glow like AA",
-    highlight: "AA",
-    subtitle: "See https://cdn.example/aa-banner.png for the look",
-    primary: { label: "Shop", href: "/collections" },
-    secondary: { label: "Bestseller", href: "/collections/aa-exclusive-serum" },
-  });
-  await setBlock("announcement", { enabled: true, text: "Free shipping over ₹999", href: "" });
-  await setBlock("home_sections", [
-    { kind: "collections", title: "Shop by ritual", limit: 6, enabled: true },
-    { kind: "new", title: "Fresh in", limit: 8, enabled: true },
-  ]);
+  const { writeContentDrafts } = await import("../lib/content-writes.js");
+  const Docs = await import("../lib/documents/service.js");
+  await writeContentDrafts(
+    {
+      hero: {
+        value: {
+          title: "Glow like AA",
+          highlight: "AA",
+          subtitle: "See https://cdn.example/aa-banner.png for the look",
+          primary: { label: "Shop", href: "/collections" },
+          secondary: { label: "Bestseller", href: "/collections/aa-exclusive-serum" },
+        },
+      },
+      announcement: { enabled: true, text: "Free shipping over ₹999", href: "" },
+      home_sections: [
+        { kind: "collections", title: "Shop by ritual", limit: 6, enabled: true },
+        { kind: "new", title: "Fresh in", limit: 8, enabled: true },
+      ],
+    },
+    { source: "test:agency", documents: Docs },
+  );
 });
 await inB(async () => {
   await libsql.execute({
@@ -188,8 +196,10 @@ await t("apply: support role refused; staff writes DRAFTS only on the destinatio
   ok(r.written.includes("hero") && r.written.includes("home_sections"), "blocks written");
   ok(r.note.includes("DRAFTS"), "honest draft note");
   await inB(async () => {
-    const { getBlockRow } = await import("../lib/cms/store.js");
-    eq((await getBlockRow("hero")).value.title, "Glow like AA", "dest hero draft:");
+    const Docs = await import("../lib/documents/service.js");
+    const doc = await Docs.getDocument("doc_home");
+    const hero = doc.body.sections.find((s) => s.kind === "hero");
+    eq(hero.settings.title, "Glow like AA", "dest hero draft:");
     const { getLiveRelease } = await import("../lib/releases.js");
     eq(await getLiveRelease(), null, "live pointer untouched:");
   });
@@ -207,8 +217,9 @@ await t("approve records identity against THE hash; a changed draft reads stale"
   eq(list.find((x) => x.id === ap.id).current, true, "approval is current:");
   // the draft changes — the old approval must go stale, not authorize it
   await inB(async () => {
-    const { setBlock } = await import("../lib/cms/store.js");
-    await setBlock("announcement", { enabled: true, text: "Changed after approval", href: "" });
+    const { writeContentDrafts } = await import("../lib/content-writes.js");
+    const Docs = await import("../lib/documents/service.js");
+    await writeContentDrafts({ announcement: { enabled: true, text: "Changed after approval", href: "" } }, { source: "test:agency", documents: Docs });
   });
   list = await A.approvalsForAgency(agency.id);
   eq(list.find((x) => x.id === ap.id).current, false, "changed draft ⇒ stale approval:");

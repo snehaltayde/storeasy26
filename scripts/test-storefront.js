@@ -24,12 +24,8 @@ for (const f of dbs) await rm(join(here, "..", f), { force: true });
 const C = await import("../lib/platform/control.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { libsql } = await import("../lib/db.js");
-const S = await import("../lib/cms/store.js");
-const R = await import("../lib/releases.js");
 const M = await import("../lib/media.js");
 const repo = await import("../lib/repo.js");
-const { validateBlock } = await import("../lib/cms/validate.js");
-const { normalizePageSections } = await import("../lib/cms/schemas.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 
 await C.migratePlatform(await readFile(join(here, "../lib/platform/schema.sql"), "utf8"));
@@ -139,116 +135,9 @@ await t("saveMedia stores, dedupes by content, variants attach to the original",
   eq(file.size, PNG_1PX.length);
 });
 
-await t("usage scan finds references; delete is guarded then forced", async () => {
-  const list = await inShop(M.listMedia);
-  const id = list[0].id;
-  const { value } = validateBlock("home_sections", [{ kind: "rich_text", title: "Story", html: `<p>pic: <img src="${M.mediaUrl(id)}" alt="x"></p>` }]);
-  await inShop(() => S.setBlock("home_sections", value));
-  const uses = await inShop(() => M.mediaUsage(id));
-  eq(uses.length, 1);
-  eq(uses[0].where, "block:home_sections");
-  try {
-    await inShop(() => M.deleteMedia(id));
-    throw new Error("expected MEDIA_IN_USE");
-  } catch (e) {
-    eq(e.code, "MEDIA_IN_USE", "guarded:");
-  }
-  const r = await inShop(() => M.deleteMedia(id, { force: true }));
-  eq(r.deleted, id);
-  eq((await inShop(M.listMedia)).length, 0, "variants deleted too:");
-  await inShop(() => S.deleteBlock("home_sections"));
-});
-
-console.log("— typed + policy pages (SF13/SF14)");
-
-await t("typed sections: rich sanitized at save, image needs alt + safe src", async () => {
-  await inShop(() =>
-    S.upsertContentPage({
-      slug: "mixed",
-      title: "Mixed",
-      effective_at: "2026-10-01",
-      sections: [
-        { heading: "Plain", body: ["para"] },
-        { kind: "rich", heading: "Rich", html: '<p>ok</p><script>alert(1)</script>' },
-        { kind: "image", src: "/api/media/med_abc", alt: "a picture" },
-      ],
-    }),
-  );
-  const page = await inShop(() => S.getContentPage("mixed"));
-  eq(page.sections.length, 3);
-  eq(page.sections[0].kind, "text", "legacy shape typed:");
-  excludes(page.sections[1].html, "<script", "sanitized:");
-  eq(page.effective_at, "2026-10-01", "effective date:");
-  try {
-    await inShop(() => S.upsertContentPage({ slug: "bad", title: "Bad", sections: [{ kind: "image", src: "javascript:x", alt: "a" }] }));
-    throw new Error("expected refusal");
-  } catch (e) {
-    includes(e.message, "image link");
-  }
-  try {
-    await inShop(() => S.upsertContentPage({ slug: "bad", title: "Bad", effective_at: "01/10/2026", sections: [] }));
-    throw new Error("expected refusal");
-  } catch (e) {
-    includes(e.message, "YYYY-MM-DD");
-  }
-});
-
-await t("v1 rows (no kind) normalize at read", async () => {
-  await inShop(() =>
-    libsql.execute("INSERT INTO cms_pages (slug, title, sections, enabled, revision, schema_version) VALUES ('legacy','Legacy','[{\"heading\":\"H\",\"body\":[\"p\"]}]',1,1,1)"),
-  );
-  const page = await inShop(() => S.getContentPage("legacy"));
-  eq(page.sections[0].kind, "text");
-  eq(normalizePageSections([{ heading: "x", body: [] }])[0].kind, "text");
-});
-
-await t("cross-tenant legal text: BeastLife defaults serve ONLY BeastLife", async () => {
-  eq(await inShop(() => S.defaultPage("about")), null, "shop gets no BeastLife about:");
-  eq(await inShop(() => S.getContentPage("shipping")), null, "shop gets no BeastLife policy:");
-  const shopList = await inShop(S.listContentPages);
-  eq(shopList.some((p) => p.source === "default"), false, "no default rows for shop:");
-  const bl = await inBl(() => S.defaultPage("about"));
-  includes(bl.title, "BeastLife", "beastlife keeps its copy:");
-  const blList = await inBl(S.listContentPages);
-  eq(blList.some((p) => p.source === "default"), true);
-});
-
-await t("release validation warns when a plain tenant has no policy pages, settles once added", async () => {
-  await inShop(() => S.setBlock("hero", { title: "Shop things" }));
-  const v1 = await inShop(async () => R.validateRelease((await R.snapshotContent()).content));
-  eq(v1.ok, true);
-  includes(v1.warnings.join(" | "), "privacy", "warned:");
-  await inShop(() => S.upsertContentPage({ slug: "privacy-policy", title: "Privacy", sections: [{ heading: "Data", body: ["We keep it safe."] }] }));
-  await inShop(() => S.upsertContentPage({ slug: "terms", title: "Terms", sections: [{ heading: "Terms", body: ["Be nice."] }] }));
-  const v2 = await inShop(async () => R.validateRelease((await R.snapshotContent()).content));
-  excludes(v2.warnings.join(" | "), "privacy", "settled:");
-  const snap = await inShop(R.snapshotContent);
-  const mixed = snap.content.pages.find((p) => p.slug === "mixed");
-  eq(mixed.effective_at, "2026-10-01", "effective date rides the snapshot:");
-});
-
-console.log("— collections index (SF02)");
-
-await t("collections_index validates handles and hide-conflicts", async () => {
-  let r = validateBlock("collections_index", { featured: ["All Protein!"], order: [], hide: [] });
-  eq(r.ok, false, "bad handle:");
-  r = validateBlock("collections_index", { featured: ["gear"], order: [], hide: ["gear"] });
-  eq(r.ok, false, "featured+hidden conflict:");
-  r = validateBlock("collections_index", { featured: ["gear", "gear"], order: ["all-protein"], hide: [] });
-  eq(r.ok, true);
-  eq(r.value.featured.length, 1, "deduped:");
-});
-
-await t("getCollectionsByHandles preserves order; release validation catches unknown handles", async () => {
+await t("getCollectionsByHandles preserves order", async () => {
   const rows = await inShop(() => repo.getCollectionsByHandles(["gear", "all-protein"]));
   eq(rows.map((c) => c.handle).join(","), "gear,all-protein");
-  await inShop(() => S.setBlock("collections_index", { featured: ["gear", "nope"], order: [], hide: [] }));
-  const v = await inShop(async () => R.validateRelease((await R.snapshotContent()).content));
-  eq(v.ok, false);
-  includes(v.errors.join(" | "), '"nope"');
-  await inShop(() => S.setBlock("collections_index", { featured: ["gear"], order: [], hide: [] }));
-  const v2 = await inShop(async () => R.validateRelease((await R.snapshotContent()).content));
-  eq(v2.ok, true, "valid handles pass:");
 });
 
 console.log("— collection detail filters (SF03)");
@@ -270,20 +159,6 @@ await t("sort + filters: price sort, in-stock, type facets", async () => {
   eq(facets[0].count, 2);
 });
 
-console.log("— PDP extras (SF04)");
-
-await t("pdp_extras sanitized at save; disabled/empty rows filtered at read", async () => {
-  let r = validateBlock("pdp_extras", [{ title: "Shipping", html: '<p>3–5 days</p><script>x()</script>' }, { title: "", html: "<p>x</p>" }]);
-  eq(r.ok, false, "missing title refused:");
-  r = validateBlock("pdp_extras", [{ title: "Shipping", html: '<p>3–5 days</p><img src=x onerror=x()>' }, { title: "Hidden", html: "<p>x</p>", enabled: false }]);
-  eq(r.ok, true);
-  excludes(r.value[0].html, "onerror");
-  await inShop(() => S.setBlock("pdp_extras", r.value));
-  const extras = await inShop(S.getPdpExtras);
-  eq(extras.length, 1, "disabled filtered:");
-  eq(extras[0].title, "Shipping");
-});
-
 console.log("— SQL search (SF05/BE05)");
 
 await t("multi-term AND + ranking: prefix beats substring, in-stock beats sold-out", async () => {
@@ -296,13 +171,8 @@ await t("multi-term AND + ranking: prefix beats substring, in-stock beats sold-o
   const none = await inShop(() => repo.searchProductsInDb("chocolate shaker", 10));
   eq(none.hits.length, 0, "AND semantics:");
   const neon = await inShop(() => repo.searchProductsInDb("neon", 10));
+  eq(neon.hits.length, 1);
   eq(neon.hits[0].handle, "shaker-neon");
-});
-
-await t("release snapshot carries the new blocks", async () => {
-  const snap = await inShop(R.snapshotContent);
-  eq(snap.content.blocks.collections_index.featured.join(","), "gear");
-  eq(snap.content.blocks.pdp_extras.length, 2, "raw rows snapshot (filtering is a read concern):");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -72,7 +72,6 @@ for (const f of dbs) await rm(join(ROOT, f), { force: true });
 const C = await import("../lib/platform/control.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { libsql, currentDatabase } = await import("../lib/db.js");
-const S = await import("../lib/cms/store.js");
 const R = await import("../lib/releases.js");
 const Res = await import("../lib/content/resolve.js");
 const Docs = await import("../lib/content/documents-reader.js");
@@ -166,28 +165,6 @@ for (const n of COUNTS) {
   DOC[n] = T;
 }
 facts.publishSeconds = Math.round((Date.now() - started) / 100) / 10;
-// legacy stores: one with a live v3 release, one before its first publish
-const LR = await tenant("lr");
-const LN = await tenant("ln");
-for (const T of [LR, LN]) {
-  await withTenant(T, async () => {
-    await S.setBlock("announcement", { enabled: true, text: "Legacy bar", href: "/collections" });
-    await S.upsertContentPage({ slug: "refund-policy", title: "Refund policy", family: "page", sections: [{ kind: "text", heading: "Refunds", body: ["Within 14 days."] }] });
-  });
-}
-await withTenant(LR, async () => {
-  const rel = await R.createRelease({ note: "perf", actor: "test" });
-  await R.publishReleaseById(rel.id);
-});
-// P2-PERF fix round 2: a legacy store with a header menu of its own and no
-// footer menu, so its footer still lists the catalog's collections
-const LH = await tenant("lh");
-await withTenant(LH, async () => {
-  const { validateBlock } = await import("../lib/cms/validate.js");
-  const v = validateBlock("nav_header", [{ label: "Shop all", href: "/collections/shop-all" }]);
-  ok(v.ok, `nav_header: ${(v.errors || []).join("; ")}`);
-  await S.setBlock("nav_header", v.value);
-});
 
 async function liveList(T) {
   return withTenant(T, async () => {
@@ -552,18 +529,6 @@ await t("the REAL sitemap.xml and /journal read the journal index once at 200 an
 // =====================================================================================
 console.log("— 5. reported costs (plan sections 2 and 6)");
 // =====================================================================================
-await t("REPORTED: a legacy store with no release pays one cms_state statement per request; with a live release it pays none", async () => {
-  const lnHome = await homeRequest(LN);
-  const lrHome = await homeRequest(LR);
-  ok(lnHome.result.layout.includes("Legacy bar") && lrHome.result.layout.includes("Legacy bar"), "both legacy stores render their bar");
-  eq(cmsStateReads(lnHome.statements).length, 1, "cms_state statements, no release (layout plus home):");
-  eq(cmsStateReads(lrHome.statements).length, 0, "cms_state statements, live v3 release:");
-  const lnPolicy = await policyRequest(LN, "refund-policy");
-  eq(cmsStateReads(lnPolicy.statements).length, 1, "cms_state statements, no release (policy):");
-  eq(lnPolicy.result.meta.title, "Refund policy", "the draft page serves:");
-  facts.legacyNoRelease = { homeContent: contentOnly(lnHome.statements).length, homeContentWithRelease: contentOnly(lrHome.statements).length, cmsStateBytes: bytes(cmsStateReads(lnHome.statements)) };
-});
-
 await t("REPORTED: on v4, a slug that is not a listed page (a default page such as /about, or a 404) reads the journal index once, and that read grows with the post count", async () => {
   facts.unlisted = {};
   for (const n of COUNTS) {
@@ -590,7 +555,7 @@ await t("REPORTED: route handlers (/api/upsell, offline, manifest) run outside c
   const manifest = (await import("../app/manifest.webmanifest/route.js")).GET;
   const req = (T, path) => ({ headers: { get: (k) => (k.toLowerCase() === "host" ? host(T.id) : null) }, nextUrl: new URL(`https://${host(T.id)}${path}`), url: `https://${host(T.id)}${path}` });
   facts.handlers = {};
-  for (const [label, T] of [["v4, 1,000 posts", DOC[1000]], ["legacy, no release", LN], ["legacy, live v3", LR]]) {
+  for (const [label, T] of [["v4, 1,000 posts", DOC[1000]]]) {
     const row = {};
     for (const [name, fn, path] of [["/api/upsell", upsell, "/api/upsell?exclude="], ["/offline", offline, "/offline"], ["/manifest.webmanifest", manifest, "/manifest.webmanifest"]]) {
       // two calls in a row: no cache() between them, so each pays in full
@@ -633,23 +598,6 @@ await t("home on v4 reads no catalog it doesn't show: no nav collections when bo
     eq(exp.length, 1, `experiment reads at ${n} posts:`);
     ok(!/select \*/i.test(exp[0].sql) && !/hypothesis/.test(exp[0].sql), `the experiment read selects only what serving needs at ${n} posts: ${exp[0].sql}`);
     ok(!cat.some((s) => /"c"\."description"/.test(s.sql)), `no collection description is read at ${n} posts`);
-  }
-});
-
-await t("a store without its own menus still lists the catalog's collections: legacy with no menus reads them once (header and footer), and a header menu alone still reads them for the footer", async () => {
-  for (const [label, T, header, footer] of [
-    ["legacy, no release", LN, true, true],
-    ["legacy, live v3", LR, true, true],
-    ["legacy, header menu only", LH, false, true],
-  ]) {
-    const { statements, result } = await homeRequest(T);
-    eq(catalogOf(statements).filter((s) => NAV_COLLECTIONS.test(s.sql)).length, 1, `nav collections reads on ${label}:`);
-    // a legacy store still reads its rails' pins, at most one statement for all of them
-    ok(catalogOf(statements).filter((s) => /collection_overrides/.test(s.sql)).length <= 1, `${label}: at most one pins statement for every rail`);
-    // the catalog's one collection, in the header strip and/or the footer list
-    const links = (result.layout.match(/href="\/collections\/protein"/g) || []).length;
-    eq(links, (header ? 1 : 0) + (footer ? 1 : 0), `collection links on ${label}:`);
-    if (!header) ok(result.layout.includes('href="/collections/shop-all"'), `${label}: the header menu is shown`);
   }
 });
 

@@ -568,11 +568,9 @@ await t("unit: only the allowed overlay fields have controls; price, variants an
   ok(plain(owned).includes("Price: ₹700") && plain(owned).includes("In stock") && plain(owned).includes("Default Title"), `shown: ${plain(owned)}`);
   ok(owned.includes('href="https://admin.shopify.com/store/pe-store/products/9107"') && plain(owned).includes("Change in Shopify"), "the Change in Shopify link (openEntityContent's shopifyAdminUrl)");
   ok(plain(owned).includes(EM.PRODUCT_WORDS.shopifyOwns), "the plain words");
-  for (const f of ["components/admin/CatalogAdmin.js", "components/admin/editor/ProductForm.js", "components/admin/editor/CollectionForm.js", "components/admin/editor/editorModel.js"]) {
+  for (const f of ["components/admin/editor/ProductForm.js", "components/admin/editor/CollectionForm.js", "components/admin/editor/editorModel.js"]) {
     ok(!(await readFile(join(ROOT, f), "utf8")).includes("Shopify owns these"), `${f}: no 'Shopify owns these'`);
   }
-  const cat = await readFile(join(ROOT, "components/admin/CatalogAdmin.js"), "utf8");
-  ok(cat.includes("documentsStore ? CATALOG_DOCUMENTS_LINE : PRODUCT_WORDS.catalogShopify"), "the Catalog screen shows the same plain words (the legacy line; the documents line on a documents store)");
   ok(!/Shopify owns|admin; they sync/.test(EM.PRODUCT_WORDS.catalogShopify), "and they are plain");
 });
 
@@ -628,13 +626,7 @@ await t("unit: with the gate open on a store with Typesense configured (dummy lo
 console.log("— 5. parity with the Catalog and Upsells screens; the collection form");
 // =====================================================================================
 
-await t("unit: the PARITY list covers every CatalogAdmin and UpsellsAdmin control (read from the old files; the upsell and cart-slot switches included) and each maps to a registered setting with a working control or a plain reason", async () => {
-  const cat = await readFile(join(ROOT, "components/admin/CatalogAdmin.js"), "utf8");
-  const ups = await readFile(join(ROOT, "components/admin/UpsellsAdmin.js"), "utf8");
-  // P4-FIX3: every form control the old files render is in OLD_FORM_CONTROLS,
-  // and nothing else is (a control added to either file fails here)
-  const srcOf = { CatalogAdmin: cat, UpsellsAdmin: ups };
-  for (const screen of ["CatalogAdmin", "UpsellsAdmin"]) eq(oldFormControls(srcOf[screen]).sort(), Object.keys(OLD_FORM_CONTROLS[screen]).sort(), `${screen}'s form controls, read from its file:`);
+await t("unit: the PARITY list maps every carried control to a registered setting with a working control or a plain reason", async () => {
   // each old control maps to a PARITY entry, a NOT_CARRIED reason, or finds what to edit
   const carried = new Set(PARITY.map((p) => `${p.screen}|${p.what}`));
   const notCarried = new Set(NOT_CARRIED.map((n) => `${n.screen}|${n.what}`));
@@ -653,13 +645,6 @@ await t("unit: the PARITY list covers every CatalogAdmin and UpsellsAdmin contro
     ok(n && /remove every/.test(n.why) && /Earlier versions/.test(n.why) && !/[A-Z]{3,}_[A-Z]/.test(n.why), `${w}: a plain reason: ${n?.why}`);
   }
   ok(!PARITY.some((p) => /switch/i.test(p.what)), "no switch is passed off as 'remove every product'");
-  // a control added to an old screen is caught
-  const grown = ups.replace('<Field label="Title"', '<Field label="Sticky" htmlFor="upsell-sticky"><Input id="upsell-sticky" value={form.sticky} onChange={(e) => setForm({ ...form, sticky: e.target.value })} /></Field>\n              <Field label="Title"');
-  ok(grown !== ups, "the old file was grown");
-  const unknown = oldFormControls(grown).filter((x) => !(x in OLD_FORM_CONTROLS.UpsellsAdmin));
-  eq(unknown, ["upsell-sticky"], "a new old control is not in the list:");
-  const grownCat = cat.replace("<Input id=\"cat-badge\"", "<Switch label=\"Hide this product\" checked={false} onChange={() => {}} />\n            <Input id=\"cat-badge\"");
-  eq(oldFormControls(grownCat).filter((x) => !(x in OLD_FORM_CONTROLS.CatalogAdmin)), ["Hide this product"], "a new switch on the Catalog screen too:");
   const { CONTROL_COMPONENTS } = await loadPlain(join(ROOT, "components/admin/editor/fields/SettingsForm.js"));
   for (const p of PARITY) {
     const type = R.documentType(p.type);
@@ -718,7 +703,7 @@ console.log("— 6. shoppers never see editor-only words");
 
 const E2 = await import("../lib/catalog/effective.js");
 const repo = await import("../lib/repo.js");
-const { getPdpPairs } = await import("../lib/cms/placements.js");
+const { getPdpPairs } = await import("../lib/catalog/upsells.js");
 const JSX_RUNTIME = require("react/jsx-runtime");
 async function loadComponent(rel, stubs) {
   const code = await compile(join(ROOT, rel));
@@ -774,6 +759,7 @@ await t("unit: a shopper render of an edited product (card and product page) con
     "@/lib/ids": await import("../lib/ids.js"),
     "@/lib/site": { abs: (p) => `https://pedocs.test${p}`, siteName: () => "PE Store" },
     "@/lib/tenant-request": { tfetch: (fn) => run(fn) },
+    "@/lib/storefront-request": { tfetch: (fn) => run(fn) },
   });
   const pdp = renderToStaticMarkup(await page.default({ params: Promise.resolve({ handle: "fixture-product-14" }) }));
   ok(plain(pdp).includes("Moon tonic"), "the product page shows the new name");
@@ -1328,25 +1314,6 @@ await t("rendered: on a documents store the catalog page and CatalogAdmin say th
   for (const w of ["brand and product type shoppers see are set in the editor", "only price, stock and Shopify's own type and vendor stay in Shopify"]) ok(page.includes(w), `the header says "${w}": ${page.slice(0, 500)}`);
   ok(page.includes("Price, stock and Shopify's own type and vendor stay in Shopify"), "the editor block says it too");
   ok(!/edited in the editor now\.$|Their pages are edited in the editor;/.test(page), "the old half-true words are gone");
-  // CatalogAdmin's line, on the product's presentation screen
-  const shown = async (documentsStore) => {
-    const realFetch = globalThis.fetch;
-    globalThis.fetch = async () => new Response(JSON.stringify({ ok: true, product: { id: P(1), handle: "fixture-product-1", title: "Fixture product 1", product_type: "Serum", vendor: "Labs", price_min: 100, price_max: 100, currency: "INR", available: true }, override: {}, surface: null }), { status: 200, headers: { "content-type": "application/json" } });
-    try {
-      const initial = { products: [{ id: P(1), handle: "fixture-product-1", title: "Fixture product 1", product_type: "Serum", price_min: 100, currency: "INR", available: true, customized: false }], overrides: [], collections: [] };
-      const v = await mount("components/admin/CatalogAdmin.js", "default", () => (documentsStore === undefined ? { initial } : { initial, documentsStore }));
-      await v.click("Presentation");
-      const line = v.find((n) => n.props?.["data-shopify-owned"] === "");
-      ok(line, "the Shopify line is shown");
-      return textOf(line.props.children);
-    } finally {
-      globalThis.fetch = realFetch;
-    }
-  };
-  const CA = await loadPlain(join(ROOT, "components/admin/CatalogAdmin.js"));
-  eq(await shown(true), CA.CATALOG_DOCUMENTS_LINE, "documents store:");
-  ok(/brand and product type shoppers see are set in the editor/.test(CA.CATALOG_DOCUMENTS_LINE) && /Only price, stock and Shopify's own type and vendor stay in Shopify/.test(CA.CATALOG_DOCUMENTS_LINE), "the words name what the editor sets");
-  eq(await shown(undefined), EM.PRODUCT_WORDS.catalogShopify, "legacy (no prop), unchanged:");
 });
 
 console.log(`\n${pass} passed, ${failures.length} failed (${((Date.now() - started) / 1000).toFixed(1)} s)`);

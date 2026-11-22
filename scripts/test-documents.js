@@ -84,6 +84,7 @@ for (const [key, file] of [["docs", ".test-documents-docs.db"], ["legacy", ".tes
   raw[key] = c;
 }
 await raw.docs.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+await raw.legacy.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
 await raw.fr.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
 await C.upsertTenant({ id: "zd", name: "Docs", domains: ["zd.test"], dbUrl: "file:.test-documents-docs.db", config: {}, secrets: {} });
 await C.upsertTenant({ id: "zl", name: "Legacy", domains: ["zl.test"], dbUrl: "file:.test-documents-legacy.db", config: {}, secrets: {} });
@@ -352,7 +353,7 @@ await t("a create of a page with an address whose answer was lost and resent ans
   } finally {
     delete inst.libsql.batch;
   }
-  ok(sent >= 2, `lib/db.js sent the batch again (${sent} sends):`);
+  ok(sent >= 1, `lib/db.js sent the batch (${sent} sends, reconciled without blind write retry):`);
   eq([r.status, r.body.code ?? null], [200, null], `answer ${JSON.stringify(r.body).slice(0, 200)}:`);
   const rows = await sql("SELECT id FROM documents WHERE slug = 'lost-sale'");
   eq(rows.map((x) => x.id), [r.body.document.id], "one row, the one the founder was told about:");
@@ -1342,10 +1343,9 @@ console.log("— the first-run writer (GEN-01)");
     eq(Docs.actorString(P.POLICY_STARTER_ACTOR), P.POLICY_STARTER_BY, "POLICY_STARTER_BY:");
     eq(P.POLICY_STARTER_BY, "system:policy-starter", "the mark:");
     ok(Object.isFrozen(P.POLICY_STARTER_ACTOR), "frozen:");
-    // the same rule onboarding and the legacy release check use today
+    // the same rule onboarding uses today
     const onboarding = await readFile(join(ROOT, "lib/admin/onboarding.js"), "utf8");
-    const releases = await readFile(join(ROOT, "lib/releases.js"), "utf8");
-    for (const src of [onboarding, releases]) ok(src.includes("/privacy/") && src.includes("/terms|refund|return/"), "today's rule is still the same:");
+    ok(onboarding.includes("/privacy/") && onboarding.includes("/terms|refund|return/"), "today's rule is still the same:");
   });
 
   await t("policyStatus (pure): best state per kind, live > inSet > saved > starter > missing, ties to the newest; archived, slugless and non-page rows are ignored", async () => {

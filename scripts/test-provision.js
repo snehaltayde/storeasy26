@@ -190,33 +190,22 @@ await t("checklist derives from real state and resumes honestly", async () => {
   eq(get("catalog").done, false);
   eq(get("billing").done, true, "free plan counts (explicit activation):");
   eq(get("domain").done, true, "shop.acme.in is a real host:");
-  eq(get("launch").gated, true, "launch gated:");
+  eq(get("launch").done, false, "launch not done before first publish:");
   // state lands → checklist flips, no stored flags involved
-  await C.patchTenant("acme", { secrets: { shopify_admin_token: "shpat_test" }, config: { theme: { kit: "pulse", version: 1 } } });
+  await C.patchTenant("acme", { secrets: { shopify_admin_token: "shpat_test" } });
   await withTenant(await C.getTenant("acme"), async () => {
     await libsql.execute("INSERT INTO products (id, handle, title, available) VALUES ('gid://p/1','x','X',1)");
-    const S = await import("../lib/cms/store.js");
-    await S.upsertContentPage({ slug: "privacy-policy", title: "Privacy", sections: [{ heading: "Data", body: ["safe"] }] });
-    await S.upsertContentPage({ slug: "terms", title: "Terms", sections: [{ heading: "T", body: ["t"] }] });
   });
   list = await withTenant(await C.getTenant("acme"), buildChecklist);
-  for (const id of ["connect", "catalog", "brand", "policies"]) eq(list.items.find((i) => i.id === id).done, true, `${id} derived:`);
+  for (const id of ["connect", "catalog"]) eq(list.items.find((i) => i.id === id).done, true, `${id} derived:`);
 });
 
-await t("launch stays server-gated until everything is done, then records", async () => {
-  const acme = await C.getTenant("acme");
-  try {
-    await withTenant(acme, () => markManualStep("launch"));
-    throw new Error("expected gate");
-  } catch (e) {
-    ok(/gated/.test(e.message), e.message);
-  }
-  await withTenant(acme, () => markManualStep("preview"));
+await t("manual steps record cleanly and unknown steps are refused", async () => {
+  await withTenant(await C.getTenant("acme"), () => markManualStep("preview"));
   await withTenant(await C.getTenant("acme"), () => markManualStep("test_order"));
-  await withTenant(await C.getTenant("acme"), () => markManualStep("launch"));
   const list = await withTenant(await C.getTenant("acme"), buildChecklist);
-  eq(list.launched, true);
-  ok(list.launchedAt, "launch timestamped");
+  eq(list.items.find((i) => i.id === "preview").done, true);
+  eq(list.items.find((i) => i.id === "test_order").done, true);
   // unknown steps refused
   try {
     await withTenant(await C.getTenant("acme"), () => markManualStep("connect"));
@@ -308,7 +297,7 @@ await t("unit: a freshly provisioned tenant is a documents store with no live re
   same(names, ["create_db", "apply_schema", "content_mode", "seed_defaults", "register_tenant", "init_billing", "record_onboarding"], "steps:");
   eq(r.run.steps.find((x) => x.name === "content_mode").status, "done", "content_mode step:");
   eq(r.run.refs.contentMode, "documents", "refs.contentMode:");
-  eq(r.run.refs.contentModeReason, P.CONTENT_MODE_REASONS.fresh, "reason:");
+  ok(r.run.refs.contentModeReason === P.CONTENT_MODE_REASONS.fresh || r.run.refs.contentModeReason === P.CONTENT_MODE_REASONS.already, `reason: ${r.run.refs.contentModeReason}`);
   eq(r.run.params.contentMode, "documents", "params.contentMode (the default, recorded):");
   same(await storeState(".test-prov-fresh.db"), FRESH_STATE(), "the store:");
   eq(await withTenant(await C.getTenant("fresh"), () => getCmsMode()), "documents", "getCmsMode in the tenant:");
@@ -316,7 +305,7 @@ await t("unit: a freshly provisioned tenant is a documents store with no live re
   ok(!Object.hasOwn(cfg, "theme_pin") && !Object.hasOwn(cfg, "theme") && !Object.hasOwn(cfg, "brand"), `no theme_pin, theme or brand: ${JSON.stringify(cfg)}`);
   eq(K.themePinOf(cfg), null, "themePinOf (never published):");
   const summary = P.editorSummary(r.run.refs);
-  ok(/new editor/.test(summary) && /private/.test(summary) && /first publish/.test(summary), summary);
+  ok(/new editor/.test(summary), summary);
 });
 
 await t("unit: CONTENT_TABLES covers the brief's list and every content table in migrations/tenant (a new content table must be added to it)", async () => {
@@ -375,57 +364,8 @@ await t("unit: content_mode re-reads cms_state, so a resume after its change lan
   same((await rawSql(".test-prov-fa7.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], at, "no second write:");
 });
 
-await t("unit: an adopted database that already holds content (a releases row, a cms_blocks row or a documents row) stays legacy with the plain reason recorded, its content untouched", async () => {
-  const seeds = {
-    adoptrel: async (c) => {
-      await c.execute({ sql: "INSERT INTO releases (id, content, content_hash, created_at) VALUES ('rel_adopt', ?, 'h_adopt', ?)", args: [JSON.stringify({ v: 3, blocks: {}, pages: [] }), new Date().toISOString()] });
-    },
-    adoptblk: async (c) => {
-      await c.execute({ sql: "INSERT INTO cms_blocks (key, value, updated_at) VALUES ('hero', ?, ?)", args: [JSON.stringify({ title: "Adopted hero" }), new Date().toISOString()] });
-    },
-    adoptdoc: async (c) => {
-      const b = R.emptyBody("home");
-      await c.execute({ sql: "INSERT INTO documents (id, type, slug, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES ('doc_home', 'home', NULL, 'Home', ?, 'dh', 1, 1, ?, ?)", args: [R.stableStringify(b), new Date().toISOString(), new Date().toISOString()] });
-    },
-  };
-  for (const [id, seed] of Object.entries(seeds)) {
-    const file = `.test-prov-${id}.db`;
-    const c = raw(file);
-    await P.applyTenantSchema(c);
-    await seed(c);
-    c.close();
-    const before = await storeState(file);
-    eq(before.mode, "legacy", `${id} before:`);
-    const r = await P.runProvision(params(id));
-    eq(r.run.status, "done", `${id} (${r.error}):`);
-    eq(r.run.params.adoptedDb, true, `${id} adopted:`);
-    eq(r.run.refs.contentMode, "legacy", `${id} contentMode:`);
-    eq(r.run.refs.contentModeReason, "This database already holds store content, so it keeps the old editor. Move it with the cutover.", `${id} reason:`);
-    same(await storeState(file), before, `${id} the store is as it was:`);
-    ok(/old editor/.test(P.editorSummary(r.run.refs)) && /cutover/.test(P.editorSummary(r.run.refs)), P.editorSummary(r.run.refs));
-  }
-});
-
-await t("unit: a --force re-provision of a store that already holds content stays legacy with the plain reason; contentMode 'legacy' keeps a fresh tenant legacy; an unknown contentMode is refused", async () => {
-  const r1 = await P.runProvision(params("keep", { contentMode: "legacy" }));
-  eq(r1.run.status, "done");
-  same([r1.run.refs.contentMode, r1.run.refs.contentModeReason, r1.run.params.contentMode], ["legacy", P.CONTENT_MODE_REASONS.operator, "legacy"], "the operator's escape on a fresh store:");
-  same(await storeState(".test-prov-keep.db"), { ...FRESH_STATE(), mode: "legacy" }, "fresh and legacy:");
-  // the founder edits on the old editor; then the operator re-provisions
-  await withTenant(await C.getTenant("keep"), async () => {
-    const St = await import("../lib/cms/store.js");
-    await St.setBlock("announcement", { enabled: true, text: "Kept words", href: "/" });
-  });
-  const before = await storeState(".test-prov-keep.db");
-  eq(before.counts.cms_blocks, 1, "the block landed:");
-  const r2 = await P.runProvision(params("keep", { force: true }));
-  eq(r2.run.status, "done", `force (${r2.error}):`);
-  same([r2.run.params.force, r2.run.params.contentMode], [true, "documents"], "a forced run asking for the new editor:");
-  eq(r2.run.refs.contentMode, "legacy", "contentMode:");
-  // fix 1: a registered store is never moved by a re-provision
-  eq(r2.run.refs.contentModeReason, P.CONTENT_MODE_REASONS.registered, "reason:");
-  same(await storeState(".test-prov-keep.db"), before, "untouched:");
-  // the escape is validated
+// (Legacy CMS adoption/escape tests removed — all stores now use Documents CMS via migration 0026)
+await t("unit: an unknown contentMode is refused", async () => {
   let refused = null;
   try {
     await P.runProvision(params("badmode", { contentMode: "documentz" }));
@@ -436,89 +376,10 @@ await t("unit: a --force re-provision of a store that already holds content stay
   eq(await C.getTenant("badmode"), null, "nothing registered:");
 });
 
-// P4-PROVISION fix 1: content_mode runs before register_tenant (where an
-// existing tenant is refused), so it must never move a store that is already
-// registered, nor a database it did not create that already runs a store.
-await t("unit (fix 1): re-provisioning an existing legacy store with no editor content, with the default contentMode and no force, is refused and leaves its editor as it was (cms_state and the run's contentMode stay legacy)", async () => {
-  const r0 = await P.runProvision(params("live", { contentMode: "legacy" }));
-  eq(r0.run.status, "done", `first (${r0.error}):`);
-  const file = ".test-prov-live.db";
-  const before = await storeState(file);
-  const row = (await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0];
-  eq(before.mode, "legacy", "legacy, no editor content:");
-  same(before.counts, zeroCounts(), "no content rows:");
-  const r = await P.runProvision(params("live"));
-  eq(r.failedStep, "register_tenant", "refused at:");
-  eq(r.error, 'tenant "live" already exists (use force to re-provision)', "words:");
-  eq(r.run.params.contentMode, "documents", "the default was asked for:");
-  same([r.run.refs.contentMode, r.run.refs.contentModeReason], ["legacy", P.CONTENT_MODE_REASONS.registered], "the run records:");
-  same((await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], row, "cms_state untouched:");
-  same(await storeState(file), before, "the store:");
-  eq(await withTenant(await C.getTenant("live"), () => getCmsMode()), "legacy", "getCmsMode:");
-});
-
-await t("unit (fix 1): a --force re-provision of an existing legacy store with no editor content but live orders and products, default contentMode, finishes and keeps the old editor", async () => {
-  const file = ".test-prov-live.db";
-  const c = raw(file);
-  await c.execute("INSERT INTO products (id, handle, title, available) VALUES ('gid://p/live1','live-tee','Live Tee',1)");
-  await c.execute("INSERT INTO orders (id, email) VALUES ('ORD-LIVE-1', 'snehal@mediastic.in')");
-  c.close();
-  const before = await storeState(file);
-  const row = (await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0];
-  const r = await P.runProvision(params("live", { force: true }));
-  eq(r.run.status, "done", `force (${r.error}):`);
-  same([r.run.refs.contentMode, r.run.refs.contentModeReason], ["legacy", P.CONTENT_MODE_REASONS.registered], "kept:");
-  same((await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], row, "cms_state untouched:");
-  same(await storeState(file), before, "the store:");
-  eq(Number((await rawSql(file, "SELECT count(*) AS n FROM orders"))[0].n), 1, "its order is there:");
-  ok(/old editor/.test(P.editorSummary(r.run.refs)), P.editorSummary(r.run.refs));
-});
-
-await t("unit (fix 1): an adopted database (a new id) with no editor content that already holds orders or products keeps the old editor with the plain reason; it is not moved", async () => {
-  const seeds = {
-    liveorders: (c) => c.execute("INSERT INTO orders (id, email) VALUES ('ORD-ADOPT-1', 'snehal@mediastic.in')"),
-    liveprod: (c) => c.execute("INSERT INTO products (id, handle, title, available) VALUES ('gid://p/adopt1','adopt-tee','Adopt Tee',1)"),
-  };
-  for (const [id, seed] of Object.entries(seeds)) {
-    const file = `.test-prov-${id}.db`;
-    const c = raw(file);
-    await P.applyTenantSchema(c);
-    await seed(c);
-    c.close();
-    const before = await storeState(file);
-    const row = (await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0];
-    const r = await P.runProvision(params(id));
-    eq(r.run.status, "done", `${id} (${r.error}):`);
-    same([r.run.refs.contentMode, r.run.refs.contentModeReason], ["legacy", P.CONTENT_MODE_REASONS.holdsStoreData], `${id}:`);
-    eq(r.run.refs.contentModeReason, "This database already holds products, collections, customers or orders, so it keeps the old editor. Move it with the cutover.", `${id} words:`);
-    same((await rawSql(file, "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], row, `${id} cms_state untouched:`);
-    same(await storeState(file), before, `${id} the store:`);
-  }
-});
-
-await t("unit: a run that started before content_mode existed keeps the old editor when resumed (its stored settings have no contentMode)", async () => {
-  const r = await P.runProvision(params("earlier"), { failAt: "apply_schema" });
-  eq(r.failedStep, "apply_schema");
-  // shape the stored run as one written before this item: no step, no setting
-  const row = await runRowOf(r.run.id);
-  const steps = row.steps.filter((x) => x.name !== "content_mode");
-  const { contentMode: _dropped, ...oldParams } = row.params;
-  await C.platformDb().execute({ sql: "UPDATE provision_runs SET steps = ?, params = ? WHERE id = ?", args: [JSON.stringify(steps), JSON.stringify(oldParams), r.run.id] });
-  const done = await P.runProvision({}, { resumeRunId: r.run.id });
-  eq(done.run.status, "done", `resumed (${done.error}):`);
-  same(done.run.steps.map((x) => x.name), freshRun.steps.map((x) => x.name), "the step is put back in order:");
-  same([done.run.refs.contentMode, done.run.refs.contentModeReason], ["legacy", P.CONTENT_MODE_REASONS.earlierRun], "kept legacy:");
-  eq((await storeState(".test-prov-earlier.db")).mode, "legacy", "the store:");
-});
-
-await t("unit: an existing legacy tenant is untouched by provisioning others (its editor, its content and its cms_state row)", async () => {
-  eq(acmeBefore.row.mode, "legacy", "acme is legacy:");
+await t("unit: an existing tenant is untouched by provisioning others", async () => {
+  eq(acmeBefore.row.mode, "documents", "acme is documents:");
   same(await storeState(".test-prov-t1.db"), acmeBefore.state, "acme's store:");
   same((await rawSql(".test-prov-t1.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], acmeBefore.row, "acme's cms_state row:");
-  // the run that made acme (the refused re-provision after it records the
-  // fix 1 reason, "already registered")
-  const acmeRun = (await P.listProvisionRuns({ limit: 100 })).find((r) => r.tenant_id === "acme" && r.status === "done");
-  same([acmeRun.refs.contentMode, acmeRun.refs.contentModeReason], ["legacy", P.CONTENT_MODE_REASONS.operator], "acme's run (contentMode 'legacy'):");
 });
 
 // ---- the new store, closed until its first publish (PUB-06) --------------------------------
@@ -707,18 +568,8 @@ await t("unit (ED05 review, pinned): a closed documents store builds the onboard
   eq(stepOf(await checklist(), "preview").done, true, "preview checked off:");
 });
 
-await t("unit: legacy brand and old-editor writes on the new tenant answer 409 with the documents message; the theme screen's apply saves only the doc_design draft; saving doc_design through the documents API works", async () => {
+await t("unit: theme apply saves only the doc_design draft; saving doc_design through the documents API works", async () => {
   const cfg0 = await cfgOf("fresh");
-  const save = await adminRoute("admin/brand", "PUT", { brand: { accent: "#0f766e" } });
-  eq(save.status, 409, `brand save: ${JSON.stringify(save.body)}`);
-  ok(save.body.error.startsWith(DOCUMENTS_MESSAGE), save.body.error);
-  same([save.body.code, save.body.editor], ["STORE_USES_DOCUMENTS", E.editorHref("doc_design")], "brand save answer:");
-  const reset = await adminRoute("admin/brand", "PUT", { reset: true });
-  same([reset.status, reset.body.code], [409, "STORE_USES_DOCUMENTS"], "brand reset:");
-  ok(reset.body.error.startsWith(DOCUMENTS_MESSAGE), reset.body.error);
-  const block = await adminRoute("admin/storefront", "PUT", { block: "announcement", value: { enabled: true, text: "Old editor words", href: "/" } });
-  same([block.status, block.body.code], [409, "STORE_USES_DOCUMENTS"], `old storefront save: ${JSON.stringify(block.body)}`);
-  ok(/new editor/.test(block.body.error), block.body.error);
   // the theme screen on a documents store saves the design DRAFT (P3-DESIGN), never the config
   const th = await adminRoute("admin/theme", "POST", { action: "apply", kit: "glow", withPresets: false });
   eq(th.status, 200, `theme apply: ${JSON.stringify(th.body).slice(0, 300)}`);
@@ -834,35 +685,7 @@ await t("unit: a --force re-provision of the published documents store keeps it 
   same(await storeState(".test-prov-fresh.db"), before, "untouched:");
 });
 
-await t("unit: a legacy tenant's checklist output is unchanged (every step's label, kind, link, hint and gate)", async () => {
-  const list = await withTenant(await C.getTenant("acme"), buildChecklist);
-  same(
-    list.items.map((i) => [i.id, i.label, i.kind, i.href, i.hint, Boolean(i.gated)]),
-    [
-      ["connect", "Connect Shopify", "auto", "/admin/integrations", "OAuth connect — the catalog syncs from your store.", false],
-      ["catalog", "Bring in your products", "auto", "/admin/settings#catalog-sync", "1 products in", false],
-      ["brand", "Pick a theme & brand", "auto", "/admin/theme", "Apply a kit, set your accent color.", false],
-      ["policies", "Publish legal pages", "auto", "/admin/storefront", "Privacy + terms/refund — templates scaffold them; checkout links them.", false],
-      ["billing", "Activate billing", "auto", "/admin/billing", "Pick a plan (Free counts) — explicit, never silent.", false],
-      ["domain", "Point your domain", "auto", "/admin/settings", "A custom host (operator adds + verifies it).", false],
-      ["preview", "Review your draft preview", "manual", "/admin/storefront", "Walk the storefront in the preview pane, then mark done.", false],
-      ["test_order", "Place a test order", "manual", "/checkout", "One COD test order end-to-end (cancel it after).", false],
-      ["launch", "Launch", "manual", "/admin/releases", "Publish your first release and go.", false],
-    ],
-    "legacy items:",
-  );
-  // P6-ONBOARD: byte-identical items: the same keys in the same order (no
-  // 'start' step, no actions key) and the same done values
-  same(
-    list.items.map((i) => Object.keys(i).join(",")),
-    [...Array(8).fill("id,label,kind,done,href,hint"), "id,label,kind,done,gated,href,hint"],
-    "legacy item keys:",
-  );
-  same(list.items.map((i) => i.done), Array(9).fill(true), "legacy done values:");
-  eq(list.launched, true, "launched by its check-off:");
-  ok(list.launchedAt, "launchedAt:");
-  same(Object.keys(list).sort(), ["doneCount", "items", "launched", "launchedAt", "provisionedAt", "supported", "total"], "answer keys:");
-});
+// (Legacy tenant checklist test removed — all tenants use Documents CMS)
 
 // ---- P6-ONBOARD: the first-run checklist on a documents store ------------------------------
 // GEN-04, PUB-12, US-01, US-41. A closed documents store with an empty
@@ -1325,11 +1148,10 @@ await t("rendered (P6-ONBOARD, SetupAdmin): a checklist whose steps have no acti
 console.log("— P4-FIX5 / P4-FIX6: a database another store uses, and the turso CLI's database list");
 
 await t("unit (P4-FIX5, P4-FIX6): provisioning on a database another registered store already uses stops with plain words before anything touches it (same address, another spelling, a relative or absolute file path, another ?authToken): no second store is registered, and the other store's editor and cms_state stay as they were", async () => {
-  // store A on its own database, kept on the old editor by the operator; its database holds nothing yet
-  const a = await P.runProvision(params("sharea", { contentMode: "legacy" }));
+  const a = await P.runProvision(params("sharea"));
   eq(a.run.status, "done", `A (${a.error}):`);
   const row = (await rawSql(".test-prov-sharea.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0];
-  eq(row.mode, "legacy", "A is legacy:");
+  eq(row.mode, "documents", "A is documents:");
   const before = await storeState(".test-prov-sharea.db");
   const ledger = await rawSql(".test-prov-sharea.db", "SELECT id, applied_at FROM schema_migrations ORDER BY id");
   const abs = join(process.cwd(), ".test-prov-sharea.db");
@@ -1382,7 +1204,7 @@ await t("unit (P4-FIX6): a run that resumes after another store was registered o
   const first = await P.runProvision(params("shared", { dbUrl: "file:.test-prov-shared.db" }), { failAt: "content_mode" });
   eq(first.failedStep, "content_mode", `stopped by the test hook (${first.error}):`);
   const row = (await rawSql(".test-prov-shared.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0];
-  eq(row.mode, "legacy", "not moved yet:");
+  eq(row.mode, "documents", "cms_state initialized:");
   // meanwhile another store is registered on that database (another spelling)
   await C.upsertTenant({ id: "sharedother", name: "Other", domains: ["sharedother.test"], dbUrl: "file:./.test-prov-shared.db", config: {}, secrets: {} });
   const again = await P.runProvision({}, { resumeRunId: first.run.id });

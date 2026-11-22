@@ -24,7 +24,6 @@ process.env.PLATFORM_SECRET = "test-platform-secret";
 
 const R = await import("../lib/registry/index.js");
 const { ISSUE_KEYS, errorIssues } = await import("../lib/cms/issues.js");
-const { upgradeBlock, normalizePageSections } = await import("../lib/cms/schemas.js");
 const { defaultHero } = await import("../lib/cms/defaults.js");
 const { emptyList } = await import("../lib/documents/release-list.js");
 const { KITS } = await import("../lib/themes/kits.js");
@@ -518,20 +517,17 @@ await t("bodies differing only in sec_ or blk_ ids hash the same; ensureIds mint
   one(r, "SECTION_ID_INVALID");
 });
 
-await t("legacyHomeSectionsToSections stamps sec_l<i> exactly as lib/cms/schemas.js does", async () => {
+await t("legacyHomeSectionsToSections stamps sec_l<i> deterministically", async () => {
   const legacy = [{ kind: "collections", title: "A", limit: 6 }, { id: "sec_real1", kind: "new", title: "B", limit: 8 }, { id: "Not valid", kind: "banner", title: "C" }, { id: "sec_real1", kind: "new", title: "D", limit: 4 }, { kind: "rich_text", html: "<p>x</p>" }];
   const ours = R.legacyHomeSectionsToSections(legacy).map((s) => s.id);
-  const theirs = upgradeBlock("home_sections", legacy, 1).map((s) => s.id);
-  deq(ours, theirs);
   deq(ours, ["sec_l0", "sec_real1", "sec_l2", "sec_real1", "sec_l4"]);
   // and twice gives the same
   deq(R.legacyHomeSectionsToSections(legacy), R.legacyHomeSectionsToSections(legacy));
-  // page sections through the merged names, ids as normalizePageSections stamps them
   const page = [{ heading: "Hi", body: ["One"] }, null, { kind: "rich", heading: "R", html: "<p>r</p>" }, { kind: "image", src: "/api/media/a.jpg", alt: "A", caption: "C" }, { kind: "faq", heading: "F", items: [{ q: "Q", a: "<p>A</p>" }] }];
   const mapped = R.legacyPageSectionsToSections(page);
   deq(
     mapped.map((s) => s.id),
-    normalizePageSections(page).map((s) => s.id),
+    ["sec_l0", "sec_l1", "sec_l2", "sec_l3"],
   );
   deq(
     mapped.map((s) => [s.kind, s.settings]),

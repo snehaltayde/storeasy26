@@ -96,6 +96,10 @@ await backing.execute({
   sql: "INSERT INTO variants (id, product_id, title, price, currency, available) VALUES (?, ?, 'Choc', 1000, 'INR', 1)",
   args: [VARIANT, PRODUCT],
 });
+const { emptyList } = await import("../lib/content/documents-reader.js");
+const openNow = new Date().toISOString();
+await backing.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_at, published_at) VALUES ('rel_open', ?, 'h', 'open', ?, ?)", args: [JSON.stringify(emptyList()), openNow, openNow] });
+await backing.execute({ sql: "INSERT OR REPLACE INTO release_state (id, live_release_id, updated_at) VALUES (1, 'rel_open', ?)", args: [openNow] });
 
 const CART = {
   items: [{ variantId: VARIANT, productId: PRODUCT, title: "Whey", variantTitle: "Choc", image: null, price: 1000, quantity: 2, lineTotal: 2000, discount: 0 }],

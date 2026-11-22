@@ -75,14 +75,13 @@ for (const f of dbs) await rm(join(ROOT, f), { force: true });
 const C = await import("../lib/platform/control.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { libsql, currentDatabase } = await import("../lib/db.js");
-const S = await import("../lib/cms/store.js");
 const X = await import("../lib/experiments.js");
 const Reg = await import("../lib/registry/index.js");
 const Svc = await import("../lib/documents/service.js");
 const Pub = await import("../lib/documents/publish.js");
 const { resolveHomeSectionData } = await import("../lib/cms/section-data.js");
 const { createPreviewSession } = await import("../lib/preview-sessions.js");
-const { PREVIEW_COOKIE } = await import("../lib/cms/candidates.js");
+const { PREVIEW_COOKIE } = await import("../lib/preview-sessions.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 
 let pass = 0;
@@ -379,66 +378,9 @@ await t("every registered kind's root element carries data-section-id and data-s
 });
 
 // =====================================================================================
-console.log("— 2. legacy stores render exactly as at a6d028e");
-// =====================================================================================
+// (Section 2 legacy a6d028e HTML parity removed — Legacy CMS retired)
 const then = JSON.parse(await readFile(join(here, "fixtures/home-render-outputs.a6d028e.json"), "utf8"));
-const run = spawnSync(process.execPath, [join(here, "support/home-render-outputs.js"), join(ROOT, OUTPUTS)], {
-  cwd: ROOT,
-  encoding: "utf8",
-  timeout: 90_000,
-  env: { ...process.env, HOME_RENDER_DB_PREFIX: ".test-sr-rec" },
-});
-const now = run.status === 0 ? JSON.parse(await readFile(join(ROOT, OUTPUTS), "utf8")) : null;
 
-await t("the recorder ran in this checkout", () => {
-  ok(now, `home-render-outputs.js failed: ${run.stderr?.slice(-800)}`);
-  same(Object.keys(now.states), ["drafts", "exp_b", "exp_control", "exp_founder", "exp_preview", "candidate", "v1", "v2", "v3", "empty"], "states:");
-});
-
-const LABEL = {
-  drafts: "legacy drafts",
-  exp_b: "a running hero experiment, a visitor in variant b",
-  exp_control: "a running hero experiment, a visitor in control",
-  exp_founder: "a running hero experiment, a browser signed in to the console",
-  exp_preview: "a running hero experiment, the founder's preview",
-  candidate: "an S59 preview candidate",
-  v1: "a v1 release",
-  v2: "a v2 release",
-  v3: "a v3 release",
-  empty: "an empty store",
-};
-for (const [state, label] of Object.entries(LABEL)) {
-  await t(`${label}: the home page and every content page equal a6d028e's HTML (data-section-* taken out)`, () => {
-    ok(now, "no output");
-    const a = then.states[state];
-    const b = now.states[state];
-    ok(a && b, `state ${state} missing`);
-    const cmp = (old, cur, what) => {
-      const n = normalize(cur);
-      if (n === old) return;
-      let i = 0;
-      while (i < old.length && old[i] === n[i]) i++;
-      throw new Error(`${what} differs at ${i}:\n      a6d028e: ${old.slice(Math.max(0, i - 120), i + 160)}\n      now:     ${n.slice(Math.max(0, i - 120), i + 160)}`);
-    };
-    cmp(a.home, b.home, "home");
-    same(Object.keys(b.pages), Object.keys(a.pages), "pages:");
-    for (const slug of Object.keys(a.pages)) cmp(a.pages[slug], b.pages[slug], `page ${slug}`);
-    if (state !== "empty") ok(/data-section-id="sec_hero" data-section-kind="hero"/.test(b.home), "the hero has no section attributes");
-  });
-}
-
-await t("the fixtures are what they claim: in stock, rails above minItems, the variant and the candidate visible", () => {
-  const d = then.states;
-  ok(!/Sold out/.test(Object.values(d).map((s) => s.home).join("")), "a fixture shows a sold-out product");
-  ok(/Glow, <span class="text-sf-hero-accent">simply<\/span>/.test(d.exp_b.home), "variant b's title is not in exp_b");
-  ok(!/simply/.test(d.exp_control.home) && !/simply/.test(d.exp_founder.home) && !/simply/.test(d.exp_preview.home), "the variant leaked");
-  ok(/A test is running on this section/.test(d.exp_preview.home), "the preview note is missing");
-  ok(/data-exp-ping|Candidate/.test(d.candidate.home) && /Candidate banner/.test(d.candidate.home), "the candidate is not shown");
-  ok(/data-sec="i-0"/.test(d.v1.home), "v1's id-less sections should key by index");
-  for (const s of ["drafts", "v1", "v2", "v3"]) ok(/data-sec="sec_rail01"|data-sec="i-5"/.test(d[s].home), `${s}: a rail is missing`);
-});
-
-// =====================================================================================
 console.log("— 3. a documents store (v4)");
 // =====================================================================================
 await t("a v4 home with a hero image renders the image and its alt through StoreImage (a library photo stays its own url)", async () => {
@@ -479,24 +421,15 @@ await t("a v4 home whose hero is hidden renders without a hero, with no error, a
   ok(!/data-exp-ping/.test(h), "a hidden hero pinged an experiment");
 });
 
-await t("a v4 home's rails never read collection_overrides (plan decision 9); a legacy store's rails still do and follow the pin", async () => {
+await t("a v4 home's rails never read collection_overrides (plan decision 9)", async () => {
   await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("product_rail", "sec_rail1", { title: "Serums", collection: { handle: "serums", id: COL(1) }, limit: 3 })]);
   const v4 = await inV4(() => watch(() => renderHome("srv.test")));
   same(v4.statements.filter((q) => /collection_overrides/i.test(q)), [], "v4 statements on collection_overrides:");
   const v4Rail = v4.result.match(/data-section-id="sec_rail1"[\s\S]*?<\/section>/)?.[0] || "";
   same([...v4Rail.matchAll(/href="\/products\/([^"]+)"/g)].map((m) => m[1]), ["glow-serum", "night-cream", "dew-drops"], "v4 rail order (the collection's own):");
-
-  await inLeg(async () => {
-    await S.setBlock("hero", { title: "Legacy hero" });
-    await S.setBlock("home_sections", [{ id: "sec_rail1", kind: "product_rail", title: "Serums", collection: "serums", collection_id: COL(1), limit: 3 }]);
-  });
-  const leg = await inLeg(() => watch(() => renderHome("srl.test")));
-  eq(leg.statements.filter((q) => /collection_overrides/i.test(q)).length, 1, "legacy statements on collection_overrides:");
-  const legRail = leg.result.match(/data-section-id="sec_rail1"[\s\S]*?<\/section>/)?.[0] || "";
-  same([...legRail.matchAll(/href="\/products\/([^"]+)"/g)].map((m) => m[1]), ["dew-drops", "glow-serum", "night-cream"], "legacy rail order (the pin first):");
 });
 
-await t("section-data: documents: true never asks for pins; a legacy call does, and says the order is hand-picked", async () => {
+await t("section-data: never asks for legacy pins", async () => {
   const calls = [];
   const repo = {
     getNewestProducts: async () => [],
@@ -509,10 +442,6 @@ await t("section-data: documents: true never asks for pins; a legacy call does, 
   const v4 = await resolveHomeSectionData([rail], { repo, documents: true });
   same(calls, ["products:serums:[]"], "v4 calls:");
   eq(v4.get("sec_r1").handPicked, false, "v4 handPicked:");
-  calls.length = 0;
-  const leg = await resolveHomeSectionData([rail], { repo });
-  same(calls, ["pins:serums", 'products:serums:["p2"]'], "legacy calls:");
-  eq(leg.get("sec_r1").handPicked, true, "legacy handPicked:");
 });
 
 await t("an experiment variant merged with heroVariantSettings changes only the variant's fields (v4: the image, badge and other button stay)", async () => {
@@ -1094,21 +1023,10 @@ await t("a binding that failed: cause source_unknown says 'Remove it and add it 
   }
 });
 
-await t("a legacy preview shows no hidden note (the scope only a documents preview sets); the same section in a documents preview does", async () => {
+await t("a documents preview shows the hidden note for a hidden section", async () => {
   const drop = hiddenKinds();
   try {
     const hid = sec("fake_hidden", "sec_hid1");
-    const legacyToken = await inLeg(() => legacyPreviewToken());
-    const leg = await inRequest("srl.test", { [PREVIEW_COOKIE]: legacyToken }, async (src) => {
-      ok(src.preview === true && src.mode === "draft", `not a legacy preview: ${JSON.stringify({ preview: src.preview, mode: src.mode })}`);
-      return { home: home([hid]), view: view(hid, {}, { surface: "home", secKey: "sec_hid1" }), founder: isFounderPreview({}), cell: html(React.createElement(FounderNote, { ctx: {}, text: "A cell was dropped." })) };
-    });
-    eq(leg.home, "", "legacy preview, HomeSections:");
-    eq(leg.view, "", "legacy preview, SectionView:");
-    eq(leg.founder, false, "legacy preview, isFounderPreview:");
-    eq(leg.cell, "", "legacy preview, FounderNote:");
-    const legPage = await renderHomeIn("srl.test", { _unit: "unit-sections-plain", [PREVIEW_COOKIE]: legacyToken });
-    ok(!/data-hidden-reason|hidden from shoppers/.test(legPage), "the legacy preview page holds a hidden note");
     const docs = await inRequest("srv.test", { [PREVIEW_COOKIE]: await previewToken() }, async () => home([hid]));
     ok(docs.includes(HIDDEN_WHY_HTML), `documents preview: ${docs}`);
   } finally {

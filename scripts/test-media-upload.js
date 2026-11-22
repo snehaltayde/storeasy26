@@ -1388,7 +1388,7 @@ const code = async (rel) =>
     .replace(/^\s*\/\/.*$/gm, "");
 
 await t("MediaAdmin and MediaPicker both upload through uploadImage and hold no copy of their own", async () => {
-  for (const rel of ["components/admin/MediaAdmin.js", "components/admin/cms/MediaPicker.js"]) {
+  for (const rel of ["components/admin/MediaAdmin.js", "components/admin/shared/MediaPicker.js"]) {
     const s = await code(rel);
     includes(s, 'import { uploadImage } from "@/lib/media-upload"', `${rel}:`);
     includes(s, "uploadImage(file, { onProgress: setUploading })", `${rel}:`);
@@ -1434,7 +1434,7 @@ async function libraryUpload({ result, fetch = async () => ({ json: async () => 
 
 async function pickerUpload({ result, closeDuringUpload = false, closeDuringLoad = false }) {
   const state = { uploading: "in flight", error: "old error", selected: [], loads: 0, toasts: [], errorToasts: [], input: { value: "C:\\fakepath\\IMG_0042.jpg" } };
-  const body = await sliceOf("components/admin/cms/MediaPicker.js", "async function upload(file)", "const filtered = useMemo");
+  const body = await sliceOf("components/admin/shared/MediaPicker.js", "async function upload(file)", "const filtered = useMemo");
   const make = new Function("uploadImage", "uploadMessage", "session", "setUploading", "setUploadErr", "load", "onSelect", "toast", "fileRef", `${body}\nreturn upload;`);
   const session = { current: 1 };
   const upload = make(
@@ -1506,7 +1506,7 @@ await t("picker closed during an upload that fails: a toast says so, not a banne
 });
 
 await t("picker: every open and every close counts, so reopening for another spot doesn't catch an old upload", async () => {
-  const body = await sliceOf("components/admin/cms/MediaPicker.js", "useEffect(() => {\n    session.current++", "async function upload(file)");
+  const body = await sliceOf("components/admin/shared/MediaPicker.js", "useEffect(() => {\n    session.current++", "async function upload(file)");
   includes(body, "}, [open]);");
   const session = { current: 0 };
   const opened = [];
@@ -1530,7 +1530,7 @@ await t("the progress banner draws nothing while idle, and something while uploa
 });
 
 await t("picker grid shows the preview when there is one", async () => {
-  const body = await sliceOf("components/admin/cms/MediaPicker.js", "const thumbOf =", "return (\n    <Dialog");
+  const body = await sliceOf("components/admin/shared/MediaPicker.js", "const thumbOf =", "return (\n    <Dialog");
   const thumbOf = new Function(`${body}\nreturn thumbOf;`)();
   eq(thumbOf({ url: "/api/media/med_1", variants: [{ variant: "thumb", id: "med_2" }] }), "/api/media/med_2");
   eq(thumbOf({ url: "/api/media/med_1", variants: [] }), "/api/media/med_1");
@@ -1541,11 +1541,11 @@ await t("the JSX shows what the handlers set", async () => {
   includes(admin, '{error && <Banner tone="danger">{error}</Banner>}');
   includes(admin, "onChange={(e) => e.target.files?.length && upload([...e.target.files])}");
   includes(admin, "disabled={!!uploading}", "library input waits for the upload:");
-  const picker = await code("components/admin/cms/MediaPicker.js");
+  const picker = await code("components/admin/shared/MediaPicker.js");
   includes(picker, '{uploadErr && <Banner tone="danger">{uploadErr}</Banner>}');
   includes(picker, "onChange={(e) => upload(e.target.files?.[0])}");
   includes(picker, "busy={!!uploading}", "picker button waits for the upload:");
-  const input = await sliceOf("components/admin/cms/MediaPicker.js", "<input\n", "/>");
+  const input = await sliceOf("components/admin/shared/MediaPicker.js", "<input\n", "/>");
   ok(!input.includes("disabled"), "the picker's hidden input stays usable, the button opens it:");
   const banner = await code("components/admin/MediaUploadStatus.js");
   includes(banner, "{progressLabel(progress)}");

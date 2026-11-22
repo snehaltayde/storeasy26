@@ -462,34 +462,7 @@ await t("rendered: each old screen redirects to the editor in documents mode, be
   eq((await run("storefront/designer/page.js", { mode: "documents" })).redirect, "/admin/editor?doc=doc_home", "the Designer is never reached on a documents store:");
 });
 
-// The screens in legacy and migrating: the same markup as the same file
-// with its one P3-ROUTES redirect line taken out.
-const withoutRedirect = (src) => {
-  const lines = src.split("\n");
-  const kept = lines.filter((l) => !/redirect\(editorHref\(/.test(l));
-  if (kept.length !== lines.length - 1) throw new Error(`expected exactly one redirect line, found ${lines.length - kept.length}`);
-  return kept.join("\n");
-};
-await t("rendered: each old screen renders as before in legacy and migrating (same markup as without the redirect line)", async () => {
-  for (const [route, file] of Object.entries(ROUTE_FILES)) {
-    const src = await readFile(join(AUTHED, file), "utf8");
-    const before = await run(file, { mode: "legacy", source: withoutRedirect(src) });
-    ok(before.html && before.html.includes(SHOWS[route]), `${route}: the screen's own content is missing: ${String(before.html).slice(0, 300)}`);
-    for (const mode of ["legacy", "migrating"]) {
-      const r = await run(file, { mode });
-      ok(!r.redirect, `${route} (${mode}) redirected to ${r.redirect}`);
-      ok(r.html === before.html, `${route} (${mode}) renders differently from before`);
-      ok(r.modeReads === 1, `${route} (${mode}): ${r.modeReads} mode reads`);
-    }
-  }
-});
-
-await t("rendered: an old screen whose mode read fails renders as before (its writes still refuse on their own fresh read)", async () => {
-  for (const [route, file] of Object.entries(ROUTE_FILES)) {
-    const r = await run(file, { modeThrows: true });
-    ok(!r.redirect && r.html.includes(SHOWS[route]), `${route}: ${r.redirect || String(r.html).slice(0, 200)}`);
-  }
-});
+// Legacy screens now redirect straight to the editor in all modes (Legacy CMS retired).
 
 // ---- 3. rendered: the console nav ----------------------------------------------
 console.log("— the console nav");
@@ -523,7 +496,7 @@ await t("rendered: SidebarNav in documents mode links the storefront to /admin/e
   ok(s.filter((h) => h === "/admin/editor").length === 1 && !s.includes("/admin/storefront/designer") && !s.includes("/admin/brand"), `shell: ${s}`);
 });
 
-await t("P3-FIX3 rendered: the phone drawer, rendered open, gets cmsMode too: documents links to the editor, legacy is unchanged", () => {
+await t("P3-FIX3 rendered: the phone drawer, rendered open, links to the editor", () => {
   const docs = shell({ cmsMode: "documents", drawerOpen: true });
   const drawer = docs.slice(docs.indexOf("<dialog"), docs.indexOf("</dialog>"));
   ok(drawer.includes("Close menu"), "the drawer is open");
@@ -534,36 +507,13 @@ await t("P3-FIX3 rendered: the phone drawer, rendered open, gets cmsMode too: do
   // on an editor route the drawer is the only nav, and it has the mode too
   const ed = shell({ cmsMode: "documents", drawerOpen: true }, "/admin/editor");
   ok(hrefs(ed).includes("/admin/editor") && !hrefs(ed).includes("/admin/storefront/designer"), `editor route drawer: ${hrefs(ed)}`);
-  // legacy: the open drawer is the legacy nav
-  const legacy = shell({ cmsMode: "legacy", drawerOpen: true });
-  const lDrawer = hrefs(legacy.slice(legacy.indexOf("<dialog"), legacy.indexOf("</dialog>")));
-  eq(lDrawer, hrefs(shell({ drawerOpen: true }).slice(shell({ drawerOpen: true }).indexOf("<dialog"))).slice(0, lDrawer.length), "legacy drawer as without a mode:");
-  ok(lDrawer.includes("/admin/storefront/designer") && !lDrawer.includes("/admin/editor"), `legacy drawer: ${lDrawer}`);
   // closed (the default), the drawer renders no links
   eq(hrefs(shell({ cmsMode: "documents" })).filter((h) => h === "/admin/editor").length, 1, "closed, only the desktop sidebar:");
 });
 
-await t("rendered: SidebarNav outside documents mode is exactly the legacy nav", () => {
-  pathname = "/admin/storefront/home";
-  const base = renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "owner", badges: {} }));
-  for (const cmsMode of [null, "legacy", "migrating", "", "DOCUMENTS"]) {
-    eq(renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "owner", badges: {}, cmsMode })), base, `${cmsMode}:`);
-  }
-  eq(hrefs(base), LEGACY_ALL, "legacy links in order:");
-  ok(Nav.navGroups("legacy") === Nav.NAV_GROUPS && Nav.navGroups(undefined) === Nav.NAV_GROUPS, "legacy groups are not the same object");
-  ok(Nav.navGroups("documents") !== Nav.NAV_GROUPS && Nav.NAV_GROUPS.find((g) => g.label === "Storefront").items.length === 10, "documents mode changed NAV_GROUPS itself");
-  // staff: role filtering is unchanged in documents mode
+await t("rendered: SidebarNav role filtering works for staff", () => {
   const staff = hrefs(renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "staff", cmsMode: "documents" })));
   ok(staff.includes("/admin/editor") && !staff.includes("/admin/settings") && !staff.includes("/admin/setup"), `staff: ${staff}`);
-});
-
-await t("rendered: ConsoleShell's legacy output is unchanged by the cmsMode prop", () => {
-  for (const path of ["/admin/dashboard", "/admin/storefront", "/admin/storefront/designer", "/admin/storefront/designer/product"]) {
-    const base = shell({}, path);
-    for (const cmsMode of [null, "legacy", "migrating"]) eq(shell({ cmsMode }, path), base, `${path} ${cmsMode}:`);
-  }
-  const html = shell({});
-  eq(hrefs(html).filter((h) => LEGACY_STOREFRONT.includes(h)), LEGACY_STOREFRONT, "the sidebar carries every legacy storefront link (the drawer renders nothing while closed):");
 });
 
 await t("rendered: the (authed) layout passes the mode it reads to the shell, best-effort", async () => {
@@ -592,9 +542,8 @@ await t("rendered: the (authed) layout passes the mode it reads to the shell, be
   S.modeThrows = false;
 });
 
-// P6-NAV (GEN-04, US-01): the logo and colours can be found after the store
-// opens. Documents only; the legacy nav is pinned unchanged just above.
-await t("P6-NAV rendered: the documents nav has 'Logo and colours' -> /admin/start right after Editor, for owners and staff; the legacy nav has no such link", () => {
+// P6-NAV (GEN-04, US-01): the logo and colours can be found after the store opens.
+await t("P6-NAV rendered: the nav has 'Logo and colours' -> /admin/start right after Editor, for owners and staff", () => {
   pathname = "/admin/start";
   const html = renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "owner", cmsMode: "documents", badges: {} }));
   const links = hrefs(html);
@@ -604,312 +553,8 @@ await t("P6-NAV rendered: the documents nav has 'Logo and colours' -> /admin/sta
   const store = Nav.navGroups("documents").find((g) => g.label === "Storefront").items;
   eq(store[1], { id: "start", label: "Logo and colours", href: "/admin/start" }, "the item (not admin-only):");
   ok(hrefs(renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "staff", cmsMode: "documents" }))).includes("/admin/start"), "staff see it");
-  for (const cmsMode of [null, "legacy", "migrating"]) {
-    const l = renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "owner", cmsMode, badges: {} }));
-    ok(!hrefs(l).includes("/admin/start") && !l.includes("Logo and colours"), `${cmsMode}: the legacy nav links to /admin/start`);
-  }
-  ok(!Nav.NAV_GROUPS.some((g) => g.items.some((it) => it.id === "start")), "NAV_GROUPS itself changed");
   // both sidebars of the shell (the drawer open)
   eq(hrefs(shell({ cmsMode: "documents", drawerOpen: true })).filter((h) => h === "/admin/start").length, 2, "desktop and drawer:");
-});
-
-// ---- 4. the Designer: a failed candidate push --------------------------------------
-console.log("— the Designer's failed preview push (PV-01)");
-let H = null;
-const hookReact = new Proxy(React, {
-  get: (target, key) => (H && (key === "useState" || key === "useRef" || key === "useEffect" || key === "useContext") ? H[key] : target[key]),
-});
-function shallow(Component, props) {
-  const states = [];
-  const refs = [];
-  const lastDeps = [];
-  let effects = [];
-  let ei = 0;
-  let si = 0;
-  let ri = 0;
-  const h = {
-    useState(init) {
-      const k = si++;
-      if (!(k in states)) states[k] = typeof init === "function" ? init() : init;
-      return [states[k], (v) => (states[k] = typeof v === "function" ? v(states[k]) : v)];
-    },
-    useRef(init) {
-      const k = ri++;
-      if (!(k in refs)) refs[k] = { current: init ?? null };
-      return refs[k];
-    },
-    // runs like React: on the first pass, then only when a dependency changed
-    useEffect(fn, deps) {
-      const k = ei++;
-      const prev = lastDeps[k];
-      const changed = !deps || !prev || deps.length !== prev.length || deps.some((d, i) => !Object.is(d, prev[i]));
-      if (changed) effects.push(() => ((lastDeps[k] = deps), fn()));
-    },
-    useContext: () => null,
-  };
-  const s = {
-    render() {
-      si = ri = ei = 0;
-      effects = [];
-      const prev = H;
-      H = h;
-      try {
-        s.tree = Component(props);
-      } finally {
-        H = prev;
-      }
-      return s;
-    },
-    runEffects: () => effects.map((fn) => fn()),
-  };
-  return s.render();
-}
-// every element in the tree, through children AND element-valued props
-// (EditorShell gets the tree, preview and inspector as props)
-function* walk(node) {
-  if (node == null || typeof node !== "object") return;
-  if (Array.isArray(node)) {
-    for (const n of node) yield* walk(n);
-    return;
-  }
-  if (!node.props) return;
-  yield node;
-  for (const v of Object.values(node.props)) if (v && typeof v === "object") yield* walk(v);
-}
-const find = (tree, pred) => {
-  for (const el of walk(tree)) if (pred(el)) return el;
-  return null;
-};
-const textOf = (node) => {
-  if (node == null || typeof node === "boolean") return "";
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (Array.isArray(node)) return node.map(textOf).join("");
-  return textOf(node.props?.children);
-};
-
-const API = { pushes: [], answers: [] };
-const designerLoad = world({
-  "next/navigation": { usePathname: () => "/admin/storefront/designer", useRouter: () => ({ push() {}, refresh() {}, replace() {} }) },
-  "next/link": { __esModule: true, default: ({ href, children, ...rest }) => React.createElement("a", { href, ...rest }, children) },
-  "@/components/admin/StoreSwitcher": { __esModule: true, default: () => null },
-  "@/components/console/Toast": { useToast: () => ({ success() {}, info() {}, error() {} }) },
-  "./api": {
-    getStorefrontView: async () => ({ ok: false }),
-    saveBlock: async () => ({ ok: false }),
-    resetBlock: async () => ({ ok: false }),
-    getHistory: async () => ({ ok: true, history: [] }),
-    startPreview: async () => ({ ok: true, url: "/api/preview?token=x", to: "/" }),
-    saveCandidate: async (payload) => {
-      API.pushes.push(payload);
-      return API.answers.shift() ?? { ok: true };
-    },
-  },
-  "./useDirtyGuard": { useDirtyGuard() {} },
-  "./MediaPicker": { MediaPicker: () => null },
-  "./RefPicker": { CollectionPicker: () => null, ProductPicker: () => null, refLabel: (x) => x?.title || "" },
-  "@/lib/cms/registry": await import("../lib/cms/registry.js"),
-  "@/lib/cms/defaults": await import("../lib/cms/defaults.js"),
-});
-const DESIGNER = join(ROOT, "components/admin/cms/Designer.js");
-const DesignerMod = await designerLoad(DESIGNER);
-const IsoDesigner = (await designerLoad(DESIGNER, { overrides: { react: hookReact } })).default;
-const { Banner } = await designerLoad(join(ROOT, "components/console/Banner.js"));
-const designerInitial = {
-  customized: { hero: true, announcement: false, home_sections: true },
-  revisions: { hero: 1, announcement: null, home_sections: 2 },
-  blocks: {
-    hero: { title: "Skin first", primary: { label: "Shop", href: "/collections" }, secondary: { label: "", href: "" } },
-    announcement: { enabled: true, text: "Sale", href: "" },
-    home_sections: [{ id: "sec_1", kind: "collections", title: "Shop by collection", enabled: true }],
-  },
-};
-const flush = async () => {
-  for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
-};
-
-// The Designer up to a connected preview with an unsaved hero edit; each
-// call to push() runs one candidate push (the 700 ms timer, run at once).
-async function designerSession() {
-  const listeners = [];
-  const timers = [];
-  const realSetTimeout = globalThis.setTimeout;
-  globalThis.window = { location: { origin: "http://localhost" }, addEventListener: (type, fn) => type === "message" && listeners.push(fn), removeEventListener() {}, open() {} };
-  const s = shallow(IsoDesigner, { initial: designerInitial, tests: {} });
-  s.runEffects(); // mints the preview
-  await flush();
-  s.render();
-  for (const fn of listeners) fn({ origin: "http://localhost", source: undefined, data: { type: "storeasy:ready" } });
-  s.render();
-  find(s.tree, (el) => el.type === "button" && "data-tree-pick" in el.props && textOf(el).includes("Hero")).props.onClick();
-  s.render();
-  const pickHero = () => {
-    find(s.tree, (el) => el.type === "button" && "data-tree-pick" in el.props && textOf(el).includes("Hero")).props.onClick();
-    s.render();
-  };
-  const typeTitle = (v) => {
-    if (!find(s.tree, (el) => el.props?.id === "ins-hero-title")) pickHero();
-    find(s.tree, (el) => el.props?.id === "ins-hero-title").props.onChange({ target: { value: v } });
-    s.render();
-  };
-  const push = async () => {
-    timers.length = 0;
-    globalThis.setTimeout = (fn) => (timers.push(fn), 0);
-    try {
-      s.runEffects();
-    } finally {
-      globalThis.setTimeout = realSetTimeout;
-    }
-    for (const fn of timers) await fn();
-    await flush();
-    s.render();
-  };
-  const preview = () => find(s.tree, (el) => typeof el.type === "function" && el.props?.preview)?.props.preview;
-  const status = () => textOf(find(preview(), (el) => el.props?.role === "status"));
-  const banner = () => find(preview(), (el) => el.type === Banner && el.props.title === "The preview didn't update");
-  const done = () => delete globalThis.window;
-  return { s, typeTitle, push, status, banner, done };
-}
-
-await t("unit: candidateFailure words every failure plainly, never as 'nothing was saved' from a save", () => {
-  const F = DesignerMod.candidateFailure;
-  ok(typeof F === "function", "Designer does not export candidateFailure");
-  const cases = [
-    [{ ok: false, error: "We couldn't reach Storeasy, so nothing was saved. …", code: "NETWORK" }, /couldn't reach Storeasy, so the preview didn't update/],
-    [{ ok: false, issues: [{ severity: "error", message: "Add a title.", sectionId: "hero" }], errors: ["Hero: Add a title."] }, /something in your edits needs fixing/],
-    [{ ok: false, errors: ["Header menu, item 2: that link goes nowhere."] }, /didn't update: Header menu, item 2: that link goes nowhere\./],
-    [{ ok: false, error: "The preview isn't open any more. Reopen the preview, then keep editing.", code: "NO_PREVIEW", status: 409 }, /isn't open any more/],
-    [{ ok: false, error: "Something failed (DB_DOWN), so nothing was saved.", code: "DB_DOWN", status: 503 }, /went wrong on our side \(error 503\), so the preview didn't update/],
-    [{ ok: false, error: "x", code: "UNREADABLE_RESPONSE", status: 502 }, /error 502/],
-    [{ ok: false }, /went wrong on our side, so the preview didn't update/],
-  ];
-  for (const [res, re] of cases) {
-    const f = F(res);
-    ok(re.test(f.message), `${JSON.stringify(res)} -> ${f.message}`);
-    ok(f.message.includes("still shows an earlier version"), `doesn't say the frame is stale: ${f.message}`);
-    ok(!/nothing was saved\./.test(f.message), `reads like a failed save: ${f.message}`);
-  }
-  eq(F(cases[3][0]).reopen, true, "an expired preview offers to reopen:");
-  eq(F(cases[0][0]).reopen, false, "a network failure doesn't:");
-  eq(F(cases[1][0]).issues.length, 1, "the issues ride along:");
-});
-
-await t("P3-FIX3 unit: candidateFailure keeps a 5xx answer's own plain message, and on a migrating store doesn't suggest Save will work", () => {
-  const F = DesignerMod.candidateFailure;
-  const mode = F({ ok: false, status: 503, code: "CMS_MODE_UNAVAILABLE", error: "We couldn't check which editor this store uses, so nothing was saved. Try again in a minute." });
-  eq(mode.message.startsWith("We couldn't check which editor this store uses, so the preview didn't update. Try again in a minute."), true, `its own words: ${mode.message}`);
-  ok(!/nothing was saved\./.test(mode.message) && mode.message.includes("still shows an earlier version"), mode.message);
-  const plain503 = F({ ok: false, status: 503, code: "BUSY", error: "The store is busy right now." });
-  ok(plain503.message.startsWith("The store is busy right now. The preview didn't update."), plain503.message);
-  // a message with a code in it, or none, still gets the generic words
-  ok(/went wrong on our side \(error 503\)/.test(F({ ok: false, status: 503, code: "DB_DOWN", error: "Something failed (DB_DOWN), so nothing was saved." }).message), "a code in the message");
-  ok(/went wrong on our side \(error 500\)/.test(F({ ok: false, status: 500 }).message), "no message");
-  // migrating: the refusal's words, and no promise that Save works
-  const mig = F({ ok: false, status: 409, code: "STORE_USES_DOCUMENTS", error: "This store is moving to the new editor right now, so the preview didn't change. Make this change in the new editor once the move is done." });
-  ok(mig.message.startsWith("This store is moving to the new editor right now") && mig.message.includes("still shows an earlier version"), mig.message);
-  ok(!/until you press Save/.test(mig.message) && /can't be saved here/.test(mig.message), `no Save promise: ${mig.message}`);
-  ok(/until you press Save/.test(F({ ok: false, status: 409, code: "NO_PREVIEW", error: "The preview isn't open any more." }).message), "other answers still say Save keeps them");
-});
-
-await t("rendered: a failed push shows a plain message, and the label stops saying the preview shows the edits", async () => {
-  const d = await designerSession();
-  try {
-    ok(/Preview shows your last save/.test(d.status()), `before: ${d.status()}`);
-    d.typeTitle("Skin first, always");
-    API.answers.push({ ok: true });
-    await d.push();
-    ok(/UNSAVED edits/.test(d.status()) && !d.banner(), `after a good push: ${d.status()}`);
-    eq(API.pushes.at(-1)?.hero?.title, "Skin first, always", "pushed:");
-
-    d.typeTitle("Skin first, always and");
-    API.answers.push({ ok: false, error: "We couldn't reach Storeasy, so nothing was saved.", code: "NETWORK" });
-    await d.push();
-    const b = d.banner();
-    ok(b, "no message after a failed push (it was swallowed)");
-    const html = renderToStaticMarkup(b);
-    ok(html.includes("We couldn&#x27;t reach Storeasy, so the preview didn&#x27;t update") && html.includes("still shows an earlier version"), html);
-    ok(!/UNSAVED edits/.test(d.status()) && /didn't update/.test(d.status()), `the label still claims the edits: ${d.status()}`);
-
-    // the next push that works clears it
-    d.typeTitle("Skin first, always and ever");
-    API.answers.push({ ok: true });
-    await d.push();
-    ok(!d.banner() && /UNSAVED edits/.test(d.status()), `after recovering: ${d.status()}`);
-  } finally {
-    d.done();
-  }
-});
-
-await t("rendered: an incomplete section names the section and links to it; an expired preview offers Reopen", async () => {
-  const d = await designerSession();
-  try {
-    d.typeTitle("");
-    API.answers.push({ ok: false, issues: [{ severity: "error", code: "REQUIRED", message: "Add a title.", sectionId: "sec_1" }], errors: ["Add a title."] });
-    await d.push();
-    const b = d.banner();
-    ok(b, "no message for an incomplete section");
-    const link = find(b, (el) => el.type === "button" && /Section 1/.test(textOf(el)));
-    ok(link, `the issue doesn't name its section: ${renderToStaticMarkup(b)}`);
-    link.props.onClick();
-    d.s.render();
-    ok(find(d.s.tree, (el) => el.type === "button" && "data-tree-pick" in el.props && el.props["aria-current"] && /Shop by collection/.test(textOf(el))), "clicking the issue didn't select the section");
-
-    API.answers.push({ ok: false, error: "The preview isn't open any more. Reopen the preview, then keep editing.", code: "NO_PREVIEW", status: 409 });
-    d.typeTitle("x");
-    await d.push();
-    const reopen = d.banner()?.props.actions;
-    ok(reopen && textOf(reopen) === "Reopen preview", `no Reopen: ${renderToStaticMarkup(d.banner())}`);
-
-    API.answers.push({ ok: false, error: "boom, nothing was saved", code: "INTERNAL", status: 500 });
-    d.typeTitle("y");
-    await d.push();
-    // P3-FIX3: a 5xx answer's own plain words are kept, worded for the preview
-    ok(/boom, so the preview didn(&#x27;|')t update/.test(renderToStaticMarkup(d.banner())) && !d.banner().props.actions, `a server error: ${renderToStaticMarkup(d.banner())}`);
-  } finally {
-    d.done();
-  }
-});
-
-await t("P3-FIX3 rendered: 'Reopen preview' clears the failed-push message, and so does undoing the edits back to the last save", async () => {
-  const d = await designerSession();
-  try {
-    // an expired preview, then Reopen
-    API.answers.push({ ok: false, error: "The preview isn't open any more. Reopen the preview, then keep editing.", code: "NO_PREVIEW", status: 409 });
-    d.typeTitle("Skin first, again");
-    await d.push();
-    const reopen = d.banner()?.props.actions;
-    ok(reopen && textOf(reopen) === "Reopen preview", "Reopen is offered");
-    reopen.props.onClick();
-    await flush();
-    d.s.render();
-    ok(!d.banner(), `Reopen clears it: ${d.banner() && renderToStaticMarkup(d.banner())}`);
-  } finally {
-    d.done();
-  }
-  const e = await designerSession();
-  try {
-    API.answers.push({ ok: false, error: "We couldn't reach Storeasy, so nothing was saved.", code: "NETWORK" });
-    e.typeTitle("Skin first, typed");
-    await e.push();
-    ok(e.banner(), "the failed push shows");
-    const before = API.pushes.length;
-    e.typeTitle("Skin first"); // back to the last save: nothing dirty
-    await e.push();
-    eq(API.pushes.length, before, "nothing is pushed:");
-    ok(!e.banner() && /Preview shows your last save/.test(e.status()), `undoing the edits clears it: ${e.status()}`);
-  } finally {
-    e.done();
-  }
-});
-
-await t("P3-FIX3 unit: editorHref encodes the id", () => {
-  eq(E.editorHref("doc a&b=c"), "/admin/editor?doc=doc%20a%26b%3Dc", "encoded:");
-  eq([E.editorHref(""), E.editorHref(null)], ["/admin/editor", "/admin/editor"], "none:");
-});
-
-await t("rendered: Designer's static render is unchanged when nothing failed (no banner)", () => {
-  const html = renderToStaticMarkup(React.createElement(DesignerMod.default, { initial: designerInitial }));
-  ok(!html.includes("data-preview-push-failed") && !html.includes("The preview didn"), "a failure message on first render");
-  ok(html.includes("data-editor-shell"), "not the Designer");
 });
 
 // ---- P4-SCAFFOLD: product and collection addresses, document ids, editability --

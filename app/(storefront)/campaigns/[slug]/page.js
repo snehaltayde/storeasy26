@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import ContentPage from "@/components/ContentPage";
 import TrackEvent from "@/components/analytics/TrackEvent";
 import { resolvedContentPage } from "@/lib/content/resolve";
-import { campaignVisible } from "@/lib/cms/store";
+import { campaignVisible } from "@/lib/content/pages";
 import { pickUtmParams, appendUtmToHtml } from "@/lib/content/utm";
 import { siteLegalName } from "@/lib/site";
 import { tfetch } from "@/lib/storefront-request";

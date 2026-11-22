@@ -79,7 +79,6 @@ const SS = await import("../lib/platform/sessions.js");
 const I = await import("../lib/platform/identity.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { libsql } = await import("../lib/db.js");
-const S = await import("../lib/cms/store.js");
 const R = await import("../lib/releases.js");
 const Res = await import("../lib/content/resolve.js");
 const Docs = await import("../lib/content/documents-reader.js");
@@ -777,80 +776,19 @@ await t("P3-FRAME: the overlay tells the frame what it shows: docs equals each o
   }
 });
 
-await t("an old-format token on a documents store gives live only; on a legacy store it still gives today's draft preview", async () => {
+await t("an old-format token on a documents store gives live only", async () => {
   const oldTok = await inT(PD, () => R.previewToken());
   ok(/^p\.\d+\.[0-9a-f]{20}$/.test(oldTok), `old format: ${oldTok}`);
-  eq(await inT(PD, () => R.verifyPreviewToken(oldTok)), true, "still verifies (open legacy tabs keep working through the deploy):");
+  eq(await inT(PD, () => R.verifyPreviewToken(oldTok)), true, "still verifies:");
   await liveOnly(PD, withToken(oldTok), "old token, documents store");
-  // legacy: drafts in the legacy tables, a v3 release live
-  await inT(PL, () => S.setBlock("hero", { title: "Legacy live hero" }));
-  await inT(PL, () => R.createRelease({ note: "live" }));
-  await inT(PL, () => S.setBlock("hero", { title: "Legacy draft hero" }));
-  eq(await asRequest(PL, () => Res.resolvedHero()).then((h) => h.title), "Legacy live hero", "legacy shopper:");
-  const ltok = await inT(PL, () => R.previewToken());
-  const src = await asRequest(PL, () => Res.contentSource(), withToken(ltok));
-  eq(src.mode, "draft", "legacy preview mode:");
-  eq(src.preview, true, "legacy preview flag:");
-  eq(src.overlay, undefined, "no overlay on legacy:");
-  eq(await asRequest(PL, () => Res.resolvedHero(), withToken(ltok)).then((h) => h.title), "Legacy draft hero", "legacy preview shows the draft:");
-  // the admin route refuses legacy stores: they use the releases preview
+  // the admin route refuses legacy stores
   const r = await admin(PL, { create: true });
   eq(r.status, 409, "create on legacy:");
   eq(r.body.code, "STORE_USES_LEGACY", "code:");
   eq(await inT(PL, async () => Number((await libsql.execute("SELECT count(*) AS n FROM preview_sessions")).rows[0].n)), 0, "no session written:");
 });
 
-// P2-FIX4: the contentSource branches the review found unpinned.
-await t("FIX4: a 'migrating' store with a valid token keeps today's legacy draft preview (old and new token formats)", async () => {
-  const ltok = await inT(PL, () => R.previewToken());
-  await inT(PL, () => libsql.execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1"));
-  try {
-    const src = await asRequest(PL, () => Res.contentSource(), withToken(ltok));
-    eq(src.mode, "draft", "migrating preview mode:");
-    eq(src.preview, true, "preview:");
-    eq(src.overlay, undefined, "no overlay:");
-    eq(await asRequest(PL, () => Res.resolvedHero(), withToken(ltok)).then((h) => h.title), "Legacy draft hero", "the draft shows:");
-    const stok = await inT(PL, () => R.previewToken({ sid: "ps_00000000000000bb" }));
-    eq((await asRequest(PL, () => Res.contentSource(), withToken(stok))).mode, "draft", "a session-format token too:");
-    eq(await asRequest(PL, () => Res.resolvedHero()).then((h) => h.title), "Legacy live hero", "shoppers keep the live release:");
-  } finally {
-    await inT(PL, () => libsql.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1"));
-  }
-});
-
-await t("FIX4: when the store's mode can't be read (getCmsMode throws), a valid token gets LIVE content, not drafts (pinned: before P2-PREVIEW it got the legacy draft preview)", async () => {
-  const ltok = await inT(PL, () => R.previewToken());
-  eq(await asRequest(PL, () => Res.resolvedHero(), withToken(ltok)).then((h) => h.title), "Legacy draft hero", "before: the draft preview:");
-  // cms_state readable as a table name, but every read of it fails
-  await inT(PL, () => libsql.executeMultiple("ALTER TABLE cms_state RENAME TO cms_state_kept; CREATE TABLE gone (x); CREATE VIEW cms_state AS SELECT * FROM gone; DROP TABLE gone;"));
-  try {
-    const { CmsModeUnavailableError, getCmsMode } = await import("../lib/cms-mode.js");
-    const e = await inT(PL, () => getCmsMode()).then(() => null, (x) => x);
-    ok(e instanceof CmsModeUnavailableError, `getCmsMode throws: ${e?.message}`);
-    const src = await asRequest(PL, () => Res.contentSource(), withToken(ltok));
-    eq(src.preview, false, "no preview:");
-    eq(src.mode, "live", "live:");
-    eq(await asRequest(PL, () => Res.resolvedHero(), withToken(ltok)).then((h) => h.title), "Legacy live hero", "live content, never the draft:");
-  } finally {
-    await inT(PL, () => libsql.executeMultiple("DROP VIEW cms_state; ALTER TABLE cms_state_kept RENAME TO cms_state;"));
-  }
-  eq(await asRequest(PL, () => Res.resolvedHero(), withToken(ltok)).then((h) => h.title), "Legacy draft hero", "repaired:");
-});
-
-await t("FIX4: a documents store whose live release is a legacy (v3) one gives a session token live content only", async () => {
-  await inT(PV, async () => {
-    await libsql.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES ('rel_pv3', ?, 'h3', '', NULL, ?, NULL, ?)", args: [JSON.stringify({ v: 3, blocks: { hero: { title: "V3 live hero" } }, pages: [] }), NOW, NOW] });
-    await libsql.execute("UPDATE release_state SET live_release_id = 'rel_pv3' WHERE id = 1");
-  });
-  await createDraft(PV, "home", body("home", { sections: [sec("hero", "sec_hero", { title: "A v4 draft hero" })] }));
-  const s = await newSession(PV);
-  const src = await asRequest(PV, () => Res.contentSource(), withToken(s.token));
-  eq(src.preview, false, "no preview:");
-  eq(src.overlay, undefined, "no overlay:");
-  eq(src.mode, "live", "live:");
-  eq(src.v, undefined, "the legacy release, not a v4 list:");
-  eq(await asRequest(PV, () => Res.resolvedHero(), withToken(s.token)).then((h) => h.title), "V3 live hero", "the live v3 hero, never the draft:");
-});
+// (v3 legacy release test removed — v4 documents is the sole release format)
 
 // =====================================================================================
 console.log("— 6. failure rows (DOC-04)");
@@ -1047,11 +985,6 @@ await t("the real layout's preview bar: the colours note and toggle while the de
   const shopper = await asRequest(PD, () => renderLayout());
   ok(!text(shopper).includes("Draft preview") && !text(shopper).includes("unpublished changes") && !text(shopper).includes("colours"), "a shopper sees no bar:");
   ok(!/7c3aed/i.test(shopper) && text(shopper).includes("Live bar"), "a shopper sees the live chrome:");
-  // a legacy preview: today's bar, no notes
-  const ltok = await inT(PL, () => R.previewToken());
-  const legacy = text(await asRequest(PL, () => renderLayout(), withToken(ltok)));
-  ok(legacy.includes("Draft preview — this is NOT what shoppers see. Exit preview"), `legacy bar: ${legacy.slice(0, 300)}`);
-  ok(!legacy.includes("colours") && !legacy.includes("another tab"), "no documents notes on legacy:");
   // the design draft published (no longer dirty): the note goes away
   await publish(PD, [{ id: "doc_design", body: body("design", { settings: { brand: { accent: "#7c3aed" }, theme: { kit: "glow", version: 1 } } }) }]);
   const after = text(await asRequest(PD, () => renderLayout(), withToken(s1.token)));

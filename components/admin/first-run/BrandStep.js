@@ -8,7 +8,7 @@ import { Banner } from "@/components/console/Banner";
 import { Button } from "@/components/console/Button";
 import { Field, Input } from "@/components/console/fields";
 import { cx } from "@/components/console/cx";
-import { MediaPicker } from "@/components/admin/cms/MediaPicker";
+import { MediaPicker } from "@/components/admin/shared/MediaPicker";
 import { PALETTES } from "@/lib/themes/palettes";
 import { brandCssVars } from "@/lib/brand";
 

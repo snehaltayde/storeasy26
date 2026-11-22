@@ -70,7 +70,6 @@ for (const f of dbs) await rm(join(ROOT, f), { force: true });
 const C = await import("../lib/platform/control.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { libsql } = await import("../lib/db.js");
-const S = await import("../lib/cms/store.js");
 const R = await import("../lib/releases.js");
 const Res = await import("../lib/content/resolve.js");
 const Reg = await import("../lib/registry/index.js");
@@ -586,11 +585,6 @@ const fvDocs = await inT(FV, async () => {
   const aboutD = await upsert("page", withBody("page", { meta: { slug: "about", title: "Our story, drafted" }, sections: [sec("text", "sec_ab", { title: "Who we are", body: ["Two friends.", "One kitchen.", "Small batches, drafted."] })] }), about.id);
   return { home: homeD, about: aboutD, off };
 });
-// FL: a legacy store with a v3 release live
-await inT(FL, async () => {
-  await S.setBlock("hero", { title: "Legacy live hero" });
-  await R.createRelease({ note: "live" });
-});
 
 const require = createRequire(import.meta.url);
 const React = require("react");
@@ -708,18 +702,12 @@ const BEFORE = {
   "v4 layout, a cart cookie": "79ade2b433d32f0fb9a380fd46b8a372af8897530c5e32be0cb1a163dd176d8e",
   "v4 home page": "67b92590eac9c4e6de604980d52f252024f47d400221d351cd358d29137703e9",
   "v4 about page": "fc6d186ec3df743eb9c63d499fd1474c6ae40459a22290d484c64df371be671f",
-  "legacy layout, no cookies": "d962e06cd052d93af8d60e0b4cfb60f6345ab981e79d95378c708412cd60a553",
-  "legacy layout, _admin": "d962e06cd052d93af8d60e0b4cfb60f6345ab981e79d95378c708412cd60a553",
-  "legacy home page": "ef91e06f0412ee58780710db0a54e65b44dafc5939e71439a250a16f1f2b9725",
 };
 const shopperRenders = async () => ({
   "v4 layout, no cookies": await layoutHtml(FV),
   "v4 layout, a cart cookie": await layoutHtml(FV, { _cart: "cart_none" }),
   "v4 home page": await homeHtml(FV),
   "v4 about page": await pageHtml(FV, "about"),
-  "legacy layout, no cookies": await layoutHtml(FL),
-  "legacy layout, _admin": await layoutHtml(FL, { _admin: "x" }),
-  "legacy home page": await homeHtml(FL),
 });
 if (RECORD) {
   const out = {};
@@ -784,10 +772,6 @@ await t("no preview cookie plus _admin (or _platform) on a documents store's liv
   const mx = await layoutHtml(FV, { _mx: "x" });
   same(bridgesIn(mx), [], "_mx: no bridge:");
   ok(!mx.includes("Edit this page"), "_mx: no link");
-  // legacy: today's HTML exactly (also pinned by the byte-equality test)
-  const leg = await layoutHtml(FL, { _admin: "x" });
-  same(bridgesIn(leg), [], "legacy: no bridge:");
-  ok(!leg.includes("Edit this page"), "legacy: no link");
 });
 
 await t("rendered: EditThisPage renders only with no preview and a console cookie, with href /admin/editor?path=…; never without the cookie, never in a preview", async () => {
@@ -828,12 +812,6 @@ await t("a valid documents session renders the banner: 'You're seeing your unpub
   ok(!text(await layoutHtml(FV, { [Res.PREVIEW_COOKIE]: s.token }, "/about")).includes("This page is offline"), "not on another page");
   // shoppers: nothing changed for them
   ok(!/offline/i.test(text(await layoutHtml(FV, {}, "/policies/returns"))), "shopper sees no offline line");
-  // a legacy preview keeps today's words and gets the bridge with reason legacy
-  const lt = await inT(FL, () => R.previewToken());
-  const lh = await layoutHtml(FL, { [Res.PREVIEW_COOKIE]: lt });
-  ok(text(lh).includes("Draft preview — this is NOT what shoppers see. Exit preview"), "legacy words:");
-  same(bridgesIn(lh), [{ ok: false, reason: "legacy" }], "legacy bridge:");
-  ok(!/data-doc=|data-field=/.test(lh), "no attributes in a legacy preview");
 });
 
 console.log("— 3. preview-only attributes");
@@ -901,7 +879,6 @@ await t("rendered: the hero title, a button label, a text paragraph (body.2) and
   ok(!/data-field=|data-doc=/.test(live), "a live home page carries a preview attribute");
   ok(!/data-field=|data-doc=/.test(await pageHtml(FV, "about")), "a live page carries a preview attribute");
   ok(!/data-field=|data-doc=/.test(await homeHtml(FV, { _admin: "x" })), "a console cookie alone adds none");
-  ok(!/data-field=|data-doc=/.test(await homeHtml(FL, { [Res.PREVIEW_COOKIE]: await inT(FL, () => R.previewToken()) })), "a legacy preview adds none");
 });
 
 await t("annotateFields: first match wins in document order, nothing is marked twice, and a section with nothing to mark is returned as it is", () => {

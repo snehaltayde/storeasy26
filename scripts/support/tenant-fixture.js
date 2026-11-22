@@ -374,6 +374,15 @@ export async function makeTenant({ name, stage = "latest", products = [], id, co
       c.close();
     }
     if (r.contentMode !== "documents") throw new Error(`tenant-fixture: the store did not move to documents: ${r.contentModeReason}`);
+  } else if (mode === "legacy" && (stage === "latest" || stage >= "0021")) {
+    const c = createClient({ url });
+    try {
+      await c.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
+    } catch {
+      // pre-0021 stage without cms_state
+    } finally {
+      c.close();
+    }
   }
 
   let list;

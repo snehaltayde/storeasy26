@@ -8,7 +8,7 @@ import { Drawer } from "../Drawer";
 import { IconButton } from "../Button";
 import { SidebarNav } from "./SidebarNav";
 import StoreSwitcher from "@/components/admin/StoreSwitcher";
-import { isEditorRoute } from "@/components/admin/cms/editorLayout";
+import { isEditorRoute } from "@/components/admin/shared/editorLayout";
 
 // Merchant console shell (S50): fixed role-aware sidebar (collapsible,
 // persisted), store context pinned at top, role + sign-out pinned at

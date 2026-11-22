@@ -12,7 +12,7 @@ import { ConfirmDialog, Dialog } from "@/components/console/Dialog";
 import { Field, Input, Select } from "@/components/console/fields";
 import { SkeletonText, EmptyState } from "@/components/console/bits";
 import { cx } from "@/components/console/cx";
-import { ProductPicker, VariantPicker } from "@/components/admin/cms/RefPicker";
+import { ProductPicker, VariantPicker } from "@/components/admin/shared/RefPicker";
 import { OFFER_KINDS, OFFER_TYPE_NAMES, currencySign, defaultOfferTitle, money, offerDetails, offerSentence, offerWarnings, plainErrors, staleNameWarning } from "@/lib/offers/plain";
 import { TARGET_CHOICES, formFromOffer, formProblems, newOfferId, offerFromForm, randomSuffix, reachOf, sameSettings, schedulePayload, updateForm, when } from "./offerFormModel";
 

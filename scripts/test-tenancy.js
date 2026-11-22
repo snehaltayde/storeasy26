@@ -189,26 +189,25 @@ await t("getCart computes per-tenant (offers table isolation)", async () => {
   eq(c2.items.length, 0, "same cart id in t2 is EMPTY — full isolation");
 });
 
-// --- P4-PROVISION (MIG-03): only the provisioning step moves a NEW store to
-// documents; the schema alone, the env store (_default) and the fixture
-// tenants built with it stay on the old editor ---------------------------------
-await t("P4-PROVISION: applyTenantSchema alone leaves cms_state 'legacy'; the env store (_default) and schema-built tenants read as legacy", async () => {
+// --- Legacy CMS retired (migration 0026): applyTenantSchema initializes
+// cms_state to 'documents' with no live release ---------------------------------
+await t("Schema-built tenants start in 'documents' mode with no live release", async () => {
   const { createClient } = await import("@libsql/client");
   const { applyTenantSchema } = await import("../lib/platform/provision.js");
   const { getCmsMode } = await import("../lib/cms-mode.js");
   const c = createClient({ url: "file:.test-tenancy-t3.db" });
   await applyTenantSchema(c);
   const row = (await c.execute("SELECT mode FROM cms_state WHERE id = 1")).rows[0];
-  eq(row?.mode, "legacy", "a database given only the schema:");
+  eq(row?.mode, "documents", "a database given only the schema:");
   const live = (await c.execute("SELECT live_release_id FROM release_state WHERE id = 1")).rows[0];
   eq(live?.live_release_id ?? null, null, "no live release:");
   c.close();
   eq(tenantId(), "_default", "outside a tenant the store is _default:");
-  eq(await getCmsMode(), "legacy", "the env store (_default):");
-  eq(await withTenant(T1, () => getCmsMode()), "legacy", "t1:");
-  eq(await withTenant(T2, () => getCmsMode()), "legacy", "t2:");
+  eq(await getCmsMode(), "documents", "the env store (_default):");
+  eq(await withTenant(T1, () => getCmsMode()), "documents", "t1:");
+  eq(await withTenant(T2, () => getCmsMode()), "documents", "t2:");
   const T3 = { ...T2, id: "t3", dbUrl: "file:.test-tenancy-t3.db" };
-  eq(await withTenant(T3, () => getCmsMode()), "legacy", "a tenant on the schema-only database:");
+  eq(await withTenant(T3, () => getCmsMode()), "documents", "a tenant on the schema-only database:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

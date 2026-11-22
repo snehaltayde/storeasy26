@@ -86,7 +86,6 @@ const W = await import("../lib/platform/worker.js");
 const J = await import("../lib/platform/jobs.js");
 const Reporting = await import("../lib/reporting.js");
 const OffersCat = await import("../lib/offers/catalog.js");
-const { upsertPlacement } = await import("../lib/cms/placements.js");
 const { handleRefsGet } = await import("../lib/admin/refs.js");
 const { handleDocumentsPut } = await import("../lib/admin/documents-api.js");
 const S = await import("../lib/platform/sessions.js");
@@ -847,21 +846,6 @@ await t("the offer, bundle and upsell pickers find a renamed product by its new 
   const b = await adminRoute(docs, "bundles", "POST", { check: { items: [{ variantId, quantity: 1 }, { variantId: "gid://shopify/ProductVariant/91421", quantity: 1 }], bundle_price: 10 } });
   eq(b.status, 200, `bundles: ${JSON.stringify(b.body).slice(0, 200)}`);
   eq(b.body.compat.components.map((c) => c.title), ["Picker Renamed Forty", "Fixture product 42"], "bundle components:");
-});
-
-await t("the upsells route lists targets with the published name and Shopify's beside it; with no live rows its answer is as before plus the name", async () => {
-  // a legacy store (placements are a legacy write) with a live row written directly
-  await legacy.run(() => upsertPlacement({ kind: "cart_upsell", targetProductIds: [P(1), P(2)], title: "Pairs well" }));
-  const before = await adminRoute(legacy, "upsells", "GET");
-  eq(before.status, 200, "GET:");
-  eq(before.body.placements[0].targets, [{ handle: H(1), state: "ok", title: "Fixture product 1" }, { handle: H(2), state: "ok", title: "Fixture product 2" }], "no live rows:");
-  await raw(legacy).execute({ sql: "INSERT INTO product_content_live (product_id, document_id, version_id, title, published_at) VALUES (?, 'doc_prod_x', 'ver_x', 'Upsell Renamed One', ?)", args: [P(1), new Date().toISOString()] });
-  const after = await adminRoute(legacy, "upsells", "GET");
-  eq(after.body.placements[0].targets[0], { handle: H(1), state: "ok", title: "Upsell Renamed One", shopify_title: "Fixture product 1" }, "renamed:");
-  eq(after.body.placements[0].target_handles, [H(1), H(2)], "the handles the form edits are unchanged:");
-  const pick = await refsGet(legacy, `type=product&q=${encodeURIComponent("Upsell Renamed")}`);
-  eq(pick.body.items.map((i) => i.id), [P(1)], "the upsell form's picker finds it:");
-  await raw(legacy).execute({ sql: "DELETE FROM product_content_live WHERE product_id = ?", args: [P(1)] });
 });
 
 await t("top products: renaming a product keeps one row with the current published name; a store with no live rows reads Shopify's names as before", async () => {

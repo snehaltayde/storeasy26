@@ -397,7 +397,7 @@ await t("unit (test-media-picker): choosing a library image in ImageControl stor
   const picker = Idx.createLibraryPicker(() => {});
   const chosen = [];
   await withFetch(sf.fetch, async () => {
-    const view = await mount("components/admin/cms/MediaPicker.js", "MediaPicker", () => ({ open: true, onClose: picker.close, onSelect: (sel) => (chosen.push(sel), picker.select(sel)) }), { inflight: sf.inflight });
+    const view = await mount("components/admin/shared/MediaPicker.js", "MediaPicker", () => ({ open: true, onClose: picker.close, onSelect: (sel) => (chosen.push(sel), picker.select(sel)) }), { inflight: sf.inflight });
     eq(sf.calls.map((c) => [c.method, c.url]), [["GET", "/api/admin/media"]], "the picker reads the library:");
     const offered = view.nodes().filter((n) => n.type === "button" && typeof n.props.title === "string").map((n) => n.props.title.split(" — ")[0]);
     ok(offered.includes("kept-jar.png"), `the kept file is offered: ${offered}`);

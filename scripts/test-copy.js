@@ -563,7 +563,6 @@ await t("marketing-only routes stay 404 on a store's own address", async () => {
 const C = await import("../lib/platform/control.js");
 const { withTenant, tenantShippingConfig } = await import("../lib/tenant-context.js");
 const { libsql, db } = await import("../lib/db.js");
-const S = await import("../lib/cms/store.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 const repo = await import("../lib/repo.js");
 const sectionData = await import("../lib/cms/section-data.js");
@@ -689,13 +688,14 @@ async function renderHome({ emptyCatalogSrc = realEmptyCatalog, stats = null, he
     "@/lib/cms/defaults": cmsDefaults,
     // resolve.js needs a request; a store with no release reads drafts, which is these getters
     "@/lib/content/resolve": {
-      resolvedHero: async () => ({ ...(await S.getHero()), ...hero }),
-      resolvedHomeSections: S.getHomeSections,
-      resolvedHomePage: async () => [registryLegacy.legacyHeroToSection({ ...(await S.getHero()), ...hero }), ...registryLegacy.legacyHomeSectionsToSections(await S.getHomeSections())],
-      resolvedCollectionsIndex: S.getCollectionsIndex,
-      contentSource: async () => ({ mode: "draft", content: null, preview: false }), // a shopper, not a preview (PV-08)
+      resolvedHero: async () => ({ ...cmsDefaults.defaultHero(site.siteName()), ...hero }),
+      resolvedHomeSections: async () => cmsDefaults.DEFAULT_HOME_SECTIONS,
+      resolvedHomePage: async () => [registryLegacy.legacyHeroToSection({ ...cmsDefaults.defaultHero(site.siteName()), ...hero }), ...registryLegacy.legacyHomeSectionsToSections(cmsDefaults.DEFAULT_HOME_SECTIONS)],
+      resolvedCollectionsIndex: async () => cmsDefaults.DEFAULT_COLLECTIONS_INDEX,
+      contentSource: async () => ({ mode: "live", content: null, preview: false }),
     },
     "@/lib/tenant-request": { tfetch: inShop },
+    "@/lib/storefront-request": { tfetch: inShop },
   });
   return renderToStaticMarkup(await page.default());
 }
@@ -732,8 +732,9 @@ await t("empty catalog (rendered): collections index shows exactly the shopper m
     "next/link": passthrough,
     "@/components/CollectionCard": nothing,
     "@/lib/repo": repo,
-    "@/lib/content/resolve": { resolvedCollectionsIndex: S.getCollectionsIndex },
+    "@/lib/content/resolve": { resolvedCollectionsIndex: async () => cmsDefaults.DEFAULT_COLLECTIONS_INDEX },
     "@/lib/tenant-request": { tfetch: inShop },
+    "@/lib/storefront-request": { tfetch: inShop },
   });
   const html = renderToStaticMarkup(await page.default());
   assertClean(html, "empty collections");
@@ -765,8 +766,8 @@ await t("error page (rendered): plain words, no status code, no gym voice", asyn
 
 await t("code defaults: a store with nothing set reads neutral", async () => {
   const seen = await inShop(async () => ({
-    hero: await S.getHero(),
-    sections: await S.getHomeSections(),
+    hero: cmsDefaults.DEFAULT_HERO,
+    sections: cmsDefaults.DEFAULT_HOME_SECTIONS,
     tagline: site.siteTagline(),
     footer: site.siteFooterTagline(),
     title: site.siteTitle(),
@@ -775,25 +776,6 @@ await t("code defaults: a store with nothing set reads neutral", async () => {
   assertClean(JSON.stringify(seen), "default content");
   eq(seen.name, "Acme Candles", "own name, never another store's:");
   ok(!/shopify|storefront/i.test(seen.tagline), `tagline talks about the platform: ${seen.tagline}`);
-  const { COMPONENTS } = await import("../lib/cms/registry.js");
-  assertClean(JSON.stringify(COMPONENTS), "section registry");
-});
-
-// The Home editor isn't scanned (it is a console file), but what its "add section"
-// buttons start with can reach shoppers. Read from the real source; a move fails loudly.
-await t("home editor: a new section starts with nothing a shopper could be shown unedited", async () => {
-  const block = (await readFile(join(ROOT, "components/admin/cms/HomeEditor.js"), "utf8")).match(/const NEW_SECTION = (\{[\s\S]*?\n\});/);
-  ok(block, "NEW_SECTION has moved in the Home editor");
-  const NEW_SECTION = new Function(`return ${block[1]}`)();
-  eq(NEW_SECTION.new.title, "New arrivals", "newest products:");
-  eq(NEW_SECTION.collections.title, "Shop by collection", "collections:");
-  assertClean(JSON.stringify(NEW_SECTION), "new sections");
-  eq(`${NEW_SECTION.banner.title}${NEW_SECTION.banner.text}${NEW_SECTION.banner.label}`, "", "a new banner has no words of its own:");
-  eq(`${NEW_SECTION.rich_text.title}${NEW_SECTION.rich_text.html}`, "", "a new rich text section has no words of its own:");
-  const { validateBlock } = await import("../lib/cms/validate.js");
-  eq(validateBlock("home_sections", [NEW_SECTION.banner]).ok, false, "an unedited banner can't be saved:");
-  eq(validateBlock("home_sections", [NEW_SECTION.rich_text]).ok, false, "an unedited rich text section can't be saved:");
-  ok(validateBlock("home_sections", [{ ...NEW_SECTION.banner, title: "Hello" }]).ok, "a banner the founder typed saves");
 });
 
 await t("automation emails: the rule's name stays out of a shopper's email", async () => {
@@ -812,20 +794,9 @@ await t("automation emails: the rule's name stays out of a shopper's email", asy
   });
 });
 
-await t("BeastLife keeps its stored voice: only code defaults changed", async () => {
-  const stored = "Science-backed protein, creatine and pre-workout — browse the full catalog at ludicrous speed.";
-  await inBl(() => S.setBlock("hero", { title: "Go Beast Mode.", highlight: "Beast", subtitle: stored, primary: { label: "Shop", href: "/collections" }, secondary: { label: "New", href: "#new" } }));
-  const bl = await inBl(async () => ({ hero: await S.getHero(), tagline: site.siteTagline(), about: S.defaultPage("about"), shipping: await S.getContentPage("shipping") }));
-  eq(bl.hero.subtitle, stored, "stored hero wins:");
+await t("BeastLife keeps its stored tagline", async () => {
+  const bl = await inBl(async () => ({ tagline: site.siteTagline() }));
   eq(bl.tagline, "Train harder.", "stored tagline wins:");
-  ok(bl.about?.title.includes("BeastLife"), "BeastLife keeps its about page");
-  ok(bl.shipping?.title, "BeastLife keeps its shipping policy");
-});
-
-await t("BeastLife's pages never reach another store", async () => {
-  eq(await inShop(() => S.defaultPage("about")), null, "about:");
-  eq(await inShop(() => S.getContentPage("shipping")), null, "shipping:");
-  eq(await inShop(() => S.getContentPage("terms")), null, "terms:");
 });
 
 // ---- layer 3: default shipping values ---------------------------------------
@@ -847,6 +818,7 @@ const flowStubs = {
   "@/lib/shipping": shippingLib,
   "@/lib/shopper-errors": shopperErrors,
   "@/lib/checkout-price": checkoutPrice,
+  "@/lib/checkout/confirm-payment": await import("../lib/checkout/confirm-payment.js"),
   "@/lib/track/client": { track() {} },
 };
 const realFlow = () => loadComponent(sources.get("components/checkout/CheckoutFlow.js"), flowStubs);
@@ -863,6 +835,7 @@ async function renderCheckoutPage(inTenant, cartId, flow) {
     "@/lib/content/resolve": { resolvedContentPageList: async () => [] },
     "@/components/checkout/CheckoutFlow": flow,
     "@/lib/tenant-request": { tfetch: inTenant },
+    "@/lib/storefront-request": { tfetch: inTenant },
   });
   return renderToStaticMarkup(await page.default());
 }
@@ -1268,19 +1241,21 @@ await t("settings: only a real change counts, and a bad value still reaches vali
 // ---- public API routes, called directly
 
 const { NextRequest } = require("next/server");
+const tenantReqMod = await loadComponent(await readFile(join(ROOT, "lib/tenant-request.js"), "utf8"), {
+  react: React,
+  "next/headers": {},
+  "next/navigation": {},
+  "next/server": require("next/server"),
+  "./platform/control.js": C,
+  "./tenant-context.js": tenantContext,
+  "./tenant-gate.js": await import("../lib/tenant-gate.js"),
+});
 const ROUTE_ENV = {
   "next/server": require("next/server"),
   "@/lib/rate-limit": await import("../lib/rate-limit.js"),
   "@/lib/log": await import("../lib/log.js"),
-  "@/lib/tenant-request": await loadComponent(await readFile(join(ROOT, "lib/tenant-request.js"), "utf8"), {
-    react: React,
-    "next/headers": {},
-    "next/navigation": {},
-    "next/server": require("next/server"),
-    "./platform/control.js": C,
-    "./tenant-context.js": tenantContext,
-    "./tenant-gate.js": await import("../lib/tenant-gate.js"),
-  }),
+  "@/lib/tenant-request": tenantReqMod,
+  "@/lib/storefront-request": { tfetch: tenantReqMod.tfetch, storefrontHandler: tenantReqMod.tenantHandler },
 };
 const loadRoute = async (route, stubs) => loadComponent(await readFile(join(ROOT, "app/api", route, "route.js"), "utf8"), { ...ROUTE_ENV, ...stubs });
 const jsonPost = (host, path, body, cookie) =>
@@ -1390,6 +1365,7 @@ async function accountBadges(src = accountSrc) {
     "@/components/account/AccountAuth": nothing,
     "@/components/account/ProfileForm": nothing,
     "@/lib/tenant-request": { tfetch: inOwn },
+    "@/lib/storefront-request": { tfetch: inOwn },
   });
   const html = renderToStaticMarkup(await page.default({ searchParams: Promise.resolve({}) }));
   return Object.fromEntries([...html.matchAll(/font-mono[^>]*>(B-\d+)<.*?rounded-sf-2xs bg-sf-surface-sunken[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]]));

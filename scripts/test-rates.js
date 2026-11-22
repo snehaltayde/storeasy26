@@ -122,6 +122,10 @@ await inT(async () => {
   await runMigrations(libsql, await loadMigrations("tenant"));
   await db.insertInto("products").values({ id: "gid://t/P1", handle: "glow-serum", title: "Radiance Glow Serum", price_min: 1299, price_max: 1299, currency: "INR", available: 1, tags: "[]" }).execute();
   await db.insertInto("variants").values({ id: "gid://t/V1", product_id: "gid://t/P1", title: "30 ml", price: 1299, currency: "INR", available: 1 }).execute();
+  const { emptyList } = await import("../lib/content/documents-reader.js");
+  const now = new Date().toISOString();
+  await libsql.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_at, published_at) VALUES ('rel_open', ?, 'h', 'open', ?, ?)", args: [JSON.stringify(emptyList()), now, now] });
+  await libsql.execute({ sql: "INSERT OR REPLACE INTO release_state (id, live_release_id, updated_at) VALUES (1, 'rel_open', ?)", args: [now] });
 });
 
 // A founder's save through the console (this instance's cache is busted too).

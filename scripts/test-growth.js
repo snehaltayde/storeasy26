@@ -30,7 +30,7 @@ const X = await import("../lib/experiments.js");
 const AI = await import("../lib/ai/insights.js");
 const F = await import("../lib/platform/flags.js");
 const Costs = await import("../lib/platform/costs.js");
-const { getBlockRow } = await import("../lib/cms/store.js");
+const Docs = await import("../lib/documents/service.js");
 const { recordUsage, usageTotals, periodOf } = await import("../lib/platform/billing.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 
@@ -176,10 +176,11 @@ await t("adoption: refused while running; completed → hero DRAFT, release unto
     await X.startExperiment("hero-c");
     await throws(() => X.adoptVariant("hero-c", "b"), "complete the experiment", "running can't adopt:");
     await X.setExperimentStatus("hero-c", "completed");
-    const r = await X.adoptVariant("hero-c", "b");
-    ok(r.draft && r.note.includes("publish a release"), "draft + honest note");
-    const block = await getBlockRow("hero");
-    eq(block.value.title, "Adopted title", "hero draft written:");
+    const r = await X.adoptVariant("hero-c", "b", { documents: Docs });
+    ok(r.draft && /publish/i.test(r.note), "draft + honest note");
+    const doc = await Docs.getDocument("doc_home");
+    const hero = doc.body.sections.find((s) => s.kind === "hero");
+    eq(hero.settings.title, "Adopted title", "hero draft written:");
     const { getLiveRelease } = await import("../lib/releases.js");
     eq(await getLiveRelease(), null, "no release published by adoption:");
   });
@@ -240,8 +241,9 @@ await t("good mock: stored, usage metered, draft applies through the CMS", async
     eq(spent, 200, "tokens metered on the platform ledger:");
     const applied = await AI.applyInsightDraft(r.id, 0);
     ok(applied.note.includes("DRAFT"), "apply is a draft");
-    const block = await getBlockRow("hero");
-    ok(block.value.title.includes("Whey Gold"), "hero draft updated");
+    const doc = await Docs.getDocument("doc_home");
+    const hero = doc.body.sections.find((s) => s.kind === "hero");
+    ok(hero.settings.title.includes("Whey Gold"), "hero draft updated");
   });
 });
 

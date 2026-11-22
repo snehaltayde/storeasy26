@@ -116,6 +116,7 @@ for (const [key, file] of [["docs", ".test-doc-changes-docs.db"], ["legacy", ".t
   raw[key] = c;
 }
 await raw.docs.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+await raw.legacy.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
 await C.upsertTenant({ id: "zc", name: "Changes", domains: ["zc.test"], dbUrl: "file:.test-doc-changes-docs.db", config: {}, secrets: {} });
 await C.upsertTenant({ id: "zcl", name: "Legacy", domains: ["zcl.test"], dbUrl: "file:.test-doc-changes-legacy.db", config: {}, secrets: {} });
 const TEN = { docs: await C.getTenant("zc"), legacy: await C.getTenant("zcl") };

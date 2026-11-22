@@ -380,18 +380,6 @@ await t("PUB-06 checkout: with a valid documents preview session a COD order pas
   eq((await checkout(CC, c3, "cod", pv)).status, 403, "revoked session:");
 });
 
-await t("PUB-06 checkout: a legacy store with no release is unaffected (COD placed, card reaches its own checks), also with console cookies", async () => {
-  for (const cookies of [{}, { _admin: "x" }]) {
-    const cart = await cartOn(CL);
-    const r = await checkout(CL, cart, "cod", cookies);
-    eq(r.status, 200, `legacy COD ${JSON.stringify(cookies)} (${JSON.stringify(r.body)}):`);
-    eq((await ordersOn(CL, cart)).length, 1, "legacy order stored:");
-    const rz = await checkout(CL, await cartOn(CL), "razorpay_create", cookies);
-    ok(rz.body?.code !== "STORE_CLOSED", `legacy card refused as closed: ${JSON.stringify(rz.body)}`);
-  }
-  globalThis.__comAfter.length = 0;
-});
-
 await t("PUB-06: checkoutCapability's signature is unchanged (synchronous, no arguments, same answer shape)", async () => {
   eq(A.checkoutCapability.length, 0, "arguments:");
   eq(A.checkoutCapability.constructor.name, "Function", "a plain (not async) function:");
@@ -400,7 +388,7 @@ await t("PUB-06: checkoutCapability's signature is unchanged (synchronous, no ar
   eq(cap.available, true, "a closed store's capability is still its configured one (the closed check lives in the routes):");
 });
 
-await t("PUB-06 forms: contact, leads and quiz POST on a closed store are 403 STORE_CLOSED for anonymous and forged-cookie requests, and pass with a valid preview session; legacy stores are unaffected", async () => {
+await t("PUB-06 forms: contact, leads and quiz POST on a closed store are 403 STORE_CLOSED for anonymous and forged-cookie requests, and pass with a valid preview session", async () => {
   const forms = [
     ["contact", contactRoute.POST, (T) => `https://${T.id}.test/api/contact`, { name: "Closed Test", email: "snehal@mediastic.in", message: "A test message from the closed store suite." }, (r) => r.status === 200 && r.body.received === true],
     ["quiz", quizRoute.POST, (T) => `https://${T.id}.test/api/quiz/fit`, { answers: {} }, (r) => r.status === 200 && r.body.ok === true],
@@ -418,10 +406,6 @@ await t("PUB-06 forms: contact, leads and quiz POST on a closed store are 403 ST
     }
     const ok1 = await call(route, url(CC), { body, cookies: pv });
     ok(passed(ok1), `${name} with a preview session: ${ok1.status} ${JSON.stringify(ok1.body)}`);
-    for (const cookies of [{}, { _admin: "x" }]) {
-      const lg = await call(route, url(CL), { body, cookies });
-      ok(passed(lg), `${name} on a legacy store: ${lg.status} ${JSON.stringify(lg.body)}`);
-    }
   }
   // the marketing host still takes leads
   const mk = await call(leadsRoute.POST, "https://storeasy.test/api/leads", { body: { name: "Lead", email: "snehal@mediastic.in" } });

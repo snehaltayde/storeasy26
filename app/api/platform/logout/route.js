@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { PLATFORM_COOKIE } from "@/lib/platform/admin-auth";
 import { revokeSessionByToken } from "@/lib/platform/sessions";
 import { sameOrigin } from "@/lib/origin-check";
-import { PREVIEW_COOKIE } from "@/lib/cms/candidates";
+import { PREVIEW_COOKIE } from "@/lib/preview-sessions";
 import { MAINTENANCE_PASS_COOKIE } from "@/lib/maintenance";
 
 export const runtime = "nodejs";

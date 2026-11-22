@@ -308,16 +308,7 @@ await t("P3-FIX4 unit: a kit apply whose design saved but whose hero write faile
   eq([r.status, r.body.ok, r.body.applied?.presets, r.body.applied?.document?.revision, r.body.design?.revision], [200, true, [], Number(after.revision), Number(after.revision)], `the answer: ${JSON.stringify(r.body).slice(0, 300)}`);
 });
 
-await t("unit: applyKit on legacy behaves as before (config pin and brand, the hero as a legacy draft); a migrating store refuses and writes nothing", async () => {
-  const r = await route("legacy", "admin/theme", "POST", { action: "apply", kit: "glow" });
-  eq([r.status, r.body.theme.kit, r.body.applied.presets], [200, "glow", ["hero"]], `legacy apply: ${JSON.stringify(r.body).slice(0, 200)}`);
-  const cfg = await cfgOf("dl");
-  eq([cfg.theme.kit, cfg.brand.accent], ["glow", K.KITS.glow.brand.accent], "legacy config:");
-  eq((await sql("legacy", "SELECT count(*) AS n FROM cms_blocks WHERE key = 'hero'"))[0].n, 1, "legacy hero block:");
-  eq((await sql("legacy", "SELECT count(*) AS n FROM documents")), [{ n: 0 }], "no document on legacy:");
-  const g = await route("legacy", "admin/theme", "GET", null);
-  eq([g.body.theme.kit, g.body.design], ["glow", undefined], "legacy GET:");
-  // migrating
+await t("unit: a migrating store refuses applyKit and writes nothing", async () => {
   await raw.docs.execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
   try {
     const before = await designRow();
@@ -329,27 +320,7 @@ await t("unit: applyKit on legacy behaves as before (config pin and brand, the h
   }
 });
 
-// ======================================================================================
-console.log("— 2. the brand API");
-
-await t("unit: the brand API on a documents store refuses save and reset with the documents message and the editor's address; GET reads the design draft; preview stays open", async () => {
-  const before = await designRow();
-  const cfg = await cfgOf("dd");
-  for (const b of [{ brand: { accent: "#0f766e" } }, { reset: true }]) {
-    const r = await route("docs", "admin/brand", "PUT", b);
-    eq([r.status, r.body.code, r.body.editor], [409, "STORE_USES_DOCUMENTS", "/admin/editor?doc=doc_design"], `${JSON.stringify(b)}:`);
-    ok(r.body.error.startsWith(DOCUMENTS_MESSAGE) && /editor/.test(r.body.error) && /nothing was saved/.test(r.body.error), `words: ${r.body.error}`);
-  }
-  eq(await designRow(), before, "design untouched:");
-  eq(await cfgOf("dd"), cfg, "config untouched:");
-  const g = await route("docs", "admin/brand", "GET", null);
-  eq([g.status, g.body.documents, g.body.brand.accent, g.body.editor], [200, true, K.KITS.glow.brand.accent, "/admin/editor?doc=doc_design"], "GET reads the doc_design draft, not config.brand:");
-  const p = await route("docs", "admin/brand", "PUT", { preview: { accent: "#0f766e" } });
-  eq([p.status, p.body.ok], [200, true], "preview:");
-  // legacy GET is unchanged
-  const lg = await route("legacy", "admin/brand", "GET", null);
-  eq([lg.body.brand.accent, lg.body.documents], [K.KITS.glow.brand.accent, undefined], "legacy GET:");
-});
+// (Legacy /api/admin/brand route removed in Phase 1.1)
 
 // ======================================================================================
 console.log("— 3. two admins");
@@ -801,14 +772,6 @@ await t("unit: onboarding, Help, the agency kit export and brand readability rea
   } finally {
     await raw.docs.execute({ sql: "UPDATE releases SET content = ? WHERE id = ?", args: [rel.content, rel.id] });
   }
-  // legacy readers: their config, as before
-  const lob = await inL(() => ON.buildChecklist());
-  eq([lob.items.find((i) => i.id === "brand").done, lob.items.find((i) => i.id === "brand").href], [true, "/admin/theme"], "legacy onboarding:");
-  const lh = await route("legacy", "admin/help", "GET", null);
-  eq(lh.body.diagnostics.theme, "glow@1", "legacy help (its config pin):");
-  const inv2 = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@dd.test", role: "staff" });
-  await A.acceptGrant(inv2.token, { tenantId: "dl", actorEmail: "owner@dd.test" });
-  eq((await A.exportAgencyKit({ agencyId: agency.id, tenantId: "dl", name: "From legacy" })).payload.brand?.accent, K.KITS.glow.brand.accent, "legacy agency export:");
 });
 
 await t("unit: onboarding on a documents store with no published design is not done, even with an old config brand", async () => {
@@ -865,7 +828,6 @@ await t("unit: the operator screens read theme_pin (overview, themes, tenant det
   const ov = await platformGet("overview");
   eq(ov.status, 200, `overview: ${JSON.stringify(ov.body).slice(0, 200)}`);
   eq(ov.body.fleet.find((f) => f.tenant === "dd")?.kit, "glow-1", "overview, documents store:");
-  eq(ov.body.fleet.find((f) => f.tenant === "dl")?.kit, "glow-1", "overview, legacy store (its config pin):");
   const th = await platformGet("themes");
   const row = th.body.tenants.find((x) => x.id === "dd");
   eq([row.kit, row.version, row.pinned], ["glow", 1, true], "themes:");
@@ -987,32 +949,13 @@ await t("P6-LOGO-REG unit: designFromBody returns the logo ({ media, alt? }) or 
   eq(Reader.designFromBody(null), { brand: null, theme: null, logo: null }, "no body:");
 });
 
-await t("P6-LOGO-REG unit: resolvedLogo() is the logo for a v4 release with a design logo, and null for a v4 release without one, a closed store, a legacy store and a moving store; resolvedBrand reads as before", async () => {
+await t("P6-LOGO-REG unit: resolvedLogo() is the logo for a v4 release with a design logo, and null for a v4 release without one or a closed store; resolvedBrand reads as before", async () => {
   eq(await asRequest("lgopen", () => Res.resolvedLogo()), LOGO_A, "open, with a logo:");
   eq(await asRequest("lgopen", () => Res.resolvedBrand()), BRAND_A, "open, its brand:");
   eq(await asRequest("lgplain", () => Res.resolvedLogo()), null, "open, no logo:");
   eq((await asRequest("lgclosed", () => Res.contentSource())).mode, "closed", "closed mode:");
   eq(await asRequest("lgclosed", () => Res.resolvedLogo()), null, "closed (a draft logo is never a shopper's):");
   eq(await asRequest("lgclosed", () => Res.resolvedBrand()), null, "closed brand as before:");
-  await C.patchTenant("dl", { config: legacyLogoCfg });
-  await C.patchTenant("lgmoving", { config: legacyLogoCfg });
-  try {
-    eq((await asRequest("dl", () => Res.contentSource())).mode, "draft", "legacy mode:");
-    eq(await asRequest("dl", () => Res.resolvedLogo()), null, "legacy:");
-    eq(await asRequest("dl", () => Res.resolvedBrand()), legacyLogoCfg.brand, "legacy brand read as before (its config):");
-    eq((await asRequest("lgmoving", () => Res.contentSource())).mode, "draft", "moving mode:");
-    eq(await asRequest("lgmoving", () => Res.resolvedLogo()), null, "moving:");
-    // a legacy release (v3) on a documents-mode-free store: still null
-    await raw.legacy.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES ('rel_lglogo3', ?, 'h', '', NULL, ?, NULL, ?)", args: [JSON.stringify({ v: 3, blocks: {}, brand: { accent: "#7c3aed", logo: "/api/media/med_cfglogo" }, theme: null }), new Date().toISOString(), new Date().toISOString()] });
-    await raw.legacy.execute("UPDATE release_state SET live_release_id = 'rel_lglogo3' WHERE id = 1");
-    const src = await asRequest("dl", () => Res.contentSource());
-    eq([src.mode, src.v ?? null], ["live", null], "a v3 release:");
-    eq(await asRequest("dl", () => Res.resolvedLogo()), null, "a v3 release has no picture logo:");
-  } finally {
-    await raw.legacy.execute("UPDATE release_state SET live_release_id = NULL WHERE id = 1");
-    await raw.legacy.execute("DELETE FROM releases WHERE id = 'rel_lglogo3'");
-    await C.patchTenant("dl", { config: { ...STALE, site: { name: "Design Legacy" } } });
-  }
   // the getters bound to a source (P4-SEAM) give the same answer
   const G = Res.contentGettersFor(await asRequest("lgopen", () => Res.contentSource()));
   eq(await asRequest("lgopen", () => G.resolvedLogo()), LOGO_A, "contentGettersFor:");
@@ -1211,36 +1154,6 @@ const headerHtml = (h) => h.match(/<header\b[\s\S]*?<\/header>/)?.[0] ?? null;
 const footerHtml = (h) => h.match(/<footer\b[\s\S]*?<\/footer>/)?.[0] ?? null;
 const barText = (h) => (h.match(/<div data-preview-bar=""[\s\S]*?<\/div>/)?.[0] ?? "").replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/\s+/g, " ").trim();
 
-await t("P6-LOGO-RENDER rendered: the layout on a legacy fixture passes no image even when a design document with a logo exists, and its header is today's", async () => {
-  // a design document with a logo in the legacy store's own database (written
-  // while it was briefly in documents mode, then put back to legacy)
-  const LEGACY_LOGO = { media: "/api/media/med_legacylogo", alt: "Legacy logo" };
-  await raw.legacy.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
-  try {
-    await inL(async () => {
-      const d = await Docs.getDocument("doc_design").catch(() => null);
-      if (d) await Docs.saveDraft({ id: d.id, revision: d.revision, body: designWith(BRAND_B, LEGACY_LOGO), actor: LOGO_ACTOR });
-      else await Docs.createDocument({ type: "design", body: designWith(BRAND_B, LEGACY_LOGO), actor: LOGO_ACTOR });
-    });
-  } finally {
-    await raw.legacy.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
-  }
-  eq((await sql("legacy", "SELECT count(*) AS n FROM documents WHERE id = 'doc_design' AND draft LIKE '%med_legacylogo%'"))[0].n, 1, "the design document is there:");
-  eq((await asRequest("dl", () => Res.contentSource())).mode, "draft", "a legacy store:");
-  const { html: page, header } = await layoutOf("dl");
-  ok(header, "the layout rendered the Header");
-  // exactly what siteLogo() gave before this item: the text pair, no image, no name
-  eq(header.logo, { text1: "Design Legacy", text2: "" }, "the logo handed to the Header:");
-  ok(!Object.hasOwn(header.logo, "image"), "no image key");
-  ok(!page.includes("<img") && !page.includes("med_legacylogo") && !page.includes("Legacy logo"), "no picture anywhere on the page");
-  // its header is the Header rendered with today's props (and today's wordmark)
-  eq(headerHtml(page), renderToStaticMarkup(React.createElement(RealHeader, { ...header, logo: { text1: "Design Legacy", text2: "" } })), "header output:");
-  ok(headerHtml(page).includes('<a href="/" class="shrink-0 text-xl font-extrabold tracking-tight ">Design Legacy</a>'), "today's wordmark:");
-  // a moving store is the same
-  const moving = await layoutOf("lgmoving");
-  ok(moving.header && !Object.hasOwn(moving.header.logo, "image") && !moving.html.includes("<img"), "a moving store: no image");
-});
-
 await t("P6-LOGO-RENDER rendered: the layout on an open documents store renders its live logo in the header and footer, and a store with no logo keeps its text wordmark; shoppers never see the draft logo", async () => {
   const { html: page, header } = await layoutOf("lgopen");
   eq(header.logo, { image: LOGO_A, name: "Logo lgopen", text1: "Logo lgopen", text2: "" }, "the logo handed to the Header:");
@@ -1314,15 +1227,8 @@ const READ_PATTERNS = [
 ];
 // file -> why it may read them
 const ALLOW = {
-  "lib/brand.js": "the brand engine itself; legacy-mode reads of the brand",
-  "lib/cms/schemas.js": "legacy (v1-v3) block schemas",
-  "lib/releases.js": "legacy releases snapshot config.brand and config.theme (legacy mode only)",
-  "lib/content/resolve.js": "the legacy draft branch of resolvedBrand / resolvedTheme (v4 reads doc_design)",
-  "lib/themes/kits.js": "legacy applyKit, and draftDesignOf / themePinOf, the one place other files read through",
-  "app/api/admin/theme/route.js": "the legacy branch of the theme API",
-  "app/api/admin/brand/route.js": "the legacy branch of the brand API",
-  "app/(console)/admin/(authed)/brand/page.js": "the legacy Brand screen; P3-ROUTES redirects it in documents mode",
-  "app/(console)/admin/(authed)/theme/page.js": "the legacy Theme screen; P3-ROUTES redirects it in documents mode",
+  "lib/brand.js": "the brand engine itself",
+  "lib/themes/kits.js": "draftDesignOf / themePinOf fallback for unmigrated configs",
 };
 
 const stripComments = (src) =>
@@ -1381,7 +1287,7 @@ await t("unit: the guard finds no config.brand or config.theme read outside the 
   for (const f of ["lib/admin/onboarding.js", "app/api/admin/help/route.js", "lib/platform/agency.js", "lib/admin/brand-readability.js", "app/api/platform/overview/route.js", "app/api/platform/themes/route.js", "app/api/platform/tenants/[id]/route.js", "components/platform/TenantDetail.js"]) {
     eq(configReads(await readFile(join(ROOT, f), "utf8")), [], `${f}:`);
   }
-  ok(allowedHits.has("lib/themes/kits.js") && allowedHits.has("lib/content/resolve.js"), `the allowlist is used: ${[...allowedHits]}`);
+  ok(allowedHits.has("lib/themes/kits.js"), `the allowlist is used: ${[...allowedHits]}`);
 });
 
 // ======================================================================================

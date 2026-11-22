@@ -232,7 +232,7 @@ export default function CheckoutFlow({ cart: pageCart, razorpayEnabled, storeNam
           else {
             setError(
               result.state === "rejected"
-                ? result.error
+                ? `We couldn't confirm your payment for order ${data.orderId}. If money left your account, please don't pay again — contact the store with this order number.`
                 : `Your payment went through and we're confirming order ${data.orderId}. Please don't pay again. We'll email you once it's confirmed.`,
             );
             setPlacing(false);

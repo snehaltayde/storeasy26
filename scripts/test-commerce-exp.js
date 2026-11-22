@@ -42,7 +42,7 @@ const B = await import("../lib/bundles.js");
 const Q = await import("../lib/quiz.js");
 const R = await import("../lib/returns.js");
 const O = await import("../lib/offers/store.js");
-const { upsertContentPage, getContentPage, campaignVisible, resolveSlugRedirect, deleteContentPage } = await import("../lib/cms/store.js");
+const { campaignVisible } = await import("../lib/content/pages.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 
 await C.migratePlatform(await readFile(join(here, "../lib/platform/schema.sql"), "utf8"));
@@ -215,30 +215,12 @@ await t("disabled quizzes vanish for shoppers (getQuiz) but stay listed for the 
   });
 });
 
-console.log("— journal: scheduled publish + slug redirects (SF20)");
+console.log("— journal: scheduled publish visibility (SF20)");
 
 await t("window_start in the future means NOT visible yet (scheduled publish)", async () => {
-  await inT(async () => {
-    const future = new Date(Date.now() + 3600_000).toISOString();
-    await upsertContentPage({ slug: "launch-notes", title: "Launch Notes", family: "journal", window_start: future, sections: [{ kind: "text", heading: "Soon", body: ["coming soon"] }] });
-    const page = await getContentPage("launch-notes");
-    eq(page.family, "journal");
-    eq(campaignVisible(page), false, "future post invisible:");
-    await upsertContentPage({ slug: "launch-notes", title: "Launch Notes", family: "journal", window_start: new Date(Date.now() - 1000).toISOString(), sections: [{ kind: "text", heading: "Now", body: ["live now"] }] });
-    eq(campaignVisible(await getContentPage("launch-notes")), true, "past start visible:");
-  });
-});
-
-await t("redirect_from maps the old slug; self-redirects refused; loops back deleted", async () => {
-  await inT(async () => {
-    await upsertContentPage({ slug: "new-name", title: "Renamed", family: "journal", redirect_from: "old-name", sections: [] });
-    eq(await resolveSlugRedirect("old-name"), "new-name", "old slug 301 target:");
-    await throws(() => upsertContentPage({ slug: "new-name", title: "Renamed", family: "journal", redirect_from: "new-name", sections: [] }), "itself", "self-redirect:");
-    // a page REAPPEARING at a redirected-from slug kills the stale redirect
-    await upsertContentPage({ slug: "old-name", title: "Back again", family: "journal", sections: [] });
-    eq(await resolveSlugRedirect("old-name"), null, "live page beats stale redirect:");
-    await deleteContentPage("old-name");
-  });
+  const future = new Date(Date.now() + 3600_000).toISOString();
+  eq(campaignVisible({ slug: "launch-notes", family: "journal", window_start: future }), false, "future post invisible:");
+  eq(campaignVisible({ slug: "launch-notes", family: "journal", window_start: new Date(Date.now() - 1000).toISOString() }), true, "past start visible:");
 });
 
 console.log("— returns: eligibility + state machine, approval ≠ refund (SF21)");

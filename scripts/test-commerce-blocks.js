@@ -608,6 +608,7 @@ await t("P5-FIX1: in a grid, the bundle that lost a product keeps its cell live 
 // request; here tfetch runs the read in the store this suite is in, and the
 // store is open.
 STUBS["@/lib/tenant-request"] = { __esModule: true, tfetch: (fn) => fn() };
+STUBS["@/lib/storefront-request"] = { __esModule: true, tfetch: (fn) => fn() };
 STUBS["@/lib/content/resolve"] = { __esModule: true, closedStoreGate: async () => null };
 const BundlePage = (await loadJsx(join(ROOT, "app/(storefront)/bundles/[slug]/page.js"))).default;
 const renderPage = (slug) => inT(async () => html(await BundlePage({ params: Promise.resolve({ slug }) })));

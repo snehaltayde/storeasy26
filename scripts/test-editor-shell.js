@@ -984,23 +984,20 @@ const RELEASES = join(ROOT, "app/(console)/admin/(authed)/releases/page.js");
 const Releases = (await load(RELEASES)).default;
 const renderReleases = async () => html(await Releases());
 
-await t("rendered: /admin/releases renders RecentlyPublished in documents mode, with access passed on; the legacy screen otherwise", async () => {
+await t("rendered: /admin/releases renders RecentlyPublished in documents mode, with access passed on; migrating gets the note", async () => {
   S.mode = "documents";
   S.rows = [
     { logId: "log_1", setId: "set_1", documentId: "doc_home", label: "Home page", action: "publish", actionWords: "Published", byName: "Asha", at: "2026-11-02T10:00:00.000Z", summary: [{ words: "Hero: title changed" }], canUndo: true, undo: { id: "doc_home", revision: 3, logId: "log_1" } },
     { logId: "log_2", setId: "set_2", documentId: "doc_x", label: "Diwali sale", action: "undo", actionWords: "Undid", byName: "Asha", at: "2026-11-02T09:00:00.000Z", summary: [], canUndo: false, undo: null, note: "Publish it again from the editor to bring it back." },
   ];
   const page = await renderReleases();
-  ok(/data-recently-published-page=""/.test(page) && textOf(page).includes("Loading what was published") && !/data-stub="ReleasesAdmin"/.test(page), `the page mounts the documents list, not the legacy screen: ${page.slice(0, 400)}`);
+  ok(/data-recently-published-page=""/.test(page) && textOf(page).includes("Loading what was published"), `the page mounts the documents list: ${page.slice(0, 400)}`);
   // the list once its rows are read (listRecentlyPublished through the documents API)
   const m = html(h(Editor.PublishingHistory, { initialRows: S.rows, access: { canPublish: true, reason: null } }));
   ok(/data-recently-published=""/.test(m), `RecentlyPublished: ${m.slice(0, 500)}`);
   ok(textOf(m).includes("Published Home page") && textOf(m).includes("Hero: title changed") && textOf(m).includes("Publish it again from the editor"), "rows");
   eq((m.match(/>Undo</g) || []).length, 1, "Undo only where canUndo:");
 
-  S.mode = "legacy";
-  const legacy = await renderReleases();
-  ok(/data-stub="ReleasesAdmin"/.test(legacy) && !/data-recently-published/.test(legacy), "legacy: the old screen");
   S.mode = "migrating";
   const mig = await renderReleases();
   ok(/data-documents-mode=""/.test(mig) && !/data-recently-published/.test(mig), "migrating: the note, as before");

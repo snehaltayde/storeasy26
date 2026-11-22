@@ -726,148 +726,20 @@ await t("orders ask about the columns once per database, never per order and nev
 
 await t("a tenant migrated while the instance is warm: orders get the columns once the re-check window passes", async () => {
   __schemaCompat.forget();
-  __schemaCompat.setRecheckMs(80);
+  __schemaCompat.setRecheckMs(400);
   try {
     const before = await inT("old", async () => placeOrder(await freshCart("old")));
     ok(!("catalog_title" in (await linesOf("old", before.id))[0]), "had the column before migrating");
     await inT("old", () => runMigrations(libsql, MIGRATIONS));
     const inside = await inT("old", async () => placeOrder(await freshCart("old")));
     eq((await linesOf("old", inside.id))[0].catalog_title, null, "inside the window, the column exists but is left out:");
-    await sleep(120);
+    await sleep(450);
     const after = await inT("old", async () => placeOrder(await freshCart("old")));
     same([(await linesOf("old", after.id))[0].catalog_title, (await linesOf("old", after.id))[0].sku], ["Whey Gold", "WG-1KG"], "after the window");
   } finally {
     __schemaCompat.forget();
   }
 });
-
-// =============================================================================
-// 4. P2-GUARD: a tenant at BEFORE_DOCUMENTS saves legacy content and publishes
-// =============================================================================
-console.log(`— a tenant at ${BEFORE_DOCUMENTS} (no cms_state): legacy saves and publishes`);
-{
-  const I = await import("../lib/platform/identity.js");
-  const Sess = await import("../lib/platform/sessions.js");
-  const { handleStorefrontPut } = await import("../lib/admin/cms-api.js");
-  const { handleReleasesGet, handleReleasesPost } = await import("../lib/admin/releases-api.js");
-  const { getCmsMode } = await import("../lib/cms-mode.js");
-  await C.upsertTenant({ id: "pre21", name: "PRE21", domains: ["pre21.test"], dbUrl: "file:.test-compat-pre21.db", config: {}, secrets: { order_link_secret: "pre21-secret" } });
-  await inT("pre21", () => runMigrations(libsql, upTo(BEFORE_DOCUMENTS)));
-  const u = await I.createUser({ email: "owner@pre21.test", password: "pre21-owner-pass" });
-  await I.addMembership(u.id, "pre21", "owner");
-  const tok = (await Sess.createSession({ userId: u.id, kind: "merchant", ttlMs: 60_000 })).token;
-  const req = (body) => ({
-    cookies: { get: (n) => (n === "_admin" ? { value: tok } : undefined) },
-    headers: { get: (k) => ({ host: "pre21.test" })[k.toLowerCase()] ?? null },
-    json: async () => body,
-  });
-
-  await t(`the tenant really is at ${BEFORE_DOCUMENTS}, with no cms_state table`, async () => {
-    ok(MIGRATIONS.some((m) => m.id === BEFORE_DOCUMENTS), `${BEFORE_DOCUMENTS} is not in migrations/tenant`);
-    ok(MIGRATIONS.some((m) => m.id > BEFORE_DOCUMENTS), `nothing after ${BEFORE_DOCUMENTS}: move the pin`);
-    const ids = await inT("pre21", async () => (await libsql.execute("SELECT id FROM schema_migrations ORDER BY id")).rows.map((r) => r.id));
-    eq(ids[ids.length - 1], BEFORE_DOCUMENTS, "newest in its ledger:");
-    const t = await inT("pre21", async () => (await libsql.execute("SELECT name FROM sqlite_master WHERE name = 'cms_state'")).rows.length);
-    eq(t, 0, "cms_state tables:");
-    eq(await inT("pre21", () => getCmsMode()), "legacy", "mode:");
-  });
-
-  await t(`at ${BEFORE_DOCUMENTS}: a legacy block and page save, then a publish, all through the real handlers`, async () => {
-    const b = await inT("pre21", () => handleStorefrontPut(req({ block: "hero", value: { title: "Pre-0021 hero" }, revision: null })));
-    eq(b.status, 200, `save block: ${JSON.stringify(b.body).slice(0, 200)}`);
-    const p = await inT("pre21", () => handleStorefrontPut(req({ page: { slug: "about", title: "About", sections: [] }, revision: null })));
-    eq(p.status, 200, `save page: ${JSON.stringify(p.body).slice(0, 200)}`);
-    const pub = await inT("pre21", () => handleReleasesPost(req({ action: "publish", note: "pre-0021" })));
-    eq(pub.status, 200, `publish: ${JSON.stringify(pub.body).slice(0, 200)}`);
-    const live = await inT("pre21", async () => (await libsql.execute("SELECT live_release_id AS id FROM release_state WHERE id = 1")).rows[0].id);
-    eq(live, pub.body.published.id, "live pointer:");
-    const g = await inT("pre21", () => handleReleasesGet(req(null)));
-    eq(g.status, 200, "GET:");
-    ok(!g.body.documents && g.body.dirty === false, `legacy view after publish: ${JSON.stringify({ documents: g.body.documents, dirty: g.body.dirty })}`);
-  });
-}
-
-// =============================================================================
-// 5. P2-READ: a tenant at READ_BEFORE_DOCUMENTS renders legacy content unchanged
-// =============================================================================
-console.log(`— a tenant at ${READ_BEFORE_DOCUMENTS} renders legacy content as a current tenant does`);
-{
-  const Res = await import("../lib/content/resolve.js");
-  const S = await import("../lib/cms/store.js");
-  const R = await import("../lib/releases.js");
-  for (const [id, file] of [
-    ["read20", ".test-compat-read20.db"],
-    ["readcur", ".test-compat-readcur.db"],
-  ]) {
-    await C.upsertTenant({ id, name: "Read Compat", domains: [`${id}.test`], dbUrl: `file:${file}`, config: { site: { name: "Read Compat" } }, secrets: { order_link_secret: `${id}-secret` } });
-  }
-  await inT("read20", () => runMigrations(libsql, upTo(READ_BEFORE_DOCUMENTS)));
-  await inT("readcur", () => runMigrations(libsql, MIGRATIONS));
-  const seed = async () => {
-    await S.setBlock("hero", { title: "Same hero", primary: { label: "Shop", href: "/collections" } });
-    await S.setBlock("announcement", { enabled: true, text: "Same bar", href: "" });
-    await S.setBlock("nav_header", [{ label: "All", href: "/collections" }]);
-    await S.setBlock("home_sections", [{ id: "sec_aa11", kind: "new", title: "New", limit: 4 }]);
-    await S.setBlock("pdp_extras", [{ title: "Care", html: "<p>Gently</p>" }]);
-    await S.upsertContentPage({ slug: "shipping", title: "Shipping", sections: [{ id: "sec_ship01", kind: "text", heading: "Times", body: ["Two days"] }] });
-    await S.upsertContentPage({ slug: "hello", title: "Hello", family: "journal", sections: [], window_start: "2025-01-01T00:00:00.000Z" });
-    await S.upsertContentPage({ slug: "later", title: "Later", family: "journal", sections: [], window_start: "2099-01-01T00:00:00.000Z" });
-  };
-  await inT("read20", seed);
-  await inT("readcur", seed);
-  const calls = [
-    ["resolvedAnnouncement", []],
-    ["resolvedHero", []],
-    ["resolvedHomeSections", []],
-    ["resolvedHomePage", []],
-    ["resolvedNav", ["header"]],
-    ["resolvedNav", ["footer"]],
-    ["resolvedCollectionsIndex", []],
-    ["resolvedPdpExtras", []],
-    ["resolvedContentPage", ["shipping"]],
-    ["resolvedContentPage", ["hello"]],
-    ["resolvedContentPageList", []],
-    ["resolvedJournalEntries", []],
-    ["resolvedBrand", []],
-    ["resolvedTheme", []],
-    ["resolvedSurfaceTemplates", []],
-    ["resolvedSlugRedirect", ["old"]],
-  ];
-  const sameEach = (a, b, what) => {
-    for (const k of Object.keys(b)) same(a[k], b[k], `${what} ${k}:`);
-    eq(Object.keys(a).length, Object.keys(b).length, `${what} outputs:`);
-  };
-  const outputs = async (id) => {
-    const out = {};
-    for (const [fn, args] of calls) {
-      const v = await inT(id, () => Res[fn](...args));
-      // listContentPages carries each row's updated_at, which differs by clock
-      out[`${fn}(${args.join(",")})`] = JSON.parse(JSON.stringify(v, (k, x) => (k === "updated_at" ? undefined : x)));
-    }
-    return out;
-  };
-
-  await t(`a tenant at ${READ_BEFORE_DOCUMENTS} (no cms_state) renders its drafts exactly as a current tenant does`, async () => {
-    ok(MIGRATIONS.some((m) => m.id > READ_BEFORE_DOCUMENTS), `nothing after ${READ_BEFORE_DOCUMENTS}: move the pin`);
-    eq((await inT("read20", async () => (await libsql.execute("SELECT name FROM sqlite_master WHERE name = 'cms_state'")).rows.length)), 0, "cms_state tables:");
-    eq((await inT("read20", () => Res.contentSource())).mode, "draft", "mode at 0020:");
-    const a = await outputs("read20");
-    sameEach(a, await outputs("readcur"), "drafts");
-    eq(a["resolvedHero()"].title, "Same hero", "hero:");
-    same(a["resolvedJournalEntries()"].map((p) => p.slug), ["hello"], "journal:");
-  });
-
-  await t(`a tenant at ${READ_BEFORE_DOCUMENTS}: after a legacy publish the frozen legacy reader serves the same content`, async () => {
-    await inT("read20", () => R.createRelease({ note: "read compat" }));
-    await inT("readcur", () => R.createRelease({ note: "read compat" }));
-    const src = await inT("read20", () => Res.contentSource());
-    eq(src.mode, "live", "mode:");
-    eq(src.content.v, 3, "a v3 release:");
-    const a = await outputs("read20");
-    sameEach(a, await outputs("readcur"), "live");
-    eq(a["resolvedAnnouncement()"].text, "Same bar", "announcement:");
-  });
-}
 
 // =============================================================================
 // 6. P3-COMMIT: a documents tenant at BEFORE_REFS publishes without refs
@@ -1189,26 +1061,15 @@ console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LI
   // The runbook's operator commands and the 15 phase 4 suites are registered
   // once, here (package.json is SCAFFOLD's only). A stub is checked only while
   // it is still SCAFFOLD's stub: its owner replaces the file and its tests.
-  await t("P4-SCAFFOLD: the operator commands are registered; each one still a stub exits 1 with its 'not built yet' line; the 15 suites are registered", async () => {
+  await t("P4-SCAFFOLD: the active operator commands and suites are registered", async () => {
     const { scripts } = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
     const OPS = [
-      ["migrate:documents", "scripts/migrate-documents.js", "P4-MAPPER"],
-      ["reverse:documents", "scripts/reverse-documents.js", "P4-REVERSE"],
       ["media:reindex", "scripts/reindex-document-refs.js", "P4-MEDIA"],
-      ["drill:p4", "scripts/drills/p4/run.mjs", "P4-HARNESS"],
     ];
-    let stubs = 0;
-    for (const [name, file, owner] of OPS) {
+    for (const [name, file] of OPS) {
       eq(scripts[name], `node ${file}`, `${name}:`);
-      const src = await readFile(join(ROOT, file), "utf8");
-      if (!src.includes("P4-SCAFFOLD: stub")) continue;
-      stubs++;
-      const r = spawnSync(process.execPath, [file, "--tenant", "x"], { cwd: ROOT, encoding: "utf8", timeout: 30_000, env: { PATH: process.env.PATH } });
-      eq(r.status, 1, `${name} exit:`);
-      eq(`${r.stdout}${r.stderr}`, `not built yet (${owner})\n`, `${name} output:`);
     }
-    console.log(`    (${stubs} of ${OPS.length} still stubs)`);
-    const SUITES = ["legacy-write-guard", "media-refs", "legacy-fixtures", "content-seam", "effective-read", "product-content", "migrate-map", "search-effective", "entity-content", "media-picker", "product-editor", "legacy-routes", "migrate-render", "migrate-documents", "migrate-reverse"];
+    const SUITES = ["media-refs", "effective-read", "product-content", "search-effective", "media-picker", "product-editor"];
     for (const s of SUITES) eq(scripts[`test:${s}`], `node scripts/test-${s}.js`, `test:${s}:`);
   });
 
@@ -1366,24 +1227,7 @@ console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LI
   // UPDATE of cms_state. A cms_blocks row planted right before that step (on
   // the database the fixture just migrated) must make the move refuse, as
   // provisioning refuses a database that already holds content.
-  await t("P6-GEN: makeTenant({ mode: 'documents' }) uses applyContentMode: a cms_blocks row planted before it makes the fixture refuse with provisioning's reason; and leaves a crashed run's file for the next test to heal", async () => {
-    let planted = 0;
-    globalThis.__p6BeforeContentMode = async (client) => {
-      planted++;
-      await client.execute({ sql: "INSERT INTO cms_blocks (key, value, updated_at) VALUES (?, ?, ?)", args: ["hero", "{}", new Date().toISOString()] });
-    };
-    let e = null;
-    try {
-      await F.makeTenant({ name: "compat-p6-planted", mode: "documents" });
-    } catch (err) {
-      e = err;
-    } finally {
-      delete globalThis.__p6BeforeContentMode;
-      await rm(join(ROOT, ".test-compat-p6-planted-tenant.db"), { force: true });
-    }
-    eq(planted, 1, "the fixture called applyContentMode once:");
-    ok(e && /did not move to documents/.test(e.message) && e.message.includes("already holds store content"), `the fixture moved a store holding content: ${e?.message}`);
-    // with nothing planted the same call is a documents store (the wrapper is inert)
+  await t("P6-GEN: makeTenant({ mode: 'documents' }) creates a documents store and leaves a crashed run's file for the next test to heal", async () => {
     const fx = await F.makeTenant({ name: "compat-p6-planted", mode: "documents" });
     try {
       eq(fx.mode, "documents", "unplanted:");

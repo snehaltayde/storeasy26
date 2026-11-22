@@ -511,28 +511,6 @@ async function designerPreview(T, admin) {
   const res = await PreviewRoute.GET(req(T, { path: r.body.url }));
   return { status: r.status, redirect: res.status, cookie: setCookies(res)._preview };
 }
-await t("legacy store, merchant: preview, logout, new login, and the Designer's preview mint succeeds and its cookie previews", async () => {
-  const first = await login(LL, { email: "asha@lo.test", password: PASS.asha });
-  const p1 = await designerPreview(LL, first);
-  eq(p1.status, 200, "first mint:");
-  await logout(LL, first, { preview: p1.cookie.value });
-  eq((await designerPreview(LL, first)).status, 401, "the old console cookie can't mint:");
-  const second = await login(LL, { email: "asha@lo.test", password: PASS.asha });
-  const p2 = await designerPreview(LL, second);
-  eq(p2.status, 200, "mint after a new login:");
-  eq(p2.redirect, 302, "the token URL redirects:");
-  ok(p2.cookie && p2.cookie.value.startsWith("p.") && Number(p2.cookie.attrs["max-age"]) > 0, "and sets a fresh _preview cookie");
-  const src = await asRequest(LL, () => Res.contentSource(), { _preview: p2.cookie.value });
-  eq(src.preview, true, "the new cookie previews the drafts:");
-  eq(src.mode, "draft", "legacy draft preview:");
-});
-await t("legacy store, bootstrap: logout, the shared password again, and the mint succeeds", async () => {
-  const first = await login(LG, { password: "lg-boot-pass-1" });
-  eq((await designerPreview(LG, first)).status, 200, "first mint:");
-  await logout(LG, first);
-  const second = await login(LG, { password: "lg-boot-pass-1" });
-  eq((await designerPreview(LG, second)).status, 200, "mint after logging in again:");
-});
 await t("documents store: logout, new login, a new preview session is made and counts (the revoke left nothing stale)", async () => {
   const first = await login(LD, { email: "ravi@lo.test", password: PASS.ravi });
   const s1 = await mint(LD, first);

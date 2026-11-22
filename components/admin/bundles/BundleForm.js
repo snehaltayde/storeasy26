@@ -5,7 +5,7 @@ import { Plus, X } from "lucide-react";
 import { Banner } from "@/components/console/Banner";
 import { Button, IconButton } from "@/components/console/Button";
 import { Field, Input, Textarea } from "@/components/console/fields";
-import { VariantPicker } from "@/components/admin/cms/RefPicker";
+import { VariantPicker } from "@/components/admin/shared/RefPicker";
 import { formatMoney } from "@/lib/format";
 import { reasonSentence } from "@/lib/commerce/bundle-words";
 

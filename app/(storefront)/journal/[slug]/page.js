@@ -1,7 +1,7 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import ContentPage from "@/components/ContentPage";
 import { resolvedContentPage } from "@/lib/content/resolve";
-import { campaignVisible } from "@/lib/cms/store";
+import { campaignVisible } from "@/lib/content/pages";
 import { resolvedSlugRedirect } from "@/lib/content/resolve";
 import { siteLegalName } from "@/lib/site";
 import { tfetch } from "@/lib/storefront-request";

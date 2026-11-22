@@ -420,7 +420,7 @@ async function renderedTests() {
   const stubs = (d) => ({
     react: d.react,
     "next/link": { __esModule: true, default: function Link({ href, className, children }) { return React.createElement("a", { href, className }, children); } },
-    "@/components/admin/cms/MediaPicker": {
+    "@/components/admin/shared/MediaPicker": {
       MediaPicker: function MediaPicker(p) {
         pickerProps = p;
         return null;
@@ -624,7 +624,7 @@ async function renderedTests() {
   await t("RENDERED (US-01): when the sync finishes, the page reads the first run again and makes the store with ONE POST, then shows the ready view", async () => {
     const notYet = { eligible: false, reason: "catalog_not_confirmed", generated: false, byGenerator: [], kept: [], empty: false, noCollections: false, summary: null };
     const eligible = { ...notYet, eligible: true, reason: null };
-    const v = await mount(FR, { canEdit: true, canSync: true, pollMs: 5 }, {
+    const v = await mount(FR, { canEdit: true, canSync: true, pollMs: 40 }, {
       "GET /api/admin/first-run": [ok200({ ok: true, firstRun: notYet, sync: syncView("running") }), ok200({ ok: true, firstRun: eligible, sync: syncView("complete", { firstSync: false }) })],
       "GET /api/admin/sync": ok200({ ok: true, sync: syncView("complete", { firstSync: false }) }),
       "POST /api/admin/first-run": ok200({ ok: true, ran: true, generated: true, created: ["doc_home", "doc_design"], refilled: [], unchanged: [], skipped: [], products: 3, collections: 2, summary: SUMMARY }),

@@ -152,14 +152,22 @@ async function seedCatalog(tn) {
 const T = await F.makeTenant({ name: "effr", stage: "latest", products: PRODUCTS });
 const TL = await F.makeTenant({ name: "effl", stage: "latest", products: PRODUCTS });
 const T23 = await F.makeTenant({ name: "eff23", stage: "0023", products: PRODUCTS });
-for (const tn of [T, TL, T23]) await seedCatalog(tn);
+const { emptyList: emptyReleaseList } = await import("../lib/documents/release-list.js");
+const { singletonTypes: regSingletons } = await import("../lib/registry/index.js");
+for (const tn of [T, TL, T23]) {
+  await seedCatalog(tn);
+  await tn.run(async () => {
+    await libsql.execute({ sql: "INSERT OR REPLACE INTO releases (id, content, content_hash, created_at) VALUES ('rel_open', ?, 'h', '2026-01-01T00:00:00Z')", args: [JSON.stringify(emptyReleaseList(1, regSingletons()))] });
+    await libsql.execute("UPDATE release_state SET live_release_id = 'rel_open' WHERE id = 1");
+  });
+}
 const inT = (fn) => T.run(fn);
 
 const E = await import("../lib/catalog/effective.js");
 const repo = await import("../lib/repo.js");
 const Cart = await import("../lib/cart.js");
 const O = await import("../lib/orders.js");
-const { getPdpPairs, upsertPlacement } = await import("../lib/cms/placements.js");
+const { getPdpPairs } = await import("../lib/catalog/upsells.js");
 const { resolveWishlist } = await import("../lib/wishlist.js");
 const Quiz = await import("../lib/quiz.js");
 const B = await import("../lib/bundles.js");
@@ -245,6 +253,7 @@ async function productPageModule(tn) {
     "@/lib/ids": ids,
     "@/lib/site": { abs: (p) => `https://${tn.id}.test${p}`, siteName: () => "Fixture Store" },
     "@/lib/tenant-request": { tfetch: (fn) => tn.run(fn) },
+    "@/lib/storefront-request": { tfetch: (fn) => tn.run(fn) },
   });
 }
 const pageMods = new Map();
@@ -277,7 +286,6 @@ const EFFECTIVE = "lib/catalog/effective.js";
 const ALLOWLIST = [
   { file: "app/sitemap.js", fn: "buildSitemap", columns: ["handle", "updated_at"], reason: "lists product addresses only; no content" },
   { file: "lib/customers.js", fn: "buildReorder", columns: ["id", "handle", "available"], reason: "reorder checks a product still exists and is in stock; no content" },
-  { file: "lib/cms/placements.js", fn: "resolveHandles", columns: ["id", "handle"], reason: "turns typed handles into ids (spec's placements.js:62); no content" },
   { file: "lib/repo.js", fn: "getCollectionTypeFacets", columns: ["id", "product_type"], reason: "the collection filter's facets: Shopify's RAW product type by design (filters are logic, OVL-01)" },
   { file: "lib/content/resolve.js", fn: "cartPlacementRows", columns: ["id", "handle"], reason: "the cart slot's handles to ids (the plan's resolve.js:669); no content" },
 ];
@@ -623,9 +631,9 @@ async function guard({ read = readReal, allowlist = ALLOWLIST } = {}) {
 
 const real = await guard();
 
-await t("the guard passes on this tree with exactly the listed allowlist (five statements, each with its reason)", async () => {
+await t("the guard passes on this tree with exactly the listed allowlist (four statements, each with its reason)", async () => {
   eq(real.violations.length, 0, `content reads outside effective.js:${real.violations.map((v) => `\n      ${v}`).join("")}\n    count:`);
-  same(ALLOWLIST.map((a) => `${a.file} ${a.fn}`), ["app/sitemap.js buildSitemap", "lib/customers.js buildReorder", "lib/cms/placements.js resolveHandles", "lib/repo.js getCollectionTypeFacets", "lib/content/resolve.js cartPlacementRows"], "the allowlist");
+  same(ALLOWLIST.map((a) => `${a.file} ${a.fn}`), ["app/sitemap.js buildSitemap", "lib/customers.js buildReorder", "lib/repo.js getCollectionTypeFacets", "lib/content/resolve.js cartPlacementRows"], "the allowlist");
   ok(ALLOWLIST.every((a) => a.reason && a.columns.length), "every entry has its reason and columns");
   ok(real.files.includes("lib/repo.js") && real.files.includes("lib/cart.js") && real.files.includes("lib/content/resolve.js") && real.files.includes(EFFECTIVE), "the scan reached the shopper modules");
   ok(real.statements.some((s) => s.file === EFFECTIVE && s.reasons.length), "effective.js itself reads content (the scan sees it)");
@@ -688,10 +696,7 @@ await t("the allowlist is narrow: a content column added to an allowed statement
   ok(other.violations.some((v) => v.includes("getCatalogStats") && v.includes("products.title (sql)")), other.violations.join(" | ") || "getCatalogStats: no violation");
 });
 
-await t("scope: a console-only function in a shared module, and code no shopper path imports, are not shopper reads", async () => {
-  // listProductOverrides (lib/catalog-overrides.js) reads p.title for the console only
-  ok(scanSource("lib/catalog-overrides.js", await readReal("lib/catalog-overrides.js")).some((s) => s.fn === "listProductOverrides" && s.reasons.length), "the console read is seen by the scan");
-  ok(!real.statements.some((s) => s.fn === "listProductOverrides"), "but it is not on a shopper path");
+await t("scope: code no shopper path imports is not a shopper read", async () => {
   // planting a content read in an exported function that no shopper path imports
   const r = await guard({ read: plant("lib/repo.js", (src) => src + '\nexport async function consoleOnlyTitles() {\n  return db.selectFrom("products").select(["id", "title"]).execute();\n}\n') });
   eq(r.violations.length, 0, `unused export flagged: ${r.violations}`);
@@ -856,6 +861,7 @@ async function renderCheckout(tn, cartId) {
         "@/lib/content/resolve": { resolvedContentPageList: async () => [] },
         "@/components/checkout/CheckoutFlow": { __esModule: true, default: (p) => ((globalThis.__effCheckoutProps = plain(p)), null) },
         "@/lib/tenant-request": { tfetch: (fn) => tn.run(fn) },
+    "@/lib/storefront-request": { tfetch: (fn) => tn.run(fn) },
       }),
     );
   }
@@ -890,6 +896,7 @@ async function renderConfirmation(tn, orderId) {
     "@/lib/format": format,
     "@/lib/ids": ids,
     "@/lib/tenant-request": { tfetch: (fn) => tn.run(fn) },
+    "@/lib/storefront-request": { tfetch: (fn) => tn.run(fn) },
   });
   const status = await loadComponent("app/(storefront)/orders/[orderId]/page.js", {
     "next/link": Link,
@@ -901,6 +908,7 @@ async function renderConfirmation(tn, orderId) {
     "@/lib/format": format,
     "@/lib/site": { siteSupport: () => ({ email: null, phone: null }) },
     "@/lib/tenant-request": { tfetch: (fn) => tn.run(fn) },
+    "@/lib/storefront-request": { tfetch: (fn) => tn.run(fn) },
   });
   tracked = [];
   const args = { params: Promise.resolve({ orderId }), searchParams: Promise.resolve({ t: token }) };
@@ -1013,9 +1021,6 @@ await t("bundle components and the pairs strip (manual and automatic) show 'New'
   const auto = await inT(() => getPdpPairs(PID(4), { limit: 4 }));
   same(auto.products.map((p) => p.title), ["Aardvark Bar", "New", "Steel Shaker"], "automatic pairs, by shared count then the title shown");
   await T.run(() => db.deleteFrom("product_content_live").where("product_id", "=", PID(3)).execute());
-  await inT(() => upsertPlacement({ id: "pl_eff", kind: "pdp_pairs", sourceProductId: PID(2), targetProductIds: [PID(1)], title: "With it" }));
-  const manual = await inT(() => getPdpPairs(PID(2), { limit: 4 }));
-  same([manual.source, manual.products.map((p) => p.title)], ["manual", ["New"]], "manual pairs");
   const pdp = await renderProduct(T, "shaker");
   ok(pdp.html.includes(">New<"), "the pairs strip on the rendered page");
 });
