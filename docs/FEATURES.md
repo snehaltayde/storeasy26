@@ -1,0 +1,109 @@
+# Features
+
+One line is one slice: built from data model to tests, in this order. A line is ticked only
+when it has been verified. See the `steelthread:slice-writing` skill for how to write lines.
+
+## Already working (recorded at adoption, 2026-11-24)
+
+Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 80 of 80, `pnpm typecheck` and `pnpm build` clean, run 2026-11-24). Browser drills were not re-run after the legacy-CMS retirement, so nothing here is browser-verified on today's code.
+
+- [x] A merchant member can sign in with email and password and sign out; a support member is refused every write (`test:authz`, `test:admin-console`, `test:logout-preview`)
+- [x] One store can never read another store's data through the admin API, the cache or media (`test:tenant-boundary`, `test:tenancy`)
+- [x] A founder can edit a page, the home page, header, footer and design as drafts and publish them; staff can draft but not publish (`test:documents`, `test:publish-service`, `test:publish-checks`, `test:publish-ui`)
+- [x] A founder can undo a publish (`test:publish-undo`)
+- [x] A founder can edit a product's title, description and images over Shopify's values, and shoppers see the published values everywhere (`test:product-content`, `test:effective-read`, `test:product-editor`)
+- [x] A founder can put a bundle card or grid on the home page; sold-out, disabled and no-saving bundles behave as decided (`test:commerce-blocks`, `test:bundle-form`)
+- [x] A new store gets a generated starter home page and design after its first sync, with no AI key (`test:first-run`)
+- [x] A founder cannot open the store without a way to pay, a privacy page and a returns page (`test:open-checks`, `test:policy-start`)
+- [x] A shopper can add to cart and check out; totals are recomputed on the server and a double payment is refused (`test:commerce`, `test:orders`, `test:payment-recovery`)
+- [x] A closed store shows only the maintenance page to shoppers (`test:maintenance`)
+
+## Phase 0: hardening and the new console skeleton
+
+- [ ] A per-role permission harness calls every `app/api/admin/*` route as owner, admin, staff, support and signed-out, and a guard test fails when a new route has no permission check
+- [ ] A support member gets a test proving they cannot read anything outside the matrix (settings, secrets, audit, team) on every existing admin read
+- [ ] A shopper can read only their own cart, orders and account, proven by a test that tries another shopper's ids on every shopper read
+- [ ] The agency partner programme is gone: no agency routes, screens or links remain, its tables are left unused, and its suite is replaced by a test that no agency route answers
+- [ ] One command seeds a local store with an owner, admin, staff and support member, an operator, a shopper with an order, and a synced catalog
+- [ ] The browser drills run on today's code: drills that tested the retired legacy CMS are removed, and `pnpm drill:p6` and the p5 drill pass
+- [ ] shadcn/ui is set up for the consoles only (tokens from `docs/UI.md`, `components/ui/`), and the storefront's styles are unchanged (a storefront render comparison proves it)
+- [ ] A signed-in merchant lands in a new console shell (sidebar, top bar, store switcher) that shows only the sections their role can use; support sees no write actions
+
+## Phase 1: simple onboarding
+
+- [ ] A founder can sign up on their own with name, email and password, verify the email, and land in their new (closed) store's console; a local file database stands in for Turso
+- [ ] Signup creates the store's Turso database for real (provisioning runs as a job; a failed step is retried or reported in plain words)
+- [ ] A founder sees one onboarding page with four steps (Connect Shopify, Import products, Brand, Open your store), each showing done, in progress or blocked, and it resumes where they left off; it replaces the start page and setup checklist
+- [ ] A founder can connect their Shopify store from step 1 through OAuth, with a stand-in Shopify for tests first
+- [ ] A founder sees their products import with live progress in step 2, and a failed import says what to do
+- [ ] A founder can choose a palette and add a logo in step 3, and the starter store updates in a live preview beside it
+- [ ] A founder can open their store in step 4 once payment and the privacy and returns pages are ready, with each missing item fixable from that step
+- [ ] An operator can see every signup and the step each store is on, and help a stuck store from one screen
+- [ ] An operator can create a store for a founder in one form (name, owner email, Shopify domain), which sends the founder an invite into the same onboarding
+
+## Phase 2: merchant console on shadcn
+
+- [ ] A merchant sees the dashboard (sales today, orders to act on, store status) on the new UI
+- [ ] A merchant can list, search and open orders, and admins can push or cancel them, on the new UI; support sees orders read-only
+- [ ] A merchant can browse products and collections and open a product's content in the editor, on the new UI
+- [ ] A merchant can create and edit offers and bundles on the new UI; support sees them read-only
+- [ ] A merchant can upload, find, archive and delete media on the new UI
+- [ ] A merchant uses the editor (page list, section tree, inspector, preview, publish panel) in the new shell
+- [ ] An admin can manage settings (store details, checkout and payments, shipping, domains) on the new UI; staff and support cannot reach them
+- [ ] An admin can invite a team member with a role and remove one; only the owner can grant or transfer ownership
+- [ ] A merchant can see releases, analytics, experiments and automations on the new UI
+- [ ] The old console screens and their components are removed once every route has a new screen
+
+## Phase 3: operator console on shadcn
+
+- [ ] An operator can list, search and open stores, with each store's status, plan and health
+- [ ] An operator can suspend or resume a store and rotate its secrets, with an audit row for each
+- [ ] An operator can manage plans, subscriptions and billing events
+- [ ] An operator can manage feature flags and incidents
+- [ ] An operator can open time-boxed support access to a store, and the store's team sees that it is open
+
+## Phase 4: plugin system (roadmap Phase 2A)
+
+- [ ] An admin can install a first-party plugin from `/admin/apps` and turn it off again; staff and support cannot
+- [ ] A plugin can add a block to a named storefront slot, rendered without running the plugin's own JavaScript
+- [ ] A plugin can receive store webhooks (order created, fulfilled) through an outbox with retries and signed deliveries
+- [ ] An external plugin gets a scoped token limited to the permissions the admin approved, and every call with it is audited
+
+## Phase 5: uploadable themes (roadmap Phase 2B)
+
+- [ ] An admin can upload a theme package; anything with scripts, event handlers or external imports is refused with plain words
+- [ ] A shopper sees a store rendered by an uploaded theme, with cart, buy box and checkout still Storeasy's own protected parts
+- [ ] An admin can switch between installed themes with a preview before publishing
+
+## Phase 6: studio editor (roadmap Phase 3)
+
+- [ ] A founder edits in a full-screen studio with drag-and-drop sections and an instant preview
+- [ ] A founder can customise the theme's colours, type and spacing in the studio within the design tokens
+
+## Phase 7: flagship themes and storefront UX (roadmap Phase 4)
+
+- [ ] A founder can choose one of five flagship themes at onboarding or later
+- [ ] A shopper can filter search results by several facets
+- [ ] A shopper on a phone sees a sticky add-to-cart bar and a cart drawer with tiered offers
+
+## Phase 8: India and global checkout (roadmap Phase 5)
+
+- [ ] A shopper can enter a pincode and get their address filled and a delivery estimate
+- [ ] A shopper choosing COD is offered a prepaid nudge, and COD orders can require an OTP
+- [ ] A signed-in shopper can save addresses and pick one at checkout
+- [ ] A founder can sell in more than one currency and country
+- [ ] A founder can schedule a bundle and an offer for a collection
+
+## Phase 9: first-party plugins (roadmap Phase 6)
+
+- [ ] A shopper who bought a product can leave a review through an invite link, an admin moderates it, and the product page shows stars and review structured data
+- [ ] A shopper can subscribe to a product and pause, skip, swap or cancel from their account
+- [ ] A shopper who agreed to marketing messages gets WhatsApp order updates and an abandoned-cart reminder; nobody else does
+- [ ] A shopper sees a delivery estimate and live tracking from Shiprocket on the order page
+- [ ] A founder can ask the AI copilot for a starter store, product SEO and FAQs, or offer ideas, and gets drafts only, within a daily token budget and with no shopper data sent
+
+## Later (not planned yet)
+
+- Multi-provider AI (Gemini, OpenAI) beside Anthropic.
+- Real-device and Safari checks of every console screen.
+- The open items in `docs/cms-reviews/OWNER-HANDOVER.md` that are not slices yet.
