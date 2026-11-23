@@ -3,6 +3,30 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 Changing or removing an owner needs team.owner (on the owner's behalf)
+
+- **Decision:** in `/api/admin/team`, changing the role of, or removing, a member who is currently an owner requires `team.owner`; `team.manage` covers everyone else.
+- **Why:** an admin could demote or remove an owner as long as another owner remained; the matrix says granting or transferring ownership is owner-only.
+- **Instead of:** keeping `team.manage` plus the last-owner guard.
+- **Decided by:** Claude, on the owner's behalf (architect finding F1)
+- **Slice:** Phase 0, permission harness
+
+## 2026-11-24 Same-origin check on every non-GET request (on the owner's behalf)
+
+- **Decision:** `requireAdmin` checks the Origin on every request whose method is not GET/HEAD, read actions included. A request object with no method keeps today's behaviour.
+- **Why:** preview-session create/revoke, release preview and the integration test call run under `.read` actions and so skipped the CSRF check.
+- **Instead of:** moving those operations to new `.write` actions, which would stop support from previewing.
+- **Decided by:** Claude, on the owner's behalf (architect finding F2)
+- **Slice:** Phase 0, permission harness
+
+## 2026-11-24 How the permission harness is built (on the owner's behalf)
+
+- **Decision:** a hand-declared route table (`scripts/support/admin-routes.js`) with expected results derived from `roleAllows`; `ACTIONS` exported from `authz.js`; the guard walks the filesystem so untracked routes fail too; "allowed" means not 401/403 (response bodies are line 2's job); auth pages (login, logout, accept-invite, reset, recover, maintenance-pass) are exempt with their own tested rules; support members keep a maintenance curtain pass; a new suite `test:permissions`. Staff and support cannot open Help (it needs `settings.read`) — recorded, not changed.
+- **Why:** body-selected actions and handlers in `lib/admin/*` cannot be found by parsing route files alone.
+- **Instead of:** deriving actions from source only; git-only guard; growing `test-authz.js`.
+- **Decided by:** Claude, on the owner's behalf
+- **Slice:** Phase 0, permission harness
+
 ## 2026-11-24 Remove the agency partner programme
 
 - **Decision:** drop agencies entirely: routes, screens, links and the suite go; the tables stay unused (migrations are additive).

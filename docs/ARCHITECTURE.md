@@ -68,7 +68,7 @@ Full columns and types are in the SQL files named below. This page lists each ta
 
 Least-trusted roles: `support` in the merchant console; the anonymous shopper on the storefront.
 
-Merchant roles are per store (`memberships.role`) and nest: owner ⊇ admin ⊇ staff ⊇ support. The matrix below is the code's own table in `lib/platform/authz.js`, enforced by `requireAdmin(request, action)` in every `app/api/admin/*` route (confirmed by reading `authz.js` and by `test:authz` passing; that every route asks for the right action is **not** confirmed route by route — see Phase 0).
+Merchant roles are per store (`memberships.role`) and nest: owner ⊇ admin ⊇ staff ⊇ support. The matrix below is the code's own table in `lib/platform/authz.js`, enforced by `requireAdmin(request, action)` in every `app/api/admin/*` route (confirmed route by route by `test:permissions`: `scripts/support/admin-routes.js` lists every route × method × body-selected action, each row is called as owner, admin, staff, support, signed-out, another store's owner and an operator under a support grant, and the expected answer comes from `roleAllows()`; a static guard fails when a route file, method or `requireAdmin` action has no row). Every non-GET/HEAD admin request is also refused cross-origin, read actions included. Changing or removing an existing owner needs `team.owner`.
 
 | Action | owner | admin | staff | support | shopper | operator |
 |---|---|---|---|---|---|---|
@@ -87,6 +87,19 @@ Merchant roles are per store (`memberships.role`) and nest: owner ⊇ admin ⊇ 
 | team.owner (grant or transfer owner) | allow | deny | deny | deny | deny | deny |
 | cart, checkout, account | — | — | — | — | own cart / own account only (unconfirmed by a least-trusted test) | — |
 | platform console (tenants, provisioning, billing, flags, incidents) | deny | deny | deny | deny | deny | allow (TOTP sessions; bootstrap shared password until the first operator exists) |
+
+Admin routes that do not call `requireAdmin`, each with its own rule tested by `test:permissions`:
+
+| Route | Rule |
+|---|---|
+| `admin/login` POST | public; cross-origin → 403; `{}` → 400; a wrong password → 401 with no `_admin` cookie; the shared password on a store with members → 401 |
+| `admin/logout` POST | any caller (`allowUnresolved`); cross-origin → 403; signed-out → 200 and clears `_admin`; a session it is called with is revoked |
+| `admin/accept-invite` POST | public token route; cross-origin → 403; `{}` → 400; a bad token → 400; never 401 |
+| `admin/reset` POST | same rule as accept-invite |
+| `admin/recover` POST | cross-origin → 403; `{}` → 400; an unknown email → 200 with the generic body |
+| `admin/maintenance-pass` GET | public; always 302 to `/admin/login`; the `_mx` cookie only for a verified member (support included: a curtain pass only) or operator session, signed with the store's `order_link_secret`; signed-out and other stores' members get none |
+
+`preview-session`, `documents`, `refs` and `releases` are gated through their `lib/admin/*` handlers, not exempt.
 
 "own only" means the cart, order or account must belong to the caller's session. Anything not listed is denied. The operator column is **unconfirmed** cell by cell: operator access to a store goes through `support_grants` and `lib/platform/admin-auth.js`, read but not tested here.
 

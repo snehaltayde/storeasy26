@@ -20,7 +20,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Phase 0: hardening and the new console skeleton
 
-- [ ] A per-role permission harness calls every `app/api/admin/*` route as owner, admin, staff, support and signed-out, and a guard test fails when a new route has no permission check
+- [x] A per-role permission harness calls every `app/api/admin/*` route as owner, admin, staff, support and signed-out, and a guard test fails when a new route has no permission check (`test:permissions`)
 - [ ] A support member gets a test proving they cannot read anything outside the matrix (settings, secrets, audit, team) on every existing admin read
 - [ ] A shopper can read only their own cart, orders and account, proven by a test that tries another shopper's ids on every shopper read
 - [ ] The agency partner programme is gone: no agency routes, screens or links remain, its tables are left unused, and its suite is replaced by a test that no agency route answers
@@ -103,6 +103,9 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [ ] A founder can ask the AI copilot for a starter store, product SEO and FAQs, or offer ideas, and gets drafts only, within a daily token budget and with no shopper data sent
 
 ## Later (not planned yet)
+
+- `orders/[id]` POST push answers 500 for an unknown order; it should be 404 (allowed as `allowStatus` in `scripts/support/admin-routes.js` until fixed).
+- `requireAdmin`'s origin check passes a write with no Origin header; add a `Sec-Fetch-Site: cross-site` refusal as a second layer.
 
 - Multi-provider AI (Gemini, OpenAI) beside Anthropic.
 - Real-device and Safari checks of every console screen.
