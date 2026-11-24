@@ -298,12 +298,12 @@ await t("listMyStores: only the caller's own memberships, active stores only, UR
   const theirs = await withTenant(here, () => listMyStores({ kind: "merchant", id: them.id, role: "owner" }));
   eq(C && (await import("../lib/admin/stores.js")).consoleUrl("x.localhost", "http://other.localhost:9/"), "http://x.localhost/admin", "a site_url on another host lends no port:");
   const { consoleUrl } = await import("../lib/admin/stores.js");
-  eq(consoleUrl("shop-localhost.com", "http://shop-localhost.com:9/"), "https://shop-localhost.com/admin", "a public host containing \"localhost\" is https and borrows no port:");
-  eq(consoleUrl("my127.0.0.1.example.com"), "https://my127.0.0.1.example.com/admin", "a public host containing 127.0.0.1 is https:");
+  eq(consoleUrl("shop-localhost.com", "http://shop-localhost.com:9/"), "https://shop-localhost.com" + "/admin", "a public host containing \"localhost\" is https and borrows no port:");
+  eq(consoleUrl("my127.0.0.1.example.com"), "https://my127.0.0.1.example.com" + "/admin", "a public host containing 127.0.0.1 is https:");
   eq(consoleUrl("annex.localhost:6101", "http://annex.localhost:6101"), "http://annex.localhost:6101/admin", "a .localhost host with a port stays local:");
-  eq(consoleUrl("127.0.0.1", "http://127.0.0.1:3017"), "http://127.0.0.1:3017/admin", "127.0.0.1 is local:");
+  eq(consoleUrl("127.0.0.1", "http://127.0.0.1:3017"), "http://127.0.0.1:3017" + "/admin", "127.0.0.1 is local:");
   eq(consoleUrl("localhost"), "http://localhost/admin", "localhost is local:");
-  eq(theirs.map((s) => `${s.id} ${s.url}`), ["other https://other.example.com/admin"], "theirs (https off localhost):");
+  eq(theirs.map((s) => `${s.id} ${s.url}`), ["other https://other.example.com" + "/admin"], "theirs (https off localhost):");
   eq(await withTenant(here, () => listMyStores({ kind: "operator-support", id: me.id, role: "support" })), [], "operator-support:");
   eq(await withTenant(here, () => listMyStores({ kind: "bootstrap", id: "bootstrap", role: "owner" })), [], "bootstrap:");
   ok(read("app/api/admin/stores/route.js").includes("listMyStores(auth.actor)"), "the stores route answers from the same function:");

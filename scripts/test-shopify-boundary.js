@@ -209,9 +209,13 @@ const findMutationNames = (text) => [...text.matchAll(MUTATION_NAME)].map((m) =>
 const SHOPIFY_ADMIN_ENDPOINT = /^\/admin\/(?:api\/(?:\$\{[^}]*\}|[\w.-]+)\/graphql\.json|oauth\/(?:access_token|authorize))(?:\?.*)?$/;
 // This app's own console pages, always built on a store's own origin, which is a
 // variable. A URL that spells out http(s):// and its host gets no such allowance.
-const CONSOLE_PAGE = /^\/admin(?:\/(?:login|accept-invite|reset))?(?:\?.*)?$/;
+const CONSOLE_PAGE = /^\/admin(?:\/(?:login|accept-invite|reset|dashboard))?(?:\?.*)?$/;
 // Not Shopify: test/seed console login URLs.
 const NOT_SHOPIFY_URLS = ["http://localhost:3017/admin/login", "http://ma.test/admin/login"];
+// A literal local test host (localhost, *.localhost, *.test, with an optional port)
+// is never a Shopify store, so one of the app's console pages on it is allowed.
+const LOCAL_CONSOLE_URL = /^https?:\/\/(?:localhost|[\w.-]+\.localhost|[\w.-]+\.test)(?::\d+)?(\/admin(?:\/[^\s"'`<]*)?)$/;
+const isLocalConsoleUrl = (u) => { const m = LOCAL_CONSOLE_URL.exec(u); return !!m && CONSOLE_PAGE.test(m[1]); };
 
 // There is no way to read the HTTP method reliably from source, so any Admin API
 // URL other than graphql.json counts as a REST write until someone reviews it. So
@@ -220,7 +224,7 @@ const NOT_SHOPIFY_URLS = ["http://localhost:3017/admin/login", "http://ma.test/a
 function findAdminRest(text) {
   const hits = [];
   for (const m of text.matchAll(/https?:\/\/(?:\$\{[^}]*\}|[^\s"'`\/$])*(\/admin(?![\w-])[^\s"'`<]*)/g)) {
-    if (!SHOPIFY_ADMIN_ENDPOINT.test(m[1]) && !NOT_SHOPIFY_URLS.includes(m[0])) hits.push(m[0]);
+    if (!SHOPIFY_ADMIN_ENDPOINT.test(m[1]) && !NOT_SHOPIFY_URLS.includes(m[0]) && !isLocalConsoleUrl(m[0])) hits.push(m[0]);
   }
   // After a variable (`${base}/admin/...`) or a join (base + "/admin/..."). With
   // the origin out of sight, one of the app's own console pages is allowed.
@@ -337,7 +341,9 @@ await t("SHOP-01: scanners catch what they must and ignore prose", async () => {
   eq(findAdminRest("`https://${storeDomain()}/admin/api/${API_VERSION()}/graphql.json`"), [], "graphql.json:");
   eq(findAdminRest("`https://${d}/admin/oauth/access_token` `https://${d}/admin/oauth/authorize?x=1` href='/admin/orders' href='/admin/api-keys'"), [], "oauth + console paths:");
   eq(findAdminRest('"http://localhost:3017/admin/login" `http://rf1.test/api/admin/refs?${qs}`'), [], "not Shopify:");
-  eq(findAdminRest("`${base}/admin/accept-invite?token=${t}` `${proto}://${host}/admin/reset?token=${t}\\n\\nIf` `${origin}/admin` <code>{origin}/admin/login</code>"), [], "console pages:");
+  eq(findAdminRest("`${base}/admin/accept-invite?token=${t}` `${ORIGIN}/admin/dashboard` `${proto}://${host}/admin/reset?token=${t}\\n\\nIf` `${origin}/admin` <code>{origin}/admin/login</code>"), [], "console pages:");
+  eq(findAdminRest("'http://a.localhost/admin' 'http://b.localhost:6101/admin/dashboard' 'http://ma.test/admin/reset?token=1'"), [], "console pages on local test hosts:");
+  for (const u of ["'http://shop.myshopify.com/admin'", "'http://a.localhost/admin/products/1.json'", "'http://evil.localhost.com/admin'"]) ok(findAdminRest(u).length > 0, `still caught: ${u}`);
 
   eq(["'x,read_themes'", '"read_products read_themes"', "`\n  read_themes,\n`", "'unauthenticated_read_checkouts'"].map((s) => s.match(READ_SCOPE_TOKEN).at(-1)), ["read_themes", "read_themes", "read_themes", "unauthenticated_read_checkouts"], "read scopes in a string:");
   eq("thread_id spread_x already_read".match(READ_SCOPE_TOKEN), null, "ordinary identifiers:");
