@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/console/PageHeader";
 import { Card } from "@/components/console/Card";
 import { PermissionNote } from "@/components/console/bits";
 import { tfetch } from "@/lib/console-request";
+import BackToOnboarding, { fromOnboarding } from "@/components/admin/onboarding/BackToOnboarding";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings · Admin", robots: { index: false } };
@@ -56,8 +57,9 @@ function SectionNav() {
   );
 }
 
-export default async function AdminSettingsPage() {
+export default async function AdminSettingsPage({ searchParams }) {
   const jar = await cookies();
+  const back = fromOnboarding(await searchParams) ? <BackToOnboarding /> : null;
   // S34 (OP10): merchants sign in normally; an OPERATOR passes only under an
   // active support grant (support role — read-only, PII-redacted).
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
@@ -67,6 +69,7 @@ export default async function AdminSettingsPage() {
   if (!roleAllows(actor.role, "settings.read")) {
     return (
       <>
+        {back}
         <PageHeader title="Settings" />
         <Card>
           <PermissionNote role={actor.role} need="view the store's settings" />
@@ -96,6 +99,7 @@ export default async function AdminSettingsPage() {
 
   return (
     <>
+      {back}
       <PageHeader title="Settings" description="Store configuration — changes go live without a deploy." />
       <SectionNav />
       <SettingsAdmin initial={view} syncProgress={syncProgress} canRunSync={roleAllows(actor.role, "sync.run")} documents={documents} />

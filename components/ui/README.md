@@ -5,7 +5,7 @@ restyled to `docs/UI.md`. Consoles only: nothing under `app/(storefront)/` or
 `proxy.js` may import from here, and no storefront file may use their utility
 names (`scripts/test-console-ui.js` checks both).
 
-In here: `button`, `input`, `separator`, `skeleton`, `tooltip`, `sheet`,
+In here: `button`, `input`, `separator`, `skeleton`, `tooltip`, `sheet`, `dialog`,
 `dropdown-menu`, `avatar`, `sidebar`, the `use-mobile` hook and `utils.js`
 (`cn`). Their tokens live in `app/console.css` under `.console` /
 `.console.dark`. Add `.console` to the console root `<body>` to use them.
@@ -46,7 +46,7 @@ instead and copy the result in:
 - No raw colours: no hex, `oklch(`, `rgb(`, and no palette utilities
   (`bg-black/10`, `text-white`, `bg-zinc-…`). Use the tokens (`bg-muted`,
   `text-muted-foreground`, `bg-foreground/20` …).
-- Overlays (`sheet`, `dropdown-menu`, `tooltip`) get `motion-reduce:animate-none`.
+- Overlays (`sheet`, `dialog`, `dropdown-menu`, `tooltip`) get `motion-reduce:animate-none`.
 - Every part keeps its `data-slot`. Sheets close on Esc (Radix Dialog's default;
   don't override `onEscapeKeyDown`).
 - Then run `node scripts/test-console-ui.js` and `pnpm drill:sf-styles` with

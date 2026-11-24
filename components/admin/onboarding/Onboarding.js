@@ -146,7 +146,7 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
               </Button>
             )}
             {step.id === "import" && <ConnectedNote />}
-            <Panel key={step.id} step={step} canSync={canSync} publishHref={publishHref} onChange={refresh} onModel={setModel} />
+            <Panel key={step.id} step={step} canSync={canSync} publishHref={publishHref} onChange={refresh} onModel={setModel} onGoStep={(id) => choose(id, { focus: true })} />
             {nextUp && (
               <Button size="lg" className="h-10 px-4" onClick={() => choose(nextUp.id, { focus: true })} data-onboarding="next">
                 Next: {nextUp.label}

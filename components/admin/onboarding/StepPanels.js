@@ -18,31 +18,17 @@ import FirstRun from "@/components/admin/first-run/FirstRun";
 //            approval, the errors; nothing is written to Shopify
 //   Import   SyncProgress's own body, readSync and requestSync (/api/admin/sync)
 //   Brand    FirstRun (the starter store and BrandStep at #brand), legacy styled
-//   Open     the opening report's items, the policy starters
-//            (/api/admin/policy-start), "I placed a test order"
-//            (/api/admin/onboarding) and the way to the editor's Publish
+//   Open     OpenStepPanel.js (line 7): every opening item with its fix,
+//            and the editor's own publish flow in a dialog
 
 export const POLICY_START_URL = "/api/admin/policy-start";
 export const ONBOARDING_URL = "/api/admin/onboarding";
 export const PANEL_WORDS = Object.freeze({
-  notLegalAdvice: "These are starting points, not legal advice.",
   failed: "That didn't work, so nothing changed. Try again in a minute.",
   notAllowed: "Your role can't do that, so nothing changed.",
   shopDomain: "Your Shopify store",
   noDomain: "No Shopify store recorded yet.",
   products: (n) => (n === 1 ? "1 product is in your store." : `${n} products are in your store.`),
-  testOrderTitle: "A test order",
-  testOrderMarked: "You told us you placed a test order.",
-  testOrderMark: "I placed a test order",
-  testOrderUndo: "I haven't placed one yet",
-  openTitle: "Open your store",
-  openWords: "Opening happens in the editor: Publish your home page and your store opens to shoppers.",
-  openButton: "Go to Publish in the editor",
-  fixFirst: "Fix the items marked “Needed” first.",
-  openDone: "Shoppers can visit your store. Changes you make show to them after you publish.",
-  supportFixes: "Storeasy's team fixes this for you.",
-  needed: "Needed",
-  check: "Worth checking",
 });
 
 const actionOf = (step, id) => step.actions?.find((a) => a.id === id) || null;
@@ -166,123 +152,5 @@ export function BrandPanel({ step, canSync, onChange }) {
 }
 
 // ---- Open ------------------------------------------------------------------
-const policyKey = (a) => (a.type === "startPolicy" ? `start:${a.kind}` : `read:${a.id}`);
-
-function OpeningItem({ item, step, busy, onAct }) {
-  const acts = Array.isArray(item.actions) ? item.actions : [];
-  return (
-    <li className="space-y-2 py-3" data-opening-item={item.id} data-level={item.level}>
-      <div className="flex items-start gap-2">
-        <p className="min-w-0 flex-1 text-sm font-medium text-foreground">{item.title}</p>
-        {item.level === "block" && <span className="shrink-0 rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger">{PANEL_WORDS.needed}</span>}
-        {item.level === "warn" && <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-text">{PANEL_WORDS.check}</span>}
-      </div>
-      {item.message && <p className="text-[0.8125rem] text-muted-foreground">{item.message}</p>}
-      {(acts.length > 0 || item.href || item.who === "support") && (
-        <div className="flex flex-wrap items-start gap-2">
-          {acts.map((a) => {
-            const gate = actionOf(step, a.type === "startPolicy" ? "policy_start" : "policy_read");
-            const key = policyKey(a);
-            return (
-              <Gated key={key} action={gate} reasonId={`reason-${key.replace(/\W/g, "-")}`} size="sm" variant={a.type === "startPolicy" ? "default" : "outline"} disabled={busy !== null} aria-busy={busy === key || undefined} onClick={() => onAct(a)}>
-                {a.label}
-              </Gated>
-            );
-          })}
-          {item.href && (
-            <Button asChild size="sm" variant="outline">
-              <Link href={item.href}>{item.linkLabel || "Fix this"}</Link>
-            </Button>
-          )}
-          {item.who === "support" && <p className="text-xs text-muted-foreground">{PANEL_WORDS.supportFixes}</p>}
-        </div>
-      )}
-      {acts.length > 0 && <p className="text-xs text-muted-foreground">{PANEL_WORDS.notLegalAdvice}</p>}
-    </li>
-  );
-}
-
-export function OpenPanel({ step, publishHref, onChange, onModel }) {
-  const [busy, setBusy] = useState(null);
-  const [error, setError] = useState(null);
-  const [note, setNote] = useState(null);
-  if (step.state === "done") return <p className="text-sm text-muted-foreground">{PANEL_WORDS.openDone}</p>;
-
-  const items = (step.facts?.items || []).filter((i) => i.level !== "ok" && i.id !== "test_order");
-  const testItem = (step.facts?.items || []).find((i) => i.id === "test_order");
-  const marked = step.facts?.testOrderMarked === true;
-
-  async function policy(a) {
-    const key = policyKey(a);
-    setBusy(key);
-    setError(null);
-    setNote(null);
-    const r = await post(POLICY_START_URL, a.type === "startPolicy" ? { kind: a.kind } : { markRead: { id: a.id, revision: a.revision } });
-    if (r.ok) setNote(r.body.message || (a.type === "markPolicyRead" ? "Marked as read. This page now counts as yours." : "Your page is started as a draft."));
-    else setError(errorWords(r));
-    if (r.ok || r.status === 409) await onChange?.();
-    setBusy(null);
-  }
-  async function testOrder(done) {
-    setBusy("test_order");
-    setError(null);
-    setNote(null);
-    const r = await post(ONBOARDING_URL, { step: "test_order", done });
-    if (r.ok && Array.isArray(r.body.steps)) onModel?.(r.body);
-    else setError(errorWords(r));
-    setBusy(null);
-  }
-
-  const testAction = actionOf(step, "test_order");
-  const open = actionOf(step, "open_store");
-  const blocked = step.state === "blocked";
-  return (
-    <div className="space-y-4">
-      {error && <Notice>{error}</Notice>}
-      {note && <Notice tone="success">{note}</Notice>}
-      {items.length > 0 && (
-        <ul className="-mt-3 divide-y divide-border border-b border-border" data-onboarding="opening-items">
-          {items.map((i) => (
-            <OpeningItem key={i.id} item={i} step={step} busy={busy} onAct={policy} />
-          ))}
-        </ul>
-      )}
-
-      <section className="space-y-2" data-onboarding="test-order" aria-label={PANEL_WORDS.testOrderTitle}>
-        <p className="text-sm font-medium text-foreground">{PANEL_WORDS.testOrderTitle}</p>
-        {marked ? (
-          <p className="flex items-center gap-2 text-sm text-success"><CircleCheck aria-hidden className="size-4" />{PANEL_WORDS.testOrderMarked}</p>
-        ) : (
-          testItem?.message && <p className="text-[0.8125rem] text-muted-foreground">{testItem.message}</p>
-        )}
-        <div className="flex flex-wrap items-start gap-2">
-          {!marked && testItem?.href && (
-            <Button asChild size="sm" variant="outline">
-              <Link href={testItem.href}>{testItem.linkLabel || "Open your preview"}</Link>
-            </Button>
-          )}
-          <Gated action={testAction} reasonId="test-order-reason" size="sm" variant={marked ? "ghost" : "outline"} disabled={busy !== null} aria-busy={busy === "test_order" || undefined} onClick={() => testOrder(!marked)}>
-            {marked ? PANEL_WORDS.testOrderUndo : PANEL_WORDS.testOrderMark}
-          </Gated>
-        </div>
-      </section>
-
-      {open && (
-        <section className="space-y-3 border-t border-border pt-4" data-onboarding="open-store" aria-label={PANEL_WORDS.openTitle}>
-          <p className="text-sm text-muted-foreground">{PANEL_WORDS.openWords}</p>
-          {open.allowed && !blocked ? (
-            <Button asChild size="lg" className="h-10 px-4">
-              <Link href={publishHref}>
-                {PANEL_WORDS.openButton}
-              </Link>
-            </Button>
-          ) : (
-            <Gated action={open.allowed ? { ...open, allowed: false, reason: PANEL_WORDS.fixFirst } : open} reasonId="open-reason" size="lg" className="h-10 px-4">
-              {PANEL_WORDS.openButton}
-            </Gated>
-          )}
-        </section>
-      )}
-    </div>
-  );
-}
+// Phase 1 line 7: step 4 has its own file.
+export { default as OpenPanel } from "./OpenStepPanel";
