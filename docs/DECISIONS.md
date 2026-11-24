@@ -3,6 +3,21 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 Self-serve signup (on the owner's behalf)
+
+- **Decision (schema first):**
+  - A new `signups` table holds pending signups; the user and the store are created only after the email is verified. A new `platform_mail` table records platform emails (signup codes); the email body is kept only when mail is mocked locally, so codes are never stored in production. `users.email_verified_at` is added (existing users stay empty). Migration `platform/0011`, nothing destructive.
+  - Signup is anonymous, on the Storeasy marketing host only (`/signup`); verification is a 6-digit emailed code (15 minutes, 5 tries, resend once a minute up to 5 times) entered in the same tab, bound to a browser cookie so nobody can guess or burn someone else's signup.
+  - An email that already has an account gets an identical response and a "sign in instead" email (no enumeration); adding a second store to an existing account comes later.
+  - After verification a single-use, 2-minute handoff token (in the URL fragment, never in logs) signs the founder into their new store's console at `/admin/onboarding`, the page line 3 grows into the four steps.
+  - Stores live at `<slug>.<SIGNUP_STORE_DOMAIN>`; the slug becomes the store id. The database is created behind `lib/platform/provisioner.js` with a `file` driver (refused in production) that line 2 swaps for Turso; existing provisioning keeps using Turso.
+  - Signup is off until an operator turns on the flag `ff_self_signup`.
+- **Why:** the owner wants onboarding simple; verify-before-create keeps fake signups from making stores.
+- **Instead of:** creating an unverified user and store at once; a verification link (can open in another browser); a shared parent-domain cookie (breaks custom domains).
+- **Accepted risk:** an attacker could send their own handoff link and sign someone into the attacker's empty new store; the token lasts 2 minutes and works once.
+- **Decided by:** Claude, on the owner's behalf (scope by the owner)
+- **Slice:** Phase 1, self-serve signup
+
 ## 2026-11-24 Phase 0 audit: job secret and health details (on the owner's behalf)
 
 - **Decision:** the job secret (`CRON_SECRET`) fails closed in production: without it, `/api/jobs/*`, `/api/health?all=1` and `/api/connect/shopify/start` refuse everyone (local development stays open). Signed-out `/api/health` answers only `{status, at}` with the same status code; pending orders, error counts, configured integrations and dependency errors need the job secret.
