@@ -104,6 +104,16 @@ export async function onboardingStage(drill) {
   drill.check(v.compactVisible && !v.railVisible && !v.overflow && Object.keys(v.states).length === 4, "at 375 the compact step list shows above the panel and nothing scrolls sideways", { compact: v.compactVisible, rail: v.railVisible, overflow: v.overflow });
   await drill.screenshot(np, "h-onboarding-open-375");
   await narrow.close();
+  // the in-between widths (screenshots only): 768 keeps the compact list, 1280 has the rail
+  for (const width of [768, 1280]) {
+    const wctx = await p6Context(drill, { width });
+    const wp = await loginP6(drill, wctx);
+    await goStep(drill, wp, "brand");
+    await drill.screenshot(wp, `h-onboarding-brand-${width}`);
+    await goStep(drill, wp, "import");
+    await drill.screenshot(wp, `h-onboarding-import-${width}`);
+    await wctx.close();
+  }
 
   // ---- 4. support: reads everything, changes nothing ----
   const sctx = await p6Context(drill);
@@ -119,6 +129,7 @@ export async function onboardingStage(drill) {
   await drill.screenshot(sp, "h-onboarding-support-open-1440");
   await goStep(drill, sp, "brand");
   const brandText = clean(await sp.locator('[data-onboarding="panel"]').innerText());
+  await drill.screenshot(sp, "h-onboarding-support-brand-1440");
   drill.check(brandText.includes(READ_ONLY), "support: the Brand step says why nothing can be changed", brandText.slice(0, 300));
   const brandButtons = await sp.locator('[data-onboarding="panel"] [data-brand-step] button:not([disabled])').count();
   drill.check(brandButtons === 0, "support: the brand step has no enabled button", brandButtons);
