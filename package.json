@@ -80,6 +80,7 @@
     "test:signup": "node scripts/test-signup.js",
     "test:signup-provision": "node scripts/test-signup-provision.js",
     "test:operator-onboarding": "node scripts/test-operator-onboarding.js",
+    "test:operator-create-store": "node scripts/test-operator-create-store.js",
     "test:turso-api": "node scripts/test-turso-api.js",
     "test:design-harness": "node scripts/test-design-harness.js",
     "check:turso-real": "node scripts/turso-real-check.js",

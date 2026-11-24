@@ -54,6 +54,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // --- fixtures ----------------------------------------------------------------
 await C.migratePlatform(await readFile(join(here, "../lib/platform/schema.sql"), "utf8"));
+// Phase 1 line 9: an accepted invite marks a new user's email verified (platform migration 0011)
+{
+  const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
+  await runMigrations(C.platformDb(), await loadMigrations("platform"), {});
+}
 await C.upsertTenant({ id: "ia", name: "Store A", domains: ["ia.test"], dbUrl: "file:.test-identity-default.db", config: {}, secrets: {} });
 await C.upsertTenant({ id: "ib", name: "Store B", domains: ["ib.test"], dbUrl: "file:.test-identity-default.db", config: {}, secrets: {} });
 await C.upsertTenant({ id: "ig", name: "Store G (bootstrap)", domains: [], dbUrl: "file:.test-identity-default.db", config: {}, secrets: { admin_password: "gamma-boot-pass1" } });
@@ -215,6 +220,22 @@ await t("invite: accept creates user+membership; token is single-use", async () 
   ok(user, "accepted");
   eq(await S.membershipRole(user.id, "ib"), "staff", "membership");
   eq(await I.acceptInvite({ token, name: "x", password: "xxxxxxxxx", tenantId: "ib" }), null, "single use");
+  ok((await I.getUser(user.id)).email_verified_at, "line 9: the invite proved the email");
+  eq(user.existingAccount, false, "a new account");
+});
+
+await t("line 9: an existing account accepts with its current password, checked before the token is spent; peekInvite never spends it", async () => {
+  const { token } = await I.createInvite({ email: "carol@example.com", tenantId: "ia", role: "admin" });
+  eq((await I.peekInvite(token, "ia")).existingAccount, true, "peek: existing");
+  eq(await I.peekInvite(token, "ib"), null, "peek: another store");
+  eq((await I.acceptInvite({ token, name: "x", password: "wrong-pass-123", tenantId: "ia" })).wrongPassword, true, "wrong password");
+  ok(await I.peekInvite(token, "ia"), "still usable after a wrong password");
+  const user = await I.acceptInvite({ token, name: "ignored", password: "carol-pass-1", tenantId: "ia" });
+  eq(user.existingAccount, true, "existing");
+  eq(await S.membershipRole(user.id, "ia"), "admin", "membership");
+  const fresh = await I.createInvite({ email: "newbie@example.com", tenantId: "ia" });
+  ok((await I.acceptInvite({ token: fresh.token, name: "N", password: "short", tenantId: "ia" })).passwordProblem, "weak password refused");
+  ok(await I.peekInvite(fresh.token, "ia"), "and the token is not spent");
 });
 
 await t("invite: wrong-tenant attempt rejected WITHOUT burning the token; expired rejected", async () => {

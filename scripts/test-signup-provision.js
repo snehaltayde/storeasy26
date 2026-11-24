@@ -506,6 +506,12 @@ await t("a lapsed signup's job fails as lapsed and Try again says start again", 
   eq((await api("signup/verify", "POST", { body: { retry: true }, cookie: s.cookie })).body.error, S.SIGNUP_LAPSED, "retry says start again");
 });
 
+await t("line 9: the lapse rule skips a store an operator created (source 'operator'), past any expiry and with no password", async () => {
+  const past = new Date(Date.now() - 49 * 3600_000).toISOString();
+  eq(SP.signupLapsed({ source: "signup", expires_at: past, user_id: null, password_hash: null }), true, "a founder's signup lapses");
+  eq(SP.signupLapsed({ source: "operator", expires_at: past, user_id: null, password_hash: null }), false, "an operator's never does");
+});
+
 // --- operator view ------------------------------------------------------------------------
 
 await t("operator: resuming a signup run makes its job due (not run inline); the list carries the signup badge data and failure kind", async () => {

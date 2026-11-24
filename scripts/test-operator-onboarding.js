@@ -493,6 +493,10 @@ await t("owner invite: a store with no owner gets a 7-day invite to the founder'
   const diff = JSON.parse((await one("SELECT diff FROM audit_log WHERE action = 'team.invite_created' ORDER BY rowid DESC LIMIT 1")).diff);
   eq(diff.via, "operator-onboarding", "via");
   eq((await post({ action: "owner_invite", subject: `tenant:${store.a.id}` })).status, 409, "a store with an owner: refused");
+  // line 9: the invite mail is the shared helper's, and its kinds are registered
+  const PM = await import("../lib/platform/platform-mail.js");
+  for (const k of ["operator_owner_invite", "operator_store_invite"]) ok(PM.PLATFORM_MAIL_KINDS.includes(k), k);
+  eq(typeof OPS.mailOwnerInvite, "function", "mailOwnerInvite exported");
 });
 
 await t("owner invite with no signup on file falls back to the store's support email; a failed send keeps the earlier invite usable", async () => {

@@ -15,16 +15,20 @@ import { slog } from "@/lib/log";
 // self-serve signup made it; resuming such a run makes the signup's job due
 // (run in after()) instead of running inline, so the user and the owner
 // membership are made too.
+// Phase 1 line 9: a run for a store an operator created (source "operator")
+// is treated the same way (its job sends the owner's invite); its `signup`
+// carries source "operator" for the panel's "Created by Storeasy" badge.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const unauthorized = () => NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const JOB_SOURCES = ["signup", "operator"];
 
 export async function GET(request) {
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const runs = await listProvisionRuns({ limit: 20 });
-  const signups = await signupsForRuns(runs.filter((r) => r.params?.source === "signup").map((r) => r.id));
+  const signups = await signupsForRuns(runs.filter((r) => JOB_SOURCES.includes(r.params?.source)).map((r) => r.id));
   return NextResponse.json({ ok: true, runs: runs.map((r) => (signups[r.id] ? { ...r, signup: signups[r.id] } : r)) });
 }
 
@@ -33,7 +37,7 @@ export async function POST(request) {
   if (!(await verifyPlatformToken(request.cookies.get(PLATFORM_COOKIE)?.value))) return unauthorized();
   const body = await request.json().catch(() => ({}));
   try {
-    if (body.action === "resume" && (await getProvisionRun(String(body.run || "")))?.params?.source === "signup") {
+    if (body.action === "resume" && JOB_SOURCES.includes((await getProvisionRun(String(body.run || "")))?.params?.source)) {
       const q = await resumeSignupRun(String(body.run));
       if (q?.jobId) after(() => runJobById(q.jobId, { budgetMs: 50_000 }));
       slog("provision_resumed", { run: body.run, queued: Boolean(q?.jobId) });

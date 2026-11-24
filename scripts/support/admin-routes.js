@@ -133,6 +133,7 @@ export const ADMIN_ROUTES = Object.freeze([
 export const EXEMPT_ROUTES = Object.freeze([
   { path: "login", method: "POST", kind: "login" },
   { path: "logout", method: "POST", kind: "logout" },
+  { path: "accept-invite", method: "GET", kind: "token" },
   { path: "accept-invite", method: "POST", kind: "token" },
   { path: "reset", method: "POST", kind: "token" },
   { path: "handoff", method: "POST", kind: "token" },
