@@ -33,7 +33,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 - [x] A founder can sign up on their own with name, email and password, verify the email, and land in their new (closed) store's console; a local file database stands in for Turso (`test:signup`, `pnpm drill:signup`; off until an operator turns on `ff_self-signup`)
 - [x] Signup creates the store's Turso database for real (provisioning runs as a job; a failed step is retried or reported in plain words) (`test:signup-provision`, `test:turso-api`, `pnpm drill:signup` against a local Turso stand-in; real Turso not yet checked: owner runs `pnpm check:turso-real`, see `docs/cms-reviews/MANUAL-CHECKS.md`)
-- [ ] A founder sees one onboarding page with four steps (Connect Shopify, Import products, Brand, Open your store), each showing done, in progress or blocked, and it resumes where they left off; it replaces the start page and setup checklist
+- [x] A founder sees one onboarding page with four steps (Connect Shopify, Import products, Brand, Open your store), each showing done, in progress or blocked, and it resumes where they left off; it replaces the start page and setup checklist (`test:onboarding`, `pnpm drill:p6` stage h)
 - [ ] A founder can connect their Shopify store from step 1 through OAuth, with a stand-in Shopify for tests first
 - [ ] A founder sees their products import with live progress in step 2, and a failed import says what to do
 - [ ] A founder can choose a palette and add a logo in step 3, and the starter store updates in a live preview beside it
