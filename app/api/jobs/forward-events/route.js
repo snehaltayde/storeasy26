@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { runEventSweep, forwardEventById, eventStats } from "@/lib/events";
 import { sendAlert } from "@/lib/alerts";
 import { forEachActiveTenant, runAsTenant } from "@/lib/platform/ops";
@@ -16,15 +17,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function authorized(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  const header = request.headers.get("authorization") || "";
-  return header === `Bearer ${secret}` || request.nextUrl.searchParams.get("secret") === secret;
-}
-
 export async function GET(request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!cronAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   // S29 insurance: drain a few due jobs on the daily cadence too.
   const { runDueJobs } = await import("@/lib/platform/worker");
   await runDueJobs({ limit: 10 }).catch(() => {});
@@ -47,7 +41,7 @@ export async function GET(request) {
 // sync-shopify POST — operator calls on the platform host must name a tenant.
 export const POST = tenantHandler(
   async (request) => {
-    if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!cronAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = await request.json().catch(() => ({}));
     if (!body.eventId) return NextResponse.json({ error: "eventId required" }, { status: 400 });
     if (platformConfigured() && !currentTenant() && !body.tenant) {

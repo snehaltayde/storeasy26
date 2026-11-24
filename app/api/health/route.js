@@ -7,6 +7,7 @@ import { forEachActiveTenant, aggregateHealth } from "@/lib/platform/ops";
 import { tenantOwnSecret, currentTenant } from "@/lib/tenant-context";
 import { tenantHandler } from "@/lib/tenant-request";
 import { platformConfigured } from "@/lib/platform/control";
+import { cronAuthorized } from "@/lib/cron-auth";
 
 // Health check (Session 17): dependency latencies + queue depths + config
 // flags in one place. 200 ok / 200 degraded (non-core issue) / 503 when the
@@ -103,20 +104,13 @@ async function tenantHealth() {
   };
 }
 
-function rollupAuthorized(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  const header = request.headers.get("authorization") || "";
-  return header === `Bearer ${secret}` || request.nextUrl.searchParams.get("secret") === secret;
-}
-
 // allowUnresolved: the ?all=1 rollup is called on the deployment/platform host
 // (not a tenant domain) by monitoring. The single-tenant check stays fail-closed
 // by hand: platform mode + no resolved tenant → 404 TENANT_UNKNOWN.
 export const GET = tenantHandler(
   async (request) => {
     if (request.nextUrl.searchParams.get("all") === "1") {
-      if (!rollupAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      if (!cronAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       const results = await forEachActiveTenant(tenantHealth);
       const rollup = aggregateHealth(results);
       // S29 (BE19): platform queue health rides the rollup — dead letters or a
@@ -138,7 +132,11 @@ export const GET = tenantHandler(
       return NextResponse.json({ error: "Store not found", code: "TENANT_UNKNOWN" }, { status: 404 });
     }
     const body = await tenantHealth();
-    return NextResponse.json(body, { status: body.status === "down" ? 503 : 200 });
+    // Phase 0 audit gap A: an anonymous caller (an uptime monitor) gets the
+    // status and its code; queue depths, error counts and integration flags
+    // need the job secret.
+    const shown = cronAuthorized(request) ? body : { status: body.status, at: body.at };
+    return NextResponse.json(shown, { status: body.status === "down" ? 503 : 200 });
   },
   { allowUnresolved: true },
 );

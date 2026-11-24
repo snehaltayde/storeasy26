@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { getTenant, listTenants } from "@/lib/platform/control.js";
 import { withTenant } from "@/lib/tenant-context.js";
 import { startCatalogSync } from "@/lib/platform/sync-jobs";
@@ -19,13 +20,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const BUDGET_MS = 45_000;
-
-function authorized(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  const header = request.headers.get("authorization") || "";
-  return header === `Bearer ${secret}` || request.nextUrl.searchParams.get("secret") === secret;
-}
 
 async function queueOne(slug) {
   const tenant = await getTenant(slug);
@@ -56,7 +50,7 @@ async function runFirstSlices(results, started) {
 
 export async function POST(request) {
   const started = Date.now();
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!cronAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   if (!body.tenant) return NextResponse.json({ error: "tenant required" }, { status: 400 });
   const [result] = await runFirstSlices([await queueOne(body.tenant)], started);
@@ -65,7 +59,7 @@ export async function POST(request) {
 
 export async function GET(request) {
   const started = Date.now();
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!cronAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const limit = Number(request.nextUrl.searchParams.get("limit") || 0);
   let tenants = (await listTenants()).filter((t) => t.status === "active");
   if (limit > 0) tenants = tenants.slice(0, limit);

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { runDueJobs, TICK_BUDGET_MS } from "@/lib/platform/worker";
 import { queueStats, pruneQueues } from "@/lib/platform/jobs";
 import { platformConfigured } from "@/lib/platform/control";
@@ -14,15 +15,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function authorized(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  const header = request.headers.get("authorization") || "";
-  return header === `Bearer ${secret}` || request.nextUrl.searchParams.get("secret") === secret;
-}
-
 async function tick(request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!cronAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!platformConfigured()) {
     return NextResponse.json({ ok: true, skipped: "no control plane (legacy mode — sweeps own retries)" });
   }

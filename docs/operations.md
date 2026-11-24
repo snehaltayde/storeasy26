@@ -5,7 +5,10 @@
 `GET /api/health` — dependency latencies (Turso, Typesense), queue depths
 (order sync + event forwarding: pending/dead/oldest age), 24h error count, and
 config flags. `200 {status:"ok"|"degraded"}`; **503** when Turso is down.
-Point an uptime monitor here.
+Point an uptime monitor here. Without the job secret (`Authorization: Bearer
+$CRON_SECRET` or `?secret=`) the body is only `{status, at}`; every job route,
+the `?all=1` rollup and `/api/connect/shopify/start` refuse with 401 in
+production when `CRON_SECRET` is unset (Phase 0 audit, `lib/cron-auth.js`).
 
 ## Error tracking (first-party; Sentry-ready)
 
