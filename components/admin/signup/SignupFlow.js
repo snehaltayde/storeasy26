@@ -76,7 +76,9 @@ export default function SignupFlow({ storeDomain, codeMinutes = 15, resendSecond
   const set = (k) => (e) => {
     const v = e.target.value;
     setFields((f) => ({ ...f, [k]: v }));
-    setErrors((x) => (x[k] ? { ...x, [k]: undefined } : x));
+    // the address is made from the store name, so a new name clears its error too
+    const clear = k === "storeName" ? [k, "slug"] : [k];
+    setErrors((x) => (clear.some((c) => x[c]) ? { ...x, ...Object.fromEntries(clear.map((c) => [c, undefined])) } : x));
   };
 
   // the address: derived from the store name until the founder edits it
