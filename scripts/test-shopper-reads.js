@@ -845,6 +845,83 @@ await t("search, upsell, wishlist and media answer anonymous callers with none o
   }
 });
 
+// ---------------------------------------------------------------------------
+// 9. Job routes and /api/health (Phase 0 audit, gaps A and B)
+// ---------------------------------------------------------------------------
+console.log("— 8. job routes and health, anonymous");
+
+const JOBS = {
+  "health": await import("../app/api/health/route.js"),
+  "jobs/tick": await import("../app/api/jobs/tick/route.js"),
+  "jobs/forward-events": await import("../app/api/jobs/forward-events/route.js"),
+  "jobs/sync-catalog": await import("../app/api/jobs/sync-catalog/route.js"),
+  "jobs/sync-shopify": await import("../app/api/jobs/sync-shopify/route.js"),
+  "connect/shopify/start": await import("../app/api/connect/shopify/start/route.js"),
+};
+async function job(name, method, { host = HOST_A, query = "", auth = null } = {}) {
+  const headers = { host };
+  if (auth) headers.authorization = `Bearer ${auth}`;
+  if (method !== "GET") {
+    headers["content-type"] = "application/json";
+    headers.origin = `http://${host}`;
+  }
+  const req = new NextRequest(`http://${host}/api/${name}${query ? `?${query}` : ""}`, { method, headers, body: method === "GET" ? undefined : JSON.stringify({ orderId: "ord_missing", tenant: sA.tenant.id }) });
+  const res = await JOBS[name][method](req, { params: Promise.resolve({}) });
+  const text = await res.text();
+  let body = null;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    // not JSON
+  }
+  return { status: res.status, body, text };
+}
+
+await t("production, no CRON_SECRET: every job route, the health rollup and the Shopify connect start answer anonymous 401 (gap B)", async () => {
+  const saved = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "";
+  process.env.NODE_ENV = "production";
+  try {
+    const bad = [];
+    for (const [name, mod] of Object.entries(JOBS)) {
+      for (const method of ["GET", "POST"].filter((m) => typeof mod[m] === "function")) {
+        const query = name === "health" ? "all=1" : name === "connect/shopify/start" ? `tenant=${sA.tenant.id}` : "";
+        const r = await job(name, method, { query });
+        if (r.status !== 401) bad.push(`${method} /api/${name}${query ? `?${query}` : ""} → ${r.status} ${r.text.slice(0, 80)}`);
+      }
+    }
+    eq(bad.join("\n"), "", "open job routes");
+  } finally {
+    process.env.CRON_SECRET = saved ?? "";
+  }
+});
+
+await t("anonymous /api/health gets only {status, at}: no queue depths, error counts or integration flags (gap A); the job secret gets the full body", async () => {
+  const saved = process.env.CRON_SECRET;
+  try {
+    for (const env of ["production", "development"]) {
+      process.env.NODE_ENV = env;
+      process.env.CRON_SECRET = "cnycronsec0";
+      const anon = await job("health", "GET");
+      ok(anon.status === 200 || anon.status === 503, `${env} anonymous status ${anon.status}`);
+      same(Object.keys(anon.body ?? {}).sort(), ["at", "status"], `${env} anonymous keys`);
+      const wrong = await job("health", "GET", { auth: "nope" });
+      same(Object.keys(wrong.body ?? {}).sort(), ["at", "status"], `${env} wrong secret keys`);
+      const full = await job("health", "GET", { auth: "cnycronsec0" });
+      ok(full.body?.checks && full.body?.configured, `${env} the job secret gets checks and configured`);
+    }
+    // production with no secret at all: still only the status
+    process.env.NODE_ENV = "production";
+    process.env.CRON_SECRET = "";
+    same(Object.keys((await job("health", "GET")).body ?? {}).sort(), ["at", "status"], "production, no secret");
+    // local development with no secret keeps the full body (the harness reads it)
+    process.env.NODE_ENV = "development";
+    ok((await job("health", "GET")).body?.checks, "development, no secret: full body");
+  } finally {
+    process.env.CRON_SECRET = saved ?? "";
+  }
+});
+
 await t("no network: nothing reached fetch()", async () => {
   eq(fetchCalls.length, 0, `fetch calls: ${fetchCalls.join(", ")}`);
 });
