@@ -242,17 +242,23 @@ export async function brandStage(drill) {
   errors = watchErrors(ctx);
   page = await loginP6(drill, ctx);
   const mints = [];
-  page.on("request", (r) => r.method() === "POST" && new URL(r.url()).pathname === "/api/admin/preview-session" && mints.push(r.url()));
+  const t0r = Date.now();
+  const stepAt = [];
+  page.on("request", (r) => r.method() === "POST" && new URL(r.url()).pathname === "/api/admin/preview-session" && mints.push({ ms: Date.now() - t0r, after: stepAt.at(-1) || "start" }));
   await openStart(drill, page);
   await previewShown(page);
+  stepAt.push("shown at 1280");
   await page.setViewportSize({ width: 390, height: 812 });
+  stepAt.push("390");
   await page.locator("[data-brand-preview-open]").click();
   await page.locator("[data-brand-sheet]").waitFor({ state: "visible", timeout: 30_000 });
   const narrowShown = await previewShown(page);
+  stepAt.push("sheet shown");
   await page.setViewportSize({ width: 1280, height: 900 });
+  stepAt.push("1280 again");
   const wideAgain = await previewShown(page);
   await sleep(1500); // a late re-mint would show here
-  drill.check(narrowShown && wideAgain && mints.length === 1 && (await page.locator("[data-preview-frame]").count()) === 1, "resizing 1280 → 390 → 1280 keeps one frame and one preview session (one POST /api/admin/preview-session)", { mints: mints.length });
+  drill.check(narrowShown && wideAgain && mints.length === 1 && (await page.locator("[data-preview-frame]").count()) === 1, "resizing 1280 → 390 → 1280 keeps one frame and one preview session (one POST /api/admin/preview-session)", { mints, log: await page.locator("[data-brand-preview]").getAttribute("data-preview-log").catch(() => null) });
   drill.check(errors.length === 0, "no page errors (resize run)", errors);
   await ctx.close();
 

@@ -103,7 +103,7 @@ export default function BrandPreview({ message = null, canEdit = false, saved = 
   const computer = width === "computer";
   const failed = view?.phase === "failed";
   return (
-    <section aria-label={PREVIEW_WORDS.title} className={cn("min-w-0 space-y-3", className)} data-brand-preview="" data-preview-phase={view?.phase || ""} data-preview-width={width} data-preview-reconnecting={view?.reconnecting ? "" : undefined}>
+    <section aria-label={PREVIEW_WORDS.title} className={cn("min-w-0 space-y-3", className)} data-brand-preview="" data-preview-phase={view?.phase || ""} data-preview-width={width} data-preview-reconnecting={view?.reconnecting ? "" : undefined} data-preview-log={(ctlRef.current?.log || []).slice(-16).join(" ")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div role="radiogroup" aria-label={PREVIEW_WORDS.width} className="inline-flex rounded-md border border-border bg-muted p-0.5">
           {["phone", "computer"].map((w) => (
