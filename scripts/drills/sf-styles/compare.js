@@ -24,6 +24,11 @@
 //   ignoreBoxes  box differences are counted in `boxReported`, not `box`:
 //                reported and expected (a wider content column moves boxes),
 //                never a failure
+//   frameOutside an element the next capture marks outside every old-screen
+//                region (l falsy: the new shell's frame, e.g. <body> and Next's
+//                hidden elements on a whole-document page) has its style and
+//                custom-property differences counted in `frame`, reported, not
+//                failed; inside a region (l: 1) every difference still counts
 //   limit        samples kept per capture (default 20)
 import { createHash } from "node:crypto";
 
@@ -51,11 +56,11 @@ export function ignoreMatcher(ignoreProps = []) {
 }
 
 // Two captures of the same page and width → { style, box, added, removed, shot, samples }.
-export function diffCapture(base, next, { limit = 20, ignoreProps = [], ignoreBoxes = false } = {}) {
+export function diffCapture(base, next, { limit = 20, ignoreProps = [], ignoreBoxes = false, frameOutside = false } = {}) {
   const skip = ignoreMatcher(ignoreProps);
   const a = new Map(base.elements.map((e) => [e.k, e]));
   const b = new Map(next.elements.map((e) => [e.k, e]));
-  const out = { page: next.page, width: next.width, style: 0, box: 0, added: 0, removed: 0, customChanged: 0, customAdded: 0, ignored: 0, boxReported: 0, shot: base.shot === next.shot ? "same" : "differs", samples: [], customNames: [] };
+  const out = { page: next.page, width: next.width, style: 0, box: 0, added: 0, removed: 0, customChanged: 0, customAdded: 0, ignored: 0, boxReported: 0, frame: 0, shot: base.shot === next.shot ? "same" : "differs", samples: [], customNames: [] };
   const names = new Set();
   const sample = (row) => out.samples.length < limit && out.samples.push(row);
   for (const [k, e] of a) {
@@ -77,6 +82,11 @@ export function diffCapture(base, next, { limit = 20, ignoreProps = [], ignoreBo
       if (e.s[p] === f.s[p]) continue;
       if (skip(p)) {
         out.ignored++;
+        continue;
+      }
+      if (frameOutside && !f.l) {
+        out.frame++;
+        if (out.samples.length < limit && !out.samples.some((x) => x.kind === "frame" && x.k === k)) sample({ k, kind: "frame", prop: p, before: e.s[p] ?? null, after: f.s[p] ?? null });
         continue;
       }
       if (p.startsWith("--") && e.s[p] === undefined) {
@@ -111,7 +121,7 @@ export function diffRuns(base, next, opts) {
   }
   for (const k of byKey.keys()) missing.push(`${k} (not in this run)`);
   const sum = (f) => pages.reduce((n, p) => n + p[f], 0);
-  const totals = { style: sum("style"), box: sum("box"), added: sum("added"), removed: sum("removed"), customChanged: sum("customChanged"), customAdded: sum("customAdded"), ignored: sum("ignored"), boxReported: sum("boxReported"), shots: pages.filter((p) => p.shot !== "same").length, missing: missing.length };
+  const totals = { style: sum("style"), box: sum("box"), added: sum("added"), removed: sum("removed"), customChanged: sum("customChanged"), customAdded: sum("customAdded"), ignored: sum("ignored"), boxReported: sum("boxReported"), frame: sum("frame"), shots: pages.filter((p) => p.shot !== "same").length, missing: missing.length };
   const customAdded = [...new Set(pages.flatMap((p) => p.customNames))].sort();
   return { totals, pages, missing, customAdded };
 }

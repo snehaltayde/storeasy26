@@ -514,7 +514,7 @@ await t("sf-styles compare: identical captures have no differences; a synthetic 
   const same = structuredClone(base);
   same[0].elements[0].s = { "letter-spacing": "normal", color: "red" }; // property order never matters
   const d0 = C.diffRuns(base, same);
-  eq(JSON.stringify(d0.totals), JSON.stringify({ style: 0, box: 0, added: 0, removed: 0, customChanged: 0, customAdded: 0, ignored: 0, boxReported: 0, shots: 0, missing: 0 }), "identical:");
+  eq(JSON.stringify(d0.totals), JSON.stringify({ style: 0, box: 0, added: 0, removed: 0, customChanged: 0, customAdded: 0, ignored: 0, boxReported: 0, frame: 0, shots: 0, missing: 0 }), "identical:");
   ok(C.isClean(d0.totals), "identical is clean:");
   eq(C.elementHash(base[0].elements[0]), C.elementHash(same[0].elements[0]), "hash ignores property order:");
   const next = structuredClone(base);
@@ -524,7 +524,7 @@ await t("sf-styles compare: identical captures have no differences; a synthetic 
   next[0].elements.pop();
   next[0].elements.push(el("html>body:1>div:1", { color: "red" }));
   const d1 = C.diffRuns(base, next);
-  eq(JSON.stringify(d1.totals), JSON.stringify({ style: 1, box: 1, added: 1, removed: 1, customChanged: 0, customAdded: 0, ignored: 0, boxReported: 0, shots: 1, missing: 0 }), "changed:");
+  eq(JSON.stringify(d1.totals), JSON.stringify({ style: 1, box: 1, added: 1, removed: 1, customChanged: 0, customAdded: 0, ignored: 0, boxReported: 0, frame: 0, shots: 1, missing: 0 }), "changed:");
   ok(!C.isClean(d1.totals), "changed is not clean:");
   const s = d1.pages[0].samples.find((x) => x.kind === "style");
   eq(`${s.k} ${s.prop} ${s.before} → ${s.after}`, "html letter-spacing normal → 0.0375px", "style sample:");
@@ -582,6 +582,17 @@ await t("console-styles compare: ignoreProps (names and prefixes) and ignoreBoxe
   const d2 = C.diffRuns(base, bitten, opts);
   eq(`${d2.totals.style} ${d2.totals.customAdded} ${d2.totals.ignored} ${C.isClean(d2.totals)}`, "1 0 3 false", "a bite still fails; a prefix entry skips --tw-x:");
   eq(C.ignoreMatcher(["--*"])("--c-bg") && !C.ignoreMatcher(["--*"])("color"), true, "a prefix entry matches only its prefix:");
+  // frameOutside: outside an old region (l falsy in the next capture) differences are reported as frame; inside they fail
+  const doc = [{ page: "admin-login", width: 1280, shot: "a", elements: [el("html>body:2", { "background-color": "white" }), el("html>body:2>div:1", { color: "black" })] }];
+  const after = structuredClone(doc);
+  after[0].elements[0].s["background-color"] = "paper";
+  after[0].elements[0].l = 0;
+  after[0].elements[1].l = 1;
+  const d3 = C.diffRuns(doc, after, { frameOutside: true });
+  eq(`${d3.totals.style} ${d3.totals.frame} ${C.isClean(d3.totals)}`, "0 1 true", "the frame is reported:");
+  after[0].elements[1].s.color = "blue";
+  const d4 = C.diffRuns(doc, after, { frameOutside: true });
+  eq(`${d4.totals.style} ${d4.totals.frame} ${C.isClean(d4.totals)}`, "1 1 false", "inside a region a difference fails:");
 });
 
 await t("shell: drill:shell runs the roles store, adds the annex, then the drill; it is in drill:all", async () => {

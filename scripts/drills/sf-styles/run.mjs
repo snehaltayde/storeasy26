@@ -54,7 +54,11 @@ import { diffRuns, elementHash, hashOf, isClean } from "./compare.js";
 export const SET = process.env.SF_STYLES_SET === "console" ? "console" : "storefront";
 export const DRILL_ID = SET === "console" ? "CONSOLE-STYLES" : "SF-STYLES";
 // layout-derived: they follow the content column's width, not the styles
-export const CONSOLE_IGNORE = Object.freeze(["width", "height", "inline-size", "block-size", "top", "right", "bottom", "left", "transform-origin", "perspective-origin"]);
+// Added after the first line 8 compare (each a resolved px value that follows
+// the column's width): the logical inset-* aliases of top/right/bottom/left,
+// grid-template-columns/rows (fr and auto tracks resolve to px) and the
+// horizontal margins (mx-auto resolves to px).
+export const CONSOLE_IGNORE = Object.freeze(["width", "height", "inline-size", "block-size", "top", "right", "bottom", "left", "transform-origin", "perspective-origin", "inset-block-start", "inset-block-end", "inset-inline-start", "inset-inline-end", "grid-template-columns", "grid-template-rows", "margin-left", "margin-right", "margin-inline-start", "margin-inline-end"]);
 export const CONSOLE_REGION = Object.freeze(["main > [data-legacy]", "main"]);
 export const WIDTHS = [375, 768, 1280];
 const HEIGHTS = { 375: 812, 768: 1024, 1280: 900 };
@@ -81,11 +85,13 @@ export function captureDom(roots = null) {
   const kids = (el) => [...el.children].flatMap((c) => (c.tagName === "SCRIPT" ? [] : c.hasAttribute("data-legacy") ? kids(c) : [c]));
   const walk = (el, path) => {
     const r = el.getBoundingClientRect();
-    out.push({ k: path, s: styleOf(getComputedStyle(el)), b: [r2(r.x + scrollX), r2(r.y + scrollY), r2(r.width), r2(r.height)] });
+    // l: inside an old-screen region (line 8's [data-legacy])
+    const l = el.closest("[data-legacy]") || inRegion ? 1 : 0;
+    out.push({ k: path, s: styleOf(getComputedStyle(el)), b: [r2(r.x + scrollX), r2(r.y + scrollY), r2(r.width), r2(r.height)], l });
     for (const pseudo of ["::before", "::after"]) {
       const cs = getComputedStyle(el, pseudo);
       if (cs.content === "none" || cs.content === "normal") continue;
-      out.push({ k: path + pseudo, s: styleOf(cs), b: null });
+      out.push({ k: path + pseudo, s: styleOf(cs), b: null, l });
     }
     // <script>s are never drawn, and Next dev streams a varying number of
     // them (123 or 124 on one page between two runs of the same commit),
@@ -93,10 +99,12 @@ export function captureDom(roots = null) {
     let i = 0;
     for (const c of kids(el)) walk(c, `${path}>${c.tagName.toLowerCase()}:${++i}`);
   };
+  let inRegion = false;
   if (!roots) {
     walk(document.documentElement, "html");
     return out;
   }
+  inRegion = true;
   const root = roots.map((q) => document.querySelector(q)).find(Boolean);
   if (!root) return out;
   let i = 0;
@@ -285,7 +293,7 @@ async function sfStyles(drill) {
   if (!baselineDir) return;
 
   const base = readCaptures(baselineDir);
-  const opts = consoleSet ? { ignoreProps: [...CONSOLE_IGNORE], ignoreBoxes: true } : {};
+  const opts = consoleSet ? { ignoreProps: [...CONSOLE_IGNORE], ignoreBoxes: true, frameOutside: true } : {};
   const diff = diffRuns(base.captures, captures, opts);
   const report = {
     id: DRILL_ID,
@@ -293,7 +301,7 @@ async function sfStyles(drill) {
     baseline: { dir: baselineDir, head: base.manifest.head, ranAt: base.manifest.ranAt, css: base.manifest.css },
     run: { head, bite, css: manifest.css },
     cssDeltaBytes: manifest.css.bytes - base.manifest.css.bytes,
-    ...(consoleSet ? { ignoreProps: opts.ignoreProps, ignoreBoxes: true } : {}),
+    ...(consoleSet ? { ignoreProps: opts.ignoreProps, ignoreBoxes: true, frameOutside: true } : {}),
     totals: diff.totals,
     missing: diff.missing,
     customAdded: diff.customAdded,
@@ -301,7 +309,7 @@ async function sfStyles(drill) {
   };
   writeFileSync(join(drill.dir, "compare.json"), `${JSON.stringify(report, null, 2)}\n`);
   const t = diff.totals;
-  drill.note(`compare: ${t.style} computed-style, ${t.box} box, ${t.added} added and ${t.removed} removed element differences; ${t.customChanged} changed and ${t.customAdded} added custom properties (${diff.customAdded.join(", ") || "none"}); ${t.shots} screenshot(s) differ; ${t.missing} missing; ${t.ignored} ignored layout values, ${t.boxReported} box differences reported; CSS ${report.cssDeltaBytes >= 0 ? "+" : ""}${report.cssDeltaBytes} bytes`);
+  drill.note(`compare: ${t.style} computed-style, ${t.box} box, ${t.added} added and ${t.removed} removed element differences; ${t.customChanged} changed and ${t.customAdded} added custom properties (${diff.customAdded.join(", ") || "none"}); ${t.shots} screenshot(s) differ; ${t.missing} missing; ${t.ignored} ignored layout values, ${t.boxReported} box differences and ${t.frame} frame (outside [data-legacy]) differences reported; CSS ${report.cssDeltaBytes >= 0 ? "+" : ""}${report.cssDeltaBytes} bytes`);
   if (bite) {
     const caught = diff.pages.some((p) => p.samples.some((s) => s.prop === "letter-spacing"));
     drill.check(!isClean(t) && caught, "bite: the 0.01em letter-spacing is caught as computed-style differences", t);
