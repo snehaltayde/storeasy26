@@ -456,10 +456,13 @@ too. -->
   Radix portals inherit it), shadcn's names (`--background`, `--primary`,
   `--sidebar-*` …) mapped onto them, `tw-animate-css`, and a `dark:` variant
   that matches only inside `.console.dark`. `[data-console]` keeps the legacy
-  values (`--primary`/`--ring` point at `--c-primary`/`--c-ring`). No live
-  page carries `.console` yet (line 8). Several UI.md names (`--c-surface`,
-  `--c-border`, `--c-accent`, the status colours) are also legacy names, so
-  `.console` re-skins any legacy screen under it until line 8 aliases them.
+  values (`--primary`/`--ring` point at `--c-primary`/`--c-ring`). **Line 8**
+  puts `.console` on the console `<body>` and every old screen in a
+  `data-legacy` region (`display: contents`), where `.console [data-legacy]`
+  gives back the old tokens, `--background`/`--foreground`, line height,
+  text colour and border default; `pnpm drill:console-styles` compares the
+  old screens' computed styles against a baseline (zero differences inside
+  the regions; layout-derived values and boxes reported).
   The components are `components/ui/` (README: generate in a scratch
   project, never run the shadcn CLI here); `pnpm test:console-ui` keeps them
   off the storefront and `pnpm drill:sf-styles` proves the storefront and
@@ -476,15 +479,24 @@ too. -->
   SecretReveal + CopyButton for one-time codes, plain-SVG Bars/Sparkline.
   lucide-react (exact-pinned) is the one icon family; `return null` while
   loading/on error is banned.
-- **Shell**: the merchant console mounts ONE role-aware sidebar
-  (`(authed)/layout.js` → ConsoleShell): 18 tabs grouped into
-  Overview/Orders/Catalog/Storefront/Growth/Store, support & staff never
-  see admin-only entries (server-side denials unchanged), Setup progress +
-  open-returns badges, pinned store context + StoreSwitcher (mounts once —
-  the per-page re-mount flicker is gone), role chip + sign-out, collapse to
-  icons (persisted) and a mobile drawer. Auth pages render in a centered
-  card shell; login lands on the Dashboard. Route-level loading skeletons +
-  error boundaries (console errors no longer hit the storefront 500 page).
+- **Shell** (Phase 0 line 8): `(authed)/layout.js` → `components/admin/shell/AdminShell.js`,
+  built from `components/ui`: a skip link, the shadcn sidebar (240px from
+  1024px, icons with tooltips at 768–1023px, a sheet below 768px; ⌘B and
+  the `sidebar_state` cookie on `/admin`, read on the server), a 56px top
+  bar (toggle, store switcher, support's read-only label, account menu) and
+  the content capped at 1200px. The nav model is `lib/admin/nav.js`
+  (`navFor(role)` filters by `roleAllows` on the server, so hidden items
+  never reach the browser; owner/admin 16 items, staff/support 11); badges
+  are counted only for visible items. The store switcher reads
+  `lib/admin/stores.js` `listMyStores(actor)` (also behind
+  `GET /api/admin/stores`); the notices come from `lib/admin/notices.js`
+  and show at the top of the content area and above the sign-in pages.
+  Editor routes put the nav in a sheet (`useConsoleNav`,
+  `ConsolePageFrame`). `pnpm test:console-shell` and `pnpm drill:shell`
+  (every role at 1280, 900 and 375) cover it. Auth pages render in a
+  centered card shell; login lands on the Dashboard. Route-level loading
+  skeletons + error boundaries (console errors no longer hit the storefront
+  500 page).
 - **Honesty fixes shipped with the redesign**: storefront editor false-409/
   block-wipe bug (shared `lib/cms/view.js`), dashboard "Today" = today in
   the merchant TZ + TZ-correct 7-day cut + dense chart (quiet days are real
@@ -1057,7 +1069,7 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   runs.
 - **Files**: [lib/admin/onboarding.js](../lib/admin/onboarding.js),
   `app/admin/setup/`, `app/api/admin/setup/`, `app/api/admin/stores/`,
-  `components/admin/SetupAdmin.js`, `components/admin/StoreSwitcher.js`,
+  `components/admin/SetupAdmin.js`, `components/admin/shell/StoreSwitcher.js`,
   `components/platform/TenantDetail.js`.
 
 #### Shopify OAuth connect

@@ -1,9 +1,19 @@
 # Console primitives (S50)
 
-The design system for both consoles (/admin, /platform).
+The design system for both consoles (/admin, /platform) before Phase 0
+line 8; the new console UI is `components/ui/` and `docs/UI.md`.
 Tokens live in `app/console.css`, scoped to `[data-console]` — the console
 route group's `<html>` carries the attribute, so tenant brand variables never
 re-skin the console and console tokens never touch the storefront.
+
+**Since line 8** these primitives render only inside a `data-legacy` region
+(`<div data-legacy className="contents">`): the new shell's `main`, the
+sign-in layout, the platform layout, the console error and 404 pages and the
+Toast viewport. `.console [data-legacy]` in `app/console.css` gives them
+their old tokens back under the new `.console` body. A primitive used
+outside such a region picks up the new tokens. The old shell
+(`nav/ConsoleShell.js`, `nav/SidebarNav.js`) is gone; the shell is
+`components/admin/shell/`.
 
 ## House rules
 
