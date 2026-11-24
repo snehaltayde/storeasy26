@@ -95,11 +95,11 @@ export default function OnboardingTable({ rows, busy, onOpen, selected }) {
     <div className={`overflow-hidden rounded-card border border-border bg-card shadow-card transition-opacity motion-reduce:transition-none ${busy ? "opacity-60" : ""}`} aria-busy={busy || undefined}>
       <Table className="table-fixed min-w-[960px]">
         <colgroup>
-          <col className="w-[22%]" />
+          <col className="w-[20%]" />
           <col className="w-[18%]" />
-          <col className="w-[13rem]" />
-          <col className="w-[24%]" />
-          <col className="w-[6.5rem]" />
+          <col className="w-[10.5rem]" />
+          <col className="w-[22%]" />
+          <col className="w-[5.5rem]" />
           <col />
         </colgroup>
         <TableHeader>
@@ -132,7 +132,7 @@ export default function OnboardingTable({ rows, busy, onOpen, selected }) {
                   <div className="flex min-w-0 items-baseline gap-2">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button type="button" onClick={() => onOpen(r.subject)} className="min-w-0 truncate rounded-sm text-left font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                        <button type="button" onClick={() => onOpen(r.subject)} className="max-w-full shrink-0 truncate rounded-sm text-left font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                           {r.store.name}
                         </button>
                       </TooltipTrigger>

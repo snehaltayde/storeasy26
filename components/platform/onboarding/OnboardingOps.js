@@ -81,7 +81,7 @@ export default function OnboardingOps() {
   const rows = state.data?.rows || [];
   const page = cursors.length;
   const emptyWords = useMemo(() => {
-    if (q) return `Nothing matches “${q}” in ${VIEW_LABELS[view].toLowerCase()}.`;
+    if (q) return view === "all" ? `Nothing matches “${q}”.` : `Nothing matches “${q}” in ${VIEW_LABELS[view]}.`;
     if (view === "attention") return "No stores need attention.";
     return `Nothing in ${VIEW_LABELS[view].toLowerCase()} yet.`;
   }, [q, view]);

@@ -73,7 +73,13 @@ async function until(fn, ms = 60_000, step = 500) {
 async function newPage(drill, width = 1280) {
   const ctx = await drill.browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 1 });
   ctx.setDefaultTimeout(60_000);
-  return { ctx, page: await ctx.newPage() };
+  const page = await ctx.newPage();
+  // the browser's own errors go into the results, so a dev-overlay "issue" has words
+  const seen = new Set();
+  const say = (t) => !seen.has(t) && seen.add(t) && drill.note(`browser: ${t.slice(0, 400)}`);
+  page.on("pageerror", (e) => say(`page error: ${e.message}`));
+  page.on("console", (m) => m.type() === "error" && say(`console error: ${m.text()}`));
+  return { ctx, page };
 }
 
 // An operator: a user with is_operator and a live operator session row (only
