@@ -39,7 +39,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] A founder can choose a palette and add a logo in step 3, and the starter store updates in a live preview beside it (`test:onboarding-brand`, `test:preview-frame`, `pnpm drill:p6` stage b)
 - [x] A founder can open their store in step 4 once payment and the privacy and returns pages are ready, with each missing item fixable from that step (`test:onboarding-open`, `pnpm drill:p6` stage j)
 - [x] An operator can see every signup and the step each store is on, and help a stuck store from one screen (`test:operator-onboarding`, `pnpm drill:operator-onboarding`; the old operator handoff route is removed)
-- [ ] An operator can create a store for a founder in one form (name, owner email, Shopify domain), which sends the founder an invite into the same onboarding
+- [x] An operator can create a store for a founder in one form (name, owner email, Shopify domain), which sends the founder an invite into the same onboarding (`test:operator-create-store`, `pnpm drill:operator-create-store`)
 - [ ] No legacy code remains: retired modules, routes, screens, components, drills, scripts and docs that the new architecture no longer uses are removed (including the old operator handoff route that shows invite links), proven by a test that fails on any file nothing imports or routes to; legacy tables stay in the database untouched
 
 ## Phase 2: merchant console on shadcn
