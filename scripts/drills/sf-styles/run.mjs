@@ -156,10 +156,14 @@ async function pagesOf(drill) {
   return pages;
 }
 
-// The console set's sign-in: the real form's endpoint, in this context.
+// The console set's sign-in: the real form's endpoint, once per login (the
+// sign-in throttle allows 10 in 15 minutes); later contexts get its cookies.
+const sessions = new Map();
 async function apiSignIn(ctx, origin, creds) {
+  if (sessions.has(creds.email)) return ctx.addCookies(sessions.get(creds.email));
   const res = await ctx.request.post(`${origin}/api/admin/login`, { data: creds, headers: { origin }, maxRedirects: 0 });
   if (res.status() !== 200) throw new Error(`sign-in as ${creds.email} answered ${res.status()}`);
+  sessions.set(creds.email, (await ctx.cookies(origin)).filter((c) => c.name === "_admin"));
 }
 
 function rolesSeed() {
