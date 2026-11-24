@@ -141,9 +141,9 @@ const tick = (ms) => (clock.at += ms);
 
 // --- data, driver, gate ------------------------------------------------------------
 
-await t("migration 0012: signups gains job_id, provision_attempts, next_attempt_at, failure_kind, handoff_invite_id, done_at and a (status, updated_at) index", async () => {
+await t("migrations 0012 and 0013: signups gains job_id, provision_attempts, next_attempt_at, failure_kind, handoff_invite_id, done_at, alerted_kinds and a (status, updated_at) index", async () => {
   const cols = (await q("PRAGMA table_info(signups)")).map((c) => c.name);
-  for (const c of ["job_id", "provision_attempts", "next_attempt_at", "failure_kind", "handoff_invite_id", "done_at"]) ok(cols.includes(c), c);
+  for (const c of ["job_id", "provision_attempts", "next_attempt_at", "failure_kind", "handoff_invite_id", "done_at", "alerted_kinds"]) ok(cols.includes(c), c);
   ok(await one("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_signups_status'"), "index");
 });
 
@@ -387,6 +387,96 @@ await t("a 409 the run never asked for (someone else's database with that name) 
   const row = await rowFor(s.f.email);
   eq(`${row.status}:${row.failure_kind}`, "failed:needs_operator", "needs us");
   eq(await C.getTenant("taken-name-co", { fresh: true }), null, "no store registered");
+  const run = await P.getProvisionRun(row.provision_run_id);
+  ok(!run.refs.dbCreateRequestedAt, "a clear 409 leaves no unknown ask behind");
+  // Try again: still someone else's database, still needs us, never adopted
+  const r = await api("signup/verify", "POST", { body: { retry: true }, cookie: s.cookie });
+  eq(r.body.status, "provisioning", r.text);
+  await H.drainAfter();
+  const again = await rowFor(s.f.email);
+  eq(`${again.status}:${again.failure_kind}`, "failed:needs_operator", "Try again still needs us");
+  eq(again.provision_run_id, row.provision_run_id, "the same run");
+  const run2 = await P.getProvisionRun(row.provision_run_id);
+  ok(!run2.refs.dbUrl && run2.refs.dbCreated == null, `nothing adopted: ${JSON.stringify(run2.refs)}`);
+  eq(creates("storeasy-t-taken-name-co").filter((c) => c.status === 409).length, 2, "two asks, two 409s");
+  eq(await C.getTenant("taken-name-co", { fresh: true }), null, "still no store registered");
+});
+
+await t("a 429 after a timed-out ask keeps the unknown ask, so the next 409 is adopted (one database); a clear 4xx alone leaves none", async () => {
+  const s = await start("Hung Then Busy Co");
+  const keep = A.tursoApiTiming.timeoutMs;
+  A.tursoApiTiming.timeoutMs = 300;
+  try {
+    await fault({ route: "create", commitThenHang: true, delayMs: 3000 });
+    await verify(s);
+    await H.drainAfter();
+  } finally {
+    A.tursoApiTiming.timeoutMs = keep;
+  }
+  let row = await rowFor(s.f.email);
+  const asked = (await P.getProvisionRun(row.provision_run_id)).refs.dbCreateRequestedAt;
+  ok(asked, "the timed-out ask is kept");
+  await fault({ route: "create", status: 429 });
+  tick(Date.parse(row.next_attempt_at) - clock.at);
+  await runJob(s);
+  eq((await P.getProvisionRun(row.provision_run_id)).refs.dbCreateRequestedAt, asked, "a clear 429 keeps the earlier unknown ask");
+  row = await rowFor(s.f.email);
+  tick(Date.parse(row.next_attempt_at) - clock.at);
+  await runJob(s);
+  row = await rowFor(s.f.email);
+  eq(row.status, "done", `done: ${row.failure_kind}`);
+  eq(fake.dbs().filter((d) => d.name === "storeasy-t-hung-then-busy-co").length, 1, "one database");
+  eq((await P.getProvisionRun(row.provision_run_id)).refs.dbCreated, true, "adopted as this run's");
+});
+
+await t("the operator is alerted once per signup per failure kind: a second needs-us failure after Try again sends no second alert", async () => {
+  const s = await start("Alert Once Co");
+  await fault({ route: "create", status: 402 });
+  await verify(s);
+  await H.drainAfter();
+  const row = await rowFor(s.f.email);
+  eq(`${row.status}:${row.failure_kind}`, "failed:needs_operator", "needs us");
+  const alerts = () => logged.filter((l) => l.startsWith("[ALERT") && l.includes(row.id)).length;
+  eq(alerts(), 1, "one alert");
+  eq(row.alerted_kinds, ",needs_operator,", "recorded on the signup");
+  for (let i = 0; i < 2; i++) {
+    await fault({ route: "create", status: 402 });
+    await api("signup/verify", "POST", { body: { retry: true }, cookie: s.cookie });
+    await H.drainAfter();
+    eq((await rowFor(s.f.email)).failure_kind, "needs_operator", `try ${i + 2} needs us`);
+  }
+  eq(alerts(), 1, "still one alert after two Try agains");
+  await clearFaults();
+});
+
+await t("two runners racing on one signup (the first one's lease ran out mid-create): one database, one long token, the signup done and never overwritten to failed", async () => {
+  const s = await start("Race Pair Co");
+  const name = "storeasy-t-race-pair-co";
+  await fault({ route: "create", status: 503 });
+  await verify(s);
+  await H.drainAfter();
+  let row = await rowFor(s.f.email);
+  eq(row.status, "provisioning", "waiting on a retry");
+  tick(Date.parse(row.next_attempt_at) - clock.at);
+  // runner A asks Turso and waits on a slow answer
+  await fault({ route: "create", delayMs: 1500 });
+  const first = runJob(s);
+  for (let i = 0; i < 100 && !creates(name).some((c) => c.status === 0); i++) await new Promise((r) => setTimeout(r, 20));
+  ok(creates(name).some((c) => c.status === 0), "runner A is waiting on Turso");
+  // A's lease runs out; runner B takes the job and finishes the store
+  await db.execute({ sql: "UPDATE jobs SET lease_until = ? WHERE id = ?", args: [new Date(Date.now() - 1000).toISOString(), row.job_id] });
+  const second = await runJob(s);
+  ok(second.ok && !second.lostLease, `runner B ran: ${JSON.stringify(second)}`);
+  eq((await rowFor(s.f.email)).status, "done", "B finished");
+  const a = await first;
+  ok(a.lostLease, `runner A stopped on a lost lease: ${JSON.stringify(a)}`);
+  row = await rowFor(s.f.email);
+  eq(row.status, "done", `still done: ${row.failure_kind}`);
+  eq(row.failure_kind, null, "no failure written");
+  eq(fake.dbs().filter((d) => d.name === name).length, 1, "one database");
+  eq(fake.state.minted.filter((m) => m.name === name && m.expiration === "never").length, 1, "one long token");
+  eq((await P.getProvisionRun(row.provision_run_id)).status, "done", "the run stays done");
+  eq((await one("SELECT status FROM jobs WHERE id = ?", [row.job_id])).status, "done", "the job is done");
 });
 
 await t("400 (bad group), 401 and 403 also stop at once as needs_operator", async () => {

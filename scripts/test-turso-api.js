@@ -159,13 +159,19 @@ await t("a create that commits then hangs times out as a retry, and the database
   eq((await caught(api.createDatabase("storeasy-t-hang"))).kind, "conflict", "a second create is a 409");
 });
 
-await t("the fake's localUrl is honoured only for a loopback API address and a loopback (or file) database address", () => {
+await t("on a loopback API address the database address is the fake's loopback localUrl; a reply without one throws, never a libsql:// fallback", () => {
   const d = { Hostname: "x-acme.turso.io", localUrl: "http://127.0.0.1:5000" };
   eq(A.tursoApi(env).dbUrlFor(d), "http://127.0.0.1:5000", "loopback API + loopback db");
   eq(A.tursoApi({ ...env, TURSO_API_URL: "" }).dbUrlFor(d), "libsql://x-acme.turso.io", "the real API address never honours it");
-  eq(A.tursoApi(env).dbUrlFor({ ...d, localUrl: "http://evil.example:5000" }), "libsql://x-acme.turso.io", "a non-loopback localUrl is ignored");
-  eq(A.tursoApi(env).dbUrlFor({ ...d, localUrl: "libsql://evil.example" }), "libsql://x-acme.turso.io", "other schemes ignored");
-  eq(A.tursoApi(env).dbUrlFor({ Hostname: "x-acme.turso.io" }), "libsql://x-acme.turso.io", "no localUrl");
+  for (const [bad, label] of [[{ ...d, localUrl: "http://evil.example:5000" }, "a non-loopback localUrl"], [{ ...d, localUrl: "libsql://evil.example" }, "another scheme"], [{ Hostname: "x-acme.turso.io" }, "no localUrl"], [{ Hostname: "storeasy-t-x-local-fake.turso.io", localUrl: "" }, "an empty localUrl"]]) {
+    let err = null;
+    try {
+      A.tursoApi(env).dbUrlFor(bad);
+    } catch (e) {
+      err = e;
+    }
+    ok(err instanceof A.TursoApiError && err.kind === "needs_operator" && /loopback/.test(err.message), `${label} throws: ${err?.message ?? "no error"}`);
+  }
 });
 
 await t("delete through the fake: the database is gone (404 after)", async () => {
@@ -219,6 +225,36 @@ await t("real check: --dry-run with every gate open says what it would do (one s
   ok(!r.out.includes("made-up-real-check-token") && !/BLOCKED/.test(r.out), "no token, no network");
   const keep = realCheck(["--create-one-database", "--dry-run", "--keep"], { ...CREDS, ...CONSENT });
   ok(/keep/i.test(keep.out) && keep.code === 0, keep.out);
+});
+
+await t("real check body (against the fake): a create that times out after Turso made the database, or a failed token step, still deletes it; a clean run deletes it; --keep keeps only a clean run; a 404 on delete is fine", async () => {
+  const { runTursoCheck } = await import("./support/turso-real-check-run.js");
+  const api = A.tursoApi(env);
+  const lines = [];
+  const io = { out: (l) => lines.push(l), err: (l) => lines.push(l) };
+  const exists = async (n) => !(await caught(api.getDatabase(n)));
+  const keepMs = A.tursoApiTiming.timeoutMs;
+  A.tursoApiTiming.timeoutMs = 300;
+  try {
+    await fetch(`${fake.url}/_fake/faults`, { method: "POST", body: JSON.stringify({ route: "create", commitThenHang: true, delayMs: 2000 }) });
+    eq(await runTursoCheck({ api, name: "storeasy-check-hung01", ...io }), 1, "a timed-out create fails");
+  } finally {
+    A.tursoApiTiming.timeoutMs = keepMs;
+  }
+  eq(await exists("storeasy-check-hung01"), false, "made by the hung create, then deleted");
+  ok(lines.some((l) => /deleted storeasy-check-hung01/.test(l)), lines.join("\n"));
+  await fetch(`${fake.url}/_fake/faults`, { method: "POST", body: JSON.stringify({ route: "create", status: 503 }) });
+  eq(await runTursoCheck({ api, name: "storeasy-check-never1", ...io }), 1, "a 503 create fails");
+  ok(lines.some((l) => /never made \(404 on delete\)/.test(l)), "a 404 on delete is fine");
+  await fetch(`${fake.url}/_fake/faults`, { method: "POST", body: JSON.stringify({ route: "token", status: 500 }) });
+  eq(await runTursoCheck({ api, name: "storeasy-check-token1", keep: true, ...io }), 1, "a failed token step fails");
+  eq(await exists("storeasy-check-token1"), false, "deleted after a failure, even with --keep");
+  eq(await runTursoCheck({ api, name: "storeasy-check-clean1", ...io }), 0, `clean: ${lines.join("\n")}`);
+  eq(await exists("storeasy-check-clean1"), false, "a clean run deletes");
+  eq(await runTursoCheck({ api, name: "storeasy-check-kept01", keep: true, ...io }), 0, "clean, kept");
+  eq(await exists("storeasy-check-kept01"), true, "--keep keeps a clean run");
+  await api.deleteDatabase("storeasy-check-kept01");
+  ok(!lines.join("\n").includes(API_TOKEN) && !/eyJ/.test(lines.join("\n")), "no token printed");
 });
 
 await t("check:turso-real is not a test:* script, so pnpm test never runs it", async () => {
