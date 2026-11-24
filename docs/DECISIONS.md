@@ -3,6 +3,20 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 The four-step onboarding page (on the owner's behalf)
+
+- **Decision:**
+  - No migration and nothing stored: each step's state is worked out from the store's real state every time (connection, sync runs, home page and brand, opening checks, live release); the page opens on the first step not done, or on `?step=`. A check that fails to read leaves the step not done rather than guessing.
+  - Four states: done, in progress, to do, blocked (a failure shows as a problem on a "to do" step), since a step ready to start fits none of the line's three words.
+  - Opening is not gated on steps 1–3: only today's opening checks block it, so no new rule appears.
+  - "Onboarding" replaces both "Setup" and "Logo and colours" in the nav, for every role, with an `n/4` badge only while the store is closed (logo and colours stay in step 3 afterwards).
+  - The Shopify shop domain shows only to roles with settings access. `/api/admin/setup` becomes `/api/admin/onboarding` (the test-order mark moves there; the "preview" and "launch" check-offs retire, old values left in place). `/admin/start` and `/admin/setup` redirect to the new page, and `/admin` sends a closed store to onboarding, so signup, operator-created and existing closed stores all land on the same page.
+  - The current starter-store and brand panels are reused inside the old-look wrapper until line 6 rebuilds them.
+- **Why:** owner: onboarding was chaotic across several screens; one page, from real state, can't drift.
+- **Instead of:** a stored step pointer; a new rule that blocks opening until steps 1–3 are done.
+- **Decided by:** Claude, on the owner's behalf (one onboarding page by the owner)
+- **Slice:** Phase 1, onboarding page
+
 ## 2026-11-24 Signup creates the store's Turso database in a job (on the owner's behalf)
 
 - **Decision (schema first):**

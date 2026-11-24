@@ -204,3 +204,108 @@ Audit `tenant.provisioned` (system: signup) and `signup.verified` as in line 1; 
 3. No documented quota/rate-limit error: treat 402, 403 and any 400 mentioning "limit" as needs-operator; confirm with the real check.
 4. A crash between minting the never-expiring token and saving the tenant leaves one unused valid token on that DB; accepted.
 5. A harness killed with `-9` leaves per-store sqld processes; pid-file cleanup covers it; review closely.
+
+## Line 3: the four-step onboarding page
+
+**Fit:** replaces `/admin/start` and `/admin/setup` with one page, `/admin/onboarding`. No migration; the step a founder is on is derived from real store state, never stored. Line 1 already made `/admin/onboarding`, `Welcome.js` and the shell's onboarding mode. Lines 4–7 fill each step for real; this line wires only what today's code can do, so nothing regresses.
+
+### 1. Feature list (floor)
+
+1. **Page:** `/admin/onboarding` (all roles, `storefront.read`): Welcome card at the top (store name, address, Closed/Open badge, verified email; existing `data-onboarding` attributes stay), then four steps each with a state, plain words and a panel; "Go to your dashboard" stays.
+2. **Layout** (`docs/UI.md`): no sidebar; content column max 640px; from 1024px a `StepList` on the left, below 1024px a compact progress list above the panel; each step shows number, label and Done / In progress / To do / Blocked; blocked steps show the reason.
+3. **Resume:** opens on `?step=<connect|import|brand|open>` when given, else the first step not done; choosing a step does `router.replace('?step=…', {scroll:false})`; an unknown `?step` is ignored.
+4. **Step 1, Connect Shopify:** connected or not; shop domain shown only to roles with `settings.read`; honest words (today an operator finishes the connection; line 4 adds the founder's own OAuth); nothing written to Shopify.
+5. **Step 2, Import products:** reuses `SyncProgressBody`, `readSync`, `requestSync` (`/api/admin/sync`): progress, Start, Try again with `sync.run`; handles "no products" and "being updated".
+6. **Step 3, Brand:** reuses `FirstRun` (starter-store generator, its views, `BrandStep` at `#brand`) inside a `data-legacy` wrapper; line 6 rebuilds it.
+7. **Step 4, Open your store:** `openingReport()` items with today's actions — Start a privacy page / Start a returns page, Read it, "I've read it" (via `/api/admin/policy-start`); "I placed a test order"; existing Fix links; an "Open your store" button to the editor's Publish (`EDITOR_PUBLISH_HREF`). Line 7 moves opening into the step.
+8. **Live refresh:** re-read `GET /api/admin/onboarding` every 10 s while a step is in progress and the tab is visible, on window focus, and after a save in FirstRun, BrandStep or the policy panels (new optional `onChange` prop).
+9. **Every role sees the page:** controls a role can't use are shown disabled with the reason (`RoleGate` pattern); support and operator-support only read.
+10. **Already-open stores:** every step Done, "Your store is open", no badge.
+11. **`_default` store:** "This store is set up from its environment config" and a dashboard link.
+12. **Landing:** `/admin`, login and accept-invite go to `/admin`, which redirects to `/admin/onboarding` while the store is closed, else the dashboard (signup and operator-created stores land in the same onboarding).
+13. **Retirements and moves:** `/admin/start` → `/admin/onboarding?step=brand`; `/admin/setup` → `/admin/onboarding`; checklist UI and `buildChecklist` removed; the dashboard's two setup nudges become one "Onboarding: n/4 done"; links in `SettingsAdmin.js` and `DesignForm.js` → `?step=brand`; operator `TenantDetail` shows the four step states.
+
+Out of scope: founder OAuth (line 4), new import UI (5), palette/logo/live preview (6), opening inside the step (7), operator signups list (8), operator create form (9).
+
+### 2. Step model
+
+`lib/onboarding/steps.js`: `deriveSteps(facts, role)` →
+```
+{ supported, open, current, doneCount, total: 4,
+  steps: [{ id, label, state: "done"|"in_progress"|"ready"|"blocked",
+            words, blockedBy?: stepId|"updating", problem?: string,
+            facts, actions: [{ id, allowed, reason? }] }] }
+```
+
+Facts read by `lib/onboarding/service.js` in `withTenant`: tenant config (`shopify_store_domain`, `onboarding.brand_step`); `catalogSyncStatus()` (`linked`, sync view); whether any `sync_runs` row is complete and the product count; whether `doc_home` exists and `storeDesign()`; `getCmsMode()`; `openingReport()`; `release_state` (open = a live release). A failed read leaves that step not done with "We couldn't check this just now"; never done on a guess.
+
+| Step | done | in_progress | blocked | ready |
+|---|---|---|---|---|
+| connect | linked, or any complete sync, or products > 0 | domain recorded, not linked yet | never | otherwise |
+| import | a complete run ever, or legacy products | latest run running or retrying | connect not done; sync paused (store being moved) | no run, or failed/stalled (with `problem`) |
+| brand | brand step recorded (or design has a brand/theme) **and** `doc_home` exists | exactly one of those | CMS mode is not `documents` | neither |
+| open | a live release | — | any opening item at level `block` (reasons = their titles) | no blocking items |
+
+An open store has every step done. `current` = first step not done (all done → `open`). Open is **not** gated on steps 1–3.
+
+Actions → authz (permissions stay in `lib/platform/authz.js`): sync start/retry `sync.run`; starter store, brand save/skip, policy start/read `storefront.write`; brand description `settings.write`; test-order mark `settings.write`; Open `storefront.publish`; show shop domain `settings.read`.
+
+### 3. Data
+
+No migration. `config.onboarding.manual.test_order` keeps working; `preview` and `launch` check-offs are no longer read (old values left in place). No step stored in config.
+
+### 4. Permissions and least-trusted tests
+
+| Action | owner | admin | staff | support / operator-support | signed out |
+|---|---|---|---|---|---|
+| page and `GET /api/admin/onboarding` (`storefront.read`) | read | read | read | read, no enabled controls | login redirect / 401 |
+| shop domain in the response | yes | yes | omitted | omitted | — |
+| `POST /api/admin/onboarding {step:"test_order", done}` (`settings.write`) | yes | yes | 403 | 403 | 401 |
+| sync / first-run / brand-step / policy-start | unchanged | unchanged | unchanged | 403 | 401 |
+| Open (publish) | yes | yes | disabled, "Only the owner or an admin can open the store" | disabled | — |
+
+Tests (`test-onboarding.js` unless noted): support GET → 200 with exactly keys `["ok","supported","open","current","doneCount","total","steps"]`, no `shopDomain`, tokens or client id; every action `allowed:false` for support; support POST → 403; signed out → 401; another store's session on this host → 401; cross-origin POST → 403; `test-support-reads` sweeps the page's props.
+
+### 5. Events
+
+The test-order mark keeps its audit row (`settings.write`, resource `onboarding:test_order`) plus `slog onboarding_step`. Reads emit nothing.
+
+### 6. File plan (A then B, one branch)
+
+**WP-A: model, API, nav, tests**
+1. `lib/onboarding/steps.js` (new, pure; holds `TEST_ORDER_CLOSED_HINT`).
+2. `lib/onboarding/service.js` (new): `readOnboardingFacts`, `onboardingFor(actor)`, `markTestOrder(done)`.
+3. `lib/documents/opening.js`: one import changes.
+4. Delete `lib/admin/onboarding.js`, `components/admin/SetupAdmin.js`, `app/api/admin/setup/route.js`.
+5. `app/api/admin/onboarding/route.js` (new): GET and POST.
+6. `components/admin/editor/publish/publishModel.js`: `SETUP_URL` → `/api/admin/onboarding`.
+7. `lib/admin/nav.js`: `setup` → `{id:"onboarding", label:"Onboarding", href:"/admin/onboarding", page:"onboarding", action:"storefront.read", badgeKey:"onboarding"}`; remove the `start` ("Logo and colours") item.
+8. `app/(console)/admin/(authed)/layout.js`: `onboarding` badge `n/4` while closed.
+9. Redirects: `app/(console)/admin/(authed)/page.js` (closed → onboarding); `start/page.js` → `?step=brand`; `setup/page.js` → onboarding.
+10. `app/api/platform/tenants/[id]/route.js`: use `onboardingFor`.
+11. Guard tables: `scripts/support/admin-routes.js` (`onboarding` GET and POST rows; remove `setup`); `support-reads.js` (`onboarding` row; remove `setup`); `admin-pages.js` (notes that `setup` and `start` redirect).
+12. `scripts/test-onboarding.js` (new): the state table, resume rules, roles, least-trusted cases; `test:onboarding` in `package.json`.
+13. Update `test-provision.js`, `test-design-doc.js`, `test-first-sync.js`, `test-console-shell.js`, `test-editor-routes.js`, `test-brand-step.js`, `test-publish-ui.js`.
+
+**WP-B: UI and drills**
+14. `app/(console)/admin/(authed)/onboarding/page.js`: server read; `searchParams.step` (awaited, as `dashboard/page.js` does).
+15. `components/admin/onboarding/`: `Onboarding.js` (client: selected step, refresh), `StepList.js`, `StepPanels.js` (Connect, Import, Brand, Open), `Welcome.js` (trimmed to the store card).
+16. `components/admin/first-run/FirstRun.js`, `BrandStep.js`: optional `onChange`.
+17. `components/admin/shell/AdminShell.js`: onboarding `main` grows to `lg:max-w-[920px]`; the column stays 640px (`data-onboarding="column"`).
+18. Dashboard nudge (`dashboard/page.js`); links in `SettingsAdmin.js`, `DesignForm.js`; `LoginForm.js`, `AcceptInviteForm.js` push `/admin`; `components/platform/TenantDetail.js`.
+19. Drills: `scripts/drills/p6/{brand,generate,empty,open}.mjs` use `/admin/onboarding?step=brand`; `setup.mjs` becomes step 4's policy starters; new `onboarding.mjs` stage `h` (states, resume, support read-only, open store all done), registered in `run.mjs`; `scripts/drills/shell/run.mjs` deep-links to onboarding; `scripts/drills/signup/run.mjs` checks the step list and the 640px column.
+
+### 7. Checks first
+
+1. `node scripts/test-provision.js && node scripts/test-brand-step.js && node scripts/test-first-run.js && node scripts/test-console-shell.js && node scripts/test-editor-routes.js && node scripts/test-publish-ui.js && node scripts/test-support-reads.js && node scripts/test-permissions.js && node scripts/test-open-checks.js && node scripts/test-policy-start.js`
+2. `pnpm drill:p6 -- g` and `pnpm drill:signup` once on HEAD.
+3. `rg -n "buildChecklist|lib/admin/onboarding|/admin/start|/admin/setup|api/admin/setup|SetupAdmin|LoginForm.*dashboard" app components lib scripts`
+4. What the p6 seed leaves (`sync_runs` complete? Shopify keys blank?) — decides whether step 1 reads as done there.
+
+### 8. Risks
+
+1. Test churn: about eight suites assert on the checklist, `/admin/start` or nav counts (owner/admin 16 → 15; staff/support stay 11); missed references show only in the full run — run `test:security` and `test:shopify-boundary` as neighbours.
+2. `openingReport()` reads policies, products and orders on every load and poll: poll only while something is in progress and the tab is visible.
+3. Legacy-styled FirstRun and BrandStep inside new-UI pages until line 6: ui-designer to confirm.
+4. Step 1 words: a store with a known domain but not connected stays "In progress" until an operator runs OAuth; the words must make clear the founder has nothing to do yet.
+5. Login landing changes to `/admin`: update tests asserting `/admin/dashboard`, don't loosen them.
