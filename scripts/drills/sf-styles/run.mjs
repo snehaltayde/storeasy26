@@ -19,7 +19,8 @@
 // rounded to 0.5px, plus a full-page screenshot hash. Held fixed: reduced
 // motion, animations and transitions off (an adopted stylesheet, so no
 // element is added), document.fonts.ready, images complete, service workers
-// blocked, the same consent and experiment cookies.
+// blocked, the same consent and experiment cookies, running experiments'
+// salts pinned (each seed makes a random one).
 //
 // Saved in docs/cms-reviews/drills/SF-STYLES/ (the runner copies it to
 // .drill-results/<stamp>/SF-STYLES/, which is what SF_STYLES_BASELINE names):
@@ -171,6 +172,11 @@ async function sfStyles(drill) {
   if (bite && !baselineDir) throw new Error("SF_STYLES_BITE=1 needs SF_STYLES_BASELINE=<abs dir> (a bite is only caught by a compare).");
   if (baselineDir && !existsSync(join(baselineDir, "manifest.json"))) throw new Error(`SF_STYLES_BASELINE has no manifest.json: ${baselineDir}`);
   await reseed(drill, { start: true });
+  // risk 3: a running experiment's salt is random per seed, so the same _unit
+  // got a different hero variant (other text, other heights) on each run.
+  // Pinned here, in this worktree's own store, before any page is captured.
+  const [pinned] = await storeSql("tenant", ["UPDATE experiments SET salt = 'sf-styles' WHERE status = 'running'"]);
+  drill.note(`experiment salts pinned to "sf-styles" (${pinned.rowsAffected} running)`);
   const head = spawnSync("git", ["-C", ROOT, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).stdout.trim();
   drill.note(`HEAD ${head}${bite ? "; bite mode: :root letter-spacing 0.01em" : ""}${baselineDir ? `; baseline ${baselineDir}` : ""}`);
   const captures = [];
