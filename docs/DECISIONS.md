@@ -3,6 +3,20 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 Phase 1 lines 4–8: decisions taken from the plans (on the owner's behalf)
+
+Schema and permission decisions first; full detail in `docs/plans/phase-1.md` lines 4–8.
+
+- **Line 5 (schema):** tenant migration `0028` adds `collections_total`, `skipped_count` and `skipped` (JSON, at most 50) to `sync_runs`; no stage or error-kind column (stage is `phase`; the failure kind is worked out from the error). A product or collection that can't be mapped is skipped and listed, not fatal; a run with skips is complete; a skipped product already in the store keeps its last good copy. Sync code still works on stores without 0028.
+- **Line 8 (schema):** platform migration `0014` adds `onboarding_progress` (an operator-only cache refreshed by a 10-minute sweep and on opening a store; the founder page stays live), append-only `operator_notes`, and `released_at`/`released_by` on `signups` (status `released` frees a lapsed address; the app checks the database is gone but never deletes one).
+- **Line 4 (schema/permissions):** no migration; new keys in the encrypted tenant JSON for expiring Shopify tokens (`shopify_refresh_token`, expiry times, `reauth_needed_at`, `connected_by`). Authorization code grant with expiring offline tokens and refresh (Shopify requires them for apps from 2026-12-01). Founder routes under `app/api/admin/shopify/` need `settings.write`; state is HMAC-signed and bound to the store, the session and a nonce cookie. A shop another active store already holds can't be connected. One Shopify app per store; the domain locks once the app is set up. The test stand-in is loopback-only via `SHOPIFY_API_ORIGIN`, refused in production.
+- **Line 8 (permissions):** operator-only screen; audit rows carry the real operator id (`platformOperator()`); help goes by email to addresses on file only — operators never see a token or link, and the old handoff route that showed invite links is removed. At most 5 help emails per store per hour.
+- **Line 7:** step 4 drives the editor's own publish flow (one publish path, no new route); cash on delivery turns on through the existing settings call; Razorpay keys are only entered in Settings (with a "Back to onboarding" link); inline policy reader with "I've read it" after the text; inline contact form only while both support fields are empty.
+- **Line 6:** the live preview is the existing preview session plus an overlay message to the frame (ids only, frame computes the CSS, logo must be a library URL, plain-text description; accepted only from a working same-origin preview); no autosave — Save and Skip as today, unsaved choices in `sessionStorage`; step 3 alone gets a wider layout; FirstRun and BrandStep retire.
+- **Line 5 (UI):** new `ImportStep` on the new UI; time left is a rough estimate shown only under strict conditions; the old `SyncProgress` stays for the dashboard and Settings until Phase 2.
+- **New `components/ui` copies** (Progress, Dialog, RadioGroup, Label, Table, Badge, Textarea, AlertDialog) come from the installed `radix-ui`; no new dependency.
+- **Decided by:** Claude, on the owner's behalf
+
 ## 2026-11-24 Remove legacy remnants; shared Shopify app later
 
 - **Decision:** everything runs on the new architecture. A Phase 1 line removes every legacy remnant the new code no longer uses (retired modules, routes, screens, components, drills, scripts, docs), including the old operator handoff route that shows invite links to operators, with a test that fails on any unreferenced file. Legacy database tables stay untouched (dropping them would delete data and can't be undone). Old console screens are removed by Phase 2's last line as each is rebuilt. The shared Storeasy Shopify app is a later item; line 4 builds one app per store.
