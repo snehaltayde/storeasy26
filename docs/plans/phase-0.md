@@ -178,3 +178,65 @@ Separate suite; canary search with owner positive controls; least-trusted caller
 3. Transformed canaries slip past search; keep them short lowercase ASCII.
 4. Error bodies (`refs` 500, `media` 422 raw `e.message`) not covered by happy-path probes.
 5. `route-harness.js` changes must keep `test:permissions` green alone.
+
+## Line 3: a shopper reads only their own cart, orders and account
+
+**Fit:** Phase 0 line 3; confirms `docs/ARCHITECTURE.md` matrix row "cart, checkout, account". There is no shopper privacy-request route and no order-lookup-by-email route.
+
+### 1. How a shopper read identifies the caller
+
+`_customer` cookie → `customerFromToken` (hashed, looked up in the store's DB); cart cookie (`CART_COOKIE`, UUID; body ids ignored); signed order link `?t=2.<exp>.<hmac20>` from `order_link_secret`.
+
+**Callers on every read:** anonymous; shopper A (owner, positive control); shopper B using A's ids; B with a forged, revoked (after logout) or expired `_customer`; A's cookies replayed on store B's host; A's cart cookie with B's cart id in body/URL.
+
+### 2. Probes (owner gets data; everyone else 401/403/404 or the empty shape, no canary in body or props)
+
+- `GET /api/account` `view=me|orders|wishlist`: anonymous → 200 `{authenticated:false}`, exact keys.
+- `GET /api/account?view=reorder&order=<A's>`: B → 404, same body as a nonexistent order.
+- `POST /api/account`: `request_return` on A's order as B → 422 same text as unknown, no `return_requests` row; `profile`, `wishlist_merge`, `wishlist_remove`: anonymous 401, B changes only B's rows (A's unchanged in DB); `verify` with A's email + wrong code → no cookie, no `claimedOrders`; `request_otp` → same body for existing, nonexistent and over-cap emails.
+- `GET`/`POST /api/cart`: own cart only; forged or other-store cookie → `emptyCart`; body `cartId`/`id` never changes A's cart.
+- `POST /api/checkout`: `cod`/`razorpay_create` with A's `idempotencyKey` as B or anonymous → no `orderId`, `confirmationPath`, `razorpayOrderId`; A's cart not cleared. `razorpay_verify` with A's `orderId` and a bad signature, or B's valid signature → 400, no link.
+- Pages: `/account`, `/account/orders/[orderId]` (B notFound, anonymous redirect); `/orders/[orderId]` and `/checkout/confirmation/[orderId]` — valid link works; 404 for tampered signature, expired `exp`, A's token on another order id, link signed by store B, missing token, v1 legacy token after cutoff (inject `now`), link forged with `"dev-only-secret"` in production; `/checkout` and the storefront layout's `initialCart`.
+- Public reads (`search`, `upsell`, `wishlist` POST, `media/[id]`) anonymous with A's canaries in the DB → no canary.
+- **Canaries:** A's and B's email, phone, name, address line 1, order id, `razorpay_payment_id`, coupon, cart id, customer id, session token, return reason, wishlist handle; store B's copies.
+
+### 3. Findings (each red before its fix)
+
+1. **High:** `app/api/checkout/route.js:49-61,201-208,262-264`, `lib/orders.js:101-109,151-156` — an idempotency key alone returns another shopper's order with a signed `confirmationPath` (name, address, phone, payment id) and their `razorpayOrderId`/amount; empty cart skips the amount check; dedup runs before the `!cartId` check, so anonymous works too; client fallback key is weak (`components/checkout/CheckoutFlow.js:134`). **Fix:** `findOrderByIdempotencyKey(key, cartId)` everywhere (incl. createOrder fast path and unique-violation recovery); same key with a different `cart_id` → 409 `IDEMPOTENCY_CONFLICT`, no order fields; no cart cookie → no dedup.
+2. **Medium:** `lib/orders.js:466-471`, `lib/customers.js:35` — no `order_link_secret` and no `razorpay_key_secret` falls back to public `"dev-only-secret"`; order ids are 32-bit (`lib/orders.js:80-83`). **Fix:** in production verify returns false and mint throws without a tenant secret; dev fallback only outside production; same for customer hashes.
+3. **Low:** `app/api/checkout/route.js:322-325` returns raw `e.message` (GEN-03). **Fix:** `shopperErrorMessage(e, …)`, keep `code`.
+4. **Low:** `lib/customers.js:116-117` OTP attempts read-then-write. **Fix:** one conditional update `attempts = attempts + 1 where id = ? and attempts < 5`; 0 rows → refuse.
+5. **Low (oracle):** `lib/customers.js:78-80` "Too many codes requested". **Fix:** over cap → same `{ok:true, sent:true}`, send nothing, log only. "No active code" on verify stays.
+
+No change needed: `customerOrder` WHERE, `requestReturn` WHERE, cart reading only its cookie, Razorpay order match in `razorpay_verify`, tenant-bound sessions and links.
+
+### 4. Data, permissions, events
+
+No migration (`orders.cart_id` exists). Shopper identity comes only from `customerFromToken` and the cart cookie; order links only via `verifyOrderStatusToken`; shoppers are not added to `authz.js`. New `slog("checkout_idem_foreign_cart")` and `slog("account_otp_capped")`, no ids or PII.
+
+### 5. File plan (one builder, in order)
+
+1. `scripts/support/shopper-routes.js` (new): every `app/api/**/route.js` outside `admin/` with methods, class and owning suite. Classes: `shopper` (account, cart, checkout), `public-read` (search, upsell, wishlist, media/[id]), `collector` (track, exp, contact, leads, quiz/[slug], errors), `token` (approve, preview, connect/shopify/start, connect/shopify/callback), `agency` (partners, partners/auth), `operator` (platform/*), `webhook` (shopify/webhooks, razorpay/webhook, platform/billing/webhook), `job` (jobs/*, health). Also every `app/(storefront)/**/page.js` and `layout.js` as `shopper` or `public`.
+2. `scripts/support/page-harness.js`: accept storefront pages; stub `lib/storefront-request` `tfetch`.
+3. `scripts/test-shopper-reads.js` (new): guard (fails on any route file, method or page without a row, and if a `shopper` route reads `body.cartId`, `body.customerId` or a cart id from the query); the §2 probes on `makeRoleStore`/`makeTenant` with `host`, seeded customers A and B, orders, carts, wishlists, returns. Written first so findings 1, 2, 5 go red.
+4. Fixes in `lib/orders.js`, `app/api/checkout/route.js`, `lib/customers.js`; Web Crypto only, no `node:*` (`lib/cart.js` is imported by the Edge cart route; leave it untouched).
+5. `package.json`: `"test:shopper-reads": "node scripts/test-shopper-reads.js"`.
+6. `docs/ARCHITECTURE.md`: the shopper matrix row confirmed by `test:shopper-reads`, plus a table of non-admin routes and their classes.
+
+### 6. Checks to run first
+
+- `node scripts/test-permissions.js && node scripts/test-support-reads.js`
+- `node scripts/test-orders.js && node scripts/test-commerce.js && node scripts/test-customers.js` (drop any that don't exist)
+- `node scripts/test-payment-recovery.js` (dedup retry paths)
+- `grep -n idempotency_key lib/schema.sql migrations/tenant/*.sql` (UNIQUE/indexed?)
+- `grep -n "(console)\|host" scripts/support/page-harness.js scripts/support/route-harness.js`
+- `grep -rn "dev-only-secret" scripts lib`
+- `git ls-files 'app/api/**/route.js' | grep -v '^app/api/admin/' | wc -l`
+
+### 7. Risks
+
+1. Finding 1 touches the money path: a real retry after the cart was cleared must still dedup (cart cookie remains); `test:payment-recovery` and `test-orders` must stay green.
+2. Failing closed (finding 2) may break suites or `dev:design` running with NODE_ENV=production; grep first.
+3. Storefront pages may need more stubbing (`tfetch`, `cookies()`, `after()`).
+4. Out of scope: `/api/track` accepts any `transaction_id` as a purchase order id (integrity, later analytics line).
+5. Legacy v1 order tokens don't expire until 2027-01-31; accepted, tested via injected `now`.

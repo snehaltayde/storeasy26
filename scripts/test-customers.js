@@ -133,7 +133,11 @@ await t("expired codes refuse; resend capped at 3 active per hour", async () => 
   await throws(() => inA(() => K.verifyOtp(EMAIL, "123456")), /expired/);
   await inA(() => K.requestOtp(EMAIL));
   await inA(() => K.requestOtp(EMAIL));
-  await throws(() => inA(() => K.requestOtp(EMAIL)), /Too many codes/, "resend cap:");
+  // Phase 0 line 3 (finding 5): over the cap answers like a sent code, sends nothing
+  const before = (await inA(() => db.selectFrom("customer_otps").selectAll().execute())).length;
+  const capped = await inA(() => K.requestOtp(EMAIL));
+  eq(capped.capped, true, "resend cap:");
+  eq((await inA(() => db.selectFrom("customer_otps").selectAll().execute())).length, before, "no code minted over the cap:");
 });
 
 console.log("— sessions + isolation");

@@ -48,6 +48,8 @@ export const POST = tenantHandler(async (request) => {
       if (String(body.website || "").trim()) return NextResponse.json({ ok: true, sent: true }); // honeypot
       if (!validEmail(body.email)) return NextResponse.json({ error: "That email doesn't look right." }, { status: 422 });
       const r = await requestOtp(body.email);
+      // over the cap: the same answer, nothing sent (lib/customers.js)
+      if (r.capped) return NextResponse.json({ ok: true, sent: true });
       // deliver through the jobs fast path (same as the contact form)
       after(async () => {
         const { runDueJobs } = await import("@/lib/platform/worker.js");

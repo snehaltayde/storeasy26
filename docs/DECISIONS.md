@@ -3,6 +3,21 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 Shopper reads: own data only (on the owner's behalf)
+
+- **Decision:**
+  - A checkout retry with the same idempotency key returns the earlier order only to the cart (cookie) that placed it; any other caller gets 409 with no order details. No cart cookie, no retry lookup.
+  - Order links and shopper hashes fail closed in production when the store has no secret of its own (no shared `dev-only-secret` fallback outside local development). The Razorpay key secret stays as a fallback for now.
+  - Signed-out `GET /api/account` keeps answering 200 `{authenticated:false}`.
+  - Asking for too many sign-in codes answers the same "sent" message as normal and sends nothing.
+  - Checkout errors to shoppers use plain words, never the raw error.
+  - Orders still attach to whoever verifies the email typed at checkout (as designed in S45); the risk is accepted and recorded here.
+  - Shoppers get no permission module: their identity comes only from the shopper session cookie and the cart cookie, and every non-admin route and storefront page must be classified in the test or it fails.
+- **Why:** the shopper-reads audit found that knowing a checkout's idempotency key was enough to get another shopper's order and a link showing their address and phone.
+- **Instead of:** keeping key-only retry lookup; keeping the public fallback secret.
+- **Decided by:** Claude, on the owner's behalf
+- **Slice:** Phase 0, shopper reads
+
 ## 2026-11-24 What support and staff may see in admin reads (on the owner's behalf)
 
 - **Decision:**

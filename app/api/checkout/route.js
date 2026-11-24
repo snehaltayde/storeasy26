@@ -10,6 +10,7 @@ import {
   findOrderByIdempotencyKey,
   orderConfirmationPath,
   ORDER_STATUS,
+  storeLinkSecret,
 } from "@/lib/orders";
 import { verifyBrowserPayment, runOrderEffects } from "@/lib/payment-settle";
 import { razorpayConfigured, razorpayKeyId, createRazorpayOrder } from "@/lib/razorpay";
@@ -20,6 +21,7 @@ import { tenantHandler } from "@/lib/tenant-request";
 import { conversionUnit } from "@/lib/experiments";
 import { closedStoreGate, STORE_CLOSED_CODE, STORE_CLOSED_MESSAGE, STORE_CLOSED_COD_ONLY_MESSAGE } from "@/lib/content/resolve";
 import { isTransient } from "@/lib/db";
+import { shopperErrorMessage } from "@/lib/shopper-errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,22 +43,40 @@ function validate(contact, address) {
 
 // S31 (BE36): amount comparisons happen at minor-unit precision via lib/money.
 
-// If this idempotency key already produced an order, short-circuit BEFORE any
-// cart/validation checks — a retry after the first request cleared the cart
-// must still return that order, not "Cart is empty". Returns null (no dup),
-// a NextResponse to send, or throws nothing. `expectedTotal` is goods+shipping
+// A store without its own link secret can't sign the confirmation link, so in
+// production it takes no order at all: refused before dedup or createOrder,
+// never an order written and then a failed answer (lib/orders.js storeLinkSecret).
+const noLinkSecret = () =>
+  storeLinkSecret()
+    ? null
+    : NextResponse.json(
+        { error: "Checkout is temporarily unavailable for this store. Nothing was charged.", code: "CHECKOUT_DISABLED" },
+        { status: 503 },
+      );
+
+const CONFLICT_MESSAGE = "This checkout attempt no longer matches your cart. Please retry.";
+const conflictResponse = () => NextResponse.json({ error: CONFLICT_MESSAGE, code: "IDEMPOTENCY_CONFLICT" }, { status: 409 });
+
+// If this idempotency key already produced an order FROM THIS CART (the cart
+// cookie), short-circuit BEFORE any cart/validation checks — a retry after the
+// first request cleared the cart must still return that order, not "Cart is
+// empty". The key alone is never enough: no cart cookie means no dedup, and the
+// key on another cart's order is a 409 with no order fields. Returns null (no
+// dup), a NextResponse to send, or the order. `expectedTotal` is goods+shipping
 // for THIS submission (order.total includes shipping since Session 13).
-async function dedupByKey(key, cart, expectedTotal) {
-  const existing = await findOrderByIdempotencyKey(key);
+async function dedupByKey(key, cartId, cart, expectedTotal) {
+  if (!cartId) return null;
+  let existing;
+  try {
+    existing = await findOrderByIdempotencyKey(key, cartId);
+  } catch (e) {
+    if (e?.code === "IDEMPOTENCY_CONFLICT") return conflictResponse();
+    throw e;
+  }
   if (!existing) return null;
   // Same key but a different (non-empty) cart ⇒ not a retry: the client must
   // rotate its key. 409 tells it to.
-  if (cart?.items?.length && !sameAmount(expectedTotal, existing.total)) {
-    return NextResponse.json(
-      { error: "This checkout attempt no longer matches your cart. Please retry.", code: "IDEMPOTENCY_CONFLICT" },
-      { status: 409 },
-    );
-  }
+  if (cart?.items?.length && !sameAmount(expectedTotal, existing.total)) return conflictResponse();
   return existing;
 }
 
@@ -182,6 +202,8 @@ export const POST = tenantHandler(async (request) => {
 
   try {
     if (action === "cod") {
+      const disabled = noLinkSecret();
+      if (disabled) return disabled;
       if (!idempotencyKey)
         return NextResponse.json({ error: "idempotencyKey is required" }, { status: 400 });
       const cart = cartId ? await getCart(cartId) : { items: [] };
@@ -198,13 +220,13 @@ export const POST = tenantHandler(async (request) => {
         config: shippingConfig,
       });
 
-      const dup = await dedupByKey(idempotencyKey, cart, (cart.total || 0) + shipping.total);
+      const dup = await dedupByKey(idempotencyKey, cartId, cart, (cart.total || 0) + shipping.total);
       if (dup instanceof NextResponse) return dup;
       if (dup) {
         // Finish what the first request started: it may have died before
         // scheduling its after() work, or before its cart clear landed.
         scheduleCodEffects(request, dup);
-        if (cartId && cart.items.length) await clearPlacedCart(cartId, dup.id);
+        if (cart.items.length) await clearPlacedCart(cartId, dup.id);
         return await codResponse(dup, true);
       }
 
@@ -242,6 +264,8 @@ export const POST = tenantHandler(async (request) => {
     }
 
     if (action === "razorpay_create") {
+      const disabled = noLinkSecret();
+      if (disabled) return disabled;
       if (!razorpayConfigured())
         return NextResponse.json({ error: "Online payment isn't available for this store right now." }, { status: 400 });
       if (!idempotencyKey)
@@ -259,7 +283,7 @@ export const POST = tenantHandler(async (request) => {
 
       // Dedup BEFORE creating a Razorpay order, so a retry reopens the SAME
       // payment instead of minting a parallel one.
-      const dup = await dedupByKey(idempotencyKey, cart, (cart.total || 0) + shipping.total);
+      const dup = await dedupByKey(idempotencyKey, cartId, cart, (cart.total || 0) + shipping.total);
       if (dup instanceof NextResponse) return dup;
       if (dup) return await razorpayResponse(dup, dup.razorpay_order_id, true);
 
@@ -318,10 +342,13 @@ export const POST = tenantHandler(async (request) => {
         { error: "We hit a temporary problem placing your order. Please try again. You won't be charged or get a duplicate order." },
         { status: 503 },
       );
-    const status = e?.code === "IDEMPOTENCY_CONFLICT" ? 409 : 400;
+    // GEN-03: shopper text only (a provider's or the driver's raw message
+    // stays in the log); the code is kept for the client.
+    if (e?.code === "IDEMPOTENCY_CONFLICT") return conflictResponse();
+    slog("checkout_failed", { action, error: String(e?.message || e).slice(0, 200) });
     return NextResponse.json(
-      { error: String(e?.message || e), ...(e?.code ? { code: e.code } : {}) },
-      { status },
+      { error: shopperErrorMessage(e, "Could not continue — your cart is untouched, please retry."), ...(e?.code ? { code: e.code } : {}) },
+      { status: 400 },
     );
   }
 }, { fresh: "prefer" });

@@ -16,7 +16,7 @@ registerHooks({
     if (specifier === "next/server" && context.parentURL !== stub) return { url: stub, shortCircuit: true };
     if (
       ["react", "next/headers", "next/navigation"].includes(specifier) &&
-      (context.parentURL?.endsWith("/lib/tenant-request.js") || context.parentURL?.endsWith("/lib/content/resolve.js"))
+      ["/lib/tenant-request.js", "/lib/content/resolve.js", "/lib/storefront-request.js"].some((f) => context.parentURL?.endsWith(f))
     ) {
       return { url: requestStub, shortCircuit: true };
     }

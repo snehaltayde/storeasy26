@@ -85,7 +85,7 @@ Merchant roles are per store (`memberships.role`) and nest: owner ⊇ admin ⊇ 
 | audit.read | allow | allow | deny | deny | deny | allow |
 | team.manage | allow | allow | deny | deny | deny | allow |
 | team.owner (grant or transfer owner) | allow | deny | deny | deny | deny | deny |
-| cart, checkout, account | — | — | — | — | own cart / own account only (unconfirmed by a least-trusted test) | — |
+| cart, checkout, account | — | — | — | — | own cart / own account only (confirmed by `test:shopper-reads`) | — |
 | platform console (tenants, provisioning, billing, flags, incidents) | deny | deny | deny | deny | deny | allow (TOTP sessions; bootstrap shared password until the first operator exists) |
 
 What the read-only callers get back is proven by `test:support-reads`: every role without `settings.read` (staff, support) and an operator under a support grant calls every read they are allowed (`scripts/support/support-reads.js`), and each raw answer is searched for canary strings (store secrets and settings, member emails, an audit row, an order's customer details, `cart_id` and `idempotency_key`, another store's data, session tokens) and held to a per-probe list of top-level keys; the owner is the positive control. Member names are names only: a member without one reads "Someone on your team", never their email. Support and an operator under a grant search orders by order id only. `cart_id` and `idempotency_key` never leave the server in an admin read, for any role. Every console page has a row in `scripts/support/admin-pages.js`; Settings, Integrations and Automations check `settings.read` on the server before they fetch anything, and every page is run as support with its components stubbed (`scripts/support/page-harness.js`) so no prop carries a canary. Storefront-public values (Shopify domain, Razorpay key id, support email, shipping rates) and derived booleans are fine for support. No route reads `upsells.read`; its page redirects to the editor.
@@ -102,6 +102,21 @@ Admin routes that do not call `requireAdmin`, each with its own rule tested by `
 | `admin/maintenance-pass` GET | public; always 302 to `/admin/login`; the `_mx` cookie only for a verified member (support included: a curtain pass only) or operator session, signed with the store's `order_link_secret`; signed-out and other stores' members get none |
 
 `preview-session`, `documents`, `refs` and `releases` are gated through their `lib/admin/*` handlers, not exempt.
+
+What a shopper gets back is proven by `test:shopper-reads`. A shopper is identified only by the `_customer` cookie (`customerFromToken`, hashed and looked up in the store's own database), the cart cookie (a body or query cart id is never read), or a signed order link `?t=2.<exp>.<hmac20>` (`verifyOrderStatusToken`, the store's `order_link_secret`); shoppers are not in `authz.js`. The suite calls `/api/account`, `/api/cart`, `/api/checkout` and the public reads, and runs `/account`, `/account/orders/[orderId]`, `/orders/[orderId]`, `/checkout/confirmation/[orderId]` and `/checkout` through the page harness, as anonymous, shopper A (positive control), shopper B with A's ids, B with a forged, revoked or expired session, and A's cookies on another store's host; every non-owner answer is searched for A's canaries. A checkout idempotency key returns an order only to the cart that made it (`orders.cart_id`): the same key from another cart is a 409 `IDEMPOTENCY_CONFLICT` with no order fields, and no cart cookie means no dedup. In production a store without its own secret mints no order link and verifies none, and hashes no sign-in code; the public `dev-only-secret` fallback is for local runs only.
+
+Routes outside `app/api/admin/`, by class (`scripts/support/shopper-routes.js`; a static guard fails on a route, method or storefront page without a row):
+
+| Class | Routes | Caller is proven by |
+|---|---|---|
+| shopper | `account`, `cart`, `checkout` | the `_customer` cookie or the cart cookie |
+| public-read | `search`, `upsell`, `wishlist` (guest handles only), `media/[id]` | nothing; returns no shopper data |
+| collector | `track`, `exp`, `contact`, `leads`, `quiz/[slug]`, `errors` | nothing; write-only intake |
+| token | `approve`, `preview`, `connect/shopify/start`, `connect/shopify/callback` | a signed token or OAuth state |
+| agency | `partners`, `partners/auth` | a partner session |
+| operator | `platform/*` (except the billing webhook) | `lib/platform/admin-auth.js` |
+| webhook | `shopify/webhooks`, `razorpay/webhook`, `platform/billing/webhook` | the provider's signature |
+| job | `jobs/*`, `health` | the job secret |
 
 "own only" means the cart, order or account must belong to the caller's session. Anything not listed is denied. The operator column is **unconfirmed** cell by cell: operator access to a store goes through `support_grants` and `lib/platform/admin-auth.js`, read but not tested here.
 

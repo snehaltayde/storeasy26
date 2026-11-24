@@ -22,7 +22,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 - [x] A per-role permission harness calls every `app/api/admin/*` route as owner, admin, staff, support and signed-out, and a guard test fails when a new route has no permission check (`test:permissions`)
 - [x] A support member gets a test proving they cannot read anything outside the matrix (settings, secrets, audit, team) on every existing admin read (`test:support-reads`)
-- [ ] A shopper can read only their own cart, orders and account, proven by a test that tries another shopper's ids on every shopper read
+- [x] A shopper can read only their own cart, orders and account, proven by a test that tries another shopper's ids on every shopper read (`test:shopper-reads`)
 - [ ] The agency partner programme is gone: no agency routes, screens or links remain, its tables are left unused, and its suite is replaced by a test that no agency route answers
 - [ ] One command seeds a local store with an owner, admin, staff and support member, an operator, a shopper with an order, and a synced catalog
 - [ ] The browser drills run on today's code: drills that tested the retired legacy CMS are removed, and `pnpm drill:p6` and the p5 drill pass
@@ -106,6 +106,10 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 - `orders/[id]` POST push answers 500 for an unknown order; it should be 404 (allowed as `allowStatus` in `scripts/support/admin-routes.js` until fixed).
 - Opening the editor runs the first-store generator during the page render for any role, support included (`app/(console)/admin/(authed)/editor/page.js` ~85); it writes drafts only, but a read-only role shouldn't trigger writes.
+- Order ids carry only 32 random bits; lengthen them (order links are the only thing that protects an order page, so this matters once links can leak).
+- The checkout client's fallback idempotency key (`components/checkout/CheckoutFlow.js` ~134) uses `Math.random`; use `crypto.randomUUID()`.
+- Preview tokens in `lib/releases.js` still fall back to `"dev-only-secret"`; make them fail closed in production like order links.
+- `/api/track` accepts any `transaction_id` as a purchase order id (analytics integrity).
 - `requireAdmin`'s origin check passes a write with no Origin header; add a `Sec-Fetch-Site: cross-site` refusal as a second layer.
 
 - Multi-provider AI (Gemini, OpenAI) beside Anthropic.

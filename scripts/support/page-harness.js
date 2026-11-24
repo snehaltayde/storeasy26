@@ -1,5 +1,6 @@
-// Runs a console page (app/(console)/admin/(authed)/**/page.js) under plain Node
-// and records the props it hands its components (Phase 0 line 2's prop sweep).
+// Runs a console page (app/(console)/admin/(authed)/**/page.js) or a storefront
+// page (app/(storefront)/**/page.js) under plain Node and records the props it
+// hands its components (Phase 0 line 2's prop sweep; line 3's shopper sweep).
 // A helper, not a suite: nothing runs on import. Import route-harness.js first
 // (its hooks resolve "@/" inside lib/).
 //
@@ -14,7 +15,12 @@
 // that renders nothing; every lib/ import is the real module. next/headers
 // answers from the cookies given to run(); next/navigation's redirect() and
 // notFound() throw, as Next's do. tfetch runs the callback in the store, read
-// fresh each time, as the console's tfetch does. Components the page defines
+// fresh each time, as the console's tfetch does; a layout's CSS and next/font
+// imports are empty stand-ins; lib/tenant-request resolves to the harness's
+// store; the storefront's tfetch
+// (lib/storefront-request) does the same with no maintenance curtain, and
+// next/server's after() is dropped (nothing after the response runs in a
+// sweep). Components the page defines
 // itself are called, so the data they load is swept too.
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
@@ -81,6 +87,18 @@ export async function makePageHarness({ tenant }) {
     },
   };
   const consoleRequestStub = { tfetch: async (fn) => withTenant(await tenant(), fn) };
+  // the storefront layout's own resolution: the harness's store, resolved
+  const tenantRequestStub = {
+    tfetch: async (fn) => withTenant(await tenant(), fn),
+    requestResolution: async () => ({ outcome: "resolved", tenant: await tenant(), name: null }),
+    requestTenant: async () => tenant(),
+  };
+  const storefrontRequestStub = { tfetch: async (fn) => withTenant(await tenant(), fn), storeCurtain: async () => null };
+  // after() dropped; the rest read on use (a require at setup can cycle with
+  // route-harness's own next/server stub)
+  // next/font: every font is a loader answering the class names Next would
+  const fontStub = new Proxy({}, { get: (_, k) => (k === "__esModule" ? true : k === "default" ? fontStub.font : () => ({ className: "", variable: "", style: {} })) });
+  const nextServerStub = new Proxy({}, { get: (_, k) => (k === "after" ? () => {} : k === "__esModule" ? false : require("next/server")[k]) });
 
   const loaded = new Map();
   const unresolved = [];
@@ -107,6 +125,11 @@ export async function makePageHarness({ tenant }) {
       else if (id === "next/headers") deps.set(id, headersStub);
       else if (id === "next/navigation") deps.set(id, navigationStub);
       else if (id === "@/lib/console-request") deps.set(id, consoleRequestStub);
+      else if (id === "@/lib/storefront-request") deps.set(id, storefrontRequestStub);
+      else if (id === "@/lib/tenant-request") deps.set(id, tenantRequestStub);
+      else if (id === "next/server") deps.set(id, nextServerStub);
+      else if (/\.css$/.test(id)) deps.set(id, {}); // a layout's stylesheet
+      else if (id === "next/font/google" || id === "next/font/local") deps.set(id, fontStub);
       else if (isComponentImport(id)) deps.set(id, stubModule(id));
       else if (id.startsWith("@/") || id.startsWith(".")) {
         const base = id.startsWith("@/") ? join(ROOT, id.slice(2)) : resolvePath(dirname(file), id);
