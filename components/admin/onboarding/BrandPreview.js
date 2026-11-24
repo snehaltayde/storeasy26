@@ -114,6 +114,7 @@ export default function BrandPreview({ message = null, canEdit = false, saved = 
               type="button"
               aria-pressed={width === w}
               data-preview-toggle={w}
+              data-onboarding="view"
               onClick={() => setWidth(w)}
               className={cn("h-8 rounded-sm px-3 text-[0.8125rem] font-medium transition-colors outline-none motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring", width === w ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground")}
             >
@@ -128,7 +129,7 @@ export default function BrandPreview({ message = null, canEdit = false, saved = 
         )}
       </div>
       {failed && (
-        <Button variant="outline" size="sm" onClick={() => ctlRef.current?.retry()} data-preview-retry="">
+        <Button variant="outline" size="sm" onClick={() => ctlRef.current?.retry()} data-preview-retry="" data-onboarding="view">
           <RotateCcw aria-hidden />
           Try again
         </Button>

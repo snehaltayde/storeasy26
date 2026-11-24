@@ -135,7 +135,7 @@ function NextLinks({ onBrand }) {
       <Link href={EDIT_HOME_HREF} className={linkClass}>
         {START_WORDS.editHome}
       </Link>
-      <button type="button" onClick={onBrand} className={cn(linkClass, "text-left")} data-brand-scroll="">
+      <button type="button" onClick={onBrand} className={cn(linkClass, "text-left")} data-brand-scroll="" data-onboarding="view">
         {START_WORDS.changeBrand}
       </button>
     </div>
@@ -666,7 +666,7 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
           <>
             {/* below 1024px: the sticky Preview button */}
             <div className={cn("sticky bottom-4 z-10 mt-6 flex justify-end lg:hidden", sheet && "hidden")}>
-              <Button ref={previewButton} size="lg" className="h-10 px-4 shadow-overlay" onClick={() => (setPreviewOn(true), setSheet(true))} aria-expanded={sheet} aria-controls="brand-preview-slot" data-brand-preview-open="">
+              <Button ref={previewButton} size="lg" className="h-10 px-4 shadow-overlay" onClick={() => (setPreviewOn(true), setSheet(true))} aria-expanded={sheet} aria-controls="brand-preview-slot" data-brand-preview-open="" data-onboarding="view">
                 <Eye aria-hidden />
                 {PREVIEW_WORDS.open}
               </Button>
@@ -688,7 +688,7 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
                 <h3 id="brand-preview-title" className="text-base font-semibold">
                   {PREVIEW_WORDS.title}
                 </h3>
-                <Button ref={sheetClose} variant="ghost" size="icon-sm" onClick={closeSheet} aria-label={PREVIEW_WORDS.close} data-brand-sheet-close="">
+                <Button ref={sheetClose} variant="ghost" size="icon-sm" onClick={closeSheet} aria-label={PREVIEW_WORDS.close} data-brand-sheet-close="" data-onboarding="view">
                   <X aria-hidden />
                 </Button>
               </div>

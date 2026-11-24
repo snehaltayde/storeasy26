@@ -106,7 +106,7 @@ export async function openStage(drill) {
   drill.check((await openStart(drill, page)) === "ready", "the store is made on /admin/onboarding?step=brand", null);
 
   // the brand step: Slate kept, the library logo chosen, saved
-  await page.getByRole("button", { name: "Choose a logo", exact: true }).click();
+  await page.getByRole("button", { name: "Choose from your library", exact: true }).click();
   const dlg = page.locator("dialog[open]").last();
   await dlg.locator(`button:has(img[src*="${P6_LOGO_MEDIA.id}"])`).first().click();
   await page.locator("#brand-logo-alt").waitFor({ timeout: 30_000 });

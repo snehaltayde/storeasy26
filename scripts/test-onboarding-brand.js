@@ -494,6 +494,9 @@ await t("least-trusted: support (and operator-support) sees every control disabl
     ok(n.props.disabled, `${b} not disabled`);
   }
   ok(v.input((p) => p.id === "brand-description").props.disabled && v.input((p) => p["data-brand-upload"] !== undefined).props.disabled, "fields disabled");
+  // the only enabled buttons are view-only ones (scroll to the form, open or close the preview), each tagged data-onboarding="view" (the shell drill's rule)
+  const enabled = v.nodes().filter((n) => n.type === "button" && !n.props.disabled);
+  ok(enabled.every((n) => n.props["data-onboarding"] === "view" && (n.props["data-brand-scroll"] !== undefined || n.props["data-brand-preview-open"] !== undefined || n.props["data-brand-sheet-close"] !== undefined)), `support has an enabled control that isn't view-only: ${enabled.map((n) => textOf(n.props.children)).join(" | ")}`);
   eq(preview.canEdit, false, "the preview never draws:");
   eq(preview.message, M.CLEAR_MESSAGE, "nothing to draw:");
   ok(!v.nodes().some((n) => n.type === "MediaPicker"), "no library picker");
