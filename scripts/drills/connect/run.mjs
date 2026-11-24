@@ -76,6 +76,15 @@ async function openConnect(page, origin, query = "") {
   await settle(page);
   await page.locator('[data-onboarding="panel"][data-step="connect"]').waitFor({ timeout: 60_000 });
 }
+// the step at a laptop width (the context's 1280), then 768 and 375
+async function shootSizes(drill, page, name) {
+  await drill.shoot(page, name);
+  for (const width of [768, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await drill.shoot(page, `${name}-${width}`, { fullPage: true });
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+}
 const fault = (body) => fetch(`http://127.0.0.1:${fakePort}/_fake/faults`, { method: body ? "POST" : "DELETE", body: body ? JSON.stringify(body) : undefined });
 
 // → where the callback sent the browser (before the page clears its parameters)
@@ -105,7 +114,8 @@ async function connectDrill(drill) {
     const filled = await owner.locator('[data-onboarding="shop-input"]').inputValue();
     drill.check(filled === SHOP, "?shop= fills the address field", filled);
     drill.check(!(await C.getTenant("annex", { fresh: true })).config.shopify_store_domain, "…and saves nothing");
-    await drill.shoot(owner, "1-prefilled");
+    drill.check((await text(owner)).includes(CONNECT_WORDS.preparingSave), "before saving: 'preparing… save your address and there's nothing else'");
+    await shootSizes(drill, owner, "1-prefilled");
 
     // 2. custom domain words; a handle saved; in progress, Connect disabled
     await owner.locator('[data-onboarding="shop-input"]').fill("brand.com");
@@ -119,8 +129,9 @@ async function connectDrill(drill) {
     const ip = await step1(owner, ANNEX);
     drill.check(ip.state === "in_progress" && ip.words === CONNECT_WORDS.appNotReady, "step 1 In progress: Storeasy's team is preparing", ip);
     const reasons = await owner.locator('[data-onboarding="reason"]').allInnerTexts();
-    drill.check(reasons.includes(CONNECT_WORDS.appNotReady), "Connect disabled with the reason", reasons);
-    await drill.shoot(owner, "2-preparing");
+    drill.check(reasons.includes(CONNECT_WORDS.preparingWait), "Connect disabled with the reason (nothing for the founder to do)", reasons);
+    drill.check((await owner.locator('[data-onboarding="shop-save"]').count()) === 0, "the saved, unchanged address has no Save button: one control");
+    await shootSizes(drill, owner, "2-preparing");
 
     // 3. the operator sets the app up
     await C.patchTenant("annex", { config: { shopify_client_id: APP.clientId }, secrets: { shopify_client_secret: APP.clientSecret } });
@@ -129,7 +140,7 @@ async function connectDrill(drill) {
     drill.check(lockedText.includes(CONNECT_WORDS.locked) && lockedText.includes(SHOP), "the address is locked with 'Wrong store?'");
     drill.check(await owner.locator('[data-onboarding="connect-button"]').isEnabled(), "Connect is enabled");
     drill.check((await owner.locator('[data-onboarding="shop-input"]').count()) === 0, "no address field once locked");
-    await drill.shoot(owner, "3-ready");
+    await shootSizes(drill, owner, "3-ready");
 
     // 4. Cancel in Shopify
     await connectVia(owner, "cancel");
@@ -137,7 +148,7 @@ async function connectDrill(drill) {
     drill.check(denied.includes(CONNECT_ERROR_WORDS.denied) && denied.includes(DENIED_HINT), "Cancel: the denied words and 'Press Connect again'");
     await owner.waitForFunction(() => !location.search.includes("connect_error"), null, { timeout: 10_000 }).catch(() => {});
     drill.check(!owner.url().includes("connect_error"), "connect_error is cleared from the address bar", owner.url());
-    await drill.shoot(owner, "4-cancelled");
+    await shootSizes(drill, owner, "4-cancelled");
 
     // 5. another shop on return
     await fault({ wrongShop: true });
@@ -157,7 +168,7 @@ async function connectDrill(drill) {
     const supReasons = await support.locator('[data-onboarding="panel"] [data-onboarding="reason"]').allInnerTexts();
     drill.check(supReasons.includes(READ_ONLY_REASON), "support: Connect disabled, read-only reason", supReasons);
     drill.check((await support.locator('[data-onboarding="panel"] [data-onboarding="connect"] button:not([disabled])').count()) === 0, "support: no enabled control in step 1");
-    await drill.shoot(support, "6-support");
+    await shootSizes(drill, support, "6-support");
     const staff = await signIn(drill, ROLES, login("staff"));
     await openConnect(staff, ROLES);
     drill.check((await staff.locator('[data-onboarding="connect"] button:not([disabled]), [data-onboarding="shop-input"]').count()) === 0, "staff: step 1 read-only");

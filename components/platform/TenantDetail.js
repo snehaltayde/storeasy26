@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Rocket } from "lucide-react";
 import { Badge } from "@/components/console/Badge";
 import { KeyValue, SkeletonText, ErrorState } from "@/components/console/bits";
+import { CopyButton } from "@/components/console/Copy";
 
 // Tenant detail (S41 / OP03, redesigned S50): lifecycle, config summary,
 // secrets as a PRESENCE map (values never leave the encrypted envelope),
@@ -58,13 +59,26 @@ export default function TenantDetail({ id }) {
           ]}
         />
         {data.connect && (
-          <>
-            <p className="mt-3 text-xs font-semibold text-fg">Redirect URLs to add to this store's Shopify app</p>
-            <ul className="mt-1.5 space-y-0.5 font-mono text-fg-muted [overflow-wrap:anywhere]" data-tenant="redirect-urls">
-              {data.connect.redirectUrls.length ? data.connect.redirectUrls.map((u) => <li key={u}>{u}</li>) : <li className="font-sans text-fg-subtle">no store domain yet</li>}
+          <div data-tenant="shopify-app">
+            <p className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-fg">
+              Shopify app redirect URLs
+              <Badge tone={data.connect.appReady ? "success" : "warning"}>{data.connect.appReady ? "App set up" : "App not set up"}</Badge>
+            </p>
+            <p className="mt-1 text-fg-subtle">Add each one to this store's Shopify app (App setup, Allowed redirection URLs).</p>
+            <ul className="mt-1.5 space-y-1" data-tenant="redirect-urls">
+              {data.connect.redirectUrls.length ? (
+                data.connect.redirectUrls.map((u) => (
+                  <li key={u} className="flex items-center gap-1 rounded-ctl bg-surface pl-2.5">
+                    <code className="min-w-0 flex-1 select-all py-1.5 font-mono text-[11px] text-fg [overflow-wrap:anywhere]">{u}</code>
+                    <CopyButton value={u} label={`Copy ${u}`} size={12} />
+                  </li>
+                ))
+              ) : (
+                <li className="text-fg-subtle">No store domain yet, so there's nothing to add.</li>
+              )}
             </ul>
-            {!data.connect.appReady && <p className="mt-1 text-fg-subtle">The store's Shopify app isn't set up yet (client id and secret), so the founder can't connect.</p>}
-          </>
+            {!data.connect.appReady && <p className="mt-1.5 text-fg-subtle">Add the app's client id and secret (More, Edit details). Until then the founder sees "Storeasy's team is preparing your Shopify connection" and can't connect.</p>}
+          </div>
         )}
         <p className="mt-3 text-xs font-semibold text-fg">Credentials (presence only)</p>
         <p className="mt-1.5 flex flex-wrap gap-1">
