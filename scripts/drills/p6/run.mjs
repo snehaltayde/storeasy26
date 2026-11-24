@@ -15,7 +15,7 @@
 // Stages, in this order (all of them when none is named):
 //   baseline  generate.mjs: seed --p3, the P3-CLOSED RSC probe on the P3
 //             closed store (closed.localhost), with an open-store control
-//   a         generate.mjs: US-01, /admin/start makes the store with no AI
+//   a         generate.mjs: US-01, /admin/onboarding?step=brand makes the store with no AI
 //             key; the preview; the closed storefront; the probe again on the
 //             generated, unpublished p6 store
 //   b         brand.mjs: GEN-04, Forest, a PNG logo, a description; Reset to
@@ -24,7 +24,9 @@
 //             pages are read or saved; a COD test order, cancelled; open
 //   d         open.mjs: checkout off blocks opening; turned on in Settings
 //   e         empty.mjs: US-04, an empty catalog, a later refill, no collections
-//   g         setup.mjs: the checklist's policy starters
+//   g         setup.mjs: onboarding step 4's policy starters
+//   h         onboarding.mjs: the four-step onboarding page (states, resume
+//             via ?step=, support read-only with reasons, an open store all done)
 //
 // Results: docs/cms-reviews/drills/P6-DRILLS/results-<stage>.json with the
 // screenshots, and the summary results.json (results-run-<stages>.json for a
@@ -44,6 +46,7 @@ const STAGE_FILES = {
   d: ["./open.mjs", "paymentStage"],
   e: ["./empty.mjs", "emptyStage"],
   g: ["./setup.mjs", "setupStage"],
+  h: ["./onboarding.mjs", "onboardingStage"],
 };
 export const STAGES = Object.keys(STAGE_FILES);
 

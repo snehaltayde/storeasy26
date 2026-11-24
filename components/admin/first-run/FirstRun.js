@@ -10,11 +10,13 @@ import { SyncProgressBody, readSync, requestSync, POLL_MS } from "@/components/a
 import { paletteById } from "@/lib/themes/palettes";
 import BrandStep from "./BrandStep";
 
-// P6-START-UI (GEN-01, US-01, US-04): "Start your store" (/admin/start), the
-// console's first-run page. It reads GET /api/admin/first-run (what was made,
+// P6-START-UI (GEN-01, US-01, US-04): "Start your store", the console's
+// first-run panel (since Phase 1 line 3 the Brand step of /admin/onboarding). It reads GET /api/admin/first-run (what was made,
 // whether it can be made now, and the catalog sync's progress) and, when the
 // store can be made and isn't yet, asks POST /api/admin/first-run ONCE. The
-// brand step (BrandStep.js) sits under it, at #brand.
+// brand step (BrandStep.js) sits under it, at #brand. onChange (optional) is
+// called after anything here changes the store (the store was made, a sync
+// settled, the brand step saved), so the onboarding steps are read again.
 //
 // Which view shows (first match wins):
 //   1. a home page the generator made        "ready": what was made (from the
@@ -260,7 +262,7 @@ function CatalogNotes({ firstRun, sync, canSync, onSettled, pollMs }) {
   return null;
 }
 
-export default function FirstRun({ canEdit = false, canSync = false, pollMs = POLL_MS }) {
+export default function FirstRun({ canEdit = false, canSync = false, pollMs = POLL_MS, onChange }) {
   const [data, setData] = useState(null); // { firstRun, sync }
   const [phase, setPhase] = useState("loading"); // loading | idle | load-failed | making | make-failed | half
   const [error, setError] = useState(null);
@@ -286,12 +288,14 @@ export default function FirstRun({ canEdit = false, canSync = false, pollMs = PO
     if (r.ok && r.body.ok && r.body.ran) {
       setData((d) => ({ ...d, firstRun: afterMake(d?.firstRun, r.body) }));
       setPhase("idle");
+      onChange?.();
       return;
     }
     if (r.ok && r.body.ok && r.body.ran === false && r.body.homeWritten === true) {
       // P6-FIX3: the home page was made, the colours were not: say so
       setHalfReason(typeof r.body.reason === "string" ? r.body.reason : "other");
       setPhase("half");
+      onChange?.();
       return;
     }
     if (r.ok && r.body.ok && r.body.ran === false && r.body.reason !== "race") {
@@ -321,7 +325,10 @@ export default function FirstRun({ canEdit = false, canSync = false, pollMs = PO
   const firstRun = data?.firstRun || {};
   const sync = data?.sync || null;
   const open = firstRun.reason === "live";
-  const reload = () => load();
+  const reload = () => {
+    load();
+    onChange?.();
+  };
 
   // what shows: the phase while a request is out or failed, else the view.
   // "make" is the POST about to go (making); once it went, the same answer
@@ -433,7 +440,7 @@ export default function FirstRun({ canEdit = false, canSync = false, pollMs = PO
           {body}
         </div>
       </Card>
-      <BrandStep canEdit={canEdit} />
+      <BrandStep canEdit={canEdit} onChange={onChange} />
     </div>
   );
 }

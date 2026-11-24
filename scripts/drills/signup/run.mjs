@@ -19,8 +19,9 @@
 //      code (read from the mock mail row) → "Setting up your store…" with the
 //      four steps (aria-live) and the retry note → done, one database made →
 //      <slug>.localhost/admin/onboarding: the shell's
-//      top bar, no sidebar, a 640px column, "Welcome to …", the address, the
-//      Closed badge, the verified email, "Next: connect your Shopify store";
+//      top bar, no sidebar, a 640px column with the step list to its left,
+//      "Welcome to …", the address, the Closed badge, the verified email, and
+//      the four steps opened on Connect Shopify (To do; Import waits for it);
 //      the handoff fragment is gone from the address and the history
 //   7. Sign out → /admin/login; sign in again with the same email and password
 //   8. the same email again (a new browser): the same code screen, no new code
@@ -245,11 +246,17 @@ async function signup(drill) {
   drill.check((await page.locator('[data-onboarding="address"]').innerText().catch(() => "")) === `${SLUG}.localhost`, "the store's address", null);
   drill.check((await page.locator('[data-onboarding="status"]').innerText().catch(() => "")).trim().toLowerCase() === "closed" && welcome.includes("Opening soon"), "the Closed badge and \"Opening soon\"", null);
   drill.check((await page.locator('[data-onboarding="email"]').innerText().catch(() => "")).includes(EMAIL) && welcome.includes("email verified"), "the verified email", null);
-  drill.check(welcome.includes("Next: connect your Shopify store"), "the next step card", null);
+  const steps = await page.evaluate(() => ({
+    panel: document.querySelector('[data-onboarding="panel"]')?.getAttribute("data-step") || null,
+    states: Object.fromEntries([...document.querySelectorAll('[data-onboarding="steplist"] button[data-step]')].map((b) => [b.getAttribute("data-step"), b.getAttribute("data-state")])),
+    words: (document.querySelector('[data-onboarding="words"]')?.innerText || "").trim(),
+  }));
+  drill.check(steps.panel === "connect" && steps.states.connect === "ready" && steps.states.import === "blocked" && Object.keys(steps.states).join(",") === "connect,import,brand,open" && steps.words.includes("Storeasy's team connects your Shopify store for you"), "the four steps, opened on Connect Shopify (To do, the team connects it); Import waits for it", steps);
   const bar = await page.locator('[data-shell="topbar"]').boundingBox();
-  const col = await page.locator('main[data-shell="onboarding"]').boundingBox();
+  const col = await page.locator('[data-onboarding="column"]').boundingBox();
+  const list = await page.locator('[data-onboarding="steplist"]').boundingBox();
   const sidebar = await page.locator('[data-slot="sidebar-container"]').count();
-  drill.check(bar && Math.round(bar.height) === 56 && sidebar === 0 && col && col.width <= 640, "the shell's 56px top bar, no sidebar, one column of at most 640px", { bar: bar?.height, sidebar, col: col?.width });
+  drill.check(bar && Math.round(bar.height) === 56 && sidebar === 0 && col && col.width <= 640 && col.width >= 600 && list && list.x + list.width <= col.x, "the shell's 56px top bar, no sidebar, one column of at most 640px with the step list to its left", { bar: bar?.height, sidebar, col: col?.width, list });
   const where = await page.evaluate(() => ({ hash: location.hash, back: history.length }));
   drill.check(where.hash === "", "the handoff token is gone from the address", where);
   await drill.screenshot(page, "05-welcome");
@@ -258,7 +265,8 @@ async function signup(drill) {
   await narrow.page.goto(at(STORE, "/admin/onboarding"), { waitUntil: "load" });
   await settle(narrow.page);
   const wide = await narrow.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
-  drill.check(wide, "375px: no sideways scroll on the Welcome page", null);
+  const compact = await narrow.page.locator('[data-onboarding="steplist-compact"]').isVisible().catch(() => false);
+  drill.check(wide && compact, "375px: the compact step list above the step, no sideways scroll", { wide, compact });
   await drill.screenshot(narrow.page, "06-welcome-375");
   await narrow.ctx.close();
 

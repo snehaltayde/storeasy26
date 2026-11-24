@@ -1786,7 +1786,7 @@ await t("P6-NAV rendered (OQ-P6-8): a null stored brand shows the button and giv
   for (const r of results) ok(r && !Pal.isLimeAccent(r.accent), `a lime reset result: ${JSON.stringify(r)}`);
 });
 
-await t("P6-NAV rendered: no '#84cc16' placeholder or hint remains (the starting accent instead), a first colour edit starts from the starting palette, and the /admin/start link shows", () => {
+await t("P6-NAV rendered: no '#84cc16' placeholder or hint remains (the starting accent instead), a first colour edit starts from the starting palette, and the brand step link (/admin/onboarding?step=brand) shows", () => {
   for (const [context, accent] of [
     [{ startingBrand: FOREST }, FOREST.accent],
     [null, SLATE.accent],
@@ -1799,7 +1799,7 @@ await t("P6-NAV rendered: no '#84cc16' placeholder or hint remains (the starting
       ok(!/placeholder="[^"]*"/.test(html.replace(new RegExp(`placeholder="${accent}"`, "g"), "")), "another placeholder");
       ok(html.includes(`placeholder="${accent}"`), `the placeholder is the starting accent ${accent}`);
       if (brand && brand.accent === "#12") ok(html.includes(`like ${accent}.`), "the hint names the starting accent");
-      ok(/<a href="\/admin\/start"[^>]*>Change your logo and colours<\/a>/.test(html), "the brand step link");
+      ok(/<a href="\/admin\/onboarding\?step=brand"[^>]*>Change your logo and colours<\/a>/.test(html), "the brand step link");
     }
   }
   // a first colour edit on a store with no brand: the starting palette's other tokens, never lime ones

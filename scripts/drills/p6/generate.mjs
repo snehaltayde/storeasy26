@@ -60,7 +60,7 @@ export async function baselineStage(drill) {
 }
 
 // ---------------------------------------------------------------------------
-// stage A: open /admin/start, the store is made, nothing is public
+// stage A: open /admin/onboarding?step=brand, the store is made, nothing is public
 // ---------------------------------------------------------------------------
 export async function generateStage(drill) {
   const seed = await reseedP6(drill, "a");
@@ -72,16 +72,16 @@ export async function generateStage(drill) {
   const hosts = watchHosts(ctx);
   const errors = watchErrors(ctx);
   const page = await loginP6(drill, ctx);
-  drill.note(`after sign-in the founder lands on ${new URL(page.url()).pathname}`);
+  drill.check(new URL(page.url()).pathname === "/admin/onboarding", "after sign-in the founder lands on onboarding (the store is closed)", page.url());
   const t0 = Date.now();
-  await page.goto(p6Url(drill, "/admin/start"), { waitUntil: "load", timeout: 120_000 });
+  await page.goto(p6Url(drill, "/admin/onboarding?step=brand"), { waitUntil: "load", timeout: 120_000 });
   await settle(page);
   const state = await waitFor(async () => {
     const s = await page.locator("[data-first-run]").getAttribute("data-first-run").catch(() => null);
     return s && !["loading", "making"].includes(s) ? s : false;
   }, 120_000, 300);
   const card = (await page.locator("[data-first-run]").innerText()).replace(/\s+/g, " ").trim();
-  drill.check(state === "ready" && card.includes("Your starting store is ready") && card.includes("the Slate colours") && card.includes("Nothing is public yet."), `/admin/start: the store is made (${((Date.now() - t0) / 1000).toFixed(1)} s from opening the page) and the page says what was made, in Slate, and that nothing is public`, card.slice(0, 400));
+  drill.check(state === "ready" && card.includes("Your starting store is ready") && card.includes("the Slate colours") && card.includes("Nothing is public yet."), `/admin/onboarding?step=brand: the store is made (${((Date.now() - t0) / 1000).toFixed(1)} s from opening the page) and the page says what was made, in Slate, and that nothing is public`, card.slice(0, 400));
   await drill.screenshot(page, "a-start-ready-1440");
 
   const docs = await docsOf();

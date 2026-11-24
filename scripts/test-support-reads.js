@@ -623,6 +623,22 @@ await t("onboarding (Phase 1 line 1): support reads the Welcome page with its ow
   eq(welcome(op)?.account, null, "an operator's support session has no account on the page:");
 });
 
+await t("onboarding (Phase 1 line 3): support's page gets the four steps with every action disabled and a reason, no Shopify domain, and opens on ?step= when it is a real step", async () => {
+  const steps = (run) => run.props.find((p) => p.component.includes("onboarding/Onboarding"))?.props;
+  const s = steps(pageRuns.onboarding);
+  ok(s, `support's onboarding renders Onboarding: ${pageRuns.onboarding.props.map((p) => p.component).join(",")}`);
+  eq(s.initial.steps.map((x) => x.id).join(","), "connect,import,brand,open", "the steps:");
+  const acts = s.initial.steps.flatMap((x) => x.actions);
+  ok(acts.every((a) => a.allowed === false && typeof a.reason === "string" && a.reason.length > 0), `every action disabled with a reason: ${JSON.stringify(acts)}`);
+  ok(!Object.hasOwn(s.initial.steps[0].facts, "shopDomain"), "no shop domain for support");
+  eq(s.canSync, false, "support can't run a sync:");
+  eq(s.initialStep, s.initial.current, "no ?step: the first step not done:");
+  const brand = await pages.run(pageRel("onboarding"), { cookies: cookies.support, searchParams: { step: "brand" } });
+  eq(steps(brand)?.initialStep, "brand", "?step=brand:");
+  const junk = await pages.run(pageRel("onboarding"), { cookies: cookies.support, searchParams: { step: "nope" } });
+  eq(steps(junk)?.initialStep, s.initial.current, "an unknown ?step is ignored:");
+});
+
 await t("page sweep (positive control): the owner's Settings and Orders pages do carry their canaries", async () => {
   const s = await pages.run(pageRel("settings"), { cookies: cookies.owner });
   ok(!s.error, `owner settings: ${s.error?.message}`);

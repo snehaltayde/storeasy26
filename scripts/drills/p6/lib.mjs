@@ -123,13 +123,16 @@ export async function p6Context(drill, { width = 1440 } = {}) {
   return ctx;
 }
 
-// The founder, through the real sign-in form, by email (fresh password each seed).
-export async function loginP6(drill, ctx) {
+// The founder (or, with as: "support", stage h's support member), through the
+// real sign-in form, by email (fresh password each seed).
+export async function loginP6(drill, ctx, { as = "owner" } = {}) {
   const seed = readP6Seed();
+  const login = seed.logins?.[as];
+  if (!login) throw new DrillError(`The p6 seed has no ${as} login (stage h seeds the support member).`);
   const page = await ctx.newPage();
   await page.goto(p6Url(drill, "/admin/login"), { waitUntil: "load", timeout: 120_000 });
-  await page.locator("#login-email").fill(seed.logins.owner.email);
-  await page.locator("#login-password").fill(seed.logins.owner.password);
+  await page.locator("#login-email").fill(login.email);
+  await page.locator("#login-password").fill(login.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   try {
     await page.waitForURL((u) => /^\/admin\/(?!login)/.test(new URL(u).pathname), { timeout: 60_000 });

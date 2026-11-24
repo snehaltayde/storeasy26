@@ -1,13 +1,11 @@
 import { Fragment } from "react";
-import Link from "next/link";
 import { CircleCheck, Globe } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
-// The onboarding landing (Phase 1 line 1), new UI from components/ui: one
-// centred column (the shell's onboarding mode caps it at 640px). Read only.
-// One card holds what the founder now owns (the address, whether shoppers can
-// see it, who is signed in); below it, the one next step and the one action.
-// Props: see app/(console)/admin/(authed)/onboarding/page.js.
+// The top of the onboarding page (Phase 1 line 1, trimmed to the store card in
+// line 3): the headline and one card with what the founder now owns (the
+// address, whether shoppers can see it, who is signed in). Read only; the
+// steps below it are Onboarding.js. Props: see
+// app/(console)/admin/(authed)/onboarding/page.js.
 // a long address wraps before a dot, never mid-word
 function BreakAtDots({ text }) {
   return text.split(".").map((part, i) => (
@@ -21,10 +19,10 @@ function BreakAtDots({ text }) {
 
 export default function Welcome({ storeName, address, open, account }) {
   return (
-    <div data-onboarding="welcome" className="space-y-8 pt-4 md:pt-8">
+    <div data-onboarding="welcome" className="space-y-6">
       <header className="space-y-3">
         <h1 className="text-[1.75rem] leading-tight font-semibold tracking-[-0.01em] text-foreground">Welcome to {storeName}</h1>
-        <p className="text-sm text-muted-foreground">Your store is ready for you to set up. Nobody else can see it until you publish it.</p>
+        <p className="text-sm text-muted-foreground">{open ? "Your store is open. Everything below is done; change anything from the editor." : "Four steps to open your store. Nobody else can see it until you open it."}</p>
       </header>
 
       <section aria-label="Your store" className="rounded-card border border-border bg-card text-card-foreground shadow-card">
@@ -56,19 +54,6 @@ export default function Welcome({ storeName, address, open, account }) {
           </p>
         )}
       </section>
-
-      <section aria-labelledby="onboarding-next" data-onboarding="next" className="space-y-3">
-        <h2 id="onboarding-next" className="text-[1.125rem] font-semibold">
-          Next: connect your Shopify store
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Your storefront is built from the products in your Shopify store. Connecting it from here isn&apos;t ready yet; this page will walk you through it as soon as it is. Until then, nothing changes in your Shopify store.
-        </p>
-      </section>
-
-      <Button asChild size="lg" className="h-10 w-full px-4 sm:w-auto">
-        <Link href="/admin/dashboard">Go to your dashboard</Link>
-      </Button>
     </div>
   );
 }

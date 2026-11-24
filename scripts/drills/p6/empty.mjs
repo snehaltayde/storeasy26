@@ -1,5 +1,5 @@
 // P6-DRILLS stage E (US-04, GEN-01): a store whose Shopify catalog is empty.
-// /admin/start says what to do in Shopify, the home page is the hero only; a
+// /admin/onboarding?step=brand says what to do in Shopify, the home page is the hero only; a
 // second confirmed sync with products (seeded, the store kept) refills the
 // untouched home when the founder opens the editor; and a store with products
 // but no collections says so and gets a valid home of its newest products.
@@ -25,7 +25,7 @@ export async function emptyStage(drill) {
   const state = await openStart(drill, page);
   const card = (await page.locator("[data-first-run]").innerText()).replace(/\s+/g, " ");
   const note = (await page.locator('[data-first-run-note="empty"]').innerText().catch(() => "")).replace(/\s+/g, " ");
-  drill.check(state === "ready" && note.includes("Your Shopify store has no products yet. Add products in Shopify, then sync again.") && note.includes("product rows appear after your next sync"), "/admin/start explains 'Add products in Shopify, then sync again' and that rows come after the next sync", { state, note });
+  drill.check(state === "ready" && note.includes("Your Shopify store has no products yet. Add products in Shopify, then sync again.") && note.includes("product rows appear after your next sync"), "/admin/onboarding?step=brand explains 'Add products in Shopify, then sync again' and that rows come after the next sync", { state, note });
   drill.check(!/opening soon/i.test(card), "the made store never says 'opening soon'", card.slice(0, 200));
   await drill.screenshot(page, "e-empty-start-1440");
   const home1 = await docOf("doc_home");
@@ -50,7 +50,7 @@ export async function emptyStage(drill) {
   await openEditor(page, "?doc=doc_home");
   await sleep(1500);
   const untouched = await docOf("doc_home");
-  drill.check(JSON.stringify(kindsOf(untouched)) === JSON.stringify(["hero"]) && untouched.revision === before.revision, "as built (finding P6D-2, an owner check): after a sync that is not the worker's (the seeded one, like the console's inline, the CLI's or the connect callback's), opening /admin/start or the editor leaves the hero-only home as it is: both only make a store that has no home yet, so only the worker's post-sync step refills it", { kinds: kindsOf(untouched), revision: untouched.revision });
+  drill.check(JSON.stringify(kindsOf(untouched)) === JSON.stringify(["hero"]) && untouched.revision === before.revision, "as built (finding P6D-2, an owner check): after a sync that is not the worker's (the seeded one, like the console's inline, the CLI's or the connect callback's), opening /admin/onboarding?step=brand or the editor leaves the hero-only home as it is: both only make a store that has no home yet, so only the worker's post-sync step refills it", { kinds: kindsOf(untouched), revision: untouched.revision });
   // the worker's own step after a completed sync (lib/platform/worker.js
   // catalog_sync -> firstRunAfterSync -> workerFirstRun.generate({ trigger: 'sync' })).
   // The harness has no Shopify, so the queued slice itself can't run; the
@@ -70,7 +70,7 @@ export async function emptyStage(drill) {
   await drill.screenshot(page, "e-refilled-preview-1440");
   await openStart(drill, page);
   const card2 = (await page.locator("[data-first-run]").innerText()).replace(/\s+/g, " ");
-  drill.check(card2.includes("rows for") && !card2.includes("no products yet"), "/admin/start now names the rows and no longer says the catalog is empty", card2.slice(0, 300));
+  drill.check(card2.includes("rows for") && !card2.includes("no products yet"), "/admin/onboarding?step=brand now names the rows and no longer says the catalog is empty", card2.slice(0, 300));
   await drill.screenshot(page, "e-refilled-start-1440");
   drill.check((await liveRelease()) == null, "still closed: nothing published", null);
   drill.check(errors.length === 0, "no page errors (refill)", errors);
@@ -84,7 +84,7 @@ export async function emptyStage(drill) {
   page = await loginP6(drill, ctx);
   const st3 = await openStart(drill, page);
   const note3 = (await page.locator('[data-first-run-note="no-collections"]').innerText().catch(() => "")).replace(/\s+/g, " ");
-  drill.check(st3 === "ready" && note3.includes("Your products have no collections in Shopify yet") && note3.includes("newest products"), "/admin/start: 'Your products have no collections in Shopify yet, so your home page shows your newest products…'", note3);
+  drill.check(st3 === "ready" && note3.includes("Your products have no collections in Shopify yet") && note3.includes("newest products"), "/admin/onboarding?step=brand: 'Your products have no collections in Shopify yet, so your home page shows your newest products…'", note3);
   await drill.screenshot(page, "e-nocollections-start-1440");
   const home3 = await docOf("doc_home");
   const k3 = kindsOf(home3);

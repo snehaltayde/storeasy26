@@ -13,7 +13,7 @@ import { PALETTES } from "@/lib/themes/palettes";
 import { brandCssVars } from "@/lib/brand";
 
 // P6-START-UI (GEN-04, US-01): the brand step of "Start your store", at
-// /admin/start#brand. It reads GET /api/admin/brand-step and saves with POST
+// /admin/onboarding?step=brand#brand. It reads GET /api/admin/brand-step and saves with POST
 // /api/admin/brand-step (lib/first-run/brand-step.js):
 //   Save         { paletteId, logo: { media, alt? } | null, description?, revision }
 //   Remove logo  the same Save with logo: null
@@ -159,7 +159,7 @@ function Swatch({ palette, selected, disabled, onPick }) {
   );
 }
 
-export default function BrandStep({ canEdit = false }) {
+export default function BrandStep({ canEdit = false, onChange }) {
   const [info, setInfo] = useState(null); // the GET answer
   const [phase, setPhase] = useState("loading"); // loading | idle | load-failed
   const [paletteId, setPaletteId] = useState(null);
@@ -206,6 +206,7 @@ export default function BrandStep({ canEdit = false }) {
       if (!skip) setCarried(false);
       if (Number.isInteger(r.body.design?.revision)) setRevision(r.body.design.revision);
       setInfo((i) => (i ? { ...i, storeOpen: Boolean(r.body.storeOpen), brandStep: r.body.brandStep ?? i.brandStep } : i));
+      onChange?.();
     } else if (r.status === 503 && r.body.code === "BRAND_STEP_PARTIAL") {
       // the design IS saved: retry from the revision it now has
       if (Number.isInteger(r.body.design?.revision)) setRevision(r.body.design.revision);

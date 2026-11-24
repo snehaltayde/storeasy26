@@ -103,7 +103,7 @@ export async function openStage(drill) {
   const ctx = await p6Context(drill);
   const errors = watchErrors(ctx);
   const page = await loginP6(drill, ctx);
-  drill.check((await openStart(drill, page)) === "ready", "the store is made on /admin/start", null);
+  drill.check((await openStart(drill, page)) === "ready", "the store is made on /admin/onboarding?step=brand", null);
 
   // the brand step: Slate kept, the library logo chosen, saved
   await page.getByRole("button", { name: "Choose a logo", exact: true }).click();

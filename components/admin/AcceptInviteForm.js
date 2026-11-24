@@ -26,7 +26,7 @@ export default function AcceptInviteForm({ token, storeName }) {
       body: JSON.stringify({ token, name, password }),
     });
     if (res.ok) {
-      router.push("/admin/dashboard");
+      router.push("/admin");
       router.refresh();
       return;
     }

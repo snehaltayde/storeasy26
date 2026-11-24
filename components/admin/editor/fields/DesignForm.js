@@ -20,7 +20,7 @@
 // null brand included), and a first colour edit on a store with no brand
 // starts from the starting palette too (design.setToken's start). The colour
 // placeholder and hint show the starting accent, and "Change your logo and
-// colours" links to the brand step (/admin/start).
+// colours" links to the brand step (/admin/onboarding?step=brand).
 //
 // BrandControl and ThemeControl are the controls of the "brand" and "theme"
 // setting kinds (inspectorModel CONTROL_OF_KIND). Edits go through
@@ -60,7 +60,7 @@ const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const described = (anchor, notes) => (notes.length ? notesId(anchor) : undefined);
 
 // The brand step's address (P6-START-UI's page).
-export const START_HREF = "/admin/start";
+export const START_HREF = "/admin/onboarding?step=brand";
 
 // The store's starting brand and its palette's name, from the inspector
 // context. Never null, never the platform default.

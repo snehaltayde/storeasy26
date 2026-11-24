@@ -30,7 +30,8 @@ import { AccountMenu } from "./AccountMenu";
 //
 // Onboarding (/admin/onboarding, docs/UI.md "Onboarding"): new UI, so no
 // [data-legacy] region; no sidebar, the top bar without its toggle, and one
-// centred column of at most 640px.
+// centred column of at most 640px (data-onboarding="column"); from 1024px the
+// main grows to 920px so the step list sits to the column's left.
 
 const ConsoleNavContext = createContext(null);
 
@@ -124,7 +125,7 @@ export function AdminShell({ nav, badges = {}, actor, account = null, stores = [
         <SidebarProvider defaultOpen={false} cookiePath="/admin" className="flex-col bg-background text-sm text-foreground">
           <SkipLink />
           <TopBar actor={actor} account={account} stores={stores} storeName={storeName} storeId={storeId} toggle={false} />
-          <main id="console-content" tabIndex={-1} data-shell="onboarding" className="mx-auto w-full max-w-[640px] px-4 py-8 outline-none md:px-6">
+          <main id="console-content" tabIndex={-1} data-shell="onboarding" className="mx-auto w-full max-w-[640px] px-4 py-8 outline-none md:px-6 lg:max-w-[920px]">
             {notices && <div className="mb-6">{notices}</div>}
             {children}
           </main>

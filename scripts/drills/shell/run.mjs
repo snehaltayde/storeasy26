@@ -9,8 +9,10 @@
 // a second failure is a real fault); admin, staff and support through
 // POST /api/admin/login in their own context. Assertions are never retried.
 //
-// Each role at 1280, 900 and 375 wide: lands on /admin/dashboard with the
-// sidebar and a 56px top bar; the nav's hrefs are navFor(role); every item
+// Each role at 1280, 900 and 375 wide: /admin lands on /admin/onboarding (the
+// roles store is closed; Phase 1 line 3) in the onboarding shell (no sidebar,
+// the 56px top bar, the step panel); then /admin/dashboard with the sidebar
+// and a 56px top bar; the onboarding nav item opens the onboarding shell; the nav's hrefs are navFor(role); every item
 // opens with 200, no error boundary, a non-empty [data-legacy] and
 // aria-current on that item; at 900 the sidebar is icon width and a tooltip
 // shows on focus; at 375 the trigger opens the sheet, Esc closes it with
@@ -38,6 +40,28 @@ const HEIGHT = 900;
 const ROLES = ["owner", "admin", "staff", "support"];
 const CONTROLS = ["skip", "toggle", "switcher", "account"];
 const ERROR_TEXT = /This page hit an error|Something went wrong|Application error|Unhandled Runtime Error/;
+const ONBOARDING = "/admin/onboarding";
+
+// The onboarding shell (Phase 1 line 3): its main, the step panel, no sidebar,
+// the top bar's height, and the step panel's controls a role could press
+// (outside the old screens' [data-legacy] regions; the step list and "Next"
+// only move between steps) and the reasons shown for disabled ones.
+async function onboardingShell(page) {
+  return page.evaluate(() => {
+    const panel = document.querySelector('[data-onboarding="panel"]');
+    const bar = document.querySelector('[data-shell="topbar"]');
+    const enabledWrites = [...(panel?.querySelectorAll("button:not([disabled])") || [])].filter((b) => !b.closest("[data-legacy]") && !b.hasAttribute("data-onboarding")).map((b) => b.innerText.trim());
+    return {
+      main: Boolean(document.querySelector('main[data-shell="onboarding"]')),
+      panel: Boolean(panel),
+      step: panel?.getAttribute("data-step") || null,
+      sidebar: Boolean(document.querySelector('[data-slot="sidebar-container"]')),
+      bar: bar ? Math.round(bar.getBoundingClientRect().height) : null,
+      enabledWrites,
+      reasons: [...(panel?.querySelectorAll('[data-onboarding="reason"]') || [])].map((r) => r.innerText.trim()),
+    };
+  });
+}
 
 const port = String(process.env.ROLES_PORT || "").trim();
 const ORIGIN = `http://roles.localhost:${port}`;
@@ -103,7 +127,11 @@ async function roleAtWidth(drill, page, role, width, out) {
     row.checks++;
     if (!drill.check(okv, `${tag}: ${label}`, detail)) row.failed++;
   };
-  check(new URL(page.url()).pathname === "/admin/dashboard" && res?.status() === 200, "/admin lands on /admin/dashboard", `${res?.status()} ${page.url()}`);
+  check(new URL(page.url()).pathname === ONBOARDING && res?.status() === 200, "/admin lands on /admin/onboarding (the store is closed)", `${res?.status()} ${page.url()}`);
+  const ob = await onboardingShell(page);
+  check(ob.main && ob.panel && !ob.sidebar && ob.bar === 56, "onboarding: no sidebar, the 56px top bar, a step panel", ob);
+  await page.goto(`${ORIGIN}/admin/dashboard`, { waitUntil: "load" });
+  await settle(page);
   const bar = await page.locator('[data-shell="topbar"]').boundingBox();
   check(bar && Math.round(bar.height) === 56, "the top bar is 56px", bar);
   const container = page.locator('[data-slot="sidebar-container"]');
@@ -151,6 +179,13 @@ async function roleAtWidth(drill, page, role, width, out) {
     const r = await page.goto(ORIGIN + href, { waitUntil: "load" });
     await settle(page);
     const body = await page.locator("body").innerText().catch(() => "");
+    if (href === ONBOARDING) {
+      // new UI in its own shell: no sidebar to mark, no [data-legacy] region
+      const o = await onboardingShell(page);
+      check(r?.status() === 200 && !ERROR_TEXT.test(body) && o.main && o.panel && !o.sidebar, `${href} opens in the onboarding shell (200, no error, the step panel, no sidebar)`, { status: r?.status(), error: ERROR_TEXT.test(body), ...o });
+      if (role === "support" && width === 1280) check(o.enabledWrites.length === 0, `${href}: support sees no enabled control in the step panel`, o.enabledWrites);
+      continue;
+    }
     const legacy = await page.evaluate(() => {
       const el = document.querySelector("main > [data-legacy]");
       return el ? el.children.length > 0 && (el.textContent || "").trim().length > 0 : false;
@@ -253,7 +288,7 @@ async function ownerFlows(drill, page) {
 // console; on the Roles Annex (support is a member, nothing published, no
 // orders) every nav item renders its empty state.
 const DENIED_PAGES = ["/admin/settings", "/admin/integrations", "/admin/billing", "/admin/automations"];
-const SETUP_PAGE = "/admin/setup";
+const ONBOARDING_OPEN = "/admin/onboarding?step=open";
 const NOTE = /Your role \(support\) can.t .+ ask an owner or admin/;
 const PLATFORM_CONSOLE = /New tenant|Tenant registry|Provision/;
 
@@ -265,16 +300,17 @@ async function supportDeepLinks(drill, page) {
     const body = await page.locator("main").innerText().catch(() => "");
     drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && NOTE.test(body) && new URL(page.url()).pathname === path, `support deep link ${path}: the permission note, no error`, { status: r?.status(), url: page.url(), body: body.slice(0, 200) });
   }
-  const setup = await page.goto(ORIGIN + SETUP_PAGE, { waitUntil: "load" });
+  const setup = await page.goto(ORIGIN + ONBOARDING_OPEN, { waitUntil: "load" });
   await settle(page);
   const setupBody = await page.locator("body").innerText().catch(() => "");
-  drill.check(setup?.status() === 200 && !ERROR_TEXT.test(setupBody), "support deep link /admin/setup: opens read-only, no error", { status: setup?.status(), url: page.url() });
+  const ob = await onboardingShell(page);
+  drill.check(setup?.status() === 200 && !ERROR_TEXT.test(setupBody) && ob.step === "open" && ob.enabledWrites.length === 0 && ob.reasons.length > 0, "support deep link /admin/onboarding?step=open: opens on that step read-only (controls disabled with their reason), no error", { status: setup?.status(), url: page.url(), ...ob });
   const api = (method, path, data) => page.request.fetch(`${ORIGIN}/api/admin/${path}`, { method, data, headers: { origin: ORIGIN }, maxRedirects: 0 }).then((r) => r.status());
   const refusals = {
     "PUT documents publish": await api("PUT", "documents", { publish: { id: "doc_missing", draftHash: "x" }, revision: 1 }),
     "PUT documents publishSet": await api("PUT", "documents", { publishSet: [] }),
     "POST releases publish": await api("POST", "releases", { action: "publish" }),
-    "POST setup": await api("POST", "setup", { step: "" }),
+    "POST onboarding": await api("POST", "onboarding", { step: "test_order", done: true }),
     "PUT settings": await api("PUT", "settings", { bogus_setting: true }),
     "GET settings": await api("GET", "settings"),
     "GET team": await api("GET", "team"),
@@ -282,7 +318,7 @@ async function supportDeepLinks(drill, page) {
     "GET help": await api("GET", "help"),
     "GET integrations": await api("GET", "integrations"),
   };
-  drill.check(Object.values(refusals).every((s) => s === 403), "support: publish, setup, settings, team, audit, help and integrations APIs answer 403", refusals);
+  drill.check(Object.values(refusals).every((s) => s === 403), "support: publish, the onboarding test-order mark, settings, team, audit, help and integrations APIs answer 403", refusals);
   const plat = await page.goto(`${ORIGIN}/platform`, { waitUntil: "load" });
   await settle(page);
   const platBody = await page.locator("body").innerText().catch(() => "");

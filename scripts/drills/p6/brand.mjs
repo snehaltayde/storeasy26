@@ -48,9 +48,9 @@ const sameBrand = (a, b) => {
   return [...keys].every((k) => String(a[k]).toLowerCase() === String(b[k]).toLowerCase());
 };
 
-// /admin/start, waited until the first run has settled
+// /admin/onboarding?step=brand, waited until the first run has settled
 export async function openStart(drill, page) {
-  await page.goto(p6Url(drill, "/admin/start"), { waitUntil: "load", timeout: 120_000 });
+  await page.goto(p6Url(drill, "/admin/onboarding?step=brand"), { waitUntil: "load", timeout: 120_000 });
   await settle(page);
   const state = await waitFor(async () => {
     const s = await page.locator("[data-first-run]").getAttribute("data-first-run").catch(() => null);
@@ -135,7 +135,7 @@ export async function brandStage(drill) {
   let errors = watchErrors(ctx);
   let page = await loginP6(drill, ctx);
   const state = await openStart(drill, page);
-  drill.check(state === "ready", "the store is made when the founder opens /admin/start", state);
+  drill.check(state === "ready", "the store is made when the founder opens /admin/onboarding?step=brand", state);
   const pre = await page.locator('[data-brand-step] input[name="palette"]:checked').getAttribute("value").catch(() => null);
   drill.check(pre === "slate", "the brand step preselects Slate (the generated store's palette)", pre);
   await page.locator('[data-brand-step] [data-palette="forest"]').click();

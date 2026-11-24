@@ -1,62 +1,68 @@
-// P6-DRILLS stage G (PUB-12, GEN-06 partly; owner answer OQ-P6-2): the
-// onboarding checklist's policy starters, on a fresh closed p6 store.
-// "Start a privacy page" makes a starter draft that does not tick the step;
-// the checklist then offers "Read your privacy page"; the same start again is
+// P6-DRILLS stage G (PUB-12, GEN-06 partly; owner answer OQ-P6-2; Phase 1
+// line 3): step 4 of onboarding ("Open your store") and its policy starters,
+// on a fresh closed p6 store, at /admin/onboarding?step=open.
+// "Start a privacy page" makes a starter draft that still blocks opening; the
+// item then offers "Read it" and "I've read it"; the same start again is
 // refused; the founder saves the privacy page in the editor; "Start a returns
-// page" and the checklist's own "I've read it" (no edit) for it; only then is
-// the step done. The storefront stays the closed page throughout.
+// page" and the step's own "I've read it" (no edit) for it; only then do the
+// policies stop blocking. The storefront stays the closed page throughout.
 import { changeOneSentence } from "./open.mjs";
 import { closedPageFacts, docsOf, loginP6, p6Context, p6Url, settle, sleep, waitFor, watchErrors, reseedP6 } from "./lib.mjs";
 
 const SENTENCE = "We keep your details only for your orders and never sell them.";
-const LABEL = "Add your legal pages";
+export const OPEN_STEP_PATH = "/admin/onboarding?step=open";
 
-async function readSetup(page) {
-  const r = await page.evaluate(async () => {
-    const res = await fetch("/api/admin/setup", { headers: { Accept: "application/json" } });
+// GET /api/admin/onboarding, as the page reads it: the open step and its items
+export async function readOnboarding(page) {
+  return page.evaluate(async () => {
+    const res = await fetch("/api/admin/onboarding", { headers: { Accept: "application/json" } });
     return { status: res.status, body: await res.json().catch(() => null) };
   });
-  const step = (r.body?.items || []).find((i) => i.id === "policies") || null;
-  return { status: r.status, step, all: r.body };
 }
-const stepLi = (page) => page.locator("ol > li").filter({ hasText: LABEL }).first();
-async function openSetup(drill, page) {
-  await page.goto(p6Url(drill, "/admin/setup"), { waitUntil: "load", timeout: 120_000 });
+async function readOpenStep(page) {
+  const r = await readOnboarding(page);
+  const step = (r.body?.steps || []).find((x) => x.id === "open") || null;
+  const item = (id) => (step?.facts?.items || []).find((i) => i.id === id) || null;
+  return { status: r.status, step, privacy: item("privacy"), returns: item("returns"), blocking: (step?.facts?.blocking || []).map((b) => b.id) };
+}
+const itemLi = (page, id) => page.locator(`[data-onboarding="panel"] [data-opening-item="${id}"]`);
+async function openStep(drill, page) {
+  await page.goto(p6Url(drill, OPEN_STEP_PATH), { waitUntil: "load", timeout: 120_000 });
   await settle(page);
-  await stepLi(page).waitFor({ timeout: 60_000 });
+  await page.locator('[data-onboarding="panel"][data-step="open"]').waitFor({ timeout: 60_000 });
 }
 async function stillClosed(drill, tag) {
   const f = await closedPageFacts(p6Url(drill, "/"));
   drill.check(f.status === 200 && f.openingSoon, `the storefront is still the closed page (${tag})`, { status: f.status, openingSoon: f.openingSoon });
 }
-const actionsOf = (step) => (step?.actions || []).map((a) => `${a.type}:${a.label}`);
+const actionsOf = (item) => (item?.actions || []).map((a) => `${a.type}:${a.label}`);
+const textOf = async (loc) => (await loc.innerText().catch(() => "")).replace(/\s+/g, " ");
 
 export async function setupStage(drill) {
   await reseedP6(drill, "g");
   const ctx = await p6Context(drill);
   const errors = watchErrors(ctx);
   const page = await loginP6(drill, ctx);
-  await openSetup(drill, page);
+  await openStep(drill, page);
   await stillClosed(drill, "at the start");
-  let s = await readSetup(page);
-  let li = stepLi(page);
-  let liText = (await li.innerText()).replace(/\s+/g, " ");
-  drill.check(s.step?.label === LABEL && !s.step.done && liText.includes("Start a privacy page") && liText.includes("Start a returns page") && liText.includes("These are starting points, not legal advice."), "/admin/setup shows 'Add your legal pages' with 'Start a privacy page' and 'Start a returns page'", { step: s.step, ui: liText.slice(0, 300) });
-  await drill.screenshot(page, "g-setup-start-1440");
+  let s = await readOpenStep(page);
+  let priv = await textOf(itemLi(page, "privacy"));
+  const ret = await textOf(itemLi(page, "returns"));
+  drill.check(s.step?.state === "blocked" && s.blocking.includes("privacy") && s.blocking.includes("returns") && priv.includes("Start a privacy page") && ret.includes("Start a returns page") && priv.includes("These are starting points, not legal advice."), "step 4 is Blocked by both policy pages and offers 'Start a privacy page' and 'Start a returns page'", { state: s.step?.state, blocking: s.blocking, ui: priv.slice(0, 300) });
+  await drill.screenshot(page, "g-open-step-start-1440");
 
   // ---- Start a privacy page ----
-  await li.getByRole("button", { name: "Start a privacy page", exact: true }).click();
+  await itemLi(page, "privacy").getByRole("button", { name: "Start a privacy page", exact: true }).click();
   s = await waitFor(async () => {
-    const r = await readSetup(page);
-    return actionsOf(r.step).some((a) => a === "link:Read your privacy page") ? r : false;
+    const r = await readOpenStep(page);
+    return actionsOf(r.privacy).includes("markPolicyRead:I've read it") ? r : false;
   }, 30_000, 400);
   await sleep(800);
-  li = stepLi(page);
-  liText = (await li.innerText()).replace(/\s+/g, " ");
-  const priv = (await docsOf()).find((d) => d.type === "page" && /privacy/.test(d.slug || ""));
-  drill.check(priv && priv.updated_by === "system:policy-starter" && !priv.published_version_id, "'Start a privacy page' makes a starter draft (marked as the starter's, not published)", priv);
-  drill.check(s && !s.step.done && liText.includes("Read your privacy page"), "the step stays not done and now shows 'Read your privacy page'", { done: s?.step?.done, actions: actionsOf(s?.step), ui: liText.slice(0, 300) });
-  await drill.screenshot(page, "g-setup-privacy-started-1440");
+  priv = await textOf(itemLi(page, "privacy"));
+  const privDoc = (await docsOf()).find((d) => d.type === "page" && /privacy/.test(d.slug || ""));
+  drill.check(privDoc && privDoc.updated_by === "system:policy-starter" && !privDoc.published_version_id, "'Start a privacy page' makes a starter draft (marked as the starter's, not published)", privDoc);
+  drill.check(s && s.blocking.includes("privacy") && priv.includes("Read it") && priv.includes("I've read it"), "the privacy page still blocks opening and the step now shows 'Read it' and 'I've read it'", { blocking: s?.blocking, ui: priv.slice(0, 300) });
+  await drill.screenshot(page, "g-open-step-privacy-started-1440");
   await stillClosed(drill, "after starting the privacy page");
 
   // ---- the same start again is refused ----
@@ -69,35 +75,36 @@ export async function setupStage(drill) {
 
   // ---- the founder saves the privacy page in the editor ----
   const ed = await ctx.newPage();
-  const saved = await changeOneSentence(ed, priv.id, SENTENCE);
+  const saved = await changeOneSentence(ed, privDoc.id, SENTENCE);
   drill.check(Boolean(saved.saved) && saved.saved.updated_by !== "system:policy-starter", "the founder changes one sentence of the privacy page and the editor saves it", { updated_by: saved.saved?.updated_by });
   await ed.close();
-  await openSetup(drill, page);
-  s = await readSetup(page);
-  drill.check(!s.step.done && actionsOf(s.step).includes("startPolicy:Start a returns page") && !actionsOf(s.step).some((a) => /privacy/i.test(a)), "with only the privacy page saved, the step is still not done and offers 'Start a returns page'", actionsOf(s.step));
+  await openStep(drill, page);
+  s = await readOpenStep(page);
+  drill.check(!s.blocking.includes("privacy") && s.blocking.includes("returns") && actionsOf(s.returns).includes("startPolicy:Start a returns page"), "with only the privacy page saved, the returns page still blocks and 'Start a returns page' is offered", { blocking: s.blocking, returns: actionsOf(s.returns) });
 
-  // ---- Start a returns page, then the checklist's "I've read it" (no edit) ----
-  await stepLi(page).getByRole("button", { name: "Start a returns page", exact: true }).click();
+  // ---- Start a returns page, then the step's own "I've read it" (no edit) ----
+  await itemLi(page, "returns").getByRole("button", { name: "Start a returns page", exact: true }).click();
   s = await waitFor(async () => {
-    const r = await readSetup(page);
-    return actionsOf(r.step).some((a) => a === "markPolicyRead:I've read it") ? r : false;
+    const r = await readOpenStep(page);
+    return actionsOf(r.returns).includes("markPolicyRead:I've read it") ? r : false;
   }, 30_000, 400);
   await sleep(800);
   const terms = (await docsOf()).find((d) => d.type === "page" && /terms|refund|return/.test(d.slug || ""));
-  drill.check(s && !s.step.done && terms?.updated_by === "system:policy-starter", "the returns starter is made; the step is still not done (an unread starter never counts)", { done: s?.step?.done, terms });
-  li = stepLi(page);
-  liText = (await li.innerText()).replace(/\s+/g, " ");
-  drill.check(liText.includes("Read your returns page") && liText.includes("I've read it"), "the checklist shows 'Read your returns page' and 'I've read it'", liText.slice(0, 300));
-  await drill.screenshot(page, "g-setup-returns-started-1440");
-  await li.getByRole("button", { name: "I've read it", exact: true }).click();
+  drill.check(s && s.blocking.includes("returns") && terms?.updated_by === "system:policy-starter", "the returns starter is made; it still blocks opening (an unread starter never counts)", { blocking: s?.blocking, terms });
+  const retText = await textOf(itemLi(page, "returns"));
+  drill.check(retText.includes("Read it") && retText.includes("I've read it"), "the returns item shows 'Read it' and 'I've read it'", retText.slice(0, 300));
+  await drill.screenshot(page, "g-open-step-returns-started-1440");
+  await itemLi(page, "returns").getByRole("button", { name: "I've read it", exact: true }).click();
   s = await waitFor(async () => {
-    const r = await readSetup(page);
-    return r.step?.done ? r : false;
+    const r = await readOpenStep(page);
+    return !r.blocking.includes("returns") ? r : false;
   }, 30_000, 400);
   await sleep(800);
   const terms2 = (await docsOf()).find((d) => d.id === terms.id);
-  drill.check(Boolean(s) && s.step.done === true && terms2.updated_by !== "system:policy-starter" && !terms2.published_version_id, "after \"I've read it\" (no edit) the step is done; the returns page counts as the founder's and is still a draft", { done: s?.step?.done, terms: terms2 });
-  await drill.screenshot(page, "g-setup-done-1440");
+  drill.check(Boolean(s) && terms2.updated_by !== "system:policy-starter" && !terms2.published_version_id, "after \"I've read it\" (no edit) the returns page no longer blocks opening; it counts as the founder's and is still a draft", { blocking: s?.blocking, terms: terms2 });
+  const ui = await textOf(page.locator('[data-onboarding="panel"]'));
+  drill.check(!(await itemLi(page, "returns").count()) || !(await textOf(itemLi(page, "returns"))).includes("Needed"), "the page shows the returns page as no longer needed", ui.slice(0, 300));
+  await drill.screenshot(page, "g-open-step-done-1440");
   drill.check(!(await docsOf()).some((d) => d.published_version_id), "nothing was published by any of it", null);
   await stillClosed(drill, "at the end");
   drill.check(errors.length === 0, "no page errors", errors);

@@ -91,6 +91,7 @@ const SKIP_DIRS = new Set([
   "components/site",
   "lib/admin",
   "lib/platform",
+  "lib/onboarding", // the console's onboarding steps (Phase 1 line 3): founder words, never a shopper's
   "lib/ai",
   ...MARKETING_ROUTES.map((r) => `app/(storefront)/${r}`),
   // Console and machine-to-machine APIs

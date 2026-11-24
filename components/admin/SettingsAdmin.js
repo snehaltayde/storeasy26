@@ -22,7 +22,7 @@ import SyncProgress from "@/components/admin/SyncProgress";
 //
 // P6-NAV (GEN-04): `documents` (from the settings page's getCmsMode read) is
 // true on a store that uses the new editor. There the picture logo is set in
-// "Logo and colours" (/admin/start), so the logo text hint says so and that
+// onboarding's Brand step (/admin/onboarding?step=brand), so the logo text hint says so and that
 // the text is used when there is no picture. Every other store keeps today's
 // hint, word for word.
 
@@ -52,8 +52,8 @@ const LEGACY_LOGO_HINT = "The storefront logo is text; the second part renders i
 const documentsLogoHint = (
   <>
     Your picture logo is set in{" "}
-    <a href="/admin/start" data-logo-start="" className="font-medium underline underline-offset-2">
-      Logo and colours
+    <a href="/admin/onboarding?step=brand" data-logo-start="" className="font-medium underline underline-offset-2">
+      onboarding&apos;s Brand step
     </a>
     . This text is used when there is no picture; the second part renders in your accent color.
   </>

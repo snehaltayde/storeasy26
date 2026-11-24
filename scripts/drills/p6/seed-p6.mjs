@@ -25,6 +25,9 @@
 //
 // Stages:
 //   a, b, g   a fresh closed documents store, 24 products in 6 collections
+//   h         the same, plus the founder's saved privacy and terms pages (as
+//             d, so nothing blocks opening) and a support member (read-only)
+//             for the onboarding page's least-trusted view (logins.support)
 //   c         the same, returns_window_days 10, no support email (contact
 //             warns), and a PNG logo already in the media library
 //   d         the same, checkout_mode disabled, a support email, and a privacy
@@ -38,7 +41,8 @@
 
 export const P6_STORE = Object.freeze({ id: "p6", host: "p6.localhost", name: "Fernway Goods" });
 export const P6_LOGIN = Object.freeze({ email: "founder@p6.test", name: "Priya Founder", role: "owner" });
-export const P6_STAGES = Object.freeze(["a", "b", "c", "d", "e", "g"]);
+export const P6_STAGES = Object.freeze(["a", "b", "c", "d", "e", "g", "h"]);
+export const P6_SUPPORT_LOGIN = Object.freeze({ email: "support@p6.test", name: "Sam Support", role: "support" });
 export const P6_VARIANTS = Object.freeze({ e: ["empty", "refill", "no-collections"] });
 export const P6_PRODUCTS = 24;
 export const P6_RETURNS_DAYS = 10;
@@ -80,7 +84,8 @@ export function stagePlan(stage, variant = null) {
     supportEmail: stage === "c" ? null : P6_SUPPORT_EMAIL,
     checkoutMode: stage === "d" ? "disabled" : "direct",
     logoInLibrary: stage === "c",
-    founderPolicies: stage === "d",
+    supportLogin: stage === "h",
+    founderPolicies: stage === "d" || stage === "h",
   };
 }
 
@@ -263,6 +268,15 @@ export async function seedP6Stage({ urls, stage, variant = null, H }) {
     await I.addMembership(user.id, P6_STORE.id, P6_LOGIN.role);
     await I.clearThrottle(`login:${P6_LOGIN.email}`).catch(() => {});
     out.logins = { owner: { id: user.id, email: P6_LOGIN.email, name: P6_LOGIN.name, role: P6_LOGIN.role, password } };
+    if (plan.supportLogin) {
+      const pw = `p6-${randomBytes(9).toString("hex")}`;
+      let sup = await I.findUserByEmail(P6_SUPPORT_LOGIN.email);
+      if (sup) await I.setUserPassword(sup.id, pw);
+      else sup = await I.createUser({ email: P6_SUPPORT_LOGIN.email, name: P6_SUPPORT_LOGIN.name, password: pw });
+      await I.addMembership(sup.id, P6_STORE.id, P6_SUPPORT_LOGIN.role);
+      await I.clearThrottle(`login:${P6_SUPPORT_LOGIN.email}`).catch(() => {});
+      out.logins.support = { id: sup.id, email: P6_SUPPORT_LOGIN.email, name: P6_SUPPORT_LOGIN.name, role: P6_SUPPORT_LOGIN.role, password: pw };
+    }
 
     // 6. photos, then the catalog through the real sync (injected fetchers)
     const cat = await perfCatalog({ products: plan.catalog === "empty" ? 0 : P6_PRODUCTS, collections: plan.catalog !== "no-collections" });

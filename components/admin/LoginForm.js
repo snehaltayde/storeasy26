@@ -29,7 +29,7 @@ export default function LoginForm() {
       body: JSON.stringify(email ? { email, password } : { password }),
     });
     if (res.ok) {
-      router.push("/admin/dashboard");
+      router.push("/admin");
       router.refresh();
       return;
     }
