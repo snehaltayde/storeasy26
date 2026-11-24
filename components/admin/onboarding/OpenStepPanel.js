@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Circle, CircleAlert, CircleCheck, Globe } from "lucide-react";
+import { CircleAlert, CircleCheck, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/components/ui/utils";
@@ -33,7 +33,7 @@ export const OPEN_PANEL_WORDS = Object.freeze({
   neededLead: "Your store can't open until these are done.",
   checkLead: "Your store can open without these, but they're worth a look first.",
   liveTitle: "Goes live with your store",
-  liveLead: "Ready. Nothing to do here unless you want to look.",
+  liveLead: "These go live as they are when your store opens.",
   notLegalAdvice: "These are starting points, not legal advice.",
   failed: "That didn't work, so nothing changed. Try again in a minute.",
   notAllowed: "Your role can't do that, so nothing changed.",
@@ -204,7 +204,7 @@ function Item({ item, feedback, primaryFix = -1, compact = false, ...rest }) {
   return (
     <li className={cn("space-y-2", compact ? "py-3" : "py-4")} data-opening-item={item.id} data-level={item.level}>
       <div className="flex items-start gap-2">
-        {compact && (done ? <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-success" /> : <Circle aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />)}
+        {compact && (done ? <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-success" /> : <span aria-hidden className="mt-0.5 grid size-4 shrink-0 place-items-center"><span className="size-1.5 rounded-full bg-muted-foreground" /></span>)}
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-sm font-medium text-foreground">{item.title}</p>
           {item.message && <p className="text-[0.8125rem] text-muted-foreground">{item.message}</p>}
