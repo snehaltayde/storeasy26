@@ -94,7 +94,8 @@ async function makeOperator() {
 async function closeSheet(page) {
   if (await page.locator("[data-subject-sheet]").count()) await page.keyboard.press("Escape");
   await page.locator("[data-subject-sheet]").waitFor({ state: "detached", timeout: 30_000 }).catch(() => {});
-  await page.waitForURL((u) => !u.searchParams.has("s"), { timeout: 30_000 });
+  // router.replace fires no load event, so poll the address
+  await until(async () => !new URL(page.url()).searchParams.has("s"), 30_000, 200);
 }
 
 async function openRow(page, subject) {
