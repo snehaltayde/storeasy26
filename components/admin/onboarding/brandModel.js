@@ -140,6 +140,7 @@ export const BRAND_WORDS = Object.freeze({
   changed:
     "Your colours or logo were changed somewhere else (in the editor, maybe) since this page opened, so nothing was saved. Check your choices here, then save again.",
   loadLatest: "Load the latest",
+  keptOnLatest: "We loaded the latest saved version and kept the changes you made here on top of it. Check them, then save.",
   failed: "We couldn't save just now. Check your connection, then try again.",
 });
 
@@ -311,6 +312,21 @@ export function overlayMessage(form, saved, { storeName = "" } = {}) {
     logo: form.logo && LIBRARY_RE.test(form.logo.media) ? { media: form.logo.media, alt: (form.alt || "").trim() || storeName || "" } : false,
     description: typeof form.description === "string" ? form.description.slice(0, DESCRIPTION_MAX) : null,
   };
+}
+
+// "Load the latest" after a 409: what is saved now, with each choice the
+// founder changed here (form against the save it started from) kept on top.
+// The logo and its alt go together.
+export function mergeOnLatest(form, before, latest) {
+  if (!form || !before) return latest;
+  const out = { ...latest };
+  if ((form.paletteId ?? null) !== (before.paletteId ?? null)) out.paletteId = form.paletteId ?? null;
+  if ((form.logo?.media ?? null) !== (before.logo?.media ?? null) || (form.alt || "").trim() !== (before.alt || "").trim()) {
+    out.logo = form.logo ? { media: form.logo.media } : null;
+    out.alt = form.logo ? form.alt || "" : "";
+  }
+  if ((form.description ?? "") !== (before.description ?? "")) out.description = form.description ?? "";
+  return out;
 }
 
 // Unsaved choices are kept in sessionStorage (this tab, this store's origin)

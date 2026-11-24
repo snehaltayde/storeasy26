@@ -594,7 +594,7 @@ await t("line 6, brand overlay: a palette puts its colours in <style id=brand-va
   b.stop();
 });
 
-await t("line 6, brand overlay refusals: before any v2 hello, after only the Designer's hello, from another origin, from a window that isn't the parent, and in a frame that isn't a working preview (revoked, expired, not_found, live, legacy) the message changes nothing", () => {
+await t("line 6, brand overlay refusals: before any v2 hello, after only the Designer's hello, in the editor's (non-look) frame, from another origin, from a window that isn't the parent, and in a frame that isn't a working preview (revoked, expired, not_found, live, legacy) the message changes nothing", () => {
   const msg = { type: "storeasy:brand", paletteId: "forest", logo: { media: "/api/media/med_abc", alt: "A" }, description: "Hello" };
   const untouched = (b, label) => {
     eq(draftStyle(b.s), null, `${label}: no draft style:`);
@@ -615,6 +615,12 @@ await t("line 6, brand overlay refusals: before any v2 hello, after only the Des
   untouched(b, "another origin");
   b.s.message(msg, "https://fv.test", { postMessage() {} });
   untouched(b, "not the parent");
+  b.stop();
+  // review fix: the editor's own frame (v2 without look) never draws an overlay
+  b = brandStand();
+  b.s.message({ type: "storeasy:editor:hello", v: 2 });
+  b.s.message(msg);
+  untouched(b, "editor frame (no look)");
   b.stop();
   for (const reason of ["revoked", "expired", "not_found", "live", "legacy"]) {
     const r = brandStand({ ok: false, reason });

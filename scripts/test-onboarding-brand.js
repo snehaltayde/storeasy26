@@ -266,6 +266,7 @@ const PANEL = join(ROOT, "components/admin/onboarding/BrandStepPanel.js");
 const STORE = { name: "Acme Candles", address: "acme.localhost" };
 
 let preview = null;
+let previewMounts = 0; // BrandPreview instances made (each one mints a preview session)
 let picker = null;
 let uploadAnswer = null;
 async function mount(props, table) {
@@ -274,18 +275,10 @@ async function mount(props, table) {
   const load = world({
     react: d.react,
     "next/link": { __esModule: true, default: function Link({ href, children }) { return React.createElement("a", { href }, children); } },
-    "./BrandPreview": { __esModule: true, default: function BrandPreview(p) { preview = p; return null; } },
+    "./BrandPreview": { __esModule: true, default: function BrandPreview(p) { const me = d.react.useRef(0); if (!me.current) me.current = ++previewMounts; preview = p; return null; } },
     "@/components/admin/shared/MediaPicker": { MediaPicker: function MediaPicker(p) { picker = p; return null; } },
     "@/components/admin/SyncProgress": { SyncProgressBody: Stub("SyncProgressBody").default, readSync: async () => null, requestSync: async () => ({ ok: true }), POLL_MS: 600000 },
     "@/lib/media-upload": { uploadImage: async () => uploadAnswer },
-    // Radix Dialog calls its own React's hooks: the sheet is drawn as plain parts here
-    "@/components/ui/sheet": {
-      Sheet: function Sheet({ children }) { return React.createElement(React.Fragment, null, children); },
-      SheetContent: function SheetContent({ children, ...p }) { return React.createElement("div", p, children); },
-      SheetHeader: function SheetHeader({ children }) { return React.createElement("div", null, children); },
-      SheetTitle: function SheetTitle({ children }) { return React.createElement("h2", null, children); },
-      SheetDescription: function SheetDescription({ children }) { return React.createElement("p", null, children); },
-    },
   });
   const C = (await load(PANEL)).default;
   const log = [];
@@ -431,7 +424,7 @@ await t("Save posts the form (as today) and reloads the preview with the saved d
   ok(changes >= 2, `onChange after Save and Skip: ${changes}`);
 });
 
-await t("a 409 DOCUMENT_CHANGED keeps its words, takes the current revision, and offers Load the latest, which reads the step again and puts the form on what is saved now", async () => {
+await t("a 409 DOCUMENT_CHANGED keeps its words, takes the current revision, and offers Load the latest, which reads the step again and keeps the founder's unsaved choices on top of what is saved now", async () => {
   reset();
   const v = await mount({ canEdit: true, canSync: true, store: STORE }, {
     "GET /api/admin/brand-step": [BRAND(), BRAND({ current: { paletteId: "navy", logo: null, description: "Newer" }, design: { id: "doc_design", revision: 4 } })],
@@ -441,11 +434,18 @@ await t("a 409 DOCUMENT_CHANGED keeps its words, takes the current revision, and
   await v.click("Save");
   ok(v.text().includes(M.BRAND_WORDS.changed), v.text());
   await v.click("Load the latest");
-  eq(v.group().props.value, "navy", "the latest palette:");
-  eq(v.input((p) => p.id === "brand-description").props.value, "Newer", "the latest description:");
-  eq(tab.has(M.DRAFT_KEY), false, "the unsaved choices are dropped:");
+  eq(v.group().props.value, "forest", "the founder's unsaved palette is kept:");
+  eq(v.input((p) => p.id === "brand-description").props.value, "Newer", "the field they didn't touch takes the latest:");
+  ok(v.has("data-brand-dirty") && v.text().includes(M.BRAND_WORDS.keptOnLatest), `says so: ${v.text()}`);
+  eq(M.takeDraft(window.sessionStorage)?.paletteId, "forest", "still kept for this tab:");
+  eq(preview.message.paletteId, "forest", "and drawn:");
   await v.click("Save");
-  eq(v.posts().at(-1).body.revision, 4, "the next Save sends the current revision:");
+  eq(v.posts().at(-1).body, { paletteId: "forest", logo: null, description: "Newer", revision: 4 }, "the next Save: the choices over the latest, the current revision:");
+  // the pure merge
+  const old = M.formOf({ paletteId: "slate", logo: null, description: "A" });
+  const latest = M.formOf({ paletteId: "navy", logo: { media: "/api/media/med_n", alt: "N" }, description: "B" });
+  eq(M.mergeOnLatest({ ...old, description: "Mine" }, old, latest), { paletteId: "navy", logo: { media: "/api/media/med_n" }, alt: "N", description: "Mine" }, "only the changed field wins:");
+  eq(M.mergeOnLatest({ ...old, logo: { media: "/api/media/med_m" }, alt: "M" }, old, latest).logo, { media: "/api/media/med_m" }, "a changed logo (with its alt) wins:");
 });
 
 await t("logo upload: a file goes through uploadImage and becomes the form's logo (in the preview, not saved); a failed upload says why; an address outside the library is refused", async () => {
@@ -502,21 +502,44 @@ await t("least-trusted: support (and operator-support) sees every control disabl
   eq(v.log.map((l) => `${l.method} ${l.url}`), ["GET /api/admin/first-run", "GET /api/admin/brand-step"], "reads only:");
 });
 
-await t("until a home page exists the preview waits with its words (no frame, no session); a made store shows it; below 1024px it is a sticky Preview button and a bottom sheet mounted on first open", async () => {
+await t("until a home page exists the preview waits with its words (no frame, no session); a made store shows it; below 1024px it is a sticky Preview button and a bottom sheet mounted on first open; crossing 1024px never makes a second preview (one session)", async () => {
   reset();
   const syncing = ok200({ ok: true, firstRun: { eligible: false, reason: "catalog_not_confirmed", generated: false, byGenerator: [], kept: [], empty: false, noCollections: false, summary: null }, sync: { state: "running" } });
   const w = await mount({ canEdit: true, canSync: true, store: STORE }, { "GET /api/admin/first-run": syncing, "GET /api/admin/brand-step": BRAND() });
   ok(w.text().includes(M.PREVIEW_WORDS.noHome), w.text());
   eq(preview, null, "no preview mounted:");
-  globalThis.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  // a viewport that crosses 1024px: one BrandPreview (one session) the whole time
+  const mql = { matches: false, fns: new Set(), addEventListener(_, fn) { this.fns.add(fn); }, removeEventListener(_, fn) { this.fns.delete(fn); } };
+  const resize = async (v, wideNow) => {
+    mql.matches = wideNow;
+    for (const fn of mql.fns) fn();
+    await v.flush();
+  };
+  globalThis.matchMedia = () => mql;
   try {
+    previewMounts = 0;
     const n = await mount({ canEdit: true, canSync: true, store: STORE }, { "GET /api/admin/brand-step": BRAND() });
     ok(n.has("data-brand-preview-open"), "the Preview button");
     eq(preview, null, "not mounted before the first open:");
     await n.click("Preview");
     ok(preview, "mounted on open");
-    const sheet = n.nodes().find((x) => x.props?.["data-brand-sheet"] !== undefined);
-    ok(sheet && sheet.props.forceMount === true && /data-\[state=closed\]:hidden/.test(sheet.props.className), "kept mounted while closed");
+    const slot = () => n.nodes().find((x) => x.props?.["data-brand-sheet"] !== undefined);
+    eq(slot().props["data-state"], "open", "the sheet is open:");
+    await n.click("Close preview");
+    eq(slot().props["data-state"], "closed", "closed:");
+    ok(preview, "and still mounted");
+    await resize(n, true);
+    await resize(n, false);
+    await resize(n, true);
+    eq(previewMounts, 1, "390 → 1280 → 390 → 1280: one preview, one session:");
+    // starting wide: mounted at once, and still one after going narrow
+    previewMounts = 0;
+    mql.matches = true;
+    const w2 = await mount({ canEdit: true, canSync: true, store: STORE }, { "GET /api/admin/brand-step": BRAND() });
+    eq(previewMounts, 1, "wide: mounted at once:");
+    await resize(w2, false);
+    await resize(w2, true);
+    eq(previewMounts, 1, "1280 → 390 → 1280: still one:");
   } finally {
     globalThis.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
   }

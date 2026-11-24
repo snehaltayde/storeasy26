@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CircleAlert, CircleCheck, Eye, Library, RotateCcw, Trash2, Upload } from "lucide-react";
+import { CircleAlert, CircleCheck, Eye, Library, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/components/ui/utils";
 import { SyncProgressBody, readSync, requestSync, POLL_MS } from "@/components/admin/SyncProgress";
 import { MediaPicker } from "@/components/admin/shared/MediaPicker";
@@ -39,6 +38,7 @@ import {
   hasHomeFor,
   isDirty,
   keepDraft,
+  mergeOnLatest,
   madeSentence,
   overlayMessage,
   paletteStyle,
@@ -55,8 +55,10 @@ import {
 // write); nothing is saved until Save. Unsaved choices are kept in this tab's
 // sessionStorage across step switches and reloads, and a page leave asks
 // first. From 1024px the form and the preview sit side by side (the preview
-// sticky); narrower, a sticky "Preview" button opens it in a bottom sheet,
-// mounted on the first open and kept mounted after (one preview session).
+// sticky); narrower, a sticky "Preview" button opens it in a bottom sheet.
+// There is one preview: mounted at once from 1024px, or on the first open
+// below, then never unmounted; crossing 1024px only moves it with CSS, so a
+// resize never mints a second preview session.
 //   canEdit     the role may save and skip (storefront.write); false: every
 //               control is disabled with `reason`, nothing is ever POSTed
 //   canSync     the role may run a sync (SyncProgress's retry and start)
@@ -300,37 +302,57 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [stale, setStale] = useState(false); // a 409: offer "Load the latest"
+  const [keptNote, setKeptNote] = useState(false); // after it: the founder's changes were kept
   const [done, setDone] = useState(null); // the last successful answer
   const [carried, setCarried] = useState(false);
   const [saves, setSaves] = useState(0); // each Save or Skip reloads the preview
-  const [sheet, setSheet] = useState(false);
-  const [sheetSeen, setSheetSeen] = useState(false);
+  const [sheet, setSheet] = useState(false); // below 1024px: the preview sheet is open
+  const [previewOn, setPreviewOn] = useState(false); // the one BrandPreview is mounted (never unmounted after)
   const fileRef = useRef(null);
   const formRef = useRef(null);
   const previewButton = useRef(null);
   const wide = useWide();
+  // wide: the preview mounts at once; narrow: on the first open. Either way it
+  // then stays mounted: crossing 1024px only moves it (CSS), one session
+  useEffect(() => {
+    if (wide === true) setPreviewOn(true);
+  }, [wide]);
+  const closeSheet = () => {
+    setSheet(false);
+    previewButton.current?.focus?.();
+  };
+  useEffect(() => {
+    if (!sheet || wide !== false || typeof window === "undefined") return undefined;
+    const onKey = (e) => e.key === "Escape" && closeSheet();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheet, wide]);
   const storeName = store?.name || "";
 
   const describeOk = Boolean(info?.canEditDescription) && canEdit;
   const max = info?.descriptionMax || DESCRIPTION_MAX;
 
-  function take(data, { restore = false } = {}) {
+  function take(data, { restore = false, keep = null } = {}) {
     const s = formOf(data.current);
     setInfo(data);
     setSaved(s);
     setRevision(data.design?.revision ?? null);
     let f = s;
-    if (restore && canEdit) {
+    if (keep && canEdit) {
+      // "Load the latest": the founder's changes stay on top of what is saved now
+      f = mergeOnLatest(keep.form, keep.saved, s);
+      if (!data.canEditDescription) f = { ...f, description: s.description };
+    } else if (restore && canEdit) {
       const kept = takeDraft(storage());
       if (kept && isDirty(kept, s)) f = data.canEditDescription ? kept : { ...kept, description: s.description };
     } else clearDraft(storage());
     setForm(f);
   }
 
-  async function load({ restore = false } = {}) {
+  async function load({ restore = false, keep = null } = {}) {
     const r = await call("GET", BRAND_STEP_URL);
     if (r.ok && r.body.ok) {
-      take(r.body, { restore });
+      take(r.body, { restore, keep });
       setPhase("idle");
     } else {
       setPhase("load-failed");
@@ -359,6 +381,7 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
 
   const change = (patch) => {
     setDone(null);
+    setKeptNote(false);
     setForm((f) => ({ ...f, ...patch }));
   };
 
@@ -378,6 +401,7 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
       if (skip) setForm(saved);
       else setSaved({ ...form, description: describeOk ? form.description : saved.description });
       clearDraft(storage());
+      setKeptNote(false);
       setSaves((n) => n + 1);
       onChange?.();
     } else if (r.status === 503 && r.body.code === "BRAND_STEP_PARTIAL") {
@@ -401,12 +425,15 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
     setDone(null);
     setError(null);
     setForm(saved);
+    setKeptNote(false);
     clearDraft(storage());
   };
   async function loadLatest() {
     setError(null);
     setStale(false);
-    await load();
+    await load({ keep: { form, saved } });
+    setDone(null);
+    setKeptNote(true);
   }
 
   function picked(m) {
@@ -563,7 +590,7 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
         {dirty && (
           <p className="flex items-center gap-2 text-[0.8125rem] text-warning-text" role="status" data-brand-dirty="">
             <span aria-hidden className="size-2 rounded-full bg-warning" />
-            {BRAND_WORDS.unsaved}
+            {keptNote ? BRAND_WORDS.keptOnLatest : BRAND_WORDS.unsaved}
           </p>
         )}
 
@@ -597,26 +624,38 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
           {formBody}
         </section>
 
-        {wide === true && <div className="sticky top-8 hidden min-w-0 lg:block">{preview}</div>}
-        {wide === false && (
+        {wide !== null && (
           <>
-            <div className="sticky bottom-4 z-10 mt-6 flex justify-end">
-              <Button ref={previewButton} size="lg" className="h-10 px-4 shadow-overlay" onClick={() => (setSheetSeen(true), setSheet(true))} data-brand-preview-open="">
+            {/* below 1024px: the sticky Preview button */}
+            <div className={cn("sticky bottom-4 z-10 mt-6 flex justify-end lg:hidden", sheet && "hidden")}>
+              <Button ref={previewButton} size="lg" className="h-10 px-4 shadow-overlay" onClick={() => (setPreviewOn(true), setSheet(true))} aria-expanded={sheet} aria-controls="brand-preview-slot" data-brand-preview-open="">
                 <Eye aria-hidden />
                 {PREVIEW_WORDS.open}
               </Button>
             </div>
-            {sheetSeen && (
-              <Sheet open={sheet} onOpenChange={(o) => (setSheet(o), o || previewButton.current?.focus())} modal={false}>
-                <SheetContent side="bottom" forceMount className="max-h-[90vh] overflow-y-auto data-[state=closed]:hidden" data-brand-sheet="">
-                  <SheetHeader className="pb-0">
-                    <SheetTitle>{PREVIEW_WORDS.title}</SheetTitle>
-                    <SheetDescription className="sr-only">{PREVIEW_WORDS.frameTitle}</SheetDescription>
-                  </SheetHeader>
-                  <div className="px-4 pb-4">{preview}</div>
-                </SheetContent>
-              </Sheet>
-            )}
+            {/* the one preview: a sticky column from 1024px, a bottom sheet below (open or hidden) */}
+            <div
+              id="brand-preview-slot"
+              role={wide === false ? "dialog" : undefined}
+              aria-modal={wide === false ? "false" : undefined}
+              aria-labelledby={wide === false ? "brand-preview-title" : undefined}
+              data-brand-sheet=""
+              data-state={sheet ? "open" : "closed"}
+              className={cn(
+                "min-w-0 lg:sticky lg:top-8 lg:z-auto lg:block lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none",
+                sheet ? "fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-card border-t border-border bg-popover p-4 shadow-overlay" : "hidden",
+              )}
+            >
+              <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
+                <h3 id="brand-preview-title" className="text-base font-semibold">
+                  {PREVIEW_WORDS.title}
+                </h3>
+                <Button variant="ghost" size="icon-sm" onClick={closeSheet} aria-label="Close preview" data-brand-sheet-close="">
+                  <X aria-hidden />
+                </Button>
+              </div>
+              {previewOn && preview}
+            </div>
           </>
         )}
       </div>

@@ -45,8 +45,8 @@
 // outlined, and body.storeasy-look hides the preview's own bar.
 //   parent → {type:"storeasy:brand", paletteId, logo, description}
 //            the founder's unsaved choices, drawn over the page until the
-//            next load; nothing is written anywhere. Taken only after a v2
-//            hello, only in a working preview (ok true), only from this
+//            next load; nothing is written anywhere. Taken only after a look
+//            hello (never in the editor's frame), only in a working preview (ok true), only from this
 //            origin and from window.parent. Each field:
 //              paletteId    a palette id: its colours (brandFor(id) → {css,
 //                           kit}, worked out here, never sent) go into
@@ -360,7 +360,7 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
     }
     if (v2) {
       if (msg.type === "storeasy:brand") {
-        if (ok === true && e.source === win.parent) applyBrand(msg);
+        if (look && ok === true && e.source === win.parent) applyBrand(msg);
         return;
       }
       if (msg.type === "storeasy:select" && !look) selectSection(msg.sectionId);
