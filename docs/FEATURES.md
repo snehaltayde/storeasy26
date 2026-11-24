@@ -110,7 +110,6 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - The checkout client's fallback idempotency key (`components/checkout/CheckoutFlow.js` ~134) uses `Math.random`; use `crypto.randomUUID()`.
 - Preview tokens in `lib/releases.js` still fall back to `"dev-only-secret"`; make them fail closed in production like order links.
 - `/api/track` accepts any `transaction_id` as a purchase order id (analytics integrity).
-- **Known flake:** in drill runs the console sign-in page sometimes fails to load right after a harness restart (a 404 "1 Issue" page, or `#login-email` never appearing); seen in about 1 run in 4, never twice in a row (p5 `disabled` and `console` stages, 2026-11-24, each passed on rerun; 4 occurrences). Find the cause before relying on drills as a merge gate.
 - A signup that failed or stalled keeps its store address for good, even after it lapses; free the address once the signup can no longer finish.
 - **Needs an owner decision:** anyone can make a store email one quiz-picks message to any address (an email relay for spam). Options: a per-address daily cap, double opt-in, or only emailing signed-in shoppers. (Phase 0 audit, open gap 1.)
 - Sign-in takes a different time for an unknown email than for a wrong password, so timing reveals who is a member; make both paths do the same work. (Phase 0 audit, open gap 2.)

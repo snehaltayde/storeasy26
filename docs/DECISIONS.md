@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 Browser drills run without Turbopack's saved dev cache (on the owner's behalf)
+
+- **Decision:** every drill sets `STOREASY_TURBOPACK_DEV_CACHE=off`, which turns off Next's `turbopackFileSystemCacheForDev` for that run only (`next.config.mjs`). The owner's own `pnpm dev:design` keeps the cache.
+- **Why:** when a harness restarted from the saved cache, the new dev server sometimes came up with most of its routes missing (sign-in, dashboard, signup, health all 404) for its whole life: the "sign-in page didn't show" flake, about 4 stages in 45. With the cache off, 54 stages in a row passed, at the same drill time. It was a timing race inside Turbopack's cache restore, not a corrupt file.
+- **Instead of:** retrying the sign-in; deleting `.next` before every start.
+- **Decided by:** Claude, on the owner's behalf
+- **Slice:** Phase 1 tooling (drill reliability)
+
 ## 2026-11-24 The four-step onboarding page (on the owner's behalf)
 
 - **Decision:**
