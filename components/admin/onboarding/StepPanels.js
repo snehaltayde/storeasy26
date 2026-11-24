@@ -253,7 +253,7 @@ export function OpenPanel({ step, publishHref, onChange, onModel }) {
       {error && <Notice>{error}</Notice>}
       {note && <Notice tone="success">{note}</Notice>}
       {items.length > 0 && (
-        <ul className="divide-y divide-border border-y border-border" data-onboarding="opening-items">
+        <ul className="-mt-3 divide-y divide-border border-b border-border" data-onboarding="opening-items">
           {items.map((i) => (
             <OpeningItem key={i.id} item={i} step={step} busy={busy} onAct={policy} />
           ))}

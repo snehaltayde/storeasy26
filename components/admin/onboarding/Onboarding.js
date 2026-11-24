@@ -151,11 +151,18 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
           </div>
         </section>
 
-        <p className="text-sm">
-          <Link href="/admin/dashboard" className="font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-            Go to your dashboard
-          </Link>
-        </p>
+        {model.doneCount === model.total ? (
+          // every step done: the dashboard is the one next action
+          <Button asChild size="lg" className="h-10 px-4">
+            <Link href="/admin/dashboard">Go to your dashboard</Link>
+          </Button>
+        ) : (
+          <p className="text-sm">
+            <Link href="/admin/dashboard" className="font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              Go to your dashboard
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );
