@@ -220,7 +220,7 @@ try {
       return { id: null, type: "page", body: b };
     };
     const home = Reg.emptyBody("home");
-    home.sections = [Reg.legacyHeroToSection({ eyebrow: MARK.hero, title: MARK.hero, subtitle: MARK.hero })];
+    home.sections = [Reg.legacyHeroToSection({ title: MARK.hero, subtitle: MARK.hero })];
     const documents = [{ id: singletonId("home"), type: "home", body: home }, page("about", MARK.about), page("drill-policy", MARK.policy)];
     for (const d of documents) {
       const r = Reg.validateDocument(d.body, { mode: "publish", documentId: d.id ?? d.body.meta.slug });
