@@ -10,7 +10,7 @@
 // 3018) and ROLES_SQLD_PORT (first of three, 18027). See scripts/seed-roles-store.js.
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { HarnessError, dbUrl, harnessPorts, readPidfile, runHarness, runningHarness } from "./design-harness.js";
+import { HarnessError, dbUrl, harnessEnv, harnessPorts, readPidfile, runHarness, runningHarness } from "./design-harness.js";
 import { ROLES_PROFILE, addRolesAnnex, assertFreshDataDir, assertNoHarnessRunning, assertSafeEnv, latestShopperCode } from "./seed-roles-store.js";
 
 const USAGE = "Use: node scripts/dev-roles.js [seed [--reset] | code | annex]";
@@ -43,6 +43,8 @@ try {
     const info = runningHarness(dataDir) ? readPidfile(dataDir) : null;
     const sqld = info?.ports?.sqld;
     if (!sqld?.platform || !sqld?.default) throw new HarnessError("The roles harness isn't running. Start it with pnpm dev:roles, then run node scripts/dev-roles.js annex.");
+    // the same environment the running harness gave its servers (PLATFORM_SECRET encrypts the annex's secrets)
+    Object.assign(process.env, harnessEnv(process.env, {}, info.ports, { siteHost: ROLES_PROFILE.siteHost }));
     const r = await addRolesAnnex({ platformUrl: dbUrl(sqld.platform), annexUrl: dbUrl(sqld.default), port: info.ports.next });
     console.log(`✓ ${r.store.name} on ${r.store.url}: ${r.members.map((m) => `${m.email} as ${m.role}`).join(", ")}`);
     process.exit(0);
