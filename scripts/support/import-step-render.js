@@ -83,7 +83,7 @@ export async function run({ t, ok, eq, V, live, at, scanText }) {
     ok(/data-stage="products" data-stage-state="current" aria-current="step"/.test(out) && /data-stage="index" data-stage-state="todo"/.test(out), "stages");
     ok(/role="progressbar"/.test(out) && /aria-valuenow="25"/.test(out), `progressbar: ${out.match(/<div[^>]*role="progressbar"[^>]*>/)?.[0]}`);
     const s = text(out);
-    for (const w of ["Bringing in products", "Bringing in collections", "Tidying up", "Getting search ready", "120 of 480 products (25%)", "Started 5 minutes ago.", "About 15 minutes left."]) ok(s.includes(w), `${w} in: ${s}`);
+    for (const w of ["Bringing in products", "Bringing in collections", "Tidying up", "Getting search ready", "120 of 480 products (25%)", "Started 5 minutes ago.", "About 15 minutes left for products."]) ok(s.includes(w), `${w} in: ${s}`);
     ok(!/<button/.test(out), "no button while running fine");
   });
 
@@ -152,6 +152,7 @@ export async function run({ t, ok, eq, V, live, at, scanText }) {
     ok(s.includes("25 products couldn't come in") && s.includes("and 5 more") && (out.match(/data-skip-reason=/g) || []).length === 20, s);
     ok(s.includes(`no-title It has no title in Shopify. Give it a title in Shopify, then refresh from Shopify. ${V.KEPT_WORDS}`), s);
     ok(/<button[^>]*>Refresh from Shopify<\/button>/.test(out), "refresh");
+    ok((out.match(/<li hidden=""/g) || []).length === 15 && /aria-expanded="false" aria-controls="import-skipped-list"[^>]*>Show all 20<\/button>/.test(out), "the first 5 show, the other 15 one 'Show all 20' away");
     ok(!/data-import="skipped"/.test(html({ view: V.syncView({ status: "complete", products: 3, collections: 0, finished_at: at(1) }), gate: START })), "no skips, no list");
   });
 
@@ -162,7 +163,7 @@ export async function run({ t, ok, eq, V, live, at, scanText }) {
 
   await t("UI words: plain founder copy; polling constants as the plan says", async () => {
     const w = M.IMPORT_WORDS;
-    const all = [w.lost, w.start, w.refresh, w.more(3), w.allIn(1), w.allIn(480), w.products(1, null), w.products(3, 9), w.collections(2, null), w.started(240_000), w.started(10_000), w.took(360_000), w.nextTry("3:40 pm")].join(" ");
+    const all = [w.lost, w.start, w.refresh, w.more(3), w.allIn(1), w.allIn(480), w.products(1, null), w.products(3, 9), w.collections(2, null), w.started(240_000), w.started(10_000), w.took(360_000), w.nextTry("3:40 pm"), w.left("About 7 minutes left"), w.showAll(20), w.fewer].join(" ");
     eq(scanText(all), [], "banned copy:");
     eq([M.POLL_MS, M.SLOW_POLL_MS, M.LOST_AFTER], [3000, 15000, 3], "polling:");
   });

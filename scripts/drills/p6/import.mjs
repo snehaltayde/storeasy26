@@ -11,7 +11,7 @@
 //                for 10 s after complete
 //   5. hidden    while running and hidden: no polling; visible again: a read
 //   6. support   the step read-only: Try again disabled with the reason
-// Screenshots at 1440 and 390.
+// Screenshots at 1440, plus the running step at 375, 768 and 1280.
 import { loginP6, p6Context, p6Sql, p6Url, platformSql, reseedP6, settle, sleep, waitFor, watchErrors } from "./lib.mjs";
 
 const ONBOARDING = "/admin/onboarding";
@@ -143,18 +143,25 @@ export async function importStage(drill) {
   v = await until(page, (s) => s.text.includes("360 of 480 products") && s, 3_000);
   drill.check(Boolean(v) && reqs.since(back) >= 1, "visible again: read at once, 360 of 480", { requests: reqs.since(back) });
 
-  // the same running step at 390: nothing scrolls sideways
-  const narrow = await p6Context(drill, { width: 390 });
-  const np = await loginP6(drill, narrow);
-  await goImport(drill, np);
-  v = await until(np, (s) => s.state === "running" && s);
-  drill.check(Boolean(v) && !v.overflow, "at 390 the running step fits (no sideways scroll)", v && { overflow: v.overflow });
-  await drill.screenshot(np, "i-import-running-390", { fullPage: true });
+  // the same running step at 375, 768 and 1280: nothing scrolls sideways;
+  // the failed step at 375
+  for (const width of [375, 768, 1280]) {
+    const wctx = await p6Context(drill, { width });
+    const wp = await loginP6(drill, wctx);
+    await goImport(drill, wp);
+    v = await until(wp, (s) => s.state === "running" && s);
+    drill.check(Boolean(v) && !v.overflow, `at ${width} the running step fits (no sideways scroll)`, v && { overflow: v.overflow });
+    await drill.screenshot(wp, `i-import-running-${width}`, { fullPage: true });
+    if (width === 375) {
+      await update("status = 'failed', finished_at = ?, lease_owner = NULL, lease_until = NULL, error = ?", [iso(0), "Admin GraphQL HTTP 401: x"]);
+      await goImport(drill, wp);
+      await until(wp, (s) => s.state === "failed" && s);
+      await drill.screenshot(wp, "i-import-failed-375", { fullPage: true });
+      await p6Sql([{ sql: "UPDATE sync_runs SET status = 'running', finished_at = NULL, error = NULL, lease_owner = ?, lease_until = ?, updated_at = ? WHERE id = ?", args: [LEASE().owner, LEASE().until, iso(0), RUN] }]);
+    }
+    await wctx.close();
+  }
   await update("status = 'failed', finished_at = ?, lease_owner = NULL, lease_until = NULL, error = ?", [iso(0), "Admin GraphQL HTTP 401: x"]);
-  await goImport(drill, np);
-  await until(np, (s) => s.state === "failed" && s);
-  await drill.screenshot(np, "i-import-failed-390", { fullPage: true });
-  await narrow.close();
 
   // ---- 6. support: reads it, changes nothing ----
   const sctx = await p6Context(drill);

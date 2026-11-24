@@ -90,10 +90,10 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
   // the step this one waits for, when that is another step: the way to it is
   // the page's one next action
   const waitsFor = step.state === "blocked" ? model.steps.find((s) => s.id === step.blockedBy) || null : null;
-  // Brand and Import still show old screens (data-legacy) until lines 4–7
-  // rebuild them: they sit on a sunken tray, so their own cards read as
-  // content inside the step, not as a second page inside the card
-  const tray = (step.id === "brand" || step.id === "import") && step.state !== "blocked";
+  // Brand still shows an old screen (data-legacy) until its line rebuilds it:
+  // it sits on a sunken tray, so its own cards read as content inside the
+  // step, not as a second page inside the card
+  const tray = step.id === "brand" && step.state !== "blocked";
   const list = { steps: model.steps, selected: step.id, onSelect: choose, doneCount: model.doneCount, total: model.total };
 
   return (

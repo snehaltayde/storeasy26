@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CircleAlert, CircleCheck, RefreshCw, RotateCcw, Unplug } from "lucide-react";
+import { ChevronDown, CircleAlert, CircleCheck, Clock, RefreshCw, RotateCcw, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,6 +36,11 @@ export const IMPORT_WORDS = Object.freeze({
   started: (ms) => (ms < 90_000 ? "Started just now" : `Started ${durationWords(ms)} ago`),
   took: (ms) => `Took ${durationWords(ms)}.`,
   nextTry: (time) => `Next try at about ${time}.`,
+  // the estimate covers products only (collections and search come after
+  // and are usually quick), so it says so
+  left: (words) => `${words} for products.`,
+  showAll: (n) => `Show all ${fmt(n)}`,
+  fewer: "Show fewer",
 });
 
 const fmt = (x) => Number(x || 0).toLocaleString("en-IN");
@@ -47,6 +52,8 @@ const timeOf = (iso) => {
 const readOf = (c) => Number(c?.done || 0) + Number(c?.skipped || 0);
 const pctOf = (c) => (c && c.total > 0 ? Math.min(100, Math.round((readOf(c) / c.total) * 100)) : null);
 
+// A notice inside the step. No live role: the headline is the step's one
+// live region, and it changes with every state these notices belong to.
 function Note({ tone, children, ...props }) {
   const Icon = tone === "success" ? CircleCheck : CircleAlert;
   return (
@@ -57,16 +64,26 @@ function Note({ tone, children, ...props }) {
   );
 }
 
+// The four stages, in order: a column on phones, a row from 640px up.
 function Stages({ stage }) {
   return (
-    <ol className="grid gap-1 text-[0.8125rem] sm:grid-cols-4 sm:gap-2" data-import="stages">
+    <ol aria-label="Import stages" className="grid gap-x-3 gap-y-1.5 text-[0.8125rem] sm:grid-cols-4" data-import="stages">
       {SYNC_STAGES.map((s, i) => {
         const at = i + 1;
         const state = at < stage.index ? "done" : at === stage.index ? "current" : "todo";
         return (
-          <li key={s.id} data-stage={s.id} data-stage-state={state} aria-current={state === "current" ? "step" : undefined} className={cn("flex items-center gap-1.5", state === "current" ? "font-medium text-foreground" : "text-muted-foreground")}>
-            {state === "done" ? <CircleCheck aria-hidden className="size-3.5 shrink-0 text-success" /> : <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", state === "current" ? "bg-primary" : "bg-border")} />}
-            {s.label}
+          <li key={s.id} data-stage={s.id} data-stage-state={state} aria-current={state === "current" ? "step" : undefined} className={cn("flex min-w-0 items-start gap-1.5 leading-snug", state === "current" ? "font-medium text-foreground" : "text-muted-foreground")}>
+            {state === "done" ? (
+              <CircleCheck aria-hidden className="mt-0.5 size-3.5 shrink-0 text-success" />
+            ) : (
+              <span aria-hidden className="flex size-3.5 shrink-0 items-center justify-center pt-0.5">
+                <span className={cn("block size-2 rounded-full", state === "current" ? "bg-primary" : "border border-muted-foreground/50")} />
+              </span>
+            )}
+            <span className="min-w-0">
+              {s.label}
+              {state === "done" && <span className="sr-only"> (done)</span>}
+            </span>
           </li>
         );
       })}
@@ -74,37 +91,57 @@ function Stages({ stage }) {
   );
 }
 
+// The products that couldn't come in. The first few show; the rest are one
+// "Show all" away, so a long list doesn't push the step's next action down.
+const SKIPPED_SHOWN = 5;
 function Skipped({ skipped }) {
+  const [all, setAll] = useState(false);
   if (!skipped?.count) return null;
+  const items = skipped.items || [];
+  const folded = items.length > SKIPPED_SHOWN;
   return (
-    <section className="space-y-2" data-import="skipped" aria-label={SKIPPED_WORDS(skipped)}>
-      <p className="text-sm font-medium text-foreground">{SKIPPED_WORDS(skipped)}</p>
-      {skipped.items.length > 0 && (
-        <ul className="divide-y divide-border rounded-md border border-border">
-          {skipped.items.map((it, i) => (
-            <li key={i} className="space-y-0.5 px-3 py-2 text-[0.8125rem]" data-skip-reason={it.reason}>
+    <section className="space-y-2" data-import="skipped" aria-labelledby="import-skipped-title">
+      <h3 id="import-skipped-title" className="flex items-start gap-2 text-sm font-medium text-foreground">
+        <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-warning" />
+        <span className="min-w-0">{SKIPPED_WORDS(skipped)}</span>
+      </h3>
+      {items.length > 0 && (
+        <ul id="import-skipped-list" className="divide-y divide-border overflow-hidden rounded-md border border-border">
+          {items.map((it, i) => (
+            <li key={i} hidden={folded && !all && i >= SKIPPED_SHOWN} className="space-y-0.5 px-3 py-2.5 text-[0.8125rem] leading-snug" data-skip-reason={it.reason}>
               <p className="font-medium text-foreground [overflow-wrap:anywhere]">{it.name}</p>
-              <p className="text-muted-foreground">
-                {it.why} {it.todo}
-                {it.kept ? ` ${KEPT_WORDS}` : ""}
-              </p>
+              <p className="text-muted-foreground">{it.why}</p>
+              <p className="text-foreground">{it.todo}</p>
+              {it.kept && <p className="text-xs text-muted-foreground">{KEPT_WORDS}</p>}
             </li>
           ))}
         </ul>
       )}
-      {skipped.more > 0 && <p className="text-xs text-muted-foreground">{IMPORT_WORDS.more(skipped.more)}</p>}
+      {(folded || skipped.more > 0) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {folded && (
+            <Button variant="ghost" size="sm" className="-ml-2" aria-expanded={all} aria-controls="import-skipped-list" onClick={() => setAll((x) => !x)} data-import="skipped-toggle">
+              <ChevronDown aria-hidden className={cn("motion-safe:transition-transform", all && "rotate-180")} />
+              {all ? IMPORT_WORDS.fewer : IMPORT_WORDS.showAll(items.length)}
+            </Button>
+          )}
+          {skipped.more > 0 && <p className="text-xs text-muted-foreground">{IMPORT_WORDS.more(skipped.more)}</p>}
+        </div>
+      )}
     </section>
   );
 }
 
 // One view, laid out. `gate` is the step's sync action ({ id, allowed,
 // reason }) or null; `showProblem` false when the step header already shows
-// the problem's words.
+// the problem's words. Hierarchy: the headline (the one live region), then
+// the count of total over the bar (where the eye lands), the time line, the
+// four stages; a problem's one next action is the only filled button.
 export function ImportStepBody({ view, gate = null, busy = false, error = null, lost = false, showProblem = true, onAct, onReconnect }) {
   if (!view) {
     return (
       <div className="space-y-3" data-import="loading" aria-busy="true">
-        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-5 w-2/3" />
         <Skeleton className="h-1.5 w-full" />
         <Skeleton className="h-4 w-1/3" />
       </div>
@@ -117,21 +154,26 @@ export function ImportStepBody({ view, gate = null, busy = false, error = null, 
   const collecting = stage && stage.index >= 2;
   const bar = live && stage ? (stage.index === 1 ? view.products : stage.index === 2 ? view.collections : null) : null;
   const pct = bar ? pctOf(bar) : null;
+  // the filled button is the one obvious next step; while it retries by
+  // itself, waiting is, so Try now stays quiet
+  const filled = (i) => i === 0 && state !== "retrying";
+  const big = { size: "lg", className: "h-10 px-4" };
   const retryAction = (label, primary) => (
-    <Gated key="retry" action={gate} reasonId="import-reason" variant={primary ? "default" : "outline"} disabled={busy} aria-busy={busy || undefined} onClick={() => onAct?.({ retry: true })}>
+    <Gated key="retry" action={gate} reasonId="import-reason" variant={primary ? "default" : "outline"} {...(primary ? big : {})} disabled={busy} aria-busy={busy || undefined} onClick={() => onAct?.({ retry: true })}>
       <RotateCcw aria-hidden />
       {label}
     </Gated>
   );
 
   return (
-    <div className="space-y-4" data-import="body" data-import-state={state}>
+    <div className="space-y-5" data-import="body" data-import-state={state}>
       <div className="space-y-1">
-        <p aria-live="polite" className="text-base font-medium text-foreground" data-import="headline">
-          {view.headline}
+        <p aria-live="polite" className="flex items-start gap-2 text-base leading-snug font-medium text-foreground" data-import="headline">
+          {state === "complete" && <CircleCheck aria-hidden className="mt-0.5 size-[1.125rem] shrink-0 text-success" />}
+          <span className="min-w-0">{view.headline}</span>
         </p>
         {(state === "none" || state === "complete") && view.detail && (
-          <p className="text-sm text-muted-foreground" data-import="detail">
+          <p className={cn("text-sm text-muted-foreground", state === "complete" && "pl-[1.625rem]")} data-import="detail">
             {view.detail}
             {state === "complete" && view.durationMs != null ? ` ${IMPORT_WORDS.took(view.durationMs)}` : ""}
           </p>
@@ -139,72 +181,79 @@ export function ImportStepBody({ view, gate = null, busy = false, error = null, 
       </div>
 
       {stage && state !== "none" && state !== "complete" && (
-        <div className="space-y-3" data-import="progress">
-          <Stages stage={stage} />
-          {live && (
-            <Progress
-              value={pct}
-              aria-label={stage.index === 2 ? "Collections brought in" : stage.index === 1 ? "Products brought in" : stage.label}
-              aria-valuetext={pct != null ? `${pct}%` : undefined}
-            />
-          )}
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[0.8125rem]">
-            <dt className="text-muted-foreground">Products</dt>
-            <dd className="tabular-nums text-foreground" data-import="products">
-              {collecting ? IMPORT_WORDS.allIn(view.products.done) : IMPORT_WORDS.products(view.products.total ? readOf(view.products) : view.products.done, view.products.total)}
-              {pct != null && stage.index === 1 ? ` (${pct}%)` : ""}
-            </dd>
-            {collecting && (
-              <>
-                <dt className="text-muted-foreground">Collections</dt>
-                <dd className="tabular-nums text-foreground" data-import="collections">
-                  {IMPORT_WORDS.collections(stage.index === 2 && view.collections.total ? readOf(view.collections) : view.collections.done, stage.index === 2 ? view.collections.total : null)}
-                  {pct != null && stage.index === 2 ? ` (${pct}%)` : ""}
+        <div className="space-y-4" data-import="progress">
+          <div className="space-y-2">
+            <dl className="space-y-1 text-sm">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <dt className="sr-only">Products</dt>
+                <dd className={cn("tabular-nums", collecting ? "flex items-center gap-1.5 text-muted-foreground" : "font-medium text-foreground")} data-import="products">
+                  {collecting && <CircleCheck aria-hidden className="size-3.5 shrink-0 text-success" />}
+                  {collecting ? IMPORT_WORDS.allIn(view.products.done) : IMPORT_WORDS.products(view.products.total ? readOf(view.products) : view.products.done, view.products.total)}
+                  {pct != null && stage.index === 1 ? ` (${pct}%)` : ""}
                 </dd>
-              </>
+              </div>
+              {collecting && (
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <dt className="sr-only">Collections</dt>
+                  <dd className={cn("tabular-nums", stage.index === 2 ? "font-medium text-foreground" : "text-muted-foreground")} data-import="collections">
+                    {IMPORT_WORDS.collections(stage.index === 2 && view.collections.total ? readOf(view.collections) : view.collections.done, stage.index === 2 ? view.collections.total : null)}
+                    {pct != null && stage.index === 2 ? ` (${pct}%)` : ""}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            {live && (
+              <Progress
+                value={pct}
+                aria-label={stage.index === 2 ? "Collections brought in" : stage.index === 1 ? "Products brought in" : stage.label}
+                aria-valuetext={pct != null ? `${pct}%` : undefined}
+              />
             )}
-          </dl>
-          {(view.elapsedMs != null || view.eta) && (
-            <p className="text-xs text-muted-foreground" data-import="time">
-              {view.elapsedMs != null ? `${IMPORT_WORDS.started(view.elapsedMs)}.` : ""}
-              {view.eta ? ` ${view.eta.words}.` : ""}
+            {(view.elapsedMs != null || view.eta) && (
+              <p className="text-xs text-muted-foreground tabular-nums" data-import="time">
+                {view.elapsedMs != null ? `${IMPORT_WORDS.started(view.elapsedMs)}.` : ""}
+                {view.eta ? ` ${IMPORT_WORDS.left(view.eta.words)}` : ""}
+              </p>
+            )}
+          </div>
+          <Stages stage={stage} />
+          {view.big && (
+            <p className="flex items-start gap-2 text-[0.8125rem] text-muted-foreground" data-import="big">
+              <Clock aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+              <span className="min-w-0">{SYNC_WORDS.big}</span>
             </p>
           )}
-          {view.big && <p className="text-xs text-muted-foreground" data-import="big">{SYNC_WORDS.big}</p>}
         </div>
       )}
 
       {problem && (
         <div className="space-y-3" data-import="problem" data-kind={problem.kind}>
-          {showProblem && (
-            <Note tone={state === "retrying" || view.firstSync === false ? "warning" : "danger"} role={state === "failed" ? "alert" : undefined}>
-              {problem.words}
-            </Note>
-          )}
+          {showProblem && <Note tone={state === "retrying" || view.firstSync === false ? "warning" : "danger"}>{problem.words}</Note>}
           {state === "retrying" && view.retryAt && timeOf(view.retryAt) && <p className="text-xs text-muted-foreground" data-import="next-try">{IMPORT_WORDS.nextTry(timeOf(view.retryAt))}</p>}
           {state !== "retrying" && <p className="text-xs text-muted-foreground" data-import="kept">{view.firstSync === false ? SYNC_WORDS.keptRefresh : SYNC_WORDS.kept}</p>}
           <div className="flex flex-wrap items-start gap-2">
             {problem.next.map((n, i) =>
               n.id === "reconnect" ? (
-                <Button key="reconnect" variant={i === 0 ? "default" : "outline"} onClick={() => onReconnect?.()} data-import="reconnect">
+                <Button key="reconnect" variant={filled(i) ? "default" : "outline"} {...(filled(i) ? big : {})} onClick={() => onReconnect?.()} data-import="reconnect">
                   <Unplug aria-hidden />
                   {n.label}
                 </Button>
               ) : (
-                retryAction(n.label, i === 0)
+                retryAction(n.label, filled(i))
               ),
             )}
           </div>
         </div>
       )}
 
-      {lost && live && <Note tone="info" role="status">{IMPORT_WORDS.lost}</Note>}
+      {lost && live && <Note tone="info">{IMPORT_WORDS.lost}</Note>}
+      {/* the answer to the founder's own click: said at once */}
       {error && <Note tone="danger" role="alert">{error}</Note>}
 
       {state === "complete" && <Skipped skipped={view.skipped} />}
 
       {(state === "none" || state === "complete") && gate && (gate.id === "start_sync" || !gate.allowed) && view.linked !== false && (
-        <Gated action={gate} reasonId="import-reason" variant={state === "none" ? "default" : "outline"} disabled={busy} aria-busy={busy || undefined} onClick={() => onAct?.({})}>
+        <Gated action={gate} reasonId="import-reason" variant={state === "none" ? "default" : "outline"} {...(state === "none" ? big : {})} disabled={busy} aria-busy={busy || undefined} onClick={() => onAct?.({})}>
           <RefreshCw aria-hidden />
           {state === "none" ? IMPORT_WORDS.start : IMPORT_WORDS.refresh}
         </Gated>

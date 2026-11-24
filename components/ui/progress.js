@@ -7,7 +7,8 @@ import { Progress as ProgressPrimitive } from "radix-ui"
 // shadcn/ui Progress (radix base), restyled to docs/UI.md. `value` null (or
 // left out) is indeterminate: Radix then leaves aria-valuenow off and sets
 // data-state="indeterminate"; the bar shows a pulsing third, which stands
-// still under reduced motion.
+// still under reduced motion. A known value eases to its new width over
+// 500ms, so a 3 s poll reads as steady movement, not jumps.
 function Progress({ className, value = null, ...props }) {
   const known = typeof value === "number" && Number.isFinite(value)
   return (
@@ -21,7 +22,7 @@ function Progress({ className, value = null, ...props }) {
         data-slot="progress-indicator"
         className={cn(
           "h-full rounded-full bg-primary",
-          known ? "w-full motion-safe:transition-transform" : "w-1/3 opacity-60 motion-safe:animate-pulse"
+          known ? "w-full motion-safe:transition-transform motion-safe:duration-500 motion-safe:ease-out" : "w-1/3 opacity-60 motion-safe:animate-pulse"
         )}
         style={known ? { transform: `translateX(-${100 - Math.min(100, Math.max(0, value))}%)` } : undefined}
       />
