@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CircleAlert, CircleCheck, Eye, Library, RotateCcw, Trash2, Upload, X } from "lucide-react";
+import { Check, CircleAlert, CircleCheck, Eye, ImageIcon, Library, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -145,7 +145,7 @@ function NextLinks({ onBrand }) {
 function CatalogNotes({ firstRun, sync, canSync, onSettled, pollMs }) {
   if (firstRun.empty) {
     return (
-      <div className="space-y-2 rounded-md bg-muted p-3" data-first-run-note="empty">
+      <div className="space-y-2 rounded-md bg-card p-3" data-first-run-note="empty">
         <p className="text-sm text-foreground">{START_WORDS.empty}</p>
         <p className="text-xs text-muted-foreground">{START_WORDS.emptyRefill}</p>
         {sync && <SyncPanel initial={sync} canRun={canSync} showStart onSettled={onSettled} pollMs={pollMs} />}
@@ -154,7 +154,7 @@ function CatalogNotes({ firstRun, sync, canSync, onSettled, pollMs }) {
   }
   if (firstRun.noCollections) {
     return (
-      <div className="rounded-md bg-muted p-3" data-first-run-note="no-collections">
+      <div className="rounded-md bg-card p-3" data-first-run-note="no-collections">
         <p className="text-sm text-foreground">{START_WORDS.noCollections}</p>
       </div>
     );
@@ -244,8 +244,8 @@ function StarterStore({ starter, canEdit, canSync, pollMs, onBrand }) {
   }
   const title = state === "ready" ? (firstRun.summary ? START_WORDS.readyTitle : START_WORDS.keptTitle) : state === "kept" ? START_WORDS.keptTitle : state === "syncing" || state === "sync-failed" ? START_WORDS.syncTitle : START_WORDS.blockedTitle;
   return (
-    <section aria-labelledby="starter-store-title" className="space-y-3" data-first-run={state}>
-      <h3 id="starter-store-title" className="text-[1.125rem] leading-snug font-semibold">
+    <section aria-labelledby="starter-store-title" className="space-y-3 rounded-md bg-muted p-4" data-first-run={state}>
+      <h3 id="starter-store-title" className="text-base leading-snug font-semibold">
         {title}
       </h3>
       {body}
@@ -264,14 +264,22 @@ function Swatch({ palette, disabled }) {
       disabled={disabled}
       aria-label={palette.label}
       data-palette={palette.id}
-      className="flex aspect-auto size-auto flex-col items-stretch gap-2 rounded-md border border-border bg-card p-2 text-left text-sm data-[state=checked]:border-primary data-[state=checked]:bg-card data-[state=checked]:text-foreground data-[state=checked]:ring-2 data-[state=checked]:ring-primary"
+      className="flex aspect-auto size-auto flex-col items-stretch gap-2 rounded-md border border-border bg-card p-2 text-left text-sm transition-colors not-disabled:hover:border-muted-foreground/40 motion-reduce:transition-none data-[state=checked]:border-primary data-[state=checked]:bg-card data-[state=checked]:text-foreground data-[state=checked]:ring-1 data-[state=checked]:ring-primary"
     >
-      <span aria-hidden className="flex h-12 items-end gap-1.5 rounded-[4px] border p-2" style={{ ...style, background: "var(--background)", borderColor: "var(--sf-border)" }}>
-        <span className="h-5 w-9 rounded-full" style={{ background: "var(--accent-500)" }} />
-        <span className="h-2 w-7 rounded-full" style={{ background: "var(--sf-text)" }} />
-        <span className="h-2 w-4 rounded-full" style={{ background: "var(--sf-text-muted)" }} />
+      {/* a tiny storefront in the palette's own colours: a page, a button, two lines of text */}
+      <span aria-hidden className="flex h-14 flex-col justify-end gap-1.5 rounded-sm border p-2" style={{ ...style, background: "var(--background)", borderColor: "var(--sf-border)" }}>
+        <span className="h-1.5 w-10 rounded-full" style={{ background: "var(--sf-text)" }} />
+        <span className="flex items-center gap-1.5">
+          <span className="h-4 w-8 rounded-full" style={{ background: "var(--accent-500)" }} />
+          <span className="h-1.5 w-6 rounded-full" style={{ background: "var(--sf-text-muted)" }} />
+        </span>
       </span>
-      <span className="font-medium text-foreground">{palette.label}</span>
+      <span className="flex items-center justify-between gap-2">
+        <span className="font-medium text-foreground">{palette.label}</span>
+        <span aria-hidden className="hidden size-4 items-center justify-center rounded-full bg-primary text-primary-foreground group-data-[state=checked]/radio-group-item:flex">
+          <Check className="size-3" strokeWidth={3} />
+        </span>
+      </span>
     </RadioGroupItem>
   );
 }
@@ -317,10 +325,26 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
   useEffect(() => {
     if (wide === true) setPreviewOn(true);
   }, [wide]);
+  // the sheet is non-modal (no focus trap, by design): opening moves focus to
+  // its close button, closing returns it to the Preview button once that
+  // button shows again (it is hidden while the sheet is open)
+  const sheetClose = useRef(null);
+  const refocus = useRef(false);
   const closeSheet = () => {
+    refocus.current = true;
     setSheet(false);
-    previewButton.current?.focus?.();
   };
+  useEffect(() => {
+    if (sheet) sheetClose.current?.focus?.();
+    else if (refocus.current) {
+      refocus.current = false;
+      previewButton.current?.focus?.();
+    }
+  }, [sheet]);
+  // crossing to 1024px and up: the sheet becomes the column, so it closes
+  useEffect(() => {
+    if (wide === true) setSheet(false);
+  }, [wide]);
   useEffect(() => {
     if (!sheet || wide !== false || typeof window === "undefined") return undefined;
     const onKey = (e) => e.key === "Escape" && closeSheet();
@@ -466,7 +490,7 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
   const locked = !canEdit || busy;
   const hasHome = hasHomeFor(starter.state, starter.firstRun);
   const message = overlayMessage(form, saved, { storeName });
-  const preview = hasHome ? <BrandPreview message={message} canEdit={canEdit} saved={saves} /> : <p className="rounded-card border border-dashed border-border p-6 text-sm text-muted-foreground" data-preview-waiting="">{PREVIEW_WORDS.noHome}</p>;
+  const preview = hasHome ? <BrandPreview message={message} canEdit={canEdit} saved={saves} address={store?.address} /> : <p className="rounded-card border border-dashed border-border p-6 text-sm text-muted-foreground" data-preview-waiting="">{PREVIEW_WORDS.noHome}</p>;
   const snippet = snippetOf({ storeName, address: store?.address, description: form?.description });
   const reasonId = "brand-reason";
   const why = !canEdit && reason ? { "aria-describedby": reasonId } : {};
@@ -498,7 +522,16 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
         <div className="space-y-2" data-brand-logo={form.logo ? "set" : "none"}>
           <p className="text-sm font-medium">{BRAND_WORDS.logo}</p>
           <div className="flex flex-wrap items-center gap-3">
-            {form.logo ? <img src={form.logo.media} alt="" className="h-12 w-auto max-w-40 rounded-md border border-border bg-card object-contain p-1" /> : <p className="text-sm text-muted-foreground">{BRAND_WORDS.noLogo}</p>}
+            {form.logo ? (
+              <img src={form.logo.media} alt="" className="h-16 w-auto max-w-48 rounded-md border border-border bg-card object-contain p-2" />
+            ) : (
+              <>
+                <span aria-hidden className="flex size-16 shrink-0 items-center justify-center rounded-md border border-dashed border-border bg-muted text-muted-foreground">
+                  <ImageIcon className="size-5" />
+                </span>
+                <p className="min-w-0 flex-1 text-sm text-muted-foreground">{BRAND_WORDS.noLogo}</p>
+              </>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <input ref={fileRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden disabled={locked || uploading} onChange={(e) => upload(e.target.files?.[0])} data-brand-upload="" />
@@ -539,11 +572,13 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
           <p id="brand-description-hint" className="text-xs text-muted-foreground">
             {describeOk ? BRAND_WORDS.descriptionHint(max) : BRAND_WORDS.cannotDescribe}
           </p>
-          <figure className="space-y-0.5 rounded-md border border-border bg-card p-3" data-brand-snippet="" aria-label={BRAND_WORDS.snippetLabel}>
+          <figure className="mt-3 space-y-2" data-brand-snippet="">
             <figcaption className="text-xs text-muted-foreground">{BRAND_WORDS.snippetLabel}</figcaption>
-            <p className="truncate text-sm font-medium text-info">{snippet.title}</p>
-            {snippet.url && <p className="truncate font-mono text-xs text-success">{snippet.url}</p>}
-            <p className="line-clamp-2 text-[0.8125rem] text-muted-foreground">{snippet.text}</p>
+            <div className="space-y-0.5 rounded-md border border-border bg-card px-3 py-2.5">
+              {snippet.url && <p className="truncate text-xs text-muted-foreground">{snippet.url}</p>}
+              <p className="truncate text-base font-medium text-foreground">{snippet.title}</p>
+              {snippet.text ? <p className="line-clamp-2 text-[0.8125rem] text-muted-foreground">{snippet.text}</p> : <p className="text-[0.8125rem] text-muted-foreground italic">{BRAND_WORDS.snippetEmpty}</p>}
+            </div>
           </figure>
         </div>
 
@@ -587,14 +622,15 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
           </Notice>
         )}
 
+        <div className="space-y-3 border-t border-border pt-4">
         {dirty && (
-          <p className="flex items-center gap-2 text-[0.8125rem] text-warning-text" role="status" data-brand-dirty="">
-            <span aria-hidden className="size-2 rounded-full bg-warning" />
+          <p className="flex items-start gap-2 text-[0.8125rem] text-warning-text" role="status" data-brand-dirty="">
+            <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-warning" />
             {keptNote ? BRAND_WORDS.keptOnLatest : BRAND_WORDS.unsaved}
           </p>
         )}
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button disabled={locked || form.paletteId == null} onClick={() => save()} {...why}>
             {busy ? `${BRAND_WORDS.save}…` : BRAND_WORDS.save}
           </Button>
@@ -603,9 +639,11 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
           </Button>
           {dirty && (
             <Button variant="ghost" disabled={locked} onClick={undo}>
+              <RotateCcw aria-hidden />
               {BRAND_WORDS.undo}
             </Button>
           )}
+        </div>
         </div>
       </div>
     );
@@ -650,7 +688,7 @@ export default function BrandStepPanel({ canEdit = false, canSync = false, reaso
                 <h3 id="brand-preview-title" className="text-base font-semibold">
                   {PREVIEW_WORDS.title}
                 </h3>
-                <Button variant="ghost" size="icon-sm" onClick={closeSheet} aria-label="Close preview" data-brand-sheet-close="">
+                <Button ref={sheetClose} variant="ghost" size="icon-sm" onClick={closeSheet} aria-label={PREVIEW_WORDS.close} data-brand-sheet-close="">
                   <X aria-hidden />
                 </Button>
               </div>

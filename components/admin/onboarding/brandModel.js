@@ -119,7 +119,8 @@ export const BRAND_WORDS = Object.freeze({
   description: "One-line description",
   descriptionHint: (max) => `Up to ${max} characters. It shows under your store name in search results and when your store is shared.`,
   counter: (n, max) => `${n}/${max}`,
-  snippetLabel: "In search results",
+  snippetLabel: "How your store can look in search results",
+  snippetEmpty: "Your one-line description shows here.",
   cannotDescribe: "Only the store owner or an admin can change the store's description.",
   readOnly: "Your role can look at this page but not change it.",
   closedBefore: "Nothing shows to shoppers until you open your store.",
@@ -147,6 +148,7 @@ export const BRAND_WORDS = Object.freeze({
 export const PREVIEW_WORDS = Object.freeze({
   title: "Preview",
   open: "Preview",
+  close: "Close preview",
   phone: "Phone",
   computer: "Computer",
   width: "Preview width",

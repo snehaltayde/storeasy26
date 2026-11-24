@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { RotateCcw } from "lucide-react";
+import { Globe, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
 import { createPreviewController } from "@/components/admin/editor/editorModel";
@@ -25,7 +25,7 @@ export const COMPUTER_PX = 1280;
 const COMPUTER_HEIGHT = 640; // what the scaled page shows of itself, in console pixels
 const api = { startDocumentsPreview, setShowDesign };
 
-export default function BrandPreview({ message = null, canEdit = false, saved = 0, className = "" }) {
+export default function BrandPreview({ message = null, canEdit = false, saved = 0, address = "", className = "" }) {
   const frameRef = useRef(null);
   const boxRef = useRef(null);
   const ctlRef = useRef(null);
@@ -101,20 +101,21 @@ export default function BrandPreview({ message = null, canEdit = false, saved = 
   }, []);
 
   const computer = width === "computer";
+  const host = String(address || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const failed = view?.phase === "failed";
   return (
     <section aria-label={PREVIEW_WORDS.title} className={cn("min-w-0 space-y-3", className)} data-brand-preview="" data-preview-phase={view?.phase || ""} data-preview-width={width} data-preview-reconnecting={view?.reconnecting ? "" : undefined} data-preview-log={(ctlRef.current?.log || []).slice(-16).join(" ")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div role="radiogroup" aria-label={PREVIEW_WORDS.width} className="inline-flex rounded-md border border-border bg-muted p-0.5">
+        {/* two toggle buttons (aria-pressed): each is its own Tab stop, Enter or Space picks it */}
+        <div role="group" aria-label={PREVIEW_WORDS.width} className="inline-flex rounded-md border border-border bg-muted p-0.5">
           {["phone", "computer"].map((w) => (
             <button
               key={w}
               type="button"
-              role="radio"
-              aria-checked={width === w}
+              aria-pressed={width === w}
               data-preview-toggle={w}
               onClick={() => setWidth(w)}
-              className={cn("h-8 rounded-[4px] px-3 text-[0.8125rem] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring", width === w ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground")}
+              className={cn("h-8 rounded-sm px-3 text-[0.8125rem] font-medium transition-colors outline-none motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring", width === w ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground")}
             >
               {PREVIEW_WORDS[w]}
             </button>
@@ -133,11 +134,20 @@ export default function BrandPreview({ message = null, canEdit = false, saved = 
         </Button>
       )}
       {!canEdit && <p className="text-xs text-muted-foreground">{PREVIEW_WORDS.readOnly}</p>}
-      <div ref={boxRef} className="overflow-hidden rounded-card border border-border bg-muted">
-        <div className={cn("relative mx-auto", !computer && "max-w-[390px]")} style={computer ? { height: COMPUTER_HEIGHT } : undefined}>
+      <div className="overflow-hidden rounded-card border border-border bg-muted shadow-card">
+        {/* the store's own address over the page, so it reads as "your store" */}
+        {host && (
+          <div className="flex items-center gap-2 border-b border-border bg-card px-3 py-2" data-preview-address="">
+            <Globe aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+            <span className="truncate text-xs text-muted-foreground">{host}</span>
+          </div>
+        )}
+        <div ref={boxRef} className={cn(!computer && "px-4 py-4 sm:px-6")}>
+        <div className={cn("relative mx-auto", !computer && "max-w-[390px] overflow-hidden rounded-card border border-border shadow-card")} style={computer ? { height: COMPUTER_HEIGHT } : undefined}>
           <div className={computer ? "absolute top-0 left-0 origin-top-left" : undefined} style={computer ? { width: COMPUTER_PX, height: Math.round(COMPUTER_HEIGHT / scale), transform: `scale(${scale})` } : undefined}>
             <iframe ref={frameRef} title={PREVIEW_WORDS.frameTitle} className={cn("block w-full bg-background", computer ? "h-full" : "h-[70vh] max-h-[760px]")} onLoad={() => ctlRef.current?.frameLoad()} data-preview-frame="" />
           </div>
+        </div>
         </div>
       </div>
     </section>
