@@ -124,8 +124,8 @@ export async function connectHarness({ start = false, env = process.env, root = 
   log(`• starting the design harness on ${baseUrl}`);
   const child = spawn(process.execPath, [join(root, "scripts/dev-design.js")], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
   let output = "";
-  child.stdout.on("data", (c) => (output = (output + c).slice(-4000)));
-  child.stderr.on("data", (c) => (output = (output + c).slice(-4000)));
+  child.stdout.on("data", (c) => (output = (output + c).slice(-200_000)));
+  child.stderr.on("data", (c) => (output = (output + c).slice(-200_000)));
   const stop = () =>
     new Promise((done) => {
       if (child.exitCode !== null) return done();
@@ -134,7 +134,7 @@ export async function connectHarness({ start = false, env = process.env, root = 
     });
   for (let i = 0; i < 360; i++) {
     if (child.exitCode !== null) throw new DrillError(`The harness stopped while starting:\n${output.trim().split("\n").slice(-8).join("\n")}`);
-    if (await isUp(baseUrl)) return { baseUrl, port: next, creds: readCredentials(root), started: true, stop };
+    if (await isUp(baseUrl)) return { baseUrl, port: next, creds: readCredentials(root), started: true, stop, output: () => output, pid: child.pid };
     await new Promise((r) => setTimeout(r, 500));
   }
   await stop();
