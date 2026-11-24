@@ -794,3 +794,107 @@ Avoids `components/admin/onboarding/*` and `lib/onboarding/service.js` (lines 4�
 3. Checking a database is gone depends on `getDatabase` returning 404; with the CLI driver or Turso unreachable, freeing is refused; test against the fake's 404.
 4. Reset links in stored mail are credentials: non-production mock mail keeps bodies in `platform_mail`; production never mocks ("Mail isn't set up"). Review closely.
 5. The old handoff route is removed here (feature item 9); check nothing else (docs, drills, MANUAL-CHECKS) still points at it.
+
+## Line 9: an operator creates a store for a founder
+
+**Core decision:** an operator-created store is a `signups` row with `source='operator'`, run through the same `provision_store` job, status steps, retry and failure kinds as a signup; line 8's screen and Resume work on it unchanged. When the job finishes it emails an owner invite instead of making a user.
+
+### 1. Feature list (floor)
+
+1. **Page `/platform/stores/new`** on `components/ui`, linked as "New store" from the `/platform` header, its empty state and `/platform/onboarding`; non-operators → `/platform`.
+2. **Fields:** store name (2–60); owner email; founder name (optional, 0–80; email greeting and line 8's "who" column); Shopify domain via `normalizeShopDomain` (`x`, `x.myshopify.com` or an admin URL; custom domains get line 4's words); store address (optional, default `slugFor(name)` as typed, shown as `<slug>.<SIGNUP_STORE_DOMAIN>`); Shopify app client id and secret (optional, as a pair; one without the other refused; secret is a password field).
+3. **Live checks (debounced):** address via `slugAvailable` (reserved, existing stores and domains, live signups) with the signup words; shop refused if any tenant (any status) has that `shopify_store_domain` ("<store> already uses this Shopify store") or a live operator-created store holds it; an email with an account shows "They'll accept with their existing Storeasy password."
+4. **Submit queues the job** (no inline provisioning): insert the row (`verified`, then `claimSignupProvision`), `after(runJobById)`; URL becomes `?signup=sgn_…` so a reload resumes progress; unique indexes refuse a double submit; 20 creates per operator per hour; refuse in plain words if `SIGNUP_STORE_DOMAIN` or a DB driver (`signupDbDriver()`) is missing.
+5. **Progress** via line 2's model (`stepStates`), last step relabelled "Sending the owner's invite"; poll every 1.5 s, back off when hidden; `aria-live`; the retry note; both failure kinds with plain words and "Try again" via line 8's `resume` action.
+6. **On finish:** a 7-day owner invite emailed to the owner (`operator_store_invite`, the store's own origin); earlier unused owner invites for that email expire; the encrypted client secret cleared from the row; done screen shows "Invite sent to x" (or "Invite not sent" with Resend), the store address, whether the Shopify app is set up, the redirect URL to add to the store's Shopify app (`<host>/api/admin/shopify/callback`), and a link to the store's row on `/platform/onboarding`.
+7. **Resend invite** = line 8's `owner_invite` action (5/hour throttle); refused once the store has an owner; the first automatic invite doesn't count.
+8. **Accepting:** new account sets name and password, `email_verified_at` set (the invite proved the email); existing account must enter its current password, checked before the token is spent (a wrong password leaves the invite usable); then `/admin` → `/admin/onboarding`, step 1 showing their shop (locked, Connect enabled if the app was set up, else "Storeasy's team is preparing…"); the accept page shows the store name and invited email.
+9. **Operator never sees a token or link:** no `stores` or `onboarding` answer contains one; only the local mock mail body has it.
+10. **Line 8 integration:** rows carry `source`, badge "Created by Storeasy", never lapse, resume through the job; the provisions panel shows the badge.
+11. **States:** field errors, loading skeleton, error with Try again (typed input kept), keyboard-only, long names truncated with tooltip.
+
+Out of scope: shared Shopify app (OQ-06); custom storefront domains at creation; adopting an existing DB or legacy editor (CLI only); the legacy `admin_password` secret (cleanup line).
+
+### 2. Data: `migrations/platform/0015_operator_create_store.sql` (nothing destructive)
+
+```sql
+ALTER TABLE signups ADD COLUMN source TEXT NOT NULL DEFAULT 'signup'; -- signup | operator
+ALTER TABLE signups ADD COLUMN created_by TEXT;          -- operator user id
+ALTER TABLE signups ADD COLUMN shop_domain TEXT;         -- normalised x.myshopify.com
+ALTER TABLE signups ADD COLUMN shopify_client_id TEXT;
+ALTER TABLE signups ADD COLUMN shopify_secret_enc TEXT;  -- encryptSecret k1:, NULL once done
+ALTER TABLE signups ADD COLUMN invite_id TEXT;
+ALTER TABLE signups ADD COLUMN invite_status TEXT;       -- sent | mock | failed
+CREATE UNIQUE INDEX IF NOT EXISTS idx_signups_shop_live ON signups(shop_domain)
+  WHERE shop_domain IS NOT NULL AND status IN ('verified','provisioning','failed');
+CREATE INDEX IF NOT EXISTS idx_signups_source ON signups(source, created_at);
+```
+
+Operator rows: `browser_hash = sha256(random32)` (no cookie ever matches); `password_hash` NULL; `expires_at = 9999-12-31T23:59:59.999Z`; `signupLapsed` and its copy in `signup.js` return false for `source='operator'`. New mail kind `operator_store_invite`; run params `source:"operator"`.
+
+### 3. Permissions and least-trusted tests
+
+| Action | signed out / shopper | any merchant role (incl. owner of B) | non-operator session, operator without TOTP, bootstrap once operators exist | operator (TOTP) |
+|---|---|---|---|---|
+| page `/platform/stores/new` | redirect | redirect | redirect | allowed |
+| `GET /api/platform/stores` (`?check`, `?signup=`) | 401 | 401 | 401 | allowed |
+| `POST /api/platform/stores` | 401 (403 cross-origin) | 401 | 401 | allowed, audited |
+| `POST /api/platform/tenants` | 405 | 405 | 405 | 405 (retired) |
+| `GET/POST /api/admin/accept-invite` | token on its own store's host only | same; an existing session isn't used | n/a | n/a |
+
+All operator checks via `platformOperator()`. `scripts/test-operator-create-store.js`: every table row; a merchant token in `_platform` → 401; response keys against an allowlist (no `token`, `token=`, `*_enc`, `secret`, `db_*`, 64-char hex); duplicate shop refused (tenant of any status and a live row; case-varied and admin-URL inputs); duplicate or reserved address refused; two simultaneous creates → one row; invite can't be accepted for another email (user B signed in posting the token → no membership; membership only to the invite's email); token on store B's host refused and still usable on the right host; existing account with wrong password refused, token not spent; used or expired token refused; resend expires the earlier invite (only the newest works), refused once there is an owner, 6th within an hour throttled; client secret never in `jobs.payload`, `provision_runs`, `audit_log`, `slog` or answers, NULL once done; fake-Turso 503 retries, 402 needs an operator and Resume via `/api/platform/onboarding` finishes it; rows never lapse; each POST writes exactly one audit row with the operator id. Guard rows: `shopper-routes.js` adds `platform/stores` (GET, POST, operator), `platform/tenants` drops to `["GET"]`; `admin-routes.js` adds the accept-invite GET (token).
+
+### 4. Events
+
+Audit (no emails or secrets in diffs): `tenant.provision` (operator actor) `{via:"operator-form", signup, slug, shop, appReady}`; `tenant.provisioned` (actor `{kind:"system", id:"operator-create"}`) `{source:"operator", run, operator}`; `team.invite_created` (creating operator) `{role:"owner", via:"store-created", mail}`; resend keeps line 8's row; `team.invite_accepted` also carries `tenantId` and `{role, existingAccount}`. `slog`: `operator_store_queued`, `operator_store_invite{status}`, `admin_invite_rejected{reason}`.
+
+### 5. File plan (A → B → C)
+
+**WP-A: server**
+1. `migrations/platform/0015_operator_create_store.sql`.
+2. `lib/platform/platform-mail.js`: the new kind.
+3. `lib/platform/provision.js`: the "409 this run never asked for" rule also for `source==="operator"`.
+4. `lib/platform/identity.js`: `peekInvite(token, tenantId)` → `{email, role, existingAccount}`; `acceptInvite` checks an existing account's password before `consumeInvite`; new users get `emailVerifiedAt`.
+5. `lib/platform/onboarding-ops.js`: extract `mailOwnerInvite({tenant, to, operatorId, base, kind})` (used by `sendOwnerInvite`); list and subject rows carry `source`.
+6. `lib/platform/signup.js`: export `stepStates(row, run, {lastLabel})`; lapse rule skips operator rows.
+7. `lib/platform/signup-provision.js` operator branch: pass `shopDomain` and client id/secret (decrypted, also on resume); crash recovery matches `source`; send the invite instead of creating a user; mark done and clear the secret.
+8. `lib/platform/operator-stores.js` (new): `validateOperatorStore`, `checkOperatorStore`, `tenantsUsingShop`, `createOperatorStore`, `operatorStoreStatus` (runs a due job like `signupStatus`).
+9. `app/api/platform/stores/route.js` (new; `nodejs`, `maxDuration=60`, `sameOrigin`, `no-store`).
+10. `app/api/platform/tenants/route.js`: delete POST and the `provisionTenant` import.
+11. `app/api/platform/provisions/route.js`: operator source like signup (resume via the job, badge data).
+12. `app/api/admin/accept-invite/route.js`: GET peek (rate-limited); POST handles existing accounts.
+13. `scripts/support/shopper-routes.js`, `scripts/support/admin-routes.js`.
+14. `scripts/test-operator-create-store.js` + `test:operator-create-store`; update `test-identity.js`, `test-operator-onboarding.js` (mail kinds, shared invite helper), `test-signup-provision.js` (lapse rule).
+
+**WP-B: UI**
+15. `app/(console)/platform/stores/new/page.js`, `loading.js`.
+16. `components/platform/stores/CreateStoreForm.js`, `CreateStoreProgress.js`, `createStoreWords.js` (pure; unit-tested in item 14's suite).
+17. `components/platform/PlatformAdmin.js`: remove `NewTenantForm`, the `creating` state, both "New tenant" buttons; add a "New store" link.
+18. `components/platform/ProvisionRunsPanel.js`: the badge, new empty-state words.
+19. `components/platform/onboarding/OnboardingOps.js` (header link), `onboardingWords.js` (source label).
+20. `components/admin/AcceptInviteForm.js`, `app/(console)/admin/(auth)/accept-invite/page.js`: existing-account mode, store name and email shown.
+
+**WP-C: drill and docs**
+21. `scripts/drills/operator-create-store/run.mjs`, registered in `scripts/drills/run-isolated.mjs`, `drill:operator-create-store`: operator (TOTP) creates a store with app credentials; progress to done; read the mock invite with `latestPlatformMail`; the founder accepts on `<slug>.localhost`, sets a password, lands on `/admin/onboarding` with step 1 showing the shop and Connect enabled; a second store without credentials shows "preparing"; duplicate shop refused; Resend works; evidence in `docs/cms-reviews/drills/OPS-CREATE-STORE/`.
+22. `scripts/drills/shell/run.mjs`: `PLATFORM_CONSOLE` regex "New tenant" → "New store".
+23. Docs: `docs/onboarding.md`, `docs/platform.md`, `docs/platform-guide.md` route row, `docs/cms-reviews/MANUAL-CHECKS.md` lines 676 and 680.
+
+### 6. Retired
+
+Removed: `NewTenantForm`, the "New tenant" buttons, its one-time console password reveal, `POST /api/platform/tenants` and its guard-table method. Kept: `provisionTenant` and `scripts/provision-tenant.js` (CLI for adopting a DB or legacy editor), `ProvisionRunsPanel` (history, resume, rollback). Flagged for the cleanup line: the per-tenant `admin_password` secret that `register_tenant` still makes.
+
+### 7. Checks first
+
+1. `ls migrations/platform/ "/Users/snehal/Documents/Projects 2026/storeasy26-wt"/*/migrations/platform/ 2>/dev/null` (0015 free).
+2. `node scripts/test-signup-provision.js && node scripts/test-operator-onboarding.js && node scripts/test-identity.js && node scripts/test-tenant-ops.js && node scripts/test-security.js && node scripts/test-shopify-connect.js`.
+3. `rg -n "expires_at|signupLapsed|lapsed\(" lib/platform`.
+4. `rg -n "PLATFORM_MAIL_KINDS|acceptInvite|accept-invite" scripts`.
+5. `rg -n "encryptSecret" lib/platform/crypto.js -A8`; `node scripts/test-schema-compat.js` after 0015.
+
+### 8. Risks
+
+1. Lapse and expiry rules are scattered (line 8's SQL views, `signup.js` pruning read `expires_at`); far-future `expires_at` is the safety net; check 3 finds the rest.
+2. The accept-invite change affects team invites too: an existing user now needs their password; tests or drills relying on token-only sign-in break.
+3. The client secret sits encrypted until the job finishes (a "needs operator" run keeps it): review scrubbing in job errors.
+4. Merge conflicts with line 6 and the cleanup line: `PlatformAdmin.js`, `package.json`, `run-isolated.mjs`, `onboarding-ops.js`.
+5. Mail failure leaves a store with no owner ("Invite not sent" with Resend); with production mail unconfigured, every operator store waits for an operator to resend.
