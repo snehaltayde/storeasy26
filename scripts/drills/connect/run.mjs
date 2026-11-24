@@ -53,7 +53,15 @@ async function control() {
 async function signIn(drill, origin, creds) {
   const ctx = await drill.browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   ctx.setDefaultTimeout(60_000);
-  const res = await ctx.request.post(`${origin}/api/admin/login`, { data: { email: creds.email, password: creds.password }, headers: { origin }, maxRedirects: 0 });
+  // the first request on a cold dev server can 404 while the route compiles (the known login flake)
+  let res;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    await ctx.request.get(`${origin}/admin/login`).catch(() => {});
+    res = await ctx.request.post(`${origin}/api/admin/login`, { data: { email: creds.email, password: creds.password }, headers: { origin }, maxRedirects: 0 });
+    if (res.status() !== 404) break;
+    drill.note(`known flake: sign-in answered 404 on ${origin} (attempt ${attempt}); trying again`);
+    await new Promise((r) => setTimeout(r, 3000));
+  }
   if (res.status() !== 200) throw new Error(`sign-in as ${creds.email} on ${origin} answered ${res.status()}`);
   return ctx.newPage();
 }
