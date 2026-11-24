@@ -289,7 +289,7 @@ async function withHarnessStore(fn) {
   if (other) throw new H.HarnessError(`The design harness is running in this checkout (pid ${other.launcher.pid}). Stop it first.`);
   await H.stopLeftovers(dataDir, console.log);
   const seeded = H.readSeeded(dataDir);
-  if (seeded?.fixture !== "perf") throw new H.HarnessError("The harness data isn't the perf fixture. Seed it first: node scripts/dev-design.js seed --fixture perf");
+  if (seeded?.fixture !== "perf") throw new H.HarnessError("The harness data isn't the perf fixture. Seed it first: node scripts/dev-design.js seed --fixture perf (this replaces everything in .design-data — ask the owner first)");
   for (const key of ["platform", "tenant"]) if (await H.isPortBusy(ports.sqld[key])) throw new H.HarnessError(`Port ${ports.sqld[key]} is already in use.`);
   const sqld = H.findSqld({ env });
   const servers = ["platform", "tenant"].map((key) => H.startSqld({ bin: sqld.bin, key, port: ports.sqld[key], dataDir }));

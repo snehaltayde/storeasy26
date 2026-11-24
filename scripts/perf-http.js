@@ -2,7 +2,7 @@
 // of the design harness (`next build`, then `next start`), storefront on the
 // edge runtime, databases on local sqld, data from the perf fixture.
 //
-//   node scripts/dev-design.js seed --fixture perf      once, to seed
+//   node scripts/dev-design.js seed --fixture perf      once, to seed (wipes .design-data; ask the owner first)
 //   node scripts/perf-report.js http --build             build, then measure
 //   node scripts/perf-report.js http                     measure an existing build
 //   node scripts/perf-report.js check <run.json> --budget <file>
@@ -293,9 +293,9 @@ export async function runHttp(argv) {
   if (other) throw new HarnessError(`The design harness is running in this checkout (pid ${other.launcher.pid}). Stop it first: the report starts its own databases and server.`);
   await stopLeftovers(dataDir, log);
   const seeded = readSeeded(dataDir);
-  if (seeded?.fixture !== "perf") throw new HarnessError("The harness data isn't the perf fixture. Seed it first: node scripts/dev-design.js seed --fixture perf");
+  if (seeded?.fixture !== "perf") throw new HarnessError("The harness data isn't the perf fixture. Seed it first: node scripts/dev-design.js seed --fixture perf (this replaces everything in .design-data — ask the owner first)");
   const added = newMigrations(seeded.migrations, migrationNames(ROOT));
-  if (added.length) throw new HarnessError(`The harness data is older than the code (${added.join(", ")}). Seed again: node scripts/dev-design.js seed --fixture perf`);
+  if (added.length) throw new HarnessError(`The harness data is older than the code (${added.join(", ")}). Seed again: node scripts/dev-design.js seed --fixture perf (this replaces everything in .design-data — ask the owner first)`);
   for (const p of [ports.next, ...Object.values(ports.sqld), ...Object.values(admin), ...Object.values(proxyPorts)]) {
     if (await isPortBusy(p)) throw new HarnessError(`Port ${p} is already in use. The report needs DESIGN_PORT and DESIGN_SQLD_PORT to DESIGN_SQLD_PORT+8 free.`);
   }
@@ -666,7 +666,7 @@ export async function runFixtureInfo() {
   if (other) throw new HarnessError(`The design harness is running in this checkout (pid ${other.launcher.pid}). Stop it first.`);
   await stopLeftovers(dataDir, log);
   const seeded = readSeeded(dataDir);
-  if (!seeded) throw new HarnessError("There is no harness data. Seed it first: node scripts/dev-design.js seed --fixture perf");
+  if (!seeded) throw new HarnessError("There is no harness data. Seed it first: node scripts/dev-design.js seed --fixture perf (this replaces everything in .design-data — ask the owner first)");
   if (await isPortBusy(ports.sqld.tenant)) throw new HarnessError(`Port ${ports.sqld.tenant} is already in use.`);
   const s = startSqld({ bin: sqld.bin, key: "tenant", port: ports.sqld.tenant, dataDir });
   try {
