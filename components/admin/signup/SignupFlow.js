@@ -391,7 +391,8 @@ export default function SignupFlow({ storeDomain, codeMinutes = 15, resendSecond
     );
   }
 
-  const slugError = errors.slug || (check && !check.available && slug && check.slug === slug ? check.message : null);
+  // an address made from an empty or bad store name: the store name's own error says what to fix
+  const slugError = (slugTouched || !errors.storeName ? errors.slug : null) || (check && !check.available && slug && check.slug === slug ? check.message : null);
   const address = slug ? `${slug}.${storeDomain}` : null;
   const checking = !empty && check?.query !== query;
   const free = !checking && check?.available && check.slug === slug;
@@ -510,14 +511,14 @@ export default function SignupFlow({ storeDomain, codeMinutes = 15, resendSecond
               hint={
                 <div className="space-y-2">
                   <p>Made from your store name. You can change it now; it's harder to change later.</p>
-                  <div data-signup-address className={cn("flex items-start gap-2 rounded-md border px-3 py-2", slugError ? "border-destructive/30 bg-destructive/5" : "border-border bg-card")}>
+                  <div data-signup-address className={cn("flex items-start gap-2 rounded-md border px-3 py-2", slugError && address ? "border-destructive/30 bg-destructive/5" : "border-border bg-card")}>
                     <Globe aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
                       {address ? (
                         <>
                           <p className="font-mono text-sm break-all text-foreground">{address}</p>
                           <p aria-live="polite" className={cn("mt-0.5", slugError ? "text-destructive" : free ? "text-success" : "text-muted-foreground")}>
-                            {slugError ? "Not available. Try another address." : checking ? "Checking if it's free…" : free ? `${address} is free.` : `Your store will be at ${address}.`}
+                            {slugError ? (errors.slug ? "Fix the address above." : "Not available. Try another address.") : checking ? "Checking if it's free…" : free ? `${address} is free.` : `Your store will be at ${address}.`}
                           </p>
                         </>
                       ) : (

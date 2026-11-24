@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { CircleCheck, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,17 @@ import { Button } from "@/components/ui/button";
 // One card holds what the founder now owns (the address, whether shoppers can
 // see it, who is signed in); below it, the one next step and the one action.
 // Props: see app/(console)/admin/(authed)/onboarding/page.js.
+// a long address wraps before a dot, never mid-word
+function BreakAtDots({ text }) {
+  return text.split(".").map((part, i) => (
+    <Fragment key={i}>
+      {i > 0 && <wbr />}
+      {i > 0 && "."}
+      {part}
+    </Fragment>
+  ));
+}
+
 export default function Welcome({ storeName, address, open, account }) {
   return (
     <div data-onboarding="welcome" className="space-y-8 pt-4 md:pt-8">
@@ -19,8 +31,8 @@ export default function Welcome({ storeName, address, open, account }) {
         <div className="space-y-3 p-4 md:p-6">
           <div className="flex items-start gap-3">
             <Globe aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <p className="min-w-0 flex-1 font-mono text-base break-all" data-onboarding="address">
-              {address || "Your store's address is being set up"}
+            <p className="min-w-0 flex-1 font-mono text-sm [overflow-wrap:anywhere] md:text-base" data-onboarding="address">
+              {address ? <BreakAtDots text={address} /> : "Your store's address is being set up"}
             </p>
             {open ? (
               <span data-onboarding="status" className="shrink-0 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium tracking-[0.04em] text-success uppercase">
