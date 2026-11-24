@@ -14,8 +14,8 @@ import FirstRun from "@/components/admin/first-run/FirstRun";
 // use is shown disabled with the model's reason under it (the RoleGate
 // pattern), never hidden and never refused after a click. After anything here
 // saves, onChange() re-reads the steps.
-//   Connect  connected or not; the Shopify domain only when the model has it
-//            (settings.read); nothing is written to Shopify
+//   Connect  ./ConnectPanel (line 4): the address, Connect through Shopify's
+//            approval, the errors; nothing is written to Shopify
 //   Import   SyncProgress's own body, readSync and requestSync (/api/admin/sync)
 //   Brand    FirstRun (the starter store and BrandStep at #brand), legacy styled
 //   Open     the opening report's items, the policy starters
@@ -86,20 +86,8 @@ function Notice({ tone = "danger", children }) {
 }
 
 // ---- Connect ---------------------------------------------------------------
-export function ConnectPanel({ step }) {
-  const hasDomainFact = Object.hasOwn(step.facts || {}, "shopDomain");
-  if (!hasDomainFact) return null;
-  return (
-    <div className="space-y-3">
-      {(
-        <dl className="rounded-md border border-border px-3 py-2 text-sm" data-onboarding="shop-domain">
-          <dt className="text-xs text-muted-foreground">{PANEL_WORDS.shopDomain}</dt>
-          <dd className="font-mono [overflow-wrap:anywhere]">{step.facts.shopDomain || <span className="font-sans text-muted-foreground">{PANEL_WORDS.noDomain}</span>}</dd>
-        </dl>
-      )}
-    </div>
-  );
-}
+// Phase 1 line 4: the panel lives in ./ConnectPanel (it reads ?shop and ?connect_error itself).
+export { ConnectPanel } from "./ConnectPanel";
 
 // ---- Import ----------------------------------------------------------------
 const LIVE = new Set(["running", "retrying"]);

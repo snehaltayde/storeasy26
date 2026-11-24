@@ -371,8 +371,25 @@ export const DRILLS = {
       return seeded !== 0 ? seeded : c.node(["scripts/drills/signup/run.mjs", ...c.headed]);
     },
   },
+  // a founder connects Shopify from onboarding step 1 (Phase 1 line 4 §5 item 14):
+  // the roles store plus the Roles Annex; the drill starts the Shopify stand-in
+  // on SHOPIFY_FAKE_PORT (a free slot in this run's block), and the harness gets
+  // SHOPIFY_API_ORIGIN for it, set here after drillEnv's blanking
+  connect: {
+    id: "P1-CONNECT",
+    warm: true,
+    run: (c) => {
+      const fakePort = c.ports.rolesSqld + 5;
+      const env = { ...c.env, SHOPIFY_API_ORIGIN: `http://127.0.0.1:${fakePort}`, SHOPIFY_FAKE_PORT: String(fakePort) };
+      const cc = { ...c, env, node: (args, opts = {}) => c.node(args, { env, ...opts }) };
+      return withRolesStore(cc, async () => {
+        const annex = await cc.node(["scripts/dev-roles.js", "annex"]);
+        return annex !== 0 ? annex : cc.node(["scripts/drills/connect/run.mjs", ...c.headed]);
+      });
+    },
+  },
 };
-export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup"];
+export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "connect"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 
