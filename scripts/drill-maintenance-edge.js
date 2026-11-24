@@ -212,7 +212,7 @@ try {
     });
     await libsql.execute({ sql: "INSERT INTO collection_products (collection_id, product_id, position) VALUES (?, ?, 0)", args: [collectionId, productId] });
     // The marked content as published documents: the about page, a policy
-    // page and the home hero, written and published through lib/documents.
+    // page, the home hero and the brand, written and published through lib/documents.
     const page = (slug, title) => {
       const b = Reg.emptyBody("page");
       b.meta = { ...b.meta, slug, title };
@@ -221,7 +221,11 @@ try {
     };
     const home = Reg.emptyBody("home");
     home.sections = [Reg.legacyHeroToSection({ title: MARK.hero, subtitle: MARK.hero })];
-    const documents = [{ id: singletonId("home"), type: "home", body: home }, page("about", MARK.about), page("drill-policy", MARK.policy)];
+    // the dark brand is published with the design document (the storefront
+    // reads its colours from the live release, not from the tenant config)
+    const design = Reg.emptyBody("design");
+    design.settings = { ...design.settings, brand: BRAND };
+    const documents = [{ id: singletonId("design"), type: "design", body: design }, { id: singletonId("home"), type: "home", body: home }, page("about", MARK.about), page("drill-policy", MARK.policy)];
     for (const d of documents) {
       const r = Reg.validateDocument(d.body, { mode: "publish", documentId: d.id ?? d.body.meta.slug });
       const errors = r.issues.filter((i) => i.severity === "error");
