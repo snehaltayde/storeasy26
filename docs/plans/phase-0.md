@@ -240,3 +240,79 @@ No migration (`orders.cart_id` exists). Shopper identity comes only from `custom
 3. Storefront pages may need more stubbing (`tfetch`, `cookies()`, `after()`).
 4. Out of scope: `/api/track` accepts any `transaction_id` as a purchase order id (integrity, later analytics line).
 5. Legacy v1 order tokens don't expire until 2027-01-31; accepted, tested via injected `now`.
+
+## Line 4: the agency partner programme is removed
+
+**Fit:** Phase 0 line 4; uses the route guards from lines 1–3. Owner decision: routes, screens, links and the suite go; tables stay; no data deleted.
+
+### 1. Delete (17 files)
+
+- Pages: `app/(console)/partners/{page,error,loading}.js`, `app/(console)/approve/[token]/page.js`.
+- API: `app/api/partners/route.js`, `app/api/partners/auth/route.js`, `app/api/approve/route.js`, `app/api/admin/agency-grants/route.js`, `app/api/platform/partners/route.js`.
+- Components: `components/partners/PartnersConsole.js`, `components/partners/PartnersLogin.js`, `components/ApprovalDecision.js`, `components/platform/PartnersPanel.js`.
+- Domain: `lib/platform/agency.js`.
+- Suite: `scripts/test-agency.js` and `test:agency` in `package.json`.
+
+### 2. Edit
+
+- Settings: `app/(console)/admin/(authed)/settings/page.js` drops the `agency-access` section; `components/admin/OpsPanels.js` drops `AgencyAccessPanel`.
+- Operator console: `components/platform/PlatformAdmin.js` replaces the "Partners" tab with "Case studies".
+- Comments/labels: `components/console/status.js` (keep `accepted`/`revoked`, fix comment), `components/console/README.md`, `app/(console)/layout.js`, `lib/content-writes.js`, `lib/cms/view.js`, `lib/admin/brand-readability.js`.
+- Types: `lib/types/tenant.ts` removes `"agency"` from `SessionKind` and the actor `kind` union.
+- Fixture: `lib/registry/fixtures.js` renames `LEGACY_HERO_FIXTURES.agency_kit` → `full_hero` (same payload; comment "a whole hero with both buttons"); `scripts/test-registry-contract.js` renames the test, keeps `>= 5`, line ~423 → `full_hero`.
+- Seed: `scripts/seed-design-preview.js` drops lines ~296–310 (agency, partner user, grant, approval). Existing harness rows untouched.
+- Suites: `test-design-doc.js` (import ~94; agency-export lines ~746–751, retitle; ~848–859 drop agency half, keep theme-kit half, retitle; ~1287 reader list); `test-order-catalog.js` (import ~58; test ~421–427; header comment); `test-support-reads.js` ~316 drop `["agency-grants", {}]`; `test-copy.js` ~91, ~98 drop `components/partners`, `partners`, `approve`; `test-maintenance.js` ~408 drop `partners` from the regex.
+- Guards: `scripts/support/admin-routes.js` drops the two `agency-grants` rows; `scripts/support/shopper-routes.js` drops `approve`, `partners`, `partners/auth`, replaces `platform/partners` with `{ path: "platform/case-studies", methods: ["GET","POST"], class: "operator", suite: "test-case-studies.js" }`, removes `"agency"` from `ROUTE_CLASSES`.
+- Docs: `docs/ARCHITECTURE.md` agency tables row → "Unused since 2026-11-24, kept (migrations are additive)", drop the agency route-class row; `docs/MANUAL_TESTING_GUIDE.md` drops the Partners/approvals/test:agency sections; `docs/platform-guide.md` §"Agency platform" gets a "Removed 2026-11-24" note. Don't touch `docs/cms-reviews/**` or `docs/CMS_*.md`.
+
+### 3. Must keep working
+
+- **Case studies** (marketing `/customers` via `lib/platform/case-studies.js`) — their authoring UI, API and tests live in Partners today; they move:
+  - `app/api/platform/case-studies/route.js` (operator only): GET list, POST `case_study`, `publish_case`, `delete_case` as they are, plus an `audit()` row on save and delete (today only publish is audited).
+  - `components/platform/CaseStudiesPanel.js`: the case-study part of PartnersPanel (~264–340 plus the delete confirm), pointed at the new route.
+- Support grants, the rest of the operator console, billing, jobs: no agency coupling. No env vars, middleware, sitemap or robots entries.
+
+### 4. Auth for non-agency callers
+
+`requireAdmin` has no agency path; `verifySession` rejects mismatched kinds. Agencies acted through `runAsTenant` inside `agency.js`, which goes; `runAsTenant` stays. The new suite proves:
+- an agency session token in the merchant cookie against an admin route → 401; in the operator cookie against `platform/overview` → 401; only an `_agency` cookie → 401;
+- an `agency-member` invite posted to `/api/admin/accept-invite` is refused and creates no membership;
+- a user with only an `agency_members` row can't sign in at `/api/admin/login` or `/api/platform/login`.
+
+### 5. Replacement tests
+
+- `scripts/test-agency-removed.js` (`test:agency-removed`):
+  1. Route table: walk `app/` for `page.js`/`route.js` (strip `(group)` segments); for `/partners`, `/approve/x`, `/api/partners`, `/api/partners/auth`, `/api/approve`, `/api/admin/agency-grants`, `/api/platform/partners` the only match may be `app/(storefront)/[...unmatched]/page.js`, which must call `notFound()`.
+  2. Reference allowlist: scan `app/`, `components/`, `lib/`, `scripts/`, `package.json` for the table names `\b(agencies|agency_members|agency_grants|agency_kits|agency_referrals|agency_commissions|client_approvals)\b` and the paths `api/partners`, `["'\`]/partners\b`, `api/approve`, `["'\`]/approve/`, `agency-grants`, `platform/partners`, `platform/agency`, `components/partners`, `"_agency"`, `kind: "agency"`, `agency-member`. Allowed only in `migrations/**`, this test file, `scripts/drills/p1/migovl.mjs` and `scripts/drills/p4/**` (retired, not run), each with a reason; each allowlisted file must exist.
+  3. The §4 auth checks (route-harness, file DBs with platform migrations incl. `0010`).
+  4. No row in `ADMIN_ROUTES` or `SHOPPER_ROUTES` names a former path; `ROUTE_CLASSES` has no `agency`.
+- `scripts/drills/agency-gone.mjs` (`drill:agency-gone`): fetch only, never seeds, base URL default `http://localhost:3017`; GET (and POST to the API paths) every former path as anonymous, support and owner; GET → 404; POST → 404 or 405, never 2xx.
+- `scripts/test-case-studies.js` (`test:case-studies`): moves the publication-gate tests from `test-agency.js` ~284–314; route tests — signed out 401, merchant owner 401, operator 200; save, publish and delete each write `audit_log`; anonymous `getCaseStudy` of an unpublished study → null.
+
+### 6. Build order (one builder)
+
+1. The two new suites, red first.
+2. Case-studies route → panel → `PlatformAdmin.js`.
+3. Delete the 17 files.
+4. Settings page and `OpsPanels.js`.
+5. Types, fixture, comments.
+6. Seed, then the suite edits.
+7. Guards and `package.json` (remove `test:agency`; add `test:agency-removed`, `test:case-studies`, `drill:agency-gone`).
+8. `git add` the new route before `test:security`; `git rm` the deletions.
+9. Docs; then ui-designer on CaseStudiesPanel and Settings.
+
+### 7. Checks to run first
+
+- Baseline: `node scripts/test-permissions.js && node scripts/test-shopper-reads.js && node scripts/test-support-reads.js && node scripts/test-design-doc.js && node scripts/test-order-catalog.js && node scripts/test-registry-contract.js && node scripts/test-copy.js && node scripts/test-maintenance.js && node scripts/test-agency.js`; `pnpm typecheck`.
+- `grep -rn "SessionKind\|kind: \"agency\"" lib app components scripts`
+- `git ls-files app/api | grep -E "partners|approve|agency"`
+- `grep -n '"test:security"' package.json`
+- With the harness running: `curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:3017/api/does-not-exist`.
+
+### 8. Risks
+
+1. Case studies lost with the Partners panel → new suite before deletions.
+2. POST to an unmatched `/api/*` may not answer 404 (page catch-all) → curl first; record the answer.
+3. The harness DB keeps its agency rows (`partner@design.test`, a grant on `design`); leave them, no re-seed. No FKs into agency tables.
+4. `test-design-doc.js` and `test-order-catalog.js` mix agency checks into tests that matter for other things; keep the theme-kit and onboarding/Help/readability assertions.
+5. Retired drills `p4/runbook.mjs`, `cutover.mjs` expect an "agency has access" result that nothing produces now; they stay unrunnable (Phase 0 drills line).

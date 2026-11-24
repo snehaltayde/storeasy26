@@ -13,12 +13,12 @@ import { CopyButton, SecretReveal } from "@/components/console/Copy";
 import { Table } from "@/components/console/Table";
 import { useToast } from "@/components/console/Toast";
 
-// Merchant ops panels (S43, redesigned S50): Team (MC23), Agency access
-// (AG02), Domains & SEO (MC21), Privacy (MC25), Audit log (MC26), Help &
-// diagnostics (MC27) — appended to the Settings page as anchor-target Cards.
+// Merchant ops panels (S43, redesigned S50): Team (MC23), Domains & SEO
+// (MC21), Privacy (MC25), Audit log (MC26), Help & diagnostics (MC27) —
+// appended to the Settings page as anchor-target Cards.
 // Each panel speaks to its own API and renders exactly one of loading /
 // permission / error / unsupported / data — never blank. Destructive actions
-// (remove member, change role, revoke agency) confirm via ConfirmDialog.
+// (remove member, change role) confirm via ConfirmDialog.
 
 function usePanel(url) {
   const [data, setData] = useState(null);
@@ -212,99 +212,6 @@ function TeamPanel({ role }) {
         body={removing ? `Remove ${removing.email} from this store? Their console access ends immediately.` : ""}
         confirmLabel="Remove"
         onConfirm={() => post({ action: "remove", userId: removing.id })}
-      />
-    </Card>
-  );
-}
-
-// ---- Agency access (S48 / AG02 client side) ------------------------------------
-
-function AgencyAccessPanel({ role }) {
-  const toast = useToast();
-  const { data, err, load } = usePanel("/api/admin/agency-grants");
-  const [token, setToken] = useState("");
-  const [actionErr, setActionErr] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [revoking, setRevoking] = useState(null); // grant
-
-  return (
-    <Card id="agency-access">
-      <CardHeader
-        title="Agency access"
-        description="An agency only sees this store after YOU accept their invitation code here — and you can revoke at any moment (it cuts their access on their very next request). Agencies are never owners."
-      />
-      {actionErr && (
-        <Banner tone="danger" className="mb-3">
-          {actionErr}
-        </Banner>
-      )}
-      <PanelState data={data} err={err} load={load} role={role} need="view agency access">
-        {(d) => (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                mono
-                aria-label="Agency invitation code"
-                className="min-w-64 flex-1"
-                placeholder="paste the agency's invitation code"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-              />
-              <Button
-                variant="primary"
-                busy={busy}
-                disabled={token.trim().length < 10}
-                onClick={async () => {
-                  setBusy(true);
-                  setActionErr(null);
-                  try {
-                    const r = await postJson("/api/admin/agency-grants", { accept: { token: token.trim() } });
-                    toast.success(`Access granted (role: ${r.grant.role}).`);
-                    setToken("");
-                    load();
-                  } catch (e) {
-                    setActionErr(String(e?.message || e));
-                  }
-                  setBusy(false);
-                }}
-              >
-                Accept invitation
-              </Button>
-            </div>
-            {d.grants?.length > 0 ? (
-              <ul className="mt-4 divide-y divide-edge">
-                {d.grants.map((g) => (
-                  <li key={g.id} className="flex flex-wrap items-center gap-2 py-2.5 text-sm">
-                    <StatusBadge status={g.status} />
-                    <span className="font-medium text-fg">{g.agency_name}</span>
-                    <span className="text-fg-muted">· {g.role}</span>
-                    {g.accepted_at && <span className="text-xs text-fg-subtle">since {new Date(g.accepted_at).toLocaleDateString("en-IN")}</span>}
-                    {g.status === "accepted" && (
-                      <Button size="sm" variant="dangerOutline" className="ml-auto" onClick={() => setRevoking(g)}>
-                        Revoke
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-xs text-fg-subtle">No agency has access to this store.</p>
-            )}
-          </>
-        )}
-      </PanelState>
-
-      <ConfirmDialog
-        open={!!revoking}
-        onClose={() => setRevoking(null)}
-        title="Revoke agency access"
-        tone="danger"
-        body={revoking ? `Revoke ${revoking.agency_name}'s access? This cuts the agency's access on their very next request.` : ""}
-        confirmLabel="Revoke"
-        onConfirm={async () => {
-          await postJson("/api/admin/agency-grants", { revoke: { id: revoking.id } });
-          load();
-        }}
       />
     </Card>
   );
@@ -549,7 +456,6 @@ export default function OpsPanels({ role }) {
   return (
     <div className="mt-4 space-y-4">
       <TeamPanel role={role} />
-      <AgencyAccessPanel role={role} />
       <DomainsPanel role={role} />
       <PrivacyPanel role={role} />
       <AuditPanel role={role} />

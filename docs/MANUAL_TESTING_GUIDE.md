@@ -16,7 +16,7 @@ design/visual QA pass for the S50 console redesign.
 
 | Environment | Start | URL(s) | Use it for |
 |---|---|---|---|
-| **Design harness** (recommended for console and storefront review) | `pnpm dev:design` (it seeds itself the first time; `pnpm seed:design` starts fresh) | http://localhost:3017 | The storefront on the **edge runtime**, exactly as deployed code declares it, plus all three consoles, with rich seeded data (8 products in 3 collections, every order status, returns, offers, experiments, automations, incident, agency). Local databases (sqld), and the known hosted keys are blanked. Needs `sqld` (see "How the design harness runs" below). |
+| **Design harness** (recommended for console and storefront review) | `pnpm dev:design` (it seeds itself the first time; `pnpm seed:design` starts fresh) | http://localhost:3017 | The storefront on the **edge runtime**, exactly as deployed code declares it, plus both consoles, with rich seeded data (8 products in 3 collections, every order status, returns, offers, experiments, automations, incident). Local databases (sqld), and the known hosted keys are blanked. Needs `sqld` (see "How the design harness runs" below). |
 | **Local dev** | `pnpm dev` | BeastLife: http://localhost:3007 · Demo tenant: http://127.0.0.1:3007 · Marketing: http://site.localhost:3007 | Storefront testing (browse, cart, checkout, wishlist, quiz, PWA) against the staging Turso DBs, plus consoles with real data. |
 | **Hosted demo** | already deployed | your hosted tenant domains | Final authed walkthroughs — same checklists as below. |
 
@@ -81,13 +81,6 @@ before starting the harness (and vice versa).
 - **Harness:** http://localhost:3017/platform — the `PLATFORM_ADMIN_PASSWORD` value from `.design-env`.
 - **Local/hosted:** the operator password from that environment's secrets.
 
-### Partners (agency) console — `/partners`
-- **Harness:** http://localhost:3017/partners — email `partner@design.test`, password = the same `DESIGN_ADMIN_PASSWORD` value from `.design-env` (the seed reuses it).
-- The seeded agency is **Northwind Studio** (verified, referral-eligible) with an accepted staff grant on the `design` tenant and one pending client approval.
-
-### Public approval page — `/approve/<code>`
-- In the partners console, open the pending approval ("Homepage refresh for the winter drop") and reveal its code (SecretReveal). Open http://localhost:3017/approve/`<code>` in a private window — no login needed; the client approves or rejects there.
-
 ### Storefront customer account (3007 only)
 - Order-status links are signed links emailed per order; wishlist/account flows are reachable from the storefront header.
 
@@ -108,7 +101,7 @@ Check at ~**1440, 1280, 768, 390** (resize the window or use devtools device mod
 - Page titles don't wrap awkwardly; sticky page headers stay readable while scrolling.
 
 ### 3.2 Chrome & leak checks
-- Consoles must show **no storefront chrome**: no shop header/search/cart drawer/footer/cookie banner on any `/admin`, `/platform`, `/partners`, `/approve` page — including login pages and error pages.
+- Consoles must show **no storefront chrome**: no shop header/search/cart drawer/footer/cookie banner on any `/admin` or `/platform` page — including login pages and error pages.
 - The harness tenant deliberately uses a **teal accent + cream background + oversized type** on its brand. If any console surface shows teal/cream/huge type, tenant brand variables are leaking — that's a bug.
 - Visit a garbage URL (e.g. `/no-such-page`) on 3007 — storefront 404. Visit a garbage **console** URL (e.g. `/admin/no-such`) — console-styled error/404, not the storefront joke 500.
 
@@ -202,22 +195,12 @@ The old single Storefront screen is now a CMS with its own routes, all deep-link
 - **Privacy/redaction:** redaction requires typing REDACT; it covers orders, customers, events, and wishlists.
 - **Flags:** `ff_*` namespace enforced; flip `ff_checkout` off and confirm checkout on 3007 returns the kill-switch response, then flip it back. CRITICAL flags re-read uncached.
 - **Costs:** enter a period total; allocation across tenants + unallocated must sum exactly to the total; unmeasured tenants are listed.
-- **Partners/Agencies:** Northwind Studio shows verified; suspend/verify confirm first; commission rows tie to billing events (earn once, reverse once).
+- **Case studies:** a new study saves as a draft; Publish is refused (with what is missing) until consent, period, method, results, limitations and confounders are filled; a published study shows at `/customers/<slug>`; delete asks first.
 - **Support grants:** issue a support grant for a tenant → that tenant's admin shows the "support access" banner; the grant expires/revokes cleanly.
 
 ---
 
-## 6. Partners console & approvals — `/partners`
-
-- Portfolio health cards render for the granted client; sections never vanish when empty (kits shows an empty state).
-- Grant invites: create one bound to a client email; it can only be accepted in the client's admin by a team-managing member with that email; roles offered are support/staff/admin (never owner).
-- Kits: generating a kit **scrubs** source-tenant identifiers; applying one creates CMS **drafts** only (brand is suggested, not applied).
-- Approvals: the pending "Homepage refresh" approval shows its code in a reveal well; open `/approve/<code>` publicly; approve → recorded with approver name; if the underlying draft changes after the snapshot, deciding must fail with a conflict (409) rather than approving stale content.
-- Reports open in a dialog; codes/secrets never render as plain inline text.
-
----
-
-## 7. Storefront — on 3007, or the harness where noted
+## 6. Storefront — on 3007, or the harness where noted
 
 Browse, search, cart, checkout's first steps, account sign-in, CMS pages and
 maintenance also work on the harness (edge runtime, seeded catalog). Anything
@@ -236,7 +219,7 @@ that needs Shopify, a real payment or real email stays on 3007 or hosted.
 
 ---
 
-## 8. Automated checks (run anytime, ~all green expected)
+## 7. Automated checks (run anytime, ~all green expected)
 
 ```bash
 pnpm build
@@ -244,19 +227,19 @@ pnpm build
 
 Suites (each `pnpm test:<name>`): the full baseline is 37 suites / ~496 checks —
 most relevant to console testing: `test:admin-console`, `test:cms`,
-`test:authz`, `test:platform-ops`, `test:agency`, `test:identity`,
+`test:authz`, `test:platform-ops`, `test:case-studies`, `test:identity`,
 `test:security` (client-import scan), `test:orders`, `test:offers-admin`.
 
 ---
 
-## 9. Reporting a bug you find
+## 8. Reporting a bug you find
 
 Note: environment (harness/3007/hosted), console + screen, role you were
 signed in as, viewport width, steps, expected vs actual, and the raw status
 string from the chip tooltip if relevant. Console errors
 (`read_console_messages` in the app, or browser devtools) help.
 
-## 10. Known limitations (so you don't chase them)
+## 9. Known limitations (so you don't chase them)
 
 - Harness storefront: fixed in P1-HARNESS (it used to fail on every page because the edge runtime can't open file databases). It needs `sqld` installed.
 - Harness hero: a running hero experiment can show its variant title instead of your draft, even in the Designer preview (P1-HARNESS finding).

@@ -199,7 +199,7 @@ for (const k of ["login", "logout", "token", "recover", "maintenance-pass"]) EXE
 await t("guard: every route file, exported method and requireAdmin action has its row (filesystem walk + import)", async () => {
   const problems = await guardProblems(ADMIN_ROUTES, EXEMPT_ROUTES, ROUTES);
   if (problems.length) throw new Error(problems.join("\n"));
-  ok(routeFiles.length >= 41, `walked ${routeFiles.length} route files`);
+  ok(routeFiles.length >= 40, `walked ${routeFiles.length} route files`);
   for (const [path, { src, methods }] of ROUTES) eq([...regexMethodsOf(src)].sort().join(","), [...methods].sort().join(","), `${path}: source scan vs exports`);
 });
 

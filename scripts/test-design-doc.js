@@ -12,7 +12,7 @@
 //      sections that use that token group (lib/registry/token-usage.js)
 //   5. theme_pin: a design publish and a design Undo write it (after-commit);
 //      a failing pin write leaves the publish answer as it was
-//   6. readers: onboarding, Help, the agency kit export and brand readability
+//   6. readers: onboarding, Help and brand readability
 //      read the LIVE doc_design; the operator screens read theme_pin
 //   7. kits that leave an unpublishable draft say so, naming what to fix
 //   8. the guard: no config.brand / config.theme read outside the allowlist
@@ -91,7 +91,6 @@ const { createClient } = await import("@libsql/client");
 const C = await import("../lib/platform/control.js");
 const S = await import("../lib/platform/sessions.js");
 const I = await import("../lib/platform/identity.js");
-const A = await import("../lib/platform/agency.js");
 const { withTenant } = await import("../lib/tenant-context.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 const K = await import("../lib/themes/kits.js");
@@ -719,7 +718,7 @@ await t("unit: themePinOf reads a build's design version; a design with no look 
 // ======================================================================================
 console.log("— 6. readers");
 
-await t("unit: onboarding, Help, the agency kit export and brand readability read the LIVE doc_design in documents mode (never config.brand / config.theme); legacy reads its config as before", async () => {
+await t("unit: onboarding, Help and brand readability read the LIVE doc_design in documents mode (never config.brand / config.theme); legacy reads its config as before", async () => {
   // the live design now: pulse, accent #0f766e (test 5). The config still says
   // purple and pulse; a draft says something else again.
   await saveDesign((b) => {
@@ -743,12 +742,6 @@ await t("unit: onboarding, Help, the agency kit export and brand readability rea
     await C.patchTenant("dd", { config: { theme: cfg0.theme } });
   }
   eq([h.status, h.body.diagnostics.theme], [200, "pulse@1"], "help:");
-  // agency export: the live brand
-  const agency = await A.createAgency({ name: "Design Studio" });
-  const inv = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@dd.test", role: "staff" });
-  ok(await A.acceptGrant(inv.token, { tenantId: "dd", actorEmail: "owner@dd.test" }), "grant accepted");
-  const kitRow = await A.exportAgencyKit({ agencyId: agency.id, tenantId: "dd", name: "From docs" });
-  eq(kitRow.payload.brand?.accent, "#0f766e", "agency export:");
   // brand readability: compared with the live design (#cccccc text kept as
   // live is a warning, not a block); with no live brand it would block
   // A publish refuses unreadable grey text, so the live design that already
@@ -845,18 +838,7 @@ await t("unit: the operator screens read theme_pin (overview, themes, tenant det
 // ======================================================================================
 console.log("— 7. kits that leave an unpublishable draft");
 
-await t("unit: an agency kit that leaves the home draft unpublishable says so in plain words and names what to fix; a theme kit whose draft publishes says nothing", async () => {
-  const agency = await A.createAgency({ name: "Broken Kits" });
-  const inv = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@dd.test", role: "staff" });
-  await A.acceptGrant(inv.token, { tenantId: "dd", actorEmail: "owner@dd.test" });
-  await C.platformDb().execute({
-    sql: "INSERT INTO agency_kits (id, agency_id, name, source_note, payload, created_at) VALUES (?, ?, ?, 'x', ?, ?)",
-    args: ["akit_offsite_dd", agency.id, "offsite", JSON.stringify({ home_sections: [{ kind: "banner", title: "Sale", text: "", label: "Shop", href: "https://elsewhere.example/sale" }] }), new Date().toISOString()],
-  });
-  const r = await A.applyAgencyKit({ agencyId: agency.id, kitId: "akit_offsite_dd", tenantId: "dd" });
-  ok(Array.isArray(r.unpublishable) && r.unpublishable[0]?.documentId === "doc_home", `unpublishable: ${JSON.stringify(r).slice(0, 300)}`);
-  ok(/The home page was saved as a draft but can't be published yet\. Fix this in the editor first: Banner/.test(r.note), `the note names it: ${r.note}`);
-  ok(!/sec_|doc_|LINK_NOT|incomplete/.test(r.note), `plain words: ${r.note}`);
+await t("unit: a theme kit whose draft publishes says nothing; one that leaves the home draft unpublishable says so in plain words and names what to fix", async () => {
   // a theme kit on a clean home: no unpublishable note
   await inD(async () => {
     const h = await Docs.getDocument("doc_home");
@@ -873,6 +855,7 @@ await t("unit: an agency kit that leaves the home draft unpublishable says so in
   eq(k2.status, 200, "applied:");
   ok(/Your home page was saved as a draft but can't be published yet\. Fix this in the editor first: Banner/.test(k2.body.note || ""), `the theme kit says so: ${k2.body.note}`);
   eq(k2.body.applied.unpublishable?.[0]?.label, "Your home page", "named:");
+  ok(!/sec_|doc_|LINK_NOT|incomplete/.test(k2.body.note), `plain words: ${k2.body.note}`);
   ok(K.unpublishableNote([]) === null && K.unpublishableNote([{ label: "X", problems: ["a.", "b.", "c.", "d."] }]).endsWith("(and 1 more)"), "note helper:");
 });
 
@@ -1284,7 +1267,7 @@ await t("unit: the guard finds no config.brand or config.theme read outside the 
     await readFile(join(ROOT, f), "utf8");
   }
   // the readers this item moved really read nothing themselves
-  for (const f of ["lib/admin/onboarding.js", "app/api/admin/help/route.js", "lib/platform/agency.js", "lib/admin/brand-readability.js", "app/api/platform/overview/route.js", "app/api/platform/themes/route.js", "app/api/platform/tenants/[id]/route.js", "components/platform/TenantDetail.js"]) {
+  for (const f of ["lib/admin/onboarding.js", "app/api/admin/help/route.js", "lib/admin/brand-readability.js", "app/api/platform/overview/route.js", "app/api/platform/themes/route.js", "app/api/platform/tenants/[id]/route.js", "components/platform/TenantDetail.js"]) {
     eq(configReads(await readFile(join(ROOT, f), "utf8")), [], `${f}:`);
   }
   ok(allowedHits.has("lib/themes/kits.js"), `the allowlist is used: ${[...allowedHits]}`);

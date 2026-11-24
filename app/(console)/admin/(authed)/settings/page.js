@@ -29,7 +29,6 @@ const SECTIONS = [
   { id: "catalog-sync", label: "Products from Shopify" },
   { id: "password", label: "Password" },
   { id: "team", label: "Team" },
-  { id: "agency-access", label: "Agency access" },
   { id: "domains-seo", label: "Domains & SEO" },
   { id: "privacy", label: "Privacy" },
   { id: "audit-log", label: "Audit log" },
@@ -100,7 +99,7 @@ export default async function AdminSettingsPage() {
       <PageHeader title="Settings" description="Store configuration — changes go live without a deploy." />
       <SectionNav />
       <SettingsAdmin initial={view} syncProgress={syncProgress} canRunSync={roleAllows(actor.role, "sync.run")} documents={documents} />
-      {/* S43: Team (MC23) · Agency (AG02) · Domains & SEO (MC21) · Privacy
+      {/* S43: Team (MC23) · Domains & SEO (MC21) · Privacy
           (MC25) · Audit (MC26) · Help (MC27) */}
       <OpsPanels role={actor.role} />
     </>

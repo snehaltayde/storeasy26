@@ -33,7 +33,7 @@ export const STATUS_TONE = {
   requested: "warning",
   approved: "success",
   rejected: "danger",
-  // agency grants / approvals
+  // invitations and grants (support grants, team invites)
   accepted: "success",
   revoked: "neutral",
   // tenants / platform

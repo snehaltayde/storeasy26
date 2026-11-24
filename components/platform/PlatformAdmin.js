@@ -14,7 +14,7 @@ import { SkeletonText, EmptyState, ErrorState } from "@/components/console/bits"
 import { useToast } from "@/components/console/Toast";
 import QueuesPanel from "./QueuesPanel";
 import { FlagsPanel, CostsPanel } from "./GrowthOpsPanels";
-import PartnersPanel from "./PartnersPanel";
+import CaseStudiesPanel from "./CaseStudiesPanel";
 import ThemesPanel from "./ThemesPanel";
 import BillingPanel from "./BillingPanel";
 import ProvisionRunsPanel from "./ProvisionRunsPanel";
@@ -39,7 +39,7 @@ const SECTIONS = [
   ["billing", "Billing"],
   ["flags", "Flags"],
   ["costs", "Costs"],
-  ["partners", "Partners"],
+  ["case-studies", "Case studies"],
   ["queues", "Queues"],
 ];
 
@@ -652,7 +652,7 @@ export default function PlatformAdmin() {
         <BillingPanel />
         <FlagsPanel />
         <CostsPanel />
-        <PartnersPanel />
+        <CaseStudiesPanel />
         <QueuesPanel />
       </main>
 

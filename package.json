@@ -78,7 +78,8 @@
     "test:customers": "node scripts/test-customers.js",
     "test:commerce-exp": "node scripts/test-commerce-exp.js",
     "test:growth": "node scripts/test-growth.js",
-    "test:agency": "node scripts/test-agency.js",
+    "test:agency-removed": "node scripts/test-agency-removed.js",
+    "test:case-studies": "node scripts/test-case-studies.js",
     "test:w6": "node scripts/test-w6.js",
     "test:copy": "node scripts/test-copy.js",
     "test:media-upload": "node scripts/test-media-upload.js",
@@ -128,6 +129,7 @@
     "drill:edge": "node scripts/drill.js harness-edge",
     "drill:p4": "node scripts/drills/p4/run.mjs",
     "drill:p6": "node scripts/drills/p6/run.mjs",
+    "drill:agency-gone": "node scripts/drills/agency-gone.mjs",
     "media:reindex": "node scripts/reindex-document-refs.js"
   },
   "dependencies": {

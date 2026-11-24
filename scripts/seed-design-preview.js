@@ -293,20 +293,11 @@ await withTenant(t, async () => {
   }
 });
 
-// ---- platform-side: incident, agency + grant + approval ------------------------
+// ---- platform-side: incident ---------------------------------------------------
 await C.platformDb().execute({
   sql: "INSERT INTO incidents (id, tenant_id, title, internal_note, public_message, status, created_at) VALUES ('inc_design', NULL, 'Payments provider latency', 'Razorpay status page shows elevated latency', 'Card payments may take a little longer than usual today.', 'open', ?)",
   args: [new Date().toISOString()],
 });
-const A = await import("../lib/platform/agency.js");
-const { createUser } = await import("../lib/platform/identity.js");
-const agency = await A.createAgency({ name: "Northwind Studio" });
-await A.setAgencyStatus(agency.id, { status: "verified", referral_eligible: true });
-const partner = await createUser({ email: "partner@design.test", name: "Design Partner", password: ADMIN_PW });
-await A.addAgencyMember(agency.id, partner.id, "owner");
-const inv = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@design.test", role: "staff" });
-await A.acceptGrant(inv.token, { tenantId: "design", actorEmail: "owner@design.test" });
-await A.createClientApproval({ agencyId: agency.id, tenantId: "design", note: "Homepage refresh for the winter drop" });
 
 if (FIXTURE === "perf") {
   console.log("• adding the perf fixture (PERF-04): a mid-size store, local only, nothing from Shopify");

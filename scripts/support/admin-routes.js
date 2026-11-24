@@ -29,8 +29,6 @@ const RELEASES = "lib/admin/releases-api.js";
 const SID = "ps_0000000000000000";
 
 export const ADMIN_ROUTES = Object.freeze([
-  { path: "agency-grants", method: "GET", action: "settings.read" },
-  { path: "agency-grants", method: "POST", action: "team.manage", probe: { body: {} } },
   { path: "audit", method: "GET", action: "audit.read" },
   { path: "automations", method: "GET", action: "settings.read" },
   { path: "automations", method: "POST", action: "settings.write", probe: { body: {} } },

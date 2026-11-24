@@ -1132,6 +1132,12 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   `migrations/platform/0009_flags_costs.sql`.
 
 #### Agency platform (S48 / BE28 + AG01–06, `/partners` + OP14 panel)
+> **Removed 2026-11-24** (Phase 0 line 4, owner decision): the `/partners` and
+> `/approve` screens, their APIs, `Settings → Agency access`, the operator
+> Partners panel and `lib/platform/agency.js` are gone; the agency tables stay
+> unused (migrations are additive) and no data was deleted. Case studies moved
+> to the operator console's **Case studies** panel (`/api/platform/case-studies`).
+> The notes below describe the removed feature.
 - **Access model (BE28)**: agencies are control-plane orgs with their own
   session kind ("agency" — never passes merchant or operator checks).
   Commercial status (verified / referral-eligible / commission bps, set in

@@ -88,14 +88,13 @@ const SKIP_DIRS = new Set([
   "components/admin",
   "components/console",
   "components/platform",
-  "components/partners",
   "components/site",
   "lib/admin",
   "lib/platform",
   "lib/ai",
   ...MARKETING_ROUTES.map((r) => `app/(storefront)/${r}`),
   // Console and machine-to-machine APIs
-  ...["admin", "platform", "partners", "connect", "jobs", "shopify", "razorpay", "approve", "preview", "health", "leads"].map((d) => `app/api/${d}`),
+  ...["admin", "platform", "connect", "jobs", "shopify", "razorpay", "preview", "health", "leads"].map((d) => `app/api/${d}`),
 ]);
 
 async function walk(dir, out = []) {

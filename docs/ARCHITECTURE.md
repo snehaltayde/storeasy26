@@ -62,7 +62,7 @@ Full columns and types are in the SQL files named below. This page lists each ta
 | `plans`, `subscriptions`, `billing_events`, `usage_events`, `entitlement_overrides`, `cost_inputs` | Storeasy's own billing of stores | `id` | Kept |
 | `audit_log` | Every merchant and operator write: actor, action, resource, diff | `id` | Kept |
 | `feature_flags`, `incidents`, `leads`, `case_studies` | Flags, status-page incidents, sales leads, marketing | `id` | Kept |
-| `agencies`, `agency_members`, `agency_grants`, `agency_kits`, `agency_referrals`, `agency_commissions`, `client_approvals` | Agency partner programme | `id` | **To be removed** (owner decision 2026-11-24; see `docs/FEATURES.md` Phase 0) |
+| `agencies`, `agency_members`, `agency_grants`, `agency_kits`, `agency_referrals`, `agency_commissions`, `client_approvals` | Agency partner programme (removed) | `id` | Unused since 2026-11-24, kept (migrations are additive) |
 
 ## Roles and permission matrix
 
@@ -112,8 +112,7 @@ Routes outside `app/api/admin/`, by class (`scripts/support/shopper-routes.js`; 
 | shopper | `account`, `cart`, `checkout` | the `_customer` cookie or the cart cookie |
 | public-read | `search`, `upsell`, `wishlist` (guest handles only), `media/[id]` | nothing; returns no shopper data |
 | collector | `track`, `exp`, `contact`, `leads`, `quiz/[slug]`, `errors` | nothing; write-only intake |
-| token | `approve`, `preview`, `connect/shopify/start`, `connect/shopify/callback` | a signed token or OAuth state |
-| agency | `partners`, `partners/auth` | a partner session |
+| token | `preview`, `connect/shopify/start`, `connect/shopify/callback` | a signed token or OAuth state |
 | operator | `platform/*` (except the billing webhook) | `lib/platform/admin-auth.js` |
 | webhook | `shopify/webhooks`, `razorpay/webhook`, `platform/billing/webhook` | the provider's signature |
 | job | `jobs/*`, `health` | the job secret |

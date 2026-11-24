@@ -3,6 +3,19 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 How the agency programme is removed (on the owner's behalf)
+
+- **Decision:**
+  - The agency tables stay, unused, with no migration (`0010_agency.sql` also creates `case_studies`, and migrations never drop anything).
+  - Existing agency sessions, invites and rows are left in place, not revoked or deleted; nothing reads them any more, and tests prove they can't sign in or act.
+  - Case studies (the marketing `/customers` pages) stay; their editor moves out of the Partners panel to an operator "Case studies" tab with its own route and suite, and saving or deleting one is now audited (only publishing was).
+  - Editing a published case study takes it back to draft, so it must pass the consent and measurement checks again before it is live; deleting a case study stays a permanent delete (it is operator-owned marketing content, not a CMS document) and is audited.
+  - The `agency` route class leaves the guard tables; the registry's `agency_kit` hero fixture is renamed `full_hero`; the retired p1/p4 drills are left as they are and allowlisted.
+- **Why:** owner's instruction to drop agencies; case studies are marketing, not agency features.
+- **Instead of:** a drop migration or a data cleanup script (destructive); removing case studies with the Partners panel.
+- **Decided by:** Claude, on the owner's behalf (scope by the owner)
+- **Slice:** Phase 0, agency removal
+
 ## 2026-11-24 Shopper reads: own data only (on the owner's behalf)
 
 - **Decision:**

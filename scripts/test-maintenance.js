@@ -405,7 +405,7 @@ await t("the sitemap and every catalog-returning shopper API are gated", async (
   }
 });
 await t("webhooks, jobs and console APIs are NOT gated", async () => {
-  const routes = (await walk("app/api")).filter((f) => /app\/api\/(razorpay|shopify|jobs|admin|platform|partners|connect)\//.test(f) && f.endsWith("route.js"));
+  const routes = (await walk("app/api")).filter((f) => /app\/api\/(razorpay|shopify|jobs|admin|platform|connect)\//.test(f) && f.endsWith("route.js"));
   eq(routes.length > 20, true, "found the routes:");
   for (const f of routes) eq((await source(f)).includes("storefrontHandler"), false, `${f} gated:`);
 });

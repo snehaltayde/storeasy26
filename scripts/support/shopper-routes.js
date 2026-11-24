@@ -8,7 +8,6 @@
 //   public-read  catalog reads any visitor may make; nothing shopper-owned
 //   collector    write-only intake from the storefront (events, forms, errors)
 //   token        proven by a signed token or an OAuth state, not a session
-//   agency       partner (agency) sessions
 //   operator     the platform console (lib/platform/admin-auth.js)
 //   webhook      signed provider callbacks
 //   job          cron / health, behind the job secret
@@ -31,13 +30,11 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "leads", methods: ["POST"], class: "collector", suite: "test-commerce.js" },
   { path: "quiz/[slug]", methods: ["POST"], class: "collector", suite: "test-commerce.js" },
   { path: "errors", methods: ["POST"], class: "collector", suite: null },
-  { path: "approve", methods: ["POST"], class: "token", suite: null },
   { path: "preview", methods: ["GET", "POST"], class: "token", suite: "test-logout-preview.js" },
   { path: "connect/shopify/start", methods: ["GET"], class: "token", suite: null },
   { path: "connect/shopify/callback", methods: ["GET"], class: "token", suite: "test-first-sync.js" },
-  { path: "partners", methods: ["GET", "POST"], class: "agency", suite: "test-agency.js" },
-  { path: "partners/auth", methods: ["POST"], class: "agency", suite: "test-agency.js" },
   { path: "platform/billing", methods: ["GET", "POST"], class: "operator", suite: "test-billing.js" },
+  { path: "platform/case-studies", methods: ["GET", "POST"], class: "operator", suite: "test-case-studies.js" },
   { path: "platform/costs", methods: ["GET", "POST"], class: "operator", suite: "test-platform-ops.js" },
   { path: "platform/domains", methods: ["GET", "POST"], class: "operator", suite: "test-platform-ops.js" },
   { path: "platform/flags", methods: ["GET", "POST"], class: "operator", suite: "test-platform-ops.js" },
@@ -45,7 +42,6 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "platform/login", methods: ["POST"], class: "operator", suite: "test-identity.js" },
   { path: "platform/logout", methods: ["POST"], class: "operator", suite: "test-logout-preview.js" },
   { path: "platform/overview", methods: ["GET"], class: "operator", suite: "test-platform-ops.js" },
-  { path: "platform/partners", methods: ["GET", "POST"], class: "operator", suite: "test-agency.js" },
   { path: "platform/privacy", methods: ["GET", "POST"], class: "operator", suite: "test-privacy.js" },
   { path: "platform/provisions", methods: ["GET", "POST"], class: "operator", suite: "test-provision.js" },
   { path: "platform/queues", methods: ["GET", "POST"], class: "operator", suite: "test-jobs.js" },
@@ -66,7 +62,7 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "health", methods: ["GET"], class: "job", suite: null },
 ]);
 
-export const ROUTE_CLASSES = Object.freeze(["shopper", "public-read", "collector", "token", "agency", "operator", "webhook", "job"]);
+export const ROUTE_CLASSES = Object.freeze(["shopper", "public-read", "collector", "token", "operator", "webhook", "job"]);
 
 // app/(storefront)/**/page.js and layout.js, by folder ("" is the store root).
 // sweep: how test-shopper-reads.js covers it ("harness": run through

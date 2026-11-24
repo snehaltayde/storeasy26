@@ -6,8 +6,8 @@
 //      react-dom/server on a real tenant database, shows "Shopify title: X,
 //      SKU: Y" only when the shopper saw another title. Old orders render
 //      exactly as before.
-//   3. Top products, AI insights and the agency report count one product as one
-//      row, by product id, under its current title.
+//   3. Top products and AI insights count one product as one row, by product
+//      id, under its current title.
 //   4. Neither value reaches Shopify through the real push.
 // P4-EFFECTIVE: "the shopper saw another title" is now a real published title,
 // a product_content_live row (what a publish writes), read through
@@ -55,7 +55,6 @@ const O = await import("../lib/orders.js");
 const { writeProduct, deleteProductByGid } = await import("../lib/sync.js");
 const Rep = await import("../lib/reporting.js");
 const AI = await import("../lib/ai/insights.js");
-const A = await import("../lib/platform/agency.js");
 const P = await import("../lib/shopify-push.js");
 const view = await import("../lib/admin/order-view.js");
 
@@ -416,15 +415,6 @@ await t("AI insights count a renamed product once, under its current title", asy
   const sales = facts.find((f) => f.kind === "sales")?.text || "";
   ok(sales.includes("Creatine Monohydrate 250g ×3"), sales);
   ok(!sales.includes("Creatine 250g ×") && !sales.includes("Creatine Pure 250g ×"), `an old title has its own entry: ${sales}`);
-});
-
-await t("the agency report counts a renamed product once, under its current title", async () => {
-  const agency = await A.createAgency({ name: "Report Studio" });
-  const inv = await A.createGrantInvite({ agencyId: agency.id, clientEmail: "owner@oc.test", role: "staff" });
-  await A.acceptGrant(inv.token, { tenantId: "oc", actorEmail: "owner@oc.test" });
-  const report = await A.agencyClientReport(agency.id, "oc");
-  const r = report.topProducts.products.filter((p) => /creatine/i.test(p.title));
-  same(r, [{ product_id: P9, title: "Creatine Monohydrate 250g", qty: 3, revenue: 1500 }], "agency rows");
 });
 
 // =============================================================================

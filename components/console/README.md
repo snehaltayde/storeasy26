@@ -1,6 +1,6 @@
 # Console primitives (S50)
 
-The design system for all three consoles (/admin, /platform, /partners).
+The design system for both consoles (/admin, /platform).
 Tokens live in `app/console.css`, scoped to `[data-console]` — the console
 route group's `<html>` carries the attribute, so tenant brand variables never
 re-skin the console and console tokens never touch the storefront.

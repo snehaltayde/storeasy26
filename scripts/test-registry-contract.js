@@ -404,10 +404,10 @@ await t("publishing home with zero enabled sections gives exactly the 'Your home
 
 // ---- DOC-02: legacy adapters ---------------------------------------------------------
 
-await t("legacyHeroToSettings turns experiment, AI and agency payloads and every kit preset into valid hero sections", async () => {
+await t("legacyHeroToSettings turns experiment and AI payloads, a whole hero and every kit preset into valid hero sections", async () => {
   const sources = { ...R.LEGACY_HERO_FIXTURES };
   for (const [id, kit] of Object.entries(KITS)) if (kit.presets?.hero) sources[`kit_${id}`] = kit.presets.hero;
-  ok(Object.keys(sources).length >= 5, "experiment, AI, agency and at least two kits");
+  ok(Object.keys(sources).length >= 5, "experiment, AI, a whole hero and at least two kits");
   for (const [name, hero] of Object.entries(sources)) {
     const section = R.legacyHeroToSection(hero);
     eq(section.kind, "hero");
@@ -420,7 +420,7 @@ await t("legacyHeroToSettings turns experiment, AI and agency payloads and every
 });
 
 await t("settingsToLegacyHero round-trips full heroes; an invalid legacy link is kept and reported, not dropped", async () => {
-  const full = [R.LEGACY_HERO_FIXTURES.agency_kit, defaultHero("Acme"), ...Object.values(KITS).map((k) => k.presets.hero), { title: "T", highlight: "", subtitle: "", primary: null, secondary: null }];
+  const full = [R.LEGACY_HERO_FIXTURES.full_hero, defaultHero("Acme"), ...Object.values(KITS).map((k) => k.presets.hero), { title: "T", highlight: "", subtitle: "", primary: null, secondary: null }];
   for (const hero of full) deq(R.settingsToLegacyHero(R.legacyHeroToSettings(hero)), hero, hero.title);
 
   const bad = { title: "Hello", primary: { label: "Go", href: "javascript:alert(1)" }, secondary: { label: "More", href: "https://evil.example" }, tagline: "kept" };

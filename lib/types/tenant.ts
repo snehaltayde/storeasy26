@@ -5,7 +5,7 @@ export type TenantStatus = "active" | "suspended" | "offboarded";
 
 export type MerchantRole = "owner" | "admin" | "staff" | "support";
 
-export type SessionKind = "merchant" | "operator" | "agency";
+export type SessionKind = "merchant" | "operator";
 
 export interface ShippingZone {
   name: string;
@@ -121,7 +121,7 @@ export interface Tenant {
 }
 
 export interface Actor {
-  kind: "merchant" | "bootstrap" | "operator" | "agency" | "system";
+  kind: "merchant" | "bootstrap" | "operator" | "system";
   id: string;
   role?: MerchantRole | string;
   email?: string;

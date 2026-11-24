@@ -313,7 +313,7 @@ await t("owner (positive control): Settings shows the config canaries, Team the 
 await t("owner: no secret, cart credential or other store's data on any settings, team, audit or probe answer", async () => {
   const bad = [];
   const ownerTokens = { ...TOKENS, ownerAdmin: "", ownerPreviewToken: "" }; // its own
-  for (const [path, opts] of [["settings", {}], ["team", {}], ["audit", {}], ["integrations", {}], ["privacy", {}], ["help", {}], ["domains", {}], ["billing", {}], ["agency-grants", {}], ["automations", {}]]) {
+  for (const [path, opts] of [["settings", {}], ["team", {}], ["audit", {}], ["integrations", {}], ["privacy", {}], ["help", {}], ["domains", {}], ["billing", {}], ["automations", {}]]) {
     const r = await call("owner", path, "GET", opts);
     const found = leaks(r.text, { skip: OWNER_SKIP, tokens: ownerTokens, emails: false });
     if (found.length) bad.push(`GET ${path}: ${found.join(", ")}`);
