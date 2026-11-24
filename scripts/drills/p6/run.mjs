@@ -27,6 +27,10 @@
 //   g         setup.mjs: onboarding step 4's policy starters
 //   h         onboarding.mjs: the four-step onboarding page (states, resume
 //             via ?step=, support read-only with reasons, an open store all done)
+//   j         open-step.mjs: Phase 1 line 7, the store opened from onboarding
+//             step 4 (checkout on, Back to onboarding, both policies read in
+//             the reader, contact details, the open dialog; the shopper sees
+//             home; support sees everything disabled)
 //
 // Results: docs/cms-reviews/drills/P6-DRILLS/results-<stage>.json with the
 // screenshots, and the summary results.json (results-run-<stages>.json for a
@@ -47,6 +51,7 @@ const STAGE_FILES = {
   e: ["./empty.mjs", "emptyStage"],
   g: ["./setup.mjs", "setupStage"],
   h: ["./onboarding.mjs", "onboardingStage"],
+  j: ["./open-step.mjs", "openStepStage"],
 };
 export const STAGES = Object.keys(STAGE_FILES);
 

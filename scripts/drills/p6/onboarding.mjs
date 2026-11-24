@@ -11,10 +11,10 @@
 //   3. marks    "I placed a test order" is stored and said; undo clears it
 //   4. support  the support member reads every step; every control is
 //               disabled with its reason; the POST is refused
-//   5. open     "Go to Publish in the editor", Open; then /admin goes to the
+//   5. open     "Open your store" and the dialog (line 7); then /admin goes to the
 //               dashboard, onboarding reads every step Done and "Your store is
 //               open", and the nav has no onboarding badge
-import { liveRelease, loginP6, openEditor, p6Context, p6Url, pressPublish, reseedP6, settle, sleep, tenantConfig, waitFor, watchErrors } from "./lib.mjs";
+import { liveRelease, loginP6, p6Context, p6Url, reseedP6, settle, sleep, tenantConfig, waitFor, watchErrors } from "./lib.mjs";
 import { readOnboarding } from "./setup.mjs";
 
 const ONBOARDING = "/admin/onboarding";
@@ -124,7 +124,7 @@ export async function onboardingStage(drill) {
     [...document.querySelectorAll('[data-onboarding="panel"] button')].map((b) => ({ text: b.innerText.trim(), disabled: b.disabled, reason: b.getAttribute("aria-describedby") ? document.getElementById(b.getAttribute("aria-describedby"))?.innerText.trim() : null })),
   );
   const byText = (t) => gated.find((g) => g.text === t);
-  drill.check(byText("I placed a test order")?.disabled && byText("I placed a test order")?.reason === READ_ONLY && byText("Go to Publish in the editor")?.disabled && byText("Go to Publish in the editor")?.reason === READ_ONLY, "support: 'I placed a test order' and 'Go to Publish in the editor' are disabled with 'Your role can look at this but not change it.'", gated);
+  drill.check(byText("I placed a test order")?.disabled && byText("I placed a test order")?.reason === READ_ONLY && byText("Open your store")?.disabled && byText("Open your store")?.reason === READ_ONLY, "support: 'I placed a test order' and 'Open your store' are disabled with 'Your role can look at this but not change it.'", gated);
   drill.check(gated.every((g) => g.disabled || g.text.startsWith("Next:")), "support: no enabled control in the Open step", gated);
   await drill.screenshot(sp, "h-onboarding-support-open-1440", { fullPage: true });
   await goStep(drill, sp, "brand");
@@ -141,18 +141,18 @@ export async function onboardingStage(drill) {
   });
   drill.check(post === 403 && !(await tenantConfig())?.onboarding?.manual?.test_order, "support: marking the test order directly is refused (403) and nothing is stored", post);
   const sread = await readOnboarding(sp);
-  drill.check(sread.status === 200 && (sread.body?.steps || []).flatMap((s) => s.actions).every((a) => a.allowed === false), "support: GET /api/admin/onboarding has every action disallowed", sread.status);
+  drill.check(sread.status === 200 && (sread.body?.steps || []).flatMap((s) => s.actions).every((a) => a.allowed === (a.id === "policy_view")), "support: GET /api/admin/onboarding has every action disallowed but reading a policy draft", sread.status);
   await sctx.close();
 
   // ---- 5. open the store, then every step is Done ----
   await goStep(drill, page, "open");
-  await page.getByRole("link", { name: "Go to Publish in the editor", exact: true }).click();
-  await page.waitForURL((u) => new URL(u).pathname === "/admin/editor", { timeout: 60_000 });
-  await openEditor(page, "?doc=doc_home");
-  const p = await pressPublish(page);
-  drill.check(p.phase === "opening" && p.open && p.open.disabled === false, "the editor's Publish shows 'Before you open your store' with Open enabled", { phase: p.phase, open: p.open });
-  await page.locator("[data-publish] button[data-open-store]").click();
-  await waitFor(async () => ["done", "refused", "error", "blocked", "conflict"].includes(await page.locator("[data-publish][data-phase]").first().getAttribute("data-phase").catch(() => "")), 90_000, 400);
+  await page.locator('[data-onboarding="open-store"]').getByRole("button", { name: "Open your store", exact: true }).click();
+  const dialog = page.locator('[data-onboarding="open-dialog"]');
+  const confirm = dialog.locator('[data-onboarding="confirm-open"]');
+  const enabled = await waitFor(async () => (await confirm.isEnabled().catch(() => false)) || false, 60_000, 300);
+  drill.check(Boolean(enabled), "'Open your store' shows what goes live with the confirm enabled", await dialog.innerText().catch(() => ""));
+  await confirm.click();
+  await waitFor(async () => (await page.locator('[data-onboarding="open-done"]').count()) > 0 || ["refused", "error", "blocked", "conflict"].includes(await dialog.getAttribute("data-phase").catch(() => "")), 90_000, 400);
   await sleep(800);
   drill.check((await liveRelease()) != null, "the store is open (a live release)", null);
   // a fresh tab: the editor may still be finishing its own navigation after Open

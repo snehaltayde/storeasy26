@@ -41,7 +41,7 @@
 
 export const P6_STORE = Object.freeze({ id: "p6", host: "p6.localhost", name: "Fernway Goods" });
 export const P6_LOGIN = Object.freeze({ email: "founder@p6.test", name: "Priya Founder", role: "owner" });
-export const P6_STAGES = Object.freeze(["a", "b", "c", "d", "e", "g", "h"]);
+export const P6_STAGES = Object.freeze(["a", "b", "c", "d", "e", "g", "h", "j"]);
 export const P6_SUPPORT_LOGIN = Object.freeze({ email: "support@p6.test", name: "Sam Support", role: "support" });
 export const P6_VARIANTS = Object.freeze({ e: ["empty", "refill", "no-collections"] });
 export const P6_PRODUCTS = 24;
@@ -80,11 +80,12 @@ export function stagePlan(stage, variant = null) {
     wipe: !(stage === "e" && v === "refill"),
     mode: "documents",
     catalog: stage === "e" ? (v === "empty" ? "empty" : v === "refill" ? "products" : "no-collections") : "products",
-    returnsWindowDays: stage === "c" ? P6_RETURNS_DAYS : null,
-    supportEmail: stage === "c" ? null : P6_SUPPORT_EMAIL,
-    checkoutMode: stage === "d" ? "disabled" : "direct",
+    // j (Phase 1 line 7): like c, with checkout off and the support member
+    returnsWindowDays: stage === "c" || stage === "j" ? P6_RETURNS_DAYS : null,
+    supportEmail: stage === "c" || stage === "j" ? null : P6_SUPPORT_EMAIL,
+    checkoutMode: stage === "d" || stage === "j" ? "disabled" : "direct",
     logoInLibrary: stage === "c",
-    supportLogin: stage === "h",
+    supportLogin: stage === "h" || stage === "j",
     founderPolicies: stage === "d" || stage === "h",
   };
 }

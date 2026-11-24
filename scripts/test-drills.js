@@ -103,13 +103,13 @@ await t("the retired drills are gone; the shared libs and the kept drills stay",
   ok(!/--p4\b/.test(readFileSync(join(ROOT, "scripts/seed-design-documents.js"), "utf8")), "seed-design-documents.js has no --p4 mode left:");
 });
 
-await t("p5 and p6 keep exactly the planned stages (no legacy, baseline-legacy, f or final; p6 h is Phase 1 line 3's onboarding page)", async () => {
+await t("p5 and p6 keep exactly the planned stages (no legacy, baseline-legacy, f or final; p6 h is Phase 1 line 3's onboarding page, j line 7's open step)", async () => {
   const p5 = await import("./drills/p5/run.mjs");
   eq(p5.STAGES.join(","), "pick,create,states,nosaving,disabled,grid,cart,console,unknown", "p5:");
   const p6 = await import("./drills/p6/run.mjs");
-  eq(p6.STAGES.join(","), "baseline,a,b,c,d,e,g,h", "p6:");
+  eq(p6.STAGES.join(","), "baseline,a,b,c,d,e,g,h,j", "p6:");
   const seed = await import("./drills/p6/seed-p6.mjs");
-  eq(seed.P6_STAGES.join(","), "a,b,c,d,e,g,h", "seed-p6 P6_STAGES:");
+  eq(seed.P6_STAGES.join(","), "a,b,c,d,e,g,h,j", "seed-p6 P6_STAGES:");
   throws(() => seed.stagePlan("f"), /--stage/, "stagePlan(f):");
 });
 
@@ -458,7 +458,7 @@ await t("the drill helpers' own checks pass (p4, p5 and p6 lib.mjs --check; p6 c
 });
 
 await t("every module the seed and drill scripts load exists, with the names they take (seed:design, --p3, --p6, seed:roles, the drills)", async () => {
-  const entries = ["scripts/seed-design-preview.js", "scripts/seed-design-documents.js", "scripts/perf-docs-fixture.js", "scripts/dev-design.js", "scripts/dev-roles.js", "scripts/seed-roles.js", "scripts/drill.js", "scripts/drills/run-isolated.mjs", "scripts/drills/smoke.js", "scripts/drills/agency-gone.mjs", "scripts/drills/p5/run.mjs", "scripts/drills/p5/blocks.mjs", "scripts/drills/p6/run.mjs", "scripts/drills/p6/seed-p6.mjs", "scripts/drills/p6/generate.mjs", "scripts/drills/p6/brand.mjs", "scripts/drills/p6/open.mjs", "scripts/drills/p6/empty.mjs", "scripts/drills/p6/setup.mjs", "scripts/drills/p6/onboarding.mjs", "scripts/drills/sf-styles/run.mjs", "scripts/drills/shell/run.mjs", "scripts/drill-maintenance-edge.js", "scripts/perf-report.js"];
+  const entries = ["scripts/seed-design-preview.js", "scripts/seed-design-documents.js", "scripts/perf-docs-fixture.js", "scripts/dev-design.js", "scripts/dev-roles.js", "scripts/seed-roles.js", "scripts/drill.js", "scripts/drills/run-isolated.mjs", "scripts/drills/smoke.js", "scripts/drills/agency-gone.mjs", "scripts/drills/p5/run.mjs", "scripts/drills/p5/blocks.mjs", "scripts/drills/p6/run.mjs", "scripts/drills/p6/seed-p6.mjs", "scripts/drills/p6/generate.mjs", "scripts/drills/p6/brand.mjs", "scripts/drills/p6/open.mjs", "scripts/drills/p6/empty.mjs", "scripts/drills/p6/setup.mjs", "scripts/drills/p6/onboarding.mjs", "scripts/drills/p6/open-step.mjs", "scripts/drills/sf-styles/run.mjs", "scripts/drills/shell/run.mjs", "scripts/drill-maintenance-edge.js", "scripts/perf-report.js"];
   const seen = new Set();
   const missing = [];
   const walk = (file) => {
