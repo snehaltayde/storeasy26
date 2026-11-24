@@ -1,0 +1,224 @@
+{
+  "id": "OPS-ONBOARDING",
+  "part": "main",
+  "title": "OPS-ONBOARDING — the operator sees every signup and helps a stuck store",
+  "ranAt": "2026-11-24T18:40:35.523Z",
+  "harness": "http://localhost:6110",
+  "chrome": "158.0.8127.37",
+  "passed": 25,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "signup is open on the marketing host",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "402 from the provider: the founder's signup fails, needing us",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the signup row is failed / needs_operator",
+      "detail": {
+        "id": "sgn_4f076fe4cb88fe79",
+        "status": "failed",
+        "failure_kind": "needs_operator"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the /platform nav links to Signups & onboarding",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the failed signup is under Needs attention (the default view), with its status in words",
+      "detail": {
+        "selected": "Needs attention\n1",
+        "rowText": "Drill Ops Founder\ndrill-ops-founder\n\t\nOps Founder\nops-founder@ops-drill.test\n\tFailed: needs us\t\nCreating the database\nfirst try · operator alerted\n\tstuck 1 min\t–"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the page renders without an error",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "Resume provisioning: the sheet says it is running",
+      "detail": "Provisioning resumed. It runs in the background; refresh in a minute."
+    },
+    {
+      "ok": true,
+      "label": "the signup is done: its store is made",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the store's sheet reads its steps live: step 1, Connect Shopify",
+      "detail": "Drill Ops Founder\n\nClosed\ndrill-ops-founder.localhost\n\nHelp\nEmail sign-in help to\nops-founder@ops-drill.test\nSend sign-in help\n\nThey get the store's sign-in address and a one-hour, single-use link to set a new password.\n\nOpen support access (read-only)\nHours (1–72)\nOpen support access\nSignup\nFounder"
+    },
+    {
+      "ok": true,
+      "label": "the store row: step 1 of 4 with a stuck time",
+      "detail": "Drill Ops Founder\ndrill-ops-founder\n\t\nOps Founder <ops-founder@ops-drill.test>\n\tClosed\t\nStep 1 of 4 · Connect Shopify (Ready)\n\tstuck 1 min\t–"
+    },
+    {
+      "ok": true,
+      "label": "the signup no longer has its own row once its store exists",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "Send sign-in help: sent to the owner on file",
+      "detail": "Sign-in help sent to ops-founder@ops-drill.test."
+    },
+    {
+      "ok": true,
+      "label": "the sheet never shows a token or the link",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the mock mail has the store's login address and a reset link",
+      "detail": "Storeasy support is helping you sign in to Drill Ops Founder.\n\nSign in here: http://drill-ops-founder.localhost:6110/admin/login\n\nIf you've forgotten your password, set a new one here. The link works "
+    },
+    {
+      "ok": true,
+      "label": "the reset link set a new password on the store host, and it signs in",
+      "detail": "http://drill-ops-founder.localhost:6110/admin"
+    },
+    {
+      "ok": true,
+      "label": "support access opens; the sheet links to the store console",
+      "detail": "http://drill-ops-founder.localhost:6110/admin"
+    },
+    {
+      "ok": true,
+      "label": "the store console shows the support-access banner",
+      "detail": "Skip to content\nDrill Ops Founder\n\nPlatform support access · read-only\n\nOU\n\nPlatform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nPlatform support access is active\n\nOperator u_4b479e4bad1fe46e, reason: “Helping the founder connect Shopify”, until 25 No"
+    },
+    {
+      "ok": true,
+      "label": "the note shows in the sheet",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "and on the row as the latest note",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "before: the lapsed signup still holds its address",
+      "detail": {
+        "slug": "drill-ops-lapsed",
+        "available": false,
+        "reason": "taken",
+        "message": "That address is taken. Try another.",
+        "address": "drill-ops-lapsed.localhost"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the address is freed (and the founder emailed)",
+      "detail": "Address freed. The founder was emailed."
+    },
+    {
+      "ok": true,
+      "label": "after: a new signup can take the address",
+      "detail": {
+        "slug": "drill-ops-lapsed",
+        "available": true,
+        "address": "drill-ops-lapsed.localhost"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the founder got the start-again note",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "signed out: /platform/onboarding goes to /platform and shows nothing of the list",
+      "detail": {
+        "url": "http://localhost:6110/platform",
+        "body": ""
+      }
+    },
+    {
+      "ok": true,
+      "label": "signed out: the API answers 401",
+      "detail": 401
+    }
+  ],
+  "notes": [],
+  "screenshots": [
+    {
+      "name": "01-needs-attention",
+      "file": "docs/cms-reviews/drills/OPS-ONBOARDING/01-needs-attention.png",
+      "bytes": 20196,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/platform/onboarding"
+    },
+    {
+      "name": "02-signup-sheet",
+      "file": "docs/cms-reviews/drills/OPS-ONBOARDING/02-signup-sheet.png",
+      "bytes": 36134,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/platform/onboarding"
+    },
+    {
+      "name": "03-store-step-1",
+      "file": "docs/cms-reviews/drills/OPS-ONBOARDING/03-store-step-1.png",
+      "bytes": 17958,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/platform/onboarding"
+    },
+    {
+      "name": "04-support-access",
+      "file": "docs/cms-reviews/drills/OPS-ONBOARDING/04-support-access.png",
+      "bytes": 37941,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/platform/onboarding"
+    },
+    {
+      "name": "05-support-banner",
+      "file": "docs/cms-reviews/drills/OPS-ONBOARDING/05-support-banner.png",
+      "bytes": 33649,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/onboarding"
+    },
+    {
+      "name": "06-free-address-dialog",
+      "file": "docs/cms-reviews/drills/OPS-ONBOARDING/06-free-address-dialog.png",
+      "bytes": 34870,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/platform/onboarding"
+    },
+    {
+      "name": "07-phone",
+      "file": "docs/cms-reviews/drills/OPS-ONBOARDING/07-phone.png",
+      "bytes": 22754,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/platform/onboarding"
+    }
+  ]
+}
