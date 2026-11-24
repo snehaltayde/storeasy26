@@ -87,7 +87,8 @@ export async function importStage(drill) {
   // the queue's next try, when the platform queued one for this run
   const job = await platformSql([{ sql: "UPDATE jobs SET status = 'pending', run_after = ? WHERE type = 'catalog_sync' AND idempotency_key LIKE ?", args: [iso(5 * 60_000), `%:${RUN}`] }]).catch(() => null);
   const queued = Number(job?.[0]?.rowsAffected || 0) > 0;
-  v = await until(page, (s) => s.state === "retrying" && s, 15_000);
+  // the step's actions (Try now) arrive with the steps' re-read, a beat after the view
+  v = await until(page, (s) => s.state === "retrying" && s.buttons.some((b) => b.text === "Try now") && s, 15_000);
   drill.check(Boolean(v) && v.text.includes("Shopify is busy. We'll try again by itself.") && v.buttons.some((b) => b.text === "Try now" && !b.disabled), "retrying (429): 'Shopify is busy. We'll try again by itself.' and an enabled 'Try now'", v || (await readStep(page)));
   if (queued) {
     const at = await until(page, (s) => /Next try at about \d/.test(s.text) && s, 15_000);
