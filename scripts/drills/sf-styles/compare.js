@@ -129,3 +129,25 @@ export function diffRuns(base, next, opts) {
 // The pass rule: no computed-style, box or element difference, no changed
 // custom property and no missing capture (new custom properties are reported).
 export const isClean = (t) => t.style === 0 && t.box === 0 && t.added === 0 && t.removed === 0 && t.customChanged === 0 && t.missing === 0;
+
+// The one `top` CONSOLE_IGNORE is known to hide (reviewer, line 8): the
+// editor's sticky preview sits below the new 56px top bar (lg:top-18, 72px;
+// 16px before). base, next: one page's captures. Lists every element inside
+// the region ([data-legacy]) whose computed `top` differs; passes only when
+// exactly one positioned element (sticky, fixed or absolute) moved, it is
+// sticky and went from `from` to `to`. A static or relative element's `top`
+// does not place it, so it is listed, not failed.
+const PLACED = new Set(["sticky", "fixed", "absolute"]);
+export function topShiftCheck(base, next, { from = "16px", to = "72px" } = {}) {
+  const a = new Map(base.elements.map((e) => [e.k, e]));
+  const shifts = [];
+  for (const e of next.elements) {
+    const b = a.get(e.k);
+    if (!b || !e.l || b.s.top === e.s.top) continue;
+    shifts.push({ k: e.k, position: e.s.position, from: b.s.top, to: e.s.top });
+  }
+  const placed = shifts.filter((s) => PLACED.has(s.position) || PLACED.has(a.get(s.k).s.position));
+  const [only] = placed;
+  const ok = placed.length === 1 && only.position === "sticky" && only.from === from && only.to === to;
+  return { ok, moved: only || null, placed: placed.length, others: shifts.length - placed.length, shifts };
+}

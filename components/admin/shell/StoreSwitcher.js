@@ -20,7 +20,7 @@ import { switcherItems } from "@/lib/admin/nav";
 export function StoreSwitcher({ stores, current }) {
   const items = switcherItems(stores, current);
   const storeRows = items.filter((i) => i.kind === "store");
-  const here = storeRows.find((s) => s.current) || storeRows[0];
+  const here = storeRows.find((s) => s.current); // switcherItems always marks one
   const link = items.find((i) => i.kind === "link");
   return (
     <DropdownMenu>

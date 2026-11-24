@@ -134,7 +134,13 @@ await t("accountItems() and switcherItems() hold no write item; the account's on
   eq(sw.map((i) => i.role ?? i.text), ["Owner", "Admin", "Open storefront"], "roles in plain words:");
   const one = Nav.switcherItems([], { id: "roles", name: "Roles Demo Co" });
   eq(one.map((i) => `${i.kind}:${i.name ?? i.text}:${i.current ?? ""}`), ["store:Roles Demo Co:true", "link:Open storefront:"], "no stores (bootstrap, operator): the current store only:");
-  for (const i of [...sw, ...one]) ok(["store", "link"].includes(i.kind) && !/create|new|add|delete/i.test(`${i.text ?? ""} ${i.id}`), `${i.id} is not a write:`);
+  // stores listed but none marked current (the current store is not one of mine): the current store is added, ticked
+  const none = Nav.switcherItems([{ id: "b", name: "B", role: "admin", url: "http://b.localhost/admin", current: false }], { id: "roles", name: "Roles Demo Co" });
+  eq(none.filter((i) => i.kind === "store").map((i) => `${i.id}:${i.current}`), ["roles:true", "b:false"], "none current: the current store is added as the ticked row, not the first store:");
+  const unmarked = Nav.switcherItems([{ id: "a", name: "A", role: "owner", url: "http://a.localhost/admin", current: false }, { id: "b", name: "B", role: "admin", url: "http://b.localhost/admin" }], { id: "b", name: "B" });
+  eq(unmarked.filter((i) => i.kind === "store").map((i) => `${i.id}:${i.current}`), ["a:false", "b:true"], "the current store listed but unmarked is ticked, not duplicated:");
+  eq(read("components/admin/shell/StoreSwitcher.js").includes("|| storeRows[0]"), false, "the switcher no longer falls back to the first store:");
+  for (const i of [...sw, ...one, ...none]) ok(["store", "link"].includes(i.kind) && !/create|new|add|delete/i.test(`${i.text ?? ""} ${i.id}`), `${i.id} is not a write:`);
 });
 
 // ---------- SWC loader with stubs (the pattern of test-editor-routes.js) ----------
@@ -291,10 +297,42 @@ await t("listMyStores: only the caller's own memberships, active stores only, UR
   ], "mine:");
   const theirs = await withTenant(here, () => listMyStores({ kind: "merchant", id: them.id, role: "owner" }));
   eq(C && (await import("../lib/admin/stores.js")).consoleUrl("x.localhost", "http://other.localhost:9/"), "http://x.localhost/admin", "a site_url on another host lends no port:");
+  const { consoleUrl } = await import("../lib/admin/stores.js");
+  eq(consoleUrl("shop-localhost.com", "http://shop-localhost.com:9/"), "https://shop-localhost.com/admin", "a public host containing \"localhost\" is https and borrows no port:");
+  eq(consoleUrl("my127.0.0.1.example.com"), "https://my127.0.0.1.example.com/admin", "a public host containing 127.0.0.1 is https:");
+  eq(consoleUrl("annex.localhost:6101", "http://annex.localhost:6101"), "http://annex.localhost:6101/admin", "a .localhost host with a port stays local:");
+  eq(consoleUrl("127.0.0.1", "http://127.0.0.1:3017"), "http://127.0.0.1:3017/admin", "127.0.0.1 is local:");
+  eq(consoleUrl("localhost"), "http://localhost/admin", "localhost is local:");
   eq(theirs.map((s) => `${s.id} ${s.url}`), ["other https://other.example.com/admin"], "theirs (https off localhost):");
   eq(await withTenant(here, () => listMyStores({ kind: "operator-support", id: me.id, role: "support" })), [], "operator-support:");
   eq(await withTenant(here, () => listMyStores({ kind: "bootstrap", id: "bootstrap", role: "owner" })), [], "bootstrap:");
   ok(read("app/api/admin/stores/route.js").includes("listMyStores(auth.actor)"), "the stores route answers from the same function:");
+});
+
+// ---------- 3b. consoleNotices drops what is not for display ----------
+await t("consoleNotices(): only operator, reason, expires_at of a grant and id, tenant_id, title, public_message of an incident", async () => {
+  const notices = await world({
+    "../platform/support.js": { activeSupportGrant: async (id) => ({ id: "grt_1", tenant_id: id, operator: "op@storeasy.test", operator_id: "usr_op1", reason: "Checkout bug", expires_at: "2026-11-25T00:00:00.000Z", granted_by: "usr_x", created_at: "2026-11-24T00:00:00.000Z" }) },
+    "../platform/incidents.js": { openIncidentsFor: async () => [{ id: "inc_1", tenant_id: null, title: "Slow sync", public_message: "Catching up", internal_notes: `ask ${OTHER_EMAIL}`, severity: "high", created_by: "usr_op1" }, { id: "inc_2", tenant_id: "roles", title: "Payments", public_message: "", internal_notes: "secret" }] },
+    "../tenant-context.js": { currentTenant: () => ({ id: "roles" }) },
+    "../console-request.js": { tfetch: (fn) => fn() },
+  })(join(ROOT, "lib/admin/notices.js"));
+  const n = await notices.consoleNotices();
+  eq(n, {
+    grant: { operator: "op@storeasy.test", reason: "Checkout bug", expires_at: "2026-11-25T00:00:00.000Z" },
+    incidents: [
+      { id: "inc_1", tenant_id: null, title: "Slow sync", public_message: "Catching up" },
+      { id: "inc_2", tenant_id: "roles", title: "Payments", public_message: null },
+    ],
+  }, "display fields only:");
+  ok(!JSON.stringify(n).includes("internal") && !JSON.stringify(n).includes(OTHER_EMAIL) && !JSON.stringify(n).includes("secret"), "no internal notes:");
+  const failed = await world({
+    "../platform/support.js": { activeSupportGrant: async () => { throw new Error("down"); } },
+    "../platform/incidents.js": { openIncidentsFor: async () => [] },
+    "../tenant-context.js": { currentTenant: () => ({ id: "roles" }) },
+    "../console-request.js": { tfetch: (fn) => fn() },
+  })(join(ROOT, "lib/admin/notices.js"));
+  eq(await failed.consoleNotices(), { grant: null, incidents: [] }, "a failed read shows no notice:");
 });
 
 // ---------- 4. support's shell, rendered on the server ----------

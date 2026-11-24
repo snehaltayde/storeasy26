@@ -49,7 +49,7 @@ import { spawnSync } from "node:child_process";
 import { ROOT } from "../../design-harness.js";
 import { reseed, runDrill, settle, storeSql, storeUrl } from "../p3/lib.mjs";
 import { CONSENT_COOKIE, serializeConsent } from "../../../lib/track/names.js";
-import { diffRuns, elementHash, hashOf, isClean } from "./compare.js";
+import { diffRuns, elementHash, hashOf, isClean, topShiftCheck } from "./compare.js";
 
 export const SET = process.env.SF_STYLES_SET === "console" ? "console" : "storefront";
 export const DRILL_ID = SET === "console" ? "CONSOLE-STYLES" : "SF-STYLES";
@@ -315,6 +315,16 @@ async function sfStyles(drill) {
     drill.check(!isClean(t) && caught, "bite: the 0.01em letter-spacing is caught as computed-style differences", t);
   } else {
     drill.check(isClean(t), "no computed-style, box or element differences against the baseline (custom properties: additions only)", t);
+    if (consoleSet) {
+      // CONSOLE_IGNORE hides `top`; the one known move is checked here
+      const pick = (list) => list.find((c) => c.page === "owner-editor" && c.width === 1280);
+      const b = pick(base.captures);
+      const n = pick(captures);
+      const top = b && n ? topShiftCheck(b, { elements: n.elements }) : null;
+      report.editorTop = top;
+      writeFileSync(join(drill.dir, "compare.json"), `${JSON.stringify(report, null, 2)}\n`);
+      drill.check(Boolean(top?.ok), "owner-editor 1280px: inside [data-legacy] only the sticky preview's top moved (16px to 72px, below the top bar); no other sticky, fixed or absolute element's top differs", top && { moved: top.moved, placed: top.placed, others: top.others });
+    }
     if (t.shots) drill.note(`screenshot differences: ${diff.pages.filter((p) => p.shot !== "same").map((p) => `${p.page}@${p.width}`).join(", ")} (they fail only if the baseline-vs-baseline screenshots were identical; see compare.json)`);
   }
 }

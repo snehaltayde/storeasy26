@@ -595,6 +595,32 @@ await t("console-styles compare: ignoreProps (names and prefixes) and ignoreBoxe
   eq(`${d4.totals.style} ${d4.totals.frame} ${C.isClean(d4.totals)}`, "1 1 false", "inside a region a difference fails:");
 });
 
+await t("console-styles: topShiftCheck passes only on the sticky preview moving 16px to 72px inside the region", async () => {
+  const C = await import("./drills/sf-styles/compare.js");
+  const el = (k, position, top, l = 1) => ({ k, s: { position, top }, l });
+  const base = { elements: [el("root>div:1", "static", "auto"), el("root>div:1>div:2", "sticky", "16px"), el("root>div:1>div:3", "absolute", "8px"), el("root>div:1>div:4", "relative", "0px")] };
+  const good = structuredClone(base);
+  good.elements[1].s.top = "72px";
+  good.elements[3].s.top = "4px"; // a relative element's top is listed, not failed
+  const r = C.topShiftCheck(base, good);
+  eq(`${r.ok} ${r.moved?.k} ${r.placed} ${r.others}`, "true root>div:1>div:2 1 1", "the preview alone moved:");
+  eq(C.topShiftCheck(base, structuredClone(base)).ok, false, "no move at all fails (the preview must be found):");
+  const two = structuredClone(good);
+  two.elements[2].s.top = "64px";
+  eq(`${C.topShiftCheck(base, two).ok} ${C.topShiftCheck(base, two).placed}`, "false 2", "a second positioned element moving fails:");
+  const wrong = structuredClone(base);
+  wrong.elements[1].s.top = "56px";
+  eq(C.topShiftCheck(base, wrong).ok, false, "the wrong offset fails:");
+  const fixed = structuredClone(base);
+  fixed.elements[2].s.top = "72px";
+  fixed.elements[2].s.position = "fixed";
+  eq(C.topShiftCheck(base, fixed).ok, false, "a non-sticky element moving to 72px fails:");
+  const outside = structuredClone(good);
+  outside.elements[2].s.top = "64px";
+  outside.elements[2].l = 0;
+  eq(C.topShiftCheck(base, outside).ok, true, "outside [data-legacy] (the frame) is not counted:");
+});
+
 await t("shell: drill:shell runs the roles store, adds the annex, then the drill; it is in drill:all", async () => {
   const { scripts } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
   eq(scripts["drill:shell"], "node scripts/drills/run-isolated.mjs shell", "drill:shell:");
