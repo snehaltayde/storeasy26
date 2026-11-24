@@ -1,14 +1,11 @@
 // Provision a new tenant end-to-end (Session 21):
 //   pnpm tenant:provision <slug> --shop <x.myshopify.com> [--name "Store"] \
 //     [--domain host ...] [--client-id ID --client-secret SECRET] \
-//     [--db-url libsql://… --db-token …] [--force] [--legacy-content]
+//     [--db-url libsql://… --db-token …] [--force]
 // Creates the tenant Turso DB via the authed `turso` CLI (or TURSO_API_TOKEN),
 // applies the commerce schema, registers the tenant (no brand content seeded).
-// P4-PROVISION (MIG-03, OQ-4): a new, empty store starts on the new editor and
-// stays private ("Opening soon") until its first publish. A database that
-// already holds store content keeps the old editor (move it with the cutover).
-// --legacy-content starts the store on the old editor (an operator escape;
-// recorded in the run).
+// P4-PROVISION (MIG-03, OQ-4): the store is on the new editor and stays
+// private ("Opening soon") until its first publish.
 import { provisionTenant, editorSummary } from "../lib/platform/provision.js";
 
 const args = process.argv.slice(2);
@@ -26,7 +23,7 @@ const clientId = flag("client-id") || process.env.SHOPIFY_CLIENT_ID || null;
 const clientSecret = flag("client-secret") || process.env.SHOPIFY_CLIENT_SECRET || null;
 
 if (!slug || !shop) {
-  console.error("usage: pnpm tenant:provision <slug> --shop <x.myshopify.com> [--name …] [--domain host …] [--client-id … --client-secret …] [--db-url … --db-token …] [--force] [--legacy-content]");
+  console.error("usage: pnpm tenant:provision <slug> --shop <x.myshopify.com> [--name …] [--domain host …] [--client-id … --client-secret …] [--db-url … --db-token …] [--force]");
   process.exit(1);
 }
 
@@ -42,7 +39,6 @@ try {
     dbUrl: flag("db-url"),
     dbToken: flag("db-token"),
     force: args.includes("--force"),
-    contentMode: args.includes("--legacy-content") ? "legacy" : "documents",
     log: console.log,
   });
   console.log(`\n✓ tenant "${tenant.id}" provisioned`);

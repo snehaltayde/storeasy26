@@ -142,7 +142,7 @@ async function chromeData() {
         brandCss: brandCssVars(brand ? resolveBrand(brand) : null, { kit: kitAttr(theme) }),
         kitAttr: kitAttr(theme),
         preview: src.preview,
-        // P2-PREVIEW: what a documents preview shows (null on legacy previews)
+        // P2-PREVIEW: what a documents preview shows
         // P6-LOGO-RENDER: designShown too, so the bar never says the new
         // colours are not shown while they are (a store with no live design)
         previewOverlay: src.overlay ? { designDirty: src.overlay.designDirty, showDesign: src.overlay.showDesign, designShown: src.overlay.designShown === true, otherTab: src.overlay.otherTab } : null,
@@ -190,7 +190,7 @@ async function chromeData() {
 //                      signed whose session was revoked, expired or not found)
 //   a live v4 page     { kind: "live" }: a console cookie may then mount the
 //                      bridge with reason "live" and the Edit this page link
-//   anything else      null: today's markup (legacy stores, legacy previews)
+//   anything else      null: the plain markup
 function frameOf(src, routes) {
   if (src.preview === true && src.v === DOCUMENTS_RELEASE_VERSION && src.overlay) {
     const o = src.overlay;
@@ -386,7 +386,7 @@ export default async function RootLayout({ children }) {
             never ship it. P3-FRAME: also for a preview that ended, and for a
             console-signed-in browser on the live store (reason "live"), so
             the editor knows what its frame shows. Never for a shopper. */}
-        {chrome.preview && (editing ? <PreviewBridgeMount state={frame.state} ok /> : <PreviewBridgeMount ok={false} reason="legacy" />)}
+        {chrome.preview && editing && <PreviewBridgeMount state={frame.state} ok />}
         {frame?.kind === "refused" && <PreviewBridgeMount ok={false} reason={frame.reason} />}
         {liveConsole && <PreviewBridgeMount ok={false} reason="live" />}
         <CartProvider initialCart={cart}>

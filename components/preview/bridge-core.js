@@ -18,7 +18,7 @@
 //            state: what the layout says this frame shows (documents preview:
 //            {kind, sid, docs:{[id]: draftHash}, offline, skipped, designShown});
 //            ok false with reason "revoked" | "expired" | "not_found" (the
-//            preview ended), "live" (no preview: the live store) or "legacy";
+//            preview ended) or "live" (no preview: the live store);
 //            unfinished: the section ids marked [data-unfinished].
 //   while v2 is on, every click on a link or a control (any button, add to
 //   cart and wishlist included, inputs, selects, summaries, labels and

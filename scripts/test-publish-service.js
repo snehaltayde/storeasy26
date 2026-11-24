@@ -1051,7 +1051,7 @@ await t("FIX4 DOC-10: meta.redirect_from publishes a redirect from the old addre
 // =========================================================================================
 console.log("— the API (storefront.publish, modes, product content)");
 
-await t("API: staff without storefront.publish get 403 with storage unchanged; a legacy-mode tenant gets 409; product_content publishes as a live row with no release (P4-LIVEROW)", async () => {
+await t("API: staff without storefront.publish get 403 with storage unchanged; a tenant whose stored mode is not documents gets 500 STORE_MODE_INVALID; product_content publishes as a live row with no release (P4-LIVEROW)", async () => {
   const d = await create("docs", "page", { body: page("staff-try", "Staff try", "x") });
   const before = await dump();
   const staff = await publishApi("docs", d.id, { as: STAFF });
@@ -1066,10 +1066,10 @@ await t("API: staff without storefront.publish get 403 with storage unchanged; a
 
   const legacyBefore = await dump("legacy");
   const lg = await api({ publish: { id: "doc_home", draftHash: "x" }, revision: 1 }, { store: "legacy" });
-  eq([lg.status, lg.body.code], [409, "STORE_USES_LEGACY"], "legacy store:");
-  ok(/nothing was published/.test(lg.body.error), "publish words");
+  eq([lg.status, lg.body.code], [500, "STORE_MODE_INVALID"], "a store whose stored mode is 'legacy':");
+  ok(/nothing changed/.test(lg.body.error), "plain words");
   const lgSvc = await inT(() => Pub.publish({ ids: [{ id: "doc_home", revision: 1, draftHash: "x" }] }).then(() => "ran", (e) => e.code), "legacy");
-  eq(lgSvc, "STORE_USES_LEGACY", "the service refuses too:");
+  eq(lgSvc, "STORE_MODE_INVALID", "the service refuses too:");
   await unchanged(legacyBefore, "legacy", "legacy");
 
   // P4-LIVEROW (OVL-02): product content publishes now, as a live row: no
@@ -1574,20 +1574,20 @@ await t("P3-COMMIT API: 401 and 403 come before the mode check; staff get 403 on
   }
 });
 
-await t("P3-COMMIT API: a legacy store answers 409 STORE_USES_LEGACY for the new writes and the two new reads (a migrating one for the reads too); getDocument and listDocuments behave as before", async () => {
+await t("P3-COMMIT API: a store whose stored mode is not documents ('legacy', 'migrating') answers 500 STORE_MODE_INVALID for the new writes and the two new reads; getDocument and listDocuments behave as before", async () => {
   const before = await dump("legacy");
   for (const [name, o] of Object.entries(NEW_OPS)) {
     const r = await api(o.good("doc_home"), { store: "legacy" });
-    eq([r.status, r.body.code], [409, "STORE_USES_LEGACY"], `${name}:`);
-    likeShape(r, SHAPES[name].outcomes.legacy, `${name} legacy`);
+    eq([r.status, r.body.code], [500, "STORE_MODE_INVALID"], `${name}:`);
+    likeShape(r, SHAPES[name].outcomes.modeInvalid, `${name} modeInvalid`);
   }
   await unchanged(before, "legacy", "legacy");
-  // migrating: the two reads refuse too (and writes, as today)
+  // a stored 'migrating' (nothing writes it any more): the two reads refuse the same way
   await raw.busy.execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
   try {
     for (const name of ["listRecentlyPublished", "listChanges"]) {
       const r = await api(NEW_OPS[name].good("doc_home"), { store: "busy" });
-      eq([r.status, r.body.code], [409, "STORE_USES_LEGACY"], `${name} migrating:`);
+      eq([r.status, r.body.code], [500, "STORE_MODE_INVALID"], `${name} migrating:`);
     }
   } finally {
     await raw.busy.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");

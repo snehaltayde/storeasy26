@@ -740,7 +740,7 @@ async function renderedTests() {
     eq(v.net.posts().length, 2, "Try again posts once more:");
     eq(v.stateOf("data-first-run"), "ready", "then ready:");
     // every reason has its own words; only the ones a retry can help get Try again
-    for (const [reason, retry, editLink] of [["migrating", true, true], ["catalog_not_confirmed", true, true], ["live", false, true], ["legacy", false, false], ["something_new", true, true]]) {
+    for (const [reason, retry, editLink] of [["catalog_not_confirmed", true, true], ["live", false, true], ["something_new", true, true]]) {
       const w = await mount(FR, { canEdit: true, canSync: true, pollMs: POLL }, { ...firstRunGet(eligible, syncView("complete", { firstSync: false })), "POST /api/admin/first-run": half(reason, "x"), ...brandTable() });
       eq(w.stateOf("data-first-run"), "half", `${reason}, state:`);
       ok(w.all().includes("Your home page was made, but your colours were not"), `${reason}: ${w.all()}`);
@@ -1301,26 +1301,27 @@ try {
     eq((await post(Rf, { paletteId: "lime" })).body.code, "PALETTE_UNKNOWN", "code:");
   });
 
-  await t("ACCEPTANCE: a legacy tenant is refused with 409 STORE_USES_LEGACY and nothing written; GET too", async () => {
+  await t("ACCEPTANCE: a tenant whose stored mode is 'legacy' is refused with 500 STORE_MODE_INVALID and nothing written; GET too", async () => {
     const L = await store("legacy", { mode: "legacy" });
     await members(L);
     const before = await dump(L);
     for (const body of [{ paletteId: "forest" }, { skip: true }, { paletteId: "forest", description: "New" }]) {
       const r = await post(L, body);
-      eq([r.status, r.body.code], [409, "STORE_USES_LEGACY"], `${JSON.stringify(body)}: ${JSON.stringify(r.body)}`);
-      ok(/current Storefront editor/.test(r.body.error) && /nothing was saved/.test(r.body.error), r.body.error);
+      eq([r.status, r.body.code], [500, "STORE_MODE_INVALID"], `${JSON.stringify(body)}: ${JSON.stringify(r.body)}`);
+      ok(/nothing changed/.test(r.body.error) && !/STORE_|legacy/.test(r.body.error), r.body.error);
     }
     await unchanged(L, before, "legacy");
-    eq((await get(L)).body.code, "STORE_USES_LEGACY", "GET:");
+    const g = await get(L);
+    eq([g.status, g.body.code], [500, "STORE_MODE_INVALID"], "GET:");
   });
 
-  await t("a store moving to the new editor is refused with 409 STORE_MIGRATING and nothing written", async () => {
+  await t("a store whose stored mode is 'migrating' is refused with 500 STORE_MODE_INVALID and nothing written", async () => {
     const Mv = await store("moving");
     await members(Mv);
     await raw(Mv).execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
     const before = await dump(Mv);
     const r = await post(Mv, { paletteId: "forest" });
-    eq([r.status, r.body.code], [409, "STORE_MIGRATING"], JSON.stringify(r.body));
+    eq([r.status, r.body.code], [500, "STORE_MODE_INVALID"], JSON.stringify(r.body));
     await unchanged(Mv, before, "moving");
   });
 

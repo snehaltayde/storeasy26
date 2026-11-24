@@ -429,7 +429,7 @@ await t("a v4 home's rails never read collection_overrides (plan decision 9)", a
   same([...v4Rail.matchAll(/href="\/products\/([^"]+)"/g)].map((m) => m[1]), ["glow-serum", "night-cream", "dew-drops"], "v4 rail order (the collection's own):");
 });
 
-await t("section-data: never asks for legacy pins", async () => {
+await t("section-data: never asks for legacy pins (a repo with the old per-rail read is never called)", async () => {
   const calls = [];
   const repo = {
     getNewestProducts: async () => [],
@@ -439,7 +439,7 @@ await t("section-data: never asks for legacy pins", async () => {
     getProductsInCollection: async (h, o) => (calls.push(`products:${h}:${JSON.stringify(o.pins ?? null)}`), { products: [{ handle: "a" }, { handle: "b" }, { handle: "c" }] }),
   };
   const rail = sec("product_rail", "sec_r1", { collection: { handle: "serums", id: COL(1) }, limit: 3 });
-  const v4 = await resolveHomeSectionData([rail], { repo, documents: true });
+  const v4 = await resolveHomeSectionData([rail], { repo });
   same(calls, ["products:serums:[]"], "v4 calls:");
   eq(v4.get("sec_r1").handPicked, false, "v4 handPicked:");
 });
@@ -644,18 +644,18 @@ await t("one failing data binding does not blank the page: the resolver settles 
     getProductsInCollection: async () => ({ products: p3 }),
   };
   const sections = [sec("new", "sec_new1", { title: "New in", limit: 3 }), sec("product_rail", "sec_rail1", { title: "Serums rail", collection: { handle: "serums" }, limit: 3 }), sec("collections", "sec_c1", { title: "Shop by collection" })];
-  const { result: data, lines } = await logsOf(() => resolveHomeSectionData(sections, { repo, documents: true }));
+  const { result: data, lines } = await logsOf(() => resolveHomeSectionData(sections, { repo }));
   same(data.get("sec_new1"), { bindingFailed: ["products"] }, "the failing section's data:");
   eq(data.get("sec_rail1").products.length, 3, "the rail still has its products:");
   eq(data.get("sec_c1").collections.length, 1, "the grid still has its collections:");
   same(lines.filter((l) => l.evt === "section_binding_failed").map((l) => [l.sectionId, l.field, l.source]), [["sec_new1", "products", "newest_products"]], "log line:");
   // a curated read and a pins read that fail are never replaced by a guess
-  const pinsDown = { ...repo, getNewestProducts: async () => p3, collectionPinsByHandles: async () => { throw new Error("pins down"); } };
-  const legacy = await logsOf(() => resolveHomeSectionData(sections, { repo: pinsDown, index: { featured: ["serums"] } }));
-  same(legacy.result.get("sec_rail1"), { bindingFailed: ["products"] }, "a rail whose pins can't be read fails, never shows the unpinned order:");
-  eq(legacy.result.get("sec_new1").products.length, 3, "the newest products are fine");
+  const pinsDown = { ...repo, getNewestProducts: async () => p3, livePinsByHandles: async () => { throw new Error("pins down"); } };
+  const downed = await logsOf(() => resolveHomeSectionData(sections, { repo: pinsDown, index: { featured: ["serums"] } }));
+  same(downed.result.get("sec_rail1"), { bindingFailed: ["products"] }, "a rail whose pins can't be read fails, never shows the unpinned order:");
+  eq(downed.result.get("sec_new1").products.length, 3, "the newest products are fine");
   const curatedDown = { ...repo, getNewestProducts: async () => p3, getCollectionsByHandles: async () => { throw new Error("curated down"); } };
-  same((await logsOf(() => resolveHomeSectionData(sections, { repo: curatedDown, index: { featured: ["serums"] }, documents: true }))).result.get("sec_c1"), { bindingFailed: ["collections"] }, "a grid whose curated list can't be read fails, never shows the uncurated list:");
+  same((await logsOf(() => resolveHomeSectionData(sections, { repo: curatedDown, index: { featured: ["serums"] }}))).result.get("sec_c1"), { bindingFailed: ["collections"] }, "a grid whose curated list can't be read fails, never shows the uncurated list:");
 
   // rendered: live leaves the section out and keeps the rest; the preview shows the note
   const live = await inV4(() => asRequest("srv.test", {}, () => htmlAsync(React.createElement(HomeSections, { sections, dataById: data }))));
@@ -667,7 +667,7 @@ await t("one failing data binding does not blank the page: the resolver settles 
   ok(/data-section-id="sec_rail1"/.test(pv), "the preview keeps the rest");
   // before P3-VALIDATE the whole resolver rejected
   let rejected = false;
-  await resolveHomeSectionData(sections, { repo, documents: true }).catch(() => (rejected = true));
+  await resolveHomeSectionData(sections, { repo }).catch(() => (rejected = true));
   eq(rejected, false, "the resolver itself never rejects for one binding:");
 });
 
@@ -732,7 +732,7 @@ await t("AU-04: every registered kind's starterSection, saved by saveDraft in dr
     const shown = preview.sections.find((s) => s.id === starter.id);
     ok(shown, `${kind}: the starter is in the preview body`);
     if (d.startsIncomplete && kind !== "product_rail") ok(shown.unfinished, `${kind}: a starter that starts incomplete previews as its note`);
-    const data = await inV4(() => resolveHomeSectionData([shown], { documents: true }));
+    const data = await inV4(() => resolveHomeSectionData([shown]));
     const out = view(shown, data.get(shown.id) || {}, { surface: type === "home" ? "home" : "page", secKey: shown.id, preview: true, ...(kind === "product_main" ? { productMain: React.createElement("p", null, "buy") } : {}) });
     ok(!out.includes("couldn&#x27;t be shown"), `${kind}: the starter failed to render`);
     if (kind === "product_rail") ok(/href="\/products\//.test(out), `the starter rail shows real products: ${out.slice(0, 300)}`);
@@ -977,7 +977,7 @@ await t("a kind without hiddenReason renders nothing in a documents preview and 
 
 await t("product_rail bound to an empty collection still renders nothing, in a documents preview and live (PV-09 unchanged)", async () => {
   const r = { ...rail({ collection: { handle: "empty-shelf" } }), id: "sec_e0" };
-  const data = await inV4(() => resolveHomeSectionData([r], { documents: true }));
+  const data = await inV4(() => resolveHomeSectionData([r]));
   same(data.get("sec_e0").products, [], "empty collection data:");
   const token = await previewToken();
   const pv = await inRequest("srv.test", { [PREVIEW_COOKIE]: token }, async () => ({ home: home([r], data), view: view(r, data.get("sec_e0"), { surface: "home", secKey: "sec_e0", preview: true }) }));

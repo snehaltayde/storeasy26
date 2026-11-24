@@ -615,12 +615,12 @@ await t("openingChecks (P6-FIX2): a set of only product and collection content o
   eq(mixed.offer.publishSet.slice(0, 2), [pc, home].map((d) => ({ id: d.id, revision: d.revision, draftHash: d.draftHash, label: d.label })), "the mixed offer:");
   eq(await dump(h), before, "nothing was written:");
 });
-await t("openingChecks: a legacy store answers 409 STORE_USES_LEGACY (it checks the mode itself)", async () => {
+await t("openingChecks: a store whose stored mode is 'legacy' answers 500 STORE_MODE_INVALID (it checks the mode itself)", async () => {
   const h = await F.makeTenant({ name: "oc-legacy", id: "oclegacy", products: 1 });
   stores.push(h);
   await I.addMembership(owner.id, h.id, "owner");
   const r = await api(h, { openingChecks: { ids: [] } });
-  eq([r.status, r.body.code], [409, "STORE_USES_LEGACY"], "legacy:");
+  eq([r.status, r.body.code], [500, "STORE_MODE_INVALID"], "legacy:");
 });
 
 // ---- the parser and the API ------------------------------------------------------------------

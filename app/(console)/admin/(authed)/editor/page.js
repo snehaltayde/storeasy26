@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
@@ -10,8 +9,6 @@ import { tfetch } from "@/lib/console-request";
 import { roleAllows } from "@/lib/platform/authz";
 import { bundleCurrency } from "@/lib/bundles";
 import { slog } from "@/lib/log";
-import { PageHeader } from "@/components/console/PageHeader";
-import { Banner } from "@/components/console/Banner";
 import DocumentEditor from "@/components/admin/editor/DocumentEditor";
 
 // P3-ROUTES (ED-02, PUB-11; plan decision 11): the new editor's one address.
@@ -31,11 +28,8 @@ import DocumentEditor from "@/components/admin/editor/DocumentEditor";
 //   A product or collection that isn't in the catalog opens the home page
 //   with a note in plain words.
 // The store's mode is read fresh on every request (getCmsMode never caches):
-//   documents  the editor
-//   legacy     a note pointing at today's Designer; nothing else changes
-//   migrating  a read-only note: old writes are paused, the new editor isn't
-//              open yet
-// A mode that can't be read is an error page, never a guess.
+// a store not in documents mode (500 STORE_MODE_INVALID) or a mode that can't
+// be read is an error page, never a guess.
 // P5-EDITOR (OQ-A): the editor gets can={{ offersWrite }}: the bundle
 // picker's "Create a bundle" is there only for a session that may write
 // offers (anyone else reads "Ask an owner to create bundles."). The store's
@@ -103,18 +97,17 @@ export default async function EditorPage({ searchParams }) {
   const query = (await searchParams) || {};
   const target = parseEditorTarget(query);
   const editable = canEdit(actor);
-  const { mode, entry, entity, readOnly, startingBrand } = await tfetch(async () => {
-    const mode = await getCmsMode();
-    if (mode !== "documents") return { mode, entry: null };
+  const { entry, entity, readOnly, startingBrand } = await tfetch(async () => {
+    await getCmsMode();
     // P6-NAV: read inside the store's context (the tenant tfetch resolved)
-    return { ...(await documentsEntry(mode)), startingBrand: await startingBrandHere() };
+    return { ...(await documentsEntry()), startingBrand: await startingBrandHere() };
   });
-  async function documentsEntry(mode) {
+  async function documentsEntry() {
     if (target.product || target.collection) {
       const type = target.product ? "product_content" : "collection_content";
       const out = await entityEntry({ type, entityId: target.product || target.collection, actor });
-      if (out.document) return { mode, entry: { document: out.document, note: null }, entity: out.entity, readOnly: out.readOnly };
-      return { mode, entry: { ...editorEntry({}, await listDocuments()), note: out.error || ENTRY_WORDS.failed }, entity: null, readOnly: null };
+      if (out.document) return { entry: { document: out.document, note: null }, entity: out.entity, readOnly: out.readOnly };
+      return { entry: { ...editorEntry({}, await listDocuments()), note: out.error || ENTRY_WORDS.failed }, entity: null, readOnly: null };
     }
     let docs = await listDocuments();
     // P6-GEN (GEN-01): a closed store that has no home page yet gets its
@@ -123,43 +116,13 @@ export default async function EditorPage({ searchParams }) {
     // generator checks the rest (closed, catalog in, nothing of the founder's).
     if (editable && !docs.some((d) => d.id === "doc_home")) docs = await firstStoreThen(actor, docs);
     const e = editorEntry(query, docs);
-    if (!ENTITY_TYPES.has(e.document?.type)) return { mode, entry: e, entity: null, readOnly: null };
+    if (!ENTITY_TYPES.has(e.document?.type)) return { entry: e, entity: null, readOnly: null };
     // ?doc= of a product's or collection's content: read what Shopify sends now
     const row = docs.find((d) => d.id === e.document.id);
-    return { mode, entry: e, entity: await entityForDocument(row), readOnly: editable ? null : ENTRY_WORDS.readOnly };
+    return { entry: e, entity: await entityForDocument(row), readOnly: editable ? null : ENTRY_WORDS.readOnly };
   }
 
-  if (mode === "documents") {
-    const offersWrite = roleAllows(actor?.role, "offers.write");
-    const currency = offersWrite ? await tfetch(currencyForBundles) : undefined;
-    return <DocumentEditor document={entry.document} note={entry.note} entity={entity ?? null} readOnly={readOnly ?? null} can={{ offersWrite }} currency={currency} startingBrand={startingBrand} />;
-  }
-
-  if (mode === "legacy") {
-    return (
-      <>
-        <PageHeader title="Editor" />
-        <Banner tone="info" title="Your store still uses the current editors">
-          <p data-editor-note="legacy">
-            The new editor opens here once your store moves to it. Until then, edit your home page in the{" "}
-            <Link href="/admin/storefront/designer" className="font-medium underline underline-offset-2">
-              Designer
-            </Link>
-            , and your other pages from Storefront.
-          </p>
-        </Banner>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <PageHeader title="Editor" />
-      <Banner tone="warning" title="Your store is moving to the new editor">
-        <p data-editor-note="migrating">
-          While the move runs, nothing can be changed here or in the old editors. Your store stays as it is for shoppers. Come back once the move is done.
-        </p>
-      </Banner>
-    </>
-  );
+  const offersWrite = roleAllows(actor?.role, "offers.write");
+  const currency = offersWrite ? await tfetch(currencyForBundles) : undefined;
+  return <DocumentEditor document={entry.document} note={entry.note} entity={entity ?? null} readOnly={readOnly ?? null} can={{ offersWrite }} currency={currency} startingBrand={startingBrand} />;
 }

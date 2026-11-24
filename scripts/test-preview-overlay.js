@@ -781,10 +781,10 @@ await t("an old-format token on a documents store gives live only", async () => 
   ok(/^p\.\d+\.[0-9a-f]{20}$/.test(oldTok), `old format: ${oldTok}`);
   eq(await inT(PD, () => R.verifyPreviewToken(oldTok)), true, "still verifies:");
   await liveOnly(PD, withToken(oldTok), "old token, documents store");
-  // the admin route refuses legacy stores
+  // the admin route refuses a store whose stored mode is 'legacy' (500 STORE_MODE_INVALID)
   const r = await admin(PL, { create: true });
-  eq(r.status, 409, "create on legacy:");
-  eq(r.body.code, "STORE_USES_LEGACY", "code:");
+  eq(r.status, 500, "create on legacy:");
+  eq(r.body.code, "STORE_MODE_INVALID", "code:");
   eq(await inT(PL, async () => Number((await libsql.execute("SELECT count(*) AS n FROM preview_sessions")).rows[0].n)), 0, "no session written:");
 });
 

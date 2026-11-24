@@ -251,6 +251,8 @@ const pageStubs = {
     getCmsMode: async () => {
       S.modeReads++;
       if (S.modeThrows) throw Object.assign(new Error("We couldn't check which editor this store uses"), { code: "CMS_MODE_UNAVAILABLE" });
+      // as lib/cms-mode.js: any stored mode but documents is STORE_MODE_INVALID
+      if (S.mode !== "documents") throw Object.assign(new Error("Something is wrong with this store's setup on our side"), { code: "STORE_MODE_INVALID", mode: S.mode });
       return S.mode;
     },
   },
@@ -317,24 +319,22 @@ await t("rendered: /admin/editor in documents mode is the editor placeholder at 
   ok(!lost.html.includes("data-editor-note"), "the legacy or migrating note shows in documents mode");
 });
 
-await t("rendered: /admin/editor in legacy mode is a note linking to the Designer, and reads no documents", async () => {
-  const r = await run("editor/page.js", { mode: "legacy", query: { doc: "doc_home" } });
-  ok(r.html.includes('data-editor-note="legacy"') && r.html.includes('href="/admin/storefront/designer"'), r.html);
-  ok(!r.html.includes("data-document-editor") && r.docsReads === 0, "the editor showed on a legacy store");
-});
+const thrown = (p) => p.then(() => null, (e) => e?.code ?? String(e));
 
-await t("rendered: /admin/editor in migrating mode is a read-only note: no editor, no link to an editor", async () => {
-  for (const mode of ["migrating", "something-else"]) {
-    const r = await run("editor/page.js", { mode });
-    ok(r.html.includes('data-editor-note="migrating"') && /nothing can be changed/.test(r.html), `${mode}: ${r.html}`);
-    ok(!r.html.includes("data-document-editor") && !r.html.includes("<a ") && !r.html.includes("<button") && r.docsReads === 0, `${mode}: something to edit with`);
+await t("rendered: /admin/editor on a store whose stored mode isn't documents ('legacy', 'migrating', anything else) is an error page (STORE_MODE_INVALID), never a note or the editor, and reads no documents", async () => {
+  for (const mode of ["legacy", "migrating", "something-else"]) {
+    Object.assign(S, { docsReads: 0 });
+    eq(await thrown(run("editor/page.js", { mode })), "STORE_MODE_INVALID", `${mode}:`);
+    eq(S.docsReads, 0, `${mode}: documents read`);
   }
+  const src = await readFile(join(AUTHED, "editor/page.js"), "utf8");
+  ok(!src.includes("data-editor-note") && !src.includes("/admin/storefront/designer"), "the old-editor notes are gone");
 });
 
 await t("rendered: /admin/editor reads the mode on every request (never cached)", async () => {
-  const a = await run("editor/page.js", { mode: "legacy" });
+  const a = await thrown(run("editor/page.js", { mode: "legacy" }));
   const b = await run("editor/page.js", { mode: "documents" });
-  ok(a.html.includes('data-editor-note="legacy"') && b.html.includes("data-document-editor") && a.modeReads === 1 && b.modeReads === 1, "the second request saw the first one's mode");
+  ok(a === "STORE_MODE_INVALID" && b.html.includes("data-document-editor") && b.modeReads === 1, "the second request saw the first one's mode");
   const src = await readFile(join(AUTHED, "editor/page.js"), "utf8");
   ok(/export const runtime = "nodejs"/.test(src) && /export const dynamic = "force-dynamic"/.test(src), "editor page must be nodejs and dynamic");
 });
@@ -401,13 +401,10 @@ await t("P6-NAV rendered: on a documents store the editor page passes startingBr
   eq(r.props.startingBrand, null, "startingBrand when its modules can't load:");
   eq(logged, ["editor_starting_brand_failed"], "logged:");
 });
-await t("P6-NAV rendered: legacy and migrating editor renders are unchanged (no startingBrand, no documents read), and the page never imports the generator statically", async () => {
+await t("P6-NAV rendered: a store whose stored mode isn't documents gets no editor (no startingBrand, no documents read), and the page never imports the generator statically", async () => {
   for (const mode of ["legacy", "migrating"]) {
-    const plain = await run("editor/page.js", { mode });
-    const withRecord = await runEditorWith({ onboarding: { brand_step: { paletteId: "forest" } } }, { mode });
-    eq(withRecord.html, plain.html, `${mode}: the markup`);
-    ok(!withRecord.html.includes("startingBrand") && !withRecord.html.includes("DocumentEditor"), `${mode}: the editor showed`);
-    eq([withRecord.modeReads, withRecord.docsReads], [1, 0], `${mode}: reads`);
+    eq(await thrown(runEditorWith({ onboarding: { brand_step: { paletteId: "forest" } } }, { mode })), "STORE_MODE_INVALID", `${mode}:`);
+    eq([S.modeReads, S.docsReads], [1, 0], `${mode}: reads`);
   }
   const src = await readFile(join(AUTHED, "editor/page.js"), "utf8");
   ok(!/^import [^\n]*first-run\/generate/m.test(src), "editor/page.js imports lib/first-run/generate.js statically");

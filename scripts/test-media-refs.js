@@ -6,7 +6,8 @@
 //      document_versions, the drafts, the settings and release:<id> rows,
 //      never document_versions.body or releases.content (lib/media.js);
 //   3. delete refusals: documents stores (forced too), stores being moved,
-//      legacy stores (today's force), and the DELETE's own guard;
+//      a stored mode that isn't documents (STORE_MODE_INVALID), and the
+//      DELETE's own guard;
 //   4. archive (migration 0025) and a store at 0024 without the column;
 //   5. the reindex (reindexTenant and scripts/reindex-document-refs.js).
 // File databases only (scripts/support/tenant-fixture.js).
@@ -88,7 +89,9 @@ const sql = async (fx, q, args = []) => (await raw(fx).execute({ sql: q, args })
 // the legacy tables (cms_blocks, cms_pages) live in lib/schema.sql
 const schema = await readFile(join(ROOT, "lib/schema.sql"), "utf8");
 for (const fx of [docs, legacy, moving, old24, cli]) await raw(fx).executeMultiple(schema);
-for (const fx of [docs, cli]) await raw(fx).execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
+// old24 stands for a store at 0024 that 0026 later set to documents (the
+// only mode); legacy and moving keep a stale stored mode (STORE_MODE_INVALID)
+for (const fx of [docs, cli, old24]) await raw(fx).execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
 await raw(moving).execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
 
 const PNG = (n) => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, n & 255, (n >> 8) & 255, 2, 3, 4, 5, 6, 7]);
@@ -490,27 +493,20 @@ await t("the DELETE's own guard also counts an address-form ref that lands betwe
   eq(await stored(docs, g.id), 1, "kept:");
 });
 
-await t("a store being moved: every delete is refused, forced or not, used or not, with 'Your store is being updated…'; the files stay", async () => {
-  const unused = await upload(moving);
-  for (const force of [false, true]) {
-    const e = await moving.run(() => M.deleteMedia(unused.id, { force }).then(() => null, (x) => x));
-    eq([e?.code, e?.status], ["STORE_MIGRATING", 409], `force ${force}:`);
-    eq(e.message, M.MIGRATING_MESSAGE, "words:");
-    ok(/^Your store is being updated/.test(e.message), "starts with the plain words:");
+await t("a store whose stored mode is 'migrating' or 'legacy': every delete and usage read is refused with 500 STORE_MODE_INVALID, forced or not, used or not; the files stay", async () => {
+  for (const fx of [moving, legacy]) {
+    const unused = await upload(fx);
+    for (const force of [false, true]) {
+      const e = await fx.run(() => M.deleteMedia(unused.id, { force }).then(() => null, (x) => x));
+      eq([e?.code, e?.status], ["STORE_MODE_INVALID", 500], `${fx.id} force ${force}:`);
+      ok(!/STORE_|legacy|migrat/i.test(e.message), `plain words: ${e.message}`);
+    }
+    eq(await fx.run(() => codeOf(M.mediaUsage(unused.id))), "STORE_MODE_INVALID", `${fx.id} usage:`);
+    eq(await stored(fx, unused.id), 1, "still stored:");
   }
-  eq(await stored(moving, unused.id), 1, "still stored:");
 });
 
-await t("legacy store: force keeps today's meaning (a page use refuses, force deletes); usage is the full scan", async () => {
-  const f = await upload(legacy);
-  await raw(legacy).execute({ sql: "INSERT INTO cms_pages (slug, title, sections, enabled, updated_at) VALUES ('uses-it', 'U', ?, 1, 'x')", args: [JSON.stringify([{ kind: "image", src: M.mediaUrl(f.id) }])] });
-  eq(await usage(legacy, f.id), [["page:uses-it"]], "the scan:");
-  eq(await legacy.run(() => codeOf(M.deleteMedia(f.id))), "MEDIA_IN_USE", "unforced:");
-  eq((await legacy.run(() => M.deleteMedia(f.id, { force: true }))).deleted, f.id, "forced deletes:");
-  eq(await stored(legacy, f.id), 0, "gone:");
-});
-
-await t("the DELETE guards itself: a ref written between the check and the DELETE, or a move that starts then, deletes nothing", async () => {
+await t("the DELETE guards itself: a ref written between the check and the DELETE, or a stored mode that stops being documents then, deletes nothing", async () => {
   // documents: a publish lands a ref right before the DELETE runs
   const g = await upload(docs);
   const inst = docs.run(() => currentDatabase());
@@ -530,51 +526,20 @@ await t("the DELETE guards itself: a ref written between the check and the DELET
   }
   eq(out, "MEDIA_IN_USE", "refused by the guard:");
   eq(await stored(docs, g.id), 1, "kept:");
-  // legacy: the move starts right before the DELETE
-  const h = await upload(legacy);
-  const ldb = await legacy.run(() => currentDatabase());
-  const lsend = ldb.libsql.execute;
-  ldb.libsql.execute = async (stmt, ...rest) => {
-    if (/^DELETE FROM media/.test(typeof stmt === "string" ? stmt : stmt?.sql || "")) await raw(legacy).execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
-    return lsend.call(ldb.libsql, stmt, ...rest);
+  // the stored mode stops being documents right before the DELETE
+  const h = await upload(docs);
+  db.libsql.execute = async (stmt, ...rest) => {
+    if (/^DELETE FROM media/.test(typeof stmt === "string" ? stmt : stmt?.sql || "")) await raw(docs).execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
+    return send.call(db.libsql, stmt, ...rest);
   };
   try {
-    out = await legacy.run(() => codeOf(M.deleteMedia(h.id, { force: true })));
+    out = await docs.run(() => codeOf(M.deleteMedia(h.id, { force: true })));
   } finally {
-    delete ldb.libsql.execute;
-    await raw(legacy).execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
+    delete db.libsql.execute;
+    await raw(docs).execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
   }
-  eq(out, "STORE_MIGRATING", "refused by the guard:");
-  eq(await stored(legacy, h.id), 1, "kept:");
-});
-
-// The legacy scan's output, frozen from HEAD's lib/media.js (607cde2) on this
-// exact fixture. A legacy store must answer byte for byte the same.
-const LEGACY_SNAPSHOT =
-  '[{"where":"block:home_sections"},{"where":"page:thumbs"},{"where":"product modules:gid://shopify/Product/77"},{"where":"live release:rel_lglive"},{"where":"scheduled release:rel_lgsched"},{"where":"retained release:rel_lgold"},{"where":"draft:doc_lgdraft","label":"draft","document":"doc_lgdraft","name":"Legacy draft"},{"where":"live:doc_lgdraft","label":"live","document":"doc_lgdraft","name":"Legacy draft","version":"ver_lglive"},{"where":"older version:doc_lgdraft","label":"older version","document":"doc_lgdraft","name":"Legacy draft","version":"ver_lgold"}]';
-await t("legacy usage output is byte-identical to before (frozen from HEAD on a fixture with blocks, pages, modules, live/scheduled/retained releases, drafts and versions)", async () => {
-  const L = raw(legacy);
-  const P = "med_aaaaaaaaaaaaaaaaaa";
-  const T = "med_aaaaaaaaaaaaaaaaab";
-  const url = (id) => `/api/media/${id}`;
-  const at = "2026-02-02T00:00:00.000Z";
-  await L.execute({ sql: "INSERT INTO media (id, filename, mime, size, sha256, data, created_at) VALUES (?, 'a.png', 'image/png', 1, 'lg1', x'01', ?)", args: [P, at] });
-  await L.execute({ sql: "INSERT INTO media (id, filename, mime, size, sha256, data, created_at, variant, parent_id) VALUES (?, 't.png', 'image/png', 1, 'lg2', x'01', ?, 'thumb', ?)", args: [T, at, P] });
-  await L.execute({ sql: "INSERT INTO cms_blocks (key, value, updated_at) VALUES ('home_sections', ?, ?)", args: [JSON.stringify([{ kind: "hero", image: url(P) }]), at] });
-  await L.execute({ sql: "INSERT INTO cms_pages (slug, title, sections, enabled, updated_at) VALUES ('thumbs', 'T', ?, 1, ?)", args: [JSON.stringify([{ src: url(T) }]), at] });
-  await L.execute({ sql: "INSERT INTO product_overrides (product_id, modules, updated_at) VALUES ('gid://shopify/Product/77', ?, ?)", args: [JSON.stringify([{ title: "M", html: `<img src="${url(P)}">` }]), at] });
-  const rel = (id, extra) => L.execute({ sql: "INSERT INTO releases (id, content, content_hash, note, created_by, created_at, scheduled_for, published_at) VALUES (?, ?, 'h', '', NULL, ?, ?, ?)", args: [id, JSON.stringify({ v: 2, img: url(P) }), extra.created, extra.scheduled ?? null, extra.published ?? null] });
-  await rel("rel_lglive", { created: "2026-02-01T00:00:00.000Z", published: at });
-  await rel("rel_lgsched", { created: "2026-02-03T00:00:00.000Z", scheduled: "2099-01-01T00:00:00.000Z" });
-  await rel("rel_lgold", { created: "2026-01-01T00:00:00.000Z", published: "2026-01-01T00:00:00.000Z" });
-  await L.execute("UPDATE release_state SET live_release_id = 'rel_lglive' WHERE id = 1");
-  const draft = JSON.stringify({ type: "page", sections: [{ src: url(P) }] });
-  await L.execute({ sql: "INSERT INTO documents (id, type, slug, label, draft, draft_hash, revision, schema_version, published_version_id, created_at, updated_at) VALUES ('doc_lgdraft', 'page', 'lg', 'Legacy draft', ?, 'dh', 1, 1, 'ver_lglive', ?, ?)", args: [draft, at, at] });
-  await L.execute({ sql: "INSERT INTO document_versions (id, document_id, kind, body, body_hash, schema_version, created_at) VALUES ('ver_lglive', 'doc_lgdraft', 'published', ?, 'b1', 1, ?)", args: [draft, "2026-02-02T00:00:00.000Z"] });
-  await L.execute({ sql: "INSERT INTO document_versions (id, document_id, kind, body, body_hash, schema_version, created_at) VALUES ('ver_lgold', 'doc_lgdraft', 'published', ?, 'b2', 1, ?)", args: [JSON.stringify({ src: url(T) }), "2026-01-01T00:00:00.000Z"] });
-  const got = JSON.stringify(await legacy.run(() => M.mediaUsage(P)));
-  eq(got, LEGACY_SNAPSHOT, "byte for byte:");
-  ok(got === LEGACY_SNAPSHOT, "identical strings");
+  eq(out, "STORE_MODE_INVALID", "refused by the guard:");
+  eq(await stored(docs, h.id), 1, "kept:");
 });
 
 // =============================================================================
@@ -717,7 +682,7 @@ await t("reindex-document-refs refuses a libsql:// store without --hosted --conf
   eq(gone.status, 1, "unknown store:");
 });
 
-await t("the console route /api/admin/media: PATCH {archived} archives and brings back, GET hides archived unless ?archived=include, a store at 0024 gets 409 in plain words, a moving store's DELETE gets 409 STORE_MIGRATING", async () => {
+await t("the console route /api/admin/media: PATCH {archived} archives and brings back, GET hides archived unless ?archived=include, a store at 0024 gets 409 in plain words, a stored 'migrating' mode's DELETE gets 500 STORE_MODE_INVALID", async () => {
   const I = await import("../lib/platform/identity.js");
   const Sess = await import("../lib/platform/sessions.js");
   const route = await import("../app/api/admin/media/route.js");
@@ -755,7 +720,7 @@ await t("the console route /api/admin/media: PATCH {archived} archives and bring
     eq(r.status, 200, "alt still saves at 0024:");
     const h = await upload(moving);
     r = await call(route.DELETE, req("mrmoving", { id: h.id, force: true }));
-    eq([r.status, r.body.code, r.body.error], [409, "STORE_MIGRATING", M.MIGRATING_MESSAGE], "moving:");
+    eq([r.status, r.body.code], [500, "STORE_MODE_INVALID"], "moving:");
     eq(await stored(moving, h.id), 1, "kept:");
   } finally {
     await at24.cleanup();

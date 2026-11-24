@@ -3,7 +3,7 @@ import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin } from "@/lib/admin-auth";
 import { roleAllows } from "@/lib/platform/authz";
 import { audit } from "@/lib/platform/audit";
-import { runCatalogSync, SYNC_PAUSED_MESSAGE } from "@/lib/sync.js";
+import { runCatalogSync } from "@/lib/sync.js";
 import { startCatalogSync, catalogSyncProgress, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
 import { plainSyncError } from "@/lib/admin/sync-view";
 import { rateLimit } from "@/lib/rate-limit";
@@ -54,14 +54,6 @@ export const POST = tenantHandler(async (request) => {
   }
   try {
     const { run, action } = await startCatalogSync({ startedBy: "manual", retry: Boolean(retry), defer: after, budgetMs: budgetFrom(started) });
-    // P4-CUTOVER (from the P4-GUARD review): while the store is being moved to
-    // the new editor nothing starts, and there may be no earlier run at all
-    // (run null). Plain words, never a 500.
-    if (action === "skipped") {
-      slog("admin_sync", { run: run?.id ?? null, action, retry: Boolean(retry) });
-      await audit({ actor: auth.actor, action: "sync.run", diff: { run: run?.id ?? null, action: "skipped" } });
-      return NextResponse.json({ ok: false, action: "skipped", paused: true, error: SYNC_PAUSED_MESSAGE }, { status: 409 });
-    }
     slog("admin_sync", { run: run.id, action, retry: Boolean(retry) });
     await audit({ actor: auth.actor, action: "sync.run", diff: { run: run.id, action } });
     const { view } = await catalogSyncProgress();

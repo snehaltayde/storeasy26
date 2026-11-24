@@ -8,8 +8,8 @@ import { tenantHandler } from "@/lib/tenant-request";
 //                                       on: true also reaches the session this browser's
 //                                       _preview cookie names (P3-FIX5, finding D1)
 //   POST { revoke: sid }                end the session now
-// storefront.read, same origin. Legacy stores get 409 STORE_USES_LEGACY: they
-// keep the releases preview. The handler lives in lib/admin/preview-session-api.js
+// storefront.read, same origin. A store not in documents mode gets 500
+// STORE_MODE_INVALID. The handler lives in lib/admin/preview-session-api.js
 // so scripts/test-preview-overlay.js runs the real dispatch.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -16,7 +16,6 @@ export const STATE_WORDS = Object.freeze({ done: "Done", in_progress: "In progre
 // Why a blocked step waits, in a few words (the panel says it in full).
 export function blockedReason(step, steps = []) {
   if (step.state !== "blocked") return null;
-  if (step.blockedBy === "updating") return "Your store is being updated";
   const by = step.blockedBy && steps.find((s) => s.id === step.blockedBy);
   if (by) return `Waits for ${by.label}`;
   const n = step.facts?.blocking?.length || 0;

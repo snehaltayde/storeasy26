@@ -30,10 +30,8 @@ import { UPLOAD_ACCEPT } from "@/lib/media-upload-plan";
 //     in plain words (usageLine: a page's name and state, never an id)
 //   - a delete the server refuses because the file is used shows the
 //     server's plain reason and where it is used, with "Archive it instead"
-//     and no way round it. On a store still on the current editors (its usage
-//     has no page, release or settings marks) the old "delete anyway" choice
-//     stays, as the server still allows it there
-//   - any other refusal (the store is being moved) shows its plain words
+//     and no way round it (lib/media.js never deletes a used file)
+//   - any other refusal shows its plain words
 
 const fmtSize = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1024))}KB`);
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -50,30 +48,15 @@ export function usageLine(u) {
   if (prefix(w, "live release:")) return "What your store shows now";
   if (prefix(w, "scheduled release:")) return "A scheduled update of your store";
   if (u.release || prefix(w, "retained release:")) return "An earlier published version of your store";
-  if (prefix(w, "block:")) return "A section of your home page";
-  if (prefix(w, "page:")) return `Your page “${w.slice(5)}”`;
-  if (prefix(w, "product modules:")) return "A product's extra content";
   return "Another part of your store";
 }
 export const usageLines = (uses) => [...new Set((Array.isArray(uses) ? uses : []).map(usageLine))];
 
-// The usage of a store on the new editor: every row names a page, an old
-// published version or the store's settings. There, a used file is never
-// deleted, forced or not (lib/media.js deleteMedia).
-export const documentsUsage = (uses) => Array.isArray(uses) && uses.length > 0 && uses.every((u) => isObj(u) && (u.document || u.release || u.config));
-
-// P4-FIX2: "Delete anyway" is offered only when it can work: lib/media.js
-// deleteMedia refuses a forced delete whenever any usage row is a page
-// document (and always on a documents store), so a legacy store whose file is
-// used by an old section AND a page draft gets the refusal, not the choice.
-export const canForceDelete = (uses) => Array.isArray(uses) && uses.length > 0 && !documentsUsage(uses) && !uses.some((u) => isObj(u) && u.document);
-
 // P4-FIX2: what a refused delete says. The server's words for a used file are
-// never shown (on a legacy store they hold codes such as "block:promo"): the
-// console says it in fixed words and lists the places by usageLines. The
-// moving-store and changed-file refusals are fixed plain sentences on the
+// never shown: the console says it in fixed words and lists the places by
+// usageLines. The changed-file refusal is a fixed plain sentence on the
 // server (lib/media.js); anything else is the plain "failed" line.
-const SERVER_WORDS_SHOWN = new Set(["STORE_MIGRATING", "MEDIA_CHANGED"]);
+const SERVER_WORDS_SHOWN = new Set(["MEDIA_CHANGED"]);
 export function refusalWords(code, message) {
   if (code === "MEDIA_IN_USE") return MEDIA_WORDS.inUse;
   if (SERVER_WORDS_SHOWN.has(code) && typeof message === "string" && message) return message;
@@ -105,7 +88,6 @@ export default function MediaAdmin({ initial, readOnly = false }) {
   const [uploading, setUploading] = useState(null); // progress of the file in flight
   const [error, setError] = useState(null);
   const [deleting, setDeleting] = useState(null); // media row
-  const [usageGuard, setUsageGuard] = useState(null); // {media, lines}: old editors only, "delete anyway"
   const [refusal, setRefusal] = useState(null); // {media, message, lines, offerArchive}
   const [showArchived, setShowArchived] = useState(false);
   const [usedBy, setUsedBy] = useState({}); // id -> { status: "loading" | "ready" | "failed", lines, message }
@@ -222,11 +204,11 @@ export default function MediaAdmin({ initial, readOnly = false }) {
 
   // One DELETE helper: { ok } when deleted, { refused: { code, message,
   // usage } } on a 409, and a throw (plain words) on anything else.
-  async function requestDelete(id, force) {
+  async function requestDelete(id) {
     const res = await fetch("/api/admin/media", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, force }),
+      body: JSON.stringify({ id }),
     });
     const json = await res.json().catch(() => ({}));
     if (res.status === 409) return { refused: { code: json.code || null, message: json.error || MEDIA_WORDS.failed, usage: Array.isArray(json.usage) ? json.usage : [] } };
@@ -365,11 +347,10 @@ export default function MediaAdmin({ initial, readOnly = false }) {
         }
         onConfirm={async () => {
           const m = deleting;
-          const r = await requestDelete(m.id, false);
+          const r = await requestDelete(m.id);
           if (r.refused) {
             const { code, message, usage } = r.refused;
-            if (code === "MEDIA_IN_USE" && canForceDelete(usage)) setUsageGuard({ media: m, lines: usageLines(usage) });
-            else setRefusal(refusalOf(m, code, message, usage));
+            setRefusal(refusalOf(m, code, message, usage));
           } else {
             toast.success("Deleted");
             await refresh();
@@ -420,43 +401,6 @@ export default function MediaAdmin({ initial, readOnly = false }) {
           </div>
         )}
       </Dialog>
-
-      <ConfirmDialog
-        open={!!usageGuard}
-        onClose={() => setUsageGuard(null)}
-        title="Still used — delete anyway?"
-        tone="danger"
-        confirmLabel="Delete anyway"
-        body={
-          usageGuard && (
-            <>
-              <Banner tone="warning" title="This file is still used by:">
-                <ul className="list-inside list-disc">
-                  {usageGuard.lines.map((l) => (
-                    <li key={l} className="text-xs">
-                      {l}
-                    </li>
-                  ))}
-                </ul>
-              </Banner>
-              <p className="mt-2">Deleting it leaves broken images there (and in any older release you roll back to).</p>
-            </>
-          )
-        }
-        onConfirm={async () => {
-          const m = usageGuard.media;
-          const r = await requestDelete(m.id, true);
-          if (r.refused) {
-            // the usage changed since (a page now uses it, or the store is
-            // being moved): the refusal in fixed words, never the server's text
-            setUsageGuard(null);
-            setRefusal(refusalOf(m, r.refused.code, r.refused.message, r.refused.usage));
-            return;
-          }
-          toast.success("Deleted");
-          await refresh();
-        }}
-      />
     </div>
   );
 }

@@ -2,10 +2,9 @@
 // steps + compensation + neutral seeds, MC02 derived checklist + gated
 // launch, MC03 verified-membership switcher data).
 // P4-PROVISION (MIG-03, PUB-06, GEN-02, TOK-03, ED-05; owner answer OQ-4): a
-// new, empty store starts on the new editor (documents mode) and stays closed
-// until its first publish; an adopted or re-provisioned database that holds
-// content stays legacy; the onboarding checklist works for a new documents
-// store. File databases and a file control plane only: nothing here creates
+// store is on the new editor (documents mode, the only one; content_mode only
+// reads it) and stays closed until its first publish; the onboarding
+// checklist works for a new documents store. File databases and a file control plane only: nothing here creates
 // a hosted database or reaches Shopify.
 //   pnpm test:provision
 import { readFile, rm, access } from "node:fs/promises";
@@ -61,7 +60,7 @@ process.env.PLATFORM_DB_TOKEN = "";
 process.env.PLATFORM_SECRET = "test-platform-secret";
 process.env.PLATFORM_CACHE_MS = "50";
 
-const P4_DBS = ["fresh", "keep", "live", "liveorders", "liveprod", "adoptrel", "adoptblk", "adoptdoc", "earlier", "badmode", "sharea", "sharec", "shared", "onb", "onbui", "onbx", "onbopen", "onbm4", "onbfail", ...Array.from({ length: 8 }, (_, i) => `fa${i}`)].map((n) => `.test-prov-${n}.db`);
+const P4_DBS = ["fresh", "keep", "live", "liveorders", "liveprod", "adoptrel", "adoptblk", "adoptdoc", "earlier", "badmode", "stalemode", "sharea", "sharec", "shared", "onb", "onbui", "onbx", "onbopen", "onbm4", "onbfail", ...Array.from({ length: 8 }, (_, i) => `fa${i}`)].map((n) => `.test-prov-${n}.db`);
 const dbs = [".test-prov-default.db", ".test-prov-platform.db", ".test-prov-t1.db", ".test-prov-beta.db", ...P4_DBS];
 const removeDbs = async () => {
   for (const f of dbs) for (const ext of ["", "-wal", "-shm", "-journal"]) await rm(join(here, "..", f + ext), { force: true });
@@ -99,9 +98,8 @@ const ok = (cond, label) => {
   if (!cond) throw new Error(label || "expected truthy");
 };
 
-// The BE26 / MC02 tenant stays on the old editor (P4-PROVISION: the operator's
-// escape, contentMode 'legacy'), so its legacy checklist is tested as before.
-const PARAMS = { id: "acme", name: "Acme Nutrition", shopDomain: "acme.myshopify.com", domains: ["shop.acme.in"], dbUrl: "file:.test-prov-t1.db", contentMode: "legacy" };
+// The BE26 / MC02 tenant (documents, the only mode since Phase 1's legacy removal)
+const PARAMS = { id: "acme", name: "Acme Nutrition", shopDomain: "acme.myshopify.com", domains: ["shop.acme.in"], dbUrl: "file:.test-prov-t1.db" };
 
 console.log("— BE26: resumable idempotent provisioning");
 
@@ -156,7 +154,7 @@ await t("re-provisioning an existing tenant without force is refused", async () 
 await t("compensation: deregisters what the run created, never deletes the database", async () => {
   // P4-FIX6: on a database of its own (acme's would now stop the run at
   // create_db: another registered store uses it)
-  const p2 = { id: "beta", name: "Beta", shopDomain: "beta.myshopify.com", dbUrl: "file:.test-prov-beta.db", contentMode: "legacy" };
+  const p2 = { id: "beta", name: "Beta", shopDomain: "beta.myshopify.com", dbUrl: "file:.test-prov-beta.db" };
   const r = await P.runProvision(p2, { failAt: "record_onboarding" });
   eq(r.run.status, "failed");
   ok(await C.getTenant("beta"), "beta registered");
@@ -283,7 +281,7 @@ const zeroCounts = () => Object.fromEntries(P.CONTENT_TABLES.map((tname) => [tna
 const FRESH_STATE = () => ({ mode: "documents", live: null, counts: zeroCounts(), offers: 0 });
 const params = (id, over = {}) => ({ id, name: `Store ${id}`, shopDomain: `${id}.myshopify.com`, domains: [`${id}.test`], dbUrl: `file:.test-prov-${id}.db`, ...over });
 
-// the legacy tenant before anything below runs, to prove it is left alone
+// the acme tenant before anything below runs, to prove it is left alone
 const acmeBefore = { state: await storeState(".test-prov-t1.db"), row: (await rawSql(".test-prov-t1.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0] };
 
 let freshRun;
@@ -358,11 +356,23 @@ await t("unit: content_mode re-reads cms_state, so a resume after its change lan
   const done = await P.runProvision({}, { resumeRunId: r.run.id });
   eq(done.run.status, "done");
   eq(done.run.refs.contentMode, "documents", "recorded:");
-  eq(done.run.refs.contentModeReason, P.CONTENT_MODE_REASONS.already, "reason:");
+  // the step only reads now: the database still holds no content, so "fresh"
+  eq(done.run.refs.contentModeReason, P.CONTENT_MODE_REASONS.fresh, "reason:");
   same((await rawSql(".test-prov-fa7.db", "SELECT mode, updated_at FROM cms_state WHERE id = 1"))[0], at, "no second write:");
 });
 
 // (Legacy CMS adoption/escape tests removed — all stores now use Documents CMS via migration 0026)
+await t("unit: a database whose stored mode isn't documents (a stale 'legacy') stops the run at content_mode in plain words; nothing is registered", async () => {
+  const r = await P.runProvision(params("stalemode"), { failAt: "content_mode" });
+  eq(r.failedStep, "content_mode");
+  await rawSql(".test-prov-stalemode.db", "UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
+  const again = await P.runProvision({}, { resumeRunId: r.run.id });
+  eq(again.failedStep, "content_mode", "stopped:");
+  ok(/no longer runs/.test(again.error || "") && /Contact support/.test(again.error || ""), `words: ${again.error}`);
+  eq(await C.getTenant("stalemode"), null, "nothing registered:");
+  eq((await rawSql(".test-prov-stalemode.db", "SELECT mode FROM cms_state WHERE id = 1"))[0].mode, "legacy", "cms_state untouched:");
+});
+
 await t("unit: an unknown contentMode is refused", async () => {
   let refused = null;
   try {
@@ -370,7 +380,7 @@ await t("unit: an unknown contentMode is refused", async () => {
   } catch (e) {
     refused = e.message;
   }
-  ok(/contentMode must be one of documents, legacy/.test(refused || ""), `refused: ${refused}`);
+  ok(/contentMode must be one of documents$/.test(refused || ""), `refused: ${refused}`);
   eq(await C.getTenant("badmode"), null, "nothing registered:");
 });
 

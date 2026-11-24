@@ -10,7 +10,7 @@
 //      because its database is the harness's third server, which this stage
 //      wipes. The drill runs in a throwaway worktree, so nothing needs it back.
 //   3. wipes the third server (every table, view and trigger dropped), so
-//      DOCUMENTS_FOR_FRESH_STORE_SQL sees empty content tables
+//      applyContentMode sees empty content tables (a fresh store)
 //   4. provisions tenant 'p6' there the way lib/platform/provision.js does it:
 //      applyTenantSchema, applyContentMode (documents),
 //      the tenant row with a control-plane domain row for p6.localhost, and

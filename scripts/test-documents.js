@@ -754,21 +754,26 @@ await t("API: a mixed payload gives 400 before anything is authorized or written
   await unchanged(before, "mixed payloads");
 });
 
-await t("API: a legacy-mode tenant gets 409 STORE_USES_LEGACY on writes (also with no revision) and 200 on reads", async () => {
+await t("API: a tenant whose stored mode is not documents ('legacy', 'migrating') gets 500 STORE_MODE_INVALID on writes (also with no revision) and 200 on reads", async () => {
   const before = await dump("legacy");
   for (const body of [...WRITE_BODIES(), { archive: "doc_home" }]) {
     const r = await api(body, { store: "legacy" });
-    eq([r.status, r.body.code], [409, "STORE_USES_LEGACY"], `${Object.keys(body)[0]}:`);
-    ok(r.body.error && !/STORE_USES|legacy mode|cms_state/i.test(r.body.error), `plain words: ${r.body.error}`);
+    eq([r.status, r.body.code], [500, "STORE_MODE_INVALID"], `${Object.keys(body)[0]}:`);
+    ok(r.body.error && !/STORE_|legacy|cms_state/i.test(r.body.error), `plain words: ${r.body.error}`);
   }
   await unchanged(before, "legacy writes", "legacy");
   const list = await api({ listDocuments: true }, { store: "legacy" });
   eq([list.status, list.body.documents], [200, []], "list:");
   eq((await api({ getDocument: "doc_home" }, { store: "legacy" })).status, 404, "a document that isn't there:");
   eq((await api({ listHistory: "doc_home" }, { store: "legacy" })).status, 404, "history of one that isn't there:");
-  // migrating is not documents
+  // the least-trusted role (support) gets the same 5xx on the mode reads, never data
+  for (const body of [{ listRecentlyPublished: {} }, { listChanges: { id: "doc_home" } }, { listProductContent: true }]) {
+    const r = await api(body, { store: "legacy", as: SUPPORT });
+    eq([r.status, r.body.code], [500, "STORE_MODE_INVALID"], `support ${Object.keys(body)[0]}:`);
+  }
+  // migrating is not documents either
   await raw.legacy.execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
-  eq((await api({ createDocument: { type: "home" } }, { store: "legacy" })).body.code, "STORE_USES_LEGACY", "migrating:");
+  eq((await api({ createDocument: { type: "home" } }, { store: "legacy" })).body.code, "STORE_MODE_INVALID", "migrating:");
   await raw.legacy.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
 });
 
@@ -1166,13 +1171,13 @@ console.log("— the first-run writer (GEN-01)");
     await unchanged(before, "a refill on a live store", "fr");
   });
 
-  await t("a legacy store gets 409 STORE_USES_LEGACY and a migrating store 409 STORE_MIGRATING, nothing written", async () => {
-    for (const [mode, code, words] of [["legacy", "STORE_USES_LEGACY", /current Storefront editor/], ["migrating", "STORE_MIGRATING", /being updated/]]) {
+  await t("a store whose stored mode is 'legacy' or 'migrating' gets 500 STORE_MODE_INVALID from the in-batch guard, nothing written", async () => {
+    for (const [mode, code, words] of [["legacy", "STORE_MODE_INVALID", /contact support/], ["migrating", "STORE_MODE_INVALID", /contact support/]]) {
       await reset();
       await raw.fr.execute({ sql: "UPDATE cms_state SET mode = ? WHERE id = 1", args: [mode] });
       const before = await dump("fr");
       const e = await refusal(gen(both(homeOf("Welcome"), designOf("#334155"))));
-      eq([e.status, e.code], [409, code], `${mode}:`);
+      eq([e.status, e.code], [500, code], `${mode}:`);
       ok(words.test(e.message), `${mode} words: ${e.message}`);
       await unchanged(before, mode, "fr");
     }
@@ -1421,12 +1426,9 @@ await t("a scan finds no INSERT, UPDATE or DELETE on documents, document_version
   for (const d of ["lib", "app", "components", "scripts", "migrations"]) await walk(d);
   ok(files.length > 100, `files scanned: ${files.length}`);
   ok(files.some((f) => f.path === "lib/documents/service.js"), "the service is in the scan:");
-  // P4-FIXTURES: the legacy tenant builders write leftover document rows on
-  // purpose (re-run fixtures for CUTOVER and REVERSE), on local file databases
-  // only; that one support file is test code like the suites
-  // P4-CUTOVER: the cutover writes the backfill and the flip itself, under
-  // the migrating guard (lib/migrate/backfill.js and flip.js only)
-  const allowed = (p) => /^scripts\/test-[\w.-]+\.js$/.test(p) || p === "scripts/support/legacy-tenants.js" || p === "lib/migrate/backfill.js" || p === "lib/migrate/flip.js";
+  // the suites are test code; nothing else (the cutover's lib/migrate and the
+  // legacy tenant builders are gone, Phase 1 legacy code removal)
+  const allowed = (p) => /^scripts\/test-[\w.-]+\.js$/.test(p);
   const found = writesOutsideService(files).filter((p) => !allowed(p));
   eq(found, [], "writers outside lib/documents/:");
   // the scan itself bites: each of these shapes is caught

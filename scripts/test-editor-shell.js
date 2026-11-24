@@ -302,11 +302,12 @@ await t("unit: re-mint is requested on ready ok:false (live, revoked, expired) w
   const first = previewRig();
   await first.ctl.start();
   eq([first.last().words, first.last().reconnecting], [PREVIEW_WORDS.loading, false], "the first load says Showing your latest changes, not Reconnecting:");
+  // the old "legacy" reason is gone (Phase 1): a reason the machine doesn't know re-mints
   const legacy = previewRig();
   await legacy.ctl.start();
   legacy.ctl.frameLoad();
   legacy.ctl.message({ type: "storeasy:ready", v: 2, ok: false, reason: "legacy" });
-  eq(legacy.minted.length, 1, "legacy never re-mints:");
+  eq(legacy.minted.length, 2, "an unknown reason re-mints:");
 });
 
 await t("unit: re-mint is requested when no ready arrives within 3 seconds of a frame load", async () => {
@@ -984,7 +985,7 @@ const RELEASES = join(ROOT, "app/(console)/admin/(authed)/releases/page.js");
 const Releases = (await load(RELEASES)).default;
 const renderReleases = async () => html(await Releases());
 
-await t("rendered: /admin/releases renders RecentlyPublished in documents mode, with access passed on; migrating gets the note", async () => {
+await t("rendered: /admin/releases renders RecentlyPublished, with access passed on; it reads no mode (the list's API refuses a store not in documents mode)", async () => {
   S.mode = "documents";
   S.rows = [
     { logId: "log_1", setId: "set_1", documentId: "doc_home", label: "Home page", action: "publish", actionWords: "Published", byName: "Asha", at: "2026-11-02T10:00:00.000Z", summary: [{ words: "Hero: title changed" }], canUndo: true, undo: { id: "doc_home", revision: 3, logId: "log_1" } },
@@ -1000,7 +1001,7 @@ await t("rendered: /admin/releases renders RecentlyPublished in documents mode, 
 
   S.mode = "migrating";
   const mig = await renderReleases();
-  ok(/data-documents-mode=""/.test(mig) && !/data-recently-published/.test(mig), "migrating: the note, as before");
+  ok(/data-recently-published-page=""/.test(mig), "no mode branch on the page:");
   S.mode = "documents";
 });
 

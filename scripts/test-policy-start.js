@@ -10,7 +10,8 @@
 //   4. refusals, each with nothing written: a page of that kind already there
 //      (any state but missing; an archived one doesn't block), an address
 //      held by another kind of document (SLUG_TAKEN words and a link, then
-//      Start works once it moves), legacy, migrating, read-only, unknown kind
+//      Start works once it moves), a stored mode that isn't documents
+//      (STORE_MODE_INVALID, thrown), read-only, unknown kind
 //   5. markPolicyRead ("I've read it"): body unchanged, last writer the
 //      founder, policyStatus 'saved'; refused on a founder-saved page and on
 //      a stale revision, nothing changed
@@ -75,7 +76,9 @@ const P = await import("../lib/documents/policy-pages.js");
 const R = await import("../lib/registry/index.js");
 const { returnsWindowDays } = await import("../lib/returns.js");
 const { editorHref } = await import("../lib/admin/editor-entry.js");
-const { MIGRATING_MESSAGE } = await import("../lib/cms-mode.js");
+const { STORE_MODE_INVALID_MESSAGE } = await import("../lib/cms-mode.js");
+// a stored mode other than documents throws StoreModeInvalidError (the route answers 500)
+const thrownCode = (p) => p.then(() => "ran", (e) => [e.code, e.message]);
 const { scanText } = await import("./support/banned-copy.js");
 const PS = await import("../lib/first-run/policy-start.js");
 const route = await import("../app/api/admin/policy-start/route.js");
@@ -372,16 +375,15 @@ await t("a campaign at /terms: the returns start answers 409 with SLUG_TAKEN's o
   eq([again.status, again.body.document?.slug], [200, "terms"], JSON.stringify(again.body));
 });
 
-await t("legacy, migrating and read-only actors are refused, and an unknown kind is 400; nothing written", async () => {
+await t("a store whose stored mode is 'legacy' or 'migrating' throws STORE_MODE_INVALID, read-only actors are refused, and an unknown kind is 400; nothing written", async () => {
   const legacyBefore = await snapshot("legacy");
-  const l = await stores.legacy.run(() => PS.startPolicyPage({ kind: "privacy", actor: OWNER }));
-  eq([l.status, l.body.code], [409, "STORE_USES_LEGACY"], JSON.stringify(l.body));
-  ok(l.body.error.startsWith("This store still uses the current Storefront editor, so no page was started here."), l.body.error);
+  const l = await thrownCode(stores.legacy.run(() => PS.startPolicyPage({ kind: "privacy", actor: OWNER })));
+  eq(l, ["STORE_MODE_INVALID", STORE_MODE_INVALID_MESSAGE], "legacy:");
   eq(await snapshot("legacy"), legacyBefore, "legacy storage:");
 
   const migBefore = await snapshot("mig");
-  const m = await stores.mig.run(() => PS.startPolicyPage({ kind: "returns", actor: OWNER }));
-  eq(m, { status: 409, body: { error: MIGRATING_MESSAGE, code: "STORE_MIGRATING" } }, "migrating:");
+  const m = await thrownCode(stores.mig.run(() => PS.startPolicyPage({ kind: "returns", actor: OWNER })));
+  eq(m, ["STORE_MODE_INVALID", STORE_MODE_INVALID_MESSAGE], "migrating:");
   eq(await snapshot("mig"), migBefore, "migrating storage:");
 
   const ro = await stores.race.run(async () => {
@@ -467,7 +469,7 @@ await t("with a stale revision: 409 in the words documents-api uses (the service
   eq((await statusOf("main")).returns.state, "starter", "still a starter:");
 });
 
-await t("markPolicyRead refusals: unknown id 404, archived 409, a campaign 409, read-only 403, legacy and migrating 409; nothing written", async () => {
+await t("markPolicyRead refusals: unknown id 404, archived 409, a campaign 409, read-only 403, a stored 'legacy' or 'migrating' mode STORE_MODE_INVALID; nothing written", async () => {
   const before = await snapshot("main");
   eq((await stores.main.run(() => PS.markPolicyRead({ id: "doc_nothere", revision: 1, actor: OWNER }))).status, 404, "unknown id:");
   eq((await stores.main.run(() => PS.markPolicyRead({ id: "", revision: 1, actor: OWNER }))).status, 400, "no id:");
@@ -477,8 +479,8 @@ await t("markPolicyRead refusals: unknown id 404, archived 409, a campaign 409, 
   eq((await stores.block.run(() => PS.markPolicyRead({ id: archived.id, revision: archived.revision, actor: OWNER }))).body.code, "DOCUMENT_ARCHIVED", "archived:");
   const camp = (await snapshot("camp")).documents.find((d) => d.type === "campaign");
   eq((await stores.camp.run(() => PS.markPolicyRead({ id: camp.id, revision: camp.revision, actor: OWNER }))).body.code, "NOT_A_STARTER", "a campaign:");
-  eq((await stores.legacy.run(() => PS.markPolicyRead({ id: "doc_x", revision: 1, actor: OWNER }))).body.code, "STORE_USES_LEGACY", "legacy:");
-  eq((await stores.mig.run(() => PS.markPolicyRead({ id: "doc_x", revision: 1, actor: OWNER }))).body, { error: MIGRATING_MESSAGE, code: "STORE_MIGRATING" }, "migrating:");
+  eq((await thrownCode(stores.legacy.run(() => PS.markPolicyRead({ id: "doc_x", revision: 1, actor: OWNER }))))[0], "STORE_MODE_INVALID", "legacy:");
+  eq((await thrownCode(stores.mig.run(() => PS.markPolicyRead({ id: "doc_x", revision: 1, actor: OWNER }))))[0], "STORE_MODE_INVALID", "migrating:");
 });
 
 // =========================================================================================

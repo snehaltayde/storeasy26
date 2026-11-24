@@ -20,11 +20,9 @@ import SyncProgress from "@/components/admin/SyncProgress";
 // last-saved snapshot); Discard resets to the snapshot. Validation errors
 // stay in a persistent danger Banner until the next attempt.
 //
-// P6-NAV (GEN-04): `documents` (from the settings page's getCmsMode read) is
-// true on a store that uses the new editor. There the picture logo is set in
-// onboarding's Brand step (/admin/onboarding?step=brand), so the logo text hint says so and that
-// the text is used when there is no picture. Every other store keeps today's
-// hint, word for word.
+// P6-NAV (GEN-04): the picture logo is set in onboarding's Brand step
+// (/admin/onboarding?step=brand), so the logo text hint says so and that the
+// text is used when there is no picture.
 
 const secretHint = (isSet) => (isSet ? "Set ✓ — leave blank to keep" : "Not set");
 
@@ -48,7 +46,6 @@ const buildState = (s) => ({
   adminPassword: "",
 });
 
-const LEGACY_LOGO_HINT = "The storefront logo is text; the second part renders in your accent color";
 const documentsLogoHint = (
   <>
     Your picture logo is set in{" "}
@@ -59,7 +56,7 @@ const documentsLogoHint = (
   </>
 );
 
-export default function SettingsAdmin({ initial, syncProgress = null, canRunSync = false, documents = false }) {
+export default function SettingsAdmin({ initial, syncProgress = null, canRunSync = false }) {
   const toast = useToast();
   const [s, setS] = useState(initial);
   const ro = s.readOnly;
@@ -175,7 +172,7 @@ export default function SettingsAdmin({ initial, syncProgress = null, canRunSync
           <Field label="Footer tagline" htmlFor="sa-footer-tagline">
             <Input id="sa-footer-tagline" disabled={ro} value={identity.footer_tagline} onChange={(e) => setIdentity({ ...identity, footer_tagline: e.target.value })} />
           </Field>
-          <Field label="Logo text" hint={documents === true ? documentsLogoHint : LEGACY_LOGO_HINT} htmlFor="sa-logo-text1">
+          <Field label="Logo text" hint={documentsLogoHint} htmlFor="sa-logo-text1">
             <div className="flex gap-2">
               <Input id="sa-logo-text1" aria-label="Logo text, first part" disabled={ro} value={identity.logo_text1} onChange={(e) => setIdentity({ ...identity, logo_text1: e.target.value })} />
               <Input id="sa-logo-text2" aria-label="Logo text, accent part" disabled={ro} value={identity.logo_text2} onChange={(e) => setIdentity({ ...identity, logo_text2: e.target.value })} />

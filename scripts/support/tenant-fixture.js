@@ -32,10 +32,11 @@
 //   collections, products by writeProduct.
 //       mode         'legacy' (default) | 'documents'. Documents runs
 //                    lib/platform/provision.js applyContentMode on the fresh
-//                    database (its DOCUMENTS_FOR_FRESH_STORE_SQL), BEFORE any
-//                    product, collection or content row is written, so the
-//                    store moves the one way a new store does. Needs stage
-//                    '0024' or later (the SQL reads every CONTENT_TABLES table).
+//                    database (it reads cms_state and every CONTENT_TABLES
+//                    table), BEFORE any product, collection or content row is
+//                    written. Needs stage '0024' or later. 'legacy' stores a
+//                    stale mode no code runs any more: such a store answers
+//                    STORE_MODE_INVALID wherever the mode is read.
 //                    The tenant config gets checkout_mode 'direct' unless the
 //                    caller's config says otherwise; no maintenance and no
 //                    billing snapshot are added.
@@ -262,7 +263,7 @@ function checkOptions({ stage, mode, sync, catalogShape, products, collections }
   const hasProducts = typeof products === "number" ? products > 0 : (products || []).length > 0;
   const hasCollections = typeof collections === "number" ? collections > 0 : (collections || []).length > 0;
   if (catalogShape != null && (hasProducts || hasCollections)) throw new Error("tenant-fixture: give a catalogShape or products/collections, not both");
-  // DOCUMENTS_FOR_FRESH_STORE_SQL reads every CONTENT_TABLES table (0024 adds the last ones)
+  // applyContentMode reads every CONTENT_TABLES table (0024 adds the last ones)
   if (mode === "documents" && !atLeast(stage, "0024")) throw new Error(`tenant-fixture: mode "documents" needs stage 0024 or later, not "${stage}"`);
   // a recorded run needs the resumable sync_runs columns (0020)
   if (sync !== "none" && !atLeast(stage, "0020")) throw new Error(`tenant-fixture: sync "${sync}" needs stage 0020 or later, not "${stage}"`);

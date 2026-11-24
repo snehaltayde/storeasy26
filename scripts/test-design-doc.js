@@ -4,7 +4,8 @@
 // every write or refusal.
 //
 //   1. kit apply: a doc_design DRAFT through the documents service, live and
-//      the control-plane config untouched; legacy as before; migrating refuses
+//      the control-plane config untouched; legacy as before; a stored
+//      'migrating' mode refuses (STORE_MODE_INVALID)
 //   2. the brand API: save and reset refuse, sending the founder to the editor
 //   3. two admins saving doc_design at once (the design form's saveDraft and
 //      kit apply): one success, one 409 with the current document
@@ -307,12 +308,12 @@ await t("P3-FIX4 unit: a kit apply whose design saved but whose hero write faile
   eq([r.status, r.body.ok, r.body.applied?.presets, r.body.applied?.document?.revision, r.body.design?.revision], [200, true, [], Number(after.revision), Number(after.revision)], `the answer: ${JSON.stringify(r.body).slice(0, 300)}`);
 });
 
-await t("unit: a migrating store refuses applyKit and writes nothing", async () => {
+await t("unit: a store whose stored mode is 'migrating' refuses applyKit with 500 STORE_MODE_INVALID and writes nothing", async () => {
   await raw.docs.execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
   try {
     const before = await designRow();
     const m = await route("docs", "admin/theme", "POST", { action: "apply", kit: "glow" });
-    eq([m.status, m.body.code], [409, "STORE_USES_DOCUMENTS"], "migrating:");
+    eq([m.status, m.body.code], [500, "STORE_MODE_INVALID"], "migrating:");
     eq(await designRow(), before, "nothing written:");
   } finally {
     await raw.docs.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");

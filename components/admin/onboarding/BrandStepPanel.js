@@ -195,7 +195,7 @@ function StarterStore({ starter, canEdit, canSync, pollMs, onBrand }) {
     body = (
       <div className="space-y-3">
         <Notice tone="warning">{halfWords(halfReason)}</Notice>
-        {halfReason !== "legacy" && <NextLinks onBrand={onBrand} />}
+        <NextLinks onBrand={onBrand} />
         {canEdit && HALF_RETRY.includes(halfReason) && retry}
       </div>
     );

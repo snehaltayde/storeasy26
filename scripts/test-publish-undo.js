@@ -852,11 +852,11 @@ await t("unit: listRecentlyPublished gives plain names, labels and summaries (ne
   const rows2 = await recent(st);
   eq([rows2[0].action, rows2[0].actionWords, rows2[0].canUndo, rows2[0].undo], ["undo", "Undid", false, null], "the undo row:");
   ok(rows2.find((r) => r.setId === set.setId && r.documentId === a.id).canUndo, "a's set row is current again");
-  // a legacy store answers 409 STORE_USES_LEGACY (the dispatcher)
+  // a store whose stored mode is 'legacy' answers 500 STORE_MODE_INVALID (the dispatcher)
   await raw[st].execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
   try {
     const lg = await api({ listRecentlyPublished: {} }, { store: st });
-    likeShape(lg, SHAPES.listRecentlyPublished.outcomes.legacy, "legacy");
+    likeShape(lg, SHAPES.listRecentlyPublished.outcomes.modeInvalid, "modeInvalid");
   } finally {
     await raw[st].execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
   }

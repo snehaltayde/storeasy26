@@ -5,7 +5,7 @@
 //
 // The response contract is lib/admin/documents-api-shapes.js; this file reads
 // it (which operations exist, the words of the common answers) and does not
-// restate it. The legacy editors keep components/admin/cms/api.js.
+// restate it.
 //
 //   call(op, args, extra?)      PUT /api/admin/documents with { [op]: args, ...extra }
 //                               (extra carries the top-level keys, e.g. { revision: 3 })
@@ -203,7 +203,7 @@ export function createDocumentsApi({ fetch: fetchImpl } = {}) {
   // A documents-mode preview: a session, the design draft when asked, then
   // the token URL fetched same-origin so the server sets the httpOnly cookie
   // in this browser. { ok: true, sid, expiresAt, showDesign } or a mapped
-  // error (a legacy store answers 409 STORE_USES_LEGACY with its words). A
+  // error (a store not in documents mode answers 500 STORE_MODE_INVALID). A
   // failed showDesign step is returned as it is: the preview is not reported
   // as showing the design when it does not.
   //

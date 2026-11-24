@@ -89,14 +89,12 @@ export const REASON_WORDS = Object.freeze({
 // "nothing was saved": the home page was made.
 export const HALF_WORDS = Object.freeze({
   race: "Your home page was made, but your colours were not, because your store changed at the same time. Try again.",
-  migrating: "Your home page was made, but your colours were not, because your store is being updated. Try again in a few minutes.",
-  legacy: "Your home page was made, but your colours were not, because this store went back to the current Storefront editor. Try again from there.",
   live: "Your home page was made, but your colours were not, because your store opened at the same time. Your live store hasn't changed.",
   catalog_not_confirmed: "Your home page was made, but your colours were not, because your products are being brought in again. Try again once they have all arrived.",
   other: "Your home page was made, but your colours were not. Try again.",
 });
 // the half-finished reasons where pressing Try again here can help
-export const HALF_RETRY = Object.freeze(["race", "migrating", "catalog_not_confirmed", "other"]);
+export const HALF_RETRY = Object.freeze(["race", "catalog_not_confirmed", "other"]);
 export const halfWords = (reason) => HALF_WORDS[Object.hasOwn(HALF_WORDS, reason) ? reason : "other"];
 
 export const BRAND_WORDS = Object.freeze({

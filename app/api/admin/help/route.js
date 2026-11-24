@@ -32,7 +32,7 @@ export const GET = tenantHandler(async (request) => {
   const tenant = currentTenant();
 
   const counts = {};
-  for (const table of ["products", "orders", "offers", "cms_pages", "media"]) {
+  for (const table of ["products", "orders", "offers", "media"]) {
     try {
       const r = await db.selectFrom(table).select(({ fn }) => fn.countAll().as("n")).executeTakeFirst();
       counts[table] = Number(r?.n ?? 0);

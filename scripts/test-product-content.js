@@ -662,7 +662,7 @@ await t("Undo restores the previous live row, or deletes it after a first publis
   ok(row && row.summary.length, "the product publish is listed with words");
 });
 
-await t("a mode change between the pre-check and the batch ('migrating', then 'legacy') makes a live-row publish, an Undo, a discardOrphanEdits and a mixed-set publish abort with no row changed and the plain mode words", async () => {
+await t("a stored mode that stops being documents between the pre-check and the batch ('migrating', then 'legacy') makes a live-row publish, an Undo, a discardOrphanEdits and a mixed-set publish abort with no row changed and 500 STORE_MODE_INVALID", async () => {
   Gate.setTitleGateForTest(false);
   const o = await open(docs, 4);
   await save(docs, o.document.id, { badge: "Mode test" });
@@ -674,7 +674,6 @@ await t("a mode change between the pre-check and the batch ('migrating', then 'l
   // an orphan to discard
   const orphan = await open(docs, 12);
   await docs.run(() => Sync.deleteProductByGid(P(12)));
-  const words = { migrating: Mode.MIGRATING_MESSAGE, legacy: "This store still uses the current Storefront editor, so nothing was published here. Publish from Storefront instead." };
   for (const mode of ["migrating", "legacy"]) {
     const before = await liveDump(docs);
     const flip = async () => setMode(docs, mode);
@@ -688,7 +687,7 @@ await t("a mode change between the pre-check and the batch ('migrating', then 'l
       const e = await refused(run());
       Pub.setPublishHooks({});
       await setMode(docs, "documents");
-      eq([e.status, e.message], [409, words[mode]], `${mode} ${label}:`);
+      eq([e.status, e.code, e.message], [500, "STORE_MODE_INVALID", Mode.STORE_MODE_INVALID_MESSAGE], `${mode} ${label}:`);
       ok(!/another|someone else|changed after/i.test(e.message), `${label}: not a race`);
       eq(await liveDump(docs), before, `${mode} ${label}: rows changed:`);
     }
@@ -697,23 +696,22 @@ await t("a mode change between the pre-check and the batch ('migrating', then 'l
     const e = await refused(docs.run(() => Docs.discardOrphanEdits({ id: dd.id, revision: dd.revision, actor: ACTOR })));
     Docs.discardHooks.beforeBatch = null;
     await setMode(docs, "documents");
-    eq(e.status, 409, `${mode} discard:`);
-    ok(mode === "migrating" ? e.message === Mode.MIGRATING_MESSAGE : /still uses the current Storefront editor/.test(e.message), `${mode} discard words: ${e.message}`);
+    eq([e.status, e.code], [500, "STORE_MODE_INVALID"], `${mode} discard:`);
     eq(await liveDump(docs), before, `${mode} discard: rows changed:`);
   }
   await docs.run(() => Sync.writeProduct(F.fixtureProduct(12)));
 });
 
-await t("a publish on a legacy or migrating store is still refused; a collection-only publish writes collection_content_live.pinned and layout_template and no outbox row", async () => {
+await t("a publish on a store whose stored mode is 'legacy' or 'migrating' is refused with 500 STORE_MODE_INVALID; a collection-only publish writes collection_content_live.pinned and layout_template and no outbox row", async () => {
   for (const fx of [legacy, moving]) {
     const o = await fx.run(() => Docs.createDocument({ type: "product_content", entityId: P(1), actor: ACTOR }));
     const e = await refused(fx.run(() => Pub.publish({ ids: [{ id: o.document.id, revision: 1, draftHash: o.document.draftHash }], actor: ACTOR })));
-    eq([e.status, e.code], [409, "STORE_USES_LEGACY"], `${fx.id}:`);
+    eq([e.status, e.code], [500, "STORE_MODE_INVALID"], `${fx.id}:`);
     const r = await api(fx, { publish: { id: o.document.id, draftHash: o.document.draftHash }, revision: 1 });
-    eq([r.status, r.body.code], [409, "STORE_USES_LEGACY"], `${fx.id} API:`);
+    eq([r.status, r.body.code], [500, "STORE_MODE_INVALID"], `${fx.id} API:`);
     eq(await countOf(fx, "product_content_live"), 0, `${fx.id} live rows:`);
     const op = await api(fx, { openEntityContent: { type: "product_content", entityId: P(1) } });
-    eq([op.status, op.body.code], [409, "STORE_USES_LEGACY"], `${fx.id} openEntityContent:`);
+    eq([op.status, op.body.code], [500, "STORE_MODE_INVALID"], `${fx.id} openEntityContent:`);
   }
   const c = await open(docs, COL, "collection_content");
   const r = await save(docs, c.document.id, { pinned: [P(2), P(1)], template: "sidebar" });
@@ -953,7 +951,7 @@ await t("discardOrphanEdits of a product that only had a draft writes no outbox 
   await docs.run(() => Sync.writeProduct(F.fixtureProduct(20)));
 });
 
-await t("openEntityContent's un-archive checks the mode in its own batch: a store that leaves documents mode meanwhile gets the plain mode words and the document stays archived", async () => {
+await t("openEntityContent's un-archive checks the mode in its own batch: a store whose stored mode stops being documents meanwhile gets 500 STORE_MODE_INVALID and the document stays archived", async () => {
   Gate.setTitleGateForTest(false);
   const o = await open(docs, 12);
   const d = await get(docs, o.document.id);
@@ -964,8 +962,7 @@ await t("openEntityContent's un-archive checks the mode in its own batch: a stor
     const e = await refused(open(docs, 12));
     Docs.openEntityHooks.beforeUnarchive = null;
     await setMode(docs, "documents");
-    eq(e.status, 409, `${mode}:`);
-    ok(mode === "migrating" ? e.message === Mode.MIGRATING_MESSAGE : /still uses the current Storefront editor/.test(e.message), `${mode} words: ${e.message}`);
+    eq([e.status, e.code], [500, "STORE_MODE_INVALID"], `${mode}:`);
     ok((await get(docs, o.document.id)).archivedAt, `${mode}: still archived`);
   }
   const back = await open(docs, 12);
@@ -1056,7 +1053,7 @@ try {
     const e = await refused(fx.run(() => Pub.publish({ ids: [{ id: home.id, revision: h3.revision, draftHash: h3.draftHash }, { id: d.id, revision: d2.revision, draftHash: d2.draftHash }], actor: ACTOR })));
     Pub.setPublishHooks({});
     await direct.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
-    eq([e.status, e.message], [409, Mode.MIGRATING_MESSAGE], "mode words:");
+    eq([e.status, e.code, e.message], [500, "STORE_MODE_INVALID", Mode.STORE_MODE_INVALID_MESSAGE], "mode refusal:");
     eq(await counts(d.id), mid, "nothing written:");
     eq((await dsql("SELECT badge FROM product_content_live WHERE product_id = ?", [P(2)]))[0].badge, "Mixed sqld", "the live row is unchanged:");
   });

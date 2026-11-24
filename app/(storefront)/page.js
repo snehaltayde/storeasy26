@@ -11,7 +11,6 @@ import { getCatalogStats } from "@/lib/repo";
 import { resolveHomeSectionData } from "@/lib/cms/section-data";
 import { defaultHero } from "@/lib/cms/defaults";
 import { resolvedHomePage, resolvedCollectionsIndex } from "@/lib/content/resolve";
-import { DOCUMENTS_RELEASE_VERSION } from "@/lib/releases";
 import { legacyHeroToSettings } from "@/lib/registry/legacy";
 import { siteName } from "@/lib/site";
 import { tfetch } from "@/lib/storefront-request";
@@ -73,8 +72,8 @@ export default async function Home() {
     }
     // S54: data resolves PER SECTION INSTANCE (registry bindings, batched) —
     // duplicate sections no longer overwrite each other's data or limits.
-    // A documents store's rails never read the legacy pins (plan decision 9).
-    const dataById = await resolveHomeSectionData(sections, { index, documents: src.v === DOCUMENTS_RELEASE_VERSION });
+    // The rails read the published pins (plan decision 9).
+    const dataById = await resolveHomeSectionData(sections, { index });
     return { hero, sections, stats, dataById, assignment, testNotice };
   });
   const empty = stats.products === 0;

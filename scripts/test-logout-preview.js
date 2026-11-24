@@ -819,12 +819,11 @@ await t("showDesign: true sets it before the cookie is fetched; setShowDesign(si
   same([gone.error, gone.code], [true, "PREVIEW_SESSION_NOT_FOUND"], "unknown session:");
   ok(/preview has ended/.test(gone.message), "in plain words");
 });
-await t("legacy store: 409 STORE_USES_LEGACY comes back as a refusal in plain words, and no cookie is fetched", async () => {
+await t("a store whose stored mode is 'legacy': 500 STORE_MODE_INVALID comes back as an error in plain words, and no cookie is fetched", async () => {
   const b = browser(LL, await sessionToken(asha));
   const r = await Api.createDocumentsApi({ fetch: b.f }).startDocumentsPreview({ showDesign: true });
-  eq(r.refused, true, `refused: ${JSON.stringify(r)}`);
-  eq(r.code, "STORE_USES_LEGACY", "code:");
-  eq(r.message, "This store still uses the current Storefront editor, so it previews from there. Use Preview in Storefront instead.", "words:");
+  same([r.error, r.code], [true, "STORE_MODE_INVALID"], `error: ${JSON.stringify(r)}`);
+  ok(/contact support/.test(r.message) && !/STORE_|legacy/.test(r.message), `words: ${r.message}`);
   eq(b.calls.length, 1, "only the create was sent");
   eq(b.jar._preview, undefined, "no cookie");
 });

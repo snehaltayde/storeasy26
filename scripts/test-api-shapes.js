@@ -13,7 +13,7 @@
 //    outcome's code is either one of those or one of the new codes listed here.
 // 4. The fields of today's outcomes match the code: the issue keys, the
 //    validation and failure() bodies and words, the document, list and history
-//    rows, the publish result, the legacy and 428 words, and the requests of
+//    rows, the publish result, the mode and 428 words, and the requests of
 //    today's operations parse with today's parser.
 // No database is opened: the parser and lib/cms/issues.js are pure.
 //
@@ -126,7 +126,7 @@ const EMITTERS = { "lib/admin/documents-api.js": apiSource, "lib/cms/issues.js":
 // is built. P3-CHANGES: TOO_MANY_KEPT likewise (lib/documents/changes.js).
 // P4-LIVEROW: the codes phase 4 adds ("p4" outcomes), each emitted now, with
 // its outcome's status.
-const P4_CODES = ["SHOPIFY_OWNED", "TITLE_NOT_EDITABLE", "TITLE_NOT_PUBLISHABLE", "STORE_MIGRATING", "CANNOT_TAKE_OFFLINE_CONTENT", "NOT_PRODUCT_CONTENT", "PRODUCT_NOT_IN_SHOPIFY", "PRODUCT_IN_SHOPIFY"];
+const P4_CODES = ["SHOPIFY_OWNED", "TITLE_NOT_EDITABLE", "TITLE_NOT_PUBLISHABLE", "CANNOT_TAKE_OFFLINE_CONTENT", "NOT_PRODUCT_CONTENT", "PRODUCT_NOT_IN_SHOPIFY", "PRODUCT_IN_SHOPIFY"];
 // P6-GEN-WRITE: the codes phase 6 adds ("p6" outcomes), each emitted now
 // (lib/documents/service.js createFirstRunDocuments). P6-OPEN adds its codes
 // to this same list in batch 2.
@@ -292,8 +292,8 @@ check("the first-run writer's outcomes carry the service's words and the p6 code
   for (const c of P6_CODES) if (!outs.some((o) => o.body.code === c && o.since === "p6")) fail(`${c} has no p6 first-run outcome`);
   for (const o of outs) {
     if (o.status === 200 || o.body.code === "VALIDATION_FAILED") continue;
-    // MIGRATING_MESSAGE is lib/cms-mode.js's, which the service imports
-    const src = o.body.code === "STORE_MIGRATING" ? extraSources["lib/cms-mode.js"] : serviceSource;
+    // STORE_MODE_INVALID_MESSAGE is lib/cms-mode.js's, which the service imports
+    const src = o.body.code === "STORE_MODE_INVALID" ? extraSources["lib/cms-mode.js"] : serviceSource;
     if (!src.includes(JSON.stringify(o.body.error))) fail(`the first-run words for ${o.body.code} aren't in service.js: ${o.body.error}`);
   }
   const okBody = FIRST_RUN?.outcomes?.ok?.body || {};
@@ -575,7 +575,7 @@ check("slug refusals carry slug and other (and document on publish)", () => {
 
 check("constant words are copied exactly", () => {
   const constant = [
-    ["saveDraft", "legacy"], ["publish", "legacy"], ["saveDraft", "revisionRequired"], ["publish", "revisionRequired"], ["publish", "reviewRequired"],
+    ["saveDraft", "revisionRequired"], ["publish", "revisionRequired"], ["publish", "reviewRequired"],
     ["publish", "nothingToPublish"], ["publish", "busy"], ["publish", "unknown"], ["publish", "deleted"], ["publish", "storeUsesReleases"],
     // P4-LIVEROW
     ["unpublish", "cannotTakeOfflineContent"], ["discardOrphanEdits", "inShopify"], ["resolveShopifyChange", "productGone"],
@@ -588,7 +588,8 @@ check("constant words are copied exactly", () => {
   }
   if (!apiSource.includes(JSON.stringify(COMMON.outcomes.malformed.body.error))) fail("UNREADABLE words");
   if (!apiSource.includes(JSON.stringify(COMMON.outcomes.malformedPublish.body.error))) fail("UNREADABLE publish words");
-  for (const op of ["listChanges", "listRecentlyPublished"]) if (!apiSource.includes(JSON.stringify(SHAPES[op].outcomes.legacy.body.error))) fail(`${op}.legacy words are not in documents-api.js`);
+  // Phase 1 legacy removal: one mode refusal, lib/cms-mode.js's words, on every write and mode read
+  for (const op of ["saveDraft", "publish", "listChanges", "listRecentlyPublished"]) if (!readFileSyncText("lib/cms-mode.js").includes(JSON.stringify(SHAPES[op].outcomes.modeInvalid.body.error))) fail(`${op}.modeInvalid words are not lib/cms-mode.js's`);
   if (!Object.values(EMITTERS).join("\n").includes(JSON.stringify(COMMON.outcomes.notBuilt.body.error))) fail("NOT_BUILT words are not in the code");
 });
 
@@ -734,7 +735,7 @@ check("P4-LIVEROW: openEntityContent's 200 is the service's answer; the words of
   const all = Object.values(EMITTERS).join("\n");
   const gate = readFileSyncText("lib/catalog/title-gate.js");
   if (!gate.includes(JSON.stringify(SHAPES.saveDraft.outcomes.titleNotEditable.body.error))) fail("the title gate's words are not title-gate.js's");
-  if (!readFileSyncText("lib/cms-mode.js").includes(JSON.stringify(SHAPES.publish.outcomes.storeMigrating.body.error))) fail("the migrating words are not lib/cms-mode.js's");
+  if (SHAPES.publish.outcomes.storeMigrating || SHAPES.publish.outcomes.legacy) fail("publish still lists a removed mode outcome (legacy or storeMigrating)");
   if (!all.includes("Product content can't be taken offline. To go back to what Shopify sends, choose Use Shopify's on each field and publish.")) fail("the take-offline words are not in the code");
 });
 

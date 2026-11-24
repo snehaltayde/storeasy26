@@ -8,7 +8,8 @@
 //   2. publishing the generated set: not lime, the automatic header and
 //      footer list the catalog's collections;
 //   3. no AI: no key, a spent budget, a fetch spy, a static import scan;
-//   4. eligibility and refusals (sync none, partial, failed, legacy, migrating,
+//   4. eligibility and refusals (sync none, partial, failed, a stored mode that
+//      isn't documents (STORE_MODE_INVALID, thrown),
 //      live, read-only, a founder's home), idempotence, refills;
 //   5. the triggers: the worker's catalog_sync handler, the console route, the
 //      editor page (compiled with Next's SWC, its data stubbed).
@@ -475,16 +476,20 @@ await t("static scan: plan.js and generate.js (and the worker hook) have no impo
 // =====================================================================================
 console.log("— 4. eligibility, refusals and refills");
 // =====================================================================================
-await t("it refuses, writing nothing, for sync none, partial and failed, a legacy store, a migrating store, a live store and a read-only actor (console and editor triggers)", async () => {
+await t("it refuses, writing nothing, for sync none, partial and failed, a live store and a read-only actor (console and editor triggers); a stored mode of 'legacy' or 'migrating' throws STORE_MODE_INVALID, writing nothing", async () => {
   const cases = [
     ["sync none", await store("snone", { catalogShape: "few", sync: "none" }), "console", OWNER, "catalog_not_confirmed"],
     ["sync partial", await store("spart", { catalogShape: "few", sync: "partial" }), "console", OWNER, "catalog_not_confirmed"],
     ["sync failed", await store("sfail", { catalogShape: "few", sync: "failed" }), "console", OWNER, "catalog_not_confirmed"],
-    ["legacy", await store("legacy", { catalogShape: "few", mode: "legacy" }), "console", OWNER, "legacy"],
   ];
   const mig = await store("mig", { catalogShape: "few" });
   await rowsOf(mig, "UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
-  cases.push(["migrating", mig, "console", OWNER, "migrating"]);
+  for (const [label, fx] of [["legacy", await store("legacy", { catalogShape: "few", mode: "legacy" })], ["migrating", mig]]) {
+    const before = await dump(fx);
+    const code = await gen(fx, "console", OWNER).then(() => "ran", (e) => e.code);
+    eq(code, "STORE_MODE_INVALID", `${label}:`);
+    eq(await dump(fx), before, `${label}: storage changed:`);
+  }
   const live = await store("live", { catalogShape: "few" });
   await rowsOf(live, "UPDATE release_state SET live_release_id = 'rel_fr_live' WHERE id = 1");
   cases.push(["live", live, "console", OWNER, "live"]);
@@ -777,8 +782,8 @@ await t("editor page: a generator failure, or a store that isn't eligible, never
   eq([n.genCalls, n.docsReads], [1, 1], "not eligible:");
   ok(n.html.includes('data-stub="DocumentEditor"'), "the editor opens");
   const legacy = await store("editorlegacy", { catalogShape: "few", mode: "legacy" });
-  const l = await openEditor(legacy, OWNER);
-  eq([l.modeReads, l.docsReads, l.genLoads], [1, 0, 0], "legacy: no documents read, no generator:");
+  const l = await openEditor(legacy, OWNER).then(() => "rendered", (e) => e.code);
+  eq([l, P.modeReads, P.docsReads, P.genLoads], ["STORE_MODE_INVALID", 1, 0, 0], "a stored 'legacy' mode: an error page, no documents read, no generator:");
 });
 
 // =====================================================================================
@@ -1062,15 +1067,13 @@ await t("FIX2 (1, R11): the home page is written and the design loses its race o
   eq((await bodyOf(fx, "doc_home")).sections[0].kind, "hero", "the planned home:");
 });
 
-await t("FIX2 (1): the store leaves documents mode between the home call and the design call: reason legacy with homeWritten, the half-finished words, never 'no starting store was made'", async () => {
+await t("FIX2 (1): the store's stored mode stops being documents between the home call and the design call: the design batch's guard throws STORE_MODE_INVALID; the home was written, the design was not", async () => {
   const fx = await store("halflegacy", { catalogShape: "few" });
   const r = await withBatchHook(async ({ plan: p }) => {
     if (!p.some((x) => x.id === "doc_design")) return;
     await libsql.execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
-  }, () => gen(fx));
-  eq([r.ran, r.reason, r.homeWritten], [false, "legacy", true], `the answer: ${JSON.stringify(r)}`);
-  eq(r.message, Gen.FIRST_RUN_HALF_WORDS.legacy, "the words:");
-  ok(!FALSE_WORDS.test(r.message), `false words: ${r.message}`);
+  }, () => gen(fx).then(() => null, (e) => [e.status, e.code]));
+  eq(r, [500, "STORE_MODE_INVALID"], "the design batch's refusal:");
   eq((await docRows(fx)).map((d) => d.id), ["doc_home"], "the home was written, the design was not:");
 });
 
@@ -1209,7 +1212,7 @@ await t("FIX3 (generate, the second try's checks): the home is written, the desi
   ok(home && home.updated_by === Docs.FIRST_RUN_BY, `the home was written: ${JSON.stringify(home)}`);
 });
 
-await t("FIX3 (generate, the home-skipped re-check): the home is written, the design loses its race, then before the second try's writer the founder saves the home and the store goes back to the current editor: reason legacy with homeWritten: true and the half words", async () => {
+await t("FIX3 (generate, the home-skipped re-check): the home is written, the design loses its race, then before the second try's writer the founder saves the home and the stored mode stops being documents: the re-check throws STORE_MODE_INVALID and the founder's home stands", async () => {
   const fx = await store("halfskip", { catalogShape: "few" });
   let checks = 0;
   Gen.firstRunGenerateHooks.afterChecks = async () => {
@@ -1223,15 +1226,13 @@ await t("FIX3 (generate, the home-skipped re-check): the home is written, the de
   let fired;
   try {
     fired = await raceDesignOnce();
-    r = await gen(fx);
+    r = await gen(fx).then(() => null, (e) => e.code);
   } finally {
     Gen.firstRunGenerateHooks.afterChecks = null;
     Docs.firstRunHooks.beforeBatch = null;
   }
   eq([fired(), checks], [1, 2], "one lost design race, two tries:");
-  eq([r.ran, r.reason, r.homeWritten], [false, "legacy", true], `the answer: ${JSON.stringify(r)}`);
-  eq(r.message, Gen.FIRST_RUN_HALF_WORDS.legacy, "the half words:");
-  ok(!FALSE_WORDS.test(r.message), `false words: ${r.message}`);
+  eq(r, "STORE_MODE_INVALID", "the re-check's refusal:");
   eq((await docRows(fx)).find((d) => d.id === "doc_home").updated_by, "merchant:u_fr_owner", "the founder's home stands:");
 });
 

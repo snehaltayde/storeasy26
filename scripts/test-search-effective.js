@@ -931,7 +931,7 @@ await t("listProductContent pages through a catalog over 30 with no gaps or repe
   const next = await api(lst, { listProductContent: { limit: 5, cursor: r.body.nextCursor } }, STAFF);
   ok(next.body.items[0].productId !== r.body.items[0].productId, "the cursor moves on");
   eq((await api(lst, { listProductContent: { filter: "nope" } })).status, 400, "a bad filter:");
-  eq((await api(legacy, { listProductContent: true })).body.code, "STORE_USES_LEGACY", "a legacy store:");
+  eq((await api(legacy, { listProductContent: true })).body.code, "STORE_MODE_INVALID", "a store whose stored mode is 'legacy':");
 });
 
 await t("listProductContent q finds a renamed product by its new name and by its Shopify name", async () => {

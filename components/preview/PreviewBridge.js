@@ -18,7 +18,7 @@ import { brandCssVars } from "@/lib/brand";
 // Props: what the layout says this frame shows.
 //   state   documents preview: {kind, sid, docs, offline, skipped, designShown}
 //   ok      true for a working documents preview
-//   reason  why not ("revoked", "expired", "not_found", "live", "legacy")
+//   reason  why not ("revoked", "expired", "not_found", "live")
 const STYLES = `
   [data-sec].storeasy-selected { outline: 2px solid #0ea5e9; outline-offset: 4px; border-radius: 4px; }
   body.storeasy-designing [data-sec] { cursor: pointer; }

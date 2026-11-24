@@ -1124,7 +1124,7 @@ await t("unit: previewMachine: a ready naming an older draft reloads, then says 
   eq(m3.send({ type: "ready", ok: true, state: { docs: {} } }).label, L.upToDate, "not listed:");
 });
 
-await t("unit: previewMachine: ready ok:false re-mints for reason live and for each ended reason (revoked, expired, not_found), saying Updating (Reconnecting); legacy says Could not update", async () => {
+await t("unit: previewMachine: ready ok:false re-mints for reason live and for each ended reason (revoked, expired, not_found), saying Updating (Reconnecting); an unknown reason (the old 'legacy') re-mints too", async () => {
   for (const reason of ["live", "revoked", "expired", "not_found"]) {
     const m = shown();
     m.send({ type: "saveAck", draftHash: "h2" });
@@ -1137,8 +1137,10 @@ await t("unit: previewMachine: ready ok:false re-mints for reason live and for e
     m.send({ type: "frameLoad" });
     eq(m.send({ type: "ready", ok: true, state: { docs: { doc_home: "h2" } } }).label, L.upToDate, `${reason}, after the re-mint:`);
   }
+  // the old "legacy" reason is gone (Phase 1): a reason the machine doesn't know re-mints like an ended one
+  ok(!("legacy" in PM.PREVIEW_WORDS), "no legacy words");
   const lg = shown().send({ type: "ready", ok: false, reason: "legacy" });
-  eq([lg.label, lg.remint, lg.words], [L.couldNotUpdate, false, PM.PREVIEW_WORDS.legacy], "legacy:");
+  eq([lg.label, lg.remint], [L.updating, true], "an unknown reason re-mints:");
 });
 
 await t("unit: previewMachine: no ready within 3 seconds of a frame load re-mints; a ready in time does not; repeated failures end in Could not update", async () => {

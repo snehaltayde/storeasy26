@@ -22,7 +22,7 @@
 //                                           hash the frame shows)
 //   {type: "ready", ok: false, reason}      revoked | expired | not_found (the
 //                                           session ended), live (the frame
-//                                           shows the live store), legacy
+//                                           shows the live store)
 //   {type: "readyTimeout"}                  no ready within READY_TIMEOUT_MS
 //                                           of a frame load
 //   {type: "retry"}                         the founder pressed Try again
@@ -58,7 +58,6 @@ export const PREVIEW_WORDS = Object.freeze({
   ended: "Your preview session ended and a new one couldn't be started. Try again.",
   live: "The preview is showing your live store, not your changes, and it couldn't reconnect. Try again.",
   timeout: "The preview didn't answer. Check your internet connection, then try again.",
-  legacy: "This store still previews from the current Storefront editor.",
   mintFailed: "We couldn't open the preview. Check your internet connection, then try again.",
   stale: "The preview is still showing an older version of your changes. Try again.",
   saveFailed: "Your latest changes aren't saved yet, so the preview doesn't show them.",
@@ -148,7 +147,6 @@ export function previewStep(state, input) {
       if (s.phase === "loading") return answer({ ...next, ackDuringLoad: true });
       if (s.phase === "failed") {
         if (s.failure?.kind === "save") return answer({ ...next, phase: "loading", failure: null, readySinceLoad: false, ackDuringLoad: false, stale: 0 }, { reload: true });
-        if (s.failure?.kind === "legacy") return answer(next);
         // the session or the frame failed: a new save is a reason to try again
         return remintOr({ ...next, remints: 0 }, s.failure?.words ?? PREVIEW_WORDS.ended);
       }
@@ -190,7 +188,6 @@ export function previewStep(state, input) {
         return answer({ ...base, phase: "shown", stale: 0, designFixes: 0, failure: null });
       }
       const reason = typeof input.reason === "string" ? input.reason : "live";
-      if (reason === "legacy") return answer({ ...s, phase: "failed", readySinceLoad: true, failure: { kind: "legacy", words: PREVIEW_WORDS.legacy, field: null } });
       return remintOr({ ...s, readySinceLoad: true }, reason === "live" ? PREVIEW_WORDS.live : PREVIEW_WORDS.ended);
     }
     case "readyTimeout":

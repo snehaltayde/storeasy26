@@ -6,7 +6,6 @@ import { currentTenant } from "@/lib/tenant-context.js";
 import { siteName } from "@/lib/site";
 import { db } from "@/lib/db";
 import { catalogSyncStatus } from "@/lib/sync";
-import { getCmsMode } from "@/lib/cms-mode";
 import { roleAllows } from "@/lib/platform/authz";
 import SettingsAdmin from "@/components/admin/SettingsAdmin";
 import OpsPanels from "@/components/admin/OpsPanels";
@@ -78,7 +77,7 @@ export default async function AdminSettingsPage({ searchParams }) {
     );
   }
 
-  const [view, name, syncProgress, documents] = await tfetch(async () => {
+  const [view, name, syncProgress] = await tfetch(async () => {
     let counts = null;
     try {
       const [p, c] = await Promise.all([
@@ -91,10 +90,7 @@ export default async function AdminSettingsPage({ searchParams }) {
     }
     // GEN-02: the sync card reads the sync's own record
     const sync = await catalogSyncStatus().catch(() => null);
-    // P6-NAV: the logo hint follows the store's editor. A mode that can't be
-    // read gets today's (legacy) words, never an error page.
-    const mode = await getCmsMode().catch(() => null);
-    return [settingsView(currentTenant(), { counts }), siteName(), sync?.view ?? null, mode === "documents"];
+    return [settingsView(currentTenant(), { counts }), siteName(), sync?.view ?? null];
   });
 
   return (
@@ -102,7 +98,7 @@ export default async function AdminSettingsPage({ searchParams }) {
       {back}
       <PageHeader title="Settings" description="Store configuration — changes go live without a deploy." />
       <SectionNav />
-      <SettingsAdmin initial={view} syncProgress={syncProgress} canRunSync={roleAllows(actor.role, "sync.run")} documents={documents} />
+      <SettingsAdmin initial={view} syncProgress={syncProgress} canRunSync={roleAllows(actor.role, "sync.run")} />
       {/* S43: Team (MC23) · Domains & SEO (MC21) · Privacy
           (MC25) · Audit (MC26) · Help (MC27) */}
       <OpsPanels role={actor.role} />

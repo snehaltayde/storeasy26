@@ -16,9 +16,7 @@ import { tenantHandler } from "@/lib/tenant-request";
 //   PATCH {id, archived}     → P4-MEDIA: archive (true) or bring back (false);
 //                              409 MEDIA_ARCHIVE_UNAVAILABLE on a store without
 //                              migration 0025, 404 MEDIA_NOT_FOUND
-//   DELETE {id, force?}      → delete; 409 + usage list while referenced;
-//                              P4-MEDIA: 409 STORE_MIGRATING while the store
-//                              is being moved to the new editor
+//   DELETE {id}              → delete; 409 + usage list while referenced
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -111,14 +109,14 @@ export const DELETE = tenantHandler(async (request) => {
   const body = await request.json().catch(() => ({}));
   const id = String(body.id || "");
   try {
-    const r = await deleteMedia(id, { force: body.force === true });
-    slog("media_deleted", { id, forced: body.force === true });
-    await audit({ actor: auth.actor, action: "storefront.write", resource: `media:${id}`, diff: { deleted: true, forced: body.force === true } });
+    const r = await deleteMedia(id);
+    slog("media_deleted", { id });
+    await audit({ actor: auth.actor, action: "storefront.write", resource: `media:${id}`, diff: { deleted: true } });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     // the "still used on …" guard is the only way to the force-delete, so it comes first
     if (e?.code === "MEDIA_IN_USE") return NextResponse.json({ error: e.message, code: e.code, usage: e.usage }, { status: 409 });
-    // P4-MEDIA: the store is being moved (STORE_MIGRATING) or the file changed
+    // P4-MEDIA: the file changed while it was being deleted (MEDIA_CHANGED)
     if (e?.name === "MediaError") return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
     const infra = infraResponse(e, { route: "admin/media" }); // DOC-04: a database failure is never a 4xx
     if (infra) return NextResponse.json(infra.body, { status: infra.status });

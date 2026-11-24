@@ -273,12 +273,12 @@ await t("negative: a document whose draft equals its published version lists non
   likeShape(nf, "listChanges", "notFound");
 });
 
-await t("listChanges is a read: read-only roles may list; a legacy store answers 409 STORE_USES_LEGACY", async () => {
+await t("listChanges is a read: read-only roles may list; a store whose stored mode is 'legacy' answers 500 STORE_MODE_INVALID", async () => {
   const d = await publishedPage("support-reads", [text("sec_sr1", "One")]);
   const r = await changes(d.id, { as: SUPPORT });
   eq(r.status, 200, "support reads:");
   const l = await changes("doc_home", { store: "legacy" });
-  likeShape(l, "listChanges", "legacy");
+  likeShape(l, "listChanges", "modeInvalid");
 });
 
 // --- PUB-09: keep the live version of a section ---------------------------------------
@@ -523,7 +523,7 @@ await t("P3-FIX5: a version kept from the local backup (from: 'backup') reads 'E
   eq([bad.status, bad.body.code], [400, "MALFORMED"], "from must be 'backup':");
 });
 
-await t("keepAsEarlierDraft dedupes an identical body (and one that differs only by stamped ids), answers 409 TOO_MANY_KEPT at 10 with nothing stored, refuses a structurally invalid body with 422, is 403 for read-only callers, 404 for an unknown page and 409 on a legacy store", async () => {
+await t("keepAsEarlierDraft dedupes an identical body (and one that differs only by stamped ids), answers 409 TOO_MANY_KEPT at 10 with nothing stored, refuses a structurally invalid body with 422, is 403 for read-only callers, 404 for an unknown page and 500 STORE_MODE_INVALID on a store whose stored mode is legacy", async () => {
   const d = await publishedPage("kept-many", [text("sec_km", "Live")]);
   const body = (n) => ({ ...route("kept-many", "Page kept-many"), sections: [text("sec_km", `Tab copy ${n}`)] });
   const first = await keep(d.id, body(0));
@@ -559,7 +559,7 @@ await t("keepAsEarlierDraft dedupes an identical body (and one that differs only
   // who and where
   eq((await keep(d.id, body(50), { as: SUPPORT })).status, 403, "support:");
   likeShape(await keep("doc_NOPE0000000000000", body(0)), "keepAsEarlierDraft", "notFound");
-  likeShape(await keep("doc_home", { type: "home", sections: [] }, { store: "legacy" }), "keepAsEarlierDraft", "legacy");
+  likeShape(await keep("doc_home", { type: "home", sections: [] }, { store: "legacy" }), "keepAsEarlierDraft", "modeInvalid");
   await unchanged(before, "refusals");
   // staff may keep
   const other = await publishedPage("kept-staff", [text("sec_ks", "Live")]);
@@ -617,7 +617,7 @@ await t("keepAsEarlierDraft: two tabs keeping at the same moment can't pass the 
 });
 
 await t("every listChanges, keepLiveSection and keepAsEarlierDraft outcome this suite produced matched documents-api-shapes.js; no NOT_BUILT left", async () => {
-  for (const want of ["listChanges.ok", "listChanges.firstPublish", "listChanges.legacy", "listChanges.notFound", "keepLiveSection.ok", "keepLiveSection.changed", "keepLiveSection.revisionRequired", "keepLiveSection.notFound", "keepAsEarlierDraft.ok", "keepAsEarlierDraft.tooManyKept", "keepAsEarlierDraft.validationFailed", "keepAsEarlierDraft.notFound", "keepAsEarlierDraft.legacy"]) {
+  for (const want of ["listChanges.ok", "listChanges.firstPublish", "listChanges.modeInvalid", "listChanges.notFound", "keepLiveSection.ok", "keepLiveSection.changed", "keepLiveSection.revisionRequired", "keepLiveSection.notFound", "keepAsEarlierDraft.ok", "keepAsEarlierDraft.tooManyKept", "keepAsEarlierDraft.validationFailed", "keepAsEarlierDraft.notFound", "keepAsEarlierDraft.modeInvalid"]) {
     ok(SEEN_SHAPES.has(want) || only, `${want} was checked`);
   }
   const d = await publishedPage("built", [text("sec_bt", "x")]);

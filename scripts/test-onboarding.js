@@ -124,10 +124,10 @@ await t("connect (line 4): done when a token is held and not uninstalled, or any
   eq(ip.words, "Storeasy's team is preparing your Shopify connection.", "the app isn't set up yet:");
   eq(st(base(), "connect"), "ready", "nothing:");
   ok(/never changes anything in Shopify/.test(step(base(), "connect").words), "honest words: nothing written to Shopify");
-  for (const f of [base(), base({ shopDomain: "x.myshopify.com" }), base({ cmsMode: "migrating" }), base({ cmsMode: "odd" })]) ok(st(f, "connect") !== "blocked", "connect is never blocked");
+  for (const f of [base(), base({ shopDomain: "x.myshopify.com" }), base({ cmsMode: null })]) ok(st(f, "connect") !== "blocked", "connect is never blocked");
 });
 
-await t("import: done on a complete run ever, or legacy products (no runs); in progress while the latest run is running or retrying; blocked until connect is done, or while the store is being moved; ready (with the problem) on failed/stalled; ready with no run", async () => {
+await t("import: done on a complete run ever, or legacy products (no runs); in progress while the latest run is running or retrying; blocked until connect is done; ready (with the problem) on failed/stalled; ready with no run", async () => {
   eq(st(base({ sync: synced() }), "import"), "done", "complete:");
   eq(st(base({ sync: { hasComplete: false, anyRun: false, products: 5, view: view("complete") } }), "import"), "done", "legacy products:");
   const doneEmpty = step(base({ sync: synced({ products: 0 }) }), "import");
@@ -136,27 +136,24 @@ await t("import: done on a complete run ever, or legacy products (no runs); in p
   eq(st(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: true, products: 2, view: view("retrying") } }), "import"), "in_progress", "retrying:");
   const bc = step(base(), "import");
   eq([bc.state, bc.blockedBy, bc.words], ["blocked", "connect", S.WORDS.import.blockedConnect], "connect not done:");
-  const bu = step(base({ connection: CONNECTED, cmsMode: "migrating" }), "import");
-  eq([bu.state, bu.blockedBy], ["blocked", "updating"], "being moved:");
+  // Phase 1 legacy removal: no "updating" block (nothing moves a store any more)
+  eq(step(base({ connection: CONNECTED, cmsMode: null }), "import").state, "ready", "an unreadable mode never blocks the import:");
   const failed = step(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: true, products: 0, view: view("failed", { message: "Shopify didn't answer." }) } }), "import");
   eq([failed.state, failed.problem], ["ready", "Shopify didn't answer."], "failed:");
   eq(failed.actions.map((a) => a.id), ["retry_sync"], "failed offers Try again:");
   eq(step(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: true, products: 0, view: view("stalled", { message: "It stopped." }) } }), "import").problem, "It stopped.", "stalled:");
   const ready = step(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: false, products: 0, view: view("none") } }), "import");
   eq([ready.state, ready.problem, ready.actions.map((a) => a.id)], ["ready", undefined, ["start_sync"]], "no run:");
-  eq(step(base({ connection: CONNECTED, sync: synced(), cmsMode: "migrating" }), "import").state, "done", "a done import stays done while the store moves:");
 });
 
-await t("brand: done when the brand step is recorded (or the design has a brand/theme) and doc_home exists; in progress with exactly one; blocked when the CMS mode is not documents; ready with neither", async () => {
+await t("brand: done when the brand step is recorded (or the design has a brand/theme) and doc_home exists; in progress with exactly one; ready with the problem and no actions when the mode could not be read as documents; ready with neither", async () => {
   eq(st(base({ brandRecorded: true, hasHome: true }), "brand"), "done", "recorded + home:");
   eq(st(base({ designBranded: true, hasHome: true }), "brand"), "done", "branded design + home:");
   eq(st(base({ brandRecorded: true }), "brand"), "in_progress", "recorded only:");
   eq(st(base({ hasHome: true }), "brand"), "in_progress", "home only:");
   eq(st(base({ designBranded: true }), "brand"), "in_progress", "branded only:");
-  for (const mode of ["migrating", "odd"]) {
-    const b = step(base({ cmsMode: mode }), "brand");
-    eq([b.state, b.blockedBy, b.actions], ["blocked", "updating", []], `${mode}:`);
-  }
+  const b = step(base({ cmsMode: null }), "brand");
+  eq([b.state, b.blockedBy, b.problem, b.actions], ["ready", undefined, S.UNREADABLE, []], "a mode not read as documents:");
   eq(st(base(), "brand"), "ready", "neither:");
 });
 
@@ -172,14 +169,12 @@ await t("open: done on a live release (and then every step is done); blocked by 
   eq(ready.facts.items.map((i) => [i.id, i.level, i.title]), [["home", "ok", "Home page"], ...OK_OPENING.items.map((i) => [i.id, i.level, i.title])], "the home line, then the opening items (line 7 adds each one's fixes):");
 });
 
-await t("a store still on the old editor (cmsMode legacy, which nothing sets since migration 0026): supported false with reason legacy and the plain 'old editor, contact support' words; no steps, never 'being updated'", async () => {
-  for (const f of [base({ cmsMode: "legacy" }), base({ cmsMode: "legacy", open: true, linked: true, sync: synced() })]) {
-    const m = S.deriveSteps(f, "owner");
-    eq([m.supported, m.reason, m.words, m.steps, m.current, m.doneCount], [false, "legacy", S.LEGACY_WORDS, [], null, 0], "legacy:");
-  }
-  ok(/old editor/.test(S.LEGACY_WORDS) && /support/i.test(S.LEGACY_WORDS) && !/being updated/.test(S.LEGACY_WORDS), S.LEGACY_WORDS);
-  const { scanText } = await import("./support/banned-copy.js");
-  eq(scanText(S.LEGACY_WORDS), [], "banned copy:");
+await t("Phase 1 legacy removal: there is no old-editor or 'updating' state; a mode that isn't documents (cmsMode null) still gives the four steps", async () => {
+  ok(!("LEGACY_WORDS" in S), "no LEGACY_WORDS");
+  ok(!("blockedUpdating" in S.WORDS.import) && !("blocked" in S.WORDS.brand), "no 'being updated' words");
+  const m = S.deriveSteps(base({ cmsMode: null }), "owner");
+  eq([m.supported, m.reason, m.steps.length], [true, undefined, 4], "supported:");
+  ok(m.steps.every((x) => x.blockedBy !== "updating"), "never 'updating'");
 });
 
 await t("openKnown: true when the live release was read (open or closed), false when it could not be (open null), for supported and _default stores alike", async () => {
@@ -202,7 +197,7 @@ await t("pollsWhile: only while Import is in progress with its sync running or r
 });
 
 await t("an open store: every step done, current 'open', doneCount 4, no blockedBy or problem anywhere (even with unreadable or unfinished facts)", async () => {
-  for (const f of [base({ open: true, opening: null }), base({ open: true, sync: null, cmsMode: "migrating", linked: null, hasHome: null })]) {
+  for (const f of [base({ open: true, opening: null }), base({ open: true, sync: null, cmsMode: null, linked: null, hasHome: null })]) {
     const m = S.deriveSteps(f, "owner");
     eq([m.open, m.current, m.doneCount], [true, "open", 4], "summary:");
     eq(m.steps.map((s) => s.state), ["done", "done", "done", "done"], "states:");
@@ -399,13 +394,15 @@ await t("a recorded domain without keys: connect in progress; with keys: connect
   eq((await statesOf("linked")).slice(0, 2), ["done", "ready"], "linked:");
 });
 
-await t("a store being moved: import and brand blocked ('updating'); a store on the old editor: not supported, the 'contact support' words", async () => {
-  const m = await modelOf("moving");
-  eq([m.steps[1].blockedBy, m.steps[2].state, m.steps[2].blockedBy], ["updating", "blocked", "updating"], "moving (the move is named first):");
-  const l = await modelOf("legacy");
-  eq([l.supported, l.reason, l.words, l.steps], [false, "legacy", S.LEGACY_WORDS, []], "legacy:");
-  const p = await inS("legacy", () => Svc.onboardingProgress());
-  eq([p.supported, p.doneCount], [false, 0], "legacy progress (no badge, no nudge):");
+await t("a store whose stored mode is 'migrating' or 'legacy' (STORE_MODE_INVALID): the four steps, never 'updating'; the brand step says the mode couldn't be read and offers nothing", async () => {
+  for (const name of ["moving", "legacy"]) {
+    const m = await modelOf(name);
+    eq([m.supported, m.steps.length], [true, 4], `${name} supported:`);
+    ok(m.steps.every((x) => x.blockedBy !== "updating"), `${name}: never 'updating'`);
+    eq([m.steps[2].state, m.steps[2].problem, m.steps[2].actions], ["ready", S.UNREADABLE, []], `${name} brand:`);
+    const p = await inS(name, () => Svc.onboardingProgress());
+    eq(p.supported, true, `${name} progress:`);
+  }
 });
 
 await t("brand: recorded brand step plus doc_home is done; the recorded step alone is in progress", async () => {
@@ -594,7 +591,7 @@ await t("redirects: /admin/setup -> /admin/onboarding; /admin/start -> /admin/on
   const def = await withTenant({ ...(await C.getTenant("onbfresh")), id: "_default" }, () => mod.default({}).catch((e) => e.redirectTo));
   eq(def, "/admin/dashboard", "_default:");
   eq(await withFailingSql("fresh", /release_state/i, () => redirectOf("page.js", "fresh")), "/admin/dashboard", "a failed read:");
-  eq(await redirectOf("page.js", "legacy"), "/admin/dashboard", "a store on the old editor (no steps; never sent to onboarding forever):");
+  eq(await redirectOf("page.js", "legacy"), "/admin/onboarding", "a closed store whose stored mode is 'legacy' goes to onboarding (no old-editor exception):");
   eq(await withFailingSql("fresh", /FROM cms_state/i, () => redirectOf("page.js", "fresh")), "/admin/onboarding", "an unreadable editor mode on a closed store still goes to onboarding:");
   const src = (await import("node:fs")).readFileSync(join(PAGES, "page.js"), "utf8");
   ok(src.includes("liveOpen") && !src.includes("getLiveReleaseState"), "/admin reads the plain live_release_id (liveOpen), not getLiveReleaseState");

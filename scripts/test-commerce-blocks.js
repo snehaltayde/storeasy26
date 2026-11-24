@@ -232,7 +232,7 @@ await raw("DELETE FROM offers WHERE id = ?", [`bundle-${K.notreadyNosave}`]);
 
 const card = (id, bundleId, title = "") => ({ id, kind: "bundle_card", v: 1, enabled: true, settings: { title, bundle: bundleId ? { id: bundleId } : null }, blocks: [] });
 const grid = (id, ids, title = "Our bundles") => ({ id, kind: "bundle_grid", v: 1, enabled: true, settings: { title, bundles: ids.map((x) => ({ id: x })) }, blocks: [] });
-const dataOf = (sections, opts = {}) => inT(() => resolveHomeSectionData(sections, { documents: true, ...opts }));
+const dataOf = (sections, opts = {}) => inT(() => resolveHomeSectionData(sections, opts));
 const sectionOf = (h, id) => h.match(new RegExp(`<section[^>]*data-section-id="${id}"[^>]*>[\\s\\S]*?</section>`))?.[0] || "";
 const buttonOf = (h) => h.match(/<button[^>]*>[^<]*<\/button>/g) || [];
 const NOTE_ONLY = "Only you can see this note in your preview.";
@@ -432,8 +432,8 @@ await t("a home with 2 bundle cards and 1 grid of 4 calls bundlesByIds once (ded
   same(calls, [[K.avail, K.sold, K.nosave, K.off, K.notready]], "one call, deduped, first-seen order:");
   // the real DEFAULT_REPO: same data, and the statement count
   const counted = await inT(async () => {
-    await resolveHomeSectionData(sections, { documents: true }); // warm the schema probe
-    return watchStatements(currentDatabase().libsql, () => resolveHomeSectionData(sections, { documents: true }));
+    await resolveHomeSectionData(sections); // warm the schema probe
+    return watchStatements(currentDatabase().libsql, () => resolveHomeSectionData(sections));
   });
   ok(counted.statements.length <= 3, `at most 3 statements, got ${counted.statements.length}: ${counted.statements.join(" | ")}`);
   eq(counted.statements.length, 3, "bundles+offers, variants, products:");

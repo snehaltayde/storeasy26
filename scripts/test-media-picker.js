@@ -12,7 +12,7 @@
 //   4. MediaAdmin, through the real /api/admin/media route on file
 //      databases: Archive, Unarchive, "Show archived files", "Where it's
 //      used", a delete refused because the file is used (plain reason, no
-//      way round it on a documents store; today's choice on a legacy store)
+//      way round it)
 //   5. every control: labelled, and every action a button (keyboard)
 // Components run with Next's own SWC: react-dom/server for markup, and a
 // small hook driver (the component called as a function, hooks kept per
@@ -287,7 +287,6 @@ const route = await import("../app/api/admin/media/route.js");
 
 const CONFIG = { site: { name: "MP Store" }, site_url: "https://mp.test" };
 const docs = await F.makeTenant({ name: "mp-docs", id: "mpdocs", config: CONFIG });
-const legacy = await F.makeTenant({ name: "mp-legacy", id: "mplegacy", config: CONFIG });
 const raws = new Map();
 const raw = (fx) => {
   if (!raws.has(fx.id)) raws.set(fx.id, fx.client());
@@ -295,7 +294,7 @@ const raw = (fx) => {
 };
 const sql = async (fx, q, args = []) => (await raw(fx).execute({ sql: q, args })).rows.map((r) => ({ ...r }));
 const schema = await readFile(join(ROOT, "lib/schema.sql"), "utf8");
-for (const fx of [docs, legacy]) await raw(fx).executeMultiple(schema);
+await raw(docs).executeMultiple(schema);
 await raw(docs).execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
 
 const PNG = (n) => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, n & 255, (n >> 8) & 255, 2, 3, 4, 5, 6, 7]);
@@ -307,7 +306,7 @@ const archivedAt = async (fx, id) => {
 };
 
 const owner = await I.createUser({ email: "owner@mp.test", name: "Owner", password: "mp-owner-pass-1" });
-for (const id of ["mpdocs", "mplegacy"]) await I.addMembership(owner.id, id, "owner");
+await I.addMembership(owner.id, "mpdocs", "owner");
 const tok = (await Sess.createSession({ userId: owner.id, kind: "merchant", ttlMs: 600_000 })).token;
 const routeReq = (tenantId, body, path) => ({
   cookies: { get: (n) => (n === "_admin" ? { value: tok } : undefined) },
@@ -792,7 +791,7 @@ await t("unit: MediaAdmin, delete of a used file shows the plain reason and wher
     await confirm.props.onClick();
     await view.flush();
   });
-  eq(sf.calls.filter((c) => c.method === "DELETE").map((c) => c.body), [{ id: used.id, force: false }], "one plain delete, never forced:");
+  eq(sf.calls.filter((c) => c.method === "DELETE").map((c) => c.body), [{ id: used.id }], "one plain delete (there is no forced delete):");
   const refused = view.find((n) => n.props?.["data-delete-refused"] != null);
   ok(refused, "the refusal shows");
   const words = textOf(refused.props.children);
@@ -806,112 +805,6 @@ await t("unit: MediaAdmin, delete of a used file shows the plain reason and wher
   ok(!view.find((n) => n.props?.["data-delete-refused"] != null), "the refusal closed");
 });
 
-await t("unit: MediaAdmin on a legacy store keeps today's choice for a used file (delete anyway), in plain words; a refusal of any other kind shows its words", async () => {
-  const f = await upload(legacy, "banner.png");
-  await raw(legacy).execute({ sql: "INSERT INTO cms_blocks (key, value) VALUES ('hero', ?)", args: [JSON.stringify({ image: `/api/media/${f.id}` })] });
-  const { sf, view, act } = await mediaAdmin(legacy);
-  await view.click("Delete banner.png");
-  await act(async () => {
-    await view.nodes().find((n) => n.type === "button" && nameOf(n) === "Delete").props.onClick();
-    await view.flush();
-  });
-  ok(view.hasButton("Delete anyway"), "today's choice stays on a legacy store");
-  const all = view.all();
-  ok(all.includes("A section of your home page") && !all.includes("block:hero"), "in plain words, no codes");
-  await act(async () => {
-    await view.nodes().find((n) => n.type === "button" && nameOf(n) === "Delete anyway").props.onClick();
-    await view.flush();
-  });
-  eq(sf.calls.filter((c) => c.method === "DELETE").map((c) => c.body.force), [false, true], "the forced delete only after the choice:");
-  eq(await archivedAt(legacy, f.id), "gone", "deleted on the legacy store, as today");
-  // a store being moved: the plain words, no archive offer
-  await raw(legacy).execute("UPDATE cms_state SET mode = 'migrating' WHERE id = 1");
-  try {
-    const g = await upload(legacy, "moving.png");
-    const m2 = await mediaAdmin(legacy);
-    await m2.view.click("Delete moving.png");
-    await m2.act(async () => {
-      await m2.view.nodes().find((n) => n.type === "button" && nameOf(n) === "Delete").props.onClick();
-      await m2.view.flush();
-    });
-    const refused = m2.view.find((n) => n.props?.["data-delete-refused"] != null);
-    ok(refused && textOf(refused.props.children).includes(M.MIGRATING_MESSAGE), "the moving store's words");
-    ok(!m2.view.hasButton("Archive it instead") && !m2.view.hasButton("Delete anyway"), "nothing to do but wait");
-    eq(await archivedAt(legacy, g.id), null, "kept");
-  } finally {
-    await raw(legacy).execute("UPDATE cms_state SET mode = 'legacy' WHERE id = 1");
-  }
-});
-
-await t("unit (P4-FIX2): on a legacy store, a file used by an old section AND a page draft gets no 'Delete anyway' (the server always refuses it), and the refusal is in fixed plain words with no codes", async () => {
-  const f = await upload(legacy, "promo.png");
-  const src = `/api/media/${f.id}`;
-  await raw(legacy).execute({ sql: "INSERT INTO cms_blocks (key, value) VALUES ('promo', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", args: [JSON.stringify({ image: src })] });
-  const now = new Date().toISOString();
-  const draft = JSON.stringify({ type: "home", sections: [{ id: "sec_x", kind: "hero", settings: { image: { media: src, alt: "" } } }] });
-  await raw(legacy).execute({ sql: "INSERT INTO documents (id, type, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES ('doc_home', 'home', 'Home page', ?, 'dh_fix2', 1, 1, ?, ?) ON CONFLICT(id) DO UPDATE SET draft = excluded.draft", args: [draft, now, now] });
-  try {
-    const usage = await legacy.run(() => M.mediaUsage(f.id));
-    ok(usage.some((u) => u.document) && usage.some((u) => !u.document), `mixed usage: ${JSON.stringify(usage)}`);
-    const { sf, view, act } = await mediaAdmin(legacy);
-    await view.click("Delete promo.png");
-    await act(async () => {
-      await view.nodes().find((n) => n.type === "button" && nameOf(n) === "Delete").props.onClick();
-      await view.flush();
-    });
-    ok(!view.hasButton("Delete anyway"), "no choice that can't succeed");
-    const refused = view.find((n) => n.props?.["data-delete-refused"] != null);
-    ok(refused, "the refusal shows");
-    const words = textOf(refused.props.children);
-    ok(words.startsWith("This file is still used, so it wasn't deleted. Remove it from the places below first."), `fixed words: ${words}`);
-    ok(words.includes("A section of your home page") && words.includes("Home page (draft)"), `the places, in plain words: ${words}`);
-    const all = view.all();
-    ok(!/block:|still referenced|doc_|med_/.test(all), `no codes or server text: ${all.slice(0, 400)}`);
-    eq(sf.calls.filter((c) => c.method === "DELETE").map((c) => c.body.force), [false], "never forced:");
-    eq(await archivedAt(legacy, f.id), null, "kept");
-    // the helpers
-    const MA = await world({ "@/components/console/Toast": toastStub })(join(ROOT, "components/admin/MediaAdmin.js"));
-    eq(MA.canForceDelete(usage), false, "canForceDelete, mixed:");
-    eq(MA.canForceDelete(usage.filter((u) => !u.document)), true, "canForceDelete, old sections only:");
-    eq(MA.refusalWords("MEDIA_IN_USE", "still referenced by block:promo"), MA.MEDIA_WORDS.inUse, "never the server's text for a used file:");
-    eq(MA.refusalWords("SOMETHING_NEW", "raw words: block:x"), MA.MEDIA_WORDS.failed, "an unknown refusal:");
-  } finally {
-    await raw(legacy).execute("DELETE FROM documents WHERE id = 'doc_home' AND draft_hash = 'dh_fix2'");
-    await raw(legacy).execute("DELETE FROM cms_blocks WHERE key = 'promo'");
-  }
-});
-
-await t("unit (P4-FIX2): a forced delete the server refuses after the choice (a page started using the file meanwhile) closes the choice and shows the fixed words, never the server's text", async () => {
-  const f = await upload(legacy, "race.png");
-  const src = `/api/media/${f.id}`;
-  await raw(legacy).execute({ sql: "INSERT INTO cms_blocks (key, value) VALUES ('race', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", args: [JSON.stringify({ image: src })] });
-  try {
-    const { sf, view, act } = await mediaAdmin(legacy);
-    await view.click("Delete race.png");
-    await act(async () => {
-      await view.nodes().find((n) => n.type === "button" && nameOf(n) === "Delete").props.onClick();
-      await view.flush();
-    });
-    ok(view.hasButton("Delete anyway"), "an old section only: the choice is offered");
-    // a page draft starts using it before the founder confirms
-    const now = new Date().toISOString();
-    await raw(legacy).execute({ sql: "INSERT INTO documents (id, type, label, draft, draft_hash, revision, schema_version, created_at, updated_at) VALUES ('doc_race', 'page', 'About us', ?, 'dh_race', 1, 1, ?, ?)", args: [JSON.stringify({ type: "page", sections: [{ image: src }] }), now, now] });
-    await act(async () => {
-      await view.nodes().find((n) => n.type === "button" && nameOf(n) === "Delete anyway").props.onClick();
-      await view.flush();
-    });
-    eq(sf.calls.filter((c) => c.method === "DELETE").map((c) => c.body.force), [false, true], "the forced delete was asked:");
-    ok(!view.hasButton("Delete anyway"), "the choice closed");
-    const refused = view.find((n) => n.props?.["data-delete-refused"] != null);
-    ok(refused && textOf(refused.props.children).startsWith("This file is still used, so it wasn't deleted."), "fixed words");
-    ok(!/block:|still referenced|doc_|med_/.test(view.all()), "no codes or server text");
-    eq(await archivedAt(legacy, f.id), null, "kept");
-  } finally {
-    await raw(legacy).execute("DELETE FROM documents WHERE id = 'doc_race'");
-    await raw(legacy).execute("DELETE FROM cms_blocks WHERE key = 'race'");
-  }
-});
-
 await t("unit: usageLine says every kind of use in plain words, never an id", async () => {
   const MA = await world({ "@/components/console/Toast": toastStub })(join(ROOT, "components/admin/MediaAdmin.js"));
   const cases = [
@@ -920,15 +813,13 @@ await t("unit: usageLine says every kind of use in plain words, never an id", as
     [{ where: "live release:rel_1", release: "rel_1" }, "What your store shows now"],
     [{ where: "retained release:rel_0", release: "rel_0" }, "An earlier published version of your store"],
     [{ where: "brand settings", config: "brand" }, "Your brand settings"],
-    [{ where: "block:hero" }, "A section of your home page"],
-    [{ where: "page:about" }, "Your page “about”"],
-    [{ where: "product modules:gid://shopify/Product/1" }, "A product's extra content"],
     [{ where: "scheduled release:rel_2" }, "A scheduled update of your store"],
     [{ where: "something new" }, "Another part of your store"],
+    // the old editor's usage words are gone with its scan
+    [{ where: "block:hero" }, "Another part of your store"],
   ];
   for (const [u, want] of cases) eq(MA.usageLine(u), want, `${u.where}:`);
   for (const [, words] of cases) ok(!/doc_|rel_|gid:|med_/.test(words), `no id in ${words}`);
-  ok(MA.documentsUsage([cases[0][0], cases[2][0], cases[4][0]]) && !MA.documentsUsage([cases[5][0]]), "a documents store's usage is told from a legacy one's");
 });
 
 // =====================================================================================
@@ -973,7 +864,7 @@ function readFileSync(p) {
   return require("node:fs").readFileSync(p, "utf8");
 }
 for (const c of raws.values()) c.close();
-for (const fx of [docs, legacy]) await fx.cleanup();
+await docs.cleanup();
 await plat.cleanup();
 await F.removeFixtureFiles("mp");
 const secs = ((Date.now() - started) / 1000).toFixed(1);
