@@ -3,6 +3,29 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 What support and staff may see in admin reads (on the owner's behalf)
+
+- **Decision:**
+  - Team members appear by name only, never by email; a member with no name shows as "Someone on your team" (for every role).
+  - Support searches orders by order id only (no email/phone matching), and the orders page redacts customer details the same way the API does.
+  - `cart_id` and `idempotency_key` never leave the server in admin order reads, for any role.
+  - The Settings, Integrations and Automations pages load nothing unless the role has `settings.read`; staff lose them too, as the matrix says.
+  - Values already public on the storefront (Shopify store domain, Razorpay key id, support email, shipping rates) and yes/no flags derived from settings are fine for support.
+  - Support may create and use its own preview links, never act on anyone else's; acting on someone else's link answers 404 (not 410), so it doesn't reveal that the link exists.
+  - For roles that don't see customer details, order reads also drop `customer_id`; support keeps the Razorpay order and payment ids and the coupon code, which support work needs.
+- **Why:** the support-reads audit found customer details on the orders page, settings data on three pages, member emails in edit history, an email/phone search oracle, and the cart cookie value in order reads.
+- **Instead of:** hiding fields only in the UI.
+- **Decided by:** Claude, on the owner's behalf
+- **Slice:** Phase 0, support reads
+
+## 2026-11-24 How support reads are tested (on the owner's behalf)
+
+- **Decision:** a separate suite `test:support-reads`; leaks found by searching raw responses for seeded canary strings, with owner positive controls; callers are every role without `settings.read`; each readable route lists its allowed top-level keys; console pages are checked by compiling them with prop-recording stubs, not a browser.
+- **Why:** `test:permissions` is near the per-suite time limit; canaries catch leaks under any field name.
+- **Instead of:** extending `test:permissions`; per-field assertions only.
+- **Decided by:** Claude, on the owner's behalf
+- **Slice:** Phase 0, support reads
+
 ## 2026-11-24 Changing or removing an owner needs team.owner (on the owner's behalf)
 
 - **Decision:** in `/api/admin/team`, changing the role of, or removing, a member who is currently an owner requires `team.owner`; `team.manage` covers everyone else.

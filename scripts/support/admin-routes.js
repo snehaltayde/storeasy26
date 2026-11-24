@@ -46,6 +46,11 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "documents", method: "PUT", variant: "listDocuments", action: "storefront.read", via: DOCS, crossOrigin: "read", probe: { body: { listDocuments: true } } },
   { path: "documents", method: "PUT", variant: "getDocument", action: "storefront.read", via: DOCS, crossOrigin: "read", probe: { body: { getDocument: "doc_missing" } } },
   { path: "documents", method: "PUT", variant: "listHistory", action: "storefront.read", via: DOCS, crossOrigin: "read", probe: { body: { listHistory: "doc_missing" } } },
+  // line 2 (S6): the four mode-checked reads; the guard wants a row for every DOCUMENT_READS op
+  { path: "documents", method: "PUT", variant: "listRecentlyPublished", action: "storefront.read", via: DOCS, crossOrigin: "read", probe: { body: { listRecentlyPublished: true } } },
+  { path: "documents", method: "PUT", variant: "listChanges", action: "storefront.read", via: DOCS, crossOrigin: "read", probe: { body: { listChanges: "doc_missing" } } },
+  { path: "documents", method: "PUT", variant: "listProductContent", action: "storefront.read", via: DOCS, crossOrigin: "read", probe: { body: { listProductContent: true } } },
+  { path: "documents", method: "PUT", variant: "openingChecks", action: "storefront.read", via: DOCS, crossOrigin: "read", probe: { body: { openingChecks: true } } },
   { path: "documents", method: "PUT", variant: "saveDraft", action: "storefront.write", via: DOCS, probe: { body: { saveDraft: { id: "doc_missing", body: {} }, revision: 1 } } },
   { path: "documents", method: "PUT", variant: "archive", action: "storefront.write", via: DOCS, probe: { body: { archive: "doc_missing", revision: 1 } } },
   { path: "documents", method: "PUT", variant: "publish", action: "storefront.publish", via: DOCS, probe: { body: { publish: { id: "doc_missing", draftHash: "x" }, revision: 1 } } },

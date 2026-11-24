@@ -8,6 +8,8 @@ import MessagesPanel from "@/components/admin/MessagesPanel";
 import { tfetch } from "@/lib/console-request";
 import { PageHeader } from "@/components/console/PageHeader";
 import { PermissionNote } from "@/components/console/bits";
+import { Card } from "@/components/console/Card";
+import { roleAllows } from "@/lib/platform/authz";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Integrations · Admin", robots: { index: false } };
@@ -18,6 +20,18 @@ export default async function AdminIntegrationsPage() {
   // active support grant (support role — read-only, PII-redacted).
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
   if (!actor) redirect("/admin/login");
+
+  // Phase 0 line 2 (S2): settings data is never fetched for a role without settings.read
+  if (!roleAllows(actor.role, "settings.read")) {
+    return (
+      <>
+        <PageHeader title="Integrations" />
+        <Card>
+          <PermissionNote role={actor.role} need="view integrations" />
+        </Card>
+      </>
+    );
+  }
 
   const [integrations, messages, notifications] = await tfetch(async () => [
     await integrationStatus(),
@@ -36,7 +50,7 @@ export default async function AdminIntegrationsPage() {
       <IntegrationsAdmin initial={integrations} />
       {/* S39 (BE23 + SF15): contact inbox + notification delivery log */}
       {redacted ? (
-        <PermissionNote role={actor.role} need="view contact messages (shopper PII)" className="mt-8" />
+        <PermissionNote role={actor.role} need="view shoppers' contact messages" className="mt-8" />
       ) : (
         <MessagesPanel messages={messages} notifications={notifications} />
       )}

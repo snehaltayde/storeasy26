@@ -219,6 +219,14 @@ await t("guard: it catches a missing row, a stale row, a dropped gate, an unlist
   ok(has(await guardProblems(ADMIN_ROUTES, EXEMPT_ROUTES.map((r) => (r.path === "recover" ? { ...r, kind: "none" } : r)), ROUTES), "(e)"), "(e) an exempt route without its rule");
 });
 
+// line 2 (S6): every read the documents dispatcher serves has its own row
+await t("guard: every DOCUMENT_READS op in lib/admin/documents-api.js has a storefront.read row", async () => {
+  const { DOCUMENT_READS } = await import("../lib/admin/documents-api.js");
+  ok(Array.isArray(DOCUMENT_READS) && DOCUMENT_READS.length >= 7, `DOCUMENT_READS exported (${DOCUMENT_READS?.length})`);
+  const missing = DOCUMENT_READS.filter((op) => !ADMIN_ROUTES.some((r) => r.path === "documents" && r.method === "PUT" && r.variant === op && r.action === "storefront.read"));
+  eq(missing.join(","), "", "document reads without a row:");
+});
+
 // (c) per method: every exported method of a gated route answers signed-out 401
 await t("guard: every exported method of every non-exempt route answers a signed-out caller 401", async () => {
   const wrong = [];

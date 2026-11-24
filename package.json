@@ -51,6 +51,7 @@
     "member:set": "node --env-file=.env.local scripts/member-set.js",
     "test:authz": "node scripts/test-authz.js",
     "test:permissions": "node scripts/test-permissions.js",
+    "test:support-reads": "node scripts/test-support-reads.js",
     "test:platform-core": "node scripts/test-platform-core.js",
     "test:jobs": "node scripts/test-jobs.js",
     "test:sync-generations": "node scripts/test-sync-generations.js",

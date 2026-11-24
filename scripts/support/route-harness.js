@@ -95,14 +95,17 @@ export const CALLERS = Object.freeze([...CALLER_ROLES, "signed-out", "owner-b", 
 // secret, an operator support grant) and store B (its own owner), both in
 // documents mode on file: databases under one file: control plane.
 //   -> { a, b, users, cookies, ids, call(caller, path, method, opts), session(userKey), cleanup() }
-// opts: { body, form, params, origin, cookies, host }. origin null sends none;
+// a / b: optional { config, secrets, products } for that store's makeTenant
+// (line 2's canaries); a's secrets are merged over the legacy admin_password.
+// opts: { body, form, params, query, origin, cookies, host }; query is a
+// search string ("product=x") added to the URL. origin null sends none;
 // the default is the store's own origin on non-GET calls. Body strings "$owner",
 // "$admin", … are swapped for that user's id.
-export async function makeRoleStore({ name = "perm" } = {}) {
+export async function makeRoleStore({ name = "perm", a: aOpts = {}, b: bOpts = {} } = {}) {
   const F = await import("./tenant-fixture.js");
   const platform = await F.makePlatform({ name });
-  const a = await F.makeTenant({ name: `${name}-a`, mode: "documents", secrets: { admin_password: `${name}-a-legacy-pass` } });
-  const b = await F.makeTenant({ name: `${name}-b`, mode: "documents" });
+  const a = await F.makeTenant({ ...aOpts, name: `${name}-a`, mode: "documents", secrets: { admin_password: `${name}-a-legacy-pass`, ...aOpts.secrets } });
+  const b = await F.makeTenant({ ...bOpts, name: `${name}-b`, mode: "documents" });
   for (const t of [a, b]) F.assertLocalDbUrl(t.tenant.dbUrl);
   const I = await import("../../lib/platform/identity.js");
   const S = await import("../../lib/platform/sessions.js");
@@ -125,7 +128,7 @@ export async function makeRoleStore({ name = "perm" } = {}) {
   const swap = (v) => JSON.parse(JSON.stringify(v), (_, x) => (typeof x === "string" && Object.hasOwn(ids, x) ? ids[x] : x));
 
   const { NextRequest } = await import("./next-server-stub.js");
-  async function call(caller, path, method, { body, form, params, origin, cookies: jar, host = a.tenant.domains[0] } = {}) {
+  async function call(caller, path, method, { body, form, params, query, origin, cookies: jar, host = a.tenant.domains[0] } = {}) {
     const file = ["route.js", "route.ts", "route.mjs"].map((f) => join(root, "app/api/admin", path, f)).find((f) => existsSync(f));
     if (!file) throw new Error(`route-harness: no route file for ${path}`);
     const route = await import(pathToFileURL(file).href);
@@ -145,7 +148,7 @@ export async function makeRoleStore({ name = "perm" } = {}) {
       headers["content-type"] = "application/json";
       reqBody = JSON.stringify(swap(body)); // a null body is sent as JSON null
     }
-    const request = new NextRequest(`http://${host}/api/admin/${concrete}`, { method, headers, body: reqBody });
+    const request = new NextRequest(`http://${host}/api/admin/${concrete}${query ? `?${query}` : ""}`, { method, headers, body: reqBody });
     const asked = (globalThis.__requireAdminSink = []);
     let res;
     try {
@@ -161,7 +164,8 @@ export async function makeRoleStore({ name = "perm" } = {}) {
       // a redirect or an empty body
     }
     // asked: the actions requireAdmin was called with (only under spyOnRequireAdmin)
-    return { status: res.status, body: json, headers: res.headers, setCookie: res.headers.getSetCookie(), asked: [...asked] };
+    // text: the raw response body (line 2 searches it for canaries)
+    return { status: res.status, body: json, text, headers: res.headers, setCookie: res.headers.getSetCookie(), asked: [...asked] };
   }
 
   return {

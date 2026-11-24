@@ -86,3 +86,95 @@ D1 hand-declared route table, results derived from `roleAllows`. D2 changing/rem
 3. F2 may break old suites (mitigated by missing-method fallback); run the suites in §5.
 4. Suite time: ~560 handler calls vs the 2-minute per-suite limit; import each route once, reuse sessions, small `PLATFORM_CACHE_MS` if needed.
 5. Allowed routes answering 403 for their own reasons: `allowStatus` override per row with a reason, never 401/403 for an allowed role.
+
+## Line 2: support cannot read outside the matrix
+
+**Fit:** Phase 0 line 2; builds on line 1's harness (70b5eab).
+
+### 1. Feature list (floor)
+
+- **Callers checked:** every role without `settings.read` (staff, support, operator under a support grant), derived from `roleAllows`.
+- **Method:** search each call's raw response text for every canary string (also lowercase and URL-encoded), plus a per-row allowlist of top-level response keys so a new field fails.
+- **Canaries in the fixture:**
+  - Store A secrets: `order_link_secret`, `admin_password`, `shopify_admin_token`, storefront tokens, `razorpay_key_secret`, `razorpay_webhook_secret`, `ga4_api_secret`, `meta_capi_token`, webhook secrets, `db_token`.
+  - Store A config: `shopify_scopes`, `meta_test_event_code`.
+  - Team: member emails (fixture users have no names, exercising the email fallback).
+  - Audit: one `audit_log` row with a canary `resource`.
+  - Order PII: one order with canary `email`, `phone`, `name`, address, snapshot, `cart_id`, `idempotency_key`; one contact message.
+  - Store B: canary name, product, offer, document, secrets.
+  - Sessions: owner `_admin` token, operator `_platform` token, `PLATFORM_SECRET`.
+  - Patterns: `[\w.+-]+@perm-[ab]\.test`; key names `"secrets"`, `"dbToken"`, `"db_token"`, `"password_hash"`, `"token_hash"`.
+- **Positive controls (owner):** `settings` GET has the config canary, `team` GET the emails, `audit` GET the audit canary. Secret values stay absent even for the owner on every route.
+- **Per route:**
+
+  | Route | Allowed | Extra checks |
+  |---|---|---|
+  | `brand-step` GET | brand step, palettes, current, design | — |
+  | `bundles` GET | bundles, currency | — |
+  | `catalog` GET (plain, `?product=`) | products, collections, `shopify_admin` | — |
+  | `documents` PUT, all 7 read ops | document content | no member emails in `by`/`updatedByName` |
+  | `experiments` GET (plain, `?analyze=`) | experiments | — |
+  | `first-run`, `sync`, `theme` GET | progress, theme | — |
+  | `insights` GET | `configured`, model, budget, insights | — |
+  | `media` GET (`?archived=include`), `media` PUT | list, usage | no `data` blob |
+  | `offers` GET, `offers/[id]` GET (real id), `offers/simulate` POST, `offers/targets` GET | offer content | — |
+  | `orders` GET | redacted list | `?q=<canary email>` and `?q=<canary phone>` return 0 rows |
+  | `orders/[id]` GET (real order) | state, money | PII null, snapshot null, `pii_redacted:true` |
+  | `preview-session` | own token only | `revoke`/`showDesign` on the owner's session → 410; owner token never echoed |
+  | `quiz` GET (plain, `?slug=`) | quiz | — |
+  | `refs` GET (product, collection, variant, bundle) | items | — |
+  | `releases` GET, POST preview | live release | no emails |
+  | `returns` GET | no customer fields | — |
+  | `setup` GET | booleans only | — |
+  | `stores` GET | exactly A plus C (support also a member there); never B or suspended D | keys only `{id,name,role,url,current}` |
+
+- **Console pages:** every `(authed)/**/page.js` gets an action in a page table (static guard), and a prop sweep: compile the page, stub its components to record props, call it with the support cookie; props must hold no canary.
+- **Recorded, no test:** no route reads `upsells.read` (`upsells/page.js` redirects to the editor).
+
+### 2. Findings (confirm each with a failing test first)
+
+- **S1 (PII):** `app/(console)/admin/(authed)/orders/page.js:19,23` passes unredacted `listOrders` (email, phone, name) to `OrdersAdmin`. **Fix:** map through `redactOrderForRole(o, actor.role)`.
+- **S2 (settings data):** `settings/page.js:65-88` (`settingsView`), `integrations/page.js:22-36` (`integrationStatus`), `automations/page.js:17-25` fetch for any role. **Fix:** `roleAllows(actor.role,"settings.read")` before any fetch, else `PermissionNote` (as `billing/page.js:24`).
+- **S3 (team emails):** `lib/platform/identity.js:351` `teamMemberNames` falls back to email; reaches support via `listHistory` (`lib/documents/versions.js:191-196`), `getDocument` `updatedByName` (`service.js:274-277`), `listRecentlyPublished`/undo labels (`undo.js:350,658,842`), `publish.js:307`. **Fix:** name only; nameless → "Someone on your team".
+- **S4 (PII oracle):** `lib/admin/orders.js:36-40` `q` matches email/phone for support. **Fix:** `piiSearch` option; support's `q` matches order id only; route and page.
+- **S5 (cart credential):** `getOrder` (`lib/orders.js:578`) returns `cart_id` (= `cart_session` cookie) and `idempotency_key` to every role. **Fix:** strip both in `lib/admin/order-view.js` for all roles (grep `components/admin` first).
+- **S6 (table gap):** `lib/admin/documents-api.js:114-115` has 7 read ops, `admin-routes.js:46-48` lists 3. **Fix:** add the 4 rows (`listRecentlyPublished`, `listChanges`, `listProductContent`, `openingChecks`), export `DOCUMENT_READS`, line-1 guard requires a row for each.
+
+### 3. File plan (one builder, in order)
+
+1. `lib/platform/identity.js` (S3)
+2. `lib/admin/order-view.js` (S5), `lib/admin/orders.js` (S4)
+3. `app/api/admin/orders/route.js`, `app/(console)/admin/(authed)/orders/page.js` (S1, S4)
+4. `app/(console)/admin/(authed)/{settings,integrations,automations}/page.js` (S2)
+5. `lib/admin/documents-api.js`: export `DOCUMENT_READS`
+6. `scripts/support/route-harness.js`: `call()` also returns `text`; `makeRoleStore({name, a:{config,secrets,products}, b:{…}})` with defaults keeping today's behaviour
+7. `scripts/support/admin-routes.js`: the 4 document read rows
+8. `scripts/support/support-reads.js`: per-row probes and allowed key sets
+9. `scripts/support/admin-pages.js`: page table
+10. `scripts/support/page-harness.js`: swc compile, prop-recording stubs, `next/headers` cookie stub, `tfetch` stub
+11. `scripts/test-support-reads.js`: the suite
+12. `scripts/test-permissions.js`: `DOCUMENT_READS` guard
+13. `package.json`: `test:support-reads`
+14. `docs/ARCHITECTURE.md`: matrix note, support bodies proven by `test:support-reads`
+
+Then ui-designer checks the three new `PermissionNote` states.
+
+### 4. Decisions
+
+Separate suite; canary search with owner positive controls; least-trusted callers derived; per-row key allowlist; names never emails; support searches orders by id only and the page redacts; `cart_id`/`idempotency_key` never leave the server in admin reads; Settings/Integrations/Automations gated on `settings.read` server-side (staff too); storefront-public values (Shopify domain, Razorpay key id, support email, shipping rates) and derived booleans are fine for support; support may create its own preview links only; pages tested by compiled prop sweep + static table.
+
+### 5. Checks to run first
+
+- Baselines: `node scripts/test-permissions.js`, `node scripts/test-documents.js`, `node scripts/test-orders.js`.
+- `grep -rn "teamMemberNames\|redactOrderForRole\|pii_redacted\|cart_id" scripts/test-*.js`.
+- `node -e "require('next/dist/build/swc/index.js').loadBindings().then(()=>console.log('ok'))"`.
+- Scratchpad: with route-harness hooks, `createRequire(...)("<abs>/lib/admin-auth.js")` is the same module as `await import()` of it.
+- `grep -n "db_token\|dbToken\|secret" lib/platform/control.js`.
+
+### 6. Risks
+
+1. Page harness may fail (`require(esm)`, shared AsyncLocalStorage) → fall back to static guard plus a support browser drill on `/admin/orders`, `/admin/settings`, `/admin/integrations`, `/admin/automations`.
+2. S3 changes owner-visible labels too; may break history assertions.
+3. Transformed canaries slip past search; keep them short lowercase ASCII.
+4. Error bodies (`refs` 500, `media` 422 raw `e.message`) not covered by happy-path probes.
+5. `route-harness.js` changes must keep `test:permissions` green alone.

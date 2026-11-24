@@ -1,0 +1,46 @@
+// The merchant console's pages (Phase 0 line 2), as plain data: one row per
+// app/(console)/admin/(authed)/**/page.js with the authz action its data needs.
+// scripts/test-support-reads.js fails when a page has no row or a row no page,
+// wants a server-side roleAllows(actor.role, "<action>") gate in every page whose
+// action a read-only role lacks, and runs every page as support (the prop sweep).
+//
+// Row fields:
+//   page    the folder under app/(console)/admin/(authed)/ ("" is the index)
+//   action  the authz string the page's data belongs to
+//   params  route params for a dynamic page ("$order" is the fixture order's id)
+//   note    why a page is shaped as it is, when it is not obvious
+
+export const ADMIN_PAGES = Object.freeze([
+  { page: "", action: "storefront.read", note: "redirects to the dashboard" },
+  { page: "analytics", action: "orders.read" },
+  { page: "automations", action: "settings.read" },
+  { page: "billing", action: "settings.read" },
+  { page: "brand", action: "storefront.read" },
+  { page: "catalog", action: "storefront.read" },
+  { page: "dashboard", action: "storefront.read" },
+  { page: "editor", action: "storefront.read" },
+  { page: "editor/templates", action: "storefront.read" },
+  { page: "experiments", action: "storefront.read" },
+  { page: "insights", action: "storefront.read" },
+  { page: "integrations", action: "settings.read" },
+  { page: "media", action: "storefront.read" },
+  { page: "offers", action: "offers.read" },
+  { page: "orders", action: "orders.read" },
+  { page: "orders/[id]", action: "orders.read", params: { id: "$order" } },
+  { page: "releases", action: "storefront.read" },
+  { page: "settings", action: "settings.read" },
+  { page: "setup", action: "storefront.read" },
+  { page: "start", action: "storefront.read" },
+  { page: "storefront", action: "storefront.read" },
+  { page: "storefront/designer", action: "storefront.read" },
+  { page: "storefront/designer/collection", action: "storefront.read" },
+  { page: "storefront/designer/product", action: "storefront.read" },
+  { page: "storefront/home", action: "storefront.read" },
+  { page: "storefront/navigation", action: "storefront.read" },
+  { page: "storefront/pages", action: "storefront.read" },
+  { page: "storefront/pages/[slug]", action: "storefront.read", params: { slug: "about" } },
+  { page: "storefront/product-pages", action: "storefront.read" },
+  { page: "theme", action: "storefront.read" },
+  // no route reads upsells.read: the page redirects to the editor (recorded, no test)
+  { page: "upsells", action: "upsells.read", note: "redirects to the editor" },
+]);

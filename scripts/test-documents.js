@@ -93,7 +93,7 @@ await C.upsertTenant({ id: "zf", name: "First run", domains: ["zf.test"], dbUrl:
 const TEN = { docs: await C.getTenant("zd"), legacy: await C.getTenant("zl"), fr: await C.getTenant("zf") };
 
 const ownerU = await I.createUser({ email: "asha@zd.test", name: "Asha Rao", password: "owner-pass-docs" });
-const staffU = await I.createUser({ email: "ravi@zd.test", password: "staff-pass-docs" }); // no name: the email is shown
+const staffU = await I.createUser({ email: "ravi@zd.test", password: "staff-pass-docs" }); // no name: shown as "Someone on your team", never the email
 const supportU = await I.createUser({ email: "help@zd.test", name: "Support Person", password: "support-pass-docs" });
 const leftU = await I.createUser({ email: "left@zd.test", name: "Gone Person", password: "left-pass-docs" });
 for (const tid of ["zd", "zl"]) {
@@ -244,7 +244,8 @@ await t("API: a stale saveDraft returns 409 with the current body and revision, 
   // P3-CHANGES: the only raw actor id is current.updatedBy, for the editor
   const { updatedBy, updatedByName, ...rest } = mine.body.current;
   ok(!JSON.stringify({ ...mine.body, current: rest }).includes("merchant:"), "no raw actor ids anywhere else:");
-  eq([updatedBy, updatedByName], [`merchant:${staffU.id}`, "ravi@zd.test"], "who saved it (staff has no name, so the email):");
+  // Phase 0 line 2 (S3): a member without a name is never shown by email
+  eq([updatedBy, updatedByName], [`merchant:${staffU.id}`, "Someone on your team"], "who saved it (staff has no name, so never the email):");
   await unchanged(before, "stale save");
   made.camp = theirs.body.document;
 });
@@ -630,7 +631,8 @@ await t("listHistory shows plain names, never matching /^(user|member|tenant|kin
   const by = Object.fromEntries(h.body.versions.map((v) => [v.note ?? v.id, v.by]));
   for (const v of h.body.versions) ok(!/^(user|member|tenant|kind)[:_]/.test(v.by) && !/^(merchant|bootstrap|operator)/.test(v.by) && !/\bu_[0-9a-f]+/.test(v.by), `plain name, got "${v.by}"`);
   const names = new Set(h.body.versions.map((v) => v.by));
-  for (const want of ["ravi@zd.test", "Asha Rao", "Someone on your team", "Storeasy"]) ok(names.has(want), `"${want}" listed: ${JSON.stringify([...names])}`);
+  for (const want of ["Asha Rao", "Someone on your team", "Storeasy"]) ok(names.has(want), `"${want}" listed: ${JSON.stringify([...names])}`);
+  ok(!names.has("ravi@zd.test"), "the nameless member is never shown by email (Phase 0 line 2, S3):");
   eq([by.support, by.system, by.bootstrap, by.odd], ["Storeasy", "Storeasy", "Someone on your team", "Someone on your team"], "fallbacks:");
   ok(!names.has("Gone Person"), "someone who left is not named:");
   eq((await I.teamMemberNames("zd")).get(ownerU.id), "Asha Rao", "teamMemberNames:");
