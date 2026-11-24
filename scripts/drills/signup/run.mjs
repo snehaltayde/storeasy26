@@ -119,8 +119,15 @@ async function signup(drill) {
     },
   ]);
   const t0 = Date.now();
-  const open = await until(async () => (await fetch(at(SITE, "/api/signup?storeName=probe")).then((r) => r.status)) === 200, 60_000, 1000);
-  drill.check(Boolean(open), "flag on: the signup API opens (the flag cache expires)", { seconds: Math.round((Date.now() - t0) / 1000) });
+  // the API route, the /signup page and pricing each read the flag through
+  // their own cached copy (up to 30 s): wait for all three
+  const open = await until(async () => {
+    const api = (await fetch(at(SITE, "/api/signup?storeName=probe")).then((r) => r.status)) === 200;
+    const form = (await fetch(at(SITE, "/signup")).then((r) => r.text())).includes('data-signup="form"');
+    const pricing = (await fetch(at(SITE, "/pricing")).then((r) => r.text())).includes('href="/signup"');
+    return api && form && pricing;
+  }, 90_000, 1000);
+  drill.check(Boolean(open), "flag on: the signup API, the /signup page and pricing open (the flag cache expires)", { seconds: Math.round((Date.now() - t0) / 1000) });
 
   // 3. pricing → /signup
   {
