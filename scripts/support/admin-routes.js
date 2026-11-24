@@ -108,6 +108,9 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "returns", method: "POST", action: "returns.decide", probe: { body: { id: "ret_missing", action: "approve" } } },
   { path: "settings", method: "GET", action: "settings.read" },
   { path: "settings", method: "PUT", action: "settings.write", probe: { body: { bogus_setting: true } } },
+  // Phase 1 line 4: the founder connect. The callback without a state is refused (mismatch) before any exchange.
+  { path: "shopify/callback", method: "GET", action: "settings.write" },
+  { path: "shopify/connect", method: "POST", action: "settings.write", probe: { body: { shop: "" } } },
   // F3: lists the caller's own memberships (line 2 checks the body)
   { path: "stores", method: "GET", action: "storefront.read" },
   { path: "sync", method: "GET", action: "storefront.read" },

@@ -1,12 +1,7 @@
 import { NextResponse, after } from "next/server";
-import { getTenant, patchTenant } from "@/lib/platform/control.js";
-import { verifyState, verifyOAuthCallbackHmac, missingScopes } from "@/lib/platform/oauth.js";
-import { sendAlert } from "@/lib/alerts";
-import { registerWebhooks } from "@/lib/platform/shopify-webhooks.js";
-import { exchangeCodeForToken } from "@/lib/shopify-admin.js";
-import { withTenant } from "@/lib/tenant-context.js";
-import { startCatalogSync, KICK_BUDGET_MS } from "@/lib/platform/sync-jobs";
-import { slog } from "@/lib/log";
+import { getTenant } from "@/lib/platform/control.js";
+import { verifyState, verifyOAuthCallbackHmac } from "@/lib/platform/oauth.js";
+import { completeConnection } from "@/lib/platform/shopify-connect.js";
 
 // Shopify OAuth callback (Session 21). NOT operator-gated — Shopify redirects
 // the merchant's browser here. Security: the HMAC-signed state names the
@@ -15,7 +10,10 @@ import { slog } from "@/lib/log";
 // permanent Admin token is stored encrypted, webhooks are registered, and the
 // first catalog sync is QUEUED (GEN-02): a recorded, resumable run whose
 // first slice starts after the response and whose rest the queue finishes —
-// any catalog size, no CLI step.
+// any catalog size, no CLI step. Phase 1 line 4: the exchange and storage are
+// lib/platform/shopify-connect.js (shared with the founder flow, so this flow
+// gets expiring tokens too), and only an operator ("op") state is taken here:
+// a founder's state is refused, as the founder callback refuses this one.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -100,56 +98,15 @@ export async function GET(request) {
   if (!code) return failPage("No authorization code in the callback.");
 
   try {
-    // exchangeCodeForToken reads the store domain + app creds from tenant context.
-    const tok = await withTenant(tenant, () => exchangeCodeForToken(code));
-    await patchTenant(tenant.id, {
-      secrets: { shopify_admin_token: tok.access_token },
-      config: {
-        shopify_scopes: tok.scope || null,
-        shopify_connected_at: new Date().toISOString(),
-        shopify_app_uninstalled_at: null, // a reconnect clears the uninstall flag
-      },
+    const { scope, missing, webhooks, syncQueued } = await completeConnection({
+      tenant,
+      code,
+      shop,
+      platformUrl: process.env.PLATFORM_URL || request.nextUrl.origin,
+      defer: after,
+      started,
     });
-    slog("shopify_connected", { tenant: tenant.id, shop, scopes: tok.scope });
-
-    // S30 (BE25): scope check at mint time — a partial grant is a loud warning
-    // now instead of a mystery failure later (e.g. orderCancel sans write_orders).
-    const missing = missingScopes(tok.scope);
-    if (missing.length) {
-      await sendAlert(
-        `Shopify token for ${tenant.id} is missing scope(s): ${missing.join(", ")} — re-run the connect flow after fixing the app's scopes`,
-        { tenant: tenant.id, shop, missing },
-        { severity: "warn" },
-      );
-    }
-
-    // Webhooks need a publicly reachable https URL — on localhost this fails
-    // harmlessly (register later with `pnpm webhooks:register <slug>`).
-    const platformUrl = process.env.PLATFORM_URL || request.nextUrl.origin;
-    let webhooks = "skipped (no https platform URL)";
-    if (platformUrl.startsWith("https://")) {
-      const fresh = await getTenant(tenant.id);
-      const results = await registerWebhooks(fresh, { callbackUrl: `${platformUrl}/api/shopify/webhooks` }).catch(
-        (e) => ({ error: String(e?.message || e) }),
-      );
-      webhooks = Array.isArray(results)
-        ? `${results.filter((r) => r.status !== "error").length}/${results.length} registered`
-        : `failed: ${results.error}`;
-    }
-
-    // First catalog sync: recorded and queued BEFORE the response, so it
-    // survives this function ending; its first slice runs after the response.
-    let syncQueued = true;
-    try {
-      const fresh = await getTenant(tenant.id);
-      const { run, action } = await withTenant(fresh, () =>
-        startCatalogSync({ startedBy: "connect", defer: after, budgetMs: Math.max(0, KICK_BUDGET_MS - (Date.now() - started)) }),
-      );
-      slog("initial_sync_queued", { tenant: tenant.id, run: run.id, action });
-    } catch (e) {
-      syncQueued = false;
-      console.error(`[connect] could not queue the first sync for ${tenant.id}: ${e?.message || e}`);
-    }
+    const tok = { scope };
 
     const firstDomain = (tenant.domains || [])[0];
     const storeOrigin = firstDomain

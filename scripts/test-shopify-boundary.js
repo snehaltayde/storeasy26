@@ -451,8 +451,9 @@ await t("SHOP-01: the spike stays a labelled one-off that nothing imports", asyn
 // one, however its URL is put together, is a reviewed change to this list.
 const ADMIN_TOKEN_FILES = {
   "lib/shopify-admin.js": {
-    urls: ["/admin/api/${API_VERSION()}/graphql.json", "/admin/oauth/access_token", "/admin/oauth/access_token"],
-    fetches: 3,
+    // Phase 1 line 4: the third token call is refreshAdminToken (expiring offline tokens)
+    urls: ["/admin/api/${API_VERSION()}/graphql.json", "/admin/oauth/access_token", "/admin/oauth/access_token", "/admin/oauth/access_token"],
+    fetches: 4,
   },
   [SPIKE]: { urls: ["/admin/api/${APIVER}/graphql.json"], fetches: 1 },
 };
@@ -460,7 +461,8 @@ const ADMIN_TOKEN_FILES = {
 await t("SHOP-01: no REST call to the Admin API, and the Admin token header stays in known files", async () => {
   const rest = files.flatMap((f) => findAdminRest(f.text).map((h) => `${f.path}: ${h}`));
   eq(rest.length, 0, `Admin API must go through graphql.json so the mutation list can see it:${listIn(rest)}\n   `);
-  const tokenUsers = files.filter((f) => /x-shopify-access-token/i.test(f.text)).map((f) => f.path);
+  // the local stand-in (Phase 1 line 4) reads the header it is sent; it never sends one
+  const tokenUsers = files.filter((f) => /x-shopify-access-token/i.test(f.text) && f.path !== "scripts/support/fake-shopify.js").map((f) => f.path);
   eq(sorted(tokenUsers), sorted(Object.keys(ADMIN_TOKEN_FILES)), "files sending the Admin token:");
 });
 

@@ -76,6 +76,16 @@ export interface TenantConfig {
     message?: string;
     eta?: string;
   };
+  // Phase 1 line 4: the Shopify connection (expiring offline tokens)
+  shopify_store_domain?: string;
+  shopify_client_id?: string;
+  shopify_scopes?: string | null;
+  shopify_connected_at?: string | null;
+  shopify_connected_by?: string | null;
+  shopify_token_expires_at?: string | null;
+  shopify_refresh_expires_at?: string | null;
+  shopify_reauth_needed_at?: string | null;
+  shopify_app_uninstalled_at?: string | null;
   onboarding?: {
     manual?: Record<string, { done: boolean; at?: string }>;
     brand_step?: {
@@ -97,6 +107,8 @@ export interface TenantConfig {
 export interface TenantSecrets {
   shopify_store_domain?: string;
   shopify_admin_token?: string;
+  shopify_refresh_token?: string | null;
+  shopify_client_secret?: string;
   shopify_storefront_token?: string;
   shopify_webhook_secret?: string;
   razorpay_key_id?: string;

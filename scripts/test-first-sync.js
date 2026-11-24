@@ -1652,8 +1652,11 @@ console.log("— the console card, rendered");
 console.log("— wiring");
 
 await t("the connect callback queues the sync instead of running it in after(); docs drop the CLI step", async () => {
-  const src = await readFile(join(root, "app/api/connect/shopify/callback/route.js"), "utf8");
-  ok(!/syncTenantCatalog/.test(src), "callback still runs the whole sync itself");
+  // Phase 1 line 4: both callbacks finish through lib/platform/shopify-connect.js
+  const route = await readFile(join(root, "app/api/connect/shopify/callback/route.js"), "utf8");
+  ok(/completeConnection\(/.test(route), "the operator callback finishes through completeConnection");
+  const src = await readFile(join(root, "lib/platform/shopify-connect.js"), "utf8");
+  ok(!/syncTenantCatalog/.test(route + src), "callback still runs the whole sync itself");
   ok(/startCatalogSync\(/.test(src), "callback queues the sync");
   const doc = await readFile(join(root, "docs/onboarding.md"), "utf8");
   ok(!/Big catalogs: run `pnpm tenant:sync/.test(doc), "onboarding still sends big catalogs to the CLI");

@@ -62,6 +62,11 @@ export async function GET(request, { params }) {
       },
       secretsPresent,
     },
+    // Phase 1 line 4: the founder connect's callback on each store domain, to add to the store's Shopify app
+    connect: {
+      appReady: Boolean(tenant.config?.shopify_client_id && tenant.secrets?.shopify_client_secret),
+      redirectUrls: (tenant.domains || []).map((d) => `${/(^|\.)localhost(:|$)|^127\.0\.0\.1/.test(d) ? "http" : "https"}://${d}/api/admin/shopify/callback`),
+    },
     onboarding: onboarding && onboarding.supported ? { doneCount: onboarding.doneCount, total: onboarding.total, open: onboarding.open, steps: onboarding.steps.map((s) => ({ id: s.id, label: s.label, state: s.state })) } : null,
     runs,
   });

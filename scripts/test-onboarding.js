@@ -86,6 +86,8 @@ const base = (over = {}) => ({
   testOrderMarked: false,
   ...over,
 });
+// line 4: a store holding a Shopify token (lib/onboarding/connect.js connectFacts)
+const CONNECTED = Object.freeze({ shopDomain: "acme.myshopify.com", appReady: true, tokenHeld: true, uninstalledAt: null, reauthNeededAt: null, missingScopes: [], locked: true });
 const OK_OPENING = { items: [{ id: "privacy", level: "ok", title: "Privacy page" }, { id: "returns", level: "ok", title: "Returns page" }, { id: "test_order", level: "warn", title: "No test order yet" }] };
 const step = (facts, id, role = "owner") => S.deriveSteps(facts, role).steps.find((s) => s.id === id);
 const st = (facts, id) => step(facts, id).state;
@@ -103,13 +105,23 @@ await t("the shape: supported, open, current, doneCount, total 4, and four steps
   eq([m.supported, m.open, m.openKnown, m.total, m.doneCount, m.current], [true, false, true, 4, 0, "connect"], "a fresh store:");
 });
 
-await t("connect: done when linked, or any complete sync, or products > 0; in progress when a domain is recorded but not linked; never blocked; ready otherwise", async () => {
-  eq(st(base({ linked: true }), "connect"), "done", "linked:");
+await t("connect (line 4): done when a token is held and not uninstalled, or any complete sync, or products > 0; client credentials alone are not done; in progress when a domain is recorded but the app isn't set up; ready to connect once it is; never blocked; ready otherwise", async () => {
+  eq(st(base({ connection: CONNECTED }), "connect"), "done", "a token:");
+  eq(st(base({ linked: true, shopDomain: "acme.myshopify.com", connection: { ...CONNECTED, tokenHeld: false } }), "connect"), "ready", "client credentials alone:");
+  const un = step(base({ shopDomain: "acme.myshopify.com", connection: { ...CONNECTED, uninstalledAt: "2026-11-20T00:00:00.000Z" } }), "connect");
+  eq([un.state, un.facts.reconnect, un.facts.connected], ["ready", true, false], "uninstalled, nothing synced:");
+  ok(/removed/.test(un.problem), un.problem);
+  const re = step(base({ sync: synced(), connection: { ...CONNECTED, tokenHeld: false, reauthNeededAt: "2026-11-20T00:00:00.000Z" } }), "connect");
+  eq([re.state, re.facts.reconnect], ["done", true], "Shopify asked to connect again, products in: done, with reconnect:");
+  ok(/Connect again/.test(re.problem), re.problem);
+  eq(step(base({ connection: { ...CONNECTED, missingScopes: ["write_orders"] } }), "connect").facts.reconnect, true, "missing scopes: reconnect");
+  const ready2 = step(base({ shopDomain: "acme.myshopify.com", connection: { ...CONNECTED, tokenHeld: false } }), "connect");
+  eq([ready2.state, ready2.words], ["ready", S.WORDS.connect.readyToConnect], "domain and app, no token: ready to connect:");
   eq(st(base({ sync: synced({ products: 0 }) }), "connect"), "done", "a complete sync (no products):");
   eq(st(base({ sync: { hasComplete: false, anyRun: false, products: 3, view: view("complete") } }), "connect"), "done", "products:");
   const ip = step(base({ shopDomain: "acme.myshopify.com" }), "connect");
   eq(ip.state, "in_progress", "domain only:");
-  ok(/nothing for you to do yet/.test(ip.words), `the founder has nothing to do yet: ${ip.words}`);
+  eq(ip.words, "Storeasy's team is preparing your Shopify connection.", "the app isn't set up yet:");
   eq(st(base(), "connect"), "ready", "nothing:");
   ok(/never changes anything in Shopify/.test(step(base(), "connect").words), "honest words: nothing written to Shopify");
   for (const f of [base(), base({ shopDomain: "x.myshopify.com" }), base({ cmsMode: "migrating" }), base({ cmsMode: "odd" })]) ok(st(f, "connect") !== "blocked", "connect is never blocked");
@@ -120,19 +132,19 @@ await t("import: done on a complete run ever, or legacy products (no runs); in p
   eq(st(base({ sync: { hasComplete: false, anyRun: false, products: 5, view: view("complete") } }), "import"), "done", "legacy products:");
   const doneEmpty = step(base({ sync: synced({ products: 0 }) }), "import");
   eq([doneEmpty.state, doneEmpty.words], ["done", S.WORDS.import.noProducts], "no products: done, says to add them in Shopify:");
-  eq(st(base({ linked: true, sync: { hasComplete: false, anyRun: true, products: 2, view: view("running") } }), "import"), "in_progress", "running:");
-  eq(st(base({ linked: true, sync: { hasComplete: false, anyRun: true, products: 2, view: view("retrying") } }), "import"), "in_progress", "retrying:");
+  eq(st(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: true, products: 2, view: view("running") } }), "import"), "in_progress", "running:");
+  eq(st(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: true, products: 2, view: view("retrying") } }), "import"), "in_progress", "retrying:");
   const bc = step(base(), "import");
   eq([bc.state, bc.blockedBy, bc.words], ["blocked", "connect", S.WORDS.import.blockedConnect], "connect not done:");
-  const bu = step(base({ linked: true, cmsMode: "migrating" }), "import");
+  const bu = step(base({ connection: CONNECTED, cmsMode: "migrating" }), "import");
   eq([bu.state, bu.blockedBy], ["blocked", "updating"], "being moved:");
-  const failed = step(base({ linked: true, sync: { hasComplete: false, anyRun: true, products: 0, view: view("failed", { message: "Shopify didn't answer." }) } }), "import");
+  const failed = step(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: true, products: 0, view: view("failed", { message: "Shopify didn't answer." }) } }), "import");
   eq([failed.state, failed.problem], ["ready", "Shopify didn't answer."], "failed:");
   eq(failed.actions.map((a) => a.id), ["retry_sync"], "failed offers Try again:");
-  eq(step(base({ linked: true, sync: { hasComplete: false, anyRun: true, products: 0, view: view("stalled", { message: "It stopped." }) } }), "import").problem, "It stopped.", "stalled:");
-  const ready = step(base({ linked: true, sync: { hasComplete: false, anyRun: false, products: 0, view: view("none") } }), "import");
+  eq(step(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: true, products: 0, view: view("stalled", { message: "It stopped." }) } }), "import").problem, "It stopped.", "stalled:");
+  const ready = step(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: false, products: 0, view: view("none") } }), "import");
   eq([ready.state, ready.problem, ready.actions.map((a) => a.id)], ["ready", undefined, ["start_sync"]], "no run:");
-  eq(step(base({ linked: true, sync: synced(), cmsMode: "migrating" }), "import").state, "done", "a done import stays done while the store moves:");
+  eq(step(base({ connection: CONNECTED, sync: synced(), cmsMode: "migrating" }), "import").state, "done", "a done import stays done while the store moves:");
 });
 
 await t("brand: done when the brand step is recorded (or the design has a brand/theme) and doc_home exists; in progress with exactly one; blocked when the CMS mode is not documents; ready with neither", async () => {
@@ -177,14 +189,14 @@ await t("openKnown: true when the live release was read (open or closed), false 
 
 await t("pollsWhile: only while Import is in progress with its sync running or retrying; never for a connect or brand step in progress, a done or failed import, or an open store", async () => {
   const poll = (f) => S.pollsWhile(S.deriveSteps(f, "owner"));
-  eq(poll(base({ linked: true, sync: { hasComplete: false, anyRun: true, products: 4, view: view("running") } })), true, "running:");
-  eq(poll(base({ linked: true, sync: { hasComplete: false, anyRun: true, products: 4, view: view("retrying") } })), true, "retrying:");
+  eq(poll(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: true, products: 4, view: view("running") } })), true, "running:");
+  eq(poll(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: true, products: 4, view: view("retrying") } })), true, "retrying:");
   eq(poll(base({ shopDomain: "acme.myshopify.com" })), false, "connect in progress:");
   eq(step(base({ shopDomain: "acme.myshopify.com" }), "connect").state, "in_progress", "(connect is in progress there)");
-  eq(poll(base({ linked: true, sync: synced(), brandRecorded: true })), false, "brand in progress:");
-  eq(step(base({ linked: true, sync: synced(), brandRecorded: true }), "brand").state, "in_progress", "(brand is in progress there)");
-  eq(poll(base({ linked: true, sync: synced() })), false, "import done:");
-  eq(poll(base({ linked: true, sync: { hasComplete: false, anyRun: true, products: 0, view: view("failed") } })), false, "failed:");
+  eq(poll(base({ connection: CONNECTED, sync: synced(), brandRecorded: true })), false, "brand in progress:");
+  eq(step(base({ connection: CONNECTED, sync: synced(), brandRecorded: true }), "brand").state, "in_progress", "(brand is in progress there)");
+  eq(poll(base({ connection: CONNECTED, sync: synced() })), false, "import done:");
+  eq(poll(base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: true, products: 0, view: view("failed") } })), false, "failed:");
   eq(poll(base({ open: true, sync: { hasComplete: false, anyRun: true, products: 4, view: view("running") } })), false, "open store:");
   eq([S.pollsWhile(null), S.pollsWhile({ steps: [] })], [false, false], "no model:");
 });
@@ -204,17 +216,17 @@ await t("the _default store: supported false, no steps, the same keys", async ()
 });
 
 await t("current is the first step not done; doneCount counts done steps", async () => {
-  const f = base({ linked: true, sync: synced() });
+  const f = base({ connection: CONNECTED, sync: synced() });
   const m = S.deriveSteps(f, "owner");
   eq([m.current, m.doneCount], ["brand", 2], "connect and import done:");
-  const m2 = S.deriveSteps(base({ linked: true, sync: synced(), brandRecorded: true, hasHome: true, opening: OK_OPENING }), "owner");
+  const m2 = S.deriveSteps(base({ connection: CONNECTED, sync: synced(), brandRecorded: true, hasHome: true, opening: OK_OPENING }), "owner");
   eq([m2.current, m2.doneCount], ["open", 3], "three done:");
   const m3 = S.deriveSteps(base({ brandRecorded: true, hasHome: true }), "owner");
   eq([m3.current, m3.doneCount], ["connect", 1], "a later step done first:");
 });
 
 await t("resume: ?step=<connect|import|brand|open> opens that step; anything else is ignored and the first step not done opens", async () => {
-  const m = S.deriveSteps(base({ linked: true, sync: synced() }), "owner");
+  const m = S.deriveSteps(base({ connection: CONNECTED, sync: synced() }), "owner");
   for (const id of S.STEP_IDS) eq(S.resumeStep(id, m), id, `${id}:`);
   for (const q of [undefined, null, "", "Brand", "setup", "launch", "../x", ["brand"], 3]) eq(S.resumeStep(q, m), "brand", `${JSON.stringify(q)}:`);
   eq(S.resumeStep(null, S.deriveSteps(base({ open: true }), "owner")), "open", "an open store opens on open:");
@@ -225,7 +237,7 @@ await t("resume: ?step=<connect|import|brand|open> opens that step; anything els
 await t("a failed read is never done: each step stays not done with 'We couldn't check this just now'", async () => {
   const c = step(base({ linked: null, sync: null }), "connect");
   eq([c.state, c.problem], ["ready", S.UNREADABLE], "connect:");
-  const i = step(base({ linked: true, sync: null }), "import");
+  const i = step(base({ connection: CONNECTED, sync: null }), "import");
   eq([i.state, i.problem], ["ready", S.UNREADABLE], "import:");
   const b1 = step(base({ brandRecorded: true, hasHome: null }), "brand");
   eq([b1.state, b1.problem], ["in_progress", S.UNREADABLE], "brand, home unreadable:");
@@ -245,11 +257,12 @@ await t("actions per role come from lib/platform/authz.js: sync start/retry sync
   eq(S.ACTION_PERMS, {
     start_sync: "sync.run", retry_sync: "sync.run", starter_store: "storefront.write", brand_save: "storefront.write", brand_skip: "storefront.write",
     brand_description: "settings.write", policy_start: "storefront.write", policy_read: "storefront.write", test_order: "settings.write", open_store: "storefront.publish",
+    connect_shopify: "settings.write",
   }, "the map:");
-  const f = base({ linked: true, sync: { hasComplete: false, anyRun: false, products: 0, view: view("none") }, opening: OK_OPENING });
+  const f = base({ connection: CONNECTED, sync: { hasComplete: false, anyRun: false, products: 0, view: view("none") }, opening: OK_OPENING });
   for (const role of ROLES) {
     const all = S.deriveSteps(f, role).steps.flatMap((s) => s.actions);
-    eq(all.map((a) => a.id).sort(), ["brand_description", "brand_save", "brand_skip", "open_store", "policy_read", "policy_start", "start_sync", "starter_store", "test_order"], `${role} ids:`);
+    eq(all.map((a) => a.id).sort(), ["brand_description", "brand_save", "brand_skip", "connect_shopify", "open_store", "policy_read", "policy_start", "start_sync", "starter_store", "test_order"], `${role} ids:`);
     for (const a of all) {
       eq(a.allowed, roleAllows(role, S.ACTION_PERMS[a.id]), `${role} ${a.id}:`);
       if (a.allowed) ok(!("reason" in a), `${role} ${a.id} has no reason`);
@@ -260,6 +273,10 @@ await t("actions per role come from lib/platform/authz.js: sync start/retry sync
   eq([staffOpen.allowed, staffOpen.reason], [false, "Only the owner or an admin can open the store"], "staff Open:");
   const staffSync = step(f, "import", "staff").actions.find((a) => a.id === "start_sync");
   eq([staffSync.allowed, staffSync.reason], [false, S.ADMIN_ONLY_REASON], "staff sync:");
+  const staffConnect = step(f, "connect", "staff").actions.find((a) => a.id === "connect_shopify");
+  eq([staffConnect.allowed, staffConnect.reason], [false, S.ADMIN_ONLY_REASON], "staff Connect (line 4):");
+  const supportConnect = step(f, "connect", "support").actions.find((a) => a.id === "connect_shopify");
+  eq([supportConnect.allowed, supportConnect.reason], [false, S.READ_ONLY_REASON], "support Connect (line 4):");
   const sup = S.deriveSteps(f, "support").steps.flatMap((s) => s.actions);
   ok(sup.every((a) => a.allowed === false && a.reason === S.READ_ONLY_REASON), "support: every action disabled, read-only words");
   ok(S.deriveSteps(f, "nobody").steps.flatMap((s) => s.actions).every((a) => !a.allowed), "an unknown role: nothing allowed");
