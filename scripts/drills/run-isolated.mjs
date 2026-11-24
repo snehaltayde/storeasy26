@@ -4,9 +4,9 @@
 // and its data are never touched: a drill seeds and wipes only the worktree's
 // own folders, and this runner fails if the owner's seed files change anyway.
 //
-//   node scripts/drills/run-isolated.mjs <p5|p6|smoke|agency-gone|sf-styles|all> [stage,…] [--keep] [--headed]
-//   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:sf-styles, drill:all;
-//   sf-styles is not in all)
+//   node scripts/drills/run-isolated.mjs <p5|p6|smoke|agency-gone|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
+//   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:sf-styles,
+//   drill:console-styles, drill:all; sf-styles and console-styles are not in all)
 //
 //   stage,…   p5 and p6 only: run just these stages
 //   --keep    leave the worktree in place (its path is printed)
@@ -24,7 +24,8 @@
 //   4. each drill runs from the worktree with DRILL_ISOLATED_ROOT=<worktree>
 //      (the drills refuse without it), the ports, PLATFORM_CACHE_MS=1000, and
 //      every Shopify, payment, hosted-database and AI key blank
-//   5. agency-gone first seeds and starts the worktree's own roles store
+//   5. agency-gone and console-styles first seed and start the worktree's own
+//      roles store (withRolesStore)
 //   6. the worktree's committed docs/cms-reviews/drills/<ID>/ is emptied before
 //      each drill, so results are this run's only; they and each
 //      drill's output are copied to .drill-results/<stamp>/ here (gitignored),
@@ -295,6 +296,24 @@ const realWarm = (c, say) =>
   warmBuild({ start: warmHarness(c), clean: () => rmSync(join(c.worktree, ".next"), { recursive: true, force: true }), gone: () => waitHarnessGone({ worktree: c.worktree, ports: c.ports }), say });
 
 const node = process.execPath;
+
+// Seeds this worktree's roles store (dev-roles.js seed), starts it, runs fn()
+// while it answers, then stops it (its own handle only). → fn's exit code.
+export async function withRolesStore(c, fn, { start = startChild, up = waitUp } = {}) {
+  const seeded = await c.node(["scripts/dev-roles.js", "seed"]);
+  if (seeded !== 0) return seeded;
+  const server = start(node, ["scripts/dev-roles.js"], { cwd: c.worktree, env: c.env, log: c.log });
+  try {
+    if (!(await up(`http://roles.localhost:${c.ports.rolesNext}/api/health`, server.child))) {
+      c.log.push("✗ the roles store did not come up\n");
+      return 1;
+    }
+    return await fn();
+  } finally {
+    await server.stop();
+  }
+}
+
 // name → { id (results folder or null), warm (boot-check the build first), run(ctx) → exit code }
 export const DRILLS = {
   // the --p3 documents store first (it has a live release), as p5's lib seeds it
@@ -311,24 +330,10 @@ export const DRILLS = {
   // the storefront render comparison (Phase 0 line 7); SF_STYLES_BASELINE and
   // SF_STYLES_BITE pass through the env. A tool, not part of drill:all.
   "sf-styles": { id: "SF-STYLES", warm: true, run: (c) => c.node(["scripts/drills/sf-styles/run.mjs", ...c.headed]) },
-  "agency-gone": {
-    id: null,
-    warm: true,
-    async run(c) {
-      const seeded = await c.node(["scripts/dev-roles.js", "seed"]);
-      if (seeded !== 0) return seeded;
-      const server = startChild(node, ["scripts/dev-roles.js"], { cwd: c.worktree, env: c.env, log: c.log });
-      try {
-        if (!(await waitUp(`http://roles.localhost:${c.ports.rolesNext}/api/health`, server.child))) {
-          c.log.push("✗ the roles store did not come up\n");
-          return 1;
-        }
-        return await c.node(["scripts/drills/agency-gone.mjs"]);
-      } finally {
-        await server.stop();
-      }
-    },
-  },
+  "agency-gone": { id: null, warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/agency-gone.mjs"])) },
+  // the old console screens inside the new shell (Phase 0 line 8 §3), on the
+  // roles store; SF_STYLES_BASELINE and SF_STYLES_BITE pass through. A tool, not in drill:all.
+  "console-styles": { id: "CONSOLE-STYLES", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/sf-styles/run.mjs", ...c.headed], { env: { ...c.env, SF_STYLES_SET: "console" } })) },
 };
 export const ALL = ["smoke", "p5", "p6", "agency-gone"];
 

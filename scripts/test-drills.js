@@ -27,6 +27,9 @@
 //   8. sf-styles (Phase 0 line 7): its runner entry, outside drill:all, and
 //      the render comparator (identical → no difference; a synthetic style,
 //      box and element change is found)
+//   9. console-styles (Phase 0 line 8): its runner entry (roles store first,
+//      the console set), outside drill:all; the comparator's ignoreProps and
+//      ignoreBoxes options
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -509,7 +512,7 @@ await t("sf-styles compare: identical captures have no differences; a synthetic 
   const same = structuredClone(base);
   same[0].elements[0].s = { "letter-spacing": "normal", color: "red" }; // property order never matters
   const d0 = C.diffRuns(base, same);
-  eq(JSON.stringify(d0.totals), JSON.stringify({ style: 0, box: 0, added: 0, removed: 0, customChanged: 0, customAdded: 0, shots: 0, missing: 0 }), "identical:");
+  eq(JSON.stringify(d0.totals), JSON.stringify({ style: 0, box: 0, added: 0, removed: 0, customChanged: 0, customAdded: 0, ignored: 0, boxReported: 0, shots: 0, missing: 0 }), "identical:");
   ok(C.isClean(d0.totals), "identical is clean:");
   eq(C.elementHash(base[0].elements[0]), C.elementHash(same[0].elements[0]), "hash ignores property order:");
   const next = structuredClone(base);
@@ -519,7 +522,7 @@ await t("sf-styles compare: identical captures have no differences; a synthetic 
   next[0].elements.pop();
   next[0].elements.push(el("html>body:1>div:1", { color: "red" }));
   const d1 = C.diffRuns(base, next);
-  eq(JSON.stringify(d1.totals), JSON.stringify({ style: 1, box: 1, added: 1, removed: 1, customChanged: 0, customAdded: 0, shots: 1, missing: 0 }), "changed:");
+  eq(JSON.stringify(d1.totals), JSON.stringify({ style: 1, box: 1, added: 1, removed: 1, customChanged: 0, customAdded: 0, ignored: 0, boxReported: 0, shots: 1, missing: 0 }), "changed:");
   ok(!C.isClean(d1.totals), "changed is not clean:");
   const s = d1.pages[0].samples.find((x) => x.kind === "style");
   eq(`${s.k} ${s.prop} ${s.before} → ${s.after}`, "html letter-spacing normal → 0.0375px", "style sample:");
@@ -534,6 +537,49 @@ await t("sf-styles compare: identical captures have no differences; a synthetic 
   eq(d2.totals.missing, 2, "a page at another width is missing both ways:");
   eq(C.round(10.26), 10.5, "boxes round to 0.5px:");
   eq(JSON.stringify(C.roundBox({ x: 1.2, y: 2.74, width: 3, height: 4.1 })), "[1,2.5,3,4]", "roundBox:");
+});
+
+await t("console-styles: the runner entry seeds and starts the roles store, then runs the console set; drill:console-styles exists, outside drill:all", async () => {
+  const { scripts } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  eq(scripts["drill:console-styles"], "node scripts/drills/run-isolated.mjs console-styles", "drill:console-styles:");
+  const spec = R.DRILLS["console-styles"];
+  eq(spec?.id, "CONSOLE-STYLES", "id:");
+  eq(spec?.warm, true, "warm:");
+  ok(!R.ALL.includes("console-styles"), "not in ALL:");
+  const calls = [];
+  const stopped = [];
+  const c = { worktree: "/w", env: { A: "1" }, ports: { rolesNext: 6101 }, log: [], headed: [], node: async (args, opts = {}) => (calls.push(`${args.join(" ")}${opts.env?.SF_STYLES_SET ? ` [${opts.env.SF_STYLES_SET}]` : ""}`), 0) };
+  const fakeStart = () => ({ child: {}, stop: async () => stopped.push("roles") });
+  eq(await R.withRolesStore(c, () => c.node(["x"]), { start: fakeStart, up: async (url) => (calls.push(url), true) }), 0, "exit:");
+  eq(calls.join(" | "), "scripts/dev-roles.js seed | http://roles.localhost:6101/api/health | x", "seed, wait, run:");
+  eq(stopped.join(","), "roles", "the roles store is stopped after:");
+  const src = readFileSync(join(ROOT, "scripts/drills/run-isolated.mjs"), "utf8");
+  ok(/"console-styles":[^\n]*withRolesStore[^\n]*sf-styles\/run\.mjs[^\n]*SF_STYLES_SET: "console"/.test(src), "console-styles runs run.mjs with SF_STYLES_SET=console inside withRolesStore:");
+  ok(/"agency-gone":[^\n]*withRolesStore/.test(src), "agency-gone uses the same helper:");
+  calls.length = 0;
+  eq(await R.withRolesStore(c, () => c.node(["x"]), { start: fakeStart, up: async () => false }), 1, "a store that never answers fails:");
+  ok(!calls.includes("x"), "and the drill is not run:");
+});
+
+await t("console-styles compare: ignoreProps (names and prefixes) and ignoreBoxes count apart; anything else still fails", async () => {
+  const C = await import("./drills/sf-styles/compare.js");
+  const el = (k, s, b = [0, 0, 100, 20]) => ({ k, s, b });
+  const base = [{ page: "owner-orders", width: 1280, shot: "a", elements: [el("root>div:1", { width: "800px", top: "0px", color: "red" })] }];
+  const wide = structuredClone(base);
+  wide[0].elements[0].s.width = "980px";
+  wide[0].elements[0].s.top = "56px";
+  wide[0].elements[0].b = [0, 0, 980, 20];
+  const strict = C.diffRuns(base, wide);
+  ok(!C.isClean(strict.totals), "without options the wider column fails:");
+  const opts = { ignoreProps: ["width", "top", "--tw-*"], ignoreBoxes: true };
+  const d = C.diffRuns(base, wide, opts);
+  eq(`${d.totals.style} ${d.totals.box} ${d.totals.ignored} ${d.totals.boxReported} ${C.isClean(d.totals)}`, "0 0 2 1 true", "ignored and reported, clean:");
+  const bitten = structuredClone(wide);
+  bitten[0].elements[0].s["letter-spacing"] = "0.16px";
+  bitten[0].elements[0].s["--tw-x"] = "1";
+  const d2 = C.diffRuns(base, bitten, opts);
+  eq(`${d2.totals.style} ${d2.totals.customAdded} ${d2.totals.ignored} ${C.isClean(d2.totals)}`, "1 0 3 false", "a bite still fails; a prefix entry skips --tw-x:");
+  eq(C.ignoreMatcher(["--*"])("--c-bg") && !C.ignoreMatcher(["--*"])("color"), true, "a prefix entry matches only its prefix:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

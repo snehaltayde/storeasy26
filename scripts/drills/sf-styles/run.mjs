@@ -28,6 +28,19 @@
 //   <page>-<width>.png       the full-page screenshot (cut at 6000px)
 //   manifest.json            pages, statuses, hashes, stylesheet sizes
 //   compare.json             (compare runs) the diff against the baseline
+//
+// The console set (Phase 0 line 8, plan §3): SF_STYLES_SET=console, run as
+// `pnpm drill:console-styles` (the runner seeds and starts the roles store
+// first). Proves the old console screens render as before inside the new
+// shell. Signs in through POST /api/admin/login as owner and support (the
+// roles seed's logins); pages dashboard, orders, orders/<the seeded order>,
+// offers, catalog, media, releases, editor, settings (owner only), at 375,
+// 768 and 1280. Region: the descendants of `main > [data-legacy]` (or `main`
+// before line 8), keyed relative to it ("root>div:1"), so a new frame around
+// it moves no key; /admin/login and /platform as whole documents. The
+// compare ignores layout-derived properties (CONSOLE_IGNORE) and reports box
+// differences without failing on them (the content column is wider). Results
+// in docs/cms-reviews/drills/CONSOLE-STYLES/.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +51,11 @@ import { reseed, runDrill, settle, storeSql, storeUrl } from "../p3/lib.mjs";
 import { CONSENT_COOKIE, serializeConsent } from "../../../lib/track/names.js";
 import { diffRuns, elementHash, hashOf, isClean } from "./compare.js";
 
-export const DRILL_ID = "SF-STYLES";
+export const SET = process.env.SF_STYLES_SET === "console" ? "console" : "storefront";
+export const DRILL_ID = SET === "console" ? "CONSOLE-STYLES" : "SF-STYLES";
+// layout-derived: they follow the content column's width, not the styles
+export const CONSOLE_IGNORE = Object.freeze(["width", "height", "inline-size", "block-size", "top", "right", "bottom", "left", "transform-origin", "perspective-origin"]);
+export const CONSOLE_REGION = Object.freeze(["main > [data-legacy]", "main"]);
 export const WIDTHS = [375, 768, 1280];
 const HEIGHTS = { 375: 812, 768: 1024, 1280: 900 };
 const PRODUCT = "/products/glow-serum";
@@ -47,8 +64,10 @@ const UNIT = "sf-styles";
 const FREEZE = "*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important;scroll-behavior:auto!important}";
 const BITE = ":root{letter-spacing:0.01em!important}";
 
-// In the page (self-contained: page.evaluate serialises it).
-export function captureDom() {
+// In the page (self-contained: page.evaluate serialises it). roots: CSS
+// selectors tried in order; the first match is the region, its descendants
+// keyed from "root". No roots: the whole document, keyed from "html".
+export function captureDom(roots = null) {
   const r2 = (n) => Math.round(n * 2) / 2;
   const out = [];
   const styleOf = (cs) => {
@@ -70,7 +89,14 @@ export function captureDom() {
     let i = 0;
     for (const c of el.children) if (c.tagName !== "SCRIPT") walk(c, `${path}>${c.tagName.toLowerCase()}:${++i}`);
   };
-  walk(document.documentElement, "html");
+  if (!roots) {
+    walk(document.documentElement, "html");
+    return out;
+  }
+  const root = roots.map((q) => document.querySelector(q)).find(Boolean);
+  if (!root) return out;
+  let i = 0;
+  for (const c of root.children) if (c.tagName !== "SCRIPT") walk(c, `root>${c.tagName.toLowerCase()}:${++i}`);
   return out;
 }
 
@@ -130,9 +156,42 @@ async function pagesOf(drill) {
   return pages;
 }
 
+// The console set's sign-in: the real form's endpoint, in this context.
+async function apiSignIn(ctx, origin, creds) {
+  const res = await ctx.request.post(`${origin}/api/admin/login`, { data: creds, headers: { origin }, maxRedirects: 0 });
+  if (res.status() !== 200) throw new Error(`sign-in as ${creds.email} answered ${res.status()}`);
+}
+
+function rolesSeed() {
+  return JSON.parse(readFileSync(join(ROOT, ".design-data-roles", "roles-seed.json"), "utf8"));
+}
+
+// The console set's pages, as { name, origin, path, as?, roots? }.
+function consolePagesOf() {
+  const port = String(process.env.ROLES_PORT || "").trim();
+  if (!port) throw new Error("The console set needs ROLES_PORT (run it as pnpm drill:console-styles).");
+  const origin = `http://roles.localhost:${port}`;
+  const seed = rolesSeed();
+  const login = (role) => {
+    const m = seed.members.find((x) => x.role === role);
+    return { email: m.email, password: m.password };
+  };
+  const paths = ["dashboard", "orders", `orders/${seed.shopper.orderId}`, "offers", "catalog", "media", "releases", "editor", "settings"];
+  const out = [];
+  for (const role of ["owner", "support"]) {
+    for (const p of paths) {
+      if (p === "settings" && role !== "owner") continue;
+      out.push({ name: `${role}-${p.startsWith("orders/") ? "order" : p}`, origin, path: `/admin/${p}`, as: login(role), roots: CONSOLE_REGION });
+    }
+  }
+  out.push({ name: "admin-login", origin, path: "/admin/login" }, { name: "platform", origin, path: "/platform" });
+  return out;
+}
+
 async function capture(drill, spec, width, bite) {
   const ctx = await context(drill, width, spec.origin);
   try {
+    if (spec.as) await apiSignIn(ctx, spec.origin, spec.as);
     const page = await ctx.newPage();
     const res = await page.goto(spec.origin + spec.path, { waitUntil: "load", timeout: 120_000 });
     await settle(page);
@@ -141,7 +200,7 @@ async function capture(drill, spec, width, bite) {
       await spec.after(page);
       await freeze(page, false);
     }
-    const elements = (await page.evaluate(captureDom)).map((e) => ({ ...e, h: elementHash(e) }));
+    const elements = (await page.evaluate(captureDom, spec.roots || null)).map((e) => ({ ...e, h: elementHash(e) }));
     const h = await page.evaluate(() => document.documentElement.scrollHeight);
     const png = await page.screenshot({ fullPage: true, clip: h > MAX_SHOT_HEIGHT ? { x: 0, y: 0, width, height: MAX_SHOT_HEIGHT } : undefined, animations: "disabled", caret: "hide" });
     const css = await page.evaluate(async () => {
@@ -152,7 +211,7 @@ async function capture(drill, spec, width, bite) {
       }
       return out;
     });
-    return { page: spec.name, width, url: spec.path, status: res?.status() ?? 0, shot: hashOf(png), png, css, elements };
+    return { page: spec.name, width, url: spec.path, landed: new URL(page.url()).pathname, status: res?.status() ?? 0, shot: hashOf(png), png, css, elements };
   } finally {
     await ctx.close();
   }
@@ -174,22 +233,29 @@ async function sfStyles(drill) {
   const bite = process.env.SF_STYLES_BITE === "1";
   if (bite && !baselineDir) throw new Error("SF_STYLES_BITE=1 needs SF_STYLES_BASELINE=<abs dir> (a bite is only caught by a compare).");
   if (baselineDir && !existsSync(join(baselineDir, "manifest.json"))) throw new Error(`SF_STYLES_BASELINE has no manifest.json: ${baselineDir}`);
-  await reseed(drill, { start: true });
-  // risk 3: a running experiment's salt is random per seed, so the same _unit
-  // got a different hero variant (other text, other heights) on each run.
-  // Pinned here, in this worktree's own store, before any page is captured.
-  const [pinned] = await storeSql("tenant", ["UPDATE experiments SET salt = 'sf-styles' WHERE status = 'running'"]);
-  drill.note(`experiment salts pinned to "sf-styles" (${pinned.rowsAffected} running)`);
+  const consoleSet = SET === "console";
+  if (!consoleSet) {
+    await reseed(drill, { start: true });
+    // risk 3: a running experiment's salt is random per seed, so the same _unit
+    // got a different hero variant (other text, other heights) on each run.
+    // Pinned here, in this worktree's own store, before any page is captured.
+    const [pinned] = await storeSql("tenant", ["UPDATE experiments SET salt = 'sf-styles' WHERE status = 'running'"]);
+    drill.note(`experiment salts pinned to "sf-styles" (${pinned.rowsAffected} running)`);
+  }
   const head = spawnSync("git", ["-C", ROOT, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).stdout.trim();
   drill.note(`HEAD ${head}${bite ? "; bite mode: :root letter-spacing 0.01em" : ""}${baselineDir ? `; baseline ${baselineDir}` : ""}`);
   const captures = [];
-  for (const spec of await pagesOf(drill)) {
+  for (const spec of consoleSet ? consolePagesOf() : await pagesOf(drill)) {
     drill.check(Boolean(spec.path), `${spec.name}: the page has an address`, spec.path);
     if (!spec.path) continue;
     for (const width of WIDTHS) {
       const c = await capture(drill, spec, width, bite);
       const expected = spec.name === "closed" ? [200, 503] : [200];
       drill.check(expected.includes(c.status), `${spec.name} ${width}px answers ${expected.join(" or ")}`, c.status);
+      if (spec.roots) {
+        drill.check(c.landed === spec.path, `${spec.name} ${width}px stays on ${spec.path} (signed in)`, c.landed);
+        drill.check(c.elements.length > 0, `${spec.name} ${width}px: the region holds elements`, c.elements.length);
+      }
       const file = `${spec.name}-${width}.json.gz`;
       writeFileSync(join(drill.dir, file), gzipSync(JSON.stringify({ page: c.page, width, url: c.url, status: c.status, shot: c.shot, css: c.css, elements: c.elements })));
       writeFileSync(join(drill.dir, `${spec.name}-${width}.png`), c.png);
@@ -199,6 +265,7 @@ async function sfStyles(drill) {
   }
   const manifest = {
     id: DRILL_ID,
+    set: SET,
     head,
     bite,
     ranAt: new Date().toISOString(),
@@ -210,13 +277,15 @@ async function sfStyles(drill) {
   if (!baselineDir) return;
 
   const base = readCaptures(baselineDir);
-  const diff = diffRuns(base.captures, captures);
+  const opts = consoleSet ? { ignoreProps: [...CONSOLE_IGNORE], ignoreBoxes: true } : {};
+  const diff = diffRuns(base.captures, captures, opts);
   const report = {
     id: DRILL_ID,
     ranAt: manifest.ranAt,
     baseline: { dir: baselineDir, head: base.manifest.head, ranAt: base.manifest.ranAt, css: base.manifest.css },
     run: { head, bite, css: manifest.css },
     cssDeltaBytes: manifest.css.bytes - base.manifest.css.bytes,
+    ...(consoleSet ? { ignoreProps: opts.ignoreProps, ignoreBoxes: true } : {}),
     totals: diff.totals,
     missing: diff.missing,
     customAdded: diff.customAdded,
@@ -224,7 +293,7 @@ async function sfStyles(drill) {
   };
   writeFileSync(join(drill.dir, "compare.json"), `${JSON.stringify(report, null, 2)}\n`);
   const t = diff.totals;
-  drill.note(`compare: ${t.style} computed-style, ${t.box} box, ${t.added} added and ${t.removed} removed element differences; ${t.customChanged} changed and ${t.customAdded} added custom properties (${diff.customAdded.join(", ") || "none"}); ${t.shots} screenshot(s) differ; ${t.missing} missing; CSS ${report.cssDeltaBytes >= 0 ? "+" : ""}${report.cssDeltaBytes} bytes`);
+  drill.note(`compare: ${t.style} computed-style, ${t.box} box, ${t.added} added and ${t.removed} removed element differences; ${t.customChanged} changed and ${t.customAdded} added custom properties (${diff.customAdded.join(", ") || "none"}); ${t.shots} screenshot(s) differ; ${t.missing} missing; ${t.ignored} ignored layout values, ${t.boxReported} box differences reported; CSS ${report.cssDeltaBytes >= 0 ? "+" : ""}${report.cssDeltaBytes} bytes`);
   if (bite) {
     const caught = diff.pages.some((p) => p.samples.some((s) => s.prop === "letter-spacing"));
     drill.check(!isClean(t) && caught, "bite: the 0.01em letter-spacing is caught as computed-style differences", t);
@@ -235,7 +304,7 @@ async function sfStyles(drill) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  runDrill({ id: DRILL_ID, part: "main", title: "SF-STYLES — the storefront renders as before" }, sfStyles).then(
+  runDrill({ id: DRILL_ID, part: "main", title: SET === "console" ? "CONSOLE-STYLES — the old console screens render as before" : "SF-STYLES — the storefront renders as before" }, sfStyles).then(
     (c) => process.exit(c),
     (e) => {
       console.error(`✗ ${e.message || e}`);
