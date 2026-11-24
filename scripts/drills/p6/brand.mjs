@@ -244,7 +244,8 @@ export async function brandStage(drill) {
   const mints = [];
   const t0r = Date.now();
   const stepAt = [];
-  page.on("request", (r) => r.method() === "POST" && new URL(r.url()).pathname === "/api/admin/preview-session" && mints.push({ ms: Date.now() - t0r, after: stepAt.at(-1) || "start" }));
+  // a session is made by {create:true}; the {showDesign} POST that follows is the same session
+  page.on("request", (r) => r.method() === "POST" && new URL(r.url()).pathname === "/api/admin/preview-session" && /"create"\s*:\s*true/.test(r.postData() || "") && mints.push({ ms: Date.now() - t0r, after: stepAt.at(-1) || "start" }));
   await openStart(drill, page);
   await previewShown(page);
   stepAt.push("shown at 1280");
@@ -258,7 +259,7 @@ export async function brandStage(drill) {
   stepAt.push("1280 again");
   const wideAgain = await previewShown(page);
   await sleep(1500); // a late re-mint would show here
-  drill.check(narrowShown && wideAgain && mints.length === 1 && (await page.locator("[data-preview-frame]").count()) === 1, "resizing 1280 → 390 → 1280 keeps one frame and one preview session (one POST /api/admin/preview-session)", { mints, log: await page.locator("[data-brand-preview]").getAttribute("data-preview-log").catch(() => null) });
+  drill.check(narrowShown && wideAgain && mints.length === 1 && (await page.locator("[data-preview-frame]").count()) === 1, "resizing 1280 → 390 → 1280 keeps one frame and one preview session (one {create:true} POST to /api/admin/preview-session)", { mints, log: await page.locator("[data-brand-preview]").getAttribute("data-preview-log").catch(() => null) });
   drill.check(errors.length === 0, "no page errors (resize run)", errors);
   await ctx.close();
 
