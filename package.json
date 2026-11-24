@@ -80,6 +80,7 @@
     "test:growth": "node scripts/test-growth.js",
     "test:agency-removed": "node scripts/test-agency-removed.js",
     "test:drills": "node scripts/test-drills.js",
+    "test:console-ui": "node scripts/test-console-ui.js",
     "test:api-unmatched": "node scripts/test-api-unmatched.js",
     "test:case-studies": "node scripts/test-case-studies.js",
     "test:w6": "node scripts/test-w6.js",
@@ -142,12 +143,16 @@
   "dependencies": {
     "@libsql/client": "^0.17.4",
     "@libsql/kysely-libsql": "^0.4.1",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
     "kysely": "^0.29.2",
     "lucide-react": "0.544.0",
     "next": "16.2.9",
+    "radix-ui": "1.8.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sharp": "^0.35.2",
+    "tailwind-merge": "3.7.0",
     "typesense": "^3.0.6"
   },
   "devDependencies": {
@@ -157,6 +162,7 @@
     "@types/react-dom": "^19.3.0",
     "playwright-core": "1.64.1",
     "tailwindcss": "^4",
+    "tw-animate-css": "1.4.0",
     "typescript": "^5.9.3"
   }
 }
