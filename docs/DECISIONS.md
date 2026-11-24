@@ -14,6 +14,7 @@ without asking the owner are marked so they are easy to review.
   - Signup is off until an operator turns on the flag `ff_self-signup` (the flag-key rule allows no underscore after `ff_`).
 - **Why:** the owner wants onboarding simple; verify-before-create keeps fake signups from making stores.
 - **Instead of:** creating an unverified user and store at once; a verification link (can open in another browser); a shared parent-domain cookie (breaks custom domains).
+- **Builder's calls (WP-B):** the console shell gains an onboarding mode (no sidebar, one 640px column, top bar and Sign out kept) for `/admin/onboarding`; the support-reads leak sweep allows a member's own email on their own page (the Welcome page shows it) and still fails on anyone else's; after an operator turns the flag on, `/signup` and pricing can show "closed" for up to 30 seconds (each page caches flags).
 - **Accepted risk:** an attacker could send their own handoff link and sign someone into the attacker's empty new store; the token lasts 2 minutes and works once.
 - **Decided by:** Claude, on the owner's behalf (scope by the owner)
 - **Slice:** Phase 1, self-serve signup
