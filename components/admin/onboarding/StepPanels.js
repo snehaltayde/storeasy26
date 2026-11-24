@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { CircleAlert, CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
-import { SyncProgressBody, readSync, requestSync, POLL_MS } from "@/components/admin/SyncProgress";
 import FirstRun from "@/components/admin/first-run/FirstRun";
+import ImportStep from "./ImportStep";
 
 // The four onboarding step panels (Phase 1 line 3). Each shows what the step
 // model (lib/onboarding/steps.js) says about the step and wires only what the
@@ -16,7 +16,7 @@ import FirstRun from "@/components/admin/first-run/FirstRun";
 // saves, onChange() re-reads the steps.
 //   Connect  ./ConnectPanel (line 4): the address, Connect through Shopify's
 //            approval, the errors; nothing is written to Shopify
-//   Import   SyncProgress's own body, readSync and requestSync (/api/admin/sync)
+//   Import   ImportStep (line 5): live progress, skips, what to do on a failure
 //   Brand    FirstRun (the starter store and BrandStep at #brand), legacy styled
 //   Open     OpenStepPanel.js (line 7): every opening item with its fix,
 //            and the editor's own publish flow in a dialog
@@ -28,7 +28,6 @@ export const PANEL_WORDS = Object.freeze({
   notAllowed: "Your role can't do that, so nothing changed.",
   shopDomain: "Your Shopify store",
   noDomain: "No Shopify store recorded yet.",
-  products: (n) => (n === 1 ? "1 product is in your store." : `${n} products are in your store.`),
 });
 
 const actionOf = (step, id) => step.actions?.find((a) => a.id === id) || null;
@@ -76,59 +75,8 @@ function Notice({ tone = "danger", children }) {
 export { ConnectPanel } from "./ConnectPanel";
 
 // ---- Import ----------------------------------------------------------------
-const LIVE = new Set(["running", "retrying"]);
-
-export function ImportPanel({ step, onChange, pollMs = POLL_MS }) {
-  const [view, setView] = useState(step.facts?.sync || null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const was = useRef(view?.state);
-  // a fresh read of the steps brings a fresh sync view
-  const fresh = JSON.stringify(step.facts?.sync || null);
-  useEffect(() => setView(step.facts?.sync || null), [fresh]);
-
-  useEffect(() => {
-    if (view && view.state !== was.current) {
-      const before = was.current;
-      was.current = view.state;
-      if (before && LIVE.has(before) !== LIVE.has(view.state)) onChange?.();
-    }
-    if (!view || !LIVE.has(view.state)) return undefined;
-    const timer = setTimeout(async () => {
-      const next = await readSync().catch(() => null);
-      setView(next || ((v) => ({ ...v })));
-    }, pollMs);
-    return () => clearTimeout(timer);
-  }, [view]);
-
-  async function act(body) {
-    setBusy(true);
-    setError(null);
-    const res = await requestSync(body);
-    if (res.ok && res.sync) setView(res.sync);
-    else if (!res.ok) setError(res.error);
-    setBusy(false);
-  }
-
-  const syncAction = actionOf(step, "retry_sync") || actionOf(step, "start_sync");
-  const blocked = step.state === "blocked";
-  return (
-    <div className="space-y-3">
-      {step.state === "done" && typeof step.facts?.products === "number" && step.facts.products > 0 && <p className="text-sm text-foreground">{PANEL_WORDS.products(step.facts.products)}</p>}
-      {view && !blocked && (
-        <div data-legacy className="contents">
-          <div data-onboarding="sync">
-            <SyncProgressBody view={view} busy={busy} error={error} canRun={Boolean(syncAction?.allowed)} showStart={step.state === "done"} onRetry={() => act({ retry: true })} onStart={() => act({})} />
-          </div>
-        </div>
-      )}
-      {syncAction && !syncAction.allowed && !blocked && (
-        <Gated action={syncAction} reasonId="import-reason" variant="outline">
-          {syncAction.id === "retry_sync" ? "Try again" : view?.state === "none" || !view ? "Bring in products" : "Refresh from Shopify"}
-        </Gated>
-      )}
-    </div>
-  );
+export function ImportPanel({ step, onChange, onGoStep }) {
+  return <ImportStep step={step} onChange={onChange} onChoose={(id) => onGoStep?.(id)} />;
 }
 
 // ---- Brand -----------------------------------------------------------------

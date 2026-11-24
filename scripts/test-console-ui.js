@@ -53,7 +53,7 @@ const ok = (v, m = "") => {
 };
 
 const UI = "components/ui";
-const UI_FILES = ["alert-dialog", "avatar", "badge", "button", "dropdown-menu", "input", "label", "separator", "sheet", "sidebar", "skeleton", "table", "textarea", "tooltip", "use-mobile", "utils"].map((n) => `${UI}/${n}.js`);
+const UI_FILES = ["alert-dialog", "avatar", "badge", "button", "dropdown-menu", "input", "label", "progress", "separator", "sheet", "sidebar", "skeleton", "table", "textarea", "tooltip", "use-mobile", "utils"].map((n) => `${UI}/${n}.js`);
 const BANNED_PACKAGES = ["radix-ui", "class-variance-authority", "tailwind-merge"];
 const CONSOLE_DIRS = ["components/admin/", "components/console/", "components/platform/", "components/ui/"];
 

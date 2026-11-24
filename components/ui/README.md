@@ -5,7 +5,7 @@ restyled to `docs/UI.md`. Consoles only: nothing under `app/(storefront)/` or
 `proxy.js` may import from here, and no storefront file may use their utility
 names (`scripts/test-console-ui.js` checks both).
 
-In here: `button`, `input`, `separator`, `skeleton`, `tooltip`, `sheet`, `dialog`,
+In here: `button`, `input`, `progress`, `separator`, `skeleton`, `tooltip`, `sheet`, `dialog`,
 `dropdown-menu`, `avatar`, `sidebar`, the `use-mobile` hook and `utils.js`
 (`cn`). Their tokens live in `app/console.css` under `.console` /
 `.console.dark`. Add `.console` to the console root `<body>` to use them.

@@ -77,7 +77,7 @@ export async function onboardingStage(drill) {
   // ---- 2. resume ----
   await goStep(drill, page, "import");
   v = await readPage(page);
-  drill.check(v.step === "import" && v.state === "done" && v.text.includes("24 products are in your store."), "?step=import opens Import: Done, '24 products are in your store.'", { step: v.step, text: v.text.slice(0, 200) });
+  drill.check(v.step === "import" && v.state === "done" && /24 products and [\d,]+ collections?, brought in/.test(v.text), "?step=import opens Import: Done, '24 products and N collections, brought in …' (line 5's words)", { step: v.step, text: v.text.slice(0, 200) });
   await page.locator('[data-onboarding="steplist"] button[data-step="open"]').click();
   await waitFor(async () => (await readPage(page)).search === "?step=open", 10_000, 200);
   v = await readPage(page);
