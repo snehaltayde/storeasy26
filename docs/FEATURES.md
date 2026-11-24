@@ -40,6 +40,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [ ] A founder can open their store in step 4 once payment and the privacy and returns pages are ready, with each missing item fixable from that step
 - [ ] An operator can see every signup and the step each store is on, and help a stuck store from one screen
 - [ ] An operator can create a store for a founder in one form (name, owner email, Shopify domain), which sends the founder an invite into the same onboarding
+- [ ] No legacy code remains: retired modules, routes, screens, components, drills, scripts and docs that the new architecture no longer uses are removed (including the old operator handoff route that shows invite links), proven by a test that fails on any file nothing imports or routes to; legacy tables stay in the database untouched
 
 ## Phase 2: merchant console on shadcn
 
@@ -103,6 +104,9 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [ ] A founder can ask the AI copilot for a starter store, product SEO and FAQs, or offer ideas, and gets drafts only, within a daily token budget and with no shopper data sent
 
 ## Later (not planned yet)
+
+- One shared Storeasy Shopify app so self-serve founders connect without waiting for an operator (owner: later; needs Shopify app review and protected customer data approval).
+- `lib/shopify-admin.js` uses Admin API version `2025-10`, past Shopify's 12-month support window; move to a supported version.
 
 - `orders/[id]` POST push answers 500 for an unknown order; it should be 404 (allowed as `allowStatus` in `scripts/support/admin-routes.js` until fixed).
 - Opening the editor runs the first-store generator during the page render for any role, support included (`app/(console)/admin/(authed)/editor/page.js` ~85); it writes drafts only, but a read-only role shouldn't trigger writes.

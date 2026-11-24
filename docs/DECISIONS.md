@@ -3,6 +3,13 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 Remove legacy remnants; shared Shopify app later
+
+- **Decision:** everything runs on the new architecture. A Phase 1 line removes every legacy remnant the new code no longer uses (retired modules, routes, screens, components, drills, scripts, docs), including the old operator handoff route that shows invite links to operators, with a test that fails on any unreferenced file. Legacy database tables stay untouched (dropping them would delete data and can't be undone). Old console screens are removed by Phase 2's last line as each is rebuilt. The shared Storeasy Shopify app is a later item; line 4 builds one app per store.
+- **Why:** owner: "whatever older code or remnants we have remove them, everything should be based on new architecture"; "shared app later".
+- **Decided by:** owner (tables kept and scheduling on the owner's behalf)
+- **Slice:** Phase 1 cleanup line; Phase 2 last line
+
 ## 2026-11-24 Parallel slices and three heavy-job slots
 
 - **Decision:** up to five slices are built at once, each in its own worktree under `../storeasy26-wt/`, merged into `main` one at a time by the session. Heavy commands (full suites, builds, browser drills) run through `~/.claude/bin/heavy`, which allows three at once on this Mac (15 cores, 24 GB) instead of one. The main checkout stays on `main` so the owner's own server always runs finished code.
