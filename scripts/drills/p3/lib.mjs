@@ -123,6 +123,15 @@ export async function loginDiag(drill, page, res, url, tag) {
     } catch (e) { out.push(`refetch ${i} error ${e.message}`); }
     await new Promise((r) => setTimeout(r, 1000));
   }
+  for (const p of ["/admin/login", "/admin/dashboard", "/admin/reset", "/platform", "/signup", "/zzz-nope", "/about", "/collections", "/api/health", "/robots.txt"]) {
+    try {
+      const r = await fetch(new URL(p, url), { redirect: "manual", headers: { accept: "text/html" } });
+      const b = await r.text();
+      out.push(`route ${p} ${r.status} builtin404=${b.includes("This page could not be found")} console404=${b.includes("This console page")} len=${b.length}`);
+    } catch (e) { out.push(`route ${p} error ${e.message}`); }
+  }
+  const { readdirSync, statSync } = await import("node:fs");
+  try { out.push(`disk login page ${statSync(join(ROOT, "app/(console)/admin/(auth)/login/page.js")).mtime.toISOString()}; (console)/admin: ${readdirSync(join(ROOT, "app/(console)/admin")).join(",")}; app: ${readdirSync(join(ROOT, "app")).join(",")}`); } catch (e) { out.push(`disk ${e.message}`); }
   out.push(`overlay ${await page.evaluate(() => [...document.querySelectorAll("nextjs-portal")].map((p) => p.shadowRoot?.textContent || "").join(" | ").slice(0, 3000)).catch((e) => e.message)}`);
   out.push(`html ${(await page.content().catch(() => "")).slice(0, 6000)}`);
   out.push(`---- harness output ----\n${owned.harness?.output?.() ?? "(none)"}`);
