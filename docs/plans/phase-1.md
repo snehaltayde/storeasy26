@@ -90,7 +90,7 @@ Audit (`lib/platform/audit.js`, tenant id set): `signup.verified` (actor the new
 
 **WP-B: UI and drill**
 12. `app/(console)/signup/page.js` + `components/admin/signup/SignupFlow.js` (form → code → "Setting up your store…" → redirect; failure + Try again), from `components/ui/*`.
-13. `app/(console)/admin/(auth)/handoff/page.js` + `components/admin/HandoffSignIn.js`.
+13. `app/(console)/admin/(handoff)/handoff/page.js` (own route group, see DECISIONS) + `components/admin/HandoffSignIn.js`.
 14. `app/(console)/admin/(authed)/onboarding/page.js` + `components/admin/onboarding/Welcome.js`; the `admin-pages.js` row.
 15. `app/(storefront)/pricing/page.js`: CTA → `/signup` when the flag is on.
 16. `scripts/drills/signup/run.mjs`, registered in `scripts/drills/run-isolated.mjs`: flag on; sign up at `storeasy.localhost`, read the code, verify; land on `<slug>.localhost/admin/onboarding` with the shell, store name and Closed badge; sign out and back in; existing email (same screen); wrong code (generic message); evidence in `docs/cms-reviews/drills/SIGNUP/`.
