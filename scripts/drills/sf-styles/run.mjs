@@ -75,6 +75,10 @@ export function captureDom(roots = null) {
     for (let i = 0; i < cs.length; i++) s[cs[i]] = cs.getPropertyValue(cs[i]);
     return s;
   };
+  // An old-screen region wrapper (line 8's [data-legacy], display: contents,
+  // no box) is see-through: its children take its place, so a wrapper added
+  // around an old screen moves no key. None exist before line 8.
+  const kids = (el) => [...el.children].flatMap((c) => (c.tagName === "SCRIPT" ? [] : c.hasAttribute("data-legacy") ? kids(c) : [c]));
   const walk = (el, path) => {
     const r = el.getBoundingClientRect();
     out.push({ k: path, s: styleOf(getComputedStyle(el)), b: [r2(r.x + scrollX), r2(r.y + scrollY), r2(r.width), r2(r.height)] });
@@ -87,7 +91,7 @@ export function captureDom(roots = null) {
     // them (123 or 124 on one page between two runs of the same commit),
     // which would shift every later sibling's path: skipped, not counted
     let i = 0;
-    for (const c of el.children) if (c.tagName !== "SCRIPT") walk(c, `${path}>${c.tagName.toLowerCase()}:${++i}`);
+    for (const c of kids(el)) walk(c, `${path}>${c.tagName.toLowerCase()}:${++i}`);
   };
   if (!roots) {
     walk(document.documentElement, "html");
@@ -96,7 +100,7 @@ export function captureDom(roots = null) {
   const root = roots.map((q) => document.querySelector(q)).find(Boolean);
   if (!root) return out;
   let i = 0;
-  for (const c of root.children) if (c.tagName !== "SCRIPT") walk(c, `root>${c.tagName.toLowerCase()}:${++i}`);
+  for (const c of kids(root)) walk(c, `root>${c.tagName.toLowerCase()}:${++i}`);
   return out;
 }
 

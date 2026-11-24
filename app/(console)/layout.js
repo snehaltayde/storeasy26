@@ -30,7 +30,7 @@ export const viewport = {
 export default function ConsoleRootLayout({ children }) {
   return (
     <html lang="en" data-console className={`${geistSans.variable} ${geistMono.variable} h-full`}>
-      <body className="min-h-full bg-surface-muted font-sans text-fg antialiased">
+      <body className="console min-h-full bg-surface-muted font-sans text-fg antialiased">
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

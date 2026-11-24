@@ -4,49 +4,81 @@ import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { currentTenant } from "@/lib/tenant-context";
 import { siteName } from "@/lib/site";
 import { tfetch } from "@/lib/console-request";
-import { ConsoleShell } from "@/components/console/nav/ConsoleShell";
+import { navFor, navItems } from "@/lib/admin/nav";
+import { listMyStores } from "@/lib/admin/stores";
+import { consoleNotices } from "@/lib/admin/notices";
+import { AdminShell } from "@/components/admin/shell/AdminShell";
+import { ConsoleNotices } from "@/components/admin/shell/ConsoleNotices";
 
-// Authed admin shell (S50): ONE auth gate + ONE sidebar mount for all 18
-// screens (pages keep their own adminActor guards — defense in depth, no
-// contract change). Nav badges are best-effort: a failed count never
-// breaks the console.
+// The signed-in console (S50; the new shell in Phase 0 line 8): one auth gate
+// and one shell for every screen (pages keep their own adminActor guards).
+// What reaches the browser is decided here, on the server:
+//   - the nav: navFor(role); a hidden item is never sent
+//   - badges: counted only for visible items, best-effort (a failed count
+//     never breaks the console)
+//   - the account: a member's name and email only (never the user row);
+//     bootstrap and operator-support sessions have none, and getUser is not called
+//   - the stores: the caller's own active memberships (listMyStores)
+//   - the sidebar's saved state: the sidebar_state cookie
+const BADGES = {
+  async returns() {
+    const { listReturns } = await import("@/lib/returns");
+    const open = (await listReturns({ status: "requested" })).length;
+    return open > 0 ? open : null;
+  },
+  async setup() {
+    const { buildChecklist } = await import("@/lib/admin/onboarding");
+    const c = await buildChecklist();
+    return c?.supported && !c.launched ? `${c.doneCount}/${c.total}` : null;
+  },
+  // S52 / P2-GUARD: the unpublished-changes dot on Publishing
+  async publish() {
+    const { publishingBadge } = await import("@/lib/releases");
+    return (await publishingBadge()) || null;
+  },
+};
+
 export default async function AdminAuthedLayout({ children }) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value)).catch(() => null);
   if (!actor) redirect("/admin/login");
 
-  const [name, host, badges, cmsMode] = await tfetch(async () => {
+  const nav = navFor(actor.role);
+  const keys = [...new Set(navItems(nav).map((i) => i.badgeKey).filter(Boolean))];
+  const [storeName, storeId, badges, account, stores] = await tfetch(async () => {
     const badges = {};
-    // P3-ROUTES: a documents store's storefront links go to the new editor.
-    // Best-effort like the badges: an unread mode keeps today's links.
-    let cmsMode = null;
-    try {
-      const { getCmsMode } = await import("@/lib/cms-mode");
-      cmsMode = await getCmsMode();
-    } catch {}
-    try {
-      const { listReturns } = await import("@/lib/returns");
-      const open = (await listReturns({ status: "requested" })).length;
-      if (open > 0) badges.returns = open;
-    } catch {}
-    try {
-      const { buildChecklist } = await import("@/lib/admin/onboarding");
-      const c = await buildChecklist();
-      if (c?.supported && !c.launched) badges.setup = `${c.doneCount}/${c.total}`;
-    } catch {}
-    try {
-      // S52: unpublished-changes dot on Publishing (hash compare, cheap).
-      // P2-GUARD: in documents mode, one count over documents_dirty instead.
-      const { publishingBadge } = await import("@/lib/releases");
-      const publish = await publishingBadge();
-      if (publish) badges.publish = publish;
-    } catch {}
-    return [siteName(), currentTenant()?.domains?.[0] || null, badges, cmsMode];
-  }).catch(() => ["Store", null, {}, null]);
+    for (const k of keys) {
+      try {
+        const v = await BADGES[k]?.();
+        if (v != null && v !== "") badges[k] = v;
+      } catch {}
+    }
+    let account = null;
+    if (actor.kind === "merchant") {
+      try {
+        const { getUser } = await import("@/lib/platform/identity");
+        const u = await getUser(actor.id);
+        if (u) account = { name: u.name || null, email: u.email || null };
+      } catch {}
+    }
+    const stores = await listMyStores(actor).catch(() => []);
+    return [siteName(), currentTenant()?.id || null, badges, account, stores];
+  }).catch(() => ["Store", null, {}, null, []]);
+  const notices = await consoleNotices();
 
   return (
-    <ConsoleShell storeName={name} host={host} role={actor.role} actorKind={actor.kind} badges={badges} cmsMode={cmsMode}>
+    <AdminShell
+      nav={nav}
+      badges={badges}
+      actor={{ kind: actor.kind, role: actor.role, ...(actor.kind === "operator-support" ? { id: actor.id } : {}) }}
+      account={account}
+      stores={stores}
+      storeName={storeName}
+      storeId={storeId}
+      defaultOpen={jar.get("sidebar_state")?.value !== "false"}
+      notices={<ConsoleNotices {...notices} />}
+    >
       {children}
-    </ConsoleShell>
+    </AdminShell>
   );
 }

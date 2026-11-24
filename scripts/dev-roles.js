@@ -4,16 +4,18 @@
 //   pnpm seed:roles --reset    deletes .design-data-roles/ (only it) and seeds again
 //   pnpm dev:roles             runs it on http://roles.localhost:3018 (seeds first if no data; deletes nothing)
 //   pnpm roles:code            prints the shopper's latest sign-in code (read only; harness running)
+//   node scripts/dev-roles.js annex  adds the "Roles Annex" store (annex.localhost) with the
+//                              owner as admin and support as support (harness running; line 8)
 // Logins: .design-data-roles/roles-seed.json (0600). Ports: ROLES_PORT (web,
 // 3018) and ROLES_SQLD_PORT (first of three, 18027). See scripts/seed-roles-store.js.
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { HarnessError, dbUrl, harnessPorts, readPidfile, runHarness, runningHarness } from "./design-harness.js";
-import { ROLES_PROFILE, assertFreshDataDir, assertNoHarnessRunning, assertSafeEnv, latestShopperCode } from "./seed-roles-store.js";
+import { ROLES_PROFILE, addRolesAnnex, assertFreshDataDir, assertNoHarnessRunning, assertSafeEnv, latestShopperCode } from "./seed-roles-store.js";
 
-const USAGE = "Use: node scripts/dev-roles.js [seed [--reset] | code]";
+const USAGE = "Use: node scripts/dev-roles.js [seed [--reset] | code | annex]";
 const args = process.argv.slice(2);
-const mode = args[0] === "seed" ? "seed" : args[0] === "code" ? "code" : args.length ? null : "dev";
+const mode = ["seed", "code", "annex"].includes(args[0]) ? args[0] : args.length ? null : "dev";
 const reset = mode === "seed" && args.includes("--reset");
 const extra = args.slice(1).filter((a) => !(mode === "seed" && a === "--reset"));
 if (!mode || extra.length) {
@@ -34,6 +36,15 @@ try {
     if (!port) throw new HarnessError("The roles harness isn't running. Start it with pnpm dev:roles, sign in as the shopper, then run pnpm roles:code.");
     const r = await latestShopperCode({ tenantUrl: dbUrl(port) });
     console.log(r ? `${r.code}  (requested ${r.at})` : "No sign-in code yet. Ask for one on the store's account page first.");
+    process.exit(0);
+  }
+  if (mode === "annex") {
+    // the running roles harness's own servers, from its pid file
+    const info = runningHarness(dataDir) ? readPidfile(dataDir) : null;
+    const sqld = info?.ports?.sqld;
+    if (!sqld?.platform || !sqld?.default) throw new HarnessError("The roles harness isn't running. Start it with pnpm dev:roles, then run node scripts/dev-roles.js annex.");
+    const r = await addRolesAnnex({ platformUrl: dbUrl(sqld.platform), annexUrl: dbUrl(sqld.default), port: info.ports.next });
+    console.log(`✓ ${r.store.name} on ${r.store.url}: ${r.members.map((m) => `${m.email} as ${m.role}`).join(", ")}`);
     process.exit(0);
   }
   assertSafeEnv();

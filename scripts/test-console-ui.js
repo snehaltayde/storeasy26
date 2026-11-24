@@ -113,7 +113,7 @@ const themeKeys = (css) =>
     .flatMap((b) => blocks(b.body).filter((d) => d.body == null).map((d) => d.prelude.split(":")[0].trim()))
     .filter((k) => k.startsWith("--"));
 const declsOf = (body) => Object.fromEntries(blocks(body).filter((d) => d.body == null && d.prelude.startsWith("--")).map((d) => [d.prelude.slice(0, d.prelude.indexOf(":")).trim(), d.prelude.slice(d.prelude.indexOf(":") + 1).trim()]));
-const ruleBody = (css, selector) => blocks(stripComments(css)).find((b) => b.prelude === selector)?.body ?? null;
+const ruleBody = (css, selector) => blocks(stripComments(css)).find((b) => b.prelude.replace(/\s+/g, " ") === selector)?.body ?? null;
 
 const consoleCss = read("app/console.css");
 const IMPORT_ALLOWLIST = ['"tw-animate-css"'];
@@ -185,7 +185,8 @@ await t("every console.css rule outside @theme/@utility/@property/@custom-varian
   ok(rules.length >= 5, `found ${rules.length} rules:`);
   const unscoped = rules.flatMap((r) => r.split(",").map((s) => s.trim())).filter((s) => !/^(\[data-console\]|\.console)(?![\w-])/.test(s));
   eq(unscoped, [], "unscoped selectors:");
-  for (const s of rules.join(",").split(",")) ok(!/(^|[\s>+~,])(:root|html|body|\*)(?![\w-])/.test(s.replace(/^(\[data-console\]|\.console(\.dark)?)/, "").replace(/\.console \*/, "")), `no :root/html/body/* outside the scope in "${s.trim()}":`);
+  // line 8: ".console *" and ".console [data-legacy] *" are descendants of the scope
+  for (const s of rules.join(",").split(",")) ok(!/(^|[\s>+~,])(:root|html|body|\*)(?![\w-])/.test(s.trim().replace(/^(\[data-console\]|\.console(\.dark)?)( \[data-legacy\])?( \*)?/, "")), `no :root/html/body/* outside the scope in "${s.trim()}":`);
   ok(/^\s*@import\s+"tw-animate-css";/m.test(stripComments(consoleCss)) && stripComments(consoleCss).trim().startsWith('@import "tw-animate-css"'), "@import \"tw-animate-css\" comes first:");
   eq(importsOf(consoleCss).filter((i) => !IMPORT_ALLOWLIST.includes(i)), [], "console.css @imports off the allowlist:");
   eq(importsOf(consoleCss).length, 1, "console.css has exactly one @import:");
@@ -256,7 +257,7 @@ await t("the console theme adds no default Tailwind key and no globals.css key; 
   const theme = Object.assign({}, ...blocks(stripComments(consoleCss)).filter((b) => /^@theme\b/.test(b.prelude)).map((b) => declsOf(b.body)));
   eq(theme["--color-primary"], "var(--primary)", "--color-primary:");
   eq(theme["--color-ring"], "var(--ring)", "--color-ring:");
-  const legacy = declsOf(ruleBody(consoleCss, "[data-console]"));
+  const legacy = declsOf(ruleBody(consoleCss, "[data-console], .console [data-legacy]"));
   eq([legacy["--primary"], legacy["--ring"]], ["var(--c-primary)", "var(--c-ring)"], "[data-console] keeps the legacy primary and ring:");
   ok(/^@custom-variant dark \(&:where\(\.console\.dark, \.console\.dark \*\)\);$/m.test(consoleCss), "dark: matches only inside .console.dark:");
 });
@@ -420,6 +421,29 @@ await t("the components render server-side with their data-slots", async () => {
   ok(/class="[^"]*rounded-md[^"]*"[^>]*data-slot="button"|data-slot="button"[^>]*class="[^"]*rounded-md/.test(html), "a button is rounded-md:");
   // portal content (sheet, menu, tooltip) mounts only in a browser; their parts carry data-slot in the source
   for (const [f, s] of [["sheet", ["sheet-content", "sheet-overlay", "sheet-title", "sheet-close"]], ["dropdown-menu", ["dropdown-menu-content", "dropdown-menu-item"]], ["tooltip", ["tooltip-content"]], ["avatar", ["avatar-image"]]]) for (const x of s) ok(read(`${UI}/${f}.js`).includes(`data-slot="${x}"`), `${f}.js has data-slot="${x}":`);
+});
+
+// ---------- 10. line 8: old screens keep the old tokens inside [data-legacy] ----------
+
+await t("line 8: .console [data-legacy] gets the old block, globals.css's :root --background/--foreground, the body's line height and colour, and the old border default", async () => {
+  const shared = ruleBody(consoleCss, "[data-console], .console [data-legacy]");
+  ok(shared, "the old block's selector is [data-console], .console [data-legacy]:");
+  const old = declsOf(shared);
+  for (const k of ["--c-surface", "--c-border", "--c-accent", "--c-success", "--c-warning", "--c-danger", "--c-info", "--primary", "--ring"]) ok(old[k], `the old block sets ${k}:`);
+  ok(/font-size:\s*1rem/.test(shared), "and font-size 1rem (the shell root is text-sm):");
+  const restore = ruleBody(consoleCss, ".console [data-legacy]");
+  const root = declsOf(ruleBody(read("app/globals.css"), ":root"));
+  const r = declsOf(restore);
+  eq([r["--background"], r["--foreground"]], [root["--background"], root["--foreground"]], "--background/--foreground equal globals.css :root:");
+  ok(/line-height:\s*1\.5/.test(restore) && /(^|;)\s*color:\s*var\(--foreground\)/.test(restore), "line-height 1.5 and color var(--foreground) (globals.css body):");
+  const base = blocks(stripComments(consoleCss)).find((b) => b.prelude === "@layer base")?.body || "";
+  const rules = blocks(base).map((b) => ({ sel: b.prelude.replace(/\s+/g, " "), body: b.body }));
+  const border = rules.find((x) => /border-color:\s*var\(--border\)/.test(x.body));
+  eq(border?.sel, ".console *, .console ::before, .console ::after", "the border default is for descendants of .console only:");
+  const legacyBorder = rules.find((x) => /border-color:\s*currentcolor/.test(x.body));
+  eq(legacyBorder?.sel, ".console [data-legacy], .console [data-legacy] *, .console [data-legacy] ::before, .console [data-legacy] ::after", "inside an old region, borders keep currentcolor:");
+  ok(!/:is\([^)]*::/.test(stripComments(consoleCss)), "no pseudo-element inside :is() (that drops the whole rule):");
+  ok(/<body className="console /.test(read("app/(console)/layout.js")), "the console <body> carries .console:");
 });
 
 // ---------- 9. sidebar shortcut and cookie ----------

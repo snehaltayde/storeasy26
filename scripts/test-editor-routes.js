@@ -7,8 +7,9 @@
 //      compiled with Next's own SWC and called as server components with
 //      their data stubbed: /admin/editor in each mode, and each old screen's
 //      redirect (documents only) or its unchanged render (legacy, migrating);
-//   3. rendered: ConsoleShell and SidebarNav with and without documents mode
-//      (P6-NAV: "Logo and colours" after Editor on a documents store);
+//   3. rendered: the console shell (components/admin/shell, Phase 0 line 8)
+//      and its nav: the editor link, staff filtering, the badge, the editor
+//      route's sheet (P6-NAV: "Logo and colours" after Editor);
 //   4. rendered + behaviour: the Designer with a stubbed api, its candidate
 //      push failing in each way, through stand-in hooks (no browser).
 // No browser drill covers these routes since the Phase 0 drills line (the p3
@@ -465,97 +466,70 @@ await t("rendered: each old screen redirects to the editor in documents mode, be
 
 // Legacy screens now redirect straight to the editor in all modes (Legacy CMS retired).
 
-// ---- 3. rendered: the console nav ----------------------------------------------
+// ---- 3. rendered: the console nav (the Phase 0 line 8 shell) ----------------
 console.log("— the console nav");
 let pathname = "/admin/dashboard";
 const navLoad = world({
   "next/navigation": { usePathname: () => pathname, useRouter: () => ({ push() {}, refresh() {}, replace() {} }) },
   "next/link": { __esModule: true, default: ({ href, children, ...rest }) => React.createElement("a", { href, ...rest }, children) },
-  "@/components/admin/StoreSwitcher": { __esModule: true, default: () => null },
 });
-const { ConsoleShell } = await navLoad(join(ROOT, "components/console/nav/ConsoleShell.js"));
-const Nav = await navLoad(join(ROOT, "components/console/nav/SidebarNav.js"));
-const shell = (props, path = "/admin/dashboard") => {
+const NavModel = await import("../lib/admin/nav.js");
+const { AdminShell } = await navLoad(join(ROOT, "components/admin/shell/AdminShell.js"));
+const NavUi = await navLoad(join(ROOT, "components/admin/shell/AdminNav.js"));
+const Sb = await navLoad(join(ROOT, "components/ui/sidebar.js"));
+const Tt = await navLoad(join(ROOT, "components/ui/tooltip.js"));
+const read = (rel) => readFileSync(join(ROOT, rel), "utf8");
+const shell = ({ role = "owner", badges = { publish: "3" }, ...props } = {}, path = "/admin/dashboard") => {
   pathname = path;
-  return renderToStaticMarkup(React.createElement(ConsoleShell, { storeName: "Design Demo Co", host: "localhost", role: "owner", actorKind: "member", badges: { publish: "3" }, ...props }, React.createElement("p", null, "page")));
+  return renderToStaticMarkup(React.createElement(AdminShell, { nav: NavModel.navFor(role), badges, actor: { kind: "merchant", role }, account: { name: "Olivia Owner", email: "owner@x.test" }, stores: [], storeName: "Design Demo Co", storeId: "design", ...props }, React.createElement("p", null, "page")));
+};
+// what the editor's sheet (and the phone sheet) holds: the same groups
+const sheetNav = (role, path, badges = {}) => {
+  pathname = path;
+  return renderToStaticMarkup(React.createElement(Tt.TooltipProvider, null, React.createElement(Sb.SidebarProvider, null, React.createElement(NavUi.NavGroups, { nav: NavModel.navFor(role), badges }))));
 };
 const hrefs = (html) => [...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1]);
+const navHrefs = (html) => [...html.matchAll(/<a [^>]*href="([^"]*)"[^>]*data-nav-item=/g)].map((m) => m[1]);
 const LEGACY_STOREFRONT = ["/admin/storefront", "/admin/storefront/home", "/admin/storefront/designer", "/admin/storefront/pages", "/admin/storefront/navigation", "/admin/storefront/product-pages", "/admin/theme", "/admin/brand", "/admin/media", "/admin/releases"];
-const LEGACY_ALL = ["/admin/dashboard", "/admin/analytics", "/admin/setup", "/admin/orders", "/admin/catalog", ...LEGACY_STOREFRONT, "/admin/offers", "/admin/upsells", "/admin/experiments", "/admin/insights", "/admin/automations", "/admin/integrations", "/admin/billing", "/admin/settings"];
 
-await t("rendered: SidebarNav in documents mode links the storefront to /admin/editor; Media and Publishing stay", () => {
-  pathname = "/admin/editor";
-  const html = renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "owner", cmsMode: "documents", badges: { publish: "3" } }));
-  const links = hrefs(html);
+await t("rendered: the shell's nav links the storefront to /admin/editor; Media and Publishing stay; Editor is current on /admin/editor/templates", () => {
+  const html = shell({}, "/admin/editor/templates");
+  const links = navHrefs(html);
   ok(links.includes("/admin/editor"), `no editor link: ${links}`);
   for (const old of LEGACY_STOREFRONT.slice(0, 8)) ok(!links.includes(old), `still links to ${old}`);
   ok(links.includes("/admin/media") && links.includes("/admin/releases"), "Media or Publishing gone");
-  ok(/<a [^>]*href="\/admin\/editor"[^>]*aria-current="page"/.test(html), "the Editor link isn't marked current on /admin/editor");
-  ok(html.includes(">Editor<") && /href="\/admin\/releases"[\s\S]*?>3</.test(html), "label or Publishing badge missing");
-  // the whole shell, both sidebars (desktop and drawer)
-  const s = hrefs(shell({ cmsMode: "documents" })); // the desktop sidebar (the closed drawer renders nothing)
-  ok(s.filter((h) => h === "/admin/editor").length === 1 && !s.includes("/admin/storefront/designer") && !s.includes("/admin/brand"), `shell: ${s}`);
+  ok(/<a [^>]*href="\/admin\/editor"[^>]*aria-current="page"/.test(html), "the Editor link isn't marked current on /admin/editor/templates");
+  eq((html.match(/aria-current="page"/g) || []).length, 1, "exactly one current item:");
+  ok(html.includes(">Editor<") && /data-badge="publish"/.test(html), "label or Publishing badge missing");
+  eq(links.filter((h) => h === "/admin/editor").length, 1, "one sidebar (the phone sheet renders nothing on the server):");
+  ok(html.includes("<p>page</p>") && /data-legacy[^>]*>(<div[^>]*>)?<p>page<\/p>|data-legacy[^>]*><p>page<\/p>/.test(html), "the page renders inside [data-legacy]:");
 });
 
-await t("P3-FIX3 rendered: the phone drawer, rendered open, links to the editor", () => {
-  const docs = shell({ cmsMode: "documents", drawerOpen: true });
-  const drawer = docs.slice(docs.indexOf("<dialog"), docs.indexOf("</dialog>"));
-  ok(drawer.includes("Close menu"), "the drawer is open");
-  const inDrawer = hrefs(drawer);
-  ok(inDrawer.includes("/admin/editor"), `the drawer links to the editor: ${inDrawer}`);
-  for (const old of LEGACY_STOREFRONT.slice(0, 8)) ok(!inDrawer.includes(old), `the drawer still links to ${old}`);
-  eq(hrefs(docs).filter((h) => h === "/admin/editor").length, 2, "both sidebars:");
-  // on an editor route the drawer is the only nav, and it has the mode too
-  const ed = shell({ cmsMode: "documents", drawerOpen: true }, "/admin/editor");
-  ok(hrefs(ed).includes("/admin/editor") && !hrefs(ed).includes("/admin/storefront/designer"), `editor route drawer: ${hrefs(ed)}`);
-  // closed (the default), the drawer renders no links
-  eq(hrefs(shell({ cmsMode: "documents" })).filter((h) => h === "/admin/editor").length, 1, "closed, only the desktop sidebar:");
+await t("rendered: on an editor route the shell steps aside; the sheet holds the nav with the editor link", () => {
+  const ed = shell({}, "/admin/storefront/designer");
+  eq(navHrefs(ed), [], "no sidebar links on the editor route (the closed sheet renders nothing):");
+  ok(!ed.includes('data-shell="topbar"') && ed.includes("<p>page</p>"), "no top bar; the page renders:");
+  const inSheet = navHrefs(sheetNav("owner", "/admin/editor"));
+  ok(inSheet.includes("/admin/editor") && !inSheet.includes("/admin/storefront/designer"), `the sheet's nav: ${inSheet}`);
+  ok(read("components/admin/shell/AdminShell.js").includes("<SheetContent") && /onNavigate=\{\(\) => setSheet\(false\)\}/.test(read("components/admin/shell/AdminShell.js")), "the editor's sheet closes on a link:");
 });
 
-await t("rendered: SidebarNav role filtering works for staff", () => {
-  const staff = hrefs(renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "staff", cmsMode: "documents" })));
+await t("rendered: staff see neither Settings nor Setup", () => {
+  const staff = navHrefs(shell({ role: "staff" }));
   ok(staff.includes("/admin/editor") && !staff.includes("/admin/settings") && !staff.includes("/admin/setup"), `staff: ${staff}`);
-});
-
-await t("rendered: the (authed) layout passes the mode it reads to the shell, best-effort", async () => {
-  const src = await readFile(join(AUTHED, "layout.js"), "utf8");
-  const Layout = (
-    await world({
-      ...pageStubs,
-      "@/lib/site": { siteName: () => "Design Demo Co" },
-      "@/lib/tenant-context": { currentTenant: () => ({ domains: ["localhost"] }) },
-      "@/lib/returns": { listReturns: async () => [] },
-      "@/lib/admin/onboarding": { buildChecklist: async () => null },
-      "@/lib/releases": { publishingBadge: async () => null },
-      "@/components/console/nav/ConsoleShell": { ConsoleShell: (p) => React.createElement("div", { "data-shell": p.cmsMode ?? "none" }, p.children) },
-    })(join(AUTHED, "layout.js"), { source: src })
-  ).default;
-  for (const [mode, throws, want] of [
-    ["documents", false, "documents"],
-    ["legacy", false, "legacy"],
-    ["migrating", false, "migrating"],
-    ["documents", true, "none"],
-  ]) {
-    Object.assign(S, { mode, modeThrows: throws });
-    const html = renderToStaticMarkup(await Layout({ children: React.createElement("p", null, "page") }));
-    ok(html.includes(`data-shell="${want}"`) && html.includes("<p>page</p>"), `${mode}${throws ? " (read fails)" : ""}: ${html}`);
-  }
-  S.modeThrows = false;
 });
 
 // P6-NAV (GEN-04, US-01): the logo and colours can be found after the store opens.
 await t("P6-NAV rendered: the nav has 'Logo and colours' -> /admin/start right after Editor, for owners and staff", () => {
-  pathname = "/admin/start";
-  const html = renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "owner", cmsMode: "documents", badges: {} }));
-  const links = hrefs(html);
+  const html = shell({ badges: {} }, "/admin/start");
+  const links = navHrefs(html);
   const at = links.indexOf("/admin/editor");
   eq(links.slice(at, at + 4), ["/admin/editor", "/admin/start", "/admin/media", "/admin/releases"], "the storefront group in order:");
-  ok(/<a [^>]*href="\/admin\/start"[^>]*aria-current="page"[^>]*>[\s\S]*?Logo and colours/.test(html), `the link, marked current on /admin/start: ${html.slice(0, 200)}`);
-  const store = Nav.navGroups("documents").find((g) => g.label === "Storefront").items;
-  eq(store[1], { id: "start", label: "Logo and colours", href: "/admin/start" }, "the item (not admin-only):");
-  ok(hrefs(renderToStaticMarkup(React.createElement(Nav.SidebarNav, { role: "staff", cmsMode: "documents" }))).includes("/admin/start"), "staff see it");
-  // both sidebars of the shell (the drawer open)
-  eq(hrefs(shell({ cmsMode: "documents", drawerOpen: true })).filter((h) => h === "/admin/start").length, 2, "desktop and drawer:");
+  ok(/<a [^>]*href="\/admin\/start"[^>]*aria-current="page"[^>]*>[\s\S]*?Logo and colours/.test(html), "the link, marked current on /admin/start:");
+  const store = NavModel.NAV.find((g) => g.label === "Storefront").items;
+  eq({ ...store[1] }, { id: "start", label: "Logo and colours", href: "/admin/start", page: "start", action: "storefront.read" }, "the item (a read every role holds):");
+  ok(navHrefs(shell({ role: "staff" })).includes("/admin/start"), "staff see it");
+  ok(navHrefs(sheetNav("owner", "/admin/start")).includes("/admin/start"), "the sheet has it too:");
 });
 
 // ---- P4-SCAFFOLD: product and collection addresses, document ids, editability --

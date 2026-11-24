@@ -1,5 +1,5 @@
 import { Skeleton, SkeletonText } from "@/components/console/bits";
-import { ConsolePageFrame } from "@/components/console/nav/ConsoleShell";
+import { ConsolePageFrame } from "@/components/admin/shell/AdminShell";
 
 // Route-level loading state (S50): the sidebar persists; the content area
 // shows a page-shaped skeleton instead of a blank screen. ED-01: on an editor

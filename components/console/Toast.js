@@ -52,19 +52,22 @@ export function ToastProvider({ children }) {
   return (
     <ToastCtx.Provider value={api}>
       {children}
-      <div aria-live="polite" aria-atomic="false" className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
-        {toasts.map((t) => {
-          const Icon = ICONS[t.kind] || Info;
-          return (
-            <div key={t.id} className={cx("pointer-events-auto flex items-start gap-2.5 rounded-card border p-3 text-sm shadow-overlay", TONES[t.kind] || TONES.info)}>
-              <Icon size={15} className={cx("mt-0.5 shrink-0", ICON_TONES[t.kind])} aria-hidden />
-              <p className="min-w-0 flex-1 break-words leading-snug">{t.message}</p>
-              <button type="button" aria-label="Dismiss" onClick={() => dismiss(t.id)} className="shrink-0 rounded p-0.5 text-fg-subtle focus-ring hover:text-fg">
-                <X size={13} aria-hidden />
-              </button>
-            </div>
-          );
-        })}
+      {/* Phase 0 line 8: an old component, so an old-token region */}
+      <div data-legacy className="contents">
+        <div aria-live="polite" aria-atomic="false" className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
+          {toasts.map((t) => {
+            const Icon = ICONS[t.kind] || Info;
+            return (
+              <div key={t.id} className={cx("pointer-events-auto flex items-start gap-2.5 rounded-card border p-3 text-sm shadow-overlay", TONES[t.kind] || TONES.info)}>
+                <Icon size={15} className={cx("mt-0.5 shrink-0", ICON_TONES[t.kind])} aria-hidden />
+                <p className="min-w-0 flex-1 break-words leading-snug">{t.message}</p>
+                <button type="button" aria-label="Dismiss" onClick={() => dismiss(t.id)} className="shrink-0 rounded p-0.5 text-fg-subtle focus-ring hover:text-fg">
+                  <X size={13} aria-hidden />
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </ToastCtx.Provider>
   );

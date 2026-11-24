@@ -81,6 +81,7 @@
     "test:agency-removed": "node scripts/test-agency-removed.js",
     "test:drills": "node scripts/test-drills.js",
     "test:console-ui": "node scripts/test-console-ui.js",
+    "test:console-shell": "node scripts/test-console-shell.js",
     "test:api-unmatched": "node scripts/test-api-unmatched.js",
     "test:case-studies": "node scripts/test-case-studies.js",
     "test:w6": "node scripts/test-w6.js",
@@ -138,6 +139,7 @@
     "drill:agency-gone": "node scripts/drills/run-isolated.mjs agency-gone",
     "drill:sf-styles": "node scripts/drills/run-isolated.mjs sf-styles",
     "drill:console-styles": "node scripts/drills/run-isolated.mjs console-styles",
+    "drill:shell": "node scripts/drills/run-isolated.mjs shell",
     "drill:all": "node scripts/drills/run-isolated.mjs all",
     "media:reindex": "node scripts/reindex-document-refs.js"
   },

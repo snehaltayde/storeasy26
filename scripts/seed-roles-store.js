@@ -340,5 +340,50 @@ export async function latestShopperCode({ tenantUrl, email = ROLES_LOGINS.shoppe
   }
 }
 
+// The Roles Annex (Phase 0 line 8, for drill:shell's store switcher): a second
+// store on annex.localhost, on the roles harness's third ("default") database,
+// with the roles store's owner as its admin and its support member as support.
+// Run while the roles harness is up (node scripts/dev-roles.js annex). The
+// seed's shape and roles-seed.json are unchanged; nothing is published.
+export const ROLES_ANNEX = Object.freeze({ id: "annex", name: "Roles Annex", host: "annex.localhost" });
+export const ANNEX_MEMBERS = Object.freeze([Object.freeze({ email: "owner@roles.test", role: "admin" }), Object.freeze({ email: "support@roles.test", role: "support" })]);
+export async function addRolesAnnex({ platformUrl, annexUrl, port = ROLES_STORE.port, env = process.env } = {}) {
+  assertSafeEnv(env);
+  const urls = { platform: assertSeedDbUrl("The platform database URL", platformUrl), annex: assertSeedDbUrl("The annex database URL", annexUrl) };
+  process.env.PLATFORM_DB_URL = urls.platform;
+  process.env.PLATFORM_DB_TOKEN = "";
+  const C = await import("../lib/platform/control.js");
+  C.__resetPlatformClient();
+  if (await C.getTenant(ROLES_ANNEX.id, { fresh: true })) throw new HarnessError("The Roles Annex is already there. Nothing was changed.");
+  const I = await import("../lib/platform/identity.js");
+  const users = [];
+  for (const m of ANNEX_MEMBERS) {
+    const u = await I.findUserByEmail(m.email);
+    if (!u) throw new HarnessError(`The roles store has no ${m.email}: seed it first (pnpm seed:roles). Nothing was changed.`);
+    users.push({ ...m, id: u.id });
+  }
+  const { createClient } = await import("@libsql/client");
+  const P = await import("../lib/platform/provision.js");
+  const c = createClient({ url: urls.annex });
+  try {
+    await P.applyTenantSchema(c);
+    await P.applyContentMode(c, { contentMode: "documents" });
+  } finally {
+    c.close();
+  }
+  await C.upsertTenant({
+    id: ROLES_ANNEX.id,
+    name: ROLES_ANNEX.name,
+    domains: [ROLES_ANNEX.host],
+    dbUrl: urls.annex,
+    config: { currency: "INR", merchant_timezone: "Asia/Kolkata", site_url: rolesUrl(port, ROLES_ANNEX.host), site: { name: ROLES_ANNEX.name }, checkout_mode: "direct" },
+    secrets: { admin_password: secretWord(), order_link_secret: randomBytes(32).toString("hex") },
+  });
+  for (const u of users) await I.addMembership(u.id, ROLES_ANNEX.id, u.role);
+  const { audit } = await import("../lib/platform/audit.js");
+  await audit({ actor: { kind: "cli", id: "seed-roles" }, action: "seed.roles_annex", tenantId: ROLES_ANNEX.id, diff: { members: users.map((u) => `${u.email}:${u.role}`) } });
+  return { store: { ...ROLES_ANNEX, url: rolesUrl(port, ROLES_ANNEX.host) }, members: users.map(({ email, role }) => ({ email, role })) };
+}
+
 // sha256 of a file's bytes (the test compares roles-seed.json across a refused re-run)
 export const fileHash = (file) => createHash("sha256").update(readFileSync(file)).digest("hex");

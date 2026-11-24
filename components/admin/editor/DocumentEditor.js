@@ -409,7 +409,7 @@ export function EditorView({
           <section aria-label="Settings" className="min-w-0 rounded-card border border-edge bg-surface p-4" data-inspector="">
             {inspector()}
           </section>
-          <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">{preview}</div>
+          <div className="min-w-0 lg:sticky lg:top-18 lg:self-start">{preview}</div>
         </div>
       )}
 
@@ -430,7 +430,7 @@ export function EditorView({
               {inspector()}
             </section>
           </div>
-          <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">{preview}</div>
+          <div className="min-w-0 lg:sticky lg:top-18 lg:self-start">{preview}</div>
         </div>
       )}
     </div>

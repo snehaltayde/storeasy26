@@ -1,0 +1,26 @@
+import { Banner } from "@/components/console/Banner";
+
+// The support-access and incident notices (moved from the old
+// app/(console)/admin/layout.js in Phase 0 line 8): at the top of the
+// console's content area and above the sign-in pages. Data from
+// consoleNotices() (lib/admin/notices.js). Old Banner look, so it renders
+// inside a [data-legacy] region.
+export function ConsoleNotices({ grant = null, incidents = [], className = "space-y-2" }) {
+  if (!grant && !incidents.length) return null;
+  return (
+    <div className={className} data-console-notices>
+      {incidents.map((i) => (
+        <Banner key={i.id} tone="info" title={`${i.tenant_id ? "Notice for your store" : "Platform notice"}: ${i.title}`}>
+          {i.public_message || null}
+        </Banner>
+      ))}
+      {grant && (
+        <Banner tone="warning" title="Platform support access is active">
+          Operator <span className="font-mono">{grant.operator}</span>, reason: “{grant.reason}”, until{" "}
+          {new Date(grant.expires_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. Support access is
+          read-only and never sees customer contact details.
+        </Banner>
+      )}
+    </div>
+  );
+}

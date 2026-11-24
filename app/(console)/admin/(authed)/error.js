@@ -1,7 +1,7 @@
 "use client";
 
 import { ErrorState } from "@/components/console/bits";
-import { ConsolePageFrame } from "@/components/console/nav/ConsoleShell";
+import { ConsolePageFrame } from "@/components/admin/shell/AdminShell";
 
 // Segment error boundary (S50): a failing admin page keeps the shell and
 // offers a retry, instead of the storefront 500 page. ED-01: on the Designer

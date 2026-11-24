@@ -4,8 +4,8 @@
 // and its data are never touched: a drill seeds and wipes only the worktree's
 // own folders, and this runner fails if the owner's seed files change anyway.
 //
-//   node scripts/drills/run-isolated.mjs <p5|p6|smoke|agency-gone|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
-//   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:sf-styles,
+//   node scripts/drills/run-isolated.mjs <p5|p6|smoke|agency-gone|shell|sf-styles|console-styles|all> [stage,…] [--keep] [--headed]
+//   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:shell, drill:sf-styles,
 //   drill:console-styles, drill:all; sf-styles and console-styles are not in all)
 //
 //   stage,…   p5 and p6 only: run just these stages
@@ -24,8 +24,8 @@
 //   4. each drill runs from the worktree with DRILL_ISOLATED_ROOT=<worktree>
 //      (the drills refuse without it), the ports, PLATFORM_CACHE_MS=1000, and
 //      every Shopify, payment, hosted-database and AI key blank
-//   5. agency-gone and console-styles first seed and start the worktree's own
-//      roles store (withRolesStore)
+//   5. agency-gone, shell and console-styles first seed and start the
+//      worktree's own roles store (withRolesStore); shell adds the Roles Annex
 //   6. the worktree's committed docs/cms-reviews/drills/<ID>/ is emptied before
 //      each drill, so results are this run's only; they and each
 //      drill's output are copied to .drill-results/<stamp>/ here (gitignored),
@@ -334,8 +334,18 @@ export const DRILLS = {
   // the old console screens inside the new shell (Phase 0 line 8 §3), on the
   // roles store; SF_STYLES_BASELINE and SF_STYLES_BITE pass through. A tool, not in drill:all.
   "console-styles": { id: "CONSOLE-STYLES", warm: true, run: (c) => withRolesStore(c, () => c.node(["scripts/drills/sf-styles/run.mjs", ...c.headed], { env: { ...c.env, SF_STYLES_SET: "console" } })) },
+  // the new console shell (Phase 0 line 8 §5): the roles store plus the Roles Annex
+  shell: {
+    id: "SHELL",
+    warm: true,
+    run: (c) =>
+      withRolesStore(c, async () => {
+        const annex = await c.node(["scripts/dev-roles.js", "annex"]);
+        return annex !== 0 ? annex : c.node(["scripts/drills/shell/run.mjs", ...c.headed]);
+      }),
+  },
 };
-export const ALL = ["smoke", "p5", "p6", "agency-gone"];
+export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 

@@ -30,6 +30,8 @@
 //   9. console-styles (Phase 0 line 8): its runner entry (roles store first,
 //      the console set), outside drill:all; the comparator's ignoreProps and
 //      ignoreBoxes options
+//  10. shell (Phase 0 line 8): its runner entry (roles store, the annex, then
+//      the drill), in drill:all
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -451,7 +453,7 @@ await t("the drill helpers' own checks pass (p4, p5 and p6 lib.mjs --check; p6 c
 });
 
 await t("every module the seed and drill scripts load exists, with the names they take (seed:design, --p3, --p6, seed:roles, the drills)", async () => {
-  const entries = ["scripts/seed-design-preview.js", "scripts/seed-design-documents.js", "scripts/perf-docs-fixture.js", "scripts/dev-design.js", "scripts/dev-roles.js", "scripts/seed-roles.js", "scripts/drill.js", "scripts/drills/run-isolated.mjs", "scripts/drills/smoke.js", "scripts/drills/agency-gone.mjs", "scripts/drills/p5/run.mjs", "scripts/drills/p5/blocks.mjs", "scripts/drills/p6/run.mjs", "scripts/drills/p6/seed-p6.mjs", "scripts/drills/p6/generate.mjs", "scripts/drills/p6/brand.mjs", "scripts/drills/p6/open.mjs", "scripts/drills/p6/empty.mjs", "scripts/drills/p6/setup.mjs", "scripts/drills/sf-styles/run.mjs", "scripts/drill-maintenance-edge.js", "scripts/perf-report.js"];
+  const entries = ["scripts/seed-design-preview.js", "scripts/seed-design-documents.js", "scripts/perf-docs-fixture.js", "scripts/dev-design.js", "scripts/dev-roles.js", "scripts/seed-roles.js", "scripts/drill.js", "scripts/drills/run-isolated.mjs", "scripts/drills/smoke.js", "scripts/drills/agency-gone.mjs", "scripts/drills/p5/run.mjs", "scripts/drills/p5/blocks.mjs", "scripts/drills/p6/run.mjs", "scripts/drills/p6/seed-p6.mjs", "scripts/drills/p6/generate.mjs", "scripts/drills/p6/brand.mjs", "scripts/drills/p6/open.mjs", "scripts/drills/p6/empty.mjs", "scripts/drills/p6/setup.mjs", "scripts/drills/sf-styles/run.mjs", "scripts/drills/shell/run.mjs", "scripts/drill-maintenance-edge.js", "scripts/perf-report.js"];
   const seen = new Set();
   const missing = [];
   const walk = (file) => {
@@ -580,6 +582,25 @@ await t("console-styles compare: ignoreProps (names and prefixes) and ignoreBoxe
   const d2 = C.diffRuns(base, bitten, opts);
   eq(`${d2.totals.style} ${d2.totals.customAdded} ${d2.totals.ignored} ${C.isClean(d2.totals)}`, "1 0 3 false", "a bite still fails; a prefix entry skips --tw-x:");
   eq(C.ignoreMatcher(["--*"])("--c-bg") && !C.ignoreMatcher(["--*"])("color"), true, "a prefix entry matches only its prefix:");
+});
+
+await t("shell: drill:shell runs the roles store, adds the annex, then the drill; it is in drill:all", async () => {
+  const { scripts } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  eq(scripts["drill:shell"], "node scripts/drills/run-isolated.mjs shell", "drill:shell:");
+  const spec = R.DRILLS.shell;
+  eq(`${spec?.id} ${spec?.warm}`, "SHELL true", "id and warm:");
+  ok(R.ALL.includes("shell"), "in ALL:");
+  const calls = [];
+  const src = readFileSync(join(ROOT, "scripts/drills/run-isolated.mjs"), "utf8");
+  ok(/shell: \{[\s\S]*?withRolesStore\(c, async \(\) => \{[\s\S]*?"scripts\/dev-roles\.js", "annex"[\s\S]*?"scripts\/drills\/shell\/run\.mjs"/.test(src), "inside withRolesStore: annex, then the drill:");
+  const c = { worktree: "/w", env: {}, ports: { rolesNext: 6101 }, log: [], headed: [], node: async (args) => (calls.push(args.join(" ")), args.includes("annex") ? 3 : 0) };
+  // a failing annex stops before the drill (exercised through the helper with stand-ins)
+  const run = (fn) => R.withRolesStore(c, fn, { start: () => ({ child: {}, stop: async () => {} }), up: async () => true });
+  eq(await run(async () => {
+    const annex = await c.node(["scripts/dev-roles.js", "annex"]);
+    return annex !== 0 ? annex : c.node(["scripts/drills/shell/run.mjs"]);
+  }), 3, "a failed annex fails the drill:");
+  ok(!calls.includes("scripts/drills/shell/run.mjs"), "and the drill is not run:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
