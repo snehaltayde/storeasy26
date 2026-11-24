@@ -246,6 +246,97 @@ async function ownerFlows(drill, page) {
   drill.check(landed === "/admin/login" && new URL(page.url()).pathname === "/admin/login", "owner: Sign out lands on /admin/login and the dashboard then redirects to sign-in", { landed, after: page.url() });
 }
 
+// Phase 0 least-trusted audit (docs/cms-reviews/PHASE-0-AUDIT.md), browser pass.
+// Support: deep links to the screens it must not have show the permission note
+// and none of their data; setup opens; the write and owner-only APIs refuse it
+// from its own signed-in context; /platform is the operator sign-in, never the
+// console; on the Roles Annex (support is a member, nothing published, no
+// orders) every nav item renders its empty state.
+const DENIED_PAGES = ["/admin/settings", "/admin/integrations", "/admin/billing", "/admin/automations"];
+const NOTE = /Your role \(support\) can.t .+ ask an owner or admin/;
+const PLATFORM_CONSOLE = /New tenant|Tenant registry|Provision/;
+
+async function supportDeepLinks(drill, page) {
+  await page.setViewportSize({ width: 1280, height: HEIGHT });
+  for (const path of DENIED_PAGES) {
+    const r = await page.goto(ORIGIN + path, { waitUntil: "load" });
+    await settle(page);
+    const body = await page.locator("main").innerText().catch(() => "");
+    drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && NOTE.test(body) && new URL(page.url()).pathname === path, `support deep link ${path}: the permission note, no error`, { status: r?.status(), url: page.url(), body: body.slice(0, 200) });
+  }
+  const setup = await page.goto(`${ORIGIN}/admin/setup`, { waitUntil: "load" });
+  await settle(page);
+  const setupBody = await page.locator("body").innerText().catch(() => "");
+  drill.check(setup?.status() === 200 && !ERROR_TEXT.test(setupBody), "support deep link /admin/setup: opens read-only, no error", { status: setup?.status(), url: page.url() });
+  const api = (method, path, data) => page.request.fetch(`${ORIGIN}/api/admin/${path}`, { method, data, headers: { origin: ORIGIN }, maxRedirects: 0 }).then((r) => r.status());
+  const refusals = {
+    "PUT documents publish": await api("PUT", "documents", { publish: { id: "doc_missing", draftHash: "x" }, revision: 1 }),
+    "PUT documents publishSet": await api("PUT", "documents", { publishSet: [] }),
+    "POST releases publish": await api("POST", "releases", { action: "publish" }),
+    "POST setup": await api("POST", "setup", { step: "" }),
+    "PUT settings": await api("PUT", "settings", { bogus_setting: true }),
+    "GET settings": await api("GET", "settings"),
+    "GET team": await api("GET", "team"),
+    "GET audit": await api("GET", "audit"),
+    "GET help": await api("GET", "help"),
+    "GET integrations": await api("GET", "integrations"),
+  };
+  drill.check(Object.values(refusals).every((s) => s === 403), "support: publish, setup, settings, team, audit, help and integrations APIs answer 403", refusals);
+  const plat = await page.goto(`${ORIGIN}/platform`, { waitUntil: "load" });
+  await settle(page);
+  const platBody = await page.locator("body").innerText().catch(() => "");
+  drill.check(plat?.status() === 200 && !PLATFORM_CONSOLE.test(platBody) && ((await page.locator("#pl-password").count()) === 1 || /Not configured/.test(platBody)), "support at /platform: the operator sign-in (or not configured), never the console", { status: plat?.status(), body: platBody.slice(0, 160) });
+}
+
+async function supportEmptyStates(drill, ctx, creds) {
+  const res = await ctx.request.post(`${ANNEX}/api/admin/login`, { data: creds, headers: { origin: ANNEX }, maxRedirects: 0 });
+  if (!drill.check(res.status() === 200, "support signs in on the Roles Annex", res.status())) return;
+  const page = await ctx.newPage();
+  await page.setViewportSize({ width: 1280, height: HEIGHT });
+  for (const href of navItems(navFor("support")).map((i) => i.href)) {
+    const r = await page.goto(ANNEX + href, { waitUntil: "load" });
+    await settle(page);
+    const body = await page.locator("body").innerText().catch(() => "");
+    const legacy = await page.evaluate(() => {
+      const el = document.querySelector("main > [data-legacy]");
+      return el ? (el.textContent || "").trim().length > 0 : false;
+    });
+    drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && legacy, `support on the empty Roles Annex: ${href} renders (200, no error, content)`, { status: r?.status(), error: ERROR_TEXT.test(body), legacy, url: page.url() });
+  }
+  await page.close();
+}
+
+// Anonymous: every console page (scripts/support/admin-pages.js) and /admin
+// itself go to /admin/login; /platform is the operator sign-in; the Roles
+// Annex (never published) shows only "Opening soon" on its storefront pages and
+// its sitemap lists only the front door.
+async function anonymousPass(drill, ctx) {
+  const { ADMIN_PAGES } = await import("../../support/admin-pages.js");
+  const page = await ctx.newPage();
+  await page.setViewportSize({ width: 1280, height: HEIGHT });
+  const stray = [];
+  for (const row of ADMIN_PAGES) {
+    const path = `/admin${row.page ? `/${row.page.replace("[id]", "SHO-MISSING").replace("[slug]", "about")}` : ""}`;
+    await page.goto(ORIGIN + path, { waitUntil: "load" });
+    if (new URL(page.url()).pathname !== "/admin/login") stray.push(`${path} → ${page.url()}`);
+  }
+  drill.check(stray.length === 0, `anonymous: all ${ADMIN_PAGES.length} console pages redirect to /admin/login`, stray);
+  await page.goto(`${ORIGIN}/platform`, { waitUntil: "load" });
+  await settle(page);
+  const platBody = await page.locator("body").innerText().catch(() => "");
+  drill.check(!PLATFORM_CONSOLE.test(platBody) && ((await page.locator("#pl-password").count()) === 1 || /Not configured/.test(platBody)), "anonymous at /platform: the operator sign-in (or not configured), never the console", platBody.slice(0, 160));
+  for (const path of ["/", "/collections", "/products/fixture-product-1", "/journal", "/search?q=a", "/policies/privacy-policy", "/bundles/any"]) {
+    const r = await page.goto(ANNEX + path, { waitUntil: "load" });
+    await settle(page);
+    const body = await page.locator("body").innerText().catch(() => "");
+    drill.check((r?.status() ?? 500) < 500 && !ERROR_TEXT.test(body) && /Opening soon/.test(body), `anonymous on the closed Roles Annex: ${path} shows only "Opening soon"`, { status: r?.status(), body: body.slice(0, 160) });
+  }
+  const sm = await ctx.request.get(`${ANNEX}/sitemap.xml`);
+  const locs = ((await sm.text()).match(/<loc>/g) || []).length;
+  drill.check(sm.status() === 200 && locs === 1, "anonymous: the closed Roles Annex sitemap lists only its front door", { status: sm.status(), locs });
+  await page.close();
+}
+
 async function shell(drill) {
   if (!port) throw new Error("drill:shell needs ROLES_PORT (run it as pnpm drill:shell).");
   const s = seed();
@@ -259,6 +350,13 @@ async function shell(drill) {
   }
   for (const role of ROLES) for (const w of WIDTHS) await roleAtWidth(drill, pages[role], role, w, out);
   await supportMenus(drill, pages.support);
+  await supportDeepLinks(drill, pages.support);
+  const annexCtx = await drill.browser.newContext({ viewport: { width: 1280, height: HEIGHT }, deviceScaleFactor: 1 });
+  annexCtx.setDefaultTimeout(60_000);
+  await supportEmptyStates(drill, annexCtx, s.members.find((x) => x.role === "support"));
+  const anonCtx = await drill.browser.newContext({ viewport: { width: 1280, height: HEIGHT }, deviceScaleFactor: 1 });
+  anonCtx.setDefaultTimeout(60_000);
+  await anonymousPass(drill, anonCtx);
   await ownerFlows(drill, pages.owner);
   const dir = drill.dir;
   writeFileSync(join(dir, "support-write-controls.json"), `${JSON.stringify({ id: DRILL_ID, note: "Write controls support still sees inside the old screens: Phase 2's list, not a failure.", total: out.supportWrites.reduce((n, p) => n + p.controls.length, 0), pages: out.supportWrites }, null, 2)}\n`);
