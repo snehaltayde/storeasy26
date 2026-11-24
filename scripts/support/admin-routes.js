@@ -132,6 +132,7 @@ export const EXEMPT_ROUTES = Object.freeze([
   { path: "logout", method: "POST", kind: "logout" },
   { path: "accept-invite", method: "POST", kind: "token" },
   { path: "reset", method: "POST", kind: "token" },
+  { path: "handoff", method: "POST", kind: "token" },
   { path: "recover", method: "POST", kind: "recover" },
   { path: "maintenance-pass", method: "GET", kind: "maintenance-pass" },
 ]);

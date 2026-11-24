@@ -72,6 +72,7 @@
     "test:storefront": "node scripts/test-storefront.js",
     "test:billing": "node scripts/test-billing.js",
     "test:provision": "node scripts/test-provision.js",
+    "test:signup": "node scripts/test-signup.js",
     "test:reporting": "node scripts/test-reporting.js",
     "test:tenant-ops": "node scripts/test-tenant-ops.js",
     "test:marketing": "node scripts/test-marketing.js",
@@ -140,6 +141,7 @@
     "drill:sf-styles": "node scripts/drills/run-isolated.mjs sf-styles",
     "drill:console-styles": "node scripts/drills/run-isolated.mjs console-styles",
     "drill:shell": "node scripts/drills/run-isolated.mjs shell",
+    "drill:signup": "node scripts/drills/run-isolated.mjs signup",
     "drill:all": "node scripts/drills/run-isolated.mjs all",
     "media:reindex": "node scripts/reindex-document-refs.js"
   },

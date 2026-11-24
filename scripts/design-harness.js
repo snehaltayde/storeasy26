@@ -105,6 +105,8 @@ export const BLANKED_ENV = [
 // can't slip through unblanked.
 export const KEPT_ENV = [
   "ANTHROPIC_API_KEY",
+  "SIGNUP_STORE_DOMAIN", // self-serve signup: new stores get <slug>.<this>; the harness sets localhost
+  "STORE_DB_DIR", // self-serve signup's file databases; the harness sets <data dir>/stores
   "AI_INSIGHTS_MODEL",
   "ADMIN_PASSWORD", // the env default store's console password; the design store has its own
   "CRON_SECRET", // only compared with incoming requests
@@ -434,12 +436,19 @@ export function readCredentials(root) {
 
 // ---------- env handed to Next and the seed ----------
 
-export function harnessEnv(baseEnv, fileEnv, ports, { siteHost = DESIGN_PROFILE.siteHost } = {}) {
+// Self-serve signup (Phase 1 line 1) runs on the marketing host
+// storeasy.localhost (set after blanking, so a value from .env.local never
+// wins) and gives each new store <slug>.localhost and a file database under
+// the harness's own data folder (dataDir; the profile's folder by default).
+export function harnessEnv(baseEnv, fileEnv, ports, { siteHost = DESIGN_PROFILE.siteHost, dataDir = join(ROOT, DESIGN_PROFILE.dataDirName) } = {}) {
   const urls = harnessUrls(ports);
   const env = { ...baseEnv, ...fileEnv };
   for (const name of BLANKED_ENV) env[name] = "";
   return {
     ...env,
+    PLATFORM_SITE_HOSTS: "storeasy.localhost",
+    SIGNUP_STORE_DOMAIN: "localhost",
+    STORE_DB_DIR: join(dataDir, "stores"),
     DATABASE_URL: urls.default,
     PLATFORM_DB_URL: urls.platform,
     PLATFORM_DB_TOKEN: "",
@@ -538,7 +547,7 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
   await assertPortsFree(ports, { includeNext: mode === "dev", waitMs: leftovers.length ? 10_000 : 0, portEnv: profile.portEnv });
 
   const fileEnv = profile.credentials ? ensureCredentials(root, log) : {};
-  const childEnv = harnessEnv(env, fileEnv, ports, { siteHost: profile.siteHost });
+  const childEnv = harnessEnv(env, fileEnv, ports, { siteHost: profile.siteHost, dataDir });
   const seedEnv = { ...childEnv, DESIGN_FIXTURE: fixture || "" };
   const seed = seedCmd || [process.execPath, [join(root, "scripts/seed-design-preview.js")]];
   const next = nextCmd || [process.execPath, [join(root, "node_modules/next/dist/bin/next"), "dev", "-p", String(ports.next)]];
