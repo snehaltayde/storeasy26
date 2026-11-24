@@ -24,7 +24,7 @@ export async function GET(request) {
   const sp = request.nextUrl.searchParams;
   try {
     if (sp.get("subject")) {
-      const r = await onboardingSubject(sp.get("subject"));
+      const r = await onboardingSubject(sp.get("subject"), { origin: requestOrigin(request) });
       return r.error ? json({ error: r.error }, r.status) : json(r);
     }
     const r = await listOnboarding({ view: sp.get("view"), stuck: sp.get("stuck"), q: sp.get("q"), sort: sp.get("sort"), cursor: sp.get("cursor") });

@@ -654,6 +654,13 @@ await t("the tick queues the sweep", async () => {
   }
 });
 
+await t("help links use the store's own host on the operator's protocol and port when its domain names no port (a signup's store)", async () => {
+  eq(OPS.storeOrigin({ domains: ["shop.stores.test"] }, "http://localhost:3017"), "http://shop.stores.test:3017", "port carried");
+  eq(OPS.storeOrigin({ domains: ["shop.example.com"] }, "https://platform.example.com"), "https://shop.example.com", "https, no port");
+  eq(OPS.storeOrigin({ domains: ["shop.localhost:4000"] }, "http://localhost:3017"), "http://shop.localhost:4000", "a domain's own port wins");
+  eq(OPS.storeOrigin({ domains: [] }, "http://localhost:3017"), null, "no domain");
+});
+
 // ---- words (WP-B) ---------------------------------------------------------------------------------
 
 await t("onboardingWords: every status code has plain words and a tone; stuck time reads '2 d 4 h'; 'at least' when not exact", async () => {
