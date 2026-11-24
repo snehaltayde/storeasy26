@@ -64,15 +64,16 @@ function Note({ tone, children, ...props }) {
   );
 }
 
-// The four stages, in order: a column on phones, a row from 640px up.
+// The four stages, in order: a column on phones; from 640px up a row that
+// wraps whole stages, never a label mid-word.
 function Stages({ stage }) {
   return (
-    <ol aria-label="Import stages" className="grid gap-x-3 gap-y-1.5 text-[0.8125rem] sm:grid-cols-4" data-import="stages">
+    <ol aria-label="Import stages" className="grid gap-y-1.5 text-[0.8125rem] sm:flex sm:flex-wrap sm:gap-x-5" data-import="stages">
       {SYNC_STAGES.map((s, i) => {
         const at = i + 1;
         const state = at < stage.index ? "done" : at === stage.index ? "current" : "todo";
         return (
-          <li key={s.id} data-stage={s.id} data-stage-state={state} aria-current={state === "current" ? "step" : undefined} className={cn("flex min-w-0 items-start gap-1.5 leading-snug", state === "current" ? "font-medium text-foreground" : "text-muted-foreground")}>
+          <li key={s.id} data-stage={s.id} data-stage-state={state} aria-current={state === "current" ? "step" : undefined} className={cn("flex min-w-0 items-start gap-1.5 leading-snug sm:whitespace-nowrap", state === "current" ? "font-medium text-foreground" : "text-muted-foreground")}>
             {state === "done" ? (
               <CircleCheck aria-hidden className="mt-0.5 size-3.5 shrink-0 text-success" />
             ) : (
@@ -154,9 +155,11 @@ export function ImportStepBody({ view, gate = null, busy = false, error = null, 
   const collecting = stage && stage.index >= 2;
   const bar = live && stage ? (stage.index === 1 ? view.products : stage.index === 2 ? view.collections : null) : null;
   const pct = bar ? pctOf(bar) : null;
-  // the filled button is the one obvious next step; while it retries by
-  // itself, waiting is, so Try now stays quiet
-  const filled = (i) => i === 0 && state !== "retrying";
+  // the filled button is the one obvious next step. While it retries by
+  // itself, waiting is, so Try now stays quiet; a refresh that failed leaves
+  // the step done, so "Next: …" below stays the filled one and the fixes
+  // are outlined
+  const filled = (i) => i === 0 && state !== "retrying" && view.firstSync !== false;
   const big = { size: "lg", className: "h-10 px-4" };
   const retryAction = (label, primary) => (
     <Gated key="retry" action={gate} reasonId="import-reason" variant={primary ? "default" : "outline"} {...(primary ? big : {})} disabled={busy} aria-busy={busy || undefined} onClick={() => onAct?.({ retry: true })}>
