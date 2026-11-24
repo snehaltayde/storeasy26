@@ -38,13 +38,19 @@
 //      and the boot repeated (up to 2 times), else the run stops with
 //      "Google Fonts could not be fetched; check the network"; a drill that
 //      failed on such a build is run once more
+//   6b. each drill's harnesses (design and roles) write their Next output and
+//      sqld logs to <worktree>/.drill-logs/<drill>/ (DRILL_LOG_DIR); after the
+//      drill, and before the worktree goes (Ctrl-C too), they are joined into
+//      .drill-results/<stamp>/<drill>/server.log; a failed drill prints its tail
+//   2b. pnpm install runs under a machine-wide lock (<tmpdir>/storeasy-drill-install.lock),
+//      so two runners never install into worktrees from the shared pnpm store at once
 //   8. the owner's .design-env, .design-data/seeded.json, p*-seed.json and
 //      roles-seed.json are hashed before and after: any change fails the run
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BLANKED_ENV, ROOT, isPortBusy, runningHarness } from "../design-harness.js";
 
@@ -136,6 +142,68 @@ export function copyResults(worktree, root, stamp, id) {
   if (!existsSync(from)) return null;
   cpSync(from, join(dir, id), { recursive: true });
   return join(dir, id);
+}
+
+// 6b. The server logs of one drill: every file in logDir (sqld first, Next
+// last, so the tail printed on a failure is Next's) plus the Turso stand-in's store databases under .design-data*/fake-turso/,
+// joined into outFile. → outFile, or null when there was nothing to keep.
+export function keepServerLog(logDir, outFile, worktree) {
+  const files = [];
+  if (existsSync(logDir)) for (const f of readdirSync(logDir).sort((a, b) => Number(a.endsWith("-next.log")) - Number(b.endsWith("-next.log")) || a.localeCompare(b))) files.push(join(logDir, f));
+  if (worktree)
+    for (const d of [".design-data", ".design-data-roles"]) {
+      const fake = join(worktree, d, "fake-turso");
+      if (existsSync(fake)) for (const f of readdirSync(fake).sort()) if (f.endsWith(".log")) files.push(join(fake, f));
+    }
+  if (!files.length) return null;
+  mkdirSync(join(outFile, ".."), { recursive: true });
+  writeFileSync(outFile, files.map((f) => `##### ${basename(f)}\n${readFileSync(f, "utf8")}`).join("\n"));
+  return outFile;
+}
+export const tailLines = (text, n = 40) => String(text).trimEnd().split("\n").slice(-n).join("\n");
+
+// 2b. One pnpm install at a time on this machine: the lock is a directory
+// (mkdir is atomic) holding the owner's pid. A lock whose pid is gone is
+// stale and taken over; a live one is waited for. Never kills anything.
+export const INSTALL_LOCK = join(tmpdir(), "storeasy-drill-install.lock");
+const pidAlive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+};
+export async function withInstallLock(fn, { dir = INSTALL_LOCK, timeoutMs = 30 * 60_000, stepMs = 1000, alive = pidAlive, say = () => {} } = {}) {
+  const end = Date.now() + timeoutMs;
+  let told = false;
+  for (;;) {
+    try {
+      mkdirSync(dir);
+      writeFileSync(join(dir, "pid"), String(process.pid));
+      break;
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      let pid = NaN;
+      try {
+        pid = Number(readFileSync(join(dir, "pid"), "utf8"));
+      } catch {}
+      // no pid yet: the owner is between mkdir and writing it; a dead pid: stale
+      if (Number.isInteger(pid) && pid > 0 && !alive(pid)) {
+        rmSync(dir, { recursive: true, force: true });
+        continue;
+      }
+      if (Date.now() >= end) throw new RunnerError(`Another drill run's pnpm install (pid ${pid || "?"}) held ${dir} for ${Math.round(timeoutMs / 60_000)} min. Nothing was stopped.`);
+      if (!told) say(`• waiting for another drill run's pnpm install (pid ${pid || "?"}) to finish`);
+      told = true;
+      await new Promise((r) => setTimeout(r, stepMs));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 // Before the next drill: the last one's harnesses (design and roles) have
@@ -413,7 +481,7 @@ export const ALL = ["smoke", "p5", "p6", "agency-gone", "shell", "signup", "conn
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 
-export async function runIsolated({ root = ROOT, names, stages = [], keep = false, headed = false, drills = DRILLS, install = ["pnpm", ["install", "--frozen-lockfile", "--prefer-offline"]], ports = null, base = tmpdir(), say = console.log, gone = waitHarnessGone, warm = realWarm } = {}) {
+export async function runIsolated({ root = ROOT, names, stages = [], keep = false, headed = false, drills = DRILLS, install = ["pnpm", ["install", "--frozen-lockfile", "--prefer-offline"]], ports = null, base = tmpdir(), say = console.log, gone = waitHarnessGone, warm = realWarm, installLock = null } = {}) {
   const status = git(root, ["status", "--porcelain"]);
   if (status.status !== 0) throw new RunnerError(`git status failed: ${status.stderr.trim()}`);
   assertCleanTree(status.stdout);
@@ -431,6 +499,7 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
   // Ctrl-C / SIGTERM: stop this run's own children (SIGTERM, then SIGKILL after
   // 15 s), remove its own worktree unless --keep, and exit. Nothing else is touched.
   let stopping = false;
+  let current = null;
   const onSignal = async (signal) => {
     if (stopping) return;
     stopping = true;
@@ -440,6 +509,7 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
     const end = Date.now() + 15_000;
     while (children.some((c) => c.exitCode === null && !c.signalCode) && Date.now() < end) await new Promise((r) => setTimeout(r, 100));
     for (const c of children) if (c.exitCode === null && !c.signalCode) c.kill("SIGKILL");
+    if (current) keepServerLog(current.logDir, current.serverLog, worktree);
     if (!keep) removeWorktree();
     else say(`• kept the worktree: ${worktree}`);
     process.exit(signal === "SIGINT" ? 130 : 143);
@@ -455,7 +525,7 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
   try {
     if (install) {
       const log = [];
-      const code = await runChild(install[0], install[1], { cwd: worktree, env: { ...process.env, ...env }, log, echo: false, timeoutMs: 15 * 60_000 });
+      const code = await withInstallLock(() => runChild(install[0], install[1], { cwd: worktree, env: { ...process.env, ...env }, log, echo: false, timeoutMs: 15 * 60_000 }), { say, ...(installLock ? { dir: installLock } : {}) });
       writeFileSync(join(resultsDir, "install.log"), log.join(""));
       if (code !== 0) throw new RunnerError(`pnpm install failed in the worktree (exit ${code}); see ${join(resultsDir, "install.log")}`);
     }
@@ -464,14 +534,16 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
       const log = [];
       const t0 = Date.now();
       say(`\n=== ${name}`);
+      current = { logDir: join(worktree, ".drill-logs", name), serverLog: join(resultsDir, name, "server.log") };
+      const denv = { ...env, DRILL_LOG_DIR: current.logDir };
       const ctx = {
         worktree,
-        env,
+        env: denv,
         ports: chosen,
         log,
         stages: stages.length ? [stages.join(",")] : [],
         headed: headed ? ["--headed"] : [],
-        node: (args, opts = {}) => runChild(node, args, { cwd: worktree, env, log, ...opts }),
+        node: (args, opts = {}) => runChild(node, args, { cwd: worktree, env: denv, log, ...opts }),
       };
       let exit;
       let fontFail = false;
@@ -495,8 +567,11 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
       }
       writeFileSync(join(resultsDir, `${name}.log`), log.join(""));
       const copied = spec.id ? copyResults(worktree, root, stamp, spec.id) : null;
-      rows.push({ drill: name, exit, seconds: Math.round((Date.now() - t0) / 1000), results: copied, log: join(resultsDir, `${name}.log`) });
+      const serverLog = keepServerLog(current.logDir, current.serverLog, worktree);
+      current = null;
+      rows.push({ drill: name, exit, seconds: Math.round((Date.now() - t0) / 1000), results: copied, log: join(resultsDir, `${name}.log`), serverLog });
       say(`--- ${name}: ${exit === 0 ? "passed" : `FAILED (exit ${exit})`} in ${Math.round((Date.now() - t0) / 1000)} s`);
+      if (exit !== 0) say(serverLog ? `--- the last lines of ${serverLog}:\n${tailLines(readFileSync(serverLog, "utf8"))}` : "--- no server log was written");
       if (fontFail) {
         say("✗ the remaining drills are not run.");
         break;

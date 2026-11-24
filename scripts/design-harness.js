@@ -23,7 +23,7 @@
 // the next start); never by name or port. Seed mode never starts it.
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import net from "node:net";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
@@ -291,8 +291,10 @@ export async function waitForHealth(url, child, { timeoutMs = 20_000, logFile, l
 
 // extraArgs: PERF-04's report adds sqld's own admin listener, to read its
 // query counters. The harness itself passes none.
-export function startSqld({ bin, key, port, dataDir, extraArgs = [] }) {
-  const logFile = join(dataDir, `${key}.log`);
+// logDir (DRILL_LOG_DIR in a drill run): the log goes there instead, named
+// after the data folder, so the runner keeps it after a reseed wipes dataDir.
+export function startSqld({ bin, key, port, dataDir, extraArgs = [], logDir = null }) {
+  const logFile = logDir ? join(logDir, `${basename(dataDir).replace(/^\./, "")}-${key}.log`) : join(dataDir, `${key}.log`);
   const out = openSync(logFile, "a");
   // Same process group as the harness: a Ctrl-C in the terminal reaches sqld
   // even if this process is gone. The harness also stops it on purpose.
@@ -559,6 +561,25 @@ const realOr = (p) => {
   }
 };
 
+// Next's stdout and stderr, to this process's own and appended to file, with a
+// header per start (a drill starts the harness many times).
+export function teeNext(child, file, port, { out = process.stdout, err = process.stderr } = {}) {
+  const fd = openSync(file, "a");
+  writeSync(fd, `\n=== ${new Date().toISOString()} next dev on ${port} (pid ${child.pid})\n`);
+  let open = 2;
+  const pipe = (stream, to) => {
+    stream.on("data", (c) => {
+      to.write(c);
+      writeSync(fd, c);
+    });
+    stream.once("close", () => {
+      if (--open === 0) closeSync(fd);
+    });
+  };
+  pipe(child.stdout, out);
+  pipe(child.stderr, err);
+}
+
 export async function runHarness({ mode, root = ROOT, env = process.env, log = console.log, nextCmd, seedCmd, repoint = pointTenantAtThisRun, script = process.argv[1], fixture = null, profile = DESIGN_PROFILE, reset = false } = {}) {
   // A drill child (DRILL_ISOLATED_ROOT names its throwaway worktree) never runs
   // a harness anywhere else: refused before any folder, file or process is made.
@@ -571,6 +592,9 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
   const ports = harnessPorts(env, profile);
   const sqld = findSqld({ env });
   const dataDir = join(root, profile.dataDirName);
+  // A drill run (run-isolated.mjs) names a folder for this harness's server
+  // logs: Next's output is copied there as well as to stdout, and sqld writes there.
+  const logDir = env.DRILL_LOG_DIR || null;
 
   const other = runningHarness(dataDir);
   if (other) {
@@ -645,7 +669,8 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
       chmodSync(dataDir, 0o700);
     } else mkdirSync(dataDir, { recursive: true });
     died = null;
-    servers = DATABASES.map((d) => startSqld({ bin: sqld.bin, key: d.key, port: ports.sqld[d.key], dataDir }));
+    if (logDir) mkdirSync(logDir, { recursive: true });
+    servers = DATABASES.map((d) => startSqld({ bin: sqld.bin, key: d.key, port: ports.sqld[d.key], dataDir, logDir }));
     pidInfo.sqld = servers.map((s) => ({ key: s.key, ...processStamp(s.child.pid), port: s.port }));
     delete pidInfo.next;
     savePidfile();
@@ -740,7 +765,8 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
     log(`• local databases up: ${servers.map((s) => `${s.key} ${s.port}`).join(", ")} (data in ${profile.dataDirName}/)`);
     log(`• local Turso stand-in on ${ports.turso}: new stores from signup get their own database (${fake.dbs().length} so far)`);
     log(`• storefront and consoles: http://${profile.siteHost}:${ports.next}  (merchant /admin/login, operator /platform; passwords in ${profile.loginsFile})`);
-    nextChild = spawn(next[0], next[1], { cwd: root, env: childEnv, stdio: "inherit" });
+    nextChild = spawn(next[0], next[1], { cwd: root, env: childEnv, stdio: logDir ? ["ignore", "pipe", "pipe"] : "inherit" });
+    if (logDir) teeNext(nextChild, join(logDir, `${profile.dataDirName.replace(/^\./, "")}-next.log`), ports.next);
     if (nextChild.pid) {
       pidInfo.next = { ...processStamp(nextChild.pid), port: ports.next, match: next[1][0] };
       savePidfile();
