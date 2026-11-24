@@ -85,7 +85,7 @@ export function readSeed() {
   try {
     return JSON.parse(readFileSync(SEED_FILE, "utf8"));
   } catch {
-    throw new DrillError(`There is no phase 3 seed config (${DATA_DIR_NAME}/p3-seed.json). Reseed: node scripts/seed-design-documents.js --p3 (with the harness stopped).`);
+    throw new DrillError(`There is no phase 3 seed config (${DATA_DIR_NAME}/p3-seed.json). Run the drills with pnpm drill:p5 (or drill:smoke), which seeds a throwaway worktree.`);
   }
 }
 

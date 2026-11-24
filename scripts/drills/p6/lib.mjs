@@ -73,7 +73,7 @@ export function readP6Seed() {
   try {
     return JSON.parse(readFileSync(P6_SEED_PATH, "utf8"));
   } catch {
-    throw new DrillError(`There is no phase 6 seed config (${DATA_DIR_NAME}/p6-seed.json). Seed a stage: node scripts/seed-design-documents.js --p6 --stage a (with the harness stopped).`);
+    throw new DrillError(`There is no phase 6 seed config (${DATA_DIR_NAME}/p6-seed.json). Run the drills with pnpm drill:p6, which seeds a throwaway worktree.`);
   }
 }
 

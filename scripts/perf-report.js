@@ -11,9 +11,10 @@
 //                                           seeded harness data
 //
 // Library mode measures the hot paths against a LARGE catalog (5,000 products
-// / 120 collections / ~30k memberships), queue drain throughput,
-// snapshot/publish with 50 pages, and a noisy-neighbor check (tenant A's
-// search latency while tenant B hammers writes). Its thresholds are
+// / 120 collections / ~30k memberships), queue drain throughput, and a
+// noisy-neighbor check (tenant A's search latency while tenant B hammers
+// writes). The documents CMS's publish and read costs are measured by
+// pnpm test:perf-docs (the legacy release snapshot it timed here is retired). Its thresholds are
 // deliberately generous LOCAL GUARDS for local SQLite + CI variance — they
 // catch ORDER-OF-MAGNITUDE regressions (a missing index, an accidental N+1),
 // not micro-drift. They are not budgets: PERF-04 sets budgets only from hosted
@@ -45,8 +46,6 @@ const { withTenant } = await import("../lib/tenant-context.js");
 const { libsql } = await import("../lib/db.js");
 const repo = await import("../lib/repo.js");
 const { evaluateOffers } = await import("../lib/offers/engine.js");
-const R = await import("../lib/releases.js");
-const S = await import("../lib/cms/store.js");
 const { enqueueJob } = await import("../lib/platform/jobs.js");
 const { runDueJobs } = await import("../lib/platform/worker.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
@@ -94,9 +93,6 @@ await inA(async () => {
     }
     await libsql.batch(member, "write");
   }
-  for (let i = 0; i < 50; i++) {
-    await S.upsertContentPage({ slug: `page-${i}`, title: `Page ${i}`, sections: [{ heading: "H", body: ["Lorem ipsum ".repeat(40)] }] });
-  }
 });
 console.log(`  seeded in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
@@ -142,9 +138,6 @@ await measure("home: newest + featured collections", 400, () =>
 console.log("— offers engine (20-line cart)");
 const bigCart = Array.from({ length: 20 }, (_, i) => ({ variantId: `gid://v/${i}`, productId: `gid://p/${i}`, title: `P${i}`, price: 999, quantity: 2, tags: ["protein"], productType: "Protein", handle: `product-${i}` }));
 await measure("evaluateOffers on 20 items", 50, async () => evaluateOffers(bigCart), { runs: 20 });
-
-console.log("— releases (50 content pages)");
-await measure("snapshot + hash (50 pages)", 600, () => inA(() => R.snapshotContent()));
 
 console.log("— jobs queue drain");
 {

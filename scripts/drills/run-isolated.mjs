@@ -13,7 +13,8 @@
 //
 // Steps:
 //   1. refuse when the tree has tracked changes, or new files under app/,
-//      components/, lib/, scripts/ or migrations/ (drills test committed HEAD)
+//      components/, lib/, scripts/ or migrations/, or new code or config files
+//      at the repo root such as proxy.js (drills test committed HEAD)
 //   2. git worktree add --detach <tmpdir>/storeasy-drill-<stamp> HEAD, then
 //      pnpm install --frozen-lockfile --prefer-offline there (no .env.local)
 //   3. free ports: site from 6100, databases from 7100, the roles store next
@@ -23,15 +24,17 @@
 //      (the drills refuse without it), the ports, PLATFORM_CACHE_MS=1000, and
 //      every Shopify, payment, hosted-database and AI key blank
 //   5. agency-gone first seeds and starts the worktree's own roles store
-//   6. results (docs/cms-reviews/drills/<ID>/ in the worktree) and each
+//   6. the worktree's committed docs/cms-reviews/drills/<ID>/ is emptied before
+//      each drill, so results are this run's only; they and each
 //      drill's output are copied to .drill-results/<stamp>/ here (gitignored),
 //      with summary.json
-//   7. the worktree is removed (git worktree remove --force, prune) unless --keep
+//   7. the worktree is removed (git worktree remove --force, prune) unless --keep;
+//      on Ctrl-C or SIGTERM the runner stops its own children first, then removes it
 //   8. the owner's .design-env, .design-data/seeded.json, p*-seed.json and
 //      roles-seed.json are hashed before and after: any change fails the run
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,6 +43,8 @@ import { BLANKED_ENV, ROOT, isPortBusy, runningHarness } from "../design-harness
 export const OWNER_PORTS = Object.freeze([3017, 3018, 18017, 18018, 18019, 18027, 18028, 18029]);
 const HANDS_OFF = new Set(["docs/CMS_CLAUDE_DIRECTION_BRIEF.md", "docs/CMS_ENTERPRISE_AUDIT_2026-10-29.md", "docs/CMS_SESSION_HANDOFF.md"]);
 const CODE_DIRS = ["app/", "components/", "lib/", "scripts/", "migrations/"];
+// a new file at the root that the build or the drills would load (proxy.js, next.config.ts, tsconfig.json …)
+const ROOT_CODE = /^[^/]+\.(?:[cm]?[jt]sx?|json)$/;
 const DRILL_TIMEOUT_MS = 90 * 60_000;
 
 export class RunnerError extends Error {}
@@ -51,7 +56,7 @@ export function assertCleanTree(porcelain) {
     const path = line.slice(3).replace(/^"|"$/g, "");
     if (HANDS_OFF.has(path)) continue;
     if (line.startsWith("??")) {
-      if (CODE_DIRS.some((d) => path.startsWith(d))) bad.push(`new ${path}`);
+      if (CODE_DIRS.some((d) => path.startsWith(d)) || ROOT_CODE.test(path)) bad.push(`new ${path}`);
     } else bad.push(`changed ${path}`);
   }
   if (bad.length) throw new RunnerError(`Drills test committed code only: commit or stash first (${bad.slice(0, 5).join(", ")}${bad.length > 5 ? ", …" : ""}).`);
@@ -89,6 +94,20 @@ export function ownerDataFingerprint(root) {
     }
   }
   return out;
+}
+
+// 6. Before a drill: empty the worktree's results folder for <id> (it holds
+// committed historical results). Never the checkout itself.
+export function clearResults(worktree, root, id) {
+  const real = (p) => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+  if (real(worktree) === real(root)) throw new RunnerError(`clearResults empties a drill worktree's results, never this checkout (${root}).`);
+  rmSync(join(worktree, "docs", "cms-reviews", "drills", id), { recursive: true, force: true });
 }
 
 // 6. <worktree>/docs/cms-reviews/drills/<id>/ → <root>/.drill-results/<stamp>/<id>/
@@ -134,10 +153,20 @@ export function drillEnv(base, worktree, ports) {
   };
 }
 
+// The children this process started and that have not exited yet: the only
+// processes a Ctrl-C or SIGTERM ever stops.
+const LIVE = new Set();
+function track(child) {
+  LIVE.add(child);
+  child.once("exit", () => LIVE.delete(child));
+  child.once("error", () => LIVE.delete(child));
+  return child;
+}
+
 // Runs one child to the end, its output appended to a log. → exit code.
 function runChild(cmd, args, { cwd, env, log, timeoutMs = DRILL_TIMEOUT_MS, echo = true }) {
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
+    const child = track(spawn(cmd, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] }));
     const out = (c) => {
       log.push(String(c));
       if (echo) process.stdout.write(c);
@@ -162,7 +191,7 @@ function runChild(cmd, args, { cwd, env, log, timeoutMs = DRILL_TIMEOUT_MS, echo
 
 // A server child (the roles store) until stop(); only this handle is ever stopped.
 function startChild(cmd, args, { cwd, env, log }) {
-  const child = spawn(cmd, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
+  const child = track(spawn(cmd, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] }));
   child.stdout.on("data", (c) => log.push(String(c)));
   child.stderr.on("data", (c) => log.push(String(c)));
   return {
@@ -239,6 +268,28 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
   const add = git(root, ["worktree", "add", "--detach", path, "HEAD"]);
   if (add.status !== 0) throw new RunnerError(`git worktree add failed: ${add.stderr.trim()}`);
   const worktree = realpathSync(path);
+  const removeWorktree = () => {
+    git(root, ["worktree", "remove", "--force", path]);
+    git(root, ["worktree", "prune"]);
+  };
+  // Ctrl-C / SIGTERM: stop this run's own children (SIGTERM, then SIGKILL after
+  // 15 s), remove its own worktree unless --keep, and exit. Nothing else is touched.
+  let stopping = false;
+  const onSignal = async (signal) => {
+    if (stopping) return;
+    stopping = true;
+    say(`\n✗ ${signal}: stopping this run's ${LIVE.size} child process(es)${keep ? "" : " and removing its worktree"}`);
+    const children = [...LIVE];
+    for (const c of children) c.kill("SIGTERM");
+    const end = Date.now() + 15_000;
+    while (children.some((c) => c.exitCode === null && !c.signalCode) && Date.now() < end) await new Promise((r) => setTimeout(r, 100));
+    for (const c of children) if (c.exitCode === null && !c.signalCode) c.kill("SIGKILL");
+    if (!keep) removeWorktree();
+    else say(`• kept the worktree: ${worktree}`);
+    process.exit(signal === "SIGINT" ? 130 : 143);
+  };
+  const signals = ["SIGINT", "SIGTERM"];
+  for (const sig of signals) process.on(sig, onSignal);
   const resultsDir = join(root, ".drill-results", stamp);
   mkdirSync(resultsDir, { recursive: true });
   const env = drillEnv(process.env, worktree, chosen);
@@ -268,6 +319,7 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
       };
       let exit;
       try {
+        if (spec.id) clearResults(worktree, root, spec.id);
         exit = await spec.run(ctx);
       } catch (e) {
         log.push(`✗ ${e.stack || e}\n`);
@@ -285,10 +337,9 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
       }
     }
   } finally {
-    if (!keep) {
-      git(root, ["worktree", "remove", "--force", path]);
-      git(root, ["worktree", "prune"]);
-    } else say(`• kept the worktree: ${worktree}`);
+    for (const sig of signals) process.off(sig, onSignal);
+    if (!keep) removeWorktree();
+    else say(`• kept the worktree: ${worktree}`);
     const after = ownerDataFingerprint(root);
     const changed = Object.keys({ ...before, ...after }).filter((k) => before[k] !== after[k]);
     const summary = { ranAt: stamp, head, worktree, kept: keep, ports: chosen, rows, ownerData: { before, after, changed }, failed: rows.filter((r) => r.exit !== 0).length + (changed.length ? 1 : 0) };

@@ -82,7 +82,7 @@ export function routesFor(measured, { extra = false, journalPosts = 60 } = {}) {
     : [];
   return [
     { key: "home", label: "Home", path: "/", headers: html, expect: ["Shop by category", "Top rated"] },
-    { key: "product", label: "Product page", path: `/products/${measured.productHandle}`, headers: html, expect: [measured.productTitle, "Pairs well with"] },
+    { key: "product", label: "Product page", path: `/products/${measured.productHandle}`, headers: html, expect: [measured.productTitle] },
     { key: "collection", label: "Collection page (one category)", path: `/collections/${measured.categoryCollection}`, headers: html, expect: [measured.categoryTitle] },
     { key: "collection-all", label: "Collection page (shop all, 400 products)", path: `/collections/${measured.allCollection}`, headers: html, expect: [measured.allTitle] },
     { key: "collections", label: "/collections", path: "/collections", headers: html, expect: [measured.allTitle, measured.categoryTitle] },
@@ -583,14 +583,15 @@ async function readFixtureSizes(tenantUrl) {
       ["productImages", "SELECT count(*) n FROM product_images"],
       ["collections", "SELECT count(*) n FROM collections"],
       ["collectionMemberships", "SELECT count(*) n FROM collection_products"],
-      ["contentPages", "SELECT count(*) n FROM cms_pages WHERE family = 'page'"],
-      ["journalPosts", "SELECT count(*) n FROM cms_pages WHERE family = 'journal'"],
-      ["campaigns", "SELECT count(*) n FROM cms_pages WHERE family = 'campaign'"],
       ["offers", "SELECT count(*) n FROM offers"],
       ["bundles", "SELECT count(*) n FROM bundles"],
-      ["placements", "SELECT count(*) n FROM placements"],
       ["media", "SELECT count(*) n FROM media"],
       ["mediaBytes", "SELECT coalesce(sum(size), 0) n FROM media"],
+      // documents CMS: route documents by type (the legacy cms_pages,
+      // cms_blocks and placements tables are not written any more)
+      ["contentPages", "SELECT count(*) n FROM documents WHERE type = 'page'"],
+      ["journalPosts", "SELECT count(*) n FROM documents WHERE type = 'journal'"],
+      ["campaigns", "SELECT count(*) n FROM documents WHERE type = 'campaign'"],
       ["liveReleaseBytes", "SELECT length(r.content) n FROM releases r JOIN release_state s ON s.live_release_id = r.id"],
     ]) {
       try {
@@ -614,9 +615,11 @@ async function readFixtureSizes(tenantUrl) {
         out[k] = null;
       }
     }
-    const home = await c.execute("SELECT value FROM cms_blocks WHERE key = 'home_sections'").catch(() => null);
+    // the home document's sections (its published version)
+    const home = await c.execute("SELECT v.body FROM documents d JOIN document_versions v ON v.id = d.published_version_id WHERE d.id = 'doc_home'").catch(() => null);
     try {
-      out.homeSections = JSON.parse(home?.rows?.[0]?.value || "[]").length;
+      const body = home?.rows?.[0]?.body;
+      out.homeSections = body ? (JSON.parse(body).sections || []).length : null;
     } catch {
       out.homeSections = null;
     }

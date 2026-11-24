@@ -22,7 +22,7 @@
 //      from an import("…") is exported there, so a deleted module or export
 //      fails pnpm test instead of the next seed
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -109,6 +109,30 @@ await t("assertIsolated refuses this checkout unless DRILL_ISOLATED_ROOT is it",
   eq(assertIsolated({ DRILL_ISOLATED_ROOT: ROOT }, ROOT), ROOT, "this checkout named:");
 });
 
+await t("seed-design-documents.js refuses to seed or wipe .design-data outside the drill worktree; check stays read-only and allowed", async () => {
+  const { assertSeedAllowed } = await import("./seed-design-documents.js");
+  for (const argv of [[], ["--p3"], ["--p6", "--stage", "a"], ["--worst-case"], ["--drafts-only"]]) {
+    throws(() => assertSeedAllowed(argv, {}, ROOT), /pnpm drill:/, `${argv.join(" ") || "(plain)"} with no env:`);
+    throws(() => assertSeedAllowed(argv, { DRILL_ISOLATED_ROOT: tmpdir() }, ROOT), /throwaway worktree/, `${argv.join(" ") || "(plain)"} in another folder:`);
+    assertSeedAllowed(argv, { DRILL_ISOLATED_ROOT: ROOT }, ROOT);
+  }
+  for (const argv of [["check"], ["check", "--p3"], ["check", "--p6"]]) assertSeedAllowed(argv, {}, ROOT);
+  // the CLI refuses before anything runs (--p3 with --drafts-only is refused by parseArgs too, so this never seeds)
+  const r = spawnSync(process.execPath, ["scripts/seed-design-documents.js", "--p3", "--drafts-only"], { cwd: ROOT, env: cleanEnv(), encoding: "utf8", timeout: 30_000 });
+  eq(r.status, 1, "exit:");
+  ok(/pnpm drill:/.test(r.stderr), `says use pnpm drill: ${r.stderr.trim().slice(0, 200)}`);
+  // pnpm seed:design (the owner's command) does not go through this file
+  const { scripts } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  eq(scripts["seed:design"], "node scripts/dev-design.js seed", "seed:design:");
+  ok(!readFileSync(join(ROOT, "scripts/dev-design.js"), "utf8").includes("seed-design-documents"), "dev-design.js does not run seed-design-documents.js:");
+  // the missing-seed messages send the reader to pnpm drill:<name>, never to a reseed of this checkout
+  for (const [file, drill] of [["scripts/drills/p3/lib.mjs", "p5"], ["scripts/drills/p6/lib.mjs", "p6"]]) {
+    const src = readFileSync(join(ROOT, file), "utf8");
+    ok(!/(Reseed|Seed a stage): node scripts\/seed-design-documents/.test(src), `${file} still tells the reader to seed this checkout:`);
+    ok(src.includes(`pnpm drill:${drill}`), `${file} names pnpm drill:${drill}:`);
+  }
+});
+
 await t("drill.js, p5 and p6 refuse to start in the main checkout (before any seed, server or browser)", async () => {
   for (const [args, code] of [[["scripts/drill.js", "smoke", "--start"], 2], [["scripts/drills/p5/run.mjs"], 1], [["scripts/drills/p6/run.mjs"], 1]]) {
     const r = spawnSync(process.execPath, args, { cwd: ROOT, env: { ...cleanEnv(), DESIGN_PORT: "6190", DESIGN_SQLD_PORT: "7190" }, encoding: "utf8", timeout: 60_000 });
@@ -131,6 +155,8 @@ await t("assertCleanTree refuses tracked changes and new code files; ignores the
   throws(() => R.assertCleanTree("M  package.json\n"), /commit/, "staged:");
   throws(() => R.assertCleanTree("?? scripts/new-thing.js\n"), /new scripts\/new-thing\.js/, "new script:");
   throws(() => R.assertCleanTree("?? app/x/page.js\n"), /commit/, "new page:");
+  throws(() => R.assertCleanTree("?? proxy.js\n"), /new proxy\.js/, "new root proxy.js:");
+  throws(() => R.assertCleanTree("?? next.config.ts\n"), /commit/, "new root config:");
   R.assertCleanTree("");
   R.assertCleanTree("?? docs/CMS_CLAUDE_DIRECTION_BRIEF.md\n?? docs/CMS_ENTERPRISE_AUDIT_2026-10-29.md\n?? docs/CMS_SESSION_HANDOFF.md\n?? notes.txt\n");
 });
@@ -258,6 +284,71 @@ await t("between drills the runner waits until the last harness has exited (pid 
   }
 });
 
+await t("results are always this run's: the worktree's committed docs/cms-reviews/drills/<ID>/ is emptied before each drill (worktree only)", async () => {
+  const root = standInRepo();
+  const g = (...a) => spawnSync("git", ["-C", root, "-c", "user.name=t", "-c", "user.email=t@t.test", ...a], { encoding: "utf8" });
+  mkdirSync(join(root, "docs/cms-reviews/drills/STANDIN"), { recursive: true });
+  writeFileSync(join(root, "docs/cms-reviews/drills/STANDIN/old.json"), '{"old":true}\n');
+  g("add", ".");
+  g("commit", "-qm", "historical results");
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "drills-wt-")));
+  try {
+    const s = await R.runIsolated({ root, names: ["standin"], drills: { standin: { id: "STANDIN", run: (c) => c.node(["-e", RESEED], { echo: false }) } }, install: null, ports: PORTS, base, say: () => {} });
+    eq(s.rows[0].exit, 0, "exit:");
+    ok(existsSync(join(s.rows[0].results, "results.json")), "this run's results copied:");
+    ok(!existsSync(join(s.rows[0].results, "old.json")), "the committed old results are not copied:");
+    ok(existsSync(join(root, "docs/cms-reviews/drills/STANDIN/old.json")), "the checkout's own committed file is untouched:");
+    throws(() => R.clearResults(root, root, "STANDIN"), /worktree/, "refuses the checkout itself:");
+    ok(existsSync(join(root, "docs/cms-reviews/drills/STANDIN/old.json")), "still there after the refusal:");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+await t("Ctrl-C (SIGINT) or SIGTERM: the runner stops its own children and removes its own worktree", async () => {
+  const { spawn } = await import("node:child_process");
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    const root = standInRepo();
+    const base = realpathSync(mkdtempSync(join(tmpdir(), "drills-wt-")));
+    const pidFile = join(base, "grandchild.pid");
+    const slow = `require("fs").writeFileSync(${JSON.stringify(pidFile)},String(process.pid));setInterval(()=>{},1000)`;
+    const script = `const R=await import(${JSON.stringify(new URL("./drills/run-isolated.mjs", import.meta.url).href)});await R.runIsolated({root:${JSON.stringify(root)},names:["slow"],drills:{slow:{id:null,run:(c)=>c.node(["-e",${JSON.stringify(slow)}],{echo:false})}},install:null,ports:${JSON.stringify(PORTS)},base:${JSON.stringify(base)},say:()=>{}});`;
+    const runner = spawn(process.execPath, ["--input-type=module", "-e", script], { cwd: ROOT, env: cleanEnv(), stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    runner.stdout.on("data", (c) => (out += c));
+    runner.stderr.on("data", (c) => (out += c));
+    let grandchild = null;
+    const alive = (pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    try {
+      for (let i = 0; i < 100 && !existsSync(pidFile); i++) await new Promise((r) => setTimeout(r, 100));
+      ok(existsSync(pidFile), `the drill child started: ${out}`);
+      grandchild = Number(readFileSync(pidFile, "utf8"));
+      eq(worktrees(root), 2, "worktree made:");
+      const exited = new Promise((r) => runner.once("exit", (code, sig) => r({ code, sig })));
+      runner.kill(signal);
+      const { code } = await exited;
+      ok(code !== 0, `${signal}: the runner exits non-zero (${code}): ${out}`);
+      for (let i = 0; i < 50 && alive(grandchild); i++) await new Promise((r) => setTimeout(r, 100));
+      ok(!alive(grandchild), `${signal}: its drill child was stopped:`);
+      eq(worktrees(root), 1, `${signal}: worktree removed (git worktree list):`);
+      eq(readdirSync(base).filter((f) => f.startsWith("storeasy-drill-")).join(","), "", `${signal}: worktree folder removed:`);
+    } finally {
+      if (runner.exitCode === null) runner.kill("SIGKILL");
+      if (grandchild && alive(grandchild)) process.kill(grandchild, "SIGKILL");
+      rmSync(root, { recursive: true, force: true });
+      rmSync(base, { recursive: true, force: true });
+    }
+  }
+});
+
 await t("smoke seeds the --p3 documents store (a live release) before it starts its harness", async () => {
   const calls = [];
   await R.DRILLS.smoke.run({ node: async (args) => (calls.push(args.join(" ")), 0), headed: [] });
@@ -272,7 +363,7 @@ await t("the drill helpers' own checks pass (p4, p5 and p6 lib.mjs --check; p6 c
 });
 
 await t("every module the seed and drill scripts load exists, with the names they take (seed:design, --p3, --p6, seed:roles, the drills)", async () => {
-  const entries = ["scripts/seed-design-preview.js", "scripts/seed-design-documents.js", "scripts/perf-docs-fixture.js", "scripts/dev-design.js", "scripts/dev-roles.js", "scripts/seed-roles.js", "scripts/drill.js", "scripts/drills/run-isolated.mjs", "scripts/drills/smoke.js", "scripts/drills/agency-gone.mjs", "scripts/drills/p5/run.mjs", "scripts/drills/p5/blocks.mjs", "scripts/drills/p6/run.mjs", "scripts/drills/p6/seed-p6.mjs"];
+  const entries = ["scripts/seed-design-preview.js", "scripts/seed-design-documents.js", "scripts/perf-docs-fixture.js", "scripts/dev-design.js", "scripts/dev-roles.js", "scripts/seed-roles.js", "scripts/drill.js", "scripts/drills/run-isolated.mjs", "scripts/drills/smoke.js", "scripts/drills/agency-gone.mjs", "scripts/drills/p5/run.mjs", "scripts/drills/p5/blocks.mjs", "scripts/drills/p6/run.mjs", "scripts/drills/p6/seed-p6.mjs", "scripts/drills/p6/generate.mjs", "scripts/drills/p6/brand.mjs", "scripts/drills/p6/open.mjs", "scripts/drills/p6/empty.mjs", "scripts/drills/p6/setup.mjs", "scripts/drill-maintenance-edge.js", "scripts/perf-report.js"];
   const seen = new Set();
   const missing = [];
   const walk = (file) => {
@@ -296,6 +387,17 @@ await t("every module the seed and drill scripts load exists, with the names the
     }
   };
   for (const e of entries) walk(join(ROOT, e));
+  // p5 and p6 load their stages through a variable import: STAGE_FILES { stage: ["./file.mjs", "export"] }
+  for (const run of ["scripts/drills/p5/run.mjs", "scripts/drills/p6/run.mjs"]) {
+    const stages = [...readFileSync(join(ROOT, run), "utf8").matchAll(/\[\s*"(\.\/[^"]+\.mjs)",\s*"(\w+)"\s*\]/g)];
+    ok(stages.length >= 5, `${run}: found ${stages.length} stage files:`);
+    for (const [, file, name] of stages) {
+      const target = resolve(dirname(join(ROOT, run)), file);
+      if (!existsSync(target)) missing.push(`${run} → ${file}`);
+      else if (!new RegExp(`export\\s+(?:async\\s+)?function\\s+${name}\\b|export\\s*\\{[^}]*\\b${name}\\b`).test(readFileSync(target, "utf8"))) missing.push(`${run} → ${file} has no export ${name}`);
+      else walk(target);
+    }
+  }
   ok(seen.size > 50, `followed ${seen.size} files:`);
   eq(missing.join("; "), "", "missing modules:");
 });

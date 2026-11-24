@@ -305,8 +305,8 @@ export function buildPerfFixture(spec = PERF_FIXTURE) {
   ].slice(0, spec.quizzes);
 
   // The product the report measures: 6 variants (3 flavours by 2 sizes) and
-  // 6 photos, with a pairs list, a badge and an extra accordion, so its page
-  // reads everything a product page can read.
+  // 6 photos. Its pairs list, badge and extra accordion stay in the fixture
+  // data only (not seeded: see seedPerfFixture).
   const MEASURED = 11;
   const measuredProduct = products[MEASURED];
   const pairSources = [measuredProduct, ...products.filter((p, i) => i !== MEASURED && i % 9 === 0)].slice(0, spec.pairedProducts);
@@ -424,10 +424,12 @@ export async function seedPerfFixture({ libsql, log = () => {}, spec = PERF_FIXT
   await inChunks(stmts);
   log(`  catalog: ${fx.products.length} products, ${fx.collections.length} collections added`);
 
-  // The fixture's content (home, header, footer, pages, posts, campaigns,
-  // pairs, badges, pins) becomes documents in perf-docs-fixture.js
-  // (takeOverHarnessStore); the legacy content writers were retired with the
-  // legacy CMS, so nothing is written to the old content tables here.
+  // The fixture's content (home, header, footer, pages, posts, campaigns)
+  // becomes documents in perf-docs-fixture.js. Its pairs, badges and pins
+  // (fx.placements, fx.overrides, fx.pins) are NOT seeded anywhere: their
+  // legacy writers were retired with the legacy CMS and perf-docs-fixture.js
+  // does not carry them, so the measured product page shows the automatic
+  // "Pairs well with" list at most, and no badge.
 
   // commerce
   const { upsertOffer } = await import("../lib/offers/store.js");

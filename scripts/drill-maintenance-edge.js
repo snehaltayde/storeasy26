@@ -177,7 +177,9 @@ try {
   const { withTenant } = await import("../lib/tenant-context.js");
   const { libsql } = await import("../lib/db.js");
   const I = await import("../lib/platform/identity.js");
-  const S = await import("../lib/cms/store.js");
+  const Reg = await import("../lib/registry/index.js");
+  const { singletonId } = await import("../lib/documents/ids.js");
+  const { publishDocumentsFixture } = await import("./perf-docs-fixture.js");
   const { createSession } = await import("../lib/platform/sessions.js");
   const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 
@@ -209,10 +211,24 @@ try {
       args: [collectionId, MARK.collectionHandle, MARK.collection, now, now],
     });
     await libsql.execute({ sql: "INSERT INTO collection_products (collection_id, product_id, position) VALUES (?, ?, 0)", args: [collectionId, productId] });
-    const text = (heading) => [{ kind: "text", heading, body: [heading] }];
-    await S.upsertContentPage({ slug: "about", title: MARK.about, sections: text(MARK.about) }, { expectedRevision: null });
-    await S.upsertContentPage({ slug: "drill-policy", title: MARK.policy, sections: text(MARK.policy) }, { expectedRevision: null });
-    await S.setBlock("hero", { eyebrow: MARK.hero, title: MARK.hero, subtitle: MARK.hero });
+    // The marked content as published documents: the about page, a policy
+    // page and the home hero, written and published through lib/documents.
+    const page = (slug, title) => {
+      const b = Reg.emptyBody("page");
+      b.meta = { ...b.meta, slug, title };
+      b.sections = Reg.legacyPageSectionsToSections([{ kind: "text", heading: title, body: [title] }]);
+      return { id: null, type: "page", body: b };
+    };
+    const home = Reg.emptyBody("home");
+    home.sections = [Reg.legacyHeroToSection({ eyebrow: MARK.hero, title: MARK.hero, subtitle: MARK.hero })];
+    const documents = [{ id: singletonId("home"), type: "home", body: home }, page("about", MARK.about), page("drill-policy", MARK.policy)];
+    for (const d of documents) {
+      const r = Reg.validateDocument(d.body, { mode: "publish", documentId: d.id ?? d.body.meta.slug });
+      const errors = r.issues.filter((i) => i.severity === "error");
+      if (errors.length) throw new Error(`the drill's ${d.type} document would not publish: ${JSON.stringify(errors).slice(0, 400)}`);
+      d.body = r.body;
+    }
+    await publishDocumentsFixture({ documents });
   });
 
   const member = await I.createUser({ email: "member@edge.test", password: "drill-member-pass" });

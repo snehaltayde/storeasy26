@@ -11,7 +11,8 @@
 // library photos those documents point at:
 //   DESIGN_PORT=… DESIGN_SQLD_PORT=… node scripts/dev-design.js seed --fixture perf
 //
-// Then, with the harness stopped:
+// Then, with the harness stopped, in a drill worktree only (pnpm drill:<name>
+// runs these; anywhere else every mode but check refuses):
 //   node scripts/seed-design-documents.js [--posts N] [--drafts-only] [--worst-case]
 //     --posts N       journal posts in the fixture (default 3)
 //     --drafts-only   create the documents as drafts and publish nothing: a
@@ -53,6 +54,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertIsolated } from "./drill.js";
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
@@ -572,7 +574,16 @@ export function parseArgs(argv) {
   return out;
 }
 
+// Every mode but check wipes or writes .design-data, so it runs only in the
+// throwaway worktree pnpm drill:<name> makes (DRILL_ISOLATED_ROOT is that
+// worktree). pnpm seed:design is scripts/dev-design.js and never comes here.
+export function assertSeedAllowed(argv, env = process.env, root) {
+  if (argv[0] === "check") return;
+  assertIsolated(env, root);
+}
+
 async function main(argv) {
+  assertSeedAllowed(argv);
   const opts = parseArgs(argv);
   if (opts.p6) return opts.cmd === "check" ? checkP6() : seedP6(opts);
   if (opts.cmd === "check") {
