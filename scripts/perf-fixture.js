@@ -449,10 +449,6 @@ export async function seedPerfFixture({ libsql, log = () => {}, spec = PERF_FIXT
     await libsql.execute({ sql: "INSERT INTO cart_items (cart_id, variant_id, product_id, quantity, price_at_add, added_at) VALUES (?,?,?,?,?,?)", args: [fx.measured.cart.id, line.variantId, line.productId, line.quantity, price, iso(n * 1000)] });
   }
 
-  // publish, so the live storefront serves the fixture
-  const { createRelease, publishReleaseById } = await import("../lib/releases.js");
-  const rel = await createRelease({ note: "PERF-04 fixture", actor: "seed" });
-  await publishReleaseById(rel.id);
-  log(`  content: ${fx.pages.length} pages, ${fx.posts.length} journal posts, ${fx.campaigns.length} campaigns, ${fx.homeSections.length} home sections; published`);
-  return { summary: fixtureSummary(fx), measured: fx.measured, release: rel.id };
+  // the content is published as documents by perf-docs-fixture.js (takeOver)
+  return { summary: fixtureSummary(fx), measured: fx.measured, release: null };
 }

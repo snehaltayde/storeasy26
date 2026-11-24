@@ -200,14 +200,9 @@ await withTenant(t, async () => {
     enabled: false,
   });
 
-  // ---- a release ------------------------------------------------------------
-  // The legacy content writers (blocks, pages, placements) were retired with
-  // the legacy CMS; content is documents now (seed-design-documents.js and
-  // perf-docs-fixture.js write them). The release stays: takeOver clears its
-  // pointer when the store moves to documents mode.
-  const { createRelease, publishReleaseById } = await import("../lib/releases.js");
-  const rel = await createRelease({ note: "Launch content", actor: "seed" });
-  await publishReleaseById(rel.id);
+  // No content here: the legacy content writers (blocks, pages, placements,
+  // releases) were retired with the legacy CMS. Content is documents now
+  // (seed-design-documents.js and perf-docs-fixture.js write them).
 
   // ---- experiments: running + completed --------------------------------------
   const X = await import("../lib/experiments.js");

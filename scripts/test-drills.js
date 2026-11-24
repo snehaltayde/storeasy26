@@ -16,7 +16,8 @@
 //      stand-in that writes the owner's data fails the run
 //   6. the drill helpers' own checks (p4, p5 and p6 lib.mjs --check)
 //   7. every module the seed and drill scripts load (static and import("…")
-//      relative paths, followed through scripts/) exists, so a deleted module
+//      relative paths, followed through scripts/) exists, and each name taken
+//      from an import("…") is exported there, so a deleted module or export
 //      fails pnpm test instead of the next seed
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -226,7 +227,7 @@ await t("the drill helpers' own checks pass (p4, p5 and p6 lib.mjs --check; p6 c
   }
 });
 
-await t("every module the seed and drill scripts load exists (seed:design, --p3, --p6, seed:roles, the drills)", async () => {
+await t("every module the seed and drill scripts load exists, with the names they take (seed:design, --p3, --p6, seed:roles, the drills)", async () => {
   const entries = ["scripts/seed-design-preview.js", "scripts/seed-design-documents.js", "scripts/perf-docs-fixture.js", "scripts/dev-design.js", "scripts/dev-roles.js", "scripts/seed-roles.js", "scripts/drill.js", "scripts/drills/run-isolated.mjs", "scripts/drills/smoke.js", "scripts/drills/agency-gone.mjs", "scripts/drills/p5/run.mjs", "scripts/drills/p5/blocks.mjs", "scripts/drills/p6/run.mjs", "scripts/drills/p6/seed-p6.mjs"];
   const seen = new Set();
   const missing = [];
@@ -237,6 +238,17 @@ await t("every module the seed and drill scripts load exists (seed:design, --p3,
       const target = resolve(dirname(file), m[1]);
       if (!existsSync(target)) missing.push(`${relative(ROOT, file)} → ${m[1]}`);
       else if (/\.m?js$/.test(target)) walk(target);
+    }
+    // const { a, b: c } = await import("./x.js"): each name must be exported there
+    for (const m of readFileSync(file, "utf8").matchAll(/const\s*\{([^}]+)\}\s*=\s*await\s+import\(\s*["'](\.{1,2}\/[^"']+)["']\s*\)/g)) {
+      const target = resolve(dirname(file), m[2]);
+      if (!existsSync(target)) continue;
+      const src = readFileSync(target, "utf8");
+      if (/export\s*\*/.test(src)) continue;
+      for (const name of m[1].split(",").map((x) => x.split(":")[0].trim()).filter(Boolean)) {
+        const exported = new RegExp(`export\\s+(?:async\\s+)?(?:function\\*?|const|let|class)\\s+${name}\\b|export\\s*\\{[^}]*\\b${name}\\b[^}]*\\}`).test(src);
+        if (!exported) missing.push(`${relative(ROOT, file)} → ${m[2]} has no export ${name}`);
+      }
     }
   };
   for (const e of entries) walk(join(ROOT, e));
