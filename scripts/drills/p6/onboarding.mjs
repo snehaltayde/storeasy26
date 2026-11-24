@@ -72,7 +72,7 @@ export async function onboardingStage(drill) {
   const inProgress = await waitFor(async () => ((await readPage(page)).states.brand === "in_progress" ? true : false), 30_000, 500);
   v = await readPage(page);
   drill.check(made === "ready" && inProgress && v.text.includes("In progress") && v.progress.includes("2 of 4"), "the starter store is made in the Brand step and the step turns In progress without a reload; '2 of 4 steps done'", { made, brand: v.states.brand, progress: v.progress });
-  await drill.screenshot(page, "h-onboarding-brand-1440");
+  await drill.screenshot(page, "h-onboarding-brand-1440", { fullPage: true });
 
   // ---- 2. resume ----
   await goStep(drill, page, "import");
@@ -94,7 +94,7 @@ export async function onboardingStage(drill) {
   await page.getByRole("button", { name: "I haven't placed one yet", exact: true }).click();
   await page.getByRole("button", { name: "I placed a test order", exact: true }).waitFor({ timeout: 30_000 });
   drill.check(!(await tenantConfig())?.onboarding?.manual?.test_order, "'I haven't placed one yet' clears it", (await tenantConfig())?.onboarding?.manual ?? null);
-  await drill.screenshot(page, "h-onboarding-open-1440");
+  await drill.screenshot(page, "h-onboarding-open-1440", { fullPage: true });
 
   // the same page at 375: the compact list above the panel, no sideways scroll
   const narrow = await p6Context(drill, { width: 375 });
@@ -102,16 +102,17 @@ export async function onboardingStage(drill) {
   await goStep(drill, np, "open");
   v = await readPage(np);
   drill.check(v.compactVisible && !v.railVisible && !v.overflow && Object.keys(v.states).length === 4, "at 375 the compact step list shows above the panel and nothing scrolls sideways", { compact: v.compactVisible, rail: v.railVisible, overflow: v.overflow });
-  await drill.screenshot(np, "h-onboarding-open-375");
+  await drill.screenshot(np, "h-onboarding-open-375", { fullPage: true });
   await narrow.close();
   // the in-between widths (screenshots only): 768 keeps the compact list, 1280 has the rail
-  for (const width of [768, 1280]) {
+  for (const width of [375, 768, 1280]) {
     const wctx = await p6Context(drill, { width });
     const wp = await loginP6(drill, wctx);
+    wp.on("console", (m) => ["error", "warning"].includes(m.type()) && console.log(`  [console ${width}] ${m.type()}: ${m.text().slice(0, 400)}`));
     await goStep(drill, wp, "brand");
-    await drill.screenshot(wp, `h-onboarding-brand-${width}`);
+    await drill.screenshot(wp, `h-onboarding-brand-${width}`, { fullPage: true });
     await goStep(drill, wp, "import");
-    await drill.screenshot(wp, `h-onboarding-import-${width}`);
+    await drill.screenshot(wp, `h-onboarding-import-${width}`, { fullPage: true });
     await wctx.close();
   }
 
@@ -126,10 +127,10 @@ export async function onboardingStage(drill) {
   const byText = (t) => gated.find((g) => g.text === t);
   drill.check(byText("I placed a test order")?.disabled && byText("I placed a test order")?.reason === READ_ONLY && byText("Go to Publish in the editor")?.disabled && byText("Go to Publish in the editor")?.reason === READ_ONLY, "support: 'I placed a test order' and 'Go to Publish in the editor' are disabled with 'Your role can look at this but not change it.'", gated);
   drill.check(gated.every((g) => g.disabled || g.text.startsWith("Next:")), "support: no enabled control in the Open step", gated);
-  await drill.screenshot(sp, "h-onboarding-support-open-1440");
+  await drill.screenshot(sp, "h-onboarding-support-open-1440", { fullPage: true });
   await goStep(drill, sp, "brand");
   const brandText = clean(await sp.locator('[data-onboarding="panel"]').innerText());
-  await drill.screenshot(sp, "h-onboarding-support-brand-1440");
+  await drill.screenshot(sp, "h-onboarding-support-brand-1440", { fullPage: true });
   drill.check(brandText.includes(READ_ONLY), "support: the Brand step says why nothing can be changed", brandText.slice(0, 300));
   const brandButtons = await sp.locator('[data-onboarding="panel"] [data-brand-step] button:not([disabled])').count();
   drill.check(brandButtons === 0, "support: the brand step has no enabled button", brandButtons);
@@ -168,7 +169,7 @@ export async function onboardingStage(drill) {
   const status = clean(await after.locator('[data-onboarding="status"]').innerText().catch(() => ""));
   drill.check(Object.values(v.states).length === 4 && Object.values(v.states).every((s) => s === "done") && v.progress.includes("4 of 4") && status.toLowerCase() === "open", "onboarding: every step Done, '4 of 4', the Open badge", { states: v.states, progress: v.progress, status });
   drill.check(v.step === "open" && v.text.includes("Your store is open."), "it opens on 'Open your store': 'Your store is open.'", v.text.slice(0, 200));
-  await drill.screenshot(after, "h-onboarding-all-done-1440");
+  await drill.screenshot(after, "h-onboarding-all-done-1440", { fullPage: true });
 
   drill.check(errors.length === 0, "no page errors", errors);
   await ctx.close();

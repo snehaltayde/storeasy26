@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleAlert } from "lucide-react";
+import { CircleAlert, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
 import StepList, { STATE_WORDS } from "./StepList";
@@ -35,6 +35,8 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
   const [model, setModel] = useState(initial);
   const [selected, setSelected] = useState(initialStep);
   const reading = useRef(false);
+  const heading = useRef(null);
+  const focusHeading = useRef(false);
 
   const refresh = useCallback(async () => {
     if (reading.current) return;
@@ -64,7 +66,16 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
 
-  function choose(id) {
+  useEffect(() => {
+    if (!focusHeading.current) return;
+    focusHeading.current = false;
+    heading.current?.focus();
+  }, [selected]);
+
+  // from a button inside the panel (Next, Go to …), which goes away with the
+  // panel: focus moves to the new step's title so the keyboard isn't lost
+  function choose(id, { focus = false } = {}) {
+    focusHeading.current = focus;
     setSelected(id);
     router.replace(`?step=${id}`, { scroll: false });
   }
@@ -73,6 +84,13 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
   const step = model.steps[index];
   const Panel = PANELS[step.id];
   const nextUp = step.state === "done" ? model.steps.find((s, i) => i > index && s.state !== "done") || null : null;
+  // the step this one waits for, when that is another step: the way to it is
+  // the page's one next action
+  const waitsFor = step.state === "blocked" ? model.steps.find((s) => s.id === step.blockedBy) || null : null;
+  // Brand and Import still show old screens (data-legacy) until lines 4–7
+  // rebuild them: they sit on a sunken tray, so their own cards read as
+  // content inside the step, not as a second page inside the card
+  const tray = (step.id === "brand" || step.id === "import") && step.state !== "blocked";
   const list = { steps: model.steps, selected: step.id, onSelect: choose, doneCount: model.doneCount, total: model.total };
 
   return (
@@ -89,7 +107,7 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
         </div>
 
         <section aria-labelledby="onboarding-step-title" data-onboarding="panel" data-step={step.id} data-state={step.state} className="rounded-card border border-border bg-card text-card-foreground shadow-card">
-          <header className="space-y-2 border-b border-border p-4 md:p-6">
+          <header className="space-y-2 p-4 md:p-6">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-muted-foreground tabular-nums">
                 Step {index + 1} of {model.total}
@@ -98,12 +116,19 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
                 {STATE_WORDS[step.state]}
               </span>
             </div>
-            <h2 id="onboarding-step-title" className="text-[1.375rem] leading-tight font-semibold">
+            <h2 ref={heading} tabIndex={-1} id="onboarding-step-title" className="text-[1.375rem] leading-tight font-semibold outline-none">
               {step.label}
             </h2>
-            <p data-onboarding="words" className="text-sm text-muted-foreground">
-              {step.words}
-            </p>
+            {step.state === "blocked" ? (
+              <p data-onboarding="words" className="flex items-start gap-2 text-sm text-foreground">
+                <Lock aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0">{step.words}</span>
+              </p>
+            ) : (
+              <p data-onboarding="words" className="text-sm text-muted-foreground">
+                {step.words}
+              </p>
+            )}
             {step.problem && (
               <p role="status" data-onboarding="problem" className="flex items-start gap-2 rounded-md bg-warning/10 px-3 py-2 text-sm text-warning-text">
                 <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
@@ -111,19 +136,26 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
               </p>
             )}
           </header>
-          <div className="space-y-4 p-4 md:p-6 empty:hidden">
+          <div data-onboarding="panel-body" data-tray={tray || undefined} className={cn("space-y-4 border-t border-border p-4 md:p-6 empty:hidden", tray && "rounded-b-card bg-muted")}>
+            {waitsFor && (
+              <Button size="lg" className="h-10 px-4" onClick={() => choose(waitsFor.id, { focus: true })} data-onboarding="go-blocker">
+                Go to {waitsFor.label}
+              </Button>
+            )}
             <Panel key={step.id} step={step} canSync={canSync} publishHref={publishHref} onChange={refresh} onModel={setModel} />
             {nextUp && (
-              <Button size="lg" className="h-10 px-4" onClick={() => choose(nextUp.id)} data-onboarding="next">
+              <Button size="lg" className="h-10 px-4" onClick={() => choose(nextUp.id, { focus: true })} data-onboarding="next">
                 Next: {nextUp.label}
               </Button>
             )}
           </div>
         </section>
 
-        <Button asChild variant="outline" size="lg" className="h-10 px-4">
-          <Link href="/admin/dashboard">Go to your dashboard</Link>
-        </Button>
+        <p className="text-sm">
+          <Link href="/admin/dashboard" className="font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+            Go to your dashboard
+          </Link>
+        </p>
       </div>
     </div>
   );

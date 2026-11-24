@@ -44,14 +44,18 @@ export default async function OnboardingPage({ searchParams }) {
 
   if (!model.supported) {
     return (
-      <div className="space-y-6">
+      <div data-onboarding="column" className="mx-auto w-full max-w-[640px] min-w-0 space-y-8">
         {welcome}
-        <p data-onboarding="default-store" className="text-sm text-muted-foreground">
-          {DEFAULT_STORE_WORDS}
-        </p>
-        <Link href="/admin/dashboard" className="inline-flex text-sm font-medium text-primary underline underline-offset-4">
-          Go to your dashboard
-        </Link>
+        <div className="space-y-3 border-t border-border pt-6">
+          <p data-onboarding="default-store" className="text-sm text-foreground">
+            {DEFAULT_STORE_WORDS}
+          </p>
+          <p className="text-sm">
+            <Link href="/admin/dashboard" className="font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              Go to your dashboard
+            </Link>
+          </p>
+        </div>
       </div>
     );
   }
