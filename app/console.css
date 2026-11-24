@@ -129,7 +129,8 @@
   --c-accent: oklch(39% 0.09 160);
   --c-accent-fg: oklch(99% 0 0);
   --c-success: oklch(52% 0.13 150);
-  --c-warning: oklch(68% 0.15 70);
+  --c-warning: oklch(68% 0.15 70);       /* fills, borders, icons: 2.97:1 on white */
+  --c-warning-text: oklch(52% 0.12 62);  /* warning text: >= 5.1:1 on bg/surface/sunken */
   --c-danger: oklch(53% 0.19 27);
   --c-info: oklch(52% 0.11 245);
 
@@ -173,6 +174,7 @@
   --c-accent-fg: oklch(18% 0.02 160);
   --c-success: oklch(75% 0.14 150);
   --c-warning: oklch(80% 0.14 75);
+  --c-warning-text: oklch(80% 0.14 75);
   --c-danger: oklch(70% 0.17 25);
   --c-info: oklch(74% 0.11 245);
 }
@@ -194,6 +196,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-warning-text: var(--c-warning-text);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-sidebar: var(--sidebar);

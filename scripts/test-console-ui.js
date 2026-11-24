@@ -213,7 +213,7 @@ await t("no storefront file uses the new utility names, dark: or class \"console
 
 await t(".console and .console.dark hold exactly docs/UI.md's colour table", async () => {
   const rows = [...read("docs/UI.md").matchAll(/^\| `(--c-[\w-]+)` \| `([^`]+)`[^|]*\| `([^`]+)`[^|]*\|/gm)].map((m) => ({ name: m[1], light: m[2], dark: m[3] }));
-  eq(rows.length, 12, "UI.md rows:");
+  eq(rows.length, 13, "UI.md rows:"); // 12 + --c-warning-text (contrast fix)
   const light = declsOf(ruleBody(consoleCss, ".console"));
   const dark = declsOf(ruleBody(consoleCss, ".console.dark"));
   for (const r of rows) {

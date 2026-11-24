@@ -19,7 +19,8 @@ Tokens live as CSS variables in `app/console.css` under `.console` (light) and `
 - **Where `.console` goes:** on the console root `<body>`, not `<html>`: Radix portals (menus, sheets, tooltips) mount into `body`, and on `<html>` the storefront's later `:root { --background }` in `app/globals.css` would win.
 - **Dark mode is class-based:** `.console.dark` on the same `<body>`. The `dark:` variant matches only inside `.console.dark`, never on the storefront. There is no toggle yet.
 - **Legacy names:** `--c-surface`, `--c-border`, `--c-accent` and the four status names are also the legacy `[data-console]` tokens, so a legacy screen under `.console` is re-skinned; the console shell (line 8) aliases them first.
-- **Warning as text:** `--c-warning` on white is likely below 4.5:1 (estimated ~2.9:1, unmeasured); use it for fills and icons, and measure before using it for text.
+- **Warning as text:** measured (WCAG 2.x, oklch → sRGB): light `--c-warning` is 2.97:1 on `--c-surface`, 2.85:1 on `--c-bg`, 2.66:1 on `--c-sunken`, so it is for fills, borders and icons only. Warning *text* uses `--c-warning-text` (light 5.71 / 5.48 / 5.11:1, and 4.77:1 on a 10% warning tint; dark keeps the warning value, 9.3:1 or more). In classes: `text-warning-text`.
+- **Measured contrast of the other text tokens:** `--c-muted` light 6.00 / 5.77 / 5.38:1 on surface / bg / sunken, dark 6.63 / 7.15 / 7.36:1; success, danger and info are 4.65:1 or more on every light surface. The primary button's hover darkens the accent (mix 15% `--foreground`) instead of fading it: `bg-primary/80` would drop white text to about 5.4:1 and lightens towards the page.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
@@ -32,7 +33,8 @@ Tokens live as CSS variables in `app/console.css` under `.console` (light) and `
 | `--c-accent` | `oklch(39% 0.09 160)` (deep green) | `oklch(78% 0.13 155)` | Primary buttons, links, focus ring, selected nav |
 | `--c-accent-fg` | `oklch(99% 0 0)` | `oklch(18% 0.02 160)` | Text on the accent |
 | `--c-success` | `oklch(52% 0.13 150)` | `oklch(75% 0.14 150)` | Paid, published, done |
-| `--c-warning` | `oklch(68% 0.15 70)` | `oklch(80% 0.14 75)` | Needs attention, draft changes |
+| `--c-warning` | `oklch(68% 0.15 70)` | `oklch(80% 0.14 75)` | Fills, borders and icons for needs attention, draft changes; never text |
+| `--c-warning-text` | `oklch(52% 0.12 62)` | `oklch(80% 0.14 75)` | Warning text and labels (≥ 4.5:1 on every surface) |
 | `--c-danger` | `oklch(53% 0.19 27)` | `oklch(70% 0.17 25)` | Destructive actions, failed |
 | `--c-info` | `oklch(52% 0.11 245)` | `oklch(74% 0.11 245)` | Neutral notices, in progress |
 
@@ -43,8 +45,10 @@ The Storeasy lime (`#84cc16`) is the platform's logo mark only; it is never a co
 - **Scale (px):** 4, 8, 12, 16, 24, 32, 48, 64. Nothing in between.
 - **Shell:** a 240px sidebar (collapses to icons below 1024px, to a sheet below 768px), a 56px top bar with the store switcher and the account menu, content max width 1200px with 24px gutters (16px on phones).
 - **Onboarding:** no sidebar; one centred column, max width 640px, with the step list on the left from 1024px up.
-- **Density:** tables use 40px rows on desktop and 48px on touch; forms use one column below 768px and at most two above.
-- **Radius:** 6px controls, 10px cards and dialogs, full for pills and avatars. In classes: `rounded-md` (6px, Tailwind's own) for controls, `rounded-card` (10px, `app/console.css`) for cards, popovers, menus, sheets and dialogs, `rounded-full` for pills and avatars. The `--radius-*` scale is not overridden. Shadows: `shadow-card` at rest, `shadow-overlay` for menus and sheets.
+- **Density:** tables use 40px rows on desktop and 48px on touch; forms use one column below 768px and at most two above. Menu items and sidebar links grow to at least 40px on a coarse pointer (`pointer-coarse:`).
+- **Sidebar behaviour:** expanded at 1024px and up (the founder's toggle and `⌘B` persist in a cookie); 768–1023px it opens as icons with tooltips, and the toggle expands it for that visit only; below 768px it is a sheet. The 56px top bar is the shell's (line 8), not a `components/ui` part.
+- **Motion:** every transition and animation in `components/ui` stops under `prefers-reduced-motion` (`motion-reduce:` / `motion-safe:`).
+- **Radius:** 6px controls, 10px cards and dialogs, full for pills and avatars. In classes: `rounded-md` (6px, Tailwind's own) for controls, `rounded-card` (10px, `app/console.css`) for cards, popovers, menus, sheets and dialogs (tooltips are small labels and stay `rounded-md`), `rounded-full` for pills and avatars. The `--radius-*` scale is not overridden. Shadows: `shadow-card` at rest, `shadow-overlay` for menus and sheets.
 
 ## Components
 

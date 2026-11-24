@@ -5,7 +5,7 @@ import { cn } from "@/components/ui/utils"
 import { Tooltip as TooltipPrimitive } from "radix-ui"
 
 function TooltipProvider({
-  delayDuration = 0,
+  delayDuration = 200,
   ...props
 }) {
   return (
