@@ -121,8 +121,6 @@ const ALLOWED = {
   "migrations/": "the agency tables stay; migrations are additive",
   "scripts/test-agency-removed.js": "this suite names what must be gone",
   "scripts/drills/agency-gone.mjs": "the drill that proves every former path answers 404",
-  "scripts/drills/p1/migovl.mjs": "retired drill (Phase 0 drills line), not run",
-  "scripts/drills/p4/": "retired drills (Phase 0 drills line), not run",
 };
 
 await t("every allowlisted file or folder exists", async () => {

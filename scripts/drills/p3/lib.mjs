@@ -4,7 +4,9 @@
 // Chrome, never a download). Not a test:* suite: drills need a harness and
 // Chrome, so pnpm test and CI never run them.
 //
-//   DESIGN_PORT=3880 DESIGN_SQLD_PORT=4880 node scripts/drills/p3/<drill>.mjs [--headed]
+// Drills run only through pnpm drill:<name> (scripts/drills/run-isolated.mjs,
+// a throwaway worktree): runDrill refuses unless DRILL_ISOLATED_ROOT is this
+// checkout.
 //
 // What a drill gets:
 //   p3Ports()                 the harness ports from DESIGN_PORT and
@@ -31,7 +33,7 @@
 //                             context returns the same counter
 //   drill.screenshot(page, name)  a small PNG in the drill's results folder
 //   drill.writeResults()      results-<part>.json in the results folder, in the
-//                             P2 drill format (scripts/drills/p2/run.mjs)
+//                             P2 drill format
 //   storeUrl(drill, store, path)  an absolute address on 'live' or 'closed'
 //   storeSql(store, stmts)    read a store's local database (the running harness's ports)
 //   docsApi(page, body)       PUT /api/admin/documents from a signed-in page
@@ -41,11 +43,11 @@
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Drill, DrillError, connectHarness, launchChrome, settle } from "../../drill.js";
+import { Drill, DrillError, assertIsolated, connectHarness, launchChrome, settle } from "../../drill.js";
 import { DATA_DIR_NAME, ROOT, harnessPorts, harnessUrls, readCredentials, runningHarness } from "../../design-harness.js";
 import { pointClosedStoreAt } from "../../seed-design-documents.js";
 
-export { DrillError, settle };
+export { DrillError, assertIsolated, settle };
 export const OWNER_PORT = 3017;
 export const SEED_FILE = join(ROOT, DATA_DIR_NAME, "p3-seed.json");
 const CONSOLE_HOME = /\/admin\/dashboard/;
@@ -286,6 +288,7 @@ export class P3Drill extends Drill {
 // Run one drill part: Chrome up, fn(drill), results written, everything this
 // run started stopped. Exit code: 0 when nothing failed (known failures aside).
 export async function runDrill({ id, part, title, headed = process.argv.includes("--headed") }, fn) {
+  assertIsolated(process.env, ROOT);
   const ports = p3Ports();
   const ours = runningHarness(join(ROOT, DATA_DIR_NAME));
   if (ours) throw new DrillError(`A design harness is already running in this checkout (pid ${ours.launcher.pid}). Phase 3 drills seed the store fresh and start their own: stop it first.`);

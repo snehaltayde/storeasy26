@@ -11,7 +11,8 @@
 //      (P6-NAV: "Logo and colours" after Editor on a documents store);
 //   4. rendered + behaviour: the Designer with a stubbed api, its candidate
 //      push failing in each way, through stand-in hooks (no browser).
-// The browser proof is scripts/drills/p3/routes.mjs on the design harness.
+// No browser drill covers these routes since the Phase 0 drills line (the p3
+// drills were retired); the editor is driven in pnpm drill:p5 and drill:p6.
 //   pnpm test:editor-routes
 import { readFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";

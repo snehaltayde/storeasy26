@@ -17,7 +17,7 @@
 // listed by hand). Branches of a ternary are never paired with each other.
 // What this cannot see: a component's background from the file that renders
 // it, and classes built at run time from data. Those are the browser drills'
-// job (scripts/drills/p1c/tokc.mjs measures every pair on the page).
+// job.
 
 const KIT_TEXT = { "header-fg": "header-fg", "header-muted": "header-muted", "hero-fg": "hero-fg", "hero-muted": "hero-muted" };
 const KIT_BG = { header: "header", hero: "hero" };

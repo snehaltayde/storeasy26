@@ -464,7 +464,7 @@ export function selfCheck() {
       return true;
     }
   })();
-  out.push({ ok: refused && stagePlan("c").returnsWindowDays === 10 && stagePlan("d").checkoutMode === "disabled" && stagePlan("f").mode === "legacy" && stagePlan("e", "refill").wipe === false, label: "the stage plans: c's returns window is 10 days, d's checkout is off, f is legacy, e's refill keeps the store; an unknown stage is refused", detail: null });
+  out.push({ ok: refused && stagePlan("c").returnsWindowDays === 10 && stagePlan("d").checkoutMode === "disabled" && stagePlan("e", "refill").wipe === false, label: "the stage plans: c's returns window is 10 days, d's checkout is off, e's refill keeps the store; an unknown stage is refused", detail: null });
   return out;
 }
 

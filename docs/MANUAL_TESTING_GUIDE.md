@@ -55,17 +55,17 @@ before starting the harness (and vice versa).
   them. `ANTHROPIC_API_KEY` is passed through on purpose, so AI insights reach
   Anthropic if your shell has a key. The list is in `scripts/design-harness.js`;
   a unit test fails when the app reads a variable that isn't on it.
-- **Browser drills.** With the harness running: `pnpm drill:smoke` (a product
-  page at 375, 768 and 1440 wide, add to cart, the drawer) and `pnpm drill:edge`
-  (every storefront page on the edge runtime, maintenance, the Designer). They
-  drive the installed desktop Chrome headless (never a download), sign in with
-  `.design-env`, and write small screenshots plus `results.json` to
-  `docs/cms-reviews/drills/<id>/`. A drill only attaches to this checkout's own
-  harness on `DESIGN_PORT`; anything else on that port is refused. A check
-  marked KNOWN is a known issue, reported but not failing the drill. Add `--start` to have a drill start and
-  stop the harness itself, `--headed` to watch. New journeys go in
-  `scripts/drills/`; the helpers are in `scripts/drill.js`. See
-  `docs/cms-reviews/P1-HARNESS.md`.
+- **Browser drills.** `pnpm drill:smoke` (a product page at 375, 768 and 1440
+  wide, add to cart, the drawer), `pnpm drill:p5`, `pnpm drill:p6`,
+  `pnpm drill:agency-gone`, or `pnpm drill:all`. Each runs in a throwaway git
+  worktree at HEAD (commit first) with its own harness, ports and data, so the
+  harness in this checkout and its `.design-data/` are never touched; the
+  drill scripts refuse to run anywhere else. They drive the installed desktop
+  Chrome headless (never a download); results and screenshots are copied to
+  `.drill-results/<stamp>/`. A check marked KNOWN is a known issue, reported
+  but not failing the drill. Add `--headed` to watch, `--keep` to keep the
+  worktree. The runner is `scripts/drills/run-isolated.mjs`; the helpers are
+  in `scripts/drill.js`.
 
 ---
 

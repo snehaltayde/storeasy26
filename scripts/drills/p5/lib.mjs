@@ -1,13 +1,13 @@
 // P5-DRILLS: shared helpers for the phase 5 drills (TREE-01, COM-01, COM-02):
 // the bundle card and grid, the bundle picker and inline create, the publish
-// warnings, and the legacy stores left as they were. Desktop Chrome on the
-// design harness; not a test:* suite (drills need a harness and Chrome).
+// warnings. Desktop Chrome on the design harness; not a test:* suite (drills
+// need a harness and Chrome). Run with pnpm drill:p5 (a throwaway worktree,
+// scripts/drills/run-isolated.mjs).
 //
-//   DESIGN_PORT=6100 DESIGN_SQLD_PORT=7100 node scripts/drills/p5/run.mjs [stage,…]
 //   node scripts/drills/p5/lib.mjs --check     the helpers' own checks (no harness)
 //
 // Everything the phase 3 and phase 4 helpers give (scripts/drills/p4/lib.mjs,
-// imported and re-exported, never edited), plus:
+// imported and re-exported), plus:
 //
 //   DRILL_ID, OUT                    "P5-DRILLS" and its results folder
 //   docStore(drill)                  the documents-mode store: the phase 3 seed

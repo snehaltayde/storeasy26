@@ -8,11 +8,11 @@
 //   1. refuses when the environment names a Shopify store or a payment secret
 //   2. parks the P3 closed store (design-closed): its domain row is taken off,
 //      because its database is the harness's third server, which this stage
-//      wipes. The last step of pnpm drill:p6 re-seeds --p3, which brings it back.
+//      wipes. The drill runs in a throwaway worktree, so nothing needs it back.
 //   3. wipes the third server (every table, view and trigger dropped), so
 //      DOCUMENTS_FOR_FRESH_STORE_SQL sees empty content tables
 //   4. provisions tenant 'p6' there the way lib/platform/provision.js does it:
-//      applyTenantSchema, applyContentMode (documents, or legacy for stage f),
+//      applyTenantSchema, applyContentMode (documents),
 //      the tenant row with a control-plane domain row for p6.localhost, and
 //      config.onboarding as record_onboarding writes it. No Shopify fields.
 //   5. the founder's login (an owner membership on p6), its password fresh and
@@ -34,12 +34,11 @@
 //   e         --variant empty (default): a complete sync of an empty catalog
 //             --variant refill: NOT wiped; a second complete sync, with products
 //             --variant no-collections: products, no collections
-//   f         a fresh LEGACY store (applyContentMode legacy), the same catalog
 // The P3 closed store stays parked through every stage.
 
 export const P6_STORE = Object.freeze({ id: "p6", host: "p6.localhost", name: "Fernway Goods" });
 export const P6_LOGIN = Object.freeze({ email: "founder@p6.test", name: "Priya Founder", role: "owner" });
-export const P6_STAGES = Object.freeze(["a", "b", "c", "d", "e", "f", "g"]);
+export const P6_STAGES = Object.freeze(["a", "b", "c", "d", "e", "g"]);
 export const P6_VARIANTS = Object.freeze({ e: ["empty", "refill", "no-collections"] });
 export const P6_PRODUCTS = 24;
 export const P6_RETURNS_DAYS = 10;
@@ -75,7 +74,7 @@ export function stagePlan(stage, variant = null) {
     stage,
     variant: v,
     wipe: !(stage === "e" && v === "refill"),
-    mode: stage === "f" ? "legacy" : "documents",
+    mode: "documents",
     catalog: stage === "e" ? (v === "empty" ? "empty" : v === "refill" ? "products" : "no-collections") : "products",
     returnsWindowDays: stage === "c" ? P6_RETURNS_DAYS : null,
     supportEmail: stage === "c" ? null : P6_SUPPORT_EMAIL,

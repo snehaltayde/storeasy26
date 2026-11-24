@@ -493,7 +493,7 @@ too. -->
   default) with data in gitignored `.design-data/`, so the storefront serves
   on the edge runtime with no code edit; Ctrl-C stops Next and sqld together.
   Ports: `DESIGN_PORT` (3017) and `DESIGN_SQLD_PORT` (18017, three in a row).
-  Browser drills (`pnpm drill:smoke`, `pnpm drill:edge`, helpers in
+  Browser drills (`pnpm drill:smoke`, `drill:p5`, `drill:p6`, `drill:all`: a throwaway worktree; helpers in
   `scripts/drill.js`) drive the installed Chrome through playwright-core and
   write screenshots to `docs/cms-reviews/drills/<id>/`.
   See `docs/MANUAL_TESTING_GUIDE.md` §1 and `docs/cms-reviews/P1-HARNESS.md`.

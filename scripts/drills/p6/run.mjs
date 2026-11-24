@@ -2,11 +2,11 @@
 // US-01, US-04, US-41), in desktop Chrome on the design harness
 // (docs/cms-reviews/P1-HARNESS.md).
 //
-//   DESIGN_PORT=6100 DESIGN_SQLD_PORT=7100 [P6_DRILL_SCRATCH=<dir>] \
-//     node scripts/drills/p6/run.mjs [stage,stage…] [--headed]
+//   pnpm drill:p6 [-- stage,stage…] [--headed]
 //
-// Ports: the harness takes DESIGN_PORT and three database ports from
-// DESIGN_SQLD_PORT. 3017 (the owner's harness) is refused. Every stage stops
+// Only in a throwaway worktree (scripts/drills/run-isolated.mjs): runDrill
+// refuses anywhere else. The runner picks DESIGN_PORT and three database
+// ports from DESIGN_SQLD_PORT; 3017 (the owner's harness) is refused. Every stage stops
 // the harness, seeds (seed-design-documents.js --p3, or --p6 --stage <s>),
 // starts it again and drives Chrome: withHarnessStore refuses a write while
 // the harness runs. Shopify, payment and AI keys are blank for the seed and the
@@ -24,11 +24,7 @@
 //             pages are read or saved; a COD test order, cancelled; open
 //   d         open.mjs: checkout off blocks opening; turned on in Settings
 //   e         empty.mjs: US-04, an empty catalog, a later refill, no collections
-//   f         legacy.mjs: a legacy store unchanged against b063753 (phase 6's
-//             base); /admin/start redirects to /admin/setup
 //   g         setup.mjs: the checklist's policy starters
-//   final     re-seed --p3 and check --p3, so the harness is left as the P3
-//             drills expect
 //
 // Results: docs/cms-reviews/drills/P6-DRILLS/results-<stage>.json with the
 // screenshots, and the summary results.json (results-run-<stages>.json for a
@@ -37,8 +33,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DATA_DIR_NAME, ROOT, runningHarness } from "../../design-harness.js";
-import { reseed, seedState } from "../p3/lib.mjs";
-import { DRILL_ID, OUT, blankKeysHere, p3Ports, runDrill, selfCheck } from "./lib.mjs";
+import { DRILL_ID, OUT, assertIsolated, blankKeysHere, p3Ports, runDrill } from "./lib.mjs";
 import { realKeysSet } from "./seed-p6.mjs";
 
 const STAGE_FILES = {
@@ -48,25 +43,9 @@ const STAGE_FILES = {
   c: ["./open.mjs", "openStage"],
   d: ["./open.mjs", "paymentStage"],
   e: ["./empty.mjs", "emptyStage"],
-  f: ["./legacy.mjs", "legacyStage"],
   g: ["./setup.mjs", "setupStage"],
-  final: [null, "finalStage"],
 };
 export const STAGES = Object.keys(STAGE_FILES);
-
-// The harness left as the P3 drills expect: a fresh --p3 seed, checked.
-export async function finalStage(drill) {
-  for (const c of selfCheck()) drill.check(c.ok, `lib.mjs: ${c.label}`, c.detail);
-  await reseed(drill, { start: false });
-  const s = await seedState();
-  drill.check(s.mode === "documents" && Boolean(s.liveRelease) && s.p3?.closed?.mode === "documents" && s.p3.closed.liveRelease == null && (s.p3.closed.domains || []).includes("closed.localhost"), "after the run: seed --p3 again, and check --p3 passes (the design store live, the closed store back on closed.localhost, no release)", { mode: s.mode, liveRelease: s.liveRelease, closed: s.p3?.closed, refs: s.p3?.refs });
-  drill.check(s.p3?.refs?.mismatched?.length === 0 && s.p3.refs.publishedVersions > 0, "check --p3: every published version's document_refs match (none missing, none extra)", s.p3?.refs);
-  // check --p3's orphanRefs counts refs of versions that are not published:
-  // P4-MEDIA writes refs for checkpoints too, so a fresh --p3 seed has some
-  // (a known owner check since P4-DRILLS, MANUAL-CHECKS "The P3 smoke's
-  // document refs check"). Recorded, not judged here.
-  drill.note(`check --p3 orphanRefs: ${s.p3?.refs?.orphanRefs} (checkpoint versions' refs, known since P4-MEDIA)`);
-}
 
 const readJson = (file) => {
   try {
@@ -77,6 +56,7 @@ const readJson = (file) => {
 };
 
 async function main() {
+  assertIsolated(process.env, ROOT);
   p3Ports();
   const real = realKeysSet();
   if (real.length) throw new Error(`This shell names a Shopify store or a payment secret (${real.join(", ")}). The phase 6 drill only runs with them blank: unset them first.`);
@@ -94,7 +74,7 @@ async function main() {
     console.log(`\n=== ${stage}`);
     const t0 = Date.now();
     const [file, name] = STAGE_FILES[stage];
-    const fn = file ? (await import(file))[name] : finalStage;
+    const fn = (await import(file))[name];
     const code = await runDrill({ id: DRILL_ID, part: stage, title: `${DRILL_ID} — ${stage}` }, fn);
     const res = readJson(join(OUT, `results-${stage}.json`));
     rows.push({ stage, exit: code, seconds: Math.round((Date.now() - t0) / 1000), passed: res?.passed, failed: res?.failed, known: res?.knownFailures, results: `results-${stage}.json` });

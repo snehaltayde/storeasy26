@@ -4,9 +4,12 @@
 // It never downloads a browser. A drill is not a test:* suite: it needs a
 // running harness and Chrome, so `pnpm test` never runs it.
 //
-//   pnpm dev:design                      (in one terminal, wait for "Ready")
 //   pnpm drill:smoke                     product page at 375/768/1440, add to cart, drawer
-//   pnpm drill:edge                      every storefront page on the edge runtime, maintenance, Designer
+//
+// Drills run only in a throwaway worktree made by scripts/drills/run-isolated.mjs
+// (pnpm drill:<name>), which sets DRILL_ISOLATED_ROOT to that worktree. The
+// CLI refuses anywhere else, so a drill never seeds or drives the owner's
+// harness and its .design-data/. Inside the worktree the runner calls
 //   node scripts/drill.js <journey> [--start] [--headed]
 //     --start   start the harness for this run and stop it after (when none is running)
 //     --headed  show the browser window
@@ -18,7 +21,7 @@
 // Env: DESIGN_PORT (default 3017) picks the harness, CHROME_BIN overrides the
 // Chrome path. Screenshots are small PNGs (at most 300KB each).
 import { spawn } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DATA_DIR_NAME, harnessPorts, readCredentials, ROOT, HarnessError, runningHarness } from "./design-harness.js";
@@ -35,6 +38,23 @@ export class DrillError extends Error {
     super(message);
     this.name = "DrillError";
   }
+}
+
+// Drills run only in the throwaway worktree the isolated runner made: it sets
+// DRILL_ISOLATED_ROOT to that worktree, and this checkout must be it.
+export function assertIsolated(env = process.env, root = ROOT) {
+  const real = (p) => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+  const want = String(env.DRILL_ISOLATED_ROOT ?? "").trim();
+  if (!want || real(want) !== real(root)) {
+    throw new DrillError(`Drills run only in a throwaway worktree, never in this checkout (${root}): use pnpm drill:<name> (p5, p6, smoke, agency-gone or all), which runs scripts/drills/run-isolated.mjs.`);
+  }
+  return root;
 }
 
 const isFile = (p) => {
@@ -339,6 +359,12 @@ export async function main(argv = process.argv.slice(2)) {
     .map((f) => f.slice(0, -3));
   if (!journey || unknown.length || !journeys.includes(journey)) {
     console.error(`Usage: node scripts/drill.js <journey> [--start] [--headed]\nJourneys: ${journeys.join(", ")}`);
+    return 2;
+  }
+  try {
+    assertIsolated();
+  } catch (e) {
+    console.error(`✗ ${e.message}`);
     return 2;
   }
   const mod = await import(pathToFileURL(join(ROOT, "scripts", "drills", `${journey}.js`)).href);

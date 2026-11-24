@@ -1278,14 +1278,13 @@ console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LI
   // P6-FIXTURE registers phase 6's gate suites and drill once, here (package.json
   // is its only in phase 6). A placeholder is run only while it still is one:
   // its owner replaces the file and its tests.
-  await t("P6-FIXTURE: the four phase 6 suites and drill:p6 are registered; each one still a placeholder prints its line and exits 0", async () => {
+  await t("P6-FIXTURE: the four phase 6 suites are registered; each one still a placeholder prints its line and exits 0", async () => {
     const { scripts } = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
     const P6 = [
       ["test:first-run", "scripts/test-first-run.js", "P6-GEN"],
       ["test:brand-step", "scripts/test-brand-step.js", "P6-BRAND"],
       ["test:open-checks", "scripts/test-open-checks.js", "P6-OPEN"],
       ["test:policy-start", "scripts/test-policy-start.js", "P6-POLICY-START"],
-      ["drill:p6", "scripts/drills/p6/run.mjs", "P6-DRILLS"],
     ];
     let placeholders = 0;
     for (const [name, file, owner] of P6) {
@@ -1298,7 +1297,6 @@ console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LI
       eq(`${r.stdout}${r.stderr}`, `placeholder: filled by ${owner}\n`, `${name} output:`);
     }
     console.log(`    (${placeholders} of ${P6.length} still placeholders)`);
-    eq(scripts["drill:p4"], "node scripts/drills/p4/run.mjs", "drill:p4 kept:");
   });
 
   // Last in this suite: makePlatform moves this process's control plane.

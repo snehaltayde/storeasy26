@@ -50,8 +50,8 @@ A new feature's files go in: a migration in `migrations/tenant/` (or `platform/`
 | Unit tests (all) | `pnpm test` |
 | Unit tests (one file) | `node scripts/test-authz.js` (any `scripts/test-<name>.js`) |
 | Migrate a fresh database | `node scripts/test-schema-compat.js` (runs the store migration chain on new file databases; `pnpm migrate` needs a `.env.local`) |
-| Browser tests (one spec) | `pnpm drill:p6` |
-| Browser tests (all) | `pnpm drill:p6 && node scripts/drills/p5/run.mjs` (the p1–p4 drills predate the legacy-CMS retirement and are not run; see `docs/FEATURES.md` Phase 0) |
+| Browser tests (one spec) | `pnpm drill:<name>` (p5, p6, smoke, agency-gone): runs in a throwaway git worktree at HEAD on its own ports and data, so commit first; results in `.drill-results/<stamp>/` |
+| Browser tests (all) | `pnpm drill:all` (one worktree: smoke, p5, p6, agency-gone; never run a drill script directly) |
 | Seed | `pnpm seed:roles` (a fresh store with every role on http://roles.localhost:3018; refuses if one exists; logins in `.design-data-roles/roles-seed.json`; `--reset` only with the owner's OK). `pnpm seed:design` wipes `.design-data/`: ask the owner first, and stop the harness first |
 
 <!-- The working agreement from the steelthread plugin goes below this line. -->

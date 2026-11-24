@@ -1,12 +1,14 @@
 // Drill: the agency partner programme is gone from a running store (Phase 0 line 4).
-//   pnpm drill:agency-gone            (the design harness on http://localhost:3017)
-//   AGENCY_GONE_BASE_URL=http://localhost:3017 pnpm drill:agency-gone
+//   pnpm drill:agency-gone   (scripts/drills/run-isolated.mjs: a throwaway
+//                             worktree, its own roles store seeded and started)
 // Fetch only: it never seeds, never writes and starts no server. Every former
 // path is asked as anonymous, support and owner: GET → 404; POST to a former
 // API path → 404 or 405, never 2xx.
-// Sign-ins (POST /api/admin/login, the real form's endpoint):
-//   owner    AGENCY_GONE_OWNER_EMAIL / _PASSWORD, else .design-data/p6-seed.json logins.owner
-//   support  AGENCY_GONE_SUPPORT_EMAIL / _PASSWORD (the harness seeds no support login)
+// Where: AGENCY_GONE_BASE_URL, else http://roles.localhost:$ROLES_PORT. There
+// is no default port (never the owner harness ports).
+// Sign-ins (POST /api/admin/login, the real form's endpoint), per role:
+//   AGENCY_GONE_<OWNER|SUPPORT>_EMAIL / _PASSWORD, else the roles seed's member
+//   (AGENCY_GONE_SEED_FILE, else .design-data-roles/roles-seed.json here)
 // A role without a sign-in is reported NOT RUN and the drill exits 2 (incomplete).
 // Exit: 0 all checks ran and passed, 1 a check failed, 2 incomplete.
 import { readFile } from "node:fs/promises";
@@ -14,15 +16,21 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
-const BASE = (process.env.AGENCY_GONE_BASE_URL || "http://localhost:3017").replace(/\/$/, "");
+const rolesPort = String(process.env.ROLES_PORT ?? "").trim();
+const BASE = (process.env.AGENCY_GONE_BASE_URL || (rolesPort ? `http://roles.localhost:${rolesPort}` : "")).replace(/\/$/, "");
+if (!BASE) {
+  console.error("✗ No store to ask: run pnpm drill:agency-gone (it seeds and starts a roles store in a throwaway worktree), or set AGENCY_GONE_BASE_URL.");
+  process.exit(2);
+}
 
 const PAGES = ["/partners", "/approve/x"];
 const APIS = ["/api/partners", "/api/partners/auth", "/api/approve", "/api/admin/agency-grants", "/api/platform/partners"];
 
-async function seededOwner() {
+async function seededMember(role) {
   try {
-    const seed = JSON.parse(await readFile(join(ROOT, ".design-data/p6-seed.json"), "utf8"));
-    return seed?.logins?.owner?.email ? { email: seed.logins.owner.email, password: seed.logins.owner.password } : null;
+    const seed = JSON.parse(await readFile(process.env.AGENCY_GONE_SEED_FILE || join(ROOT, ".design-data-roles/roles-seed.json"), "utf8"));
+    const m = (seed?.members || []).find((x) => x.role === role);
+    return m?.email && m?.password ? { email: m.email, password: m.password } : null;
   } catch {
     return null;
   }
@@ -48,13 +56,13 @@ async function signIn(creds) {
 try {
   await fetch(`${BASE}/api/health`, { redirect: "manual" });
 } catch {
-  console.error(`✗ Nothing answers at ${BASE}. Start the harness (pnpm dev:design) or set AGENCY_GONE_BASE_URL.`);
+  console.error(`✗ Nothing answers at ${BASE}. Run pnpm drill:agency-gone, or set AGENCY_GONE_BASE_URL.`);
   process.exit(2);
 }
 
 const roles = { anonymous: "" };
 const notRun = [];
-for (const [role, creds] of [["owner", fromEnv("OWNER") || (await seededOwner())], ["support", fromEnv("SUPPORT")]]) {
+for (const [role, creds] of [["owner", fromEnv("OWNER") || (await seededMember("owner"))], ["support", fromEnv("SUPPORT") || (await seededMember("support"))]]) {
   if (!creds) {
     notRun.push(`${role}: no sign-in given`);
     continue;

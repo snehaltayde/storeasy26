@@ -11,6 +11,10 @@ orchestrating a phase. Keep it under about 80 lines: merge, reword or delete bef
 
 ## Tests
 
+- Browser drills reseed and wipe the checkout they run in, so they run only through `pnpm drill:<name>`
+  (a throwaway worktree at HEAD, its own ports and data; the drills refuse anywhere else). Commit before
+  a drill run: uncommitted code is not what it tests.
+
 ## Migrations
 
 ## Going live
