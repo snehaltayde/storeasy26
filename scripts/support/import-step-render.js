@@ -87,6 +87,12 @@ export async function run({ t, ok, eq, V, live, at, scanText }) {
     ok(!/<button/.test(out), "no button while running fine");
   });
 
+  await t("UI progress counts skipped products as read: 117 in + 3 skipped of 480 reads 120 of 480 (25%); all read is 100%", async () => {
+    const out = html({ view: V.syncView(live({ products_fetched: 117, skipped_count: 3 })) });
+    ok(text(out).includes("120 of 480 products (25%)") && /aria-valuenow="25"/.test(out), text(out));
+    ok(/aria-valuenow="100"/.test(html({ view: V.syncView(live({ products_fetched: 470, skipped_count: 10, pages_done: 20 })) })), "100%");
+  });
+
   await t("UI running without a total: 'so far', an indeterminate bar with no aria-valuenow, no time left", async () => {
     const out = html({ view: V.syncView(live({ products_total: null })) });
     ok(text(out).includes("120 products so far") && !/aria-valuenow/.test(out) && /data-state="indeterminate"/.test(out) && !text(out).includes("left."), out);

@@ -961,6 +961,23 @@ console.log("— idempotent writes (the db layer may or may not retry a write)")
     await exact("");
   });
 
+  await t("one page is all or nothing: a failure that is not a row the database refuses leaves the whole page unwritten and the position unmoved", async () => {
+    await reset();
+    // a trigger that errors (malformed JSON, not a constraint) on page 2's first product
+    await inT("write", () => libsql.execute(`CREATE TRIGGER fs_boom BEFORE INSERT ON products WHEN NEW.handle = '${catalog[40].handle}' BEGIN SELECT json('not json'); END`));
+    try {
+      const res = await inT("write", () => S.runCatalogSync().catch((e) => ({ error: e.message })));
+      ok(res.error && !/constraint/i.test(res.error), `the sync reported the failure: ${res.error}`);
+      const run = await latest("write");
+      eq(run.status, "failed", "run:");
+      eq(run.cursor, enc(30), "position stays after page 1:");
+      eq(await count("write", "products"), 30, "only page 1's rows:");
+      eq(await count("write", "variants"), variantTotal(catalog.slice(0, 30)), "only page 1's variants:");
+    } finally {
+      await inT("write", () => libsql.execute("DROP TRIGGER IF EXISTS fs_boom"));
+    }
+  });
+
   // Phase 1 line 5: a bad row is skipped, never fatal (scripts/test-import-step.js
   // covers every reason and the constraint fallback); the rest of its page and
   // the run go on.

@@ -21,8 +21,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const stubUrl = (src) => `data:text/javascript,${encodeURIComponent(src)}`;
+const STUBS = {
+  // after() needs a request scope; the suite collects the deferred work instead of running it
+  "next/server": stubUrl(`export * from ${JSON.stringify(pathToFileURL(createRequire(import.meta.url).resolve("next/server.js")).href)}; export function after(fn) { (globalThis.__afterQueue ||= []).push(fn); }`),
+};
 registerHooks({
   resolve(spec, ctx, next) {
+    if (STUBS[spec]) return { url: STUBS[spec], shortCircuit: true };
     if (spec.startsWith("@/")) return next(pathToFileURL(join(ROOT, spec.slice(2) + (/\.\w+$/.test(spec) ? "" : ".js"))).href, ctx);
     if (/^next\/(headers|server|navigation)$/.test(spec)) return next(`${spec}.js`, ctx);
     return next(spec, ctx);
@@ -157,6 +163,10 @@ await mk("fault");
 await mk("resume");
 await mk("route", { config: { shopify_store_domain: "improute.myshopify.com", shopify_client_id: "imp-client-id-canary" }, secrets: { shopify_client_secret: "imp-client-secret-canary" } });
 await mk("other");
+await mk("blind");
+await mk("old2", { stage: "0027" });
+await mk("probe");
+await mk("late");
 const inS = async (key, fn) => withTenant(await C.getTenant(`imp${key}`, { fresh: true }), fn);
 const raw = async (key, q, args = []) => {
   const c = stores[key].client();
@@ -264,7 +274,63 @@ await t("a store at 0027 (no progress columns) still syncs: skips skip and are o
   ok(logs.some((l) => l.evt === "sync_skipped" && l.run === run.id && l.recorded === false), "logged, not recorded");
   // and once 0028 lands the same database records them
   await stores.old.migrateTo("latest");
-  eq(await inS("old", () => S.hasProgressColumns()), true, "columns after migrating:");
+  eq(await inS("old", () => S.hasProgressColumns()), false, "the answer is cached per database:");
+  await inS("old", () => S.resetProgressColumns());
+  eq(await inS("old", () => S.hasProgressColumns()), true, "columns after migrating (and a reset):");
+});
+
+await t("a node Shopify sends with no usable id (null) holds the product prune for that run: the product it may be is still there, and so is one gone upstream; the next clean run prunes", async () => {
+  const list = F.catalogFor("few").products;
+  ok(!(await fullSync("blind", { productsPage: pager(list, 10), collectionsPage: pager([], 5) })).error, "first sync");
+  const second = [null, list[1], list[2]]; // list[0] came back null, list[3] is gone upstream
+  const res = await fullSync("blind", { productsPage: pager(second, 10), collectionsPage: pager([], 5) });
+  ok(!res.error, `finished: ${res.error}`);
+  const run = await latest("blind");
+  eq([run.status, Number(run.no_prune), Number(run.pruned_products), Number(run.skipped_count)], ["complete", 1, 0, 1], "run:");
+  eq(await count("blind", "products"), 4, "nothing pruned:");
+  ok(logs.some((l) => l.evt === "sync_prune_held" && l.run === run.id && l.products === true), "logged");
+  ok(!(await fullSync("blind", { productsPage: pager(list.slice(0, 3), 10), collectionsPage: pager([], 5) })).error, "a clean run");
+  eq([await count("blind", "products"), Number((await latest("blind")).no_prune)], [3, 0], "the next clean run prunes:");
+});
+
+await t("without 0028 a node with no usable id can't hold the prune, so its page fails as before line 5 (nothing of it written)", async () => {
+  const list = F.catalogFor("few").products;
+  const res = await fullSync("old2", { productsPage: pager([list[0], null, list[2]], 10), collectionsPage: pager([], 5) });
+  eq(res.error, S.BLIND_SKIP, "failed:");
+  eq([await count("old2", "products"), (await latest("old2")).status], [0, "failed"], "nothing written:");
+});
+
+const refusedPage = () => F.catalogFor("few").products.map((p, i) => (i === 1 ? { ...p, images: { nodes: [{ url: null }] } } : p));
+
+await t("the constraint fallback: a lease stolen between the failed batch and the probe is still a lost lease; nothing of the page is written", async () => {
+  const { run } = await inS("probe", () => S.requestCatalogSync({ fetchers: {} }));
+  S.__syncTestHooks.beforeProbe = async () => {
+    await raw("probe", "UPDATE sync_runs SET lease_owner = 'thief', lease_until = ? WHERE id = ?", [new Date(Date.now() + 600_000).toISOString(), run.id]);
+  };
+  try {
+    const res = await inS("probe", () => S.runSyncSlice(run.id, { fetchers: { productsPage: pager(refusedPage(), 10), collectionsPage: pager([], 5) }, indexer: NO_INDEX, mode: "queued" }).catch((e) => ({ threw: e.message })));
+    eq([res.lost, await count("probe", "products"), (await latest("probe")).lease_owner, (await latest("probe")).cursor], [true, 0, "thief", null], "lost, nothing written:");
+  } finally {
+    S.__syncTestHooks.beforeProbe = null;
+  }
+});
+
+await t("the constraint fallback checks the slice's deadline in its probe: out of time, it stops; nothing is written, the lease is freed and the next slice retries the page", async () => {
+  const { run } = await inS("late", () => S.requestCatalogSync({ fetchers: {} }));
+  let late = false;
+  S.__syncTestHooks.beforeProbe = async () => {
+    late = true;
+  };
+  const fetchers = { productsPage: pager(refusedPage(), 10), collectionsPage: pager([], 5) };
+  try {
+    const res = await inS("late", () => S.runSyncSlice(run.id, { fetchers, indexer: NO_INDEX, mode: "queued", deadline: 1e12, now: () => (late ? 1e13 : 0) }));
+    const row = await latest("late");
+    eq([res.yielded, await count("late", "products"), row.lease_owner, row.cursor, Number(row.pages_done)], [true, 0, null, null, 0], "yielded, nothing written:");
+  } finally {
+    S.__syncTestHooks.beforeProbe = null;
+  }
+  const again = await inS("late", () => S.runSyncSlice(run.id, { fetchers, indexer: NO_INDEX, mode: "queued" }));
+  eq([again.status, await count("late", "products")], ["complete", 3], "the next slice brings the page in, less the refused one:");
 });
 
 await t("collections_total: Shopify's exact count on the first collections page; 'at least' is no total; no counter, no total", async () => {
@@ -408,6 +474,13 @@ await t("times: elapsed while active, duration once finished; duration words", a
   eq([V.durationWords(20_000), V.durationWords(60_000), V.durationWords(6 * 60_000), V.durationWords(65 * 60_000), V.durationWords(150 * 60_000)], ["less than a minute", "1 minute", "6 minutes", "about an hour", "about 3 hours"], "words:");
 });
 
+await t("progress counts skips as read: done + skipped of total, so the bar can reach 100%; the time left is unchanged", async () => {
+  const v = V.syncView(live({ products_fetched: 117, skipped_count: 3 }));
+  eq([v.products.done, v.products.skipped, v.eta.words], [117, 3, V.syncView(live({ products_fetched: 117 })).eta.words], "products:");
+  const c = V.syncView(live({ phase: "collections", collections_fetched: 5, collections_total: 6, skipped_count: 2, skipped: JSON.stringify([{ type: "product", id: "a" }, { type: "collection", id: "b" }]) }));
+  eq([c.products.skipped, c.collections.skipped], [1, 1], "split by type later:");
+});
+
 await t("the skipped list shows at most 20 and counts the rest", async () => {
   const list = Array.from({ length: 50 }, (_, i) => Vet.skipOf("product", P(i + 1, { title: `T${i}` }), "no_title"));
   const v = V.syncView({ status: "complete", products: 3, collections: 0, finished_at: at(1), skipped_count: 73, skipped: JSON.stringify(list) });
@@ -471,6 +544,18 @@ for (const [label, status] of [["a retrying run (the nudge branch)", "running"],
     eq([await jobs(), JSON.stringify(await latest("route"))], before, "no job queued, the run unchanged:");
   });
 }
+
+await t("positive control: the owner's GET on a retrying run queues its job (the nudge); staff's GET doesn't", async () => {
+  await raw("route", "DELETE FROM sync_runs");
+  const now = new Date().toISOString();
+  await raw("route", "INSERT INTO sync_runs (id, kind, status, phase, started_at, updated_at, products_fetched, error) VALUES ('sync_nudge', 'full', 'running', 'products', ?, ?, 30, 'Admin GraphQL HTTP 503: x')", [now, now]);
+  const before = await jobs();
+  eq((await call("GET", { tok: users.staff.tok })).status, 200, "staff:");
+  eq(await jobs(), before, "staff queues nothing:");
+  eq((await call("GET", { tok: users.owner.tok })).status, 200, "owner:");
+  eq(await jobs(), before + 1, "the owner's GET queued the run's job:");
+  globalThis.__afterQueue = [];
+});
 
 await t("GET signed out 401; another store's owner 401", async () => {
   eq((await call("GET", {})).status, 401, "signed out:");

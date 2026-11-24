@@ -43,7 +43,9 @@ const timeOf = (iso) => {
   const t = Date.parse(iso || "");
   return Number.isFinite(t) ? new Date(t).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : null;
 };
-const pctOf = (c) => (c && c.total > 0 ? Math.min(100, Math.round((c.done / c.total) * 100)) : null);
+// read so far: brought in plus skipped, so the bar can reach 100%
+const readOf = (c) => Number(c?.done || 0) + Number(c?.skipped || 0);
+const pctOf = (c) => (c && c.total > 0 ? Math.min(100, Math.round((readOf(c) / c.total) * 100)) : null);
 
 function Note({ tone, children, ...props }) {
   const Icon = tone === "success" ? CircleCheck : CircleAlert;
@@ -149,14 +151,14 @@ export function ImportStepBody({ view, gate = null, busy = false, error = null, 
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[0.8125rem]">
             <dt className="text-muted-foreground">Products</dt>
             <dd className="tabular-nums text-foreground" data-import="products">
-              {collecting ? IMPORT_WORDS.allIn(view.products.done) : IMPORT_WORDS.products(view.products.done, view.products.total)}
+              {collecting ? IMPORT_WORDS.allIn(view.products.done) : IMPORT_WORDS.products(view.products.total ? readOf(view.products) : view.products.done, view.products.total)}
               {pct != null && stage.index === 1 ? ` (${pct}%)` : ""}
             </dd>
             {collecting && (
               <>
                 <dt className="text-muted-foreground">Collections</dt>
                 <dd className="tabular-nums text-foreground" data-import="collections">
-                  {IMPORT_WORDS.collections(view.collections.done, stage.index === 2 ? view.collections.total : null)}
+                  {IMPORT_WORDS.collections(stage.index === 2 && view.collections.total ? readOf(view.collections) : view.collections.done, stage.index === 2 ? view.collections.total : null)}
                   {pct != null && stage.index === 2 ? ` (${pct}%)` : ""}
                 </dd>
               </>
@@ -218,6 +220,7 @@ export default function ImportStep({ step, onChange, onChoose }) {
   const [error, setError] = useState(null);
   const [misses, setMisses] = useState(0);
   const [tick, setTick] = useState(0);
+  const [visible, setVisible] = useState(() => typeof document === "undefined" || document.visibilityState === "visible");
   const was = useRef(view?.state);
 
   // a fresh read of the steps brings a fresh view
@@ -236,6 +239,8 @@ export default function ImportStep({ step, onChange, onChoose }) {
   }, [view?.state]);
 
   const live = Boolean(view && LIVE.has(view.state));
+  const liveRef = useRef(live);
+  liveRef.current = live;
   async function read() {
     const next = await readSync().catch(() => null);
     if (next) {
@@ -250,21 +255,22 @@ export default function ImportStep({ step, onChange, onChoose }) {
     if (!view && step.state !== "blocked") read();
   }, []);
 
+  // hidden: the pending poll is cleared (the effect re-runs on `visible`)
   useEffect(() => {
-    if (!live) return undefined;
-    if (typeof document !== "undefined" && document.visibilityState !== "visible") return undefined;
+    if (!live || !visible) return undefined;
     const timer = setTimeout(read, misses >= LOST_AFTER ? SLOW_POLL_MS : POLL_MS);
     return () => clearTimeout(timer);
-  }, [live, tick, misses]);
+  }, [live, visible, tick, misses]);
 
   useEffect(() => {
-    if (!live) return undefined;
-    const onVisible = () => {
-      if (document.visibilityState === "visible") read();
+    const onVisibility = () => {
+      const now = document.visibilityState === "visible";
+      setVisible(now);
+      if (now && liveRef.current) read();
     };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [live]);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
 
   async function act(body) {
     setBusy(true);
