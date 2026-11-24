@@ -1008,7 +1008,9 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
 - **What**: `/platform` — tenant registry with per-tenant health pulled from each
   tenant's OWN database (products, last sync, orders in flight, Shopify
   connected/uninstalled), actions **Sync / Connect Shopify / Suspend / Activate**,
-  and the **New tenant** provisioning wizard (generated console password shown once).
+  and a **New store** link (Phase 1 line 9: `/platform/stores/new` queues the
+  store's setup and emails the owner an invite; the old New tenant wizard and its
+  one-time password are gone).
 - **Use**: `<any-host>/platform`, operator password. Suspending a tenant FAILS its
   hosts CLOSED (S25): a neutral "temporarily unavailable" page, 503 + `TENANT_SUSPENDED`
   on APIs — never another store's data. Activate restores.
@@ -1936,7 +1938,8 @@ Runtime is **Node** unless marked edge. "tenant" = Host-resolved context via
 | `POST /api/admin/sync` (tenant) | 🍪A (2/min) | Inline full catalog sync (60s budget) |
 | `GET·POST /api/admin/upsells`, `PUT·DELETE /api/admin/upsells/[id]` (tenant) | 🍪A | Placement CRUD (handles→gids) |
 | `POST /api/platform/login` / `logout` | — (5/min) / — | Set / clear `_platform` (1-day) |
-| `GET·POST /api/platform/tenants` | 🍪P | Registry + per-tenant health / provision new tenant |
+| `GET /api/platform/tenants` | 🍪P | Registry + per-tenant health (POST retired in Phase 1 line 9) |
+| `GET·POST /api/platform/stores` | 🍪P | Operator creates a store: live checks, create (queues `provision_store`), progress (Phase 1 line 9) |
 | `PATCH·POST /api/platform/tenants/[id]` | 🍪P | Suspend/activate / full sync one tenant |
 | `GET /api/connect/shopify/start?tenant=` | 🍪P or 🔑 | 302 to the tenant app's authorize URL (signed state) |
 | `GET /api/connect/shopify/callback` | ✍️ state+HMAC+shop | Token exchange → encrypted store → webhooks → initial sync; HTML result page |

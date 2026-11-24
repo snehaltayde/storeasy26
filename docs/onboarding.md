@@ -35,8 +35,20 @@ Creates `storeasy-t-<slug>` on Turso, applies the commerce schema, generates
 a bootstrap console password (don't hand it over: the merchant gets their own
 account by email, §5) and the order-link secret, registers the tenant, and starts a Free-plan subscription.
 Nothing brand-flavored is seeded (S41): offers, CMS content and pages start
-empty. (Also available from `/platform` → **New tenant** — the preferred,
-console-first path. S51 additions on the tenant row: **More → Edit details**
+empty. (The CLI stays for adopting an existing database or a legacy-editor
+store. For a founder's new store, Phase 1 line 9 replaced the console's old
+**New tenant** form with **New store** (`/platform/stores/new`, linked from
+`/platform` and Signups & onboarding): store name, owner's email, founder's
+name, Shopify store, an optional address and the Shopify app's client id and
+secret as a pair. It queues the same `provision_store` job a self-serve signup
+uses (a `signups` row with `source='operator'`, which never lapses), shows the
+four steps (the last is "Sending the owner's invite") and then a done screen:
+invite sent, address, whether the app is set up and the redirect URL to add to
+the store's Shopify app (`<store origin>/api/admin/shopify/callback`). The
+founder gets a 7-day owner invite (`operator_store_invite`); a new account
+chooses a password, an existing one enters its current password (checked
+before the token is spent), then lands on `/admin/onboarding` with their shop
+on step 1. Resend invite is line 8's owner invite (5 an hour). S51 additions on the tenant row: **More → Edit details**
 fixes domains/app credentials/order-id prefix after the fact, **More → Help
 this store…** opens it in **Signups & onboarding** (§5), and **View store**
 opens the storefront. Phase 1 line 8 removed the old Share access dialog: an

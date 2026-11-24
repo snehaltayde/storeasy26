@@ -1,0 +1,268 @@
+{
+  "id": "OPS-CREATE-STORE",
+  "part": "main",
+  "title": "OPS-CREATE-STORE — an operator creates a store; the founder accepts into onboarding",
+  "ranAt": "2026-11-24T21:34:46.712Z",
+  "harness": "http://localhost:6300",
+  "chrome": "158.0.8127.37",
+  "passed": 32,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "/platform links to New store; the old New tenant form is gone",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the New store page renders without an error",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "store 1: the address check says it's available as <slug>.localhost",
+      "detail": "Available: drill-created-store.localhost"
+    },
+    {
+      "ok": true,
+      "label": "store 1: the Shopify store check normalises the input and says it's free",
+      "detail": "Available: drill-created-shop.myshopify.com"
+    },
+    {
+      "ok": true,
+      "label": "store 1: the URL carries the setup (?signup=)",
+      "detail": "http://localhost:6300/platform/stores/new?signup=sgn_c47305490d2224a6"
+    },
+    {
+      "ok": true,
+      "label": "store 1: the progress reaches the done screen",
+      "detail": "Back to the platform console\nDrill Created Store is ready\n\nCreating your store's database: done. Preparing your store: done. Registering your store address: done. Sending the owner's invite: done\n\nCreating your store's database\nPreparing your store\nRegistering your store address\nSending the owner's "
+    },
+    {
+      "ok": true,
+      "label": "done: the invite went to the owner",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "done: the address and the redirect URL for the store's Shopify app",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "done: the Shopify app is set up",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the operator sees no token, link or secret",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "a reload of ?signup= shows the same done screen",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the row: source operator, secret cleared, invite recorded",
+      "detail": {
+        "source": "operator",
+        "shopify_secret_enc": null,
+        "invite_status": "mock"
+      }
+    },
+    {
+      "ok": true,
+      "label": "the founder's invite is in the (mock) mail",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "03-founder-1: the accept page shows the store and the invited email",
+      "detail": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDrill Created Store\n\nStore console · powered by Storeasy\n\nJoin Drill Created Store\n\nInvited as cre"
+    },
+    {
+      "ok": true,
+      "label": "03-founder-1: accepting lands on /admin/onboarding",
+      "detail": "http://drill-created-store.localhost:6300/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "step 1 shows the founder's shop",
+      "detail": "Skip to content\nDrill Created Store\nMI\n\nPlatform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\n0 of 4 steps done\n\n1\nConnect Shopify\nTo do\nImport products\nBlocked\nWaits for Connect Shopify\n3\nBrand\nTo do\nOpen your store\nBlocked\n3 things to fix first\nWelco"
+    },
+    {
+      "ok": true,
+      "label": "Connect is enabled (the app was set up)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "store 2: the address check says it's available as <slug>.localhost",
+      "detail": "Available: drill-prep-store.localhost"
+    },
+    {
+      "ok": true,
+      "label": "store 2: the Shopify store check normalises the input and says it's free",
+      "detail": "Available: drill-prep-shop.myshopify.com"
+    },
+    {
+      "ok": true,
+      "label": "store 2: the URL carries the setup (?signup=)",
+      "detail": "http://localhost:6300/platform/stores/new?signup=sgn_5b7a52ad37156ba9"
+    },
+    {
+      "ok": true,
+      "label": "store 2: the progress reaches the done screen",
+      "detail": "Back to the platform console\nDrill Prep Store is ready\n\nCreating your store's database: done. Preparing your store: done. Registering your store address: done. Sending the owner's invite: done\n\nCreating your store's database\nPreparing your store\nRegistering your store address\nSending the owner's inv"
+    },
+    {
+      "ok": true,
+      "label": "done: the app isn't set up yet",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "Resend invite sends a new one",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the earlier invite no longer works; the newest does",
+      "detail": {
+        "oldPeek": 400
+      }
+    },
+    {
+      "ok": true,
+      "label": "06-founder-2: the accept page shows the store and the invited email",
+      "detail": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDrill Prep Store\n\nStore console · powered by Storeasy\n\nJoin Drill Prep Store\n\nInvited as prep-foun"
+    },
+    {
+      "ok": true,
+      "label": "06-founder-2: accepting lands on /admin/onboarding",
+      "detail": "http://drill-prep-store.localhost:6300/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "step 1 says Storeasy's team is preparing the connection, with their shop",
+      "detail": "Skip to content\nDrill Prep Store\nPF\n\nPlatform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\n0 of 4 steps done\n\n1\nConnect Shopify\nIn progress\nImport products\nBlocked\nWaits for Connect Shopify\n3\nBrand\nTo do\nOpen your store\nBlocked\n3 things to fix first\nWelcome to Drill Prep Store\n\nFour steps to open your store. Nobody else can see it until you open it.\n\ndrill-prep-store.localhost\n\nCLOSED\n\nShoppers see “Opening soon” until you publish your store for the first time.\n\nSigned in as prep-founder@ops-create.test, email verified\n\nStep 1 of 4\n\nIn progress\nC"
+    },
+    {
+      "ok": true,
+      "label": "store 2 made",
+      "detail": "sgn_5b7a52ad37156ba9"
+    },
+    {
+      "ok": true,
+      "label": "a Shopify store another store uses is refused, in words naming it",
+      "detail": "Drill Created Store already uses this Shopify store."
+    },
+    {
+      "ok": true,
+      "label": "phone width: no sideways scroll",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "signed out: /platform/stores/new goes to /platform",
+      "detail": "http://localhost:6300/platform"
+    },
+    {
+      "ok": true,
+      "label": "signed out: the API answers 401",
+      "detail": 401
+    }
+  ],
+  "notes": [
+    "browser: console error: eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for various debugging features like reconstructing callstacks from a different environment.\nReact will never use eval() in production mode",
+    "browser: console error: eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for various debugging features like reconstructing callstacks from a different environment.\nReact will never use eval() in production mode",
+    "browser: console error: eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for various debugging features like reconstructing callstacks from a different environment.\nReact will never use eval() in production mode",
+    "browser: console error: eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for various debugging features like reconstructing callstacks from a different environment.\nReact will never use eval() in production mode"
+  ],
+  "screenshots": [
+    {
+      "name": "01-new-store-form",
+      "file": "docs/cms-reviews/drills/OPS-CREATE-STORE/01-new-store-form.png",
+      "bytes": 3627,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/platform/stores/new"
+    },
+    {
+      "name": "02-done",
+      "file": "docs/cms-reviews/drills/OPS-CREATE-STORE/02-done.png",
+      "bytes": 21632,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/platform/stores/new"
+    },
+    {
+      "name": "03-founder-1-accept",
+      "file": "docs/cms-reviews/drills/OPS-CREATE-STORE/03-founder-1-accept.png",
+      "bytes": 14329,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/accept-invite"
+    },
+    {
+      "name": "04-founder-1-step-1",
+      "file": "docs/cms-reviews/drills/OPS-CREATE-STORE/04-founder-1-step-1.png",
+      "bytes": 33180,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/onboarding"
+    },
+    {
+      "name": "05-resent",
+      "file": "docs/cms-reviews/drills/OPS-CREATE-STORE/05-resent.png",
+      "bytes": 23904,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/platform/stores/new"
+    },
+    {
+      "name": "06-founder-2-accept",
+      "file": "docs/cms-reviews/drills/OPS-CREATE-STORE/06-founder-2-accept.png",
+      "bytes": 14426,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/accept-invite"
+    },
+    {
+      "name": "07-founder-2-preparing",
+      "file": "docs/cms-reviews/drills/OPS-CREATE-STORE/07-founder-2-preparing.png",
+      "bytes": 32548,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/onboarding"
+    },
+    {
+      "name": "08-duplicate-shop",
+      "file": "docs/cms-reviews/drills/OPS-CREATE-STORE/08-duplicate-shop.png",
+      "bytes": 21778,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/platform/stores/new"
+    },
+    {
+      "name": "09-phone",
+      "file": "docs/cms-reviews/drills/OPS-CREATE-STORE/09-phone.png",
+      "bytes": 24282,
+      "width": 375,
+      "height": 812,
+      "viewport": 375,
+      "path": "/platform/stores/new"
+    }
+  ]
+}

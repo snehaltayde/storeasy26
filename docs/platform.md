@@ -102,9 +102,11 @@ operator secret ✓.
   env; `_platform` cookie, also accepted by the OAuth connect start route):
   tenant registry with per-tenant health queried from each tenant's own DB
   (products, last sync, orders in flight, Shopify connected/uninstalled),
-  actions Sync / Connect Shopify / Suspend / Activate, and the **create
-  wizard** → `POST /api/platform/tenants` → S21 `provisionTenant` (generated
-  console password shown ONCE). Suspending a tenant drops its hosts to the
+  actions Sync / Connect Shopify / Suspend / Activate. Phase 1 line 9 retired
+  the create wizard and `POST /api/platform/tenants`: operators create stores
+  at `/platform/stores/new` → `POST /api/platform/stores`, which queues the
+  `provision_store` job and emails the owner an invite (no password is ever
+  shown); `provisionTenant` stays for the CLI. Suspending a tenant drops its hosts to the
   default-store fallback, never a 500.
 
 ### Live proofs (2026-10-27, local)

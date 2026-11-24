@@ -179,7 +179,7 @@ export default function CreateStoreProgress({ signup }) {
               </Fact>
               <Fact label={PROGRESS.app}>{appWords(data.done)}</Fact>
               <Fact label={PROGRESS.redirect}>
-                <code className="block truncate font-mono text-[0.8125rem]" title={data.done.redirectUrl}>
+                <code className="block font-mono text-[0.8125rem] break-all select-all">
                   {data.done.redirectUrl}
                 </code>
                 <p className="mt-1 text-xs text-muted-foreground">{PROGRESS.redirectHint}</p>

@@ -673,11 +673,12 @@ Packet: [P4-CUTOVER.md](P4-CUTOVER.md), section "Owner checks".
 
 ### New stores start on the new editor (P4-PROVISION)
 Packet: [P4-PROVISION.md](P4-PROVISION.md), section "Owner checks".
-- [ ] Staging: run a /platform 'New tenant' with the slug of an existing throwaway legacy tenant. It should be refused, and that tenant should stay on the old editor (cms_state 'legacy', storefront still open).
+- [ ] Staging: run `scripts/provision-tenant.js` (the console's New tenant form was retired in Phase 1 line 9; New store refuses a taken address before anything runs) with the slug of an existing throwaway legacy tenant. It should be refused, and that tenant should stay on the old editor (cms_state 'legacy', storefront still open).
 - [ ] Before deploy: 0024 and 0025 applied everywhere. Check that no provisioning run is half-done on the hosted control plane (`/platform`, provisioning runs). A resumed earlier run keeps the old editor, as designed.
 - [ ] OQ-4, staging, after P4-PROVISION deploys: provision one throwaway tenant (no `--legacy-content`). It starts on the new editor ("the new editor … private" in the summary), shows "Opening soon" to shoppers until its first publish (the sitemap only `/`), and every link of its onboarding checklist opens a working screen (Design, Pages, the editor, Publish). A COD test order from the editor's preview goes to `snehal@mediastic.in` and is cancelled after. The first publish opens the store and Setup shows Launch done. Then offboard it.
 - [ ] Desktop Chrome on the design harness: the Setup page of a new documents store before and after its first publish, and the preview test order. NOT DONE (no P4-DRILLS stage provisions a store).
-- [ ] Decide whether `/platform` "New tenant" needs a "start on the old editor" choice (today only the CLI has it).
+- [ ] Decide whether `/platform/stores/new` ("New store", Phase 1 line 9, which replaced "New tenant") needs a "start on the old editor" choice (today only the CLI has it).
+- [ ] Phase 1 line 9, staging: create a store from New store with a real (test) Shopify app's id and secret; the owner invite arrives through the real mail provider; the founder accepts, connects Shopify through the redirect URL shown on the done screen. Without production mail configured every operator-made store waits for an operator to press Resend invite.
 - [ ] CI: the sqld download in .github/ still needs the owner to approve its source and checksum. Nothing under .github/ was changed.
 
 ### The P4-EDITOR review findings (P4-FIX3)
