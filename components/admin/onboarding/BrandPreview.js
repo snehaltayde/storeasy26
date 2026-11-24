@@ -142,7 +142,7 @@ export default function BrandPreview({ message = null, canEdit = false, saved = 
             <span className="truncate text-xs text-muted-foreground">{host}</span>
           </div>
         )}
-        <div ref={boxRef} className={cn(!computer && "px-4 py-4 sm:px-6")}>
+        <div ref={boxRef} className={cn(!computer && "p-2 sm:p-4")}>
         <div className={cn("relative mx-auto", !computer && "max-w-[390px] overflow-hidden rounded-card border border-border shadow-card")} style={computer ? { height: COMPUTER_HEIGHT } : undefined}>
           <div className={computer ? "absolute top-0 left-0 origin-top-left" : undefined} style={computer ? { width: COMPUTER_PX, height: Math.round(COMPUTER_HEIGHT / scale), transform: `scale(${scale})` } : undefined}>
             <iframe ref={frameRef} title={PREVIEW_WORDS.frameTitle} className={cn("block w-full bg-background", computer ? "h-full" : "h-[70vh] max-h-[760px]")} onLoad={() => ctlRef.current?.frameLoad()} data-preview-frame="" />
