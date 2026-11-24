@@ -51,18 +51,36 @@ const Announcement = ({ announcement, editing = false }) =>
 // own from collapsing or growing; width follows, at most 180px.
 export const HEADER_LOGO_CLASS = "block h-8 max-h-8 w-auto max-w-[180px] object-contain md:h-10 md:max-h-10";
 
-const Wordmark = ({ logo, className = "" }) => (
-  <Link href="/" className={`shrink-0 text-xl font-extrabold tracking-tight ${className}`}>
-    {logo.image?.media ? (
-      <img src={logo.image.media} alt={logo.image.alt || logo.name || ""} className={HEADER_LOGO_CLASS} />
-    ) : (
-      <>
-        {logo.text1}
-        {logo.text2 ? <span className="text-sf-header-accent">{logo.text2}</span> : null}
-      </>
-    )}
-  </Link>
+// Phase 1 line 6: in a documents preview (`editing`) the picture and the
+// words are both rendered, one of them hidden, as the slots onboarding's
+// live preview draws an unsaved logo into (components/preview/bridge-core.js
+// look mode). Shoppers' markup is unchanged.
+const WordmarkText = ({ logo }) => (
+  <>
+    {logo.text1}
+    {logo.text2 ? <span className="text-sf-header-accent">{logo.text2}</span> : null}
+  </>
 );
+
+const Wordmark = ({ logo, className = "", editing = false }) => {
+  const picture = Boolean(logo.image?.media);
+  return (
+    <Link href="/" className={`shrink-0 text-xl font-extrabold tracking-tight ${className}`}>
+      {editing ? (
+        <>
+          <img data-store-logo-img="" src={picture ? logo.image.media : undefined} alt={picture ? logo.image.alt || logo.name || "" : ""} hidden={!picture} className={HEADER_LOGO_CLASS} />
+          <span data-store-logo-text="" hidden={picture}>
+            <WordmarkText logo={logo} />
+          </span>
+        </>
+      ) : picture ? (
+        <img src={logo.image.media} alt={logo.image.alt || logo.name || ""} className={HEADER_LOGO_CLASS} />
+      ) : (
+        <WordmarkText logo={logo} />
+      )}
+    </Link>
+  );
+};
 
 const IconLinks = () => (
   <>
@@ -134,7 +152,7 @@ export default function Header({ collections = [], logo = { text1: "Store", text
             </Link>
           </nav>
           <span className="md:hidden" aria-hidden />
-          <Wordmark logo={logo} className="justify-self-center text-center" />
+          <Wordmark logo={logo} className="justify-self-center text-center" editing={editing} />
           <span className="flex items-center justify-end gap-1">
             <IconLinks />
           </span>
@@ -153,7 +171,7 @@ export default function Header({ collections = [], logo = { text1: "Store", text
       <Announcement announcement={announcement} editing={editing} />
 
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
-        <Wordmark logo={logo} />
+        <Wordmark logo={logo} editing={editing} />
 
         <div className="hidden flex-1 md:block">
           <SearchBox />

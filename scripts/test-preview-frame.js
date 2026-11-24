@@ -146,6 +146,26 @@ class El {
   getAttribute(n) {
     return Object.hasOwn(this.attrs, n) ? this.attrs[n] : null;
   }
+  setAttribute(n, v) {
+    this.attrs[n] = String(v);
+  }
+  removeAttribute(n) {
+    delete this.attrs[n];
+  }
+  get textContent() {
+    return this.text ?? this.children.map((c) => c.textContent).join("");
+  }
+  set textContent(v) {
+    this.children = [];
+    this.text = String(v);
+  }
+  insertAdjacentElement(where, el) {
+    if (where !== "afterend" || !this.parentElement) throw new Error(`stand-in DOM: insertAdjacentElement ${where}`);
+    const kids = this.parentElement.children;
+    el.parentElement = this.parentElement;
+    kids.splice(kids.indexOf(this) + 1, 0, el);
+    return el;
+  }
   matches(sel) {
     return sel.split(",").some((one) => matchOne(this, one.trim()));
   }
@@ -183,10 +203,11 @@ function matchOne(el, sel) {
 }
 const h = (tag, attrs, ...children) => new El(tag, attrs || {}, children.flat());
 
-function standIn(bodyChildren, { storage = "memory", embedded = true, path = "/" } = {}) {
+function standIn(bodyChildren, { storage = "memory", embedded = true, path = "/", headChildren = [], kit = null } = {}) {
   const listeners = { doc: [], win: [] };
   const body = h("body", {}, ...bodyChildren);
-  const head = h("head");
+  const head = h("head", {}, ...headChildren);
+  const documentElement = h("html", kit ? { "data-kit": kit } : {}, head, body);
   const sent = [];
   const store = new Map();
   let reloads = 0;
@@ -208,6 +229,8 @@ function standIn(bodyChildren, { storage = "memory", embedded = true, path = "/"
   const document = {
     body,
     head,
+    documentElement,
+    getElementById: (id) => [...documentElement.walk()].find((e) => e.attrs.id === id) || null,
     createElement: (tag) => h(tag),
     addEventListener: (type, fn, capture) => listeners.doc.push({ type, fn, capture: capture === true }),
     removeEventListener: (type, fn) => (listeners.doc = listeners.doc.filter((l) => l.type !== type || l.fn !== fn)),
@@ -225,7 +248,7 @@ function standIn(bodyChildren, { storage = "memory", embedded = true, path = "/"
     removeEventListener: (type, fn) => (listeners.win = listeners.win.filter((l) => l.type !== type || l.fn !== fn)),
   };
   win.parent = embedded ? parent : win;
-  const message = (data, origin = "https://fv.test") => listeners.win.filter((l) => l.type === "message").forEach((l) => l.fn({ data, origin }));
+  const message = (data, origin = "https://fv.test", source = parent) => listeners.win.filter((l) => l.type === "message").forEach((l) => l.fn({ data, origin, source }));
   // P3-FIX2: the two phases, as a browser runs them at the document: every
   // capture listener first, then, unless one stopped propagation, the bubble
   // listeners (the page's own handlers). stopPropagation in the capture phase
@@ -476,6 +499,153 @@ await t("v2 select outlines the section and scrolls to it; refresh keeps the scr
   stop4();
 });
 
+// ---- Phase 1 line 6: look mode and the brand overlay (onboarding's brand step) ----
+// A page as the layout renders it in a documents preview: #brand-vars in the
+// head, the header's and the footer's logo slots, the footer's tagline slot.
+function brandPage({ logo = null } = {}) {
+  const img = () => h("img", logo ? { "data-store-logo-img": "", src: logo, alt: "Saved" } : { "data-store-logo-img": "", alt: "", hidden: "" });
+  const words = () => h("span", logo ? { "data-store-logo-text": "", hidden: "" } : { "data-store-logo-text": "" });
+  const headImg = img();
+  const headText = words();
+  const footImg = img();
+  const footText = words();
+  const tagline = h("p", { "data-store-tagline": "" });
+  tagline.textContent = "Saved line";
+  const link = h("a", { href: "/collections" });
+  const header = h("header", { "data-doc": "doc_header" }, h("a", { href: "/" }, headImg, headText), link);
+  const sec = h("section", { "data-section-id": "sec_hero", "data-section-kind": "hero" }, h("h1", { "data-field": "title" }));
+  const main = h("main", { "data-doc": "doc_home" }, sec);
+  const footer = h("footer", { "data-doc": "doc_footer" }, footImg, footText, tagline);
+  const vars = h("style", { id: "brand-vars" });
+  vars.textContent = ":root{--accent-500:#334155;}";
+  return { headImg, headText, footImg, footText, tagline, link, sec, main, vars, nodes: [header, main, footer] };
+}
+const LOOK = { type: "storeasy:editor:hello", v: 2, look: true };
+const brandFor = (id) => (id === "forest" ? { css: ":root{--accent-500:#166534;}", kit: "pulse-1" } : id === "glowy" ? { css: ":root{--accent-500:#ff00aa;}", kit: "glow-1" } : null);
+const brandStand = (opts = {}) => {
+  const page = brandPage(opts);
+  const s = standIn(page.nodes, { headChildren: [page.vars], kit: "pulse-1" });
+  const stop = Bridge.createBridge({ window: s.window, document: s.document, state: docState, ok: opts.ok ?? true, reason: opts.reason ?? null, css: "x", brandFor });
+  return { page, s, stop };
+};
+const draftStyle = (s) => s.document.getElementById(Bridge.DRAFT_STYLE_ID);
+const hidden = (el) => Object.hasOwn(el.attrs, "hidden");
+
+await t("line 6, look mode: the look hello gets the same v2 ready; clicks and submits are still stopped; no pick is posted, select outlines nothing, no editing class; body.storeasy-look (the bar's hiding rule is in the styles)", () => {
+  const { page, s, stop } = brandStand();
+  s.message(LOOK);
+  same(s.sent.at(-1).msg, { type: "storeasy:ready", v: 2, state: docState, ok: true, unfinished: [] }, "ready:");
+  ok(s.document.body.classList.contains(Bridge.LOOK_CLASS), "look class:");
+  ok(!s.document.body.classList.contains(Bridge.EDITING_CLASS), "no editing class:");
+  const e = s.click(page.link);
+  ok(e.defaultPrevented && e.stopped, "a link click is stopped:");
+  s.click(page.sec.children[0]);
+  eq(pickMsgs(s).length, 0, "no pick posted:");
+  s.message({ type: "storeasy:select", sectionId: "sec_hero" });
+  ok(!page.sec.classList.contains("storeasy-selected"), "select outlines nothing:");
+  stop();
+  ok(!s.document.body.classList.contains(Bridge.LOOK_CLASS), "taken down cleanly:");
+});
+
+await t("line 6, brand overlay: a palette puts its colours in <style id=brand-vars-draft> right after #brand-vars and its kit on <html>; a logo fills both logo slots (src, alt, shown; the words hidden); a description goes into the tagline as text; null for each puts the page's own back", () => {
+  const { page, s, stop } = brandStand();
+  s.message(LOOK);
+  s.message({ type: "storeasy:brand", paletteId: "glowy", logo: { media: "/api/media/med_abc", alt: "Acme" }, description: "Soft serums" });
+  const st = draftStyle(s);
+  ok(st, "the draft style exists:");
+  eq(st.textContent, ":root{--accent-500:#ff00aa;}", "its colours come from brandFor:");
+  eq(s.document.head.children.indexOf(st), s.document.head.children.indexOf(page.vars) + 1, "right after #brand-vars:");
+  eq(s.document.documentElement.getAttribute("data-kit"), "glow-1", "data-kit:");
+  for (const img of [page.headImg, page.footImg]) {
+    eq(img.getAttribute("src"), "/api/media/med_abc", "img src:");
+    eq(img.getAttribute("alt"), "Acme", "img alt:");
+    ok(!hidden(img), "img shown:");
+  }
+  ok(hidden(page.headText) && hidden(page.footText), "the words are hidden:");
+  eq(page.tagline.textContent, "Soft serums", "tagline:");
+  ok(!hidden(page.tagline), "tagline shown:");
+  // a second change replaces, never stacks
+  s.message({ type: "storeasy:brand", paletteId: "forest", logo: false, description: "" });
+  eq(s.document.head.children.filter((c) => c.attrs.id === Bridge.DRAFT_STYLE_ID).length, 1, "one draft style:");
+  eq(draftStyle(s).textContent, ":root{--accent-500:#166534;}", "Forest now:");
+  eq(s.document.documentElement.getAttribute("data-kit"), "pulse-1", "kit follows:");
+  ok(hidden(page.headImg) && hidden(page.footImg), "logo false: no picture:");
+  ok(!hidden(page.headText) && !hidden(page.footText), "logo false: the store name shows:");
+  ok(hidden(page.tagline), "an empty description hides the line:");
+  // all null: the page as it rendered
+  s.message({ type: "storeasy:brand", paletteId: null, logo: null, description: null });
+  eq(draftStyle(s), null, "draft style removed:");
+  eq(s.document.documentElement.getAttribute("data-kit"), "pulse-1", "kit back:");
+  ok(hidden(page.headImg) && page.headImg.getAttribute("src") === null && page.headImg.getAttribute("alt") === "", "the header's empty picture slot is back:");
+  ok(!hidden(page.headText), "the words are back:");
+  eq(page.tagline.textContent, "Saved line", "the saved line is back:");
+  ok(!hidden(page.tagline), "and shown:");
+  eq(pickMsgs(s).length, 0, "nothing posted for an overlay:");
+  eq(s.sent.filter((x) => x.msg?.type !== "storeasy:ready").length, 0, "the overlay sends nothing back:");
+  stop();
+  // a saved picture logo comes back after a change
+  const b = brandStand({ logo: "/api/media/med_saved" });
+  b.s.message(LOOK);
+  b.s.message({ type: "storeasy:brand", paletteId: null, logo: { media: "/api/media/med_new", alt: "" }, description: null });
+  eq(b.page.headImg.getAttribute("src"), "/api/media/med_new", "changed:");
+  b.s.message({ type: "storeasy:brand", paletteId: null, logo: null, description: null });
+  eq(b.page.headImg.getAttribute("src"), "/api/media/med_saved", "the saved picture is back:");
+  eq(b.page.headImg.getAttribute("alt"), "Saved", "with its alt:");
+  b.stop();
+});
+
+await t("line 6, brand overlay refusals: before any v2 hello, after only the Designer's hello, from another origin, from a window that isn't the parent, and in a frame that isn't a working preview (revoked, expired, not_found, live, legacy) the message changes nothing", () => {
+  const msg = { type: "storeasy:brand", paletteId: "forest", logo: { media: "/api/media/med_abc", alt: "A" }, description: "Hello" };
+  const untouched = (b, label) => {
+    eq(draftStyle(b.s), null, `${label}: no draft style:`);
+    ok(hidden(b.page.headImg), `${label}: no picture:`);
+    eq(b.page.tagline.textContent, "Saved line", `${label}: tagline:`);
+    eq(b.s.document.documentElement.getAttribute("data-kit"), "pulse-1", `${label}: kit:`);
+  };
+  let b = brandStand();
+  b.s.message(msg);
+  untouched(b, "no hello");
+  b.s.message("storeasy:designer:hello");
+  b.s.message(msg);
+  untouched(b, "v1 hello");
+  b.stop();
+  b = brandStand();
+  b.s.message(LOOK);
+  b.s.message(msg, "https://evil.test");
+  untouched(b, "another origin");
+  b.s.message(msg, "https://fv.test", { postMessage() {} });
+  untouched(b, "not the parent");
+  b.stop();
+  for (const reason of ["revoked", "expired", "not_found", "live", "legacy"]) {
+    const r = brandStand({ ok: false, reason });
+    r.s.message(LOOK);
+    r.s.message(msg);
+    untouched(r, reason);
+    r.stop();
+  }
+});
+
+await t("line 6, brand overlay inputs: an unknown palette id, a javascript: or https://evil logo, a logo without a library address and a <script> description have no effect beyond plain text; the description is cut to 160", () => {
+  const b = brandStand();
+  b.s.message(LOOK);
+  b.s.message({ type: "storeasy:brand", paletteId: "lime-hack", logo: null, description: null });
+  eq(draftStyle(b.s), null, "unknown palette: nothing:");
+  b.s.message({ type: "storeasy:brand", paletteId: { css: "body{display:none}" }, logo: null, description: null });
+  eq(draftStyle(b.s), null, "a palette that isn't an id: nothing:");
+  for (const media of ["javascript:alert(1)", "https://evil.test/x.png", "/api/media/../../etc", "//evil.test/api/media/med_a", "/api/media/med_a?x=1", 42]) {
+    b.s.message({ type: "storeasy:brand", paletteId: null, logo: { media, alt: "x" }, description: null });
+    ok(hidden(b.page.headImg) && b.page.headImg.getAttribute("src") === null, `logo ${media}: ignored`);
+  }
+  b.s.message({ type: "storeasy:brand", paletteId: null, logo: null, description: "<script>alert(1)</script>" });
+  eq(b.page.tagline.textContent, "<script>alert(1)</script>", "set as text:");
+  eq(b.page.tagline.children.length, 0, "no element made:");
+  b.s.message({ type: "storeasy:brand", paletteId: null, logo: null, description: "y".repeat(400) });
+  eq(b.page.tagline.textContent.length, 160, "cut to 160:");
+  b.s.message({ type: "storeasy:brand", paletteId: null, logo: null, description: 7 });
+  eq(b.page.tagline.textContent.length, 160, "a description that isn't text: ignored:");
+  b.stop();
+});
+
 await t("routeDocFor: exact addresses from the layout, product and collection pages to their layout documents, others none", () => {
   const routes = { "/": "doc_home", "/about": "doc_ab", "/collections": "doc_collections_index" };
   eq(Bridge.routeDocFor("/", routes), "doc_home");
@@ -689,7 +859,7 @@ const session = async (T) => inT(T, () => PS.createPreviewSession({ actor: { kin
 const bridgesIn = (s) => [...s.matchAll(/<i data-bridge="([^"]*)"><\/i>/g)].map((m) => JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&")));
 const text = (s) => s.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
 const tagWith = (s, re) => s.match(re)?.[0] || "";
-const FRAME_ATTRS = /data-doc=|data-field=|data-field-type=|data-bridge=|data-edit-this-page|data-preview-ended|data-preview-bar/;
+const FRAME_ATTRS = /data-doc=|data-field=|data-field-type=|data-bridge=|data-edit-this-page|data-preview-ended|data-preview-bar|data-store-logo-img|data-store-logo-text|data-store-tagline/;
 
 // =====================================================================================
 // byte equality: the shopper renders, against the base commit (5bbc819)
@@ -843,6 +1013,20 @@ await t("rendered: in a preview the header, the announcement bar, the footer and
   eq(tagWith(await layoutHtml(FV, { [Res.PREVIEW_COOKIE]: s.token }, "/search"), /<main[^>]*>/), '<main class="flex-1">', "main on a page with no document:");
 });
 
+await t("line 6, rendered: in a preview the header and the footer carry the logo slots (an empty hidden picture and the shown words) and the footer a tagline slot; a shopper's page has none of them, open or closed", async () => {
+  const s = await session(FV);
+  const h = await layoutHtml(FV, { [Res.PREVIEW_COOKIE]: s.token }, "/");
+  const imgs = h.match(/<img data-store-logo-img=""[^>]*>/g) || [];
+  eq(imgs.length, 2, `logo pictures (header, footer): ${imgs.join(" ")}`);
+  ok(imgs.every((x) => /\shidden=""/.test(x) && !/\ssrc=/.test(x)), `empty and hidden with no saved logo: ${imgs.join(" ")}`);
+  const words = h.match(/<span data-store-logo-text="">/g) || [];
+  eq(words.length, 2, "the words are shown in both:");
+  ok(/<p data-store-tagline=""[^>]*>/.test(h), `tagline slot: ${tagWith(h, /<footer[\s\S]{0,4000}?<\/footer>/).slice(0, 300)}`);
+  for (const [label, page] of [["live layout", await layoutHtml(FV)], ["home page", await homeHtml(FV)], ["closed layout", await layoutHtml(FC)]]) {
+    ok(!/data-store-logo-img|data-store-logo-text|data-store-tagline/.test(page), `${label}: a slot in a shopper's HTML`);
+  }
+});
+
 await t("rendered: the hero title, a button label, a text paragraph (body.2) and an FAQ question carry data-field equal to validate's field for the same value; the page's title and paragraphs too; live renders carry neither", async () => {
   const want = {
     title: validateField("hero", { title: LONG }),
@@ -989,6 +1173,31 @@ await t("rendered: a closed store's /quiz/<slug> and /bundles/<slug> leak no tit
     const open = await render(FV, mod, slug);
     ok(leaks(open.page).length > 0 && leaks(open.meta).length > 0, `open store: the ${label} shows`);
   }
+});
+
+await t("line 6: PreviewBridge's brandFor draws a palette as the layout draws it saved (brandCssVars on its own kit) and gives null for an unknown id", async () => {
+  const PB = await loadJsx(join(ROOT, "components/preview/PreviewBridge.js"), {});
+  const { PALETTES } = await import("../lib/themes/palettes.js");
+  const { brandCssVars } = await import("../lib/brand.js");
+  for (const p of PALETTES) same(PB.brandFor(p.id), { css: brandCssVars(p.brand, { kit: p.kit }), kit: p.kit }, `${p.id}:`);
+  for (const bad of ["lime", "", null, undefined, 3, "__proto__"]) eq(PB.brandFor(bad), null, `${String(bad)}:`);
+});
+
+await t("line 6, edge safety: everything PreviewBridge pulls in (walked from its imports) uses no node:* module", async () => {
+  const seenFiles = new Set();
+  const walk = async (file) => {
+    if (seenFiles.has(file)) return;
+    seenFiles.add(file);
+    const src = await readFile(file, "utf8");
+    ok(!/from\s+["']node:|require\(["']node:|import\(["']node:/.test(src), `${relative(ROOT, file)} imports a node:* module`);
+    for (const [, spec] of src.matchAll(/(?:^|\n)\s*(?:import|export)\s[^;]*?from\s+["']([^"']+)["']/g)) {
+      if (spec.startsWith("@/")) await walk(join(ROOT, spec.slice(2) + (/\.\w+$/.test(spec) ? "" : ".js")));
+      else if (spec.startsWith(".")) await walk(resolve(dirname(file), spec + (/\.\w+$/.test(spec) ? "" : ".js")));
+      else ok(spec === "react", `${relative(ROOT, file)} imports the package ${spec}`);
+    }
+  };
+  await walk(join(ROOT, "components/preview/PreviewBridge.js"));
+  ok(seenFiles.size >= 4, `walked: ${[...seenFiles].map((f) => relative(ROOT, f)).join(", ")}`);
 });
 
 await t("edge safety: bridge-core, PreviewBridge, PreviewBanner, EditThisPage and resolve.js import no node:* module", async () => {

@@ -38,11 +38,37 @@
 //            selection in sessionStorage, then reload; the next mount puts
 //            them back. Storage that throws (private mode, blocked) only
 //            loses the scroll, never the reload.
+//
+// Look mode (Phase 1 line 6, onboarding's brand step), after parent →
+// {type:"storeasy:editor:hello", v:2, look:true}: v2 as above (the same ready,
+// clicks and submits still stopped), but no picks are posted, nothing is
+// outlined, and body.storeasy-look hides the preview's own bar.
+//   parent → {type:"storeasy:brand", paletteId, logo, description}
+//            the founder's unsaved choices, drawn over the page until the
+//            next load; nothing is written anywhere. Taken only after a v2
+//            hello, only in a working preview (ok true), only from this
+//            origin and from window.parent. Each field:
+//              paletteId    a palette id: its colours (brandFor(id) → {css,
+//                           kit}, worked out here, never sent) go into
+//                           <style id="brand-vars-draft"> after #brand-vars,
+//                           and data-kit on <html>; null: the page's own;
+//                           an unknown id: ignored
+//              logo         {media, alt}: a library picture (LOGO_RE) in the
+//                           header and footer logo slots; false: no picture
+//                           (the store name shows); null: the page's own;
+//                           any other address: ignored
+//              description  text (at most 160 characters, set as text) in
+//                           [data-store-tagline]; null: the page's own
+//            All three null: the page as it rendered.
 
 export const SELECTED_CLASS = "storeasy-selected";
 export const DESIGNING_CLASS = "storeasy-designing";
 export const EDITING_CLASS = "storeasy-editing";
 export const RESTORE_KEY = "storeasy:frame:restore";
+export const LOOK_CLASS = "storeasy-look";
+export const DRAFT_STYLE_ID = "brand-vars-draft";
+export const LOGO_RE = /^\/api\/media\/[A-Za-z0-9_-]{1,120}$/;
+export const TAGLINE_MAX = 160;
 
 // The document a route shows, for data-doc on <main> and the offline line.
 // routes: { "<path>": "<document id>" } from the layout (lib/content/resolve.js
@@ -119,11 +145,13 @@ export function pickOf(target) {
 // Mount the bridge. Returns the function that takes it down again.
 //   state, ok, reason  what the layout says this frame shows (see above)
 //   css                the outline styles (PreviewBridge.js holds them)
-export function createBridge({ window: win, document: doc, state = null, ok = false, reason = null, css = "" } = {}) {
+//   brandFor(id)       a palette's {css, kit}, or null (PreviewBridge.js)
+export function createBridge({ window: win, document: doc, state = null, ok = false, reason = null, css = "", brandFor = () => null } = {}) {
   if (!win || !doc || !win.parent || win.parent === win) return () => {}; // not embedded: inert
   const origin = win.location?.origin;
   let v1 = false;
   let v2 = false;
+  let look = false;
   let selected = null;
   let style = null;
 
@@ -187,7 +215,7 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
         e.preventDefault();
         e.stopPropagation();
       }
-      const pick = pickOf(target);
+      const pick = look ? null : pickOf(target);
       if (pick) {
         if (pick.sectionId) selectSection(pick.sectionId, { scroll: false });
         post(pick);
@@ -218,6 +246,98 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
     }
   };
 
+  // ---- look mode: the founder's unsaved brand choices ------------------------
+  const kept = new Map(); // element -> its attributes and text as rendered
+  const html = doc.documentElement || null;
+  const keep = (el) => {
+    if (!el || kept.has(el)) return;
+    kept.set(el, { src: attrOf(el, "src"), alt: attrOf(el, "alt"), hidden: attrOf(el, "hidden"), text: el.textContent });
+  };
+  const setAttr = (el, name, v) => {
+    if (v == null) el.removeAttribute(name);
+    else el.setAttribute(name, v);
+  };
+  const restore = (el, { text = false } = {}) => {
+    const k = kept.get(el);
+    if (!k) return;
+    if (String(el.tagName).toUpperCase() === "IMG") {
+      setAttr(el, "src", k.src);
+      setAttr(el, "alt", k.alt);
+    }
+    setAttr(el, "hidden", k.hidden);
+    if (text) el.textContent = k.text;
+  };
+  const byId = (id) => (typeof doc.getElementById === "function" ? doc.getElementById(id) : null);
+  let kitBefore;
+  function applyPalette(id) {
+    if (id === null) {
+      byId(DRAFT_STYLE_ID)?.remove();
+      if (html && kitBefore !== undefined) setAttr(html, "data-kit", kitBefore);
+      return;
+    }
+    let b = null;
+    try {
+      b = typeof id === "string" ? brandFor(id) : null;
+    } catch {
+      b = null;
+    }
+    if (!b || typeof b.css !== "string") return; // unknown: ignored
+    let el = byId(DRAFT_STYLE_ID);
+    if (!el) {
+      el = doc.createElement("style");
+      el.setAttribute("id", DRAFT_STYLE_ID);
+      const after = byId("brand-vars");
+      if (after && typeof after.insertAdjacentElement === "function") after.insertAdjacentElement("afterend", el);
+      else doc.head.appendChild(el);
+    }
+    el.textContent = b.css;
+    if (html && typeof b.kit === "string" && b.kit) {
+      if (kitBefore === undefined) kitBefore = attrOf(html, "data-kit");
+      html.setAttribute("data-kit", b.kit);
+    }
+  }
+  function applyLogo(logo) {
+    const imgs = doc.querySelectorAll("[data-store-logo-img]") || [];
+    const texts = doc.querySelectorAll("[data-store-logo-text]") || [];
+    if (logo === null) {
+      for (const el of [...imgs, ...texts]) restore(el);
+      return;
+    }
+    if (logo === false) {
+      for (const el of imgs) (keep(el), el.setAttribute("hidden", ""));
+      for (const el of texts) (keep(el), el.removeAttribute("hidden"));
+      return;
+    }
+    if (!logo || typeof logo !== "object" || typeof logo.media !== "string" || !LOGO_RE.test(logo.media)) return; // ignored
+    const alt = typeof logo.alt === "string" ? logo.alt.slice(0, 300) : "";
+    for (const el of imgs) {
+      keep(el);
+      el.setAttribute("src", logo.media);
+      el.setAttribute("alt", alt);
+      el.removeAttribute("hidden");
+    }
+    for (const el of texts) (keep(el), el.setAttribute("hidden", ""));
+  }
+  function applyDescription(text) {
+    for (const el of doc.querySelectorAll("[data-store-tagline]") || []) {
+      if (text === null) {
+        restore(el, { text: true });
+        continue;
+      }
+      if (typeof text !== "string") continue;
+      keep(el);
+      const line = text.replace(/[\r\n]+/g, " ").trim().slice(0, TAGLINE_MAX);
+      el.textContent = line;
+      if (line) el.removeAttribute("hidden");
+      else el.setAttribute("hidden", "");
+    }
+  }
+  function applyBrand(msg) {
+    if (msg.paletteId !== undefined) applyPalette(msg.paletteId);
+    if (msg.logo !== undefined) applyLogo(msg.logo);
+    if (msg.description !== undefined) applyDescription(msg.description);
+  }
+
   const onMessage = (e) => {
     if (e.origin !== origin) return; // same-origin console only
     const msg = e.data;
@@ -231,13 +351,19 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
     if (!msg || typeof msg !== "object") return;
     if (msg.type === "storeasy:editor:hello" && msg.v === 2) {
       v2 = true;
+      look = msg.look === true;
       addStyle();
-      doc.body.classList.add(EDITING_CLASS);
+      doc.body.classList.add(look ? LOOK_CLASS : EDITING_CLASS);
+      doc.body.classList.remove(look ? EDITING_CLASS : LOOK_CLASS);
       post(ready());
       return;
     }
     if (v2) {
-      if (msg.type === "storeasy:select") selectSection(msg.sectionId);
+      if (msg.type === "storeasy:brand") {
+        if (ok === true && e.source === win.parent) applyBrand(msg);
+        return;
+      }
+      if (msg.type === "storeasy:select" && !look) selectSection(msg.sectionId);
       if (msg.type === "storeasy:refresh") {
         keepPlace();
         win.location.reload();
@@ -277,5 +403,6 @@ export function createBridge({ window: win, document: doc, state = null, ok = fa
     if (style) style.remove();
     doc.body.classList.remove(DESIGNING_CLASS);
     doc.body.classList.remove(EDITING_CLASS);
+    doc.body.classList.remove(LOOK_CLASS);
   };
 }

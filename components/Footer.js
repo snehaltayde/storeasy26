@@ -11,6 +11,35 @@ const FooterLogo = ({ logo, className = "" }) => (
   <img src={logo.image.media} alt={logo.image.alt || logo.name || ""} className={className ? `${FOOTER_LOGO_CLASS} ${className}` : FOOTER_LOGO_CLASS} />
 );
 
+// The wordmark (picture, else words). Phase 1 line 6: in a documents preview
+// (`editing`) both are rendered, one hidden, as the slots onboarding's live
+// preview draws an unsaved logo into; shoppers' markup is unchanged.
+function FooterMark({ logo, editing, imgClass = "" }) {
+  const picture = Boolean(logo.image?.media);
+  const words = (
+    <>
+      {logo.text1}
+      {logo.text2 ? <span className="text-sf-accent-strong">{logo.text2}</span> : null}
+    </>
+  );
+  if (!editing) return picture ? <FooterLogo logo={logo} className={imgClass} /> : words;
+  return (
+    <>
+      <img data-store-logo-img="" src={picture ? logo.image.media : undefined} alt={picture ? logo.image.alt || logo.name || "" : ""} hidden={!picture} className={imgClass ? `${FOOTER_LOGO_CLASS} ${imgClass}` : FOOTER_LOGO_CLASS} />
+      <span data-store-logo-text="" hidden={picture}>
+        {words}
+      </span>
+    </>
+  );
+}
+
+// The one-line description; in a documents preview always rendered (hidden
+// when empty) so the live preview can show an unsaved one.
+function Tagline({ tagline, editing, className }) {
+  if (editing) return <p data-store-tagline="" hidden={!tagline} className={className}>{tagline}</p>;
+  return tagline ? <p className={className}>{tagline}</p> : null;
+}
+
 // Session 23: brand, support and the Shop column come from tenant config/CMS.
 // `nav` null = top-5 collections (pre-CMS behavior); an array replaces it.
 export default function Footer({
@@ -51,16 +80,9 @@ export default function Footer({
       <footer {...doc} className="mt-20 border-t border-sf-border-soft bg-sf-surface-muted">
         <div className="mx-auto max-w-7xl px-4 py-10 text-center sm:px-6">
           <p className="text-xl font-extrabold">
-            {logo.image?.media ? (
-              <FooterLogo logo={logo} className="mx-auto" />
-            ) : (
-              <>
-                {logo.text1}
-                {logo.text2 ? <span className="text-sf-accent-strong">{logo.text2}</span> : null}
-              </>
-            )}
+            <FooterMark logo={logo} editing={editing} imgClass="mx-auto" />
           </p>
-          {tagline ? <p className="mx-auto mt-2 max-w-md text-sm text-sf-text-subtle">{tagline}</p> : null}
+          <Tagline tagline={tagline} editing={editing} className="mx-auto mt-2 max-w-md text-sm text-sf-text-subtle" />
           <nav className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-sf-text-subtle">
             {links.map((l) => (
               <Link key={l.key} href={l.href} className="hover:text-sf-text">
@@ -94,16 +116,9 @@ export default function Footer({
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="text-xl font-extrabold">
-              {logo.image?.media ? (
-                <FooterLogo logo={logo} />
-              ) : (
-                <>
-                  {logo.text1}
-                  {logo.text2 ? <span className="text-sf-accent-strong">{logo.text2}</span> : null}
-                </>
-              )}
+              <FooterMark logo={logo} editing={editing} />
             </p>
-            {tagline ? <p className="mt-3 max-w-sm text-sm text-sf-text-subtle">{tagline}</p> : null}
+            <Tagline tagline={tagline} editing={editing} className="mt-3 max-w-sm text-sm text-sf-text-subtle" />
           </div>
 
           <div>

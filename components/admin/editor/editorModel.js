@@ -571,6 +571,9 @@ export function designProblem(frameState, { sessionShowsDesign = null } = {}) {
 //   pathFor(documentId)   the address the frame shows
 //   onChange(view)        view: { label, words, field, note, phase, reconnecting, shownAck }
 //   onPick(pick)
+//   hello    what the controller answers a v1 ready with (default the
+//            editor's {type:"storeasy:editor:hello", v:2}; onboarding's brand
+//            step adds look:true, Phase 1 line 6)
 // showDesign is on while doc_design is open and off otherwise. The session is
 // minted again when the bridge reports ok:false (the session ended, or the
 // frame shows the live store) or when no ready arrives within 3 seconds of a
@@ -592,7 +595,8 @@ export function designProblem(frameState, { sessionShowsDesign = null } = {}) {
 //     controller per mount) mints one session. A dispose parks whatever
 //     answer arrives meanwhile; the next start() applies it; a controller
 //     never started again (a real unmount) drops it.
-export function createPreviewController({ api, frame, pathFor = () => "/", documentId = null, timers = defaultTimers(), onChange = () => {}, onPick = () => {} }) {
+export const EDITOR_HELLO = Object.freeze({ type: "storeasy:editor:hello", v: 2 });
+export function createPreviewController({ api, frame, pathFor = () => "/", documentId = null, timers = defaultTimers(), onChange = () => {}, onPick = () => {}, hello = EDITOR_HELLO }) {
   let docId = documentId;
   let machine = createPreviewMachine({ documentId: docId, showDesign: showDesignFor(docId) });
   let last = machine.current;
@@ -768,7 +772,7 @@ export function createPreviewController({ api, frame, pathFor = () => "/", docum
       if (!isObj(data) || typeof data.type !== "string") return;
       if (data.type === "storeasy:ready") {
         if (data.v !== 2) {
-          frame.post({ type: "storeasy:editor:hello", v: 2 });
+          frame.post({ ...hello });
           return;
         }
         bridge = true;
