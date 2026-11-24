@@ -88,7 +88,9 @@ function matches(segs, url) {
 
 await t("no former path has a page or route of its own: the only match is the storefront catch-all", async () => {
   const found = FORMER_PATHS.map((p) => [p, entries.filter((e) => matches(e.segs, p)).map((e) => e.file)]);
-  same(found.filter(([, files]) => files.some((f) => f !== CATCH_ALL)), [], "[former path, files]");
+  // the API catch-all answers every unknown /api path 404 JSON (test-api-unmatched)
+  const API_CATCH_ALL = "app/api/[...unmatched]/route.js";
+  same(found.filter(([, files]) => files.some((f) => f !== CATCH_ALL && f !== API_CATCH_ALL)), [], "[former path, files]");
 });
 
 await t("the storefront catch-all answers notFound()", async () => {
