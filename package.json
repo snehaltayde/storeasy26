@@ -80,6 +80,7 @@
     "test:growth": "node scripts/test-growth.js",
     "test:agency-removed": "node scripts/test-agency-removed.js",
     "test:drills": "node scripts/test-drills.js",
+    "test:api-unmatched": "node scripts/test-api-unmatched.js",
     "test:case-studies": "node scripts/test-case-studies.js",
     "test:w6": "node scripts/test-w6.js",
     "test:copy": "node scripts/test-copy.js",

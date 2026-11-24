@@ -81,17 +81,38 @@ async function check(role, method, path) {
   if (roles[role]) headers.cookie = roles[role];
   if (method === "POST") headers["content-type"] = "application/json";
   const res = await fetch(`${BASE}${path}`, { method, headers, body: method === "POST" ? "{}" : undefined, redirect: "manual" });
-  await res.arrayBuffer();
-  const good = method === "GET" ? res.status === 404 : [404, 405].includes(res.status);
+  const text = await res.text();
+  // a page on a closed store is the closed page for every path (no agency
+  // screen can show); an /api path is 404 JSON whatever the store's state
+  const closedPage = !path.startsWith("/api/") && res.status === 200 && text.includes(CLOSED_TITLE);
+  const good = method === "GET" ? res.status === 404 || closedPage : [404, 405].includes(res.status);
   if (good) pass++;
   else fail++;
   console.log(`${good ? "✓" : "✗"} ${role.padEnd(9)} ${method.padEnd(4)} ${path} → ${res.status}${good ? "" : method === "GET" ? " (want 404)" : " (want 404 or 405)"}`);
 }
 
+const CLOSED_TITLE = "Opening soon";
 for (const role of Object.keys(roles)) {
   for (const path of [...PAGES, ...APIS]) await check(role, "GET", path);
   for (const path of APIS) await check(role, "POST", path);
 }
+
+// Any /api path with no route: 404 JSON on this (closed) store; a real route
+// keeps its own JSON answer; a storefront page is still the closed page.
+async function probe(label, method, path, want) {
+  const res = await fetch(`${BASE}${path}`, { method, headers: { origin: BASE, "content-type": "application/json" }, body: method === "POST" ? "{}" : undefined, redirect: "manual" });
+  const type = res.headers.get("content-type") || "";
+  const text = await res.text();
+  const good = want(res.status, type, text);
+  if (good) pass++;
+  else fail++;
+  console.log(`${good ? "✓" : "✗"} ${label} → ${res.status} ${type.split(";")[0]}`);
+}
+await probe("anonymous GET  /api/definitely-not-a-route (404 JSON)", "GET", "/api/definitely-not-a-route", (s, t) => s === 404 && t.includes("application/json"));
+await probe("anonymous POST /api/definitely-not-a-route (404 JSON)", "POST", "/api/definitely-not-a-route", (s, t) => s === 404 && t.includes("application/json"));
+await probe("anonymous GET  /api/admin/no-such-thing (404 JSON)", "GET", "/api/admin/no-such-thing", (s, t) => s === 404 && t.includes("application/json"));
+await probe("anonymous GET  /api/account (its own JSON, not the closed page)", "GET", "/api/account", (s, t, b) => t.includes("application/json") && !b.includes(CLOSED_TITLE));
+await probe("anonymous GET  / (the closed page)", "GET", "/", (s, t, b) => s === 200 && b.includes(CLOSED_TITLE));
 
 console.log(`\n${pass} passed, ${fail} failed against ${BASE}`);
 for (const n of notRun) console.log(`NOT RUN  ${n}`);

@@ -424,15 +424,10 @@ export async function seedPerfFixture({ libsql, log = () => {}, spec = PERF_FIXT
   await inChunks(stmts);
   log(`  catalog: ${fx.products.length} products, ${fx.collections.length} collections added`);
 
-  // content, through the same store functions the console's saves use
-  const { validateBlock } = await import("../lib/cms/validate.js");
-  const { setBlock, upsertContentPage } = await import("../lib/cms/store.js");
-  for (const [key, value] of [["home_sections", fx.homeSections], ["nav_header", fx.navHeader], ["nav_footer", fx.navFooter]]) {
-    const v = validateBlock(key, value);
-    if (!v.ok) throw new Error(`fixture ${key} is invalid: ${(v.errors || []).join(" · ")}`);
-    await setBlock(key, v.value);
-  }
-  for (const page of [...fx.pages, ...fx.posts, ...fx.campaigns]) await upsertContentPage(page);
+  // The fixture's content (home, header, footer, pages, posts, campaigns,
+  // pairs, badges, pins) becomes documents in perf-docs-fixture.js
+  // (takeOverHarnessStore); the legacy content writers were retired with the
+  // legacy CMS, so nothing is written to the old content tables here.
 
   // commerce
   const { upsertOffer } = await import("../lib/offers/store.js");
@@ -446,11 +441,6 @@ export async function seedPerfFixture({ libsql, log = () => {}, spec = PERF_FIXT
   }
   const { upsertQuiz } = await import("../lib/quiz.js");
   for (const q of fx.quizzes) await upsertQuiz(q);
-  const { upsertPlacement } = await import("../lib/cms/placements.js");
-  for (const p of fx.placements) await upsertPlacement(p);
-  const { setProductOverride, setCollectionPins } = await import("../lib/catalog-overrides.js");
-  for (const o of fx.overrides) await setProductOverride(o.productId, { modules: o.modules, badge: o.badge });
-  for (const p of fx.pins) await setCollectionPins(p.collectionId, p.productIds);
 
   // the cart the report measures (cart API and checkout's first step)
   await libsql.execute({ sql: "INSERT INTO carts (id, coupon_code, created_at, updated_at) VALUES (?, NULL, ?, ?)", args: [fx.measured.cart.id, iso(0), iso(0)] });

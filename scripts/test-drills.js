@@ -15,10 +15,13 @@
 //      .design-env byte-identical, copies results, removes its worktree; a
 //      stand-in that writes the owner's data fails the run
 //   6. the drill helpers' own checks (p4, p5 and p6 lib.mjs --check)
+//   7. every module the seed and drill scripts load (static and import("…")
+//      relative paths, followed through scripts/) exists, so a deleted module
+//      fails pnpm test instead of the next seed
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -221,6 +224,24 @@ await t("the drill helpers' own checks pass (p4, p5 and p6 lib.mjs --check; p6 c
     const r = spawnSync(process.execPath, [`scripts/drills/${lib}/lib.mjs`, "--check"], { cwd: ROOT, env: cleanEnv(), encoding: "utf8", timeout: 60_000 });
     eq(r.status, 0, `${lib} --check: ${r.stdout}${r.stderr}`);
   }
+});
+
+await t("every module the seed and drill scripts load exists (seed:design, --p3, --p6, seed:roles, the drills)", async () => {
+  const entries = ["scripts/seed-design-preview.js", "scripts/seed-design-documents.js", "scripts/perf-docs-fixture.js", "scripts/dev-design.js", "scripts/dev-roles.js", "scripts/seed-roles.js", "scripts/drill.js", "scripts/drills/run-isolated.mjs", "scripts/drills/smoke.js", "scripts/drills/agency-gone.mjs", "scripts/drills/p5/run.mjs", "scripts/drills/p5/blocks.mjs", "scripts/drills/p6/run.mjs", "scripts/drills/p6/seed-p6.mjs"];
+  const seen = new Set();
+  const missing = [];
+  const walk = (file) => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    for (const m of readFileSync(file, "utf8").matchAll(/(?:from\s+|import\s*\(\s*)["'](\.{1,2}\/[^"']+)["']/g)) {
+      const target = resolve(dirname(file), m[1]);
+      if (!existsSync(target)) missing.push(`${relative(ROOT, file)} → ${m[1]}`);
+      else if (/\.m?js$/.test(target)) walk(target);
+    }
+  };
+  for (const e of entries) walk(join(ROOT, e));
+  ok(seen.size > 50, `followed ${seen.size} files:`);
+  eq(missing.join("; "), "", "missing modules:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

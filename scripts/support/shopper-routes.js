@@ -60,6 +60,7 @@ export const SHOPPER_ROUTES = Object.freeze([
   { path: "jobs/sync-shopify", methods: ["GET", "POST"], class: "job", suite: null },
   { path: "jobs/tick", methods: ["GET", "POST"], class: "job", suite: "test-first-sync.js" },
   { path: "health", methods: ["GET"], class: "job", suite: null },
+  { path: "[...unmatched]", methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], class: "public-read", suite: "test-api-unmatched.js", note: "an /api/* path with no route: 404 JSON, open or closed store" },
 ]);
 
 export const ROUTE_CLASSES = Object.freeze(["shopper", "public-read", "collector", "token", "operator", "webhook", "job"]);

@@ -199,34 +199,15 @@ await withTenant(t, async () => {
     offer: { id: "gift-lip-mask", type: "FREE_GIFT", scope: "gift", title: "Free lip mask over ₹2,999", threshold: 2999, gift: { variantId: "gid://shopify/ProductVariant/designlip", title: "Lip Sleeping Mask 20g" } },
     enabled: false,
   });
-  const { upsertPlacement } = await import("../lib/cms/placements.js");
-  await upsertPlacement({ kind: "pdp_pairs", sourceProductId: "gid://p/1", targetProductIds: ["gid://p/4", "gid://p/3"], title: "Pairs well with", enabled: true }).catch(() => {});
 
-  // ---- CMS: customized blocks + a page + a release ---------------------------
-  const { setBlock, upsertContentPage } = await import("../lib/cms/store.js");
-  await setBlock("announcement", { enabled: true, text: "Festive sale — free shipping over ₹1,499", href: "/collections" });
-  await setBlock("hero", {
-    title: "Skin first. Makeup second.",
-    highlight: "Skin first",
-    subtitle: "Clinically-tested routines for Indian skin — serums, SPF and repair that actually show up in the mirror.",
-    primary: { label: "Shop bestsellers", href: "/collections" },
-    secondary: { label: "What's new", href: "#new" },
-  });
-  await upsertContentPage({
-    slug: "shipping",
-    title: "Shipping policy",
-    family: "page",
-    sections: [{ kind: "text", heading: "Dispatch", body: ["Orders dispatch within 24 hours on business days."] }],
-  });
+  // ---- a release ------------------------------------------------------------
+  // The legacy content writers (blocks, pages, placements) were retired with
+  // the legacy CMS; content is documents now (seed-design-documents.js and
+  // perf-docs-fixture.js write them). The release stays: takeOver clears its
+  // pointer when the store moves to documents mode.
   const { createRelease, publishReleaseById } = await import("../lib/releases.js");
   const rel = await createRelease({ note: "Launch content", actor: "seed" });
   await publishReleaseById(rel.id);
-  await setBlock("hero", {
-    title: "Winter repair, started.",
-    highlight: "Winter repair",
-    subtitle: "The night-cream routine your skin asked for in October.",
-    primary: { label: "Shop night routine", href: "/collections" },
-  }); // → UNPUBLISHED CHANGES state on Releases
 
   // ---- experiments: running + completed --------------------------------------
   const X = await import("../lib/experiments.js");

@@ -727,14 +727,19 @@ export async function unknownStage(drill) {
   const { ctx, page, errors } = await ownerEditor(drill);
   await publishCard(drill, page, [await bundleSection("bundle_card", "sec_p5unk", { title: "A real card", bundle: { id: b.id } })]);
   // next dev writes a per-request id and timings into the page's scripts, so
-  // the raw bytes of two fetches never match; the P4 comparison's own mask
-  // (lib/migrate/render-compare.js normalize: scripts, ids, asset hashes,
-  // date-times, the origin) is applied, and its output compared byte for byte
-  const { normalize } = await import("../../../lib/migrate/render-compare.js");
-  const norm = (h) => normalize(h.html, { origin: base });
+  // the raw bytes of two fetches never match: the page's visible text is
+  // compared instead (scripts, styles, comments and tags dropped, spaces
+  // collapsed). The P4 render-compare mask went with the legacy CMS.
+  const norm = (h) =>
+    String(h.html)
+      .replace(/<(script|style|template)\b[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   const h1 = await liveHomeHtml(base);
   const h2 = await liveHomeHtml(base);
-  drill.check(h1.status === 200 && norm(h1) === norm(h2) && norm(h1).includes("A real card"), "unknown: two shopper fetches of the live home (fixed unit) are byte-identical after the P4 comparison's mask, so the comparison means something", { rawSame: h1.html === h2.html, maskedBytes: norm(h1).length });
+  drill.check(h1.status === 200 && norm(h1) === norm(h2) && norm(h1).includes("A real card"), "unknown: two shopper fetches of the live home (fixed unit) show the same visible text, so the comparison means something", { rawSame: h1.html === h2.html, maskedBytes: norm(h1).length });
   const before = await getDoc(page);
   const planted = structuredClone(before.body);
   const s = await bundleSection("bundle_card", "sec_p5bad", { title: "Planted", bundle: { id: b.id } });
@@ -748,7 +753,7 @@ export async function unknownStage(drill) {
   const stored = await sqlAt((await harnessContext()).urls.tenant, ["SELECT count(*) AS n FROM document_versions WHERE body LIKE '%no_such_source%'", { sql: "SELECT draft_hash, revision FROM documents WHERE id = ?", args: [before.id] }]);
   drill.check(after.revision === before.revision && after.draftHash === before.draftHash && !after.body.sections.some((x) => x.id === "sec_p5bad") && Number(stored[0].rows[0].n) === 0, "unknown: nothing is stored (same revision and draft, no version holds the source)", { revision: [before.revision, after.revision], draft: stored[1].rows[0] ? { ...stored[1].rows[0] } : null, versions: stored[0].rows[0].n, issues: issues.length });
   const h3 = await liveHomeHtml(base);
-  drill.check(h3.status === 200 && norm(h3) === norm(h1), "unknown: the live home is byte-identical (after the P4 mask) after the refused save", { maskedBytes: [norm(h1).length, norm(h3).length] });
+  drill.check(h3.status === 200 && norm(h3) === norm(h1), "unknown: the live home shows the same visible text after the refused save", { maskedBytes: [norm(h1).length, norm(h3).length] });
   drill.note("unknown: a draft can't hold an unknown body source (the writer refuses it), so the runtime source_unknown path (bindingFailed, the 'Remove it and add it again' preview note, the section_binding_failed log) is proved only in test-sections and test-sections-render, as the plan says.");
   drill.check(errors.length === 0, "unknown: no page errors", errors);
   await ctx.close();
