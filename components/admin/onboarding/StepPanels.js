@@ -4,8 +4,8 @@ import Link from "next/link";
 import { CircleAlert, CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
-import FirstRun from "@/components/admin/first-run/FirstRun";
 import ImportStep from "./ImportStep";
+import BrandStepPanel from "./BrandStepPanel";
 
 // The four onboarding step panels (Phase 1 line 3). Each shows what the step
 // model (lib/onboarding/steps.js) says about the step and wires only what the
@@ -16,7 +16,8 @@ import ImportStep from "./ImportStep";
 //   Connect  ./ConnectPanel (line 4): the address, Connect through Shopify's
 //            approval, the errors; nothing is written to Shopify
 //   Import   ImportStep (line 5): live progress, skips, what to do on a failure
-//   Brand    FirstRun (the starter store and BrandStep at #brand), legacy styled
+//   Brand    BrandStepPanel (line 6): the starter store, colours, logo and
+//            description beside a live preview; a wide panel
 //   Open     OpenStepPanel.js (line 7): every opening item with its fix,
 //            and the editor's own publish flow in a dialog
 
@@ -79,24 +80,16 @@ export function ImportPanel({ step, onChange, onGoStep }) {
 }
 
 // ---- Brand -----------------------------------------------------------------
-export function BrandPanel({ step, canSync, onChange }) {
+export function BrandPanel({ step, canSync, store, onChange }) {
   if (step.state === "blocked" || (step.problem && !step.actions?.length)) return null;
   const edit = actionOf(step, "brand_save");
   return (
-    <div className="space-y-3">
-      {edit && !edit.allowed && (
-        <p className="text-xs text-muted-foreground" data-onboarding="reason">
-          {edit.reason}
-        </p>
-      )}
-      <div data-legacy className="contents">
-        <div data-onboarding="brand">
-          <FirstRun canEdit={Boolean(edit?.allowed)} canSync={canSync} onChange={onChange} />
-        </div>
-      </div>
+    <div data-onboarding="brand">
+      <BrandStepPanel canEdit={Boolean(edit?.allowed)} canSync={canSync} reason={edit && !edit.allowed ? edit.reason : null} store={store} onChange={onChange} />
     </div>
   );
 }
+BrandPanel.wide = true;
 
 // ---- Open ------------------------------------------------------------------
 // Phase 1 line 7: step 4 has its own file.

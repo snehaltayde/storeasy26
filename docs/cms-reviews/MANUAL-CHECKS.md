@@ -1041,7 +1041,7 @@ Found by this drill (decide or accept):
 
 ### Batch 3 review fixes (P6-FIX3)
 Packet: [P6-FIX3.md](P6-FIX3.md), "Owner checks" and "Known limits" (From review).
-- [ ] Read the half-finished start-page words (HALF_WORDS in components/admin/first-run/FirstRun.js) and which reasons offer Try again, as a founder would. Not drilled in desktop Chrome, because it needs a staged race between two writer calls.
+- [ ] Read the half-finished start-page words (HALF_WORDS in components/admin/onboarding/brandModel.js since Phase 1 line 6; FirstRun.js is retired) and which reasons offer Try again, as a founder would. Not drilled in desktop Chrome, because it needs a staged race between two writer calls.
 - [ ] Read the Setup checklist's failed-read words: 'We couldn't check your privacy and returns pages just now. Reload this page to try again.'
 - [ ] After a page reload the half view is gone: the start page shows the store as it is, with no note that the colours were not made. Accept this or ask for a note.
 - [ ] CI sqld download under .github/ is unchanged: its source and checksum still need the owner's approval.

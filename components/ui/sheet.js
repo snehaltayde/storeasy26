@@ -47,17 +47,22 @@ function SheetOverlay({
   )
 }
 
+// forceMount (Phase 1 line 6): the content stays mounted while closed (the
+// caller hides it with data-[state=closed]:hidden), e.g. a preview frame that
+// must not reload; pass it only with modal={false} on the Sheet
 function SheetContent({
   className,
   children,
   side = "right",
   showCloseButton = true,
+  forceMount,
   ...props
 }) {
   return (
-    <SheetPortal>
+    <SheetPortal forceMount={forceMount}>
       <SheetOverlay />
       <SheetPrimitive.Content
+        forceMount={forceMount}
         data-slot="sheet-content"
         data-side={side}
         className={cn(

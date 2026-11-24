@@ -6,7 +6,7 @@ restyled to `docs/UI.md`. Consoles only: nothing under `app/(storefront)/` or
 names (`scripts/test-console-ui.js` checks both).
 
 In here: `button`, `input`, `progress`, `separator`, `skeleton`, `tooltip`, `sheet`, `dialog`,
-`dropdown-menu`, `avatar`, `sidebar`, the `use-mobile` hook and `utils.js`
+`dropdown-menu`, `avatar`, `sidebar`, `radio-group`, `label`, the `use-mobile` hook and `utils.js`
 (`cn`). Their tokens live in `app/console.css` under `.console` /
 `.console.dark`. Add `.console` to the console root `<body>` to use them.
 

@@ -1268,9 +1268,13 @@ await t("FIX3 (editor page): a half-finished run before render re-lists the docu
   ok(r.html.includes('data-doc="doc_home"'), `the editor opens the made home: ${r.html.slice(0, 200)}`);
 });
 
-await t("FIX3: the start page's own half-finished words (FirstRun.js HALF_WORDS) are the generator's, word for word", async () => {
-  const src = readFileSync(join(ROOT, "components/admin/first-run/FirstRun.js"), "utf8");
-  for (const [k, w] of Object.entries(Gen.FIRST_RUN_HALF_WORDS)) ok(src.includes(`${k}: ${JSON.stringify(w)}`), `FirstRun.js HALF_WORDS.${k} is not "${w}"`);
+await t("FIX3: the Brand step's own half-finished words (onboarding/brandModel.js HALF_WORDS) are the generator's, word for word", async () => {
+  const { HALF_WORDS } = await import(pathToFileURL(join(ROOT, "components/admin/onboarding/brandModel.js")).href);
+  const src = readFileSync(join(ROOT, "components/admin/onboarding/brandModel.js"), "utf8");
+  for (const [k, w] of Object.entries(Gen.FIRST_RUN_HALF_WORDS)) {
+    ok(src.includes(`${k}: ${JSON.stringify(w)}`), `brandModel.js HALF_WORDS.${k} is not "${w}"`);
+    ok(HALF_WORDS[k] === w, `brandModel.js HALF_WORDS.${k} (imported) is not "${w}"`);
+  }
 });
 
 // ---- cleanup --------------------------------------------------------------------------

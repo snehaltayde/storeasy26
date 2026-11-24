@@ -235,8 +235,10 @@ function countTenantWrites() {
 }
 
 // ========================================================================================
-// P6-START-UI: the start page, rendered. The client parts (FirstRun.js,
-// BrandStep.js) are compiled with Next's SWC and driven by a small hook
+// P6-START-UI: the start page, rendered. Since Phase 1 line 6 the client part
+// is the onboarding Brand step (components/admin/onboarding/BrandStepPanel.js,
+// its brandModel.js and useStarterStore.js; the live preview is stubbed and
+// tested in scripts/test-onboarding-brand.js), compiled with Next's SWC and driven by a small hook
 // driver (the one test-media-picker uses): each component is called with its
 // own hook slots, effects run after each draw, and fetch is a mock that
 // answers like GET/POST /api/admin/first-run, /api/admin/brand-step and
@@ -417,7 +419,18 @@ async function renderedTests() {
   }
 
   let pickerProps = null;
+  let previewProps = null;
+  let uploadAnswer = null;
+  globalThis.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} }); // from 1024px
   const stubs = (d) => ({
+    "./BrandPreview": {
+      __esModule: true,
+      default: function BrandPreview(p) {
+        previewProps = p;
+        return null;
+      },
+    },
+    "@/lib/media-upload": { uploadImage: async () => uploadAnswer },
     react: d.react,
     "next/link": { __esModule: true, default: function Link({ href, className, children }) { return React.createElement("a", { href, className }, children); } },
     "@/components/admin/shared/MediaPicker": {
@@ -433,7 +446,8 @@ async function renderedTests() {
     const mod = await load(join(ROOT, file));
     const C = exportName === "default" ? mod.default : mod[exportName];
     ok(typeof C === "function", `${file} has no ${exportName}`);
-    const net = mockFetch(table);
+    // the Brand step always reads the starter store too: a made one unless the test says otherwise
+    const net = mockFetch({ "GET /api/admin/first-run": ok200({ ok: true, firstRun: generated(), sync: syncView("complete", { firstSync: false }) }), ...table });
     const realFetch = globalThis.fetch;
     let nodes = [];
     const draw = () => {
@@ -469,7 +483,7 @@ async function renderedTests() {
       net,
       flush,
       nodes: () => nodes,
-      all: () => nodes.filter((n) => typeof n.type === "string").map((n) => (["p", "a", "button", "legend", "label", "h2", "span"].includes(n.type) ? textOf(n.props.children) : "")).join(" ").replace(/\s+/g, " "),
+      all: () => nodes.map((n) => (["p", "a", "button", "legend", "label", "h2", "h3", "span", "figcaption"].includes(n.type) || n.props?.["data-slot"] === "label" ? textOf(n.props.children) : "")).join(" ").replace(/\s+/g, " "),
       stateOf: (attr) => nodes.find((n) => n.props && attr in n.props)?.props[attr],
       buttons: () => nodes.filter((n) => n.type === "button").map(nameOf),
       links: () => nodes.filter((n) => n.type === "a").map((n) => [textOf(n.props.children).trim(), n.props.href]),
@@ -490,6 +504,17 @@ async function renderedTests() {
         await flush();
       },
       input: (pred) => nodes.find((n) => n.type === "input" && pred(n.props)),
+      // Phase 1 line 6: the palettes are a Radix RadioGroup
+      radios: () => nodes.filter((n) => n.props?.["data-palette"] && n.props.value),
+      group: () => nodes.find((n) => n.props?.["data-slot"] === "radio-group"),
+      async choose(id) {
+        const g = v.group();
+        ok(g, "no palette group");
+        ok(!g.props.disabled, "the palettes are disabled");
+        g.props.onValueChange(id);
+        await flush();
+      },
+      brandScroll: () => nodes.some((n) => n.type === "button" && n.props["data-brand-scroll"] !== undefined && textOf(n.props.children).trim() === "Change colours and logo"),
       async change(pred, value) {
         const el = v.input(pred);
         ok(el, "no such field");
@@ -531,8 +556,9 @@ async function renderedTests() {
       ...over,
     });
   const brandTable = (over = {}) => ({ "GET /api/admin/brand-step": BRAND_GET(over) });
-  const FR = "components/admin/first-run/FirstRun.js";
-  const BSF = "components/admin/first-run/BrandStep.js";
+  const FR = "components/admin/onboarding/BrandStepPanel.js";
+  const BSF = FR; // FirstRun and BrandStep are one panel since Phase 1 line 6
+  const MODEL = "components/admin/onboarding/brandModel.js";
   const POLL = 600_000; // never fires inside a test unless asked
   const states = {}; // state -> rendered text, for the banned-copy scan
   const noBanned = (label, text) => {
@@ -541,7 +567,7 @@ async function renderedTests() {
     ok(!/\bpnpm\b|\bmigrat|\bnpm\b|sync script|node scripts|--hosted|\bCLI\b/i.test(text), `${label}: a developer word in ${text}`);
   };
 
-  console.log("— P6-START-UI: FirstRun, rendered");
+  console.log("— P6-START-UI: the starter store (BrandStepPanel), rendered");
 
   await t("RENDERED: generated store (GET): the ready view names the product photo, the collection rows and the palette from the server's summary, says nothing is public yet, and links to the editor and the brand step", async () => {
     const v = await mount(FR, { canEdit: true, canSync: true, pollMs: POLL }, { ...firstRunGet(generated(), syncView("complete", { firstSync: false })), ...brandTable() });
@@ -550,7 +576,7 @@ async function renderedTests() {
     ok(text.includes("A home page with your store name, a photo of Lavender Soy Candle, rows for Candles and Gift Sets, a grid of your collections, a row of your newest products, and the Slate colours."), text);
     ok(text.includes("Nothing is public yet."), "closed line");
     ok(v.links().some(([l, h]) => l === "Edit the home page" && h === "/admin/editor?doc=doc_home"), JSON.stringify(v.links()));
-    ok(v.links().some(([l, h]) => l === "Change colours and logo" && h === "#brand"), JSON.stringify(v.links()));
+    ok(v.brandScroll(), "the way to the brand form (a scroll since line 6)");
     eq(v.net.posts(), [], "no POST on a generated store:");
     ok(!text.includes("We kept"), "nothing kept");
     states.ready = text;
@@ -581,7 +607,7 @@ async function renderedTests() {
     const g = await mount(FR, { canEdit: true, canSync: true, pollMs: POLL }, { ...firstRunGet({ eligible: false, reason: "founder_started", generated: true, byGenerator: [], kept: ["doc_home"], empty: false, noCollections: false, summary: null }, syncView("complete", { firstSync: false })), ...brandTable() });
     eq(g.stateOf("data-first-run"), "kept", "state:");
     ok(g.all().includes("We kept the home page you already started."), g.all());
-    ok(g.links().some(([l]) => l === "Edit the home page") && g.links().some(([l]) => l === "Change colours and logo"), JSON.stringify(g.links()));
+    ok(g.links().some(([l]) => l === "Edit the home page") && g.brandScroll(), JSON.stringify(g.links()));
     eq(g.net.posts(), [], "no POST:");
     states.kept = g.all();
     // a POST whose writer skipped the founder's home (made in the meantime)
@@ -776,7 +802,7 @@ async function renderedTests() {
       eq(v.stateOf("data-first-run"), "blocked", `${st}, state:`);
       ok(v.all().includes(already), `${st}: ${v.all()}`);
       ok(!v.all().includes("Your starting store is made as soon as your products are in."), `${st}: no waiting words`);
-      ok(v.links().some(([l]) => l === "Edit the home page") && v.links().some(([l]) => l === "Change colours and logo"), `${st}: ${JSON.stringify(v.links())}`);
+      ok(v.links().some(([l]) => l === "Edit the home page") && v.brandScroll(), `${st}: ${JSON.stringify(v.links())}`);
       eq(v.net.posts(), [], `${st}, no POST:`);
       if (st === "complete") ok(v.stateOf("data-first-run-note") !== "sync", "no sync note once complete");
       else ok(v.stateOf("data-first-run-note") === "sync", `${st}: the small sync note`);
@@ -807,13 +833,13 @@ async function renderedTests() {
     ok(scanText("Run pnpm sync to bring products in", { claims: false }).length > 0, "the scan works");
   });
 
-  console.log("— P6-START-UI: BrandStep, rendered");
+  console.log("— P6-START-UI: the brand form (BrandStepPanel), rendered");
 
   await t("RENDERED: BrandStep lists the 6 palettes with labels and swatches drawn from brandCssVars, preselects slate, and shows the alt hint and the closed-store line", async () => {
     const v = await mount(BSF, { canEdit: true }, { ...brandTable({ current: { paletteId: "slate", logo: { media: "/api/media/med_logo1" }, description: "Old tagline" } }) });
-    const radios = v.nodes().filter((n) => n.type === "input" && n.props.name === "palette");
+    const radios = v.radios();
     eq(radios.map((r) => r.props.value), Pal.PALETTES.map((p) => p.id), "palettes:");
-    eq(radios.filter((r) => r.props.checked).map((r) => r.props.value), ["slate"], "preselected:");
+    eq(v.group().props.value, "slate", "preselected:");
     for (const p of Pal.PALETTES) ok(v.all().includes(p.label), `label ${p.label}`);
     const swatches = v.nodes().filter((n) => n.type === "span" && n.props.style && n.props.style["--accent-500"]);
     eq(swatches.length, 6, "six swatches:");
@@ -842,8 +868,8 @@ async function renderedTests() {
   await t("RENDERED: choosing a palette, a library logo with an alt and a new description posts them; Remove logo then Save posts logo:null; Skip posts {skip:true}", async () => {
     const answer = ok200({ ok: true, skipped: false, design: { id: "doc_design", revision: 2 }, liveNow: ["description"], afterPublish: ["colours", "logo"], storeOpen: false, brandStep: { paletteId: "forest" } });
     const v = await mount(BSF, { canEdit: true }, { ...brandTable(), "POST /api/admin/brand-step": (body) => (body.skip ? ok200({ ok: true, skipped: true, design: null, liveNow: [], afterPublish: [], storeOpen: false, brandStep: { skipped: true } }) : answer) });
-    await v.change((p) => p.name === "palette" && p.value === "forest", "forest");
-    await v.click("Choose a logo");
+    await v.choose("forest");
+    await v.click("Choose from your library");
     ok(pickerProps?.open === true, "the library picker opened");
     pickerProps.onSelect({ url: "/api/media/med_abc123", alt: "", id: "med_abc123" });
     await v.flush();
@@ -866,11 +892,11 @@ async function renderedTests() {
     eq(v.net.posts().at(-1).body, { skip: true }, "Skip:");
     ok(v.all().includes("Skipped."), v.all());
     // a picked file that isn't a library address is never sent
-    await v.click("Choose a logo");
+    await v.click("Choose from your library");
     pickerProps.onSelect({ url: "https://elsewhere.example/x.png", alt: "" });
     await v.flush();
     ok(v.all().includes("Choose a picture from your library for the logo."), v.all());
-    ok(v.buttons().includes("Choose a logo"), "no logo taken");
+    ok(v.buttons().includes("Upload a logo") && !v.buttons().includes("Remove logo"), "no logo taken");
   });
 
   await t("RENDERED: 'Your description shows now' shows only when storeOpen, with a link to the editor's publish", async () => {
@@ -893,15 +919,15 @@ async function renderedTests() {
     ok(!("description" in v.net.posts()[0].body), JSON.stringify(v.net.posts()[0].body));
   });
 
-  await t("RENDERED: a read-only actor sees the step with no Save or Skip button, nothing to choose, and makes no POST", async () => {
+  await t("RENDERED: a read-only actor sees the step with Save, Skip and every logo control disabled with the reason (line 6: the RoleGate pattern), nothing to choose, and makes no POST", async () => {
     const v = await mount(BSF, { canEdit: false }, brandTable({ canEditDescription: false }));
-    ok(!v.buttons().includes("Save") && !v.buttons().includes("Skip for now") && !v.buttons().includes("Choose a logo"), v.buttons().join("|"));
-    ok(v.nodes().filter((n) => n.type === "input" && n.props.name === "palette").every((r) => r.props.disabled), "palettes disabled");
+    for (const b of ["Save", "Skip for now", "Upload a logo", "Choose from your library"]) ok(v.button(b).props.disabled, `${b} is not disabled`);
+    ok(v.group().props.disabled && v.radios().every((r) => r.props.disabled), "palettes disabled");
     ok(v.all().includes("Your role can look at this page but not change it."), v.all());
     eq(v.net.posts(), [], "no POST:");
     // and on the whole page
     const page = await mount(FR, { canEdit: false, canSync: false, pollMs: POLL }, { ...firstRunGet(generated(), syncView("complete", { firstSync: false })), ...brandTable({ canEditDescription: false }) });
-    ok(!page.buttons().includes("Save"), page.buttons().join("|"));
+    ok(page.button("Save").props.disabled, page.buttons().join("|"));
     eq(page.net.posts(), [], "no POST on the page:");
   });
 
@@ -914,7 +940,7 @@ async function renderedTests() {
         ok200({ ok: true, skipped: false, design: { id: "doc_design", revision: 7 }, liveNow: [], afterPublish: [], storeOpen: false, brandStep: { paletteId: "clay" } }),
       ],
     });
-    await v.change((p) => p.name === "palette" && p.value === "clay", "clay");
+    await v.choose("clay");
     await v.click("Save");
     ok(v.all().includes("Your colours and logo were saved, but this step wasn't marked as done."), v.all());
     await v.click("Save");
@@ -922,7 +948,7 @@ async function renderedTests() {
     eq(posts, [1, 7], "revisions sent:");
     ok(v.all().includes("Your colours and logo are saved. They show after you publish."), `after the retry: ${v.all()}`);
     // pure helpers
-    const M = await world(stubs(driver()))(join(ROOT, BSF));
+    const M = await import(pathToFileURL(join(ROOT, MODEL)).href);
     eq(M.savedLines({ ok: true, liveNow: [], afterPublish: [] }, { carried: true }), ["Saved.", M.BRAND_WORDS.afterPublish], "carried:");
     eq(M.savedLines({ ok: true, liveNow: [], afterPublish: [] }), ["Saved."], "not carried:");
     eq(M.saveBody({ paletteId: "ink", logo: null, alt: "", description: "x", canEditDescription: true, revision: 7 }), { paletteId: "ink", logo: null, description: "x", revision: 7 }, "saveBody:");
@@ -959,7 +985,7 @@ async function renderedTests() {
   }
 
   // Phase 1 line 3: "Start your store" is the onboarding page's Brand step
-  // (FirstRun and BrandStep render there); /admin/start only redirects.
+  // (BrandStepPanel since line 6); /admin/start only redirects.
   await t("RENDERED (Phase 1 line 3): /admin/start redirects to /admin/onboarding?step=brand for every caller and every store mode (the onboarding page decides who sees what)", async () => {
     for (const actor of [null, { role: "owner" }, { role: "staff" }, { role: "support" }]) {
       for (const mode of ["legacy", "migrating", "documents"]) eq((await renderPage({ actor, mode })).redirect, "/admin/onboarding?step=brand", `${JSON.stringify(actor)} ${mode}:`);
@@ -972,16 +998,16 @@ async function renderedTests() {
     eq(strip(page).match(/from "[^"]+"/g), ['from "next/navigation"'], "its only import:");
     ok(!page.includes("@/lib/tenant-request"), "never the cached path");
     const LEGACY = /["'`](\/admin\/(?:catalog|home|upsells)(?:[/?#][^"'`$]*)?|\/admin\/storefront(?:[?#][^"'`$]*)?)["'`$]/;
-    for (const f of [PAGE, join(ROOT, FR), join(ROOT, BSF)]) ok(!LEGACY.test(strip(await readFile(f, "utf8"))), `${f}: a literal link to an old screen`);
-    for (const f of [FR, BSF]) {
+    const PARTS = [FR, MODEL, "components/admin/onboarding/useStarterStore.js", "components/admin/onboarding/BrandPreview.js"];
+    for (const f of [PAGE, ...PARTS.map((x) => join(ROOT, x))]) ok(!LEGACY.test(strip(await readFile(f, "utf8"))), `${f}: a literal link to an old screen`);
+    for (const f of PARTS) {
       const src = await readFile(join(ROOT, f), "utf8");
-      ok(src.startsWith('"use client";'), `${f} is a client part`);
+      if (f !== MODEL) ok(src.startsWith('"use client";'), `${f} is a client part`);
       ok(!/from "(node:|@\/lib\/(db|first-run|documents|platform|admin\/settings))/.test(src), `${f} imports a server module`);
     }
     const E = await import("../lib/admin/editor-entry.js");
-    const FRm = await world(stubs(driver()))(join(ROOT, FR));
-    const BSm = await world(stubs(driver()))(join(ROOT, BSF));
-    eq([FRm.EDIT_HOME_HREF, BSm.PUBLISH_HREF], [E.EDITOR_PUBLISH_HREF, E.EDITOR_PUBLISH_HREF], "the editor's publish address:");
+    const Mm = await import(pathToFileURL(join(ROOT, MODEL)).href);
+    eq([Mm.EDIT_HOME_HREF, Mm.PUBLISH_HREF], [E.EDITOR_PUBLISH_HREF, E.EDITOR_PUBLISH_HREF], "the editor's publish address:");
     ok((await readdir(join(ROOT, "app/(console)/admin/(authed)/start"))).includes("page.js"), "the redirect page exists");
   });
 }

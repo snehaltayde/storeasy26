@@ -9,7 +9,7 @@
 //      least-trusted cases (support keys and actions, signed out, another
 //      store's session, cross-origin), the test-order check-off's audit row
 //   4. the nav and the redirects (/admin, /admin/setup, /admin/start)
-//   5. FirstRun mounted: canEdit=false never POSTs
+//   5. the Brand step's starter store (useStarterStore) mounted: canEdit=false never POSTs
 // Nothing here reaches Shopify, Typesense or a hosted database.
 //   pnpm test:onboarding
 import { createRequire, registerHooks } from "node:module";
@@ -609,17 +609,17 @@ await t("retired: lib/admin/onboarding.js, components/admin/SetupAdmin.js and ap
 });
 
 // =========================================================================================
-console.log("— 5. the Brand step's FirstRun, mounted (its hooks run; no DOM)");
+console.log("— 5. the Brand step's starter store (useStarterStore), mounted (its hooks run; no DOM)");
 
-// A small hook driver: FirstRun is called as a function with its own state,
-// refs and effects, and re-run until it settles. Children are not rendered:
-// what matters here is which requests the component itself sends.
+// A small hook driver: useStarterStore is called as a function with its own
+// state, refs and effects, and re-run until it settles: what matters here is
+// which requests it sends.
 async function mountFirstRun(props, answer) {
   const req = createRequire(import.meta.url);
   const React = req("react");
   const swc = req("next/dist/build/swc/index.js");
   await swc.loadBindings();
-  const file = join(ROOT, "components/admin/first-run/FirstRun.js");
+  const file = join(ROOT, "components/admin/onboarding/useStarterStore.js");
   const { readFileSync } = await import("node:fs");
   const code = (await swc.transform(readFileSync(file, "utf8"), { filename: file, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
   const box = [];
@@ -646,17 +646,9 @@ async function mountFirstRun(props, answer) {
     },
   };
   const react = { ...React, ...hooks, default: { ...React, ...hooks } };
-  const Stub = () => null;
   const stubs = {
     react,
-    "next/link": { default: Stub },
-    "lucide-react": { RotateCcw: Stub },
-    "@/components/console/Card": { Card: Stub, CardHeader: Stub },
-    "@/components/console/Banner": { Banner: Stub },
-    "@/components/console/Button": { Button: Stub },
-    "@/components/admin/SyncProgress": { SyncProgressBody: Stub, readSync: async () => null, requestSync: async () => null, POLL_MS: 3000 },
-    "@/lib/themes/palettes": { paletteById: () => null },
-    "./BrandStep": { default: Stub },
+    "./brandModel": await import(pathToFileURL(join(ROOT, "components/admin/onboarding/brandModel.js")).href),
   };
   const mod = { exports: {} };
   new Function("require", "module", "exports", code)((id) => (id in stubs ? stubs[id] : req(id)), mod, mod.exports);
@@ -679,11 +671,11 @@ async function mountFirstRun(props, answer) {
   } finally {
     globalThis.fetch = realFetch;
   }
-  return { sent, viewOf: mod.exports.viewOf };
+  return { sent, viewOf: stubs["./brandModel"].viewOf };
 }
 const MAKEABLE = { ok: true, firstRun: { generated: false, eligible: true, kept: [], byGenerator: [] }, sync: { state: "complete" } };
 
-await t("least-trusted: FirstRun with canEdit=false on the 'make' view (support before the starter store exists) sends no POST, only its GET; with canEdit=true the same answer sends exactly one POST", async () => {
+await t("least-trusted: the starter store with canEdit=false on the 'make' view (support before the starter store exists) sends no POST, only its GET; with canEdit=true the same answer sends exactly one POST", async () => {
   const ro = await mountFirstRun({ canEdit: false, canSync: false }, MAKEABLE);
   eq(ro.viewOf(MAKEABLE.firstRun, MAKEABLE.sync), "make", "the answer is the 'make' view:");
   eq(ro.sent, [["GET", "/api/admin/first-run"]], "support (canEdit false): the GET only, no POST:");

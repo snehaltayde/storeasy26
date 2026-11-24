@@ -61,5 +61,5 @@ export default async function OnboardingPage({ searchParams }) {
     );
   }
 
-  return <Onboarding initial={model} initialStep={resumeStep(sp?.step, model)} canSync={roleAllows(actor.role, "sync.run")} publishHref={EDITOR_PUBLISH_HREF} welcome={welcome} />;
+  return <Onboarding initial={model} initialStep={resumeStep(sp?.step, model)} canSync={roleAllows(actor.role, "sync.run")} publishHref={EDITOR_PUBLISH_HREF} welcome={welcome} store={{ name: storeName, address }} />;
 }

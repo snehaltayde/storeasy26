@@ -21,8 +21,11 @@ import { ConnectedNote } from "./ConnectPanel";
 // window gets focus, and after anything in a panel saves. A failed re-read
 // keeps what is on screen.
 //   initial      the GET answer's shape (lib/onboarding/steps.js deriveSteps)
-//   initialStep  a step id; canSync: the role may run a sync (FirstRun)
+//   initialStep  a step id; canSync: the role may run a sync (the Brand step)
 //   publishHref  the editor's Publish; welcome: the rendered Welcome card
+//   store        { name, address } (the Brand step's search-result snippet)
+// A panel with `wide` set (Brand, line 6) takes the whole row beside the step
+// list (up to 1200px); the Welcome card and the step header stay 640px.
 
 export const REFRESH_MS = 10_000;
 const PANELS = { connect: ConnectPanel, import: ImportPanel, brand: BrandPanel, open: OpenPanel };
@@ -33,7 +36,7 @@ const PILL = {
   blocked: "bg-warning/10 text-warning-text",
 };
 
-export default function Onboarding({ initial, initialStep, canSync = false, publishHref, welcome = null }) {
+export default function Onboarding({ initial, initialStep, canSync = false, publishHref, welcome = null, store = null }) {
   const router = useRouter();
   const [model, setModel] = useState(initial);
   const [selected, setSelected] = useState(initialStep);
@@ -90,27 +93,25 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
   // the step this one waits for, when that is another step: the way to it is
   // the page's one next action
   const waitsFor = step.state === "blocked" ? model.steps.find((s) => s.id === step.blockedBy) || null : null;
-  // Brand still shows an old screen (data-legacy) until its line rebuilds it:
-  // it sits on a sunken tray, so its own cards read as content inside the
-  // step, not as a second page inside the card
-  const tray = step.id === "brand" && step.state !== "blocked";
+  // a wide step (Brand: form and live preview side by side) takes the row
+  const wide = Boolean(Panel.wide) && step.state !== "blocked";
   const list = { steps: model.steps, selected: step.id, onSelect: choose, doneCount: model.doneCount, total: model.total };
 
   return (
-    <div data-onboarding="page" className="lg:grid lg:grid-cols-[200px_minmax(0,640px)] lg:justify-center lg:gap-8">
+    <div data-onboarding="page" data-wide={wide || undefined} className={cn("lg:grid lg:justify-center lg:gap-8", wide ? "lg:grid-cols-[200px_minmax(0,1fr)]" : "mx-auto lg:max-w-[920px] lg:grid-cols-[200px_minmax(0,640px)]")}>
       <div className="hidden lg:block">
         <div className="sticky top-8 pt-1">
           <StepList {...list} />
         </div>
       </div>
-      <div data-onboarding="column" className="mx-auto w-full max-w-[640px] min-w-0 space-y-8">
-        {welcome}
+      <div data-onboarding="column" className={cn("mx-auto w-full min-w-0 space-y-8", !wide && "max-w-[640px]")}>
+        {wide ? <div className="max-w-[640px]">{welcome}</div> : welcome}
         <div className="lg:hidden">
           <StepList {...list} variant="compact" />
         </div>
 
         <section aria-labelledby="onboarding-step-title" data-onboarding="panel" data-step={step.id} data-state={step.state} className="rounded-card border border-border bg-card text-card-foreground shadow-card">
-          <header className="space-y-2 p-4 md:p-6">
+          <header className={cn("space-y-2 p-4 md:p-6", wide && "max-w-[640px]")}>
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-muted-foreground tabular-nums">
                 Step {index + 1} of {model.total}
@@ -139,14 +140,14 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
               </p>
             )}
           </header>
-          <div data-onboarding="panel-body" data-tray={tray || undefined} className={cn("space-y-4 border-t border-border p-4 md:p-6 empty:hidden", tray && "rounded-b-card bg-muted")}>
+          <div data-onboarding="panel-body" className="space-y-4 border-t border-border p-4 md:p-6 empty:hidden">
             {waitsFor && (
               <Button size="lg" className="h-10 px-4" onClick={() => choose(waitsFor.id, { focus: true })} data-onboarding="go-blocker">
                 Go to {waitsFor.label}
               </Button>
             )}
             {step.id === "import" && <ConnectedNote />}
-            <Panel key={step.id} step={step} canSync={canSync} publishHref={publishHref} onChange={refresh} onModel={setModel} onGoStep={(id) => choose(id, { focus: true })} />
+            <Panel key={step.id} step={step} canSync={canSync} publishHref={publishHref} store={store} onChange={refresh} onModel={setModel} onGoStep={(id) => choose(id, { focus: true })} />
             {nextUp && (
               <Button size="lg" className="h-10 px-4" onClick={() => choose(nextUp.id, { focus: true })} data-onboarding="next">
                 Next: {nextUp.label}

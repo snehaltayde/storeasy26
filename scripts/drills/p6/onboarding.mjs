@@ -64,7 +64,10 @@ export async function onboardingStage(drill) {
   drill.check(v.railVisible && !v.compactVisible, "at 1440 the step list sits beside the column (the compact list is hidden)", { rail: v.railVisible, compact: v.compactVisible });
   const col = await page.locator('[data-onboarding="column"]').boundingBox();
   const rail = await page.locator('[data-onboarding="steplist"]').boundingBox();
-  drill.check(col && col.width <= 640 && col.width >= 600 && rail && rail.x + rail.width <= col.x, "the column is at most 640px wide with the step list to its left", { col, rail });
+  const head = await page.locator('[data-onboarding="panel"] > header').boundingBox();
+  const wide = await page.locator('[data-onboarding="page"][data-wide]').count();
+  // Phase 1 line 6: Brand is a wide step (form and preview side by side); its step header stays 640px
+  drill.check(wide === 1 && col && col.width > 640 && head && head.width <= 640 && rail && rail.x + rail.width <= col.x, "Brand is a wide step: the column takes the row, the step header stays at most 640px, the step list to its left", { col, head, rail });
   const made = await waitFor(async () => {
     const s = await page.locator("[data-first-run]").getAttribute("data-first-run").catch(() => null);
     return s && !["loading", "making"].includes(s) ? s : false;
@@ -135,6 +138,13 @@ export async function onboardingStage(drill) {
   drill.check(brandText.includes(READ_ONLY), "support: the Brand step says why nothing can be changed", brandText.slice(0, 300));
   const brandButtons = await sp.locator('[data-onboarding="panel"] [data-brand-step] button:not([disabled])').count();
   drill.check(brandButtons === 0, "support: the brand step has no enabled button", brandButtons);
+  const sControls = await sp.evaluate(() => {
+    const form = document.querySelector("[data-brand-step]");
+    return { radios: [...form.querySelectorAll("[data-palette]")].map((r) => r.disabled), fields: [...form.querySelectorAll("input")].map((i) => i.disabled), save: [...form.querySelectorAll("button")].find((b) => b.innerText.trim() === "Save")?.disabled ?? null };
+  });
+  drill.check(sControls.radios.length === 6 && sControls.radios.every(Boolean) && sControls.fields.every(Boolean) && sControls.save === true, "support: every palette, field and Save are disabled", sControls);
+  const sFrame = await waitFor(async () => (await sp.locator("[data-brand-preview]").getAttribute("data-preview-phase").catch(() => null)) === "shown", 60_000, 300);
+  drill.check(Boolean(sFrame) && (await sp.locator("[data-preview-frame]").count()) === 1, "support: the live preview frame shows the saved store", null);
   await goStep(drill, sp, "connect");
   drill.check((await sp.locator('[data-onboarding="shop-domain"]').count()) === 0, "support: no Shopify store address on the page", null);
   const post = await sp.evaluate(async () => {
