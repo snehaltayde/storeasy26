@@ -26,7 +26,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] The agency partner programme is gone: no agency routes, screens or links remain, its tables are left unused, and its suite is replaced by a test that no agency route answers (`test:agency-removed`, `test:case-studies`; the live `drill:agency-gone` runs at the phase-end browser pass)
 - [x] One command seeds a local store with an owner, admin, staff and support member, an operator, a shopper with an order, and a synced catalog (`pnpm seed:roles`; `test:seed-roles`)
 - [x] The browser drills run on today's code: drills that tested the retired legacy CMS are removed, and `pnpm drill:p6` and the p5 drill pass (`pnpm drill:all`, each in a throwaway worktree; known flake below)
-- [ ] shadcn/ui is set up for the consoles only (tokens from `docs/UI.md`, `components/ui/`), and the storefront's styles are unchanged (a storefront render comparison proves it)
+- [x] shadcn/ui is set up for the consoles only (tokens from `docs/UI.md`, `components/ui/`), and the storefront's styles are unchanged (a storefront render comparison proves it) (`test:console-ui`; `pnpm drill:sf-styles`, evidence in `docs/cms-reviews/drills/SF-STYLES/compare.json`)
 - [ ] A signed-in merchant lands in a new console shell (sidebar, top bar, store switcher) that shows only the sections their role can use; support sees no write actions
 
 ## Phase 1: simple onboarding
