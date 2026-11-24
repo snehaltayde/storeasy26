@@ -11,7 +11,7 @@ without asking the owner are marked so they are easy to review.
   - An email that already has an account gets an identical response and a "sign in instead" email (no enumeration); adding a second store to an existing account comes later.
   - After verification a single-use, 2-minute handoff token (in the URL fragment, never in logs) signs the founder into their new store's console at `/admin/onboarding`, the page line 3 grows into the four steps.
   - Stores live at `<slug>.<SIGNUP_STORE_DOMAIN>`; the slug becomes the store id. The database is created behind `lib/platform/provisioner.js` with a `file` driver (refused in production) that line 2 swaps for Turso; existing provisioning keeps using Turso.
-  - Signup is off until an operator turns on the flag `ff_self_signup`.
+  - Signup is off until an operator turns on the flag `ff_self-signup` (the flag-key rule allows no underscore after `ff_`).
 - **Why:** the owner wants onboarding simple; verify-before-create keeps fake signups from making stores.
 - **Instead of:** creating an unverified user and store at once; a verification link (can open in another browser); a shared parent-domain cookie (breaks custom domains).
 - **Accepted risk:** an attacker could send their own handoff link and sign someone into the attacker's empty new store; the token lasts 2 minutes and works once.

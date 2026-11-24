@@ -9,7 +9,7 @@ One section per line of `docs/FEATURES.md` Phase 1. Agents read only the section
 ### 1. Feature list (floor)
 
 1. **Signup form** at `/signup` on the platform site host only (`PLATFORM_SITE_HOSTS`); a store host gets 404. Fields: name (1–80), email, password (8–200, not the email), store name (2–60). Store address shown live as `<slug>.<SIGNUP_STORE_DOMAIN>`, derived from the store name, editable. Availability check: bad format, reserved words (`www admin api app platform storeasy mail help status signup` and every label in `PLATFORM_SITE_HOSTS`), existing tenant ids and domains, slugs held by live signups. Pricing's "Get started" → `/signup` when signup is open.
-2. **Kill switch:** open only while flag `ff_self_signup` is on (`flagEnabled(..., {fallback:false})`); off → "signups are closed" with a link to `/contact`.
+2. **Kill switch:** open only while flag `ff_self-signup` is on (`flagEnabled(..., {fallback:false})`); off → "signups are closed" with a link to `/contact`.
 3. **Email code:** 6 digits, 15-minute expiry, 5 wrong tries then dead; resend at most once per 60 s and 5 per signup, each a new code; stored as `sha256(signupId:code)`, compared in constant time.
 4. **Browser binding:** submit sets host-only, httpOnly, SameSite=Lax cookie `se_signup` on the marketing host (only its hash stored); verify, resend and retry act only on the signup matching the cookie.
 5. **No enumeration:** an existing email gets the same response, code screen and scrypt work; its email says "you already have an account: sign in or reset" with no code; every code fails with the same generic message. Validation errors are per field, never "email taken".
