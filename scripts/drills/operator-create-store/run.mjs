@@ -162,7 +162,8 @@ async function opsCreateStore(drill) {
   {
     const f = await acceptAs(drill, ONE, tokenOf(invite1), { label: "03-founder-1" });
     const step = await text(f.page);
-    drill.check(step.includes(ONE.shopDomain), "step 1 shows the founder's shop", step.slice(0, 300));
+    const shopShown = step.includes(ONE.shopDomain) || (await f.page.locator(`input[value="${ONE.shopDomain}"]`).count()) > 0;
+    drill.check(shopShown, "step 1 shows the founder's shop", step.slice(0, 300));
     const connect = f.page.locator('[data-onboarding="connect-button"]');
     drill.check((await connect.count()) === 1 && (await connect.isEnabled()), "Connect is enabled (the app was set up)", null);
     await drill.screenshot(f.page, "04-founder-1-step-1");
@@ -186,7 +187,9 @@ async function opsCreateStore(drill) {
   {
     const f = await acceptAs(drill, TWO, newest, { label: "06-founder-2" });
     const step = await text(f.page);
-    drill.check(/preparing your Shopify connection/.test(step) && step.includes(TWO.shopDomain), "step 1 says Storeasy's team is preparing the connection", step.slice(0, 300));
+    // the shop shows in the step's address field (an input's value is not in innerText)
+    const shopShown = step.includes(TWO.shopDomain) || (await f.page.locator(`input[value="${TWO.shopDomain}"]`).count()) > 0;
+    drill.check(/preparing your Shopify connection/.test(step) && shopShown, "step 1 says Storeasy's team is preparing the connection, with their shop", step.slice(0, 600));
     await drill.screenshot(f.page, "07-founder-2-preparing");
     await f.ctx.close();
   }
