@@ -25,7 +25,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - [x] A shopper can read only their own cart, orders and account, proven by a test that tries another shopper's ids on every shopper read (`test:shopper-reads`)
 - [x] The agency partner programme is gone: no agency routes, screens or links remain, its tables are left unused, and its suite is replaced by a test that no agency route answers (`test:agency-removed`, `test:case-studies`; the live `drill:agency-gone` runs at the phase-end browser pass)
 - [x] One command seeds a local store with an owner, admin, staff and support member, an operator, a shopper with an order, and a synced catalog (`pnpm seed:roles`; `test:seed-roles`)
-- [ ] The browser drills run on today's code: drills that tested the retired legacy CMS are removed, and `pnpm drill:p6` and the p5 drill pass
+- [x] The browser drills run on today's code: drills that tested the retired legacy CMS are removed, and `pnpm drill:p6` and the p5 drill pass (`pnpm drill:all`, each in a throwaway worktree; known flake below)
 - [ ] shadcn/ui is set up for the consoles only (tokens from `docs/UI.md`, `components/ui/`), and the storefront's styles are unchanged (a storefront render comparison proves it)
 - [ ] A signed-in merchant lands in a new console shell (sidebar, top bar, store switcher) that shows only the sections their role can use; support sees no write actions
 
@@ -110,6 +110,8 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - The checkout client's fallback idempotency key (`components/checkout/CheckoutFlow.js` ~134) uses `Math.random`; use `crypto.randomUUID()`.
 - Preview tokens in `lib/releases.js` still fall back to `"dev-only-secret"`; make them fail closed in production like order links.
 - `/api/track` accepts any `transaction_id` as a purchase order id (analytics integrity).
+- **Known flake:** in drill runs the console sign-in page sometimes fails to load right after a harness restart (a 404 "1 Issue" page, or `#login-email` never appearing); seen in about 1 run in 4, never twice in a row. Find the cause before relying on drills as a merge gate.
+- The storefront and console fonts come from `next/font/google`, so every cold build fetches Google Fonts over the network; a failed fetch breaks the whole dev build. Self-host the font files (`next/font/local`) so builds don't depend on the network.
 - `requireAdmin`'s origin check passes a write with no Origin header; add a `Sec-Fetch-Site: cross-site` refusal as a second layer.
 
 - Multi-provider AI (Gemini, OpenAI) beside Anthropic.
