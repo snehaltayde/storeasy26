@@ -135,6 +135,7 @@
     "drill:p5": "node scripts/drills/run-isolated.mjs p5",
     "drill:p6": "node scripts/drills/run-isolated.mjs p6",
     "drill:agency-gone": "node scripts/drills/run-isolated.mjs agency-gone",
+    "drill:sf-styles": "node scripts/drills/run-isolated.mjs sf-styles",
     "drill:all": "node scripts/drills/run-isolated.mjs all",
     "media:reindex": "node scripts/reindex-document-refs.js"
   },

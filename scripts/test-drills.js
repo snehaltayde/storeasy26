@@ -24,6 +24,9 @@
 //      relative paths, followed through scripts/) exists, and each name taken
 //      from an import("…") is exported there, so a deleted module or export
 //      fails pnpm test instead of the next seed
+//   8. sf-styles (Phase 0 line 7): its runner entry, outside drill:all, and
+//      the render comparator (identical → no difference; a synthetic style,
+//      box and element change is found)
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -445,7 +448,7 @@ await t("the drill helpers' own checks pass (p4, p5 and p6 lib.mjs --check; p6 c
 });
 
 await t("every module the seed and drill scripts load exists, with the names they take (seed:design, --p3, --p6, seed:roles, the drills)", async () => {
-  const entries = ["scripts/seed-design-preview.js", "scripts/seed-design-documents.js", "scripts/perf-docs-fixture.js", "scripts/dev-design.js", "scripts/dev-roles.js", "scripts/seed-roles.js", "scripts/drill.js", "scripts/drills/run-isolated.mjs", "scripts/drills/smoke.js", "scripts/drills/agency-gone.mjs", "scripts/drills/p5/run.mjs", "scripts/drills/p5/blocks.mjs", "scripts/drills/p6/run.mjs", "scripts/drills/p6/seed-p6.mjs", "scripts/drills/p6/generate.mjs", "scripts/drills/p6/brand.mjs", "scripts/drills/p6/open.mjs", "scripts/drills/p6/empty.mjs", "scripts/drills/p6/setup.mjs", "scripts/drill-maintenance-edge.js", "scripts/perf-report.js"];
+  const entries = ["scripts/seed-design-preview.js", "scripts/seed-design-documents.js", "scripts/perf-docs-fixture.js", "scripts/dev-design.js", "scripts/dev-roles.js", "scripts/seed-roles.js", "scripts/drill.js", "scripts/drills/run-isolated.mjs", "scripts/drills/smoke.js", "scripts/drills/agency-gone.mjs", "scripts/drills/p5/run.mjs", "scripts/drills/p5/blocks.mjs", "scripts/drills/p6/run.mjs", "scripts/drills/p6/seed-p6.mjs", "scripts/drills/p6/generate.mjs", "scripts/drills/p6/brand.mjs", "scripts/drills/p6/open.mjs", "scripts/drills/p6/empty.mjs", "scripts/drills/p6/setup.mjs", "scripts/drills/sf-styles/run.mjs", "scripts/drill-maintenance-edge.js", "scripts/perf-report.js"];
   const seen = new Set();
   const missing = [];
   const walk = (file) => {
@@ -482,6 +485,48 @@ await t("every module the seed and drill scripts load exists, with the names the
   }
   ok(seen.size > 50, `followed ${seen.size} files:`);
   eq(missing.join("; "), "", "missing modules:");
+});
+
+await t("sf-styles: the runner entry and drill:sf-styles exist, outside drill:all", async () => {
+  const { scripts } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  eq(scripts["drill:sf-styles"], "node scripts/drills/run-isolated.mjs sf-styles", "drill:sf-styles:");
+  const spec = R.DRILLS["sf-styles"];
+  eq(spec?.id, "SF-STYLES", "id:");
+  eq(spec?.warm, true, "warm:");
+  ok(!R.ALL.includes("sf-styles"), "not in ALL:");
+  const calls = [];
+  await spec.run({ node: async (args) => (calls.push(args.join(" ")), 0), headed: [] });
+  eq(calls.join(" | "), "scripts/drills/sf-styles/run.mjs", "runs:");
+  const env = R.drillEnv({ SF_STYLES_BASELINE: "/abs/base", SF_STYLES_BITE: "1" }, "/w", { next: 6100, sqld: 7100, rolesNext: 6101, rolesSqld: 7103 });
+  eq(env.SF_STYLES_BASELINE, "/abs/base", "the baseline passes through:");
+  eq(env.SF_STYLES_BITE, "1", "the bite flag passes through:");
+});
+
+await t("sf-styles compare: identical captures have no differences; a synthetic style, box and element change is found", async () => {
+  const C = await import("./drills/sf-styles/compare.js");
+  const el = (k, s, b = [0, 0, 100, 20]) => ({ k, s, b });
+  const base = [{ page: "home", width: 375, shot: "a", elements: [el("html", { color: "red", "letter-spacing": "normal" }), el("html>body:1", { color: "red" }), el("html>body:1::before", { content: '""' }, null)] }];
+  const same = structuredClone(base);
+  same[0].elements[0].s = { "letter-spacing": "normal", color: "red" }; // property order never matters
+  const d0 = C.diffRuns(base, same);
+  eq(JSON.stringify(d0.totals), JSON.stringify({ style: 0, box: 0, added: 0, removed: 0, shots: 0, missing: 0 }), "identical:");
+  ok(C.isClean(d0.totals), "identical is clean:");
+  eq(C.elementHash(base[0].elements[0]), C.elementHash(same[0].elements[0]), "hash ignores property order:");
+  const next = structuredClone(base);
+  next[0].shot = "b";
+  next[0].elements[0].s["letter-spacing"] = "0.0375px";
+  next[0].elements[1].b = [0, 0, 100.5, 20];
+  next[0].elements.pop();
+  next[0].elements.push(el("html>body:1>div:1", { color: "red" }));
+  const d1 = C.diffRuns(base, next);
+  eq(JSON.stringify(d1.totals), JSON.stringify({ style: 1, box: 1, added: 1, removed: 1, shots: 1, missing: 0 }), "changed:");
+  ok(!C.isClean(d1.totals), "changed is not clean:");
+  const s = d1.pages[0].samples.find((x) => x.kind === "style");
+  eq(`${s.k} ${s.prop} ${s.before} → ${s.after}`, "html letter-spacing normal → 0.0375px", "style sample:");
+  const d2 = C.diffRuns(base, [{ ...base[0], width: 768 }]);
+  eq(d2.totals.missing, 2, "a page at another width is missing both ways:");
+  eq(C.round(10.26), 10.5, "boxes round to 0.5px:");
+  eq(JSON.stringify(C.roundBox({ x: 1.2, y: 2.74, width: 3, height: 4.1 })), "[1,2.5,3,4]", "roundBox:");
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

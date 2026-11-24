@@ -4,8 +4,9 @@
 // and its data are never touched: a drill seeds and wipes only the worktree's
 // own folders, and this runner fails if the owner's seed files change anyway.
 //
-//   node scripts/drills/run-isolated.mjs <p5|p6|smoke|agency-gone|all> [stage,…] [--keep] [--headed]
-//   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:all)
+//   node scripts/drills/run-isolated.mjs <p5|p6|smoke|agency-gone|sf-styles|all> [stage,…] [--keep] [--headed]
+//   (pnpm drill:p5, drill:p6, drill:smoke, drill:agency-gone, drill:sf-styles, drill:all;
+//   sf-styles is not in all)
 //
 //   stage,…   p5 and p6 only: run just these stages
 //   --keep    leave the worktree in place (its path is printed)
@@ -307,6 +308,9 @@ export const DRILLS = {
   },
   p5: { id: "P5-DRILLS", warm: true, run: (c) => c.node(["scripts/drills/p5/run.mjs", ...c.stages, ...c.headed]) },
   p6: { id: "P6-DRILLS", warm: true, run: (c) => c.node(["scripts/drills/p6/run.mjs", ...c.stages, ...c.headed]) },
+  // the storefront render comparison (Phase 0 line 7); SF_STYLES_BASELINE and
+  // SF_STYLES_BITE pass through the env. A tool, not part of drill:all.
+  "sf-styles": { id: "SF-STYLES", warm: true, run: (c) => c.node(["scripts/drills/sf-styles/run.mjs", ...c.headed]) },
   "agency-gone": {
     id: null,
     warm: true,
@@ -444,9 +448,9 @@ async function main(argv) {
   const flags = argv.filter((a) => a.startsWith("--"));
   const [name, ...rest] = argv.filter((a) => !a.startsWith("--"));
   const unknown = flags.filter((f) => !["--keep", "--headed"].includes(f));
-  const names = name === "all" ? ALL : DRILLS[name] ? [name] : null;
+  const names = name === "all" ? ALL : Object.hasOwn(DRILLS, name ?? "") ? [name] : null;
   if (!names || unknown.length || (rest.length && !["p5", "p6"].includes(name)) || rest.length > 1) {
-    console.error(`Use: node scripts/drills/run-isolated.mjs <${[...ALL, "all"].join("|")}> [stage,…] (p5, p6) [--keep] [--headed]`);
+    console.error(`Use: node scripts/drills/run-isolated.mjs <${[...Object.keys(DRILLS), "all"].join("|")}> [stage,…] (p5, p6) [--keep] [--headed]`);
     return 2;
   }
   const summary = await runIsolated({ names, stages: rest, keep: flags.includes("--keep"), headed: flags.includes("--headed") });
