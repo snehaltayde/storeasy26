@@ -1,0 +1,39 @@
+{
+  "ranAt": "2026-11-24T06-40-56-073Z",
+  "head": "e35076a",
+  "worktree": "/private/var/folders/qv/kw93gh7s6n11gs_hs2cgvd8c0000gn/T/storeasy-drill-2026-11-24T06-40-56-073Z",
+  "kept": false,
+  "ports": {
+    "next": 6100,
+    "sqld": 7100,
+    "rolesNext": 6101,
+    "rolesSqld": 7103
+  },
+  "rows": [
+    {
+      "drill": "signup",
+      "exit": 0,
+      "seconds": 119,
+      "results": "/Users/snehal/Documents/Projects 2026/storeasy26/.drill-results/2026-11-24T06-40-56-073Z/SIGNUP",
+      "log": "/Users/snehal/Documents/Projects 2026/storeasy26/.drill-results/2026-11-24T06-40-56-073Z/signup.log"
+    }
+  ],
+  "ownerData": {
+    "before": {
+      ".design-data-roles/roles-seed.json": null,
+      ".design-data/p3-seed.json": "3bee6df4e4d1c86cb4837a8691402967e966894213ffabb2d997f74b7881b0e9",
+      ".design-data/p6-seed.json": "1b94352f182aed598cd4c7c7fce788a1cc8e2af88718f6a5330c269cf59d9e03",
+      ".design-data/seeded.json": "d0d5b4306de1d7216848d65c37a70a2f863b1a509f57738e8e5af85ec023dcd2",
+      ".design-env": "0b9044b99cd00579fe1c6feb799b54c482a3278b6ed272546c1b627a5002462f"
+    },
+    "after": {
+      ".design-data-roles/roles-seed.json": null,
+      ".design-data/p3-seed.json": "3bee6df4e4d1c86cb4837a8691402967e966894213ffabb2d997f74b7881b0e9",
+      ".design-data/p6-seed.json": "1b94352f182aed598cd4c7c7fce788a1cc8e2af88718f6a5330c269cf59d9e03",
+      ".design-data/seeded.json": "d0d5b4306de1d7216848d65c37a70a2f863b1a509f57738e8e5af85ec023dcd2",
+      ".design-env": "0b9044b99cd00579fe1c6feb799b54c482a3278b6ed272546c1b627a5002462f"
+    },
+    "changed": []
+  },
+  "failed": 0
+}

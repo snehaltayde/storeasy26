@@ -1,0 +1,279 @@
+{
+  "id": "SIGNUP",
+  "part": "main",
+  "title": "SIGNUP — a founder signs up on their own",
+  "ranAt": "2026-11-24T06:42:57.243Z",
+  "harness": "http://localhost:6100",
+  "chrome": "158.0.8127.37",
+  "passed": 31,
+  "failed": 0,
+  "knownFailures": 0,
+  "checks": [
+    {
+      "ok": true,
+      "label": "flag off: /signup says signups are closed and links to /contact",
+      "detail": {
+        "status": 200,
+        "body": "Storeasy\n\nSignups are closed right now\n\nSignups are closed right now. Tell us about your store and we'll be in touch.\n\nTell us about your store"
+      }
+    },
+    {
+      "ok": true,
+      "label": "flag on: the signup API, the /signup page and pricing open (the flag cache expires)",
+      "detail": {
+        "seconds": 29
+      }
+    },
+    {
+      "ok": true,
+      "label": "pricing: every \"Get started\" goes to /signup",
+      "detail": [
+        "/signup",
+        "/signup",
+        "/signup"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "an empty submit: an error under each field",
+      "detail": [
+        "signup-name",
+        "signup-email",
+        "signup-password",
+        "signup-store",
+        "signup-slug"
+      ]
+    },
+    {
+      "ok": true,
+      "label": "the address follows the store name and shows the full address",
+      "detail": {
+        "shownSlug": "drill-signup-shop",
+        "hint": "drill-signup-shop.localhost is free."
+      }
+    },
+    {
+      "ok": true,
+      "label": "nothing typed was lost after the errors",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the code screen names the email",
+      "detail": "Storeasy\n\nCheck your email\n\nWe sent a 6-digit code to founder@signup-drill.test. It works for 15 minutes.\n\nCode from the email\nVerify and create my store\nSend a new code\n\nYou can ask for a new code in"
+    },
+    {
+      "ok": true,
+      "label": "the resend countdown counts down and the button waits",
+      "detail": {
+        "n1": 60,
+        "n2": 58
+      }
+    },
+    {
+      "ok": true,
+      "label": "a code was mailed (the mock mail row)",
+      "detail": {
+        "id": "pml_13a0ef5bad963fe4"
+      }
+    },
+    {
+      "ok": true,
+      "label": "verify lands on drill-signup-shop.localhost /admin/onboarding",
+      "detail": "http://drill-signup-shop.localhost:6100/admin/onboarding"
+    },
+    {
+      "ok": true,
+      "label": "the Welcome page names the store",
+      "detail": "Skip to content\nDrill Signup Shop\nDF\n\nPlatform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\nWelcome to Drill Signup Shop\n\nYour store is ready for you to set up. Nobody else can see it until you publish it.\n\ndrill-signup-shop.localhost\n\nCLOSED\n\nShoppers "
+    },
+    {
+      "ok": true,
+      "label": "the store's address",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the Closed badge and \"Opening soon\"",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the verified email",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the next step card",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "the shell's 56px top bar, no sidebar, one column of at most 640px",
+      "detail": {
+        "bar": 56,
+        "sidebar": 0,
+        "col": 640
+      }
+    },
+    {
+      "ok": true,
+      "label": "the handoff token is gone from the address",
+      "detail": {
+        "hash": "",
+        "back": 3
+      }
+    },
+    {
+      "ok": true,
+      "label": "375px: no sideways scroll on the Welcome page",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "Sign out lands on /admin/login",
+      "detail": "http://drill-signup-shop.localhost:6100/admin/login"
+    },
+    {
+      "ok": true,
+      "label": "the same email and password sign in again on the store's own /admin/login",
+      "detail": "http://drill-signup-shop.localhost:6100/admin/dashboard"
+    },
+    {
+      "ok": true,
+      "label": "signed in again: /admin/onboarding reads",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "the dashboard of a store with no Shopify connection renders",
+      "detail": 200
+    },
+    {
+      "ok": true,
+      "label": "an existing email gets the same code screen",
+      "detail": "Storeasy\n\nCheck your email\n\nWe sent a 6-digit code to founder@signup-drill.test. It works for 15 minutes.\n\nCode from the email\nVerify and create my store\nSend a new code\n\nYou can ask for a new code in"
+    },
+    {
+      "ok": true,
+      "label": "and no new code is mailed for it",
+      "detail": {
+        "before": "pml_13a0ef5bad963fe4",
+        "after": "pml_13a0ef5bad963fe4"
+      }
+    },
+    {
+      "ok": true,
+      "label": "a wrong code gets the generic words",
+      "detail": "That code didn't work. Check the newest email we sent, or ask for a new code."
+    },
+    {
+      "ok": true,
+      "label": "the typed code stays",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "a made-up handoff token: refused, with the way to sign in",
+      "detail": "Platform notice: Payments provider latency\n\nCard payments may take a little longer than usual today.\n\nDrill Signup Shop\n\nStore console · powered by Storeasy\n\nThis sign-in link didn't work\n\nThis sign-i"
+    },
+    {
+      "ok": true,
+      "label": "the refused token is cleared from the address too",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "anonymous /admin/onboarding goes to /admin/login",
+      "detail": "http://drill-signup-shop.localhost:6100/admin/login"
+    },
+    {
+      "ok": true,
+      "label": "/signup on a store host is 404",
+      "detail": 404
+    },
+    {
+      "ok": true,
+      "label": "/api/signup on a store host is 404",
+      "detail": 404
+    }
+  ],
+  "notes": [
+    "the store was made too fast for \"Setting up your store…\" to show (under 1.2 s)",
+    "the new store's storefront was not visited: the Edge runtime cannot open its file: database (plan risk 1)"
+  ],
+  "screenshots": [
+    {
+      "name": "01-closed",
+      "file": "docs/cms-reviews/drills/SIGNUP/01-closed.png",
+      "bytes": 8060,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/signup"
+    },
+    {
+      "name": "02-field-errors",
+      "file": "docs/cms-reviews/drills/SIGNUP/02-field-errors.png",
+      "bytes": 20010,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/signup"
+    },
+    {
+      "name": "03-form",
+      "file": "docs/cms-reviews/drills/SIGNUP/03-form.png",
+      "bytes": 18768,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/signup"
+    },
+    {
+      "name": "04-code",
+      "file": "docs/cms-reviews/drills/SIGNUP/04-code.png",
+      "bytes": 12124,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/signup"
+    },
+    {
+      "name": "05-welcome",
+      "file": "docs/cms-reviews/drills/SIGNUP/05-welcome.png",
+      "bytes": 23901,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/onboarding"
+    },
+    {
+      "name": "06-welcome-375",
+      "file": "docs/cms-reviews/drills/SIGNUP/06-welcome-375.png",
+      "bytes": 27410,
+      "width": 375,
+      "height": 900,
+      "viewport": 375,
+      "path": "/admin/onboarding"
+    },
+    {
+      "name": "07-wrong-code",
+      "file": "docs/cms-reviews/drills/SIGNUP/07-wrong-code.png",
+      "bytes": 14403,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/signup"
+    },
+    {
+      "name": "08-handoff-refused",
+      "file": "docs/cms-reviews/drills/SIGNUP/08-handoff-refused.png",
+      "bytes": 12872,
+      "width": 720,
+      "height": 506,
+      "viewport": 1280,
+      "path": "/admin/handoff"
+    }
+  ]
+}
