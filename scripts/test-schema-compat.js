@@ -977,7 +977,7 @@ console.log(`— P4-SCAFFOLD: ${CONTENT_LIVE} on a tenant at ${BEFORE_CONTENT_LI
         c.close();
       }
     };
-    const newestOf = { "0017": "0017_cms_approvals", "0020": "0020_sync_runs_resumable", "0022": "0022_preview_sessions", "0023": "0023_document_refs", "0024": "0024_content_live", "0025": "0025_media_archived", latest: NEWEST };
+    const newestOf = { "0017": "0017_cms_approvals", "0020": "0020_sync_runs_resumable", "0022": "0022_preview_sessions", "0023": "0023_document_refs", "0024": "0024_content_live", "0025": "0025_media_archived", "0027": "0027_media_storage_url", latest: NEWEST };
     same(Object.keys(newestOf), [...F.STAGES], "every fixture stage is checked here:");
     for (const stage of F.STAGES) {
       const fx = await F.makeTenant({ name: `compat-p4-s${stage}`, stage, products: [{ title: `Stage ${stage} shirt` }, {}] });
