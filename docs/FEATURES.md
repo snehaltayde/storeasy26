@@ -105,6 +105,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Later (not planned yet)
 
+- **Drill flake under load:** with three full checks running at once, the console sign-in page twice answered 500 (p5 `states`, p5 `cart`, p6 `c`, 2026-11-24); each passed when rerun alone. The drill runner doesn't keep the harness's server log, so the cause is unknown. Keep the server log on any drill failure, then find the cause.
 - One shared Storeasy Shopify app so self-serve founders connect without waiting for an operator (owner: later; needs Shopify app review and protected customer data approval).
 - `lib/shopify-admin.js` uses Admin API version `2025-10`, past Shopify's 12-month support window; move to a supported version.
 
