@@ -396,3 +396,85 @@ No schema or migration; no new permission actions; events: one `audit_log` row, 
 3. `--reset` deletes data: no agent runs it without asking.
 4. Safari may not resolve `*.localhost`; use Chrome or a hosts entry.
 5. Fixture images point at `cdn.shopify.com/fixture/...` (broken offline; cosmetic).
+
+## Line 6: the browser drills run on today's code
+
+**Fit:** Phase 0 line 6. **Owner-data finding:** every p5/p6 stage reseeds through `seed-design-documents.js --p3|--p6` → `H.runHarness({mode:"seed"})` with the default profile → `rmSync(.design-data)`; their "legacy" stages also `copyData` over `ROOT/.design-data`. `drill:smoke`/`drill:edge` attach to the owner's :3017 (edge switches maintenance on); `drill:agency-gone` signs in on :3017 from `.design-data/p6-seed.json`. Today only "refuses while the harness runs" protects the data. Next 16.2's `.next/dev/lock` blocks a second `next dev` in the same folder, and a custom `distDir` rewrites tracked `tsconfig.json`, so drills must run in a throwaway worktree.
+
+### 1. Per-drill verdicts
+
+| Path | Verdict | Reason |
+|---|---|---|
+| `scripts/drills/p1/**`, `p1c/**`, `p2/**` (incl. `results-*.json`) | Delete | Legacy CMS editors / publish |
+| `p3/run.mjs`, `smoke`, `routes`, `editor`, `design`, `rte`, `matrix` | Delete (keep `p3/lib.mjs`) | Not this line's bar; legacy parts; unit tests plus p5/p6 cover the editor |
+| `p4/*` except `lib.mjs` | Delete; trim `p4/lib.mjs` | Legacy cutover + agency |
+| `p4/lib.mjs` | Keep, remove exports p5/p6 don't import (`revokeAgency`, `moveStore`, `rehearse`, `makeRoutes`, `movedP4Store`, `reseedP4`, `readP4Seed`, `captureShopperRoutes`, migrate/reverse/render in `harnessContext`, …) | Shared helpers |
+| `p5/legacy.mjs`; stages `baseline`, `legacy` | Delete | Legacy CMS |
+| `p5` stages `pick`, `create`, `states`, `nosaving`, `disabled`, `grid`, `cart`, `console`, `unknown` | Keep and fix | Bundles in the documents editor; COD test order (cancelled); on the `--p3` seed |
+| `p6/legacy.mjs`; stage `f` (also in `seed-p6.mjs`) | Delete | Legacy store |
+| `p6` stage `final` | Delete; its `selfCheck` moves to the unit test | Reseeds for the deleted p3 drills |
+| `p6` stages `baseline`, `a`–`e`, `g` | Keep and fix | Closed-store probe, start page without AI, brand, open checks, checkout off, empty catalog, policy starters |
+| `scripts/drills/harness-edge.js` (`drill:edge`) | Delete | Designer is legacy; maintenance covered by `test:maintenance` and `drill:maintenance-edge` |
+| `scripts/drills/smoke.js` (`drill:smoke`) | Keep and fix | PDP at 3 widths, add to cart, drawer; now isolated with `--start` |
+| `scripts/drills/agency-gone.mjs` | Keep and fix | Logins from the worktree's roles store; no 3017 default |
+| `scripts/drill.js` | Keep and fix | Add the isolation guard to its CLI entry |
+| `scripts/drill-maintenance-edge.js`, `restore:drill` | Keep as-is | Not playwright drills; not in `drill:all` |
+
+Chrome: `drill.js chromePath()` uses `CHROME_BIN`, else `/Applications/Google Chrome.app/...`, else Linux paths; never downloads.
+
+### 2. Isolated runner: `scripts/drills/run-isolated.mjs <drill|all> [--keep] [--headed]`
+
+1. Refuse if `git status --porcelain` shows tracked changes or new untracked files under `app/ components/ lib/ scripts/ migrations/` (ignore the three hands-off docs). Drills test committed HEAD.
+2. Create a throwaway worktree at HEAD under `os.tmpdir()` (never in the repo or `.claude/worktrees`); `pnpm install --frozen-lockfile --prefer-offline`. It has its own `.next`, `.design-data`, `.design-env`, `.design-data-roles` and no `.env.local`.
+3. Free ports from 6100 (site) and 7100 (DBs) plus a roles block, checked with `isPortBusy`; never 3017, 3018, 18017–18019, 18027–18029; a busy port → next block; never kill anything.
+4. Child env: `DRILL_ISOLATED_ROOT=<worktree>`, the ports, `PLATFORM_CACHE_MS=1000`, every `BLANKED_ENV` name plus `ANTHROPIC_API_KEY` empty.
+5. Run each drill from the worktree; for `agency-gone` first `dev-roles.js seed` in the worktree and start it.
+6. Copy `<worktree>/docs/cms-reviews/drills/<ID>/` into gitignored `ROOT/.drill-results/<stamp>/<ID>/` plus `summary.json`.
+7. `git worktree remove --force` and `prune`, unless `--keep`.
+8. Hash `.design-env`, `.design-data/seeded.json`, `p*-seed.json` before and after; fail if any changed.
+
+Second layer: `runDrill()` in `p3/lib.mjs` and the CLI entry of `drill.js` refuse unless `DRILL_ISOLATED_ROOT === ROOT`, telling you to use `pnpm drill:<name>`.
+
+### 3. Commands
+
+`package.json`: `drill:p6`, `drill:p5`, `drill:smoke`, `drill:agency-gone` → `node scripts/drills/run-isolated.mjs <name>`; `drill:all` → one worktree, one install, runs smoke, p5, p6, agency-gone, keeps going after a failure, non-zero if any failed; remove `drill:edge`, `drill:p4`; add `test:drills`. `CLAUDE.md`: one spec `pnpm drill:<name>` (p5, p6, smoke, agency-gone; throwaway worktree; needs committed code); all `pnpm drill:all`; drop the p1–p4 note.
+
+### 4. File plan
+
+**WP1 (runner, guard, tests):**
+1. `scripts/drills/run-isolated.mjs` (new), exporting `assertCleanTree`, `choosePorts`, `worktreePath`, `ownerDataFingerprint`, `copyResults`.
+2. `scripts/drills/p3/lib.mjs`: `assertIsolated(env, root)` called in `runDrill`.
+3. `scripts/drill.js`: same guard in its CLI entry.
+4. `scripts/drills/agency-gone.mjs`: base URL from env; logins from the roles seed file (env override); no 3017 default.
+5. `scripts/test-drills.js` (new): package wiring; deleted paths gone; guard refuses in the main checkout; port choice skips busy and owner ports; dirty tree refused; a stand-in run in a temp git repo leaves its `.design-data`/`.design-env` byte-identical; `node scripts/drills/p6/lib.mjs --check` passes.
+6. `package.json` scripts; `.gitignore` `/.drill-results/`.
+7. `scripts/test-schema-compat.js`: drop the `drill:p6` row (~1288) and the `drill:p4` assertion (~1301).
+
+**WP2 (removals and trims):**
+1. Delete `scripts/drills/{p1,p1c,p2}/`, `harness-edge.js`, `p3/{run,smoke,routes,editor,design,rte,matrix}.mjs`, `p4/{run,cutover,editor,local-tenants,media,picker,product,reverse,routes,runbook,seed-p4}.mjs`, `p5/legacy.mjs`, `p6/legacy.mjs`.
+2. `p4/lib.mjs`: remove unused exports after grepping p5/p6.
+3. `p5/run.mjs`, `p5/lib.mjs`: remove the two legacy stages; update headers.
+4. `p6/run.mjs`, `p6/lib.mjs` (`selfCheck` without `f`), `p6/seed-p6.mjs` (drop `f` from `P6_STAGES`, `stagePlan`); `seed-design-documents.js` only if it lists the stages.
+5. `scripts/test-agency-removed.js`: remove the allowlist entries for `p1/migovl.mjs` and `p4/`; trimmed `p4/lib.mjs` has no agency names.
+6. `scripts/test-editor-routes.js`: comment line ~14.
+7. `CLAUDE.md` commands; `docs/PLAYBOOK.md` lesson.
+
+Then the session runs typecheck, `pnpm test`, schema-compat, `pnpm drill:p5`, `pnpm drill:p6`, and `pnpm drill:all` at phase end, each under the lock.
+
+### 5. Checks first (read-only)
+
+- `ls -l "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" && "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version; echo "CHROME_BIN=$CHROME_BIN"`
+- `ls -l ~/.turso/sqld; command -v sqld; echo "SQLD_BIN=$SQLD_BIN"`
+- `node -p "require('playwright-core/package.json').version"`
+- `cat .design-data/harness.pid.json 2>/dev/null; ls -l .next/dev/lock 2>/dev/null; lsof -nP -iTCP -sTCP:LISTEN | grep -E ':(3017|3018|6100|7100|7101|7102) '`
+- `git status --porcelain; git worktree list`
+- `shasum .design-env .design-data/*.json 2>/dev/null` (keep as the "before" picture)
+- `node scripts/drills/p6/lib.mjs --check`
+
+### 6. Risks
+
+1. Cold `.next` plus install: slow, possibly flaky starts; the single retry in `reseedP6` stays; timeouts reported as failures.
+2. p5/p6 may fail on today's code: fix selectors and seeds in the drills; real bugs are reported, not worked around.
+3. The owner's harness keeps running; ports skipped, never freed; a fully busy block stops the runner with a message.
+4. Drills see committed code only.
+5. Lost browser coverage of the documents editor's rich text and design panel (deleted p3 drills): consider a browser spec in the console-shell line.
