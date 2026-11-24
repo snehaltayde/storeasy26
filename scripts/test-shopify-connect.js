@@ -417,7 +417,9 @@ await t("after connecting: step 1 done, step 2 current; the sync runs against th
   const text = JSON.stringify(sup.body);
   for (const c of [...SECRET_CANARIES, SHOP_A]) ok(!text.includes(c), `support: ${c} leaked`);
   ok(!("shopDomain" in sup.body.steps[0].facts) && !("locked" in sup.body.steps[0].facts), "no domain facts for support");
-  ok(sup.body.steps.flatMap((x) => x.actions).every((x) => x.allowed === false), "every support action disabled");
+  // line 7: reading a policy draft (policy_view, storefront.read) is the one support action allowed
+  ok(sup.body.steps.flatMap((x) => x.actions).every((x) => x.allowed === (x.id === "policy_view")), "every support action disabled but reading a policy draft");
+  ok(sup.body.steps[0].actions.find((x) => x.id === "connect_shopify")?.allowed === false, "Connect disabled for support");
   const staff = await onboarding("staff");
   ok(!JSON.stringify(staff.body).includes(SHOP_A), "staff: no domain");
   eq(staff.body.steps[0].actions, [{ id: "connect_shopify", allowed: false, reason: Steps.ADMIN_ONLY_REASON }], "staff Connect:");
