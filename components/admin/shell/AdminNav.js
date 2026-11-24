@@ -89,7 +89,7 @@ const badgeWords = (item, value) => {
   return "";
 };
 
-// The groups as sidebar menus; used by the sidebar and by the editor's sheet.
+// The groups as sidebar menus, for the sidebar (and its phone sheet).
 function NavGroups({ nav, badges = {}, onNavigate }) {
   const pathname = usePathname();
   const current = activeItem(pathname, navItems(nav));

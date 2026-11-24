@@ -34,6 +34,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = "scripts/test-no-dead-code.js";
+const DRILLS = "scripts/drills/";
 
 // Files nothing reaches through a literal the walk can read. Every entry says
 // why it stays; a path ending in "/" covers everything under it.
@@ -197,7 +198,7 @@ function makeResolver(present) {
 
 const commandWords = (s) => s.split(/[\s;&|()"'`=]+/).filter(Boolean);
 
-export function audit(root, { allowlist = ALLOWLIST } = {}) {
+export function audit(root, { allowlist = ALLOWLIST, legacyExempt = LEGACY_EXEMPT } = {}) {
   const problems = [];
   const fail = (check, msg) => problems.push({ check, msg });
   const files = listFiles(root);
@@ -220,28 +221,31 @@ export function audit(root, { allowlist = ALLOWLIST } = {}) {
     return (CODE.test(base) && APP_CONVENTIONS.has(base.replace(CODE, ""))) || APP_METADATA.test(base);
   });
   // Tooling roots: every package.json script, hook and workflow command, and
-  // scripts/real-checks/**. Operational roots leave out the test:* suites:
-  // lib/ code that only a test reaches is dead (a suite keeps scripts/ helpers
-  // alive, never product code).
+  // scripts/real-checks/**. Operational roots leave out the tests (test,
+  // test:*, drill:*, and everything under scripts/drills/): lib/ code that only
+  // a test or a drill reaches is dead (they keep scripts/ helpers alive, never
+  // product code).
+  const isTestScript = (name) => name === "test" || name.startsWith("test:") || name.startsWith("drill:");
   const operationalRoots = new Set(files.filter((f) => f.startsWith("scripts/real-checks/")));
   const testRoots = new Set();
   const commandSources = [
-    ...Object.entries(scripts).map(([name, cmd]) => [name.startsWith("test:"), cmd]),
+    ...Object.entries(scripts).map(([name, cmd]) => [isTestScript(name), cmd]),
     ...COMMAND_FILES(files).map((f) => [false, readFileSync(join(root, f), "utf8")]),
   ];
   for (const [isTest, cmd] of commandSources) {
     for (const w of commandWords(cmd)) {
       const hit = resolve(w, "package.json");
-      if (hit) (isTest ? testRoots : operationalRoots).add(hit);
+      if (hit) (isTest || hit.startsWith(DRILLS) ? testRoots : operationalRoots).add(hit);
     }
   }
 
-  const reach = (roots) => {
+  // skip: files the walk never enters (the operational walk stops at drills)
+  const reach = (roots, skip = () => false) => {
     const seen = new Set();
     const stack = [...roots];
     while (stack.length) {
       const f = stack.pop();
-      if (seen.has(f)) continue;
+      if (seen.has(f) || skip(f)) continue;
       seen.add(f);
       const { specs, reads } = scanOf(f);
       for (const spec of specs) {
@@ -256,7 +260,7 @@ export function audit(root, { allowlist = ALLOWLIST } = {}) {
     return seen;
   };
   const production = reach(productionRoots);
-  const operational = reach(operationalRoots);
+  const operational = reach(operationalRoots, (f) => f.startsWith(DRILLS));
   const tooling = reach([...operationalRoots, ...testRoots]);
   const reached = (f) => {
     if (f.startsWith("app/") || f.startsWith("components/")) return production.has(f);
@@ -285,7 +289,7 @@ export function audit(root, { allowlist = ALLOWLIST } = {}) {
 
   // ---- 3. legacy names ----
   for (const f of files) {
-    if (!CODE.test(f) || !SUBJECT_DIRS.some((d) => f.startsWith(d)) || LEGACY_EXEMPT.some((e) => exemptCovers(e, f))) continue;
+    if (!CODE.test(f) || !SUBJECT_DIRS.some((d) => f.startsWith(d)) || legacyExempt.some((e) => exemptCovers(e, f))) continue;
     const { strings, identifiers } = scanOf(f);
     for (const s of strings) {
       const m = LEGACY_STRING.exec(s);
@@ -293,7 +297,7 @@ export function audit(root, { allowlist = ALLOWLIST } = {}) {
     }
     for (const id of new Set(identifiers)) if (LEGACY_IDENTIFIERS.has(id)) fail("legacy", `${f} uses the retired ${id}`);
   }
-  for (const e of root === ROOT ? LEGACY_EXEMPT : []) {
+  for (const e of legacyExempt) {
     const names = (f) => (CODE.test(f) ? scanOf(f).strings.some((x) => LEGACY_STRING.test(x)) : LEGACY_STRING.test(scanOf(f).text));
     if (!files.some((f) => exemptCovers(e, f) && names(f))) fail("legacy", `${e.path} is exempt from the legacy-name check but no longer names a retired table: remove the entry`);
   }
@@ -368,7 +372,7 @@ function selfTest() {
     const dir = mkdtempSync(join(tmpdir(), "no-dead-code-"));
     try {
       write(dir, { ...base, ...extra });
-      return audit(dir, { allowlist: [], ...opts }).problems;
+      return audit(dir, { allowlist: [], legacyExempt: [], ...opts }).problems;
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -383,6 +387,10 @@ function selfTest() {
   expect("a component only a test reaches fails reachability", run({ "components/OnlyTested.js": "export default 1;\n", "scripts/test-a.js": `${base["scripts/test-a.js"]}import "../components/OnlyTested.js";\n` }), "reachability", "components/OnlyTested.js");
   expect("a lib file only a test imports fails reachability", run({ "lib/tested.js": "export const t = 1;\n", "scripts/test-a.js": `${base["scripts/test-a.js"]}import "../lib/tested.js";\n` }), "reachability", "lib/tested.js");
   expect("a lib file a non-test tool reads as text is no import", run({ "lib/read.js": "export const r = 1;\n", "scripts/tool.js": `${base["scripts/tool.js"]}import { readFileSync } from "node:fs";\nreadFileSync(join(ROOT, "lib", "read.js"), "utf8");\n` }), "reachability", "lib/read.js");
+  expect("a lib file only a drill reaches fails reachability", run({ "lib/drilled.js": "export const d = 1;\n", "scripts/drills/x/run.mjs": 'import "../../../lib/drilled.js";\n', "package.json": JSON.stringify({ scripts: { ...JSON.parse(base["package.json"]).scripts, "drill:x": "node scripts/drills/x/run.mjs" } }) }), "reachability", "lib/drilled.js");
+  expect("a lib file a non-test tool reaches only through a drill file fails reachability", run({ "lib/drilled.js": "export const d = 1;\n", "scripts/drills/lib.mjs": 'import "../../lib/drilled.js";\n', "scripts/tool.js": `${base["scripts/tool.js"]}import "./drills/lib.mjs";\n` }), "reachability", "lib/drilled.js");
+  expect("a legacy exemption that names a retired table passes", run({ "lib/z.js": 'export const z = "cms_pages";\n' }, { legacyExempt: [{ path: "lib/z.js", reason: "a reason that is long enough" }] }), null);
+  expect("a legacy exemption that names no retired table is stale", run({}, { legacyExempt: [{ path: "lib/z.js", reason: "a reason that is long enough" }] }), "legacy", "no longer names");
   expect("an orphan script fails reachability", run({ "scripts/old.js": "" }), "reachability", "scripts/old.js");
   expect("a retired table in a string fails legacy names", run({ "lib/z.js": 'export const z = "select * from cms_pages";\n' }), "legacy", "cms_pages");
   expect("a retired identifier fails legacy names", run({ "lib/z.js": "export const runLegacyBatch = 1;\n" }), "legacy", "runLegacyBatch");

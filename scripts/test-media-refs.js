@@ -727,7 +727,7 @@ await t("the console route /api/admin/media: PATCH {archived} archives and bring
   }
 });
 
-await t("a usage read that fails (document_refs gone) refuses the delete with a 5xx, forced or not, and the media row and its bytes stay", async () => {
+await t("a usage read that fails (document_refs gone) refuses the delete with 503 DATABASE_NOT_READY (the library forced too), and the media row and its bytes stay", async () => {
   const I = await import("../lib/platform/identity.js");
   const Sess = await import("../lib/platform/sessions.js");
   const route = await import("../app/api/admin/media/route.js");
@@ -753,14 +753,15 @@ await t("a usage read that fails (document_refs gone) refuses the delete with a 
     } finally {
       c.close();
     }
-    for (const force of [false, true]) {
-      const res = await route.DELETE(req({ id: f.id, force }), {});
-      const body = await res.json();
-      ok(res.status >= 500 && res.status < 600, `force ${force}: a 5xx, got ${res.status} ${JSON.stringify(body)}`);
-      ok(!["MEDIA_IN_USE", "STORE_MODE_INVALID"].includes(body.code) && !body.deleted, `force ${force}: refused for the failed read, never deleted, called in use or a mode error: ${JSON.stringify(body)}`);
-      eq(await sql(norefs, "SELECT length(data) AS n, sha256 FROM media WHERE id = ?", [f.id]), before, `force ${force}: the row and its bytes stay:`);
-    }
-    eq(await norefs.run(() => codeOf(M.deleteMedia(f.id, { force: true }))) === "ok", false, "the library call refuses too:");
+    // the route ignores force, so one request; the library is asked forced below
+    const res = await route.DELETE(req({ id: f.id }), {});
+    const body = await res.json();
+    eq([res.status, body.code], [503, "DATABASE_NOT_READY"], `the infra refusal: ${JSON.stringify(body)}`);
+    ok(!body.deleted, "nothing deleted");
+    eq(await sql(norefs, "SELECT length(data) AS n, sha256 FROM media WHERE id = ?", [f.id]), before, "the row and its bytes stay:");
+    const lib = await norefs.run(() => M.deleteMedia(f.id, { force: true }).then(() => null, (e) => e));
+    ok(lib && /no such table: document_refs/.test(String(lib.message)), `the library call, forced, refuses on the failed usage read: ${lib?.message}`);
+    eq(await sql(norefs, "SELECT length(data) AS n, sha256 FROM media WHERE id = ?", [f.id]), before, "forced: the row and its bytes stay:");
     eq(await stored(norefs, f.id), 1, "still stored:");
   } finally {
     await norefs.cleanup();
