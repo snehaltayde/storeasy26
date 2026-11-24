@@ -96,7 +96,7 @@ await t("every item is listed with its own fix: the home line first; checkout of
   ok(itemOf(m, "privacy").legalNote && itemOf(m, "returns").legalNote, "not legal advice on both");
   eq(itemOf(m, "test_order").fixes.map((f) => [f.kind, f.href ?? null]), [["link", "/admin/editor"], ["test_order", null]], "test order:");
   eq(itemOf(m, "catalog").fixes.map((f) => [f.kind, f.href]), [["link", "/admin/settings?from=onboarding#catalog-sync"]], "catalog:");
-  eq(itemOf(m, "contact").fixes.map((f) => f.kind), ["contact_form"], "contact:");
+  eq([itemOf(m, "contact").fixes.map((f) => f.kind), itemOf(m, "contact").message], [["contact_form"], O.OPEN_WORDS.contactMissing], "contact:");
   eq(itemOf(m, "design").fixes.map((f) => [f.kind, f.href, f.allowed]), [["link", "/admin/editor?doc=doc_design", true]], "design:");
   ok(!JSON.stringify(m).includes("razorpay_key"), "no key field anywhere");
 });
