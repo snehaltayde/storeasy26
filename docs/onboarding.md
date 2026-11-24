@@ -32,14 +32,15 @@ pnpm tenant:provision <slug> --shop <x.myshopify.com> --name "Store Name" \
 ```
 
 Creates `storeasy-t-<slug>` on Turso, applies the commerce schema, generates
-the **console password (shown once — hand it over securely)** and the
-order-link secret, registers the tenant, and starts a Free-plan subscription.
+a bootstrap console password (don't hand it over: the merchant gets their own
+account by email, §5) and the order-link secret, registers the tenant, and starts a Free-plan subscription.
 Nothing brand-flavored is seeded (S41): offers, CMS content and pages start
 empty. (Also available from `/platform` → **New tenant** — the preferred,
 console-first path. S51 additions on the tenant row: **More → Edit details**
-fixes domains/app credentials/order-id prefix after the fact, **More → Share
-access** creates the merchant's single-use owner invite or rotates the
-console password, and **View store** opens the storefront.)
+fixes domains/app credentials/order-id prefix after the fact, **More → Help
+this store…** opens it in **Signups & onboarding** (§5), and **View store**
+opens the storefront. Phase 1 line 8 removed the old Share access dialog: an
+operator never sees an invite link, a reset link or a password.)
 
 **Which editor the store starts on (phase 4, owner answer OQ-4).** A new,
 empty store starts on the **new editor** (documents mode). It stays
@@ -109,9 +110,24 @@ project; DNS CNAME per Vercel's instructions). It must appear in the tenant's
 
 ## 5. Merchant hand-off
 
-Give the merchant `https://<their-domain>/admin` + the generated password:
+Access goes out by email only, from `/platform` → **Signups & onboarding**
+(open the store's row):
 
-- **Settings** → rotate the console password (first thing), add Razorpay keys
+- **Email an owner invite** (a store with no owner yet): a 7-day, single-use
+  invite to the email on file (the founder's signup email, else the store's
+  support email). The merchant picks their own password. An earlier unused
+  owner invite for that email stops working once the new one is sent.
+- **Send sign-in help** (a store with owners): the store's `/admin/login`
+  address and a one-hour, single-use password-reset link, to an active owner
+  chosen from those on file.
+- You can't type a recipient, and neither action shows you a token or a link.
+  At most 5 help emails per store per hour.
+- **Open support access** (a reason, 1–72 hours) lets you look at the store's
+  console read-only; the merchant sees a banner while it is open.
+
+Once they are signed in:
+
+- **Settings** → add Razorpay keys
   (checkout is COD-only until then), GA4/Meta creds, shipping rules, identity.
 - **Setup** → the checklist. On a new-editor store every step opens the
   editor or the console screen where the work happens: Design for the look

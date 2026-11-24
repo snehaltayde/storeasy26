@@ -495,6 +495,44 @@ await t("owner invite: a store with no owner gets a 7-day invite to the founder'
   eq((await post({ action: "owner_invite", subject: `tenant:${store.a.id}` })).status, 409, "a store with an owner: refused");
 });
 
+await t("owner invite with no signup on file falls back to the store's support email; a failed send keeps the earlier invite usable", async () => {
+  await db.execute("DELETE FROM memberships WHERE tenant_id = 'resumed-store'");
+  await db.execute("UPDATE signups SET tenant_id = NULL WHERE tenant_id = 'resumed-store'");
+  const tn = await C.getTenant("resumed-store", { fresh: true });
+  await C.patchTenant("resumed-store", { config: { site: { ...(tn.config.site || {}), support_email: "Support@Resumed.test" } } });
+  const sheet = (await api("GET", { query: "subject=tenant:resumed-store" })).body;
+  eq(sheet.actions.inviteEmail, "support@resumed.test", "the sheet names the support email");
+  const r = await post({ action: "owner_invite", subject: "tenant:resumed-store", email: "typed@evil.test" });
+  eq(r.status, 200, r.text);
+  eq(r.body.sentTo, "support@resumed.test", "sent to the support email on file");
+  const live = await one("SELECT id FROM invitations WHERE tenant_id = 'resumed-store' AND email = 'support@resumed.test' AND role = 'owner' AND expires_at > ? ORDER BY created_at DESC LIMIT 1", [iso(Date.now())]);
+  ok(live, "a live invite");
+  // a failed send: production never mocks, so the mail is recorded failed
+  const env = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  let failed;
+  try {
+    failed = await post({ action: "owner_invite", subject: "tenant:resumed-store" });
+  } finally {
+    if (env === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = env;
+  }
+  eq(failed.status, 502, "failed send: refused");
+  const still = await one("SELECT expires_at FROM invitations WHERE id = ?", [live.id]);
+  ok(Date.parse(still.expires_at) > Date.now(), "the earlier invite stays usable");
+  eq(await count("SELECT COUNT(*) AS n FROM invitations WHERE tenant_id = 'resumed-store' AND email = 'support@resumed.test' AND role = 'owner' AND accepted_at IS NULL AND expires_at > ?", [iso(Date.now())]), 1, "and the failed one is not left live");
+  await db.execute("UPDATE signups SET tenant_id = 'resumed-store' WHERE slug = 'resumed-store'");
+});
+
+await t("the sheet offers sign-in help only to active owners", async () => {
+  const off = await I.createUser({ email: "disabled-owner@ops.test", password: "disabled-owner-pass-1" });
+  await I.addMembership(off.id, store.b.id, "owner");
+  await I.setUserStatus(off.id, "disabled");
+  const sheet = (await api("GET", { query: `subject=tenant:${store.b.id}` })).body;
+  ok(!sheet.actions.ownerEmails.includes("disabled-owner@ops.test"), "a disabled owner is not offered");
+  ok(sheet.actions.ownerEmails.includes(`owner@${store.b.id}.test`), "the active owner is");
+});
+
 await t("support access: reason of 5+ characters and 1–72 hours; opens a grant naming the operator, lists it on the row; revoke closes it; each audited once", async () => {
   eq((await post({ action: "support_open", subject: `tenant:${store.b.id}`, reason: "hey", hours: 4 })).status, 400, "short reason");
   eq((await post({ action: "support_open", subject: `tenant:${store.b.id}`, reason: "a good reason", hours: 73 })).status, 400, "73 hours");
@@ -545,20 +583,41 @@ await t("free a lapsed address: refused when not lapsed, still provisioning, a s
   const cant = await post({ action: "release", subject: withDb.subject });
   eq(cant.status, 503, "can't check");
   ok(/couldn't check/.test(cant.body.error), "words");
+  // a wrong organization: every lookup 404s, so a 404 proves nothing
+  const wrongOrg = await addSignup({ status: "failed", failureKind: "lapsed", slug: "lapsed-wrong-org" });
+  await db.execute({ sql: "INSERT INTO provision_runs (id, tenant_id, status, steps, refs, params, created_at, updated_at) VALUES ('prov_wrongorg', 'lapsed-wrong-org', 'failed', '[]', ?, ?, ?, ?)", args: [JSON.stringify({ dbUrl: "http://127.0.0.1:1/x", dbCreated: true }), JSON.stringify({ dbDriver: "turso-api", source: "signup" }), iso(NOW), iso(NOW)] });
+  await fetch(`${fake.url}/_fake/faults`, { method: "POST", body: JSON.stringify({ route: "get", status: 404, times: 20 }) });
+  const wrong = await post({ action: "release", subject: wrongOrg.subject });
+  await fetch(`${fake.url}/_fake/faults`, { method: "DELETE" });
+  eq(wrong.status, 503, "wrong org: refused");
+  ok(/couldn't check/.test(wrong.body.error), "words");
+  eq((await S.slugAvailable("lapsed-wrong-org")).ok, false, "still held");
+  // with the right organization, the same absent database frees it
+  eq((await post({ action: "release", subject: wrongOrg.subject })).status, 200, "right org: freed");
+  ok(!(await OPS.tursoOrgProven({ getDatabase: async () => ({}), dbUrlFor: () => "libsql://storeasy-t-other-otherorg.turso.io" }, "x")), "a probe answering with another address proves nothing");
   // the CLI driver can't be checked at all
   const cli = await addSignup({ status: "failed", failureKind: "lapsed", slug: "lapsed-cli" });
   await db.execute({ sql: "INSERT INTO provision_runs (id, tenant_id, status, steps, refs, params, created_at, updated_at) VALUES ('prov_lapsedcli', 'lapsed-cli', 'failed', '[]', ?, ?, ?, ?)", args: [JSON.stringify({ dbUrl: "libsql://x", dbCreated: true }), JSON.stringify({ dbDriver: "turso" }), iso(NOW), iso(NOW)] });
   eq((await post({ action: "release", subject: cli.subject })).status, 503, "CLI driver");
   // a file database that is still on disk, then gone
-  const file = await addSignup({ status: "failed", failureKind: "lapsed", slug: "lapsed-file" });
+  const file = await addSignup({ status: "failed", failureKind: "lapsed", slug: "lapsed-file", email: "restart@ops.test", storeName: "Old Store Name" });
   const path = join(TMP, "lapsed-file.db");
   await writeFile(path, "");
-  await db.execute({ sql: "INSERT INTO provision_runs (id, tenant_id, status, steps, refs, params, created_at, updated_at) VALUES ('prov_lapsedfile', 'lapsed-file', 'failed', '[]', ?, ?, ?, ?)", args: [JSON.stringify({ dbUrl: `file:${path}`, dbCreated: true }), JSON.stringify({ dbDriver: "file" }), iso(NOW), iso(NOW)] });
+  await db.execute({ sql: "INSERT INTO provision_runs (id, tenant_id, status, steps, refs, params, created_at, updated_at) VALUES ('prov_lapsedfile', 'lapsed-file', 'failed', '[]', ?, ?, ?, ?)", args: [JSON.stringify({ dbUrl: `file:${path}`, dbCreated: true }), JSON.stringify({ dbDriver: "file", source: "signup", supportEmail: "restart@ops.test", name: "Old Store Name" }), iso(NOW), iso(NOW)] });
   ok(/file still exists/.test((await post({ action: "release", subject: file.subject })).body.error), "file exists");
   await rm(path);
   const { r: freedFile, row: fileAudit } = await oneAudit(() => post({ action: "release", subject: file.subject }), "signup.address_released");
   eq(freedFile.status, 200, freedFile.text);
   eq(JSON.parse(fileAudit.diff).db, "absent", "db absent");
+  eq((await one("SELECT status FROM provision_runs WHERE id = 'prov_lapsedfile'")).status, "superseded", "freeing supersedes the address's old run");
+  // the founder starts again with the same email and address: a fresh run, the new store name
+  const again = await addSignup({ status: "verified", slug: "lapsed-file", email: "restart@ops.test", storeName: "New Store Name", passwordHash: await I.hashPassword("restart-pass-long-1") });
+  const claimed = await SP.claimSignupProvision(await one("SELECT * FROM signups WHERE id = ?", [again.id]), { siteUrl: "http://lapsed-file.stores.test" });
+  await W.runJobById(claimed.jobId, { budgetMs: 50_000 });
+  const fresh = await one("SELECT status, provision_run_id FROM signups WHERE id = ?", [again.id]);
+  eq(fresh.status, "done", "the restart finishes");
+  ok(fresh.provision_run_id && fresh.provision_run_id !== "prov_lapsedfile", "a fresh run, not the old one");
+  eq((await C.getTenant("lapsed-file", { fresh: true })).name, "New Store Name", "the new store name");
   // no database ever: freed, with the founder told
   const none = await addSignup({ status: "failed", failureKind: "lapsed", slug: "lapsed-none", email: "lapsed-none@ops.test" });
   eq((await S.slugAvailable("lapsed-none")).ok, false, "held before");
