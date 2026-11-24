@@ -103,18 +103,17 @@ export async function onboardingStage(drill) {
   v = await readPage(np);
   drill.check(v.compactVisible && !v.railVisible && !v.overflow && Object.keys(v.states).length === 4, "at 375 the compact step list shows above the panel and nothing scrolls sideways", { compact: v.compactVisible, rail: v.railVisible, overflow: v.overflow });
   await drill.screenshot(np, "h-onboarding-open-375", { fullPage: true });
-  await narrow.close();
-  // the in-between widths (screenshots only): 768 keeps the compact list, 1280 has the rail
+  // the same signed-in tab at other widths (screenshots only): 768 keeps the
+  // compact list, 1280 has the rail
   for (const width of [375, 768, 1280]) {
-    const wctx = await p6Context(drill, { width });
-    const wp = await loginP6(drill, wctx);
-    wp.on("console", (m) => ["error", "warning"].includes(m.type()) && console.log(`  [console ${width}] ${m.type()}: ${m.text().slice(0, 400)}`));
-    await goStep(drill, wp, "brand");
-    await drill.screenshot(wp, `h-onboarding-brand-${width}`, { fullPage: true });
-    await goStep(drill, wp, "import");
-    await drill.screenshot(wp, `h-onboarding-import-${width}`, { fullPage: true });
-    await wctx.close();
+    await np.setViewportSize({ width, height: width >= 1024 ? 900 : 812 });
+    await goStep(drill, np, "brand");
+    await drill.screenshot(np, `h-onboarding-brand-${width}`, { fullPage: true });
+    if (width === 375) continue;
+    await goStep(drill, np, "import");
+    await drill.screenshot(np, `h-onboarding-import-${width}`, { fullPage: true });
   }
+  await narrow.close();
 
   // ---- 4. support: reads everything, changes nothing ----
   const sctx = await p6Context(drill);
