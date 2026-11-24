@@ -682,7 +682,8 @@ const olist = () => inO(() => ON.onboardingFor({ role: "owner" }));
 const EDITOR_PAGE_HINT = (h) => /in the editor/i.test(h) || /\b(add|publish)\b[^.]*\bpages?\b[^.]*\beditor\b/i.test(h);
 async function checkHintsAndLinks(m, label) {
   for (const s of m.steps) ok(!EDITOR_PAGE_HINT(s.words), `${label}: ${s.id} words send the founder to the editor for a page: ${s.words}`);
-  for (const i of stepOf(m, "open").facts.items) if (i.href) ok(await hrefWorks(i.href), `${label}: ${i.id}: ${i.href} is not a console page`);
+  // line 7: the links are the items' fixes
+  for (const i of stepOf(m, "open").facts.items) for (const f of i.fixes || []) for (const href of [f.href, f.editHref].filter(Boolean)) ok(await hrefWorks(href), `${label}: ${i.id}: ${href} is not a console page`);
 }
 // PUB-12 and onboarding agree: each kind counts exactly when the opening
 // report does not block on it, and the Open step is blocked by exactly the
@@ -693,10 +694,13 @@ async function agreesWithOpening(step) {
   const st = await inO(async () => PP6.policyStatus(await PP6.readPolicyRows()));
   const level = (k) => rep.items.find((i) => i.id === k).level;
   for (const k of PP6.POLICY_KINDS) eq(PP6.policyCounts(st[k].state), level(k) !== "block", `${k}: policyStatus ${st[k].state} vs opening ${level(k)}:`);
-  const blocks = rep.items.filter((i) => i.level === "block").map((i) => i.id);
+  // line 7: the home page line comes first, then the report's items, each with its fixes
+  eq(step.facts.items[0]?.id, "home", "the home line first:");
+  const home = step.facts.items[0].level === "block" ? ["home"] : [];
+  const blocks = [...home, ...rep.items.filter((i) => i.level === "block").map((i) => i.id)];
   eq(step.state, blocks.length ? "blocked" : "ready", "onboarding state vs opening:");
   same((step.facts.blocking || []).map((b) => b.id), blocks, "the same blocking items:");
-  same(step.facts.items, rep.items, "the step shows the report's items:");
+  same(step.facts.items.slice(1).map((i) => [i.id, i.level, i.title]), rep.items.map((i) => [i.id, i.level, i.title]), "the step shows the report's items:");
 }
 const policyOf = (step, kind) => step.facts.items.find((i) => i.id === kind);
 
@@ -738,9 +742,9 @@ await t("unit (P6-ONBOARD, PUB-12 review rule; Phase 1 line 3): on a closed docu
   eq(step.state, "blocked", "no pages:");
   same(step.facts.blocking.map((b) => b.id), ["privacy", "returns"], "blocked by both pages:");
   ok(step.words.startsWith(OS.WORDS.open.blocked), step.words);
-  same(["privacy", "returns"].map((k) => policyOf(step, k).actions), [
-    [{ type: "startPolicy", kind: "privacy", label: "Start a privacy page" }],
-    [{ type: "startPolicy", kind: "returns", label: "Start a returns page" }],
+  same(["privacy", "returns"].map((k) => policyOf(step, k).fixes), [
+    [{ kind: "policy_start", policyKind: "privacy", label: "Start a privacy page", allowed: true }],
+    [{ kind: "policy_start", policyKind: "returns", label: "Start a returns page", allowed: true }],
   ], "two start buttons:");
   same(step.actions.filter((a) => ["policy_start", "policy_read"].includes(a.id)).map((a) => [a.id, a.allowed]), [["policy_start", true], ["policy_read", true]], "the owner may press them:");
   await agreesWithOpening(step);
@@ -749,8 +753,8 @@ await t("unit (P6-ONBOARD, PUB-12 review rule; Phase 1 line 3): on a closed docu
   starterPrivacy = made.document;
   step = stepOf(await olist(), "open");
   eq(policyOf(step, "privacy").level, "block", "a starter draft does not count:");
-  same([policyOf(step, "privacy").href, policyOf(step, "privacy").linkLabel, policyOf(step, "privacy").actions], [`/admin/editor?doc=${starterPrivacy.id}`, "Read it", [{ type: "markPolicyRead", id: starterPrivacy.id, revision: starterPrivacy.revision, label: "I've read it" }]], "the privacy start button is replaced:");
-  same(policyOf(step, "returns").actions, [{ type: "startPolicy", kind: "returns", label: "Start a returns page" }], "the returns one stays:");
+  same(policyOf(step, "privacy").fixes, [{ kind: "policy_read", label: "Read it", docId: starterPrivacy.id, revision: starterPrivacy.revision, editHref: `/admin/editor?doc=${starterPrivacy.id}`, allowed: true, markRead: { label: "I've read it", allowed: true } }], "the privacy start button is replaced (line 7: 'Read it' opens the reader, 'I've read it' at its end):");
+  same(policyOf(step, "returns").fixes, [{ kind: "policy_start", policyKind: "returns", label: "Start a returns page", allowed: true }], "the returns one stays:");
   await agreesWithOpening(step);
   // the returns starter through the real op: both are starters now
   const ret = await inO(() => PS6.startPolicyPage({ kind: "returns", actor: OACT }));
@@ -760,8 +764,8 @@ await t("unit (P6-ONBOARD, PUB-12 review rule; Phase 1 line 3): on a closed docu
   await agreesWithOpening(step);
   // I've read it on the privacy starter: body unchanged, it now counts as saved
   const hashBefore = (await inO(() => Docs.getDocument(starterPrivacy.id))).draftHash;
-  const mark = policyOf(step, "privacy").actions.find((a) => a.type === "markPolicyRead");
-  const read = await inO(() => PS6.markPolicyRead({ id: mark.id, revision: mark.revision, actor: OACT }));
+  const mark = policyOf(step, "privacy").fixes.find((a) => a.kind === "policy_read");
+  const read = await inO(() => PS6.markPolicyRead({ id: mark.docId, revision: mark.revision, actor: OACT }));
   eq(read.status, 200, `marked: ${JSON.stringify(read.body).slice(0, 200)}`);
   eq((await inO(() => Docs.getDocument(starterPrivacy.id))).draftHash, hashBefore, "the body is unchanged:");
   eq((await inO(async () => PP6.policyStatus(await PP6.readPolicyRows()))).privacy.state, "saved", "privacy counts as saved:");
