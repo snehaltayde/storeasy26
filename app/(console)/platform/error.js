@@ -6,6 +6,7 @@ import { ErrorState } from "@/components/console/bits";
 // styling and offers a retry, instead of the storefront 500 page.
 export default function PlatformError({ error, reset }) {
   return (
+    <div data-legacy className="contents">
     <div className="mx-auto max-w-md px-6 py-24">
       <div className="rounded-card border border-edge bg-surface p-6 shadow-card">
         <ErrorState
@@ -14,6 +15,7 @@ export default function PlatformError({ error, reset }) {
           onRetry={reset}
         />
       </div>
+    </div>
     </div>
   );
 }

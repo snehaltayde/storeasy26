@@ -4,6 +4,7 @@ import { Skeleton, SkeletonText } from "@/components/console/bits";
 // stand-in plus panel cards — instead of a blank screen.
 export default function PlatformLoading() {
   return (
+    <div data-legacy className="contents">
     <div aria-busy="true" aria-label="Loading" className="mx-auto max-w-6xl px-6 py-6">
       <div className="flex items-center justify-between">
         <Skeleton className="h-7 w-56" />
@@ -21,6 +22,7 @@ export default function PlatformLoading() {
           <SkeletonText lines={6} />
         </div>
       </div>
+    </div>
     </div>
   );
 }

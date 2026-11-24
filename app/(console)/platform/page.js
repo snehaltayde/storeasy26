@@ -15,6 +15,7 @@ export const metadata = { title: "Storeasy platform", robots: { index: false } }
 export default async function PlatformPage() {
   if (!platformAdminConfigured()) {
     return (
+      <div data-legacy className="contents">
       <div className="mx-auto max-w-md px-6 py-24">
         <Card>
           <CardHeader title="Platform console" />
@@ -24,9 +25,14 @@ export default async function PlatformPage() {
           </Banner>
         </Card>
       </div>
+      </div>
     );
   }
   const token = (await cookies()).get(PLATFORM_COOKIE)?.value;
   const authed = await verifyPlatformToken(token);
-  return authed ? <PlatformAdmin /> : <PlatformLogin />;
+  return (
+    <div data-legacy className="contents">
+      {authed ? <PlatformAdmin /> : <PlatformLogin />}
+    </div>
+  );
 }
