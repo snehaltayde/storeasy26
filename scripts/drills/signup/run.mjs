@@ -21,7 +21,7 @@
 //      <slug>.localhost/admin/onboarding: the shell's
 //      top bar, no sidebar, a 640px column with the step list to its left,
 //      "Welcome to …", the address, the Closed badge, the verified email, and
-//      the four steps opened on Connect Shopify (To do; Import waits for it);
+//      the four steps opened on Connect Shopify (To do, the address field; Import waits for it);
 //      the handoff fragment is gone from the address and the history
 //   7. Sign out → /admin/login; sign in again with the same email and password
 //   8. the same email again (a new browser): the same code screen, no new code
@@ -38,6 +38,7 @@ import { harnessPorts, harnessUrls } from "../../design-harness.js";
 import { latestSignupCode } from "../../support/signup-mail.js";
 import { CODE_FAILED } from "../../../lib/platform/signup.js";
 import { NEEDS_US_WORDS } from "../../../lib/platform/signup-provision.js";
+import { WORDS as STEP_WORDS } from "../../../lib/onboarding/steps.js";
 
 const DRILL_ID = "SIGNUP";
 const STORE_NAME = "Drill Signup Shop";
@@ -250,8 +251,10 @@ async function signup(drill) {
     panel: document.querySelector('[data-onboarding="panel"]')?.getAttribute("data-step") || null,
     states: Object.fromEntries([...document.querySelectorAll('[data-onboarding="steplist"] button[data-step]')].map((b) => [b.getAttribute("data-step"), b.getAttribute("data-state")])),
     words: (document.querySelector('[data-onboarding="words"]')?.innerText || "").trim(),
+    shopField: Boolean(document.querySelector('[data-onboarding="panel"] [data-onboarding="shop-input"]')),
   }));
-  drill.check(steps.panel === "connect" && steps.states.connect === "ready" && steps.states.import === "blocked" && Object.keys(steps.states).join(",") === "connect,import,brand,open" && steps.words.includes("Storeasy's team connects your Shopify store for you"), "the four steps, opened on Connect Shopify (To do, the team connects it); Import waits for it", steps);
+  // Phase 1 line 4: the founder enters the shop's address and connects from step 1
+  drill.check(steps.panel === "connect" && steps.states.connect === "ready" && steps.states.import === "blocked" && Object.keys(steps.states).join(",") === "connect,import,brand,open" && steps.words === STEP_WORDS.connect.ready && steps.shopField, "the four steps, opened on Connect Shopify (To do: enter the shop's address); Import waits for it", steps);
   const bar = await page.locator('[data-shell="topbar"]').boundingBox();
   const col = await page.locator('[data-onboarding="column"]').boundingBox();
   const list = await page.locator('[data-onboarding="steplist"]').boundingBox();
