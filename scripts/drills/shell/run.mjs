@@ -253,6 +253,7 @@ async function ownerFlows(drill, page) {
 // console; on the Roles Annex (support is a member, nothing published, no
 // orders) every nav item renders its empty state.
 const DENIED_PAGES = ["/admin/settings", "/admin/integrations", "/admin/billing", "/admin/automations"];
+const SETUP_PAGE = "/admin/setup";
 const NOTE = /Your role \(support\) can.t .+ ask an owner or admin/;
 const PLATFORM_CONSOLE = /New tenant|Tenant registry|Provision/;
 
@@ -264,7 +265,7 @@ async function supportDeepLinks(drill, page) {
     const body = await page.locator("main").innerText().catch(() => "");
     drill.check(r?.status() === 200 && !ERROR_TEXT.test(body) && NOTE.test(body) && new URL(page.url()).pathname === path, `support deep link ${path}: the permission note, no error`, { status: r?.status(), url: page.url(), body: body.slice(0, 200) });
   }
-  const setup = await page.goto(`${ORIGIN}/admin/setup`, { waitUntil: "load" });
+  const setup = await page.goto(ORIGIN + SETUP_PAGE, { waitUntil: "load" });
   await settle(page);
   const setupBody = await page.locator("body").innerText().catch(() => "");
   drill.check(setup?.status() === 200 && !ERROR_TEXT.test(setupBody), "support deep link /admin/setup: opens read-only, no error", { status: setup?.status(), url: page.url() });
