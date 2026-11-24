@@ -505,6 +505,23 @@ await t("sf-styles: the runner entry and drill:sf-styles exist, outside drill:al
   const env = R.drillEnv({ SF_STYLES_BASELINE: "/abs/base", SF_STYLES_BITE: "1" }, "/w", { next: 6100, sqld: 7100, rolesNext: 6101, rolesSqld: 7103 });
   eq(env.SF_STYLES_BASELINE, "/abs/base", "the baseline passes through:");
   eq(env.SF_STYLES_BITE, "1", "the bite flag passes through:");
+  eq(env.STOREASY_TURBOPACK_DEV_CACHE, "off", "drills run without the Turbopack persistent dev cache:");
+});
+
+await t("next.config.mjs: the Turbopack persistent dev cache is off only when STOREASY_TURBOPACK_DEV_CACHE=off", async () => {
+  const load = async (v) => {
+    const before = process.env.STOREASY_TURBOPACK_DEV_CACHE;
+    if (v === undefined) delete process.env.STOREASY_TURBOPACK_DEV_CACHE;
+    else process.env.STOREASY_TURBOPACK_DEV_CACHE = v;
+    try {
+      return (await import(`../next.config.mjs?v=${v}`)).default.experimental?.turbopackFileSystemCacheForDev;
+    } finally {
+      if (before === undefined) delete process.env.STOREASY_TURBOPACK_DEV_CACHE;
+      else process.env.STOREASY_TURBOPACK_DEV_CACHE = before;
+    }
+  };
+  eq(await load("off"), false, "off in a drill:");
+  eq(await load(undefined), true, "on otherwise:");
 });
 
 await t("sf-styles compare: identical captures have no differences; a synthetic style, box and element change is found", async () => {

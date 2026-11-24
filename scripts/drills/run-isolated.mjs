@@ -157,6 +157,10 @@ export function drillEnv(base, worktree, ports) {
     ROLES_PORT: String(ports.rolesNext),
     ROLES_SQLD_PORT: String(ports.rolesSqld),
     PLATFORM_CACHE_MS: "1000",
+    // next.config.mjs: no Turbopack persistent dev cache in a drill worktree.
+    // Restored across the many harness restarts of a run, it sometimes came
+    // back without most routes (the "/admin/login 404" flake).
+    STOREASY_TURBOPACK_DEV_CACHE: "off",
   };
 }
 

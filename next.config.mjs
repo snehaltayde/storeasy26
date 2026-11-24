@@ -34,6 +34,13 @@ const nextConfig = {
   // Pin the workspace root — a package-lock.json in $HOME otherwise confuses
   // Turbopack's root inference (multiple-lockfiles warning).
   turbopack: { root: import.meta.dirname },
+  // Turbopack's persistent dev cache (.next/dev/cache) is on by default in
+  // Next 16. The browser drills restart the harness on one .next many times
+  // per run, and a restored cache sometimes comes back with most of the app's
+  // routes missing for that whole server's life (/admin/login, /api/health
+  // and the catch-all 404 at once; see docs/DECISIONS.md). The drill runner
+  // turns it off with STOREASY_TURBOPACK_DEV_CACHE=off; everyone else keeps it.
+  experimental: { turbopackFileSystemCacheForDev: process.env.STOREASY_TURBOPACK_DEV_CACHE !== "off" },
   images: {
     remotePatterns,
   },
