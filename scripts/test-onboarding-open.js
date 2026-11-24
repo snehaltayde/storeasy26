@@ -277,16 +277,29 @@ await t("start both policy pages: each becomes 'Read it' with the draft; the dra
   eq(flow.canConfirm(), false, "can't confirm:");
 });
 
-await t("contact form: PUT settings identity saves the email and phone and keeps the store name and tagline; a save with only the email clears the phone (why the form shows only while both are empty); the item is then ok with no form", async () => {
+await t("contact form: only the fields the founder filled in are sent; another admin's support email survives a phone-only save; the store name and tagline are kept; the item is then ok with no form", async () => {
   ok(fixOf(await owner.step4(), "contact", "contact_form")?.allowed, "the form is offered");
-  eq((await owner.json("/api/admin/settings", "PUT", { identity: { support_email: "hi@oomain.test", support_phone: "+91 98765 43210" } })).status, 200, "save:");
-  let site = (await cfgOf("main")).site;
-  eq([site.name, site.tagline, site.support_email, site.support_phone], ["Store main", "Kept tagline", "hi@oomain.test", "+91 98765 43210"], "kept:");
-  eq((await owner.json("/api/admin/settings", "PUT", { identity: { support_email: "hi@oomain.test" } })).status, 200, "email only:");
-  site = (await cfgOf("main")).site;
-  eq(site.support_phone, null, "buildSettingsPatch writes both fields (risk 3, pinned):");
+  eq([O.contactIdentity("", " +91 98765 43210 "), O.contactIdentity("hi@oomain.test", ""), O.contactIdentity("", "")], [{ support_phone: "+91 98765 43210" }, { support_email: "hi@oomain.test" }, {}], "contactIdentity:");
+  // another admin saves an email in Settings meanwhile (the founder's form still shows: it was read before)
+  await C.patchTenant("oomain", { config: { site: { ...(await cfgOf("main")).site, support_email: "admin@oomain.test" } } });
+  eq((await owner.json("/api/admin/settings", "PUT", { identity: O.contactIdentity("", "+91 98765 43210") })).status, 200, "phone-only save:");
+  const site = (await cfgOf("main")).site;
+  eq([site.name, site.tagline, site.support_email, site.support_phone], ["Store main", "Kept tagline", "admin@oomain.test", "+91 98765 43210"], "the other admin's email survives:");
   const st = await owner.step4();
   eq([st.facts.items.find((i) => i.id === "contact").level, fixOf(st, "contact", "contact_form")], ["ok", undefined], "ok, no form:");
+});
+
+await t("buildSettingsPatch: an absent support field keeps its value; Settings' own form, which sends both, still clears one emptied on purpose", async () => {
+  const { buildSettingsPatch } = await import("../lib/admin/settings.js");
+  const cur = { site: { name: "S", support_email: "a@b.test", support_phone: "123" } };
+  eq(buildSettingsPatch({ identity: { name: "S" } }, cur).patch.config.site, { name: "S", support_email: "a@b.test", support_phone: "123" }, "absent:");
+  eq(buildSettingsPatch({ identity: { name: "S", support_email: "", support_phone: "123" } }, cur).patch.config.site, { name: "S", support_email: null, support_phone: "123" }, "emptied email:");
+  eq(buildSettingsPatch({ identity: { name: "S", support_email: "a@b.test", support_phone: "" } }, cur).patch.config.site, { name: "S", support_email: "a@b.test", support_phone: null }, "emptied phone:");
+  // through the route, as SettingsAdmin sends it (every identity field, the emptied one as "")
+  const before = (await cfgOf("main")).site;
+  eq((await owner.json("/api/admin/settings", "PUT", { identity: { name: before.name, support_email: before.support_email, support_phone: "" } })).status, 200, "route:");
+  eq((await cfgOf("main")).site.support_phone, null, "cleared on purpose:");
+  await C.patchTenant("oomain", { config: { site: { ...(await cfgOf("main")).site, support_phone: "+91 98765 43210" } } });
 });
 
 await t("I've read it on both: nothing blocks, Open is allowed; the flow folds both pages in, loads every list and can confirm; confirm sends confirmOpen and the store opens: a live release, publish_log rows for every published id with that release, a storefront.publish audit row, the starter drafts only as founder-read pages", async () => {
@@ -297,6 +310,9 @@ await t("I've read it on both: nothing blocks, Open is allowed; the flow folds b
   }
   st = await owner.step4();
   eq([st.state, st.actions.find((a) => a.id === "open_store").allowed], ["ready", true], "ready:");
+  // an unrelated draft page: it must stay a draft
+  const other = await inS("main", () => Docs.createDocument({ type: "page", body: { ...R.emptyBody("page"), meta: { ...R.emptyBody("page").meta, slug: "our-story", title: "Our story" } }, actor: { kind: "merchant", id: "usr_oo", role: "owner" } }));
+  const otherId = other.document.id;
   const flow = flowFor(owner);
   await flow.open([{ id: "doc_home" }]);
   await settle(flow);
@@ -304,6 +320,7 @@ await t("I've read it on both: nothing blocks, Open is allowed; the flow folds b
   eq([s.phase, s.items.map((i) => i.id).sort()], ["opening", ["doc_home", ...starterIds].sort()], "home plus both read pages:");
   ok(s.order.every((id) => s.lists[id]?.status === "loaded"), "every list loaded");
   eq(flow.canConfirm(), true, "can confirm:");
+  ok(!s.items.some((i) => i.id === otherId), "the unrelated draft is not in the set");
   const auditBefore = (await auditOf("ooroles", "storefront.publish")).length + (await auditOf("oomain", "storefront.publish")).length;
   // no design document yet: the server makes the starting-colours draft and
   // asks once more with it in the offer (OPENING_NEEDS_DESIGN); the flow folds
@@ -323,6 +340,8 @@ await t("I've read it on both: nothing blocks, Open is allowed; the flow folds b
   eq(out.published.map((p) => p.id).sort(), logs.map((l) => l.document_id).sort(), "every published id has its row:");
   ok(logs.every((l) => l.release_id === live), "every row names the release");
   eq((await auditOf("oomain", "storefront.publish")).length + (await auditOf("ooroles", "storefront.publish")).length, auditBefore + 1, "one audit row:");
+  eq((await raw("main", "SELECT COUNT(*) AS n FROM publish_log WHERE document_id = ?", [otherId]))[0].n, 0, "no publish_log row for the unrelated draft:");
+  eq((await raw("main", "SELECT published_version_id FROM documents WHERE id = ?", [otherId]))[0].published_version_id, null, "no live version for it:");
   const pages = await raw("main", `SELECT updated_by FROM documents WHERE id IN (${starterIds.map(() => "?").join(",")})`, starterIds);
   ok(pages.every((p) => p.updated_by !== `${Pol.POLICY_STARTER_ACTOR.kind}:${Pol.POLICY_STARTER_ACTOR.id}`), `a starter went live: ${JSON.stringify(pages)}`);
 });

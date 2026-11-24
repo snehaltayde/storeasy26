@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CircleAlert, CircleCheck, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/components/ui/utils";
+import { contactIdentity } from "@/lib/onboarding/open-step";
 import PolicyReader from "./PolicyReader";
 import OpenStoreDialog from "./OpenStoreDialog";
 
@@ -28,6 +30,8 @@ export const POLICY_START_URL = "/api/admin/policy-start";
 export const ONBOARDING_URL = "/api/admin/onboarding";
 
 export const OPEN_PANEL_WORDS = Object.freeze({
+  publishing: "Publishing your store…",
+  publishingLead: "Your store is being published. This keeps going even if you closed the window; this page updates when it's done.",
   needed: "Needed",
   check: "Worth checking",
   neededLead: "Your store can't open until these are done.",
@@ -120,7 +124,7 @@ function ContactForm({ fix, busy, onSave }) {
     e.preventDefault();
     if (!email.trim() && !phone.trim()) return setMissing(true);
     setMissing(false);
-    onSave({ support_email: email.trim(), support_phone: phone.trim() });
+    onSave(contactIdentity(email, phone));
   }
   return (
     <form onSubmit={submit} className="w-full space-y-3" data-onboarding="contact-form" noValidate>
@@ -289,6 +293,14 @@ export default function OpenStepPanel({ step, onChange, onModel, onGoStep }) {
   const [reading, setReading] = useState(null);
   const [dialog, setDialog] = useState(false);
   const [opened, setOpened] = useState(false);
+  // a confirm was sent and its answer hasn't come: Open stays off, even with the dialog closed
+  const [sending, setSending] = useState(false);
+  const router = useRouter();
+  // the server-rendered parts (the welcome block's Closed/Open) read again too
+  const reread = () => {
+    onChange?.();
+    router.refresh();
+  };
 
   if (step.state === "done") return <Done facts={step.facts} />;
   if (opened) return <Done facts={{ liveUrl: null }} />;
@@ -331,8 +343,13 @@ export default function OpenStepPanel({ step, onChange, onModel, onGoStep }) {
 
       <section className={cn("space-y-3", items.length > 0 && "border-t border-border pt-6")} data-onboarding="open-store" aria-label={OPEN_PANEL_WORDS.openTitle}>
         <p className="max-w-prose text-sm text-muted-foreground">{OPEN_PANEL_WORDS.openLead}</p>
-        <Control gate={open} reasonId="open-reason" size="lg" className="h-10 px-4" variant={open.allowed ? "default" : "outline"} disabled={busy !== null} onClick={() => setDialog(true)}>
-          {OPEN_PANEL_WORDS.openButton}
+        {sending && (
+          <p role="status" className="text-sm text-muted-foreground" data-onboarding="publishing">
+            {OPEN_PANEL_WORDS.publishingLead}
+          </p>
+        )}
+        <Control gate={open} reasonId="open-reason" size="lg" className="h-10 px-4" variant={open.allowed ? "default" : "outline"} disabled={busy !== null || sending} aria-busy={sending || undefined} onClick={() => setDialog(true)}>
+          {sending ? OPEN_PANEL_WORDS.publishing : OPEN_PANEL_WORDS.openButton}
         </Control>
       </section>
 
@@ -352,8 +369,14 @@ export default function OpenStepPanel({ step, onChange, onModel, onGoStep }) {
           onOpenChange={setDialog}
           onOpened={() => {
             setDialog(false);
+            setSending(false);
             setOpened(true);
-            onChange?.();
+            reread();
+          }}
+          onSending={(on) => {
+            setSending(on);
+            // the answer came (or was lost): read the store again
+            if (!on) reread();
           }}
           onChange={onChange}
         />

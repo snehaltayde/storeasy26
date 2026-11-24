@@ -114,7 +114,7 @@ function GoingLive({ state }) {
   );
 }
 
-export default function OpenStoreDialog({ open, onOpenChange, onOpened, onChange }) {
+export default function OpenStoreDialog({ open, onOpenChange, onOpened, onSending, onChange }) {
   const flow = useMemo(() => createPublishFlow({ call, onPublished: () => onOpened?.() }), []);
   const [state, setState] = useState(flow.getState());
   const [sent, setSent] = useState(false);
@@ -134,9 +134,18 @@ export default function OpenStoreDialog({ open, onOpenChange, onOpened, onChange
     if (state.phase === "checked" && state.outcome?.live === true) onOpened?.();
   }, [state.phase, state.outcome?.live]);
 
+  // onSending(true) when a confirm goes out, onSending(false) when its answer
+  // comes back: the panel keeps "Publishing your store…" meanwhile, even after
+  // Esc or Cancel closed this (the flow still hears the answer)
   async function confirm() {
+    if (!flow.canConfirm()) return;
     setSent(true);
-    await flow.confirm();
+    onSending?.(true);
+    try {
+      await flow.confirm();
+    } finally {
+      onSending?.(false);
+    }
   }
 
   const o = state.outcome || {};

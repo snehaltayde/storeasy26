@@ -8,6 +8,7 @@
 //   3. "Start a privacy page" / "Start a returns page", each "Read it" in the
 //      reader, "I've read it" at the end of the text
 //   4. the contact form saves a support email
+//   4b. the step and the dialog at 375 and 768; Cancel sends nothing
 //   5. support: every item and reason on screen, every control disabled
 //      with its reason, nothing enabled
 //   6. "Open your store": the dialog lists what goes live (home, both pages,
@@ -122,6 +123,24 @@ export async function openStepStage(drill) {
   await goStep(drill, page);
   await drill.screenshot(page, "j-open-step-ready-1440", { fullPage: true });
 
+  // ---- 4b. the step and the dialog at 375 and 768; Cancel sends nothing ----
+  for (const width of [375, 768]) {
+    const nctx = await p6Context(drill, { width });
+    const np = await loginP6(drill, nctx);
+    await goStep(drill, np);
+    const overflow = await np.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    drill.check(!overflow, `at ${width} step 4 has no sideways scroll`, overflow);
+    await drill.screenshot(np, `j-open-step-ready-${width}`, { fullPage: true });
+    await np.locator('[data-onboarding="open-store"]').getByRole("button", { name: "Open your store", exact: true }).click();
+    const nd = np.locator('[data-onboarding="open-dialog"]');
+    await waitFor(async () => (await nd.locator('[data-onboarding="confirm-open"]').isEnabled().catch(() => false)) || false, 60_000, 300);
+    await drill.screenshot(np, `j-open-dialog-${width}`);
+    await nd.getByRole("button", { name: "Cancel", exact: true }).click();
+    await nd.waitFor({ state: "detached", timeout: 30_000 }).catch(() => {});
+    await nctx.close();
+  }
+  drill.check((await liveRelease()) == null, "Cancel closes the dialog before anything is sent (still closed)", null);
+
   // ---- 5. support: everything visible, nothing enabled ----
   const sctx = await p6Context(drill);
   const sp = await loginP6(drill, sctx, { as: "support" });
@@ -146,12 +165,27 @@ export async function openStepStage(drill) {
   drill.check(dtext.includes("Worth checking") && dtext.includes("stays a draft") && (await confirm.innerText()).trim() === "Open my store anyway", "it shows the 'Worth checking' items, says other drafts stay drafts, and offers 'Open my store anyway'", dtext.slice(0, 400));
   await drill.screenshot(page, "j-open-dialog-1440");
   await confirm.click();
-  // the server may ask once more with the colours folded in
-  await waitFor(async () => {
+  // Esc straight after sending: the panel keeps "Publishing your store…" with
+  // Open off until the answer, and Open is never offered again meanwhile
+  await page.keyboard.press("Escape");
+  const openNow = page.locator('[data-onboarding="open-store"] button').first();
+  let sawPublishing = false;
+  let reofferedEarly = false;
+  const finished = await waitFor(async () => {
     if (await page.locator('[data-onboarding="open-done"]').count()) return true;
-    if ((await confirm.isEnabled().catch(() => false)) && (await dialog.getAttribute("data-phase").catch(() => "")) === "opening" && !(await confirm.getAttribute("aria-busy"))) await confirm.click().catch(() => {});
+    if (await page.locator('[data-onboarding="publishing"]').count()) {
+      sawPublishing = true;
+      if (await openNow.isEnabled().catch(() => false)) reofferedEarly = true;
+    } else if ((await openNow.isEnabled().catch(() => false)) && (await liveRelease()) == null) {
+      // the answer came back without opening (the server asked once more with
+      // the colours folded in): confirm again from a new dialog
+      await openNow.click().catch(() => {});
+      await waitFor(async () => (await confirm.isEnabled().catch(() => false)) || false, 30_000, 300);
+      await confirm.click().catch(() => {});
+    }
     return false;
-  }, 90_000, 600);
+  }, 90_000, 150);
+  drill.check(Boolean(finished) && !reofferedEarly, "closing the dialog after sending keeps 'Publishing your store…' with Open off until the answer (or the store is already open)", { sawPublishing, reofferedEarly });
   await sleep(800);
   const live = await liveRelease();
   drill.check(live != null, "the store is open (a live release)", live);
@@ -161,6 +195,11 @@ export async function openStepStage(drill) {
   const href = await done.locator('[data-onboarding="live-link"]').getAttribute("href").catch(() => null);
   drill.check(doneText.includes("Your store is open") && doneText.includes("p6.localhost") && href === "/api/preview?exit=1&to=%2F", "step 4 says 'Your store is open' with the store address linked to the live site", { doneText, href });
   drill.check((await page.getByRole("link", { name: "Go to your dashboard", exact: true }).count()) > 0, "'Go to your dashboard' is offered", null);
+  const pill = await waitFor(async () => {
+    const t = clean(await page.locator('[data-onboarding="status"]').first().innerText().catch(() => ""));
+    return t.toLowerCase() === "open" ? t : false;
+  }, 30_000, 400);
+  drill.check(Boolean(pill), "the welcome block's pill says Open without a reload", pill);
   await drill.screenshot(page, "j-open-step-done-1440", { fullPage: true });
   const shopper = await closedPageFacts(p6Url(drill, "/"));
   drill.check(shopper.status === 200 && !shopper.openingSoon, "a shopper now sees the home page (200, not the closed page)", { status: shopper.status, openingSoon: shopper.openingSoon });

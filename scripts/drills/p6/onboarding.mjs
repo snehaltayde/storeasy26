@@ -125,7 +125,9 @@ export async function onboardingStage(drill) {
   );
   const byText = (t) => gated.find((g) => g.text === t);
   drill.check(byText("I placed a test order")?.disabled && byText("I placed a test order")?.reason === READ_ONLY && byText("Open your store")?.disabled && byText("Open your store")?.reason === READ_ONLY, "support: 'I placed a test order' and 'Open your store' are disabled with 'Your role can look at this but not change it.'", gated);
-  drill.check(gated.every((g) => g.disabled || g.text.startsWith("Next:")), "support: no enabled control in the Open step", gated);
+  // line 7: reading a policy draft (policy_view) and going to step 3 for the home page stay open to support
+  const SUPPORT_OK = new Set(["Read it", "Make your home page in step 3"]);
+  drill.check(gated.every((g) => g.disabled || g.text.startsWith("Next:") || SUPPORT_OK.has(g.text)), "support: no enabled control in the Open step but 'Read it' and 'Make your home page in step 3'", gated);
   await drill.screenshot(sp, "h-onboarding-support-open-1440", { fullPage: true });
   await goStep(drill, sp, "brand");
   const brandText = clean(await sp.locator('[data-onboarding="panel"]').innerText());
