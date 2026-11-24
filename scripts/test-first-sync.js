@@ -464,7 +464,7 @@ console.log("— a first sync bigger than one 60-second function");
     Object.assign(shop, { products: catalog, collections: colls, pageMs: 7000, fault: null });
     const mark = shop.calls.length;
     const state = O.signState("fs-connect");
-    const params = new URLSearchParams({ code: "test-code", shop: SHOP, state, timestamp: "1700000000" });
+    const params = new URLSearchParams({ code: "test-code", shop: SHOP, state, timestamp: String(Math.floor(Date.now() / 1000)) }); // line 4: Shopify's timestamp must be recent
     const message = [...params.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join("&");
     params.set("hmac", crypto.createHmac("sha256", "test-client-secret").update(message).digest("hex"));
     const first = await quiet(() => invoke("connect", () => callback.GET(req(`https://platform.test/api/connect/shopify/callback?${params}`, { origin: false }))));

@@ -105,6 +105,21 @@ await t("state kinds: an operator state verifies only as op; a founder state onl
   eq(O.verifyState(legacy), null, "an unsigned old-format state:");
 });
 
+await t("Shopify's callback HMAC: a correctly signed answer is refused when its timestamp is missing, older than 10 minutes or more than a minute ahead", async () => {
+  const signed = (ts) => {
+    const p = new URLSearchParams({ code: "c", shop: "a.myshopify.com", state: "s", ...(ts == null ? {} : { timestamp: String(ts) }) });
+    p.set("hmac", callbackHmac(p, "app-secret"));
+    return p.toString();
+  };
+  const now = Math.floor(Date.now() / 1000);
+  ok(O.verifyOAuthCallbackHmac(signed(now), "app-secret"), "now accepted");
+  ok(O.verifyOAuthCallbackHmac(signed(now - 9 * 60), "app-secret"), "9 minutes old accepted");
+  ok(!O.verifyOAuthCallbackHmac(signed(now - 11 * 60), "app-secret"), "11 minutes old refused");
+  ok(!O.verifyOAuthCallbackHmac(signed(now + 5 * 60), "app-secret"), "5 minutes ahead refused");
+  ok(!O.verifyOAuthCallbackHmac(signed(null), "app-secret"), "no timestamp refused");
+  ok(!O.verifyOAuthCallbackHmac(signed("soon"), "app-secret"), "junk timestamp refused");
+});
+
 await t("words: every error code has plain words, an unknown code gets the general message, and none names an internal", async () => {
   for (const c of W.CONNECT_ERROR_CODES) ok(W.connectErrorWords(c).length > 20 && W.connectErrorWords(c) !== W.CONNECT_GENERAL_WORDS, c);
   eq(W.connectErrorWords("weird"), W.CONNECT_GENERAL_WORDS, "unknown:");
@@ -192,6 +207,23 @@ await t("the app set up: the domain is locked (a different shop is 409, nothing 
   eq(tokenCalls(), 0, "no token call yet");
 });
 
+const { NextRequest: RawRequest } = await import("./support/next-server-stub.js");
+const HOST_A = a.tenant.domains[0];
+const spoofed = (path, { method = "GET", query = "", jar = {} } = {}) =>
+  new RawRequest(`http://${HOST_A}/api/admin/${path}${query ? `?${query}` : ""}`, {
+    method,
+    headers: { host: HOST_A, "x-forwarded-host": "evil.test", cookie: Object.entries(jar).map(([k, v]) => `${k}=${v}`).join("; "), ...(method === "POST" ? { origin: `http://${HOST_A}`, "content-type": "application/json" } : {}) },
+    body: method === "POST" ? "{}" : undefined,
+  });
+
+await t("a spoofed x-forwarded-host is ignored: the redirect_uri Connect sends to Shopify is on the store's own host", async () => {
+  const route = await import("../app/api/admin/shopify/connect/route.js");
+  const res = await route.POST(spoofed("shopify/connect", { method: "POST", jar: store.cookies.owner }), { params: Promise.resolve({}) });
+  const body = await res.json();
+  eq(res.status, 200, JSON.stringify(body));
+  eq(new URL(body.authorizeUrl).searchParams.get("redirect_uri"), CB_A, "redirect_uri:");
+});
+
 // The stand-in's approval page and its buttons → the callback's query.
 async function approve(authorizeUrl, choice = "install") {
   const page = await fetch(authorizeUrl);
@@ -265,6 +297,23 @@ await t("refusals in order, each → ?step=connect&connect_error=<code> with zer
     eq(codeOf(await callback("owner", swap("state", old), ownerJar())), "expired", "expired:");
     eq(codeOf(await callback("owner", swap("hmac", "0".repeat(64)), ownerJar())), "hmac", "tampered HMAC:");
     eq(codeOf(await callback("owner", swap("timestamp", "1"), ownerJar())), "hmac", "a changed parameter breaks the HMAC:");
+  });
+});
+
+await t("a spoofed x-forwarded-host is ignored by the callback too: its redirect stays on the store's own host", async () => {
+  const route = await import("../app/api/admin/shopify/callback/route.js");
+  const res = await route.GET(spoofed("shopify/callback", { query: back.search.slice(1), jar: { ...store.cookies.admin, _shopify_connect: flow.nonce } }), { params: Promise.resolve({}) });
+  eq(res.status, 303, "redirect:");
+  eq(new URL(res.headers.get("location")).host, HOST_A, "host:");
+});
+
+await t("a correctly signed callback with a timestamp older than 10 minutes → hmac; nothing written", async () => {
+  await nothingWritten("stale timestamp", async () => {
+    const p = new URLSearchParams(back.search);
+    p.delete("hmac");
+    p.set("timestamp", String(Math.floor(Date.now() / 1000) - 11 * 60));
+    p.set("hmac", callbackHmac(p, APP_A.clientSecret));
+    eq(codeOf(await callback("owner", p.toString(), ownerJar())), "hmac", "stale:");
   });
 });
 
@@ -461,6 +510,66 @@ await t("a refresh that meets a 503 is tried again and succeeds", async () => {
   await fetch(`${fake.url}/_fake/faults`, { method: "DELETE" });
   ok(tok.startsWith("shpat_fake_"), "a token");
   eq(refreshCalls().slice(n).map((c) => c.status), [503, 200], "tried again:");
+});
+
+// Runs `during` when the next refresh call leaves for Shopify, then lets it go.
+async function midRefresh(during, fn) {
+  const real = globalThis.fetch;
+  globalThis.fetch = async (u, init) => {
+    if (String(u).endsWith("/admin/oauth/access_token") && String(init?.body || "").includes("refresh_token")) {
+      globalThis.fetch = real;
+      await during();
+    }
+    return real(u, init);
+  };
+  try {
+    return await fn();
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+
+await t("two workers: A refreshes and saves; B read the row before, sends the retired refresh token, is refused, and uses A's pair instead of wiping it", async () => {
+  await expireStored();
+  const seen = await rowA();
+  const tokA = await inA(() => SA.getAdminAccessToken());
+  await inA(() => SA.adminGraphql("query { shop { name } }")); // the new token is used: Shopify retires the old refresh token
+  const n = refreshCalls().length;
+  const tokB = await SA.refreshTenantToken(a.id, { seen });
+  eq(refreshCalls().slice(n).map((c) => c.status), [401], "B's refresh refused:");
+  const row = await rowA();
+  eq([tokB, row.secrets.shopify_admin_token, Boolean(row.secrets.shopify_refresh_token), row.config.shopify_reauth_needed_at ?? null], [tokA, tokA, true, null], "A's pair kept, no reconnect flag:");
+});
+
+await t("a config write that lands during a refresh is kept, and the new pair is saved too (only the token keys are written)", async () => {
+  await expireStored();
+  const tok = await midRefresh(() => C.patchTenant(a.id, { config: { site: { name: "Written meanwhile" } } }), () => inA(() => SA.getAdminAccessToken()));
+  const row = await rowA();
+  eq([row.config.site?.name, row.secrets.shopify_admin_token], ["Written meanwhile", tok], "both kept:");
+  ok(Date.parse(row.config.shopify_token_expires_at) - Date.now() > 3500_000, "new expiry saved");
+});
+
+await t("a revoke during a refresh wins: the refreshed pair is not saved and the call fails", async () => {
+  await expireStored();
+  let err;
+  await midRefresh(
+    () => C.patchTenant(a.id, { secrets: { shopify_admin_token: null, shopify_refresh_token: null }, config: { shopify_token_expires_at: null, shopify_refresh_expires_at: null } }),
+    () => inA(() => SA.getAdminAccessToken()),
+  ).catch((e) => (err = e));
+  ok(err, "the call failed");
+  const row = await rowA();
+  eq([row.secrets.shopify_admin_token ?? null, row.secrets.shopify_refresh_token ?? null], [null, null], "still revoked:");
+  await reconnect();
+});
+
+await t("Shopify asking to connect again during a refresh wins: the refreshed pair is not saved", async () => {
+  await expireStored();
+  const before = (await rowA()).secrets.shopify_admin_token;
+  let err;
+  await midRefresh(() => C.patchTenant(a.id, { config: { shopify_reauth_needed_at: new Date().toISOString() } }), () => inA(() => SA.getAdminAccessToken())).catch((e) => (err = e));
+  eq(err?.message, SA.REAUTH_ERROR, "the call says connect again:");
+  eq((await rowA()).secrets.shopify_admin_token, before, "the refreshed pair was not saved:");
+  await reconnect();
 });
 
 await t("a refused refresh (401 invalid_request) clears both tokens, sets reauth_needed_at and step 1 says Connect again; later calls throw without trying client credentials; connecting again clears it", async () => {

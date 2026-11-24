@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { infraResponse } from "@/lib/infra-response";
 import { requireAdmin, ADMIN_COOKIE } from "@/lib/admin-auth";
-import { requestOrigin } from "@/lib/origin-check";
 import { tenantHandler } from "@/lib/tenant-request";
 import { withTenant, tenantId } from "@/lib/tenant-context";
 import { getTenant } from "@/lib/platform/control";
 import { ConnectError } from "@/lib/platform/shopify-connect";
-import { startFounderConnect, CALLBACK_PATH, NONCE_COOKIE } from "@/lib/onboarding/connect";
+import { startFounderConnect, CALLBACK_PATH, NONCE_COOKIE, tenantOrigin } from "@/lib/onboarding/connect";
 import { onboardingFor } from "@/lib/onboarding/service";
 import { connectErrorWords } from "@/lib/onboarding/connect-words";
 
@@ -27,7 +26,7 @@ export const POST = tenantHandler(async (request) => {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const body = await request.json().catch(() => ({}));
   try {
-    const origin = requestOrigin(request);
+    const origin = tenantOrigin(request);
     const r = await startFounderConnect({ actor: auth.actor, shopInput: body?.shop, origin, adminCookie: request.cookies.get(ADMIN_COOKIE)?.value });
     if (!r.appReady) {
       const fresh = await getTenant(tenantId(), { fresh: true });

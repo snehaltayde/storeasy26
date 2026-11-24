@@ -1,11 +1,11 @@
 import { NextResponse, after } from "next/server";
 import { requireAdmin, ADMIN_COOKIE } from "@/lib/admin-auth";
-import { requestOrigin } from "@/lib/origin-check";
 import { tenantHandler } from "@/lib/tenant-request";
 import {
   finishFounderConnect,
   CALLBACK_PATH,
   NONCE_COOKIE,
+  tenantOrigin,
 } from "@/lib/onboarding/connect";
 
 // Phase 1 line 4: where Shopify sends the founder's browser back
@@ -56,7 +56,7 @@ export const GET = tenantHandler(async (request) => {
         : "Only the owner or an admin can connect Shopify.";
     return clearNonce(refusal(auth.status, words));
   }
-  const origin = requestOrigin(request);
+  const origin = tenantOrigin(request);
   const url = request.nextUrl || new URL(request.url);
   let r;
   try {

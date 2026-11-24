@@ -46,6 +46,26 @@ function Disabled({ children, reason, reasonId }) {
   );
 }
 
+// Shown once on step 2 after Shopify sends the founder back (?connected=1);
+// the parameter is then cleared, so a reload doesn't show it again.
+export function ConnectedNote() {
+  const params = useSearchParams();
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (params?.get("connected") !== "1") return;
+    setShown(true);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("connected");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [params]);
+  if (!shown) return null;
+  return (
+    <Notice tone="success">
+      <span data-onboarding="connected-note">{CONNECT_WORDS.connectedNote}</span>
+    </Notice>
+  );
+}
+
 async function postConnect(body) {
   try {
     const res = await fetch(CONNECT_URL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) });

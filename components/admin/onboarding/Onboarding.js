@@ -9,6 +9,7 @@ import { cn } from "@/components/ui/utils";
 import { pollsWhile } from "@/lib/onboarding/steps";
 import StepList, { STATE_WORDS } from "./StepList";
 import { BrandPanel, ConnectPanel, ImportPanel, OpenPanel, ONBOARDING_URL } from "./StepPanels";
+import { ConnectedNote } from "./ConnectPanel";
 
 // The onboarding page's steps (Phase 1 line 3, docs/UI.md "Onboarding"): the
 // Welcome card, then one step's panel at a time with the StepList beside it
@@ -144,6 +145,7 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
                 Go to {waitsFor.label}
               </Button>
             )}
+            {step.id === "import" && <ConnectedNote />}
             <Panel key={step.id} step={step} canSync={canSync} publishHref={publishHref} onChange={refresh} onModel={setModel} />
             {nextUp && (
               <Button size="lg" className="h-10 px-4" onClick={() => choose(nextUp.id, { focus: true })} data-onboarding="next">

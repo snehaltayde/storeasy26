@@ -78,12 +78,16 @@ async function openConnect(page, origin, query = "") {
 }
 const fault = (body) => fetch(`http://127.0.0.1:${fakePort}/_fake/faults`, { method: body ? "POST" : "DELETE", body: body ? JSON.stringify(body) : undefined });
 
+// → where the callback sent the browser (before the page clears its parameters)
 async function connectVia(page, choice) {
   await page.locator('[data-onboarding="connect-button"]').click();
   await page.waitForURL(/\/admin\/oauth\/authorize/, { timeout: 30_000 });
+  const back = page.waitForResponse((r) => r.url().includes("/api/admin/shopify/callback"), { timeout: 60_000 });
   await page.locator(`#${choice}`).click();
+  const res = await back;
   await page.waitForURL(/\/admin\/onboarding/, { timeout: 60_000 });
   await settle(page);
+  return new URL(res.headers().location || "/", res.url());
 }
 
 async function connectDrill(drill) {
@@ -161,9 +165,12 @@ async function connectDrill(drill) {
 
     // 7. Install
     await openConnect(owner, ANNEX);
-    await connectVia(owner, "install");
-    const u = new URL(owner.url());
-    drill.check(u.searchParams.get("step") === "import" && u.searchParams.get("connected") === "1", "back on step 2 with connected=1", owner.url());
+    const u = await connectVia(owner, "install");
+    drill.check(u.searchParams.get("step") === "import" && u.searchParams.get("connected") === "1", "the callback sends the browser to step 2 with connected=1", u.href);
+    const note = await owner.locator('[data-onboarding="connected-note"]').waitFor({ timeout: 15_000 }).then(() => true, () => false);
+    drill.check(note && (await text(owner)).includes(CONNECT_WORDS.connectedNote), "step 2 says Shopify connected");
+    await owner.waitForFunction(() => !location.search.includes("connected="), null, { timeout: 10_000 }).catch(() => {});
+    drill.check(!owner.url().includes("connected="), "connected=1 is cleared from the address bar", owner.url());
     const done = await step1(owner, ANNEX);
     drill.check(done.state === "done" && done.words === WORDS.connect.done, "step 1 Done", done?.state);
     const row = await C.getTenant("annex", { fresh: true });

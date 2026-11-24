@@ -65,7 +65,7 @@ await t("oauth state: sign/verify roundtrip, tamper + expiry + garbage rejected"
 
 await t("oauth callback hmac: valid accepted, tampered rejected", async () => {
   const secret = "app-client-secret";
-  const params = new URLSearchParams({ code: "abc", shop: "x.myshopify.com", state: "s", timestamp: "123" });
+  const params = new URLSearchParams({ code: "abc", shop: "x.myshopify.com", state: "s", timestamp: String(Math.floor(Date.now() / 1000)) }); // line 4: a recent timestamp
   const message = [...params.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join("&");
   const hmac = crypto.createHmac("sha256", secret).update(message).digest("hex");
   params.set("hmac", hmac);
