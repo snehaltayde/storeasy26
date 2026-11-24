@@ -155,6 +155,7 @@
     "drill:signup": "node scripts/drills/run-isolated.mjs signup",
     "drill:connect": "node scripts/drills/run-isolated.mjs connect",
     "drill:operator-onboarding": "node scripts/drills/run-isolated.mjs operator-onboarding",
+    "drill:operator-create-store": "node scripts/drills/run-isolated.mjs operator-create-store",
     "drill:all": "node scripts/drills/run-isolated.mjs all",
     "media:reindex": "node scripts/reindex-document-refs.js"
   },
