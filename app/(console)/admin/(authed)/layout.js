@@ -26,11 +26,12 @@ const BADGES = {
     const open = (await listReturns({ status: "requested" })).length;
     return open > 0 ? open : null;
   },
-  // Phase 1 line 3: "n/4" on Onboarding while the store is closed
+  // Phase 1 line 3: "n/4" on Onboarding while the store is known to be
+  // closed. The light read (no opening report): this runs on every page.
   async onboarding() {
-    const { onboardingFor } = await import("@/lib/onboarding/service");
-    const o = await onboardingFor({ role: "support" });
-    return o.supported && !o.open ? `${o.doneCount}/${o.total}` : null;
+    const { onboardingProgress } = await import("@/lib/onboarding/service");
+    const o = await onboardingProgress();
+    return o.supported && o.openKnown && !o.open ? `${o.doneCount}/${o.total}` : null;
   },
   // S52 / P2-GUARD: the unpublished-changes dot on Publishing
   async publish() {

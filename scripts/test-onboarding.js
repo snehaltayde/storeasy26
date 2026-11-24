@@ -9,6 +9,7 @@
 //      least-trusted cases (support keys and actions, signed out, another
 //      store's session, cross-origin), the test-order check-off's audit row
 //   4. the nav and the redirects (/admin, /admin/setup, /admin/start)
+//   5. FirstRun mounted: canEdit=false never POSTs
 // Nothing here reaches Shopify, Typesense or a hosted database.
 //   pnpm test:onboarding
 import { createRequire, registerHooks } from "node:module";
@@ -92,14 +93,14 @@ const synced = (over = {}) => ({ hasComplete: true, anyRun: true, products: 24, 
 
 await t("the shape: supported, open, current, doneCount, total 4, and four steps in order, each with a label, a state, words, facts and actions", async () => {
   const m = S.deriveSteps(base(), "owner");
-  eq(Object.keys(m), ["supported", "open", "current", "doneCount", "total", "steps"], "keys:");
+  eq(Object.keys(m), ["supported", "open", "openKnown", "current", "doneCount", "total", "steps"], "keys:");
   eq(m.steps.map((s) => [s.id, s.label]), [["connect", "Connect Shopify"], ["import", "Import products"], ["brand", "Brand"], ["open", "Open your store"]], "steps:");
   for (const s of m.steps) {
     ok(S.STEP_STATES.includes(s.state), `${s.id} state ${s.state}`);
     ok(typeof s.words === "string" && s.words.length > 10, `${s.id} words`);
     ok(s.facts && typeof s.facts === "object" && Array.isArray(s.actions), `${s.id} facts/actions`);
   }
-  eq([m.supported, m.open, m.total, m.doneCount, m.current], [true, false, 4, 0, "connect"], "a fresh store:");
+  eq([m.supported, m.open, m.openKnown, m.total, m.doneCount, m.current], [true, false, true, 4, 0, "connect"], "a fresh store:");
 });
 
 await t("connect: done when linked, or any complete sync, or products > 0; in progress when a domain is recorded but not linked; never blocked; ready otherwise", async () => {
@@ -111,7 +112,7 @@ await t("connect: done when linked, or any complete sync, or products > 0; in pr
   ok(/nothing for you to do yet/.test(ip.words), `the founder has nothing to do yet: ${ip.words}`);
   eq(st(base(), "connect"), "ready", "nothing:");
   ok(/never changes anything in Shopify/.test(step(base(), "connect").words), "honest words: nothing written to Shopify");
-  for (const f of [base(), base({ shopDomain: "x.myshopify.com" }), base({ cmsMode: "migrating" }), base({ cmsMode: "legacy" })]) ok(st(f, "connect") !== "blocked", "connect is never blocked");
+  for (const f of [base(), base({ shopDomain: "x.myshopify.com" }), base({ cmsMode: "migrating" }), base({ cmsMode: "odd" })]) ok(st(f, "connect") !== "blocked", "connect is never blocked");
 });
 
 await t("import: done on a complete run ever, or legacy products (no runs); in progress while the latest run is running or retrying; blocked until connect is done, or while the store is being moved; ready (with the problem) on failed/stalled; ready with no run", async () => {
@@ -140,7 +141,7 @@ await t("brand: done when the brand step is recorded (or the design has a brand/
   eq(st(base({ brandRecorded: true }), "brand"), "in_progress", "recorded only:");
   eq(st(base({ hasHome: true }), "brand"), "in_progress", "home only:");
   eq(st(base({ designBranded: true }), "brand"), "in_progress", "branded only:");
-  for (const mode of ["legacy", "migrating", "odd"]) {
+  for (const mode of ["migrating", "odd"]) {
     const b = step(base({ cmsMode: mode }), "brand");
     eq([b.state, b.blockedBy, b.actions], ["blocked", "updating", []], `${mode}:`);
   }
@@ -159,8 +160,37 @@ await t("open: done on a live release (and then every step is done); blocked by 
   eq(ready.facts.items, OK_OPENING.items, "the opening items are the step's facts:");
 });
 
+await t("a store still on the old editor (cmsMode legacy, which nothing sets since migration 0026): supported false with reason legacy and the plain 'old editor, contact support' words; no steps, never 'being updated'", async () => {
+  for (const f of [base({ cmsMode: "legacy" }), base({ cmsMode: "legacy", open: true, linked: true, sync: synced() })]) {
+    const m = S.deriveSteps(f, "owner");
+    eq([m.supported, m.reason, m.words, m.steps, m.current, m.doneCount], [false, "legacy", S.LEGACY_WORDS, [], null, 0], "legacy:");
+  }
+  ok(/old editor/.test(S.LEGACY_WORDS) && /support/i.test(S.LEGACY_WORDS) && !/being updated/.test(S.LEGACY_WORDS), S.LEGACY_WORDS);
+  const { scanText } = await import("./support/banned-copy.js");
+  eq(scanText(S.LEGACY_WORDS), [], "banned copy:");
+});
+
+await t("openKnown: true when the live release was read (open or closed), false when it could not be (open null), for supported and _default stores alike", async () => {
+  eq([S.deriveSteps(base(), "owner").openKnown, S.deriveSteps(base({ open: true }), "owner").openKnown, S.deriveSteps(base({ open: null }), "owner").openKnown], [true, true, false], "supported:");
+  eq([S.deriveSteps({ supported: false, open: false }).openKnown, S.deriveSteps({ supported: false, open: null }).openKnown], [true, false], "_default:");
+});
+
+await t("pollsWhile: only while Import is in progress with its sync running or retrying; never for a connect or brand step in progress, a done or failed import, or an open store", async () => {
+  const poll = (f) => S.pollsWhile(S.deriveSteps(f, "owner"));
+  eq(poll(base({ linked: true, sync: { hasComplete: false, anyRun: true, products: 4, view: view("running") } })), true, "running:");
+  eq(poll(base({ linked: true, sync: { hasComplete: false, anyRun: true, products: 4, view: view("retrying") } })), true, "retrying:");
+  eq(poll(base({ shopDomain: "acme.myshopify.com" })), false, "connect in progress:");
+  eq(step(base({ shopDomain: "acme.myshopify.com" }), "connect").state, "in_progress", "(connect is in progress there)");
+  eq(poll(base({ linked: true, sync: synced(), brandRecorded: true })), false, "brand in progress:");
+  eq(step(base({ linked: true, sync: synced(), brandRecorded: true }), "brand").state, "in_progress", "(brand is in progress there)");
+  eq(poll(base({ linked: true, sync: synced() })), false, "import done:");
+  eq(poll(base({ linked: true, sync: { hasComplete: false, anyRun: true, products: 0, view: view("failed") } })), false, "failed:");
+  eq(poll(base({ open: true, sync: { hasComplete: false, anyRun: true, products: 4, view: view("running") } })), false, "open store:");
+  eq([S.pollsWhile(null), S.pollsWhile({ steps: [] })], [false, false], "no model:");
+});
+
 await t("an open store: every step done, current 'open', doneCount 4, no blockedBy or problem anywhere (even with unreadable or unfinished facts)", async () => {
-  for (const f of [base({ open: true, opening: null }), base({ open: true, sync: null, cmsMode: "legacy", linked: null, hasHome: null })]) {
+  for (const f of [base({ open: true, opening: null }), base({ open: true, sync: null, cmsMode: "migrating", linked: null, hasHome: null })]) {
     const m = S.deriveSteps(f, "owner");
     eq([m.open, m.current, m.doneCount], [true, "open", 4], "summary:");
     eq(m.steps.map((s) => s.state), ["done", "done", "done", "done"], "states:");
@@ -170,7 +200,7 @@ await t("an open store: every step done, current 'open', doneCount 4, no blocked
 });
 
 await t("the _default store: supported false, no steps, the same keys", async () => {
-  eq(S.deriveSteps({ supported: false, open: false }, "owner"), { supported: false, open: false, current: null, doneCount: 0, total: 4, steps: [] }, "_default:");
+  eq(S.deriveSteps({ supported: false, open: false }, "owner"), { supported: false, open: false, openKnown: true, current: null, doneCount: 0, total: 4, steps: [] }, "_default:");
 });
 
 await t("current is the first step not done; doneCount counts done steps", async () => {
@@ -350,10 +380,13 @@ await t("a recorded domain without keys: connect in progress; with keys: connect
   eq((await statesOf("linked")).slice(0, 2), ["done", "ready"], "linked:");
 });
 
-await t("a store being moved: import and brand blocked ('updating'); a legacy store: brand blocked", async () => {
+await t("a store being moved: import and brand blocked ('updating'); a store on the old editor: not supported, the 'contact support' words", async () => {
   const m = await modelOf("moving");
   eq([m.steps[1].blockedBy, m.steps[2].state, m.steps[2].blockedBy], ["updating", "blocked", "updating"], "moving (the move is named first):");
-  eq((await modelOf("legacy")).steps[2].state, "blocked", "legacy:");
+  const l = await modelOf("legacy");
+  eq([l.supported, l.reason, l.words, l.steps], [false, "legacy", S.LEGACY_WORDS, []], "legacy:");
+  const p = await inS("legacy", () => Svc.onboardingProgress());
+  eq([p.supported, p.doneCount], [false, 0], "legacy progress (no badge, no nudge):");
 });
 
 await t("brand: recorded brand step plus doc_home is done; the recorded step alone is in progress", async () => {
@@ -374,9 +407,39 @@ await t("a failed SQL read leaves its step not done with 'We couldn't check this
   const runs = await withFailingSql("synced", /FROM sync_runs/, () => modelOf("synced"));
   eq([runs.steps[0].state, runs.steps[0].problem, runs.steps[1].state, runs.steps[1].problem], ["ready", S.UNREADABLE, "ready", S.UNREADABLE], "sync_runs:");
   const live = await withFailingSql("open", /FROM release_state/, () => modelOf("open"));
-  eq([live.open, live.steps[3].state, live.steps[3].problem], [false, "ready", S.UNREADABLE], "release_state (an open store is not called closed-and-done on a guess):");
+  eq([live.open, live.openKnown, live.steps[3].state, live.steps[3].problem], [false, false, "ready", S.UNREADABLE], "release_state (an open store is not called closed-and-done on a guess):");
+  const lp = await withFailingSql("open", /FROM release_state/, () => inS("open", () => Svc.onboardingProgress()));
+  eq([lp.supported, lp.open, lp.openKnown], [true, false, false], "progress, release_state unreadable (no badge, no nudge):");
   const report = await withFailingSql("fresh", /WHERE type = 'page'/, () => modelOf("fresh"));
   eq([report.steps[3].state, report.steps[3].problem], ["ready", S.UNREADABLE], "the opening report:");
+});
+
+await t("onboardingProgress (the nav badge and dashboard nudge): the same doneCount as the full model, never reads the opening report; the Open step counts only on a live release", async () => {
+  const counting = async (key, fn) => {
+    const client = await inS(key, () => currentDatabase().libsql);
+    const real = client.execute;
+    const seen = [];
+    client.execute = (stmt, ...rest) => (seen.push(typeof stmt === "string" ? stmt : stmt?.sql || ""), real(stmt, ...rest));
+    try {
+      return { value: await fn(), seen };
+    } finally {
+      delete client.execute;
+    }
+  };
+  const Opening = await import("../lib/documents/opening.js");
+  const reportSql = await counting("fresh", () => inS("fresh", () => Opening.openingReport()));
+  const marker = reportSql.seen.find((q) => /WHERE type = 'page'/.test(q));
+  ok(marker, `the opening report's own read: ${reportSql.seen.join(" | ").slice(0, 300)}`);
+  for (const key of ["fresh", "synced", "brand", "open"]) {
+    const full = await modelOf(key, { role: "support" });
+    const light = await counting(key, () => inS(key, () => Svc.onboardingProgress()));
+    eq(Object.keys(light.value), ["supported", "open", "openKnown", "doneCount", "total"], `${key} keys:`);
+    eq([light.value.doneCount, light.value.open, light.value.openKnown], [full.doneCount, full.open, true], `${key}:`);
+    ok(!light.seen.some((q) => /WHERE type = 'page'/.test(q)), `${key}: the light read ran the opening report: ${light.seen.filter((q) => /type = 'page'/.test(q)).join(" | ")}`);
+  }
+  // a closed store whose opening report would pass: the Open step still counts not done
+  const fresh = await inS("fresh", () => Svc.onboardingProgress());
+  eq([fresh.open, fresh.doneCount < 4], [false, true], "closed:");
 });
 
 await t("the _default store is not supported (it runs on environment config)", async () => {
@@ -410,7 +473,7 @@ const call = async (method, o) => {
   return { status: res.status, body: await res.json(), text: "" };
 };
 const CANARIES = ["onb-client-secret-canary", "onb-client-id-canary", "onbroute.myshopify.com", "shpat_"];
-const KEYS = ["ok", "supported", "open", "current", "doneCount", "total", "steps"];
+const KEYS = ["ok", "supported", "open", "openKnown", "current", "doneCount", "total", "steps"];
 
 await t("GET as owner and admin: 200, the model, the shop domain in connect's facts; never the client id, secret or a token", async () => {
   for (const role of ["owner", "admin"]) {
@@ -511,6 +574,10 @@ await t("redirects: /admin/setup -> /admin/onboarding; /admin/start -> /admin/on
   const def = await withTenant({ ...(await C.getTenant("onbfresh")), id: "_default" }, () => mod.default({}).catch((e) => e.redirectTo));
   eq(def, "/admin/dashboard", "_default:");
   eq(await withFailingSql("fresh", /release_state/i, () => redirectOf("page.js", "fresh")), "/admin/dashboard", "a failed read:");
+  eq(await redirectOf("page.js", "legacy"), "/admin/dashboard", "a store on the old editor (no steps; never sent to onboarding forever):");
+  eq(await withFailingSql("fresh", /FROM cms_state/i, () => redirectOf("page.js", "fresh")), "/admin/onboarding", "an unreadable editor mode on a closed store still goes to onboarding:");
+  const src = (await import("node:fs")).readFileSync(join(PAGES, "page.js"), "utf8");
+  ok(src.includes("liveOpen") && !src.includes("getLiveReleaseState"), "/admin reads the plain live_release_id (liveOpen), not getLiveReleaseState");
 });
 
 await t("retired: lib/admin/onboarding.js, components/admin/SetupAdmin.js and app/api/admin/setup/route.js are gone", async () => {
@@ -519,6 +586,89 @@ await t("retired: lib/admin/onboarding.js, components/admin/SetupAdmin.js and ap
     await access(join(ROOT, f)).catch(() => (there = false));
     ok(!there, `${f} still exists`);
   }
+});
+
+// =========================================================================================
+console.log("— 5. the Brand step's FirstRun, mounted (its hooks run; no DOM)");
+
+// A small hook driver: FirstRun is called as a function with its own state,
+// refs and effects, and re-run until it settles. Children are not rendered:
+// what matters here is which requests the component itself sends.
+async function mountFirstRun(props, answer) {
+  const req = createRequire(import.meta.url);
+  const React = req("react");
+  const swc = req("next/dist/build/swc/index.js");
+  await swc.loadBindings();
+  const file = join(ROOT, "components/admin/first-run/FirstRun.js");
+  const { readFileSync } = await import("node:fs");
+  const code = (await swc.transform(readFileSync(file, "utf8"), { filename: file, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
+  const box = [];
+  let cursor = 0;
+  let effects = [];
+  let dirty = false;
+  const hooks = {
+    useState(init) {
+      const k = cursor++;
+      if (!(k in box)) box[k] = typeof init === "function" ? init() : init;
+      return [box[k], (v) => { const nv = typeof v === "function" ? v(box[k]) : v; if (!Object.is(nv, box[k])) { box[k] = nv; dirty = true; } }];
+    },
+    useRef(init) {
+      const k = cursor++;
+      if (!(k in box)) box[k] = { current: init };
+      return box[k];
+    },
+    useEffect(fn, deps) {
+      const k = cursor++;
+      const prev = box[k];
+      if (prev && deps && deps.every((d, i) => Object.is(d, prev.deps[i]))) return;
+      box[k] = { deps };
+      effects.push(fn);
+    },
+  };
+  const react = { ...React, ...hooks, default: { ...React, ...hooks } };
+  const Stub = () => null;
+  const stubs = {
+    react,
+    "next/link": { default: Stub },
+    "lucide-react": { RotateCcw: Stub },
+    "@/components/console/Card": { Card: Stub, CardHeader: Stub },
+    "@/components/console/Banner": { Banner: Stub },
+    "@/components/console/Button": { Button: Stub },
+    "@/components/admin/SyncProgress": { SyncProgressBody: Stub, readSync: async () => null, requestSync: async () => null, POLL_MS: 3000 },
+    "@/lib/themes/palettes": { paletteById: () => null },
+    "./BrandStep": { default: Stub },
+  };
+  const mod = { exports: {} };
+  new Function("require", "module", "exports", code)((id) => (id in stubs ? stubs[id] : req(id)), mod, mod.exports);
+  const sent = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    sent.push([init.method || "GET", String(url)]);
+    return Response.json(init.method === "POST" ? { ok: true, ran: true, generated: ["doc_home"] } : answer);
+  };
+  try {
+    for (let round = 0; round < 20; round++) {
+      cursor = 0;
+      effects = [];
+      dirty = false;
+      mod.exports.default(props);
+      for (const e of effects) e();
+      for (let i = 0; i < 6; i++) await new Promise((r) => setImmediate(r));
+      if (!dirty && !effects.length) break;
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  return { sent, viewOf: mod.exports.viewOf };
+}
+const MAKEABLE = { ok: true, firstRun: { generated: false, eligible: true, kept: [], byGenerator: [] }, sync: { state: "complete" } };
+
+await t("least-trusted: FirstRun with canEdit=false on the 'make' view (support before the starter store exists) sends no POST, only its GET; with canEdit=true the same answer sends exactly one POST", async () => {
+  const ro = await mountFirstRun({ canEdit: false, canSync: false }, MAKEABLE);
+  eq(ro.viewOf(MAKEABLE.firstRun, MAKEABLE.sync), "make", "the answer is the 'make' view:");
+  eq(ro.sent, [["GET", "/api/admin/first-run"]], "support (canEdit false): the GET only, no POST:");
+  const rw = await mountFirstRun({ canEdit: true, canSync: true }, MAKEABLE);
+  eq(rw.sent.filter(([m]) => m === "POST"), [["POST", "/api/admin/first-run"]], "an editor (canEdit true): one POST:");
 });
 
 await plat.cleanup();

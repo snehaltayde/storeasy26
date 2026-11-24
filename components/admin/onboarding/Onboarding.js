@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CircleAlert, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
+import { pollsWhile } from "@/lib/onboarding/steps";
 import StepList, { STATE_WORDS } from "./StepList";
 import { BrandPanel, ConnectPanel, ImportPanel, OpenPanel, ONBOARDING_URL } from "./StepPanels";
 
@@ -14,7 +15,8 @@ import { BrandPanel, ConnectPanel, ImportPanel, OpenPanel, ONBOARDING_URL } from
 // (from 1024px) or above it (narrower). The page opens on initialStep
 // (?step=…, else the first step not done); choosing a step replaces ?step=
 // without scrolling. The steps are re-read from GET /api/admin/onboarding:
-// every 10 s while a step is in progress and the tab is visible, when the
+// every 10 s while products are coming in (pollsWhile: the Import step in
+// progress, its sync running or retrying) and the tab is visible, when the
 // window gets focus, and after anything in a panel saves. A failed re-read
 // keeps what is on screen.
 //   initial      the GET answer's shape (lib/onboarding/steps.js deriveSteps)
@@ -52,7 +54,7 @@ export default function Onboarding({ initial, initialStep, canSync = false, publ
     }
   }, []);
 
-  const busy = model.steps.some((s) => s.state === "in_progress");
+  const busy = pollsWhile(model);
   useEffect(() => {
     if (!busy) return undefined;
     const timer = setInterval(() => {

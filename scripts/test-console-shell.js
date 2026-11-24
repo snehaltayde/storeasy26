@@ -196,7 +196,14 @@ const layoutStubs = {
   "@/lib/site": { siteName: () => "Roles Demo Co" },
   "@/lib/tenant-context": { currentTenant: () => ({ id: "roles", domains: ["roles.localhost"] }) },
   "@/lib/returns": { listReturns: async () => [{ id: "ret_1" }, { id: "ret_2" }] },
-  "@/lib/onboarding/service": { onboardingFor: async () => ({ supported: true, open: false, doneCount: 2, total: 4 }) },
+  // the layout reads the light onboardingProgress on every page, never the full model (which runs the opening report)
+  "@/lib/onboarding/service": {
+    onboardingProgress: async () => L.progress || { supported: true, open: false, openKnown: true, doneCount: 2, total: 4 },
+    onboardingFor: async () => {
+      L.fullModelCalls = (L.fullModelCalls || 0) + 1;
+      throw new Error("the layout computed the full onboarding model");
+    },
+  },
   "@/lib/releases": { publishingBadge: async () => "1" },
   "@/lib/platform/identity": {
     getUser: async (id) => {
@@ -257,6 +264,21 @@ await t("the layout hands the shell navFor(role), badges for visible items only,
     eq(p.actor, { kind: actor.kind, role: actor.role, ...(actor.kind === "operator-support" ? { id: actor.id } : {}) }, `${name}: the actor sent:`);
     ok(!("cmsMode" in p), `${name}: no cmsMode prop:`);
   }
+});
+
+await t("the onboarding badge: from onboardingProgress only (never the full model); none while the open state is unreadable, for an open store, or a store without steps", async () => {
+  Object.assign(L, { actor: CASES[0][1], fullModelCalls: 0, progress: null });
+  eq([(await Layout({ children: null })).props.badges.onboarding, L.fullModelCalls], ["2/4", 0], "closed: the badge, and onboardingFor never called:");
+  for (const [label, progress] of [
+    ["open state unreadable", { supported: true, open: false, openKnown: false, doneCount: 2, total: 4 }],
+    ["open", { supported: true, open: true, openKnown: true, doneCount: 4, total: 4 }],
+    ["no steps (_default or the old editor)", { supported: false, open: false, openKnown: true, doneCount: 0, total: 4 }],
+  ]) {
+    L.progress = progress;
+    eq(["onboarding" in (await Layout({ children: null })).props.badges, L.fullModelCalls], [false, 0], `${label}:`);
+  }
+  delete L.fullModelCalls;
+  delete L.progress;
 });
 
 await t("no caller: the layout redirects to the sign-in page", async () => {

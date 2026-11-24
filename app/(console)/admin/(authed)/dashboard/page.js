@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { salesRollup, freshness, coverage, discrepancies, dayInTz } from "@/lib/reporting";
 import { listContactMessages } from "@/lib/notifications";
-import { onboardingFor } from "@/lib/onboarding/service";
+import { onboardingProgress } from "@/lib/onboarding/service";
 import { catalogSyncStatus } from "@/lib/sync";
 import { roleAllows } from "@/lib/platform/authz";
 import SyncProgress from "@/components/admin/SyncProgress";
@@ -39,8 +39,9 @@ const ago = (iso) => {
 const RANGES = [7, 30, 90];
 
 // Phase 1 line 3: while the store is closed, the one setup nudge is
-// "Onboarding: n/4 done" (the four-step page). An open store, the _default
-// store, or a read that fails shows none.
+// "Onboarding: n/4 done" (the four-step page; onboardingProgress, the light
+// read). An open store, the _default or an old-editor store, a store whose
+// open state can't be read, or a read that fails shows none.
 export default async function AdminDashboardPage({ searchParams }) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
@@ -56,7 +57,7 @@ export default async function AdminDashboardPage({ searchParams }) {
       coverage({ days }),
       discrepancies(),
       listContactMessages({ limit: 50 }),
-      onboardingFor(actor).catch(() => ({ supported: false })),
+      onboardingProgress().catch(() => ({ supported: false })),
       catalogSyncStatus().catch(() => null),
     ]),
   );
@@ -85,7 +86,7 @@ export default async function AdminDashboardPage({ searchParams }) {
     ...(inbox.filter((m) => m.notify_status === "failed").length
       ? [{ label: `${inbox.filter((m) => m.notify_status === "failed").length} contact message(s) failed to reach your inbox email`, hint: "Set a support email in Settings", href: "/admin/integrations", tone: "warning" }]
       : []),
-    ...(onboarding.supported && !onboarding.open
+    ...(onboarding.supported && onboarding.openKnown && !onboarding.open
       ? [{ label: `Onboarding: ${onboarding.doneCount}/${onboarding.total} done`, hint: "Get your store ready to open", href: "/admin/onboarding", tone: "neutral" }]
       : []),
   ];

@@ -19,7 +19,8 @@ import Onboarding from "@/components/admin/onboarding/Onboarding";
 // shown disabled with the reason (the model's actions carry it).
 //   ?step=<connect|import|brand|open>  opens on that step; anything else is
 //   ignored and the page opens on the first step not done.
-// The _default store (environment config) gets the card and one sentence.
+// The _default store (environment config) and a store still on the old editor
+// get the card and one sentence (the model's words, else DEFAULT_STORE_WORDS).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Onboarding · Admin", robots: { index: false } };
@@ -48,7 +49,7 @@ export default async function OnboardingPage({ searchParams }) {
         {welcome}
         <div className="space-y-3 border-t border-border pt-6">
           <p data-onboarding="default-store" className="text-sm text-foreground">
-            {DEFAULT_STORE_WORDS}
+            {model.words || DEFAULT_STORE_WORDS}
           </p>
           <p className="text-sm">
             <Link href="/admin/dashboard" className="font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">

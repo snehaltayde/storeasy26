@@ -1052,24 +1052,29 @@ Navigation: **Dashboard · Setup · Analytics · Offers · Orders · Storefront 
   `components/platform/ProvisionRunsPanel.js`, migration
   `migrations/platform/0006_provision_runs.sql`.
 
-#### Setup tab & onboarding (S41 / MC02 + MC03)
-- **What**: `/admin/setup` — the merchant's path to launch: connect →
-  catalog → theme/brand → legal pages → billing → domain → preview → test
-  order → launch. Resumable by construction: the first six DERIVE from real
-  state (token present, product count, brand/theme set, privacy+terms pages
-  enabled, billing snapshot, a real domain), only the last three are stored
-  check-offs, and **Launch stays gated (server-enforced) until everything
-  above it is done**. The **store switcher** (header dropdown, MC03) appears
-  when the signed-in user has VERIFIED memberships in 2+ active stores and
+#### Onboarding & store switcher (S41 / MC02 + MC03, Phase 1 line 3)
+- **What**: `/admin/onboarding` — four steps from a new store to an open
+  one: Connect Shopify → Import products → Brand → Open your store. Nothing
+  is stored about which step a founder is on: every step is DERIVED from real
+  state on each read (Shopify keys or a complete sync, sync runs and product
+  count, the brand step and `doc_home`, a live release and the opening
+  report). The only stored check-off is the test order. A store opens only
+  through the editor's Publish. `/admin` sends a closed store here and an
+  open one to the dashboard; the nav shows "n/4" on Onboarding while the
+  store is closed (`onboardingProgress()`, the light read). `?step=<id>`
+  opens a step. The **store switcher** (header dropdown, MC03) appears when
+  the signed-in user has VERIFIED memberships in 2+ active stores and
   navigates to each store's own console host — sessions stay tenant-bound.
 - **Operator (OP03/OP04)**: each `/platform` tenant row expands into a
   detail view — config summary, credentials as a PRESENCE map (values never
   leave the envelope), billing snapshot, onboarding progress, provisioning
   history; the Provisioning-runs panel carries Resume/Roll-back for failed
   runs.
-- **Files**: [lib/admin/onboarding.js](../lib/admin/onboarding.js),
-  `app/admin/setup/`, `app/api/admin/setup/`, `app/api/admin/stores/`,
-  `components/admin/SetupAdmin.js`, `components/admin/shell/StoreSwitcher.js`,
+- **Files**: [lib/onboarding/steps.js](../lib/onboarding/steps.js),
+  [lib/onboarding/service.js](../lib/onboarding/service.js),
+  `app/(console)/admin/(authed)/onboarding/`, `app/api/admin/onboarding/`,
+  `components/admin/onboarding/`, `app/api/admin/stores/`,
+  `components/admin/shell/StoreSwitcher.js`,
   `components/platform/TenantDetail.js`.
 
 #### Shopify OAuth connect
