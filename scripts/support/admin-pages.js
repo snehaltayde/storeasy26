@@ -25,6 +25,7 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "integrations", action: "settings.read" },
   { page: "media", action: "storefront.read" },
   { page: "offers", action: "offers.read" },
+  { page: "onboarding", action: "storefront.read", note: "where a self-serve signup lands (Phase 1 line 1); reads only" },
   { page: "orders", action: "orders.read" },
   { page: "orders/[id]", action: "orders.read", params: { id: "$order" } },
   { page: "releases", action: "storefront.read" },

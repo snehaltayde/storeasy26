@@ -27,6 +27,10 @@ import { AccountMenu } from "./AccountMenu";
 // bar through useConsoleNav(). ConsolePageFrame gives anything else shown on
 // such a route (the error page, the loading skeleton) the menu button and
 // the usual padded page.
+//
+// Onboarding (/admin/onboarding, docs/UI.md "Onboarding"): new UI, so no
+// [data-legacy] region; no sidebar, the top bar without its toggle, and one
+// centred column of at most 640px.
 
 const ConsoleNavContext = createContext(null);
 
@@ -73,11 +77,13 @@ function SkipLink() {
   );
 }
 
-function TopBar({ actor, account, stores, storeName, storeId }) {
+export const isOnboardingRoute = (pathname) => typeof pathname === "string" && (pathname === "/admin/onboarding" || pathname.startsWith("/admin/onboarding/"));
+
+function TopBar({ actor, account, stores, storeName, storeId, toggle = true }) {
   const label = readOnlyLabel(actor);
   return (
     <header data-shell="topbar" className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4 md:px-6">
-      <SidebarTrigger data-shell-control="toggle" aria-label="Show or hide navigation" aria-keyshortcuts="Meta+B Control+B" className="-ml-1" />
+      {toggle && <SidebarTrigger data-shell-control="toggle" aria-label="Show or hide navigation" aria-keyshortcuts="Meta+B Control+B" className="-ml-1" />}
       <StoreSwitcher stores={stores} current={{ id: storeId, name: storeName }} />
       <div className="flex-1" />
       {/* support's standing reminder: a quiet pill, icon-only on phones (the account menu says it in full) */}
@@ -111,6 +117,21 @@ export function AdminShell({ nav, badges = {}, actor, account = null, stores = [
       {children}
     </div>
   );
+
+  if (isOnboardingRoute(pathname)) {
+    return (
+      <TooltipProvider delayDuration={0}>
+        <SidebarProvider defaultOpen={false} cookiePath="/admin" className="flex-col bg-background text-sm text-foreground">
+          <SkipLink />
+          <TopBar actor={actor} account={account} stores={stores} storeName={storeName} storeId={storeId} toggle={false} />
+          <main id="console-content" tabIndex={-1} data-shell="onboarding" className="mx-auto w-full max-w-[640px] px-4 py-8 outline-none md:px-6">
+            {notices && <div className="mb-6">{notices}</div>}
+            {children}
+          </main>
+        </SidebarProvider>
+      </TooltipProvider>
+    );
+  }
 
   if (editor) {
     return (

@@ -14,10 +14,16 @@ export const metadata = { title: "Pricing" };
 const inr = (paise) => (paise === 0 ? "Free" : `₹${(paise / 100).toLocaleString("en-IN")}`);
 
 export default async function PricingPage() {
-  if (!isPlatformSiteHost((await headers()).get("host"))) notFound();
+  const host = (await headers()).get("host");
+  if (!isPlatformSiteHost(host)) notFound();
 
   let plans = [];
+  // Phase 1 line 1: "Get started" opens self-serve signup while it is open
+  // (the ff_self-signup kill switch), else it stays the contact form.
+  let getStarted = "/contact";
   if (platformConfigured()) {
+    const S = await import("@/lib/platform/signup.js");
+    if (!(await S.signupClosedAnswer(host).catch(() => true))) getStarted = "/signup";
     const B = await import("@/lib/platform/billing.js");
     await B.ensureDefaultPlans();
     plans = await B.listPlans();
@@ -50,7 +56,7 @@ export default async function PricingPage() {
                 <span className="text-lime-600">✓</span>every platform feature — plans differ by limits, not by held-back basics
               </li>
             </ul>
-            <Link href="/contact" className="mt-6 block rounded-xl bg-zinc-900 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-zinc-800">
+            <Link href={getStarted} className="mt-6 block rounded-xl bg-zinc-900 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-zinc-800">
               Get started
             </Link>
           </div>

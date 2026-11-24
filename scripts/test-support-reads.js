@@ -580,7 +580,9 @@ await t("page sweep: every console page runs as support (a page, a redirect or a
 await t("page sweep (S1, S2): no prop on any console page holds a canary for support", () => {
   const bad = [];
   for (const [page, run] of Object.entries(pageRuns)) {
-    const found = leaks(run.text, { skip: skipFor("support") });
+    // support's own email is its own (the onboarding page names the signed-in
+    // member); every other member's email still counts
+    const found = leaks(run.text.replaceAll(users.support.email, ""), { skip: skipFor("support") });
     if (found.length) bad.push(`${page}: ${found.join(", ")}`);
   }
   eq(bad.join("\n"), "", "");
@@ -599,6 +601,20 @@ await t("S2 pages: Settings, Integrations and Automations show support and staff
       eq(found.join(","), "", `${role} ${page} canaries:`);
     }
   }
+});
+
+await t("onboarding (Phase 1 line 1): support reads the Welcome page with its own email only; an operator's support session gets no account", async () => {
+  const welcome = (run) => run.props.find((p) => p.component.endsWith("onboarding/Welcome") || p.component.includes("Welcome"))?.props;
+  const s = welcome(pageRuns.onboarding);
+  ok(s, `support's onboarding renders Welcome: ${pageRuns.onboarding.props.map((p) => p.component).join(",")}`);
+  eq(s.address, a.tenant.domains[0], "the store's address:");
+  ok(typeof s.storeName === "string" && s.storeName.length > 0, "the store's name");
+  eq(s.account?.email, users.support.email, "support sees only its own email:");
+  for (const role of ["owner", "admin", "staff"]) ok(!pageRuns.onboarding.text.includes(users[role].email), `no ${role} email in support's props`);
+  eq(Object.keys(s).sort().join(","), "account,address,open,storeName", "Welcome's props:");
+  const op = await pages.run(pageRel("onboarding"), { cookies: cookies["operator-support"] });
+  ok(!op.error, `operator support: ${op.error?.message}`);
+  eq(welcome(op)?.account, null, "an operator's support session has no account on the page:");
 });
 
 await t("page sweep (positive control): the owner's Settings and Orders pages do carry their canaries", async () => {
