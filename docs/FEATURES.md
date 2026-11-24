@@ -31,7 +31,7 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 
 ## Phase 1: simple onboarding
 
-- [ ] A founder can sign up on their own with name, email and password, verify the email, and land in their new (closed) store's console; a local file database stands in for Turso
+- [x] A founder can sign up on their own with name, email and password, verify the email, and land in their new (closed) store's console; a local file database stands in for Turso (`test:signup`, `pnpm drill:signup`; off until an operator turns on `ff_self-signup`)
 - [ ] Signup creates the store's Turso database for real (provisioning runs as a job; a failed step is retried or reported in plain words)
 - [ ] A founder sees one onboarding page with four steps (Connect Shopify, Import products, Brand, Open your store), each showing done, in progress or blocked, and it resumes where they left off; it replaces the start page and setup checklist
 - [ ] A founder can connect their Shopify store from step 1 through OAuth, with a stand-in Shopify for tests first
@@ -110,7 +110,8 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - The checkout client's fallback idempotency key (`components/checkout/CheckoutFlow.js` ~134) uses `Math.random`; use `crypto.randomUUID()`.
 - Preview tokens in `lib/releases.js` still fall back to `"dev-only-secret"`; make them fail closed in production like order links.
 - `/api/track` accepts any `transaction_id` as a purchase order id (analytics integrity).
-- **Known flake:** in drill runs the console sign-in page sometimes fails to load right after a harness restart (a 404 "1 Issue" page, or `#login-email` never appearing); seen in about 1 run in 4, never twice in a row. Find the cause before relying on drills as a merge gate.
+- **Known flake:** in drill runs the console sign-in page sometimes fails to load right after a harness restart (a 404 "1 Issue" page, or `#login-email` never appearing); seen in about 1 run in 4, never twice in a row (latest: p5 `disabled`, 2026-11-24, passed on rerun). Find the cause before relying on drills as a merge gate.
+- A signup that failed or stalled keeps its store address for good, even after it lapses; free the address once the signup can no longer finish.
 - **Needs an owner decision:** anyone can make a store email one quiz-picks message to any address (an email relay for spam). Options: a per-address daily cap, double opt-in, or only emailing signed-in shoppers. (Phase 0 audit, open gap 1.)
 - Sign-in takes a different time for an unknown email than for a wrong password, so timing reveals who is a member; make both paths do the same work. (Phase 0 audit, open gap 2.)
 - The collectors (`/api/track`, `/api/exp`, `/api/errors`), `/api/shopify/webhooks` and the 23 public storefront pages have library tests and the browser pass but no route-level least-trusted suite. (Phase 0 audit, open gap 4.)
