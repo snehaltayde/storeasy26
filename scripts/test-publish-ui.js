@@ -1516,24 +1516,25 @@ await t("P6-OPEN-UI rendered (OQ-P6-1/2): missing policies block Open with 'Star
   eq([sent.op, sent.args.map((x) => x.id), sent.extra], ["publishSet", ["doc_home", PRIV.id], { checkOpening: true, confirmOpen: true }], "the privacy page goes with the store:");
 });
 
-await t("P6-OPEN-UI rendered: 'Check again' re-reads the report; 'I placed one' POSTs the test order check-off (Setup's route) and re-reads", async () => {
+await t("P6-OPEN-UI rendered: 'Check again' re-reads the report; 'I placed one' POSTs the test order check-off (the onboarding route) and re-reads", async () => {
   let n = 0;
   const call = stub({ openingChecks: () => reportOf(n++ < 2 ? [I.paymentOk, I.privacyOk, I.returnsOk, I.testOrderWarn] : [I.paymentOk, I.privacyOk, I.returnsOk, I.testOrderOk], [HOME]), listChanges: firstPubAll() });
-  const fetch = fetchSpy({ [M.SETUP_URL]: () => [200, { ok: true, items: [] }] });
+  eq(M.ONBOARDING_URL, "/api/admin/onboarding", "the route:");
+  const fetch = fetchSpy({ [M.ONBOARDING_URL]: () => [200, { ok: true, steps: [] }] });
   const flow = M.createPublishFlow({ call, fetch });
   await flow.open([HOME]);
   await flow.act({ type: "checkAgain" });
   eq(call.ops().filter((o) => o === "openingChecks").length, 2, "Check again read it again:");
   ok(textOf(renderPanel(flow)).includes(M.WORDS.placedOne), "'I placed one' on the test order");
   await flow.act({ type: "placedTestOrder" });
-  eq(fetch.sent, [{ url: "/api/admin/setup", method: "POST", json: { step: "test_order" } }], "the manual check-off:");
+  eq(fetch.sent, [{ url: "/api/admin/onboarding", method: "POST", json: { step: "test_order" } }], "the manual check-off:");
   eq(call.ops().filter((o) => o === "openingChecks").length, 3, "then read again:");
   const text = plain(renderPanel(flow), "after test order");
   ok(text.includes(M.WORDS.testOrderMarked) && !text.includes(M.WORDS.placedOne), text);
   eq(buttonOf(renderPanel(flow), "Open my store")?.disabled, false, "nothing left to check: 'Open my store':");
   // a failed check-off leaves the panel as it was
   const call2 = stub({ openingChecks: reportOf([I.paymentOk, I.testOrderWarn], [HOME]), listChanges: firstPubAll() });
-  const flow2 = M.createPublishFlow({ call: call2, fetch: fetchSpy({ [M.SETUP_URL]: () => [422, { error: 'launch is gated — still open: x' }] }) });
+  const flow2 = M.createPublishFlow({ call: call2, fetch: fetchSpy({ [M.ONBOARDING_URL]: () => [422, { error: 'launch is gated — still open: x' }] }) });
   await flow2.open([HOME]);
   await flow2.act({ type: "placedTestOrder" });
   const t2 = plain(renderPanel(flow2), "check-off failed");

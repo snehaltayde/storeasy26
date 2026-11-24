@@ -9,6 +9,8 @@ import { KeyValue, SkeletonText, ErrorState } from "@/components/console/bits";
 // secrets as a PRESENCE map (values never leave the encrypted envelope),
 // billing snapshot, onboarding progress, provisioning history — inline
 // under the registry row.
+const STEP_STATE_WORDS = { done: "done", in_progress: "in progress", ready: "to do", blocked: "blocked" };
+
 export default function TenantDetail({ id }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
@@ -78,18 +80,18 @@ export default function TenantDetail({ id }) {
           <div className="mt-1.5 text-fg-muted">
             <span className="inline-flex items-center gap-2">
               {data.onboarding.doneCount}/{data.onboarding.total}
-              {data.onboarding.launched && (
+              {data.onboarding.open && (
                 <Badge tone="success">
                   <Rocket size={11} aria-hidden />
-                  Launched
+                  Open
                 </Badge>
               )}
             </span>
             <span className="mt-1.5 flex flex-wrap gap-1">
-              {data.onboarding.items.map((i) => (
-                <Badge key={i.id} tone={i.done ? "success" : "neutral"} title={i.done ? `${i.id}: done` : `${i.id}: pending`}>
-                  {i.done && <Check size={11} aria-hidden />}
-                  {i.id}
+              {data.onboarding.steps.map((s) => (
+                <Badge key={s.id} tone={s.state === "done" ? "success" : s.state === "blocked" ? "warning" : "neutral"} title={`${s.label}: ${STEP_STATE_WORDS[s.state] || s.state}`} data-step={s.id} data-state={s.state}>
+                  {s.state === "done" && <Check size={11} aria-hidden />}
+                  {s.label}
                 </Badge>
               ))}
             </span>

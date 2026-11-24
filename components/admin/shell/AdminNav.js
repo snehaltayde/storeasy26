@@ -13,7 +13,6 @@ import {
   Lightbulb,
   ListChecks,
   Package,
-  Palette,
   Plug,
   Rocket,
   Settings,
@@ -40,11 +39,10 @@ import { activeItem, navItems } from "@/lib/admin/nav";
 const ICONS = {
   dashboard: LayoutDashboard,
   analytics: ChartNoAxesColumn,
-  setup: ListChecks,
+  onboarding: ListChecks,
   orders: ShoppingCart,
   catalog: Package,
   editor: Brush,
-  start: Palette,
   media: ImageIcon,
   releases: Rocket,
   offers: BadgePercent,
@@ -87,7 +85,7 @@ const badgeWords = (item, value) => {
   if (value == null || value === "") return "";
   if (item.badgeKey === "publish") return ", unpublished changes";
   if (item.badgeKey === "returns") return `, ${value} open return${Number(value) === 1 ? "" : "s"}`;
-  if (item.badgeKey === "setup") return `, ${value} steps done`;
+  if (item.badgeKey === "onboarding") return `, ${value} steps done`;
   return "";
 };
 

@@ -73,7 +73,7 @@ const { withTenant } = await import("../lib/tenant-context.js");
 const { libsql, db } = await import("../lib/db.js");
 const P = await import("../lib/platform/provision.js");
 const B = await import("../lib/platform/billing.js");
-const { buildChecklist, markManualStep } = await import("../lib/admin/onboarding.js");
+const { onboardingFor, markTestOrder } = await import("../lib/onboarding/service.js");
 const { createUser, addMembership } = await import("../lib/platform/identity.js");
 const { loadMigrations, runMigrations } = await import("../lib/platform/migrate.js");
 
@@ -180,39 +180,36 @@ await t("compensating a DONE run is refused (offboarding is a different, deliber
   }
 });
 
-console.log("— MC02: onboarding checklist");
+console.log("— MC02 / Phase 1 line 3: onboarding steps");
 
-await t("checklist derives from real state and resumes honestly", async () => {
+await t("the onboarding steps derive from real state and resume honestly (nothing stored)", async () => {
   const acme = await C.getTenant("acme");
-  let list = await withTenant(acme, buildChecklist);
-  const get = (id) => list.items.find((i) => i.id === id);
-  eq(get("connect").done, false, "no shopify token yet:");
-  eq(get("catalog").done, false);
-  eq(get("billing").done, true, "free plan counts (explicit activation):");
-  eq(get("domain").done, true, "shop.acme.in is a real host:");
-  eq(get("launch").done, false, "launch not done before first publish:");
-  // state lands → checklist flips, no stored flags involved
+  let m = await withTenant(acme, () => onboardingFor({ role: "owner" }));
+  const get = (id) => m.steps.find((i) => i.id === id);
+  eq(get("connect").state, "in_progress", "a shop domain recorded, no shopify token yet (an operator finishes it):");
+  eq(get("import").state, "blocked", "import waits for connect:");
+  eq(JSON.stringify([get("open").state === "done", m.open]), "[false,false]", "not open before the first publish:");
+  eq(m.current, "connect", "resumes at connect:");
+  // state lands → the steps flip, no stored flags involved
   await C.patchTenant("acme", { secrets: { shopify_admin_token: "shpat_test" } });
   await withTenant(await C.getTenant("acme"), async () => {
     await libsql.execute("INSERT INTO products (id, handle, title, available) VALUES ('gid://p/1','x','X',1)");
   });
-  list = await withTenant(await C.getTenant("acme"), buildChecklist);
-  for (const id of ["connect", "catalog"]) eq(list.items.find((i) => i.id === id).done, true, `${id} derived:`);
+  m = await withTenant(await C.getTenant("acme"), () => onboardingFor({ role: "owner" }));
+  for (const id of ["connect", "import"]) eq(m.steps.find((i) => i.id === id).state, "done", `${id} derived:`);
+  eq(m.current, "brand", "resumes at brand:");
 });
 
-await t("manual steps record cleanly and unknown steps are refused", async () => {
-  await withTenant(await C.getTenant("acme"), () => markManualStep("preview"));
-  await withTenant(await C.getTenant("acme"), () => markManualStep("test_order"));
-  const list = await withTenant(await C.getTenant("acme"), buildChecklist);
-  eq(list.items.find((i) => i.id === "preview").done, true);
-  eq(list.items.find((i) => i.id === "test_order").done, true);
-  // unknown steps refused
-  try {
-    await withTenant(await C.getTenant("acme"), () => markManualStep("connect"));
-    throw new Error("expected refusal");
-  } catch (e) {
-    ok(/isn't a manual/.test(e.message), e.message);
-  }
+await t("the test-order check-off records cleanly and is the only stored one (preview and launch check-offs are not read)", async () => {
+  await C.patchTenant("acme", { config: { onboarding: { ...((await C.getTenant("acme", { fresh: true })).config.onboarding || {}), manual: { preview: "2026-01-01T00:00:00.000Z", launch: "2026-01-01T00:00:00.000Z" } } } });
+  let m = await withTenant(await C.getTenant("acme", { fresh: true }), () => onboardingFor({ role: "owner" }));
+  eq(JSON.stringify([m.open, m.steps.find((i) => i.id === "open").state === "done", m.steps.find((i) => i.id === "open").facts.testOrderMarked]), "[false,false,false]", "old check-offs open nothing:");
+  const r = await withTenant(await C.getTenant("acme", { fresh: true }), () => markTestOrder(true));
+  eq(JSON.stringify([r.step, r.done]), '["test_order",true]', "marked:");
+  m = await withTenant(await C.getTenant("acme", { fresh: true }), () => onboardingFor({ role: "owner" }));
+  eq(m.steps.find((i) => i.id === "open").facts.testOrderMarked, true, "read back:");
+  const manual = (await C.getTenant("acme", { fresh: true })).config.onboarding.manual;
+  ok(manual.test_order && manual.preview && manual.launch, `old values left in place: ${JSON.stringify(manual)}`);
 });
 
 console.log("— MC03: store switcher (verified memberships)");
@@ -244,7 +241,8 @@ const K = await import("../lib/themes/kits.js");
 const S = await import("../lib/platform/sessions.js");
 const { getCmsMode, DOCUMENTS_MESSAGE } = await import("../lib/cms-mode.js");
 const { handleDocumentsPut } = await import("../lib/admin/documents-api.js");
-const ON = await import("../lib/admin/onboarding.js");
+const ON = await import("../lib/onboarding/service.js");
+const OS = await import("../lib/onboarding/steps.js");
 const E = await import("../lib/admin/editor-entry.js");
 const { createCart, addItem, getCart, CART_COOKIE } = await import("../lib/cart.js");
 const checkoutRoute = await import("../app/api/checkout/route.js");
@@ -510,62 +508,39 @@ await t("unit: on the closed new store an anonymous checkout is refused (403 STO
 });
 
 const FORBIDDEN_HREF = (h) => /^\/admin\/(theme|catalog|home|upsells)(?:[/?#]|$)/.test(h) || /^\/admin\/storefront(?:[?#]|$)/.test(h);
-const CONSOLE_PAGES = { "/admin/integrations": "integrations", "/admin/settings": "settings", "/admin/billing": "billing", "/admin/start": "start" };
+const CONSOLE_PAGES = { "/admin/integrations": "integrations", "/admin/settings": "settings", "/admin/billing": "billing", "/admin/onboarding": "onboarding" };
 async function hrefWorks(h) {
   if (h === "/admin/editor" || h.startsWith("/admin/editor?")) return access(join(ROOT, "app/(console)/admin/(authed)/editor/page.js")).then(() => true, () => false);
   const path = h.split(/[?#]/)[0];
   if (!CONSOLE_PAGES[path]) return false;
   return access(join(ROOT, `app/(console)/admin/(authed)/${CONSOLE_PAGES[path]}/page.js`)).then(() => true, () => false);
 }
-const checklist = () => inF(() => ON.buildChecklist());
-const stepOf = (list, id) => list.items.find((i) => i.id === id);
+const onboarding = () => inF(() => ON.onboardingFor({ role: "owner" }));
+const stepOf = (m, id) => m.steps.find((i) => i.id === id);
 
-await t("unit (ED05 review, pinned): a closed documents store builds the onboarding checklist with editor links; every step's href is an editor or working console destination, never /admin/theme, /admin/catalog, /admin/home, /admin/upsells or a bare /admin/storefront", async () => {
-  const list = await checklist();
-  eq(list.supported, true);
-  // P6-ONBOARD: 'start' comes first on a documents store
-  same(list.items.map((i) => i.id), ["start", "connect", "catalog", "brand", "policies", "billing", "domain", "preview", "test_order", "launch"], "steps:");
-  for (const i of list.items) {
+await t("unit (ED05 review, pinned; Phase 1 line 3): a closed documents store's onboarding has the four steps; every link in the Open step (the opening report's items) is an editor or working console destination, never /admin/theme, /admin/catalog, /admin/home, /admin/upsells or a bare /admin/storefront; the test order goes through the preview; a check-off can't open the store", async () => {
+  const m = await onboarding();
+  eq(m.supported, true);
+  same(m.steps.map((i) => i.id), OS.STEP_IDS, "steps:");
+  const open = stepOf(m, "open");
+  ok(open.facts.items.length > 0, "the opening report's items");
+  for (const i of open.facts.items) {
+    if (!i.href) continue;
     ok(!FORBIDDEN_HREF(i.href), `${i.id} links to ${i.href}`);
     ok(await hrefWorks(i.href), `${i.id}: ${i.href} is not an editor or working console destination`);
-    for (const a of i.actions || []) if (a.href) ok(await hrefWorks(a.href), `${i.id} action ${a.label}: ${a.href}`);
   }
-  same(
-    Object.fromEntries(list.items.map((i) => [i.id, i.href])),
-    {
-      start: "/admin/start",
-      connect: "/admin/integrations",
-      catalog: "/admin/settings#catalog-sync",
-      brand: "/admin/start",
-      policies: E.PAGES_LIST_HREF,
-      billing: "/admin/billing",
-      domain: "/admin/settings",
-      preview: E.EDITOR_PATH,
-      test_order: E.EDITOR_PATH,
-      launch: E.EDITOR_PUBLISH_HREF,
-    },
-    "hrefs:",
-  );
-  eq(stepOf(list, "brand").done, false, "no published design yet:");
-  eq(stepOf(list, "policies").done, false, "no published pages:");
-  eq(stepOf(list, "billing").done, true, "the free plan:");
-  eq(stepOf(list, "catalog").done, true, "the catalog step reads products as on any store:");
-  eq(stepOf(list, "test_order").hint, ON.TEST_ORDER_CLOSED_HINT, "the test order goes through the preview:");
-  const launch = stepOf(list, "launch");
-  same([launch.done, launch.gated, launch.kind], [false, false, "auto"], "launch before the first publish:");
-  ok(/private until your first publish/.test(launch.hint) && /Publishing from the editor opens it/.test(launch.hint), launch.hint);
-  same([list.launched, list.launchedAt], [false, null], "not launched:");
-  // a check-off can't claim a launch on the new editor: the publish is the launch
-  let refused = null;
-  try {
-    await inF(() => markManualStep("launch"));
-  } catch (e) {
-    refused = e.message;
-  }
-  ok(/opens when you publish from the editor/.test(refused || ""), `refused: ${refused}`);
-  const mp = await inF(() => markManualStep("preview"));
-  eq(mp.done, true, "the other check-offs still work:");
-  eq(stepOf(await checklist(), "preview").done, true, "preview checked off:");
+  eq(stepOf(m, "brand").state === "done", false, "no home page or brand yet:");
+  eq(stepOf(m, "import").state, "done", "the import step reads products as on any store:");
+  // the preview COD test order above was placed while the store was closed, so the item is ok;
+  // before it, the item sent the founder to the preview (TEST_ORDER_CLOSED_HINT, test-open-checks)
+  const order = open.facts.items.find((i) => i.id === "test_order");
+  same([order.level, order.href], ["ok", null], "the closed-store test order counts:");
+  same([open.state === "done", m.open], [false, false], "not open before the first publish:");
+  ok(/Before your store can open/.test(open.words) || open.state === "ready", open.words);
+  // a check-off can't claim the store is open: only the test order is stored, and it opens nothing
+  await inF(() => ON.markTestOrder(true));
+  const after = await withTenant(await C.getTenant("fresh", { fresh: true }), () => ON.onboardingFor({ role: "owner" }));
+  same([after.open, stepOf(after, "open").facts.testOrderMarked, stepOf(after, "open").facts.items.find((i) => i.id === "test_order").level], [false, true, "ok"], "test order checked off, store still closed:");
 });
 
 await t("unit: theme apply saves only the doc_design draft; saving doc_design through the documents API works", async () => {
@@ -586,7 +561,7 @@ await t("unit: theme apply saves only the doc_design draft; saving doc_design th
   eq(await asRequest(() => inF(() => Res.isStoreClosed())), true, "saving opens nothing:");
 });
 
-await t("unit: the founder publishes a first home page (open doc_home, save a section, publish): the store opens, resolvedHomePage shows the section from a live content.v 4 release, and the checklist reads Launch done from the live state", async () => {
+await t("unit: the founder publishes a first home page (open doc_home, save a section, publish): the store opens, resolvedHomePage shows the section from a live content.v 4 release, and onboarding reads every step done from the live state", async () => {
   const made = await api({ createDocument: { type: "home" } });
   eq(made.status, 200, `create home: ${JSON.stringify(made.body).slice(0, 300)}`);
   const home = await doc("doc_home");
@@ -622,15 +597,13 @@ await t("unit: the founder publishes a first home page (open doc_home, save a se
   ok(JSON.stringify(page).includes("Our first words") && JSON.stringify(page).includes("sec_first"), `resolvedHomePage: ${JSON.stringify(page).slice(0, 300)}`);
   const map = await asRequest(() => inF(() => sitemap()));
   ok(map.length > 1, "the sitemap lists more than the front door once open:");
-  const list = await checklist();
-  const launch = stepOf(list, "launch");
-  same([launch.done, launch.hint, list.launched], [true, ON.LAUNCH_HINTS.open, true], "launch done from the live state:");
-  ok(list.launchedAt, "launchedAt (the first release):");
-  same([stepOf(list, "test_order").href, stepOf(list, "test_order").hint], ["/checkout", "One COD test order end-to-end (cancel it after)."], "an open store's checkout:");
-  eq(stepOf(list, "brand").done, true, "the design opened with the store:");
+  const m = await onboarding();
+  same([m.open, m.current, m.doneCount, m.steps.map((s) => s.state)], [true, "open", 4, ["done", "done", "done", "done"]], "every step done from the live state:");
+  same([stepOf(m, "open").words, stepOf(m, "open").facts.items], [OS.WORDS.open.done, []], "an open store has nothing left to open:");
+  eq(stepOf(m, "brand").state, "done", "the design opened with the store:");
 });
 
-await t("unit: a later doc_design publish writes theme_pin (setThemePinWriter spy) and completes the design step", async () => {
+await t("unit: a later doc_design publish writes theme_pin (setThemePinWriter spy); the Brand step stays done", async () => {
   // the design went live with the first publish (P6-OPEN rule b); the founder
   // changes it again and publishes that on the open store
   const d = await doc("doc_design");
@@ -653,27 +626,27 @@ await t("unit: a later doc_design publish writes theme_pin (setThemePinWriter sp
   eq(calls[0][0], "fresh", "for this store:");
   eq(calls[0][1]?.kit, "glow", `the published look: ${JSON.stringify(calls[0][1])}`);
   ok(calls[0][1]?.release, "the pin names the live release:");
-  // P6-ONBOARD: an open store's design step links /admin/start too (the logo is changed there)
-  const step = stepOf(await checklist(), "brand");
-  same([step.done, step.href, step.hint], [true, ON.START_HREF, ON.BRAND_HINTS.open], "design step:");
-  ok(!/then publish it/.test(step.hint), step.hint);
+  // Phase 1 line 3: an open store's Brand step is done and still offers its controls (the logo is changed there)
+  const step = stepOf(await onboarding(), "brand");
+  same([step.state, step.words], ["done", OS.WORDS.brand.done], "brand step:");
+  ok(step.actions.some((a) => a.id === "brand_save" && a.allowed), "the brand controls stay for the owner");
+  ok(!/then publish it/.test(step.words), step.words);
 });
 
-await t("unit (ED05 review, pinned): the legal-pages step counts only published PAGE documents: published campaigns and a journal post named privacy and terms don't count; published privacy and terms pages do", async () => {
+await t("unit (ED05 review, pinned; Phase 1 line 3): the published page list holds campaigns (only the family filter keeps them out); an open store's onboarding stays all done whatever legal pages come and go (opening is checked before the first publish only)", async () => {
   await makeAndPublish("campaign", "privacy-week", "Privacy week sale");
   await makeAndPublish("campaign", "terms-and-returns-week", "Returns week");
   await makeAndPublish("journal", "terms-explained", "Terms explained");
   const listed = await asRequest(() => inF(() => Res.resolvedContentPageList()));
   same(listed.map((p) => [p.slug, p.family, p.enabled]), [["privacy-week", "campaign", true], ["terms-and-returns-week", "campaign", true]], "the published list holds both campaigns (only the family filter keeps them out; journal posts are not in the list):");
-  eq(stepOf(await checklist(), "policies").done, false, "campaigns and a journal post are not legal pages:");
-  // a draft is not enough
+  const allDone = async (label) => same((await onboarding()).steps.map((s) => s.state), ["done", "done", "done", "done"], label);
+  await allDone("campaigns and a journal post:");
   const priv = await api({ createDocument: { type: "page", body: routeBody("page", "privacy", "Privacy", [sec("text", "sec_priv", { title: "Privacy", body: ["We keep little."] })]) } });
   eq(priv.status, 200);
-  eq(stepOf(await checklist(), "policies").done, false, "a draft privacy page:");
+  await allDone("a draft privacy page:");
   eq((await publishOne(priv.body.document.id)).status, 200, "publish privacy:");
-  eq(stepOf(await checklist(), "policies").done, false, "privacy alone:");
   await makeAndPublish("page", "terms", "Terms");
-  eq(stepOf(await checklist(), "policies").done, true, "privacy and terms published:");
+  await allDone("privacy and terms published:");
 });
 
 await t("unit: a --force re-provision of the published documents store keeps it on the new editor with its live release", async () => {
@@ -690,9 +663,10 @@ await t("unit: a --force re-provision of the published documents store keeps it 
 // ---- P6-ONBOARD: the first-run checklist on a documents store ------------------------------
 // GEN-04, PUB-12, US-01, US-41. A closed documents store with an empty
 // catalog ("onb"), its brand step, its policy starters, and the same rule as
-// "Before you open your store" (policyStatus). Then SetupAdmin rendered with
-// a fetch spy (no network): the buttons, the reload and the refusals.
-console.log("— P6-ONBOARD: 'Start your store', the design step and the legal pages on a documents store");
+// "Before you open your store" (policyStatus), read as onboarding's Brand and
+// Open steps (Phase 1 line 3; the SetupAdmin screen is retired, the page's
+// rendered tests come with WP-B).
+console.log("— P6-ONBOARD: the Brand step and the legal pages (Open step) on a documents store");
 const PS6 = await import("../lib/first-run/policy-start.js");
 const BS6 = await import("../lib/first-run/brand-step.js");
 const PP6 = await import("../lib/documents/policy-pages.js");
@@ -703,106 +677,96 @@ const inO = async (fn) => withTenant(await C.getTenant("onb"), fn);
 const onbU = await createUser({ email: "owner@onb.test", name: "Onb Owner", password: "onb-owner-pass-1" });
 await addMembership(onbU.id, "onb", "owner");
 const OACT = { kind: "merchant", id: onbU.id, role: "owner" };
-const olist = () => inO(() => ON.buildChecklist());
-// no step hint on a documents store may send the founder to add or publish a page "in the editor"
+const olist = () => inO(() => ON.onboardingFor({ role: "owner" }));
+// no step's words on a documents store may send the founder to add or publish a page "in the editor"
 const EDITOR_PAGE_HINT = (h) => /in the editor/i.test(h) || /\b(add|publish)\b[^.]*\bpages?\b[^.]*\beditor\b/i.test(h);
-async function checkHintsAndLinks(list, label) {
-  for (const i of list.items) {
-    ok(!EDITOR_PAGE_HINT(i.hint), `${label}: ${i.id} hint sends the founder to the editor for a page: ${i.hint}`);
-    ok(await hrefWorks(i.href), `${label}: ${i.id}: ${i.href} is not a console page`);
-    for (const a of i.actions || []) if (a.type === "link") ok(await hrefWorks(a.href), `${label}: ${i.id} action ${a.label}: ${a.href} is not a console page`);
-  }
+async function checkHintsAndLinks(m, label) {
+  for (const s of m.steps) ok(!EDITOR_PAGE_HINT(s.words), `${label}: ${s.id} words send the founder to the editor for a page: ${s.words}`);
+  for (const i of stepOf(m, "open").facts.items) if (i.href) ok(await hrefWorks(i.href), `${label}: ${i.id}: ${i.href} is not a console page`);
 }
-// PUB-12 and onboarding agree: each kind counts in onboarding exactly when
-// the opening report does not block on it, and the step is done exactly when
-// neither blocks
+// PUB-12 and onboarding agree: each kind counts exactly when the opening
+// report does not block on it, and the Open step is blocked by exactly the
+// report's block items (Phase 1 line 3: the report IS the Open step's facts)
 async function agreesWithOpening(step) {
   const rep = await inO(() => OP6.openingReport());
   eq(rep.opening, true, "the store is closed:");
   const st = await inO(async () => PP6.policyStatus(await PP6.readPolicyRows()));
   const level = (k) => rep.items.find((i) => i.id === k).level;
   for (const k of PP6.POLICY_KINDS) eq(PP6.policyCounts(st[k].state), level(k) !== "block", `${k}: policyStatus ${st[k].state} vs opening ${level(k)}:`);
-  eq(step.done, level("privacy") !== "block" && level("returns") !== "block", "onboarding done vs opening:");
+  const blocks = rep.items.filter((i) => i.level === "block").map((i) => i.id);
+  eq(step.state, blocks.length ? "blocked" : "ready", "onboarding state vs opening:");
+  same((step.facts.blocking || []).map((b) => b.id), blocks, "the same blocking items:");
+  same(step.facts.items, rep.items, "the step shows the report's items:");
 }
+const policyOf = (step, kind) => step.facts.items.find((i) => i.id === kind);
 
-await t("unit (P6-ONBOARD): a closed documents store's checklist starts with 'Start your store' (/admin/start, a real console page); on an empty catalog it is done once the brand step is recorded; with products it is done once doc_home exists", async () => {
+await t("unit (P6-ONBOARD; Phase 1 line 3): the Brand step on a closed documents store: ready with nothing; in progress once the brand step is recorded (skip) with no home page; done once doc_home exists too", async () => {
   same([onbRun.run.status, onbRun.run.refs.contentMode], ["done", "documents"], `onb (${onbRun.error}):`);
-  let list = await olist();
-  const first = list.items[0];
-  same([first.id, first.label, first.kind, first.href, first.done, first.hint], ["start", "Start your store", "auto", "/admin/start", false, ON.START_HINTS.emptyCatalog], "the first step:");
-  ok(await hrefWorks(first.href), "/admin/start is a console page");
-  eq(stepOf(list, "brand").done, false, "brand before the step:");
+  let m = await olist();
+  same([stepOf(m, "brand").state, stepOf(m, "brand").words], ["ready", OS.WORDS.brand.ready], "nothing yet:");
+  ok(await hrefWorks("/admin/onboarding?step=brand"), "/admin/onboarding is a console page");
   await inO(() => BS6.saveBrandStep({ skip: true }, OACT));
-  list = await olist();
-  same([stepOf(list, "start").done, stepOf(list, "brand").done], [true, true], "the brand step skipped on an empty catalog:");
-  // with products and no home page, the step waits for the home page
+  m = await olist();
+  same([stepOf(m, "brand").state, stepOf(m, "brand").facts], ["in_progress", { brandRecorded: true, hasHome: false }], "the brand step skipped, no home page:");
   await inO(() => db.insertInto("products").values({ id: "gid://t/ONB1", handle: "onb-tee", title: "Onb Tee", price_min: 500, price_max: 500, currency: "INR", available: 1, tags: "[]" }).execute());
-  list = await olist();
-  same([stepOf(list, "start").done, stepOf(list, "start").hint], [false, ON.START_HINTS.todo], "products, no home page:");
+  eq(stepOf(await olist(), "brand").state, "in_progress", "products, no home page:");
   await inO(() => Docs.createDocument({ type: "home", actor: OACT }));
-  list = await olist();
-  same([stepOf(list, "start").done, stepOf(list, "start").hint], [true, ON.START_HINTS.done], "doc_home exists:");
-  await checkHintsAndLinks(list, "onb");
+  m = await olist();
+  same([stepOf(m, "brand").state, stepOf(m, "brand").words], ["done", OS.WORDS.brand.done], "doc_home exists:");
+  await checkHintsAndLinks(m, "onb");
 });
 
-await t("unit (P6-ONBOARD): the design step is done after a brand-step skip or save with nothing live, links /admin/start, and its closed-store hint says the colours go live when the store opens (never 'then publish it')", async () => {
-  // a second store: a brand-step SAVE (no skip before it)
+await t("unit (P6-ONBOARD; Phase 1 line 3): a brand-step save with nothing live records the Brand step (in progress until the home page exists), and its words never say 'then publish it'", async () => {
   const r = await P.runProvision(params("onbui"));
   eq(r.run.status, "done", `onbui (${r.error}):`);
-  const inU = async (fn) => withTenant(await C.getTenant("onbui"), fn);
-  const before = stepOf(await inU(() => ON.buildChecklist()), "brand");
-  same([before.done, before.href, before.hint], [false, "/admin/start", ON.BRAND_HINTS.closed], "before:");
+  const inU = async (fn) => withTenant(await C.getTenant("onbui", { fresh: true }), fn);
+  const before = stepOf(await inU(() => ON.onboardingFor({ role: "owner" })), "brand");
+  same([before.state, before.facts.brandRecorded], ["ready", false], "before:");
   const saved = await inU(() => BS6.saveBrandStep({ paletteId: PAL6.DEFAULT_PALETTE_ID }, OACT));
   same([saved.ok, saved.skipped], [true, false], `saved: ${JSON.stringify(saved).slice(0, 200)}`);
   eq(await asRequest(() => inU(() => Res.isStoreClosed())), true, "nothing live:");
-  const after = stepOf(await inU(() => ON.buildChecklist()), "brand");
-  same([after.done, after.href, after.hint], [true, "/admin/start", "Pick your colours and logo. They go live when you open your store."], "after a save:");
-  ok(!/then publish it/.test(after.hint), after.hint);
-  // the skipped store (test above) too
-  const skipped = stepOf(await olist(), "brand");
-  same([skipped.done, skipped.href, skipped.hint], [true, "/admin/start", ON.BRAND_HINTS.closed], "after a skip:");
+  const after = stepOf(await inU(() => ON.onboardingFor({ role: "owner" })), "brand");
+  same([after.state, after.facts.brandRecorded, after.words], ["in_progress", true, OS.WORDS.brand.in_progress], "after a save:");
+  ok(!/then publish it/.test(after.words), after.words);
+  // the skipped store (test above) is done: it has its home page
+  eq(stepOf(await olist(), "brand").state, "done", "after a skip and a home page:");
 });
 
 let starterPrivacy = null;
-await t("unit (P6-ONBOARD, PUB-12 review rule): on a closed documents store the legal-pages step is 'Add your legal pages' with two start buttons; a starter draft does not count and offers 'Read your privacy page' and 'I've read it'; I've read it (body unchanged) counts it; a founder-saved terms draft finishes the step; opening and onboarding agree at every stage", async () => {
-  let step = stepOf(await olist(), "policies");
-  same([step.label, step.done, step.href, step.hint], ["Add your legal pages", false, E.PAGES_LIST_HREF, ON.POLICY_HINTS.missing], "no pages:");
-  eq(step.hint, "Your store can't open without a privacy page and a returns page. Start each from a template, then read it and save it.", "the words:");
-  same(step.actions, [
-    { type: "startPolicy", kind: "privacy", label: "Start a privacy page" },
-    { type: "startPolicy", kind: "returns", label: "Start a returns page" },
+await t("unit (P6-ONBOARD, PUB-12 review rule; Phase 1 line 3): on a closed documents store the Open step is blocked by the privacy and returns pages with two start buttons; a starter draft still blocks and offers 'Read it' and 'I've read it'; I've read it (body unchanged) counts it; a founder-saved terms draft unblocks; opening and onboarding agree at every stage", async () => {
+  let step = stepOf(await olist(), "open");
+  eq(step.state, "blocked", "no pages:");
+  same(step.facts.blocking.map((b) => b.id), ["privacy", "returns"], "blocked by both pages:");
+  ok(step.words.startsWith(OS.WORDS.open.blocked), step.words);
+  same(["privacy", "returns"].map((k) => policyOf(step, k).actions), [
+    [{ type: "startPolicy", kind: "privacy", label: "Start a privacy page" }],
+    [{ type: "startPolicy", kind: "returns", label: "Start a returns page" }],
   ], "two start buttons:");
+  same(step.actions.filter((a) => ["policy_start", "policy_read"].includes(a.id)).map((a) => [a.id, a.allowed]), [["policy_start", true], ["policy_read", true]], "the owner may press them:");
   await agreesWithOpening(step);
   // a starter privacy draft, written by the policy starter
   const made = await inO(() => Docs.createDocument({ type: "page", body: PS6.starterBody("privacy"), actor: PP6.POLICY_STARTER_ACTOR }));
   starterPrivacy = made.document;
-  step = stepOf(await olist(), "policies");
-  eq(step.done, false, "a starter draft does not count:");
-  same(step.actions, [
-    { type: "link", href: `/admin/editor?doc=${starterPrivacy.id}`, label: "Read your privacy page" },
-    { type: "markPolicyRead", id: starterPrivacy.id, revision: starterPrivacy.revision, label: "I've read it" },
-    { type: "startPolicy", kind: "returns", label: "Start a returns page" },
-  ], "the privacy start button is replaced; the returns one stays:");
-  eq(step.hint, ON.POLICY_HINTS.missing, "a kind is still missing:");
+  step = stepOf(await olist(), "open");
+  eq(policyOf(step, "privacy").level, "block", "a starter draft does not count:");
+  same([policyOf(step, "privacy").href, policyOf(step, "privacy").linkLabel, policyOf(step, "privacy").actions], [`/admin/editor?doc=${starterPrivacy.id}`, "Read it", [{ type: "markPolicyRead", id: starterPrivacy.id, revision: starterPrivacy.revision, label: "I've read it" }]], "the privacy start button is replaced:");
+  same(policyOf(step, "returns").actions, [{ type: "startPolicy", kind: "returns", label: "Start a returns page" }], "the returns one stays:");
   await agreesWithOpening(step);
   // the returns starter through the real op: both are starters now
   const ret = await inO(() => PS6.startPolicyPage({ kind: "returns", actor: OACT }));
   eq(ret.status, 200, `returns starter: ${JSON.stringify(ret.body).slice(0, 200)}`);
-  step = stepOf(await olist(), "policies");
-  eq(step.hint, "We started your privacy page and your returns page from a template. It's a starting point, not legal advice: read each, change what you need and save it, or press I've read it if it is right as it is.", "two starters:");
-  eq(ON.policyStarterHint(["privacy"]), "We started your privacy page from a template. It's a starting point, not legal advice: read it, change what you need and save it, or press I've read it if it is right as it is.", "one starter (the brief's words):");
-  eq(ON.policyStarterHint(["returns"]).startsWith("We started your returns page from a template."), true, "returns words:");
+  step = stepOf(await olist(), "open");
+  same(step.facts.blocking.map((b) => b.id), ["privacy", "returns"], "two starters still block:");
   await agreesWithOpening(step);
   // I've read it on the privacy starter: body unchanged, it now counts as saved
   const hashBefore = (await inO(() => Docs.getDocument(starterPrivacy.id))).draftHash;
-  const mark = step.actions.find((a) => a.type === "markPolicyRead" && a.id === starterPrivacy.id);
+  const mark = policyOf(step, "privacy").actions.find((a) => a.type === "markPolicyRead");
   const read = await inO(() => PS6.markPolicyRead({ id: mark.id, revision: mark.revision, actor: OACT }));
   eq(read.status, 200, `marked: ${JSON.stringify(read.body).slice(0, 200)}`);
   eq((await inO(() => Docs.getDocument(starterPrivacy.id))).draftHash, hashBefore, "the body is unchanged:");
   eq((await inO(async () => PP6.policyStatus(await PP6.readPolicyRows()))).privacy.state, "saved", "privacy counts as saved:");
-  step = stepOf(await olist(), "policies");
-  same([step.done, step.hint], [false, ON.policyStarterHint(["returns"])], "returns is still a starter:");
-  same(step.actions.map((a) => [a.type, a.label]), [["link", "Read your returns page"], ["markPolicyRead", "I've read it"]], "only the returns buttons are left:");
+  step = stepOf(await olist(), "open");
+  same(step.facts.blocking.map((b) => b.id), ["returns"], "returns is still a starter:");
   await agreesWithOpening(step);
   // a merchant saveDraft of the privacy page, and the founder saves the terms page (an edit)
   const p = await inO(() => Docs.getDocument(starterPrivacy.id));
@@ -810,204 +774,12 @@ await t("unit (P6-ONBOARD, PUB-12 review rule): on a closed documents store the 
   const terms = await inO(() => Docs.getDocument(ret.body.document.id));
   eq(terms.slug, "terms", "the returns starter is the terms page:");
   await inO(() => Docs.saveDraft({ id: terms.id, revision: terms.revision, body: { ...terms.body, meta: { ...terms.body.meta, title: "Our terms" } }, actor: OACT }));
-  const list = await olist();
-  step = stepOf(list, "policies");
-  same([step.label, step.done, step.hint, step.actions], ["Add your legal pages", true, "Your privacy and returns pages are ready.", []], "both founder-saved:");
+  const m = await olist();
+  step = stepOf(m, "open");
+  same([step.state, step.words, step.facts.blocking], ["ready", OS.WORDS.open.ready, undefined], "both founder-saved:");
   await agreesWithOpening(step);
   eq(await asRequest(() => inO(() => Res.isStoreClosed())), true, "nothing was published:");
-  await checkHintsAndLinks(list, "onb, pages ready");
-});
-
-await t("unit (P6-ONBOARD): the Launch hint on a closed documents store says publishing opens the store, first shows what is still missing ('Before you open your store'), and needs a way to pay, a privacy page and a returns page", async () => {
-  const launch = stepOf(await olist(), "launch");
-  eq(launch.hint, ON.LAUNCH_HINTS.closedOpenSteps, "steps are still open:");
-  ok(/Publishing from the editor opens it/.test(launch.hint), launch.hint);
-  ok(/first shows what is still missing/.test(launch.hint) && /Before you open your store/.test(launch.hint), launch.hint);
-  ok(/can't open without a way to pay, a privacy page and a returns page/.test(launch.hint), launch.hint);
-  ok(/private until your first publish/.test(launch.hint), "the pinned words stay:");
-});
-
-// ---- SetupAdmin, rendered (Next's SWC, a small hook driver, a fetch spy) ----
-const React6 = require("react");
-const { renderToStaticMarkup: rsm6 } = require("react-dom/server");
-const swc6 = require("next/dist/build/swc/index.js");
-await swc6.loadBindings();
-const { createHash } = await import("node:crypto");
-const compile6 = async (src, filename) =>
-  (await swc6.transform(src, { filename, jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } }, target: "es2022" }, module: { type: "commonjs" } })).code;
-// load a component file (or its source) with the console components compiled too
-async function loadComponent(file, stubs, source = null) {
-  const cache = new Map();
-  async function load(f, src) {
-    if (cache.has(f)) return cache.get(f);
-    const mod = { exports: {} };
-    cache.set(f, mod.exports);
-    const code = await compile6(src ?? (await readFile(f, "utf8")), f);
-    const local = new Map();
-    for (const [, id] of code.matchAll(/require\("([^"]+)"\)/g)) {
-      if (id in stubs || local.has(id)) continue;
-      const base = id.startsWith("@/") ? join(ROOT, id.slice(2)) : id.startsWith(".") ? join(dirname(f), id) : null;
-      if (!base) continue;
-      const target = base.endsWith(".js") ? base : `${base}.js`;
-      local.set(id, /\/components\//.test(target) ? await load(target) : await import(pathToFileURL(target).href));
-    }
-    new Function("require", "module", "exports", code)((id) => (id in stubs ? stubs[id] : local.has(id) ? local.get(id) : require(id)), mod, mod.exports);
-    cache.set(f, mod.exports);
-    return mod.exports;
-  }
-  return (await load(file, source)).default;
-}
-const toasts6 = [];
-const toastStub6 = { useToast: () => ({ success: (m) => toasts6.push(["success", m]), error: (m) => toasts6.push(["error", m]), info: (m) => toasts6.push(["info", m]) }) };
-const linkStub6 = { __esModule: true, default: function Link({ href, children, ...rest }) { return React6.createElement("a", { href, ...rest }, children); } };
-// the hook driver: function components called with their own hook slots
-function driver6() {
-  const slots = new Map();
-  let cur = null;
-  let cursor = 0;
-  let dirty = false;
-  const hooks = {
-    useState(init) {
-      const box = cur;
-      const k = cursor++;
-      if (!(k in box)) box[k] = typeof init === "function" ? init() : init;
-      return [box[k], (v) => { const nv = typeof v === "function" ? v(box[k]) : v; if (!Object.is(nv, box[k])) { box[k] = nv; dirty = true; } }];
-    },
-    useEffect() {},
-    useMemo: (fn) => fn(),
-    useCallback: (fn) => fn,
-    useRef(init) { const k = cursor++; if (!(k in cur)) cur[k] = { current: init }; return cur[k]; },
-    useContext: () => null,
-  };
-  const react = { ...React6, ...hooks, default: { ...React6, ...hooks } };
-  function render(el) {
-    const nodes = [];
-    const visit = (n, path) => {
-      if (n == null || typeof n === "boolean" || typeof n === "string" || typeof n === "number") return;
-      if (Array.isArray(n)) return n.forEach((c, i) => visit(c, `${path}.${c?.key ?? i}`));
-      if (!React6.isValidElement(n)) return;
-      if (n.type === React6.Fragment) return visit(n.props.children, `${path}F`);
-      if (typeof n.type === "function") {
-        const key = `${path}/${n.type.name}`;
-        if (!slots.has(key)) slots.set(key, {});
-        cur = slots.get(key);
-        cursor = 0;
-        return visit(n.type(n.props), key);
-      }
-      nodes.push(n);
-      visit(n.props.children, `${path}/${typeof n.type === "string" ? n.type : "x"}`);
-    };
-    visit(el, "r");
-    return nodes;
-  }
-  return { react, render, takeDirty: () => { const d = dirty; dirty = false; return d; } };
-}
-const textOf6 = (n) => (n == null || typeof n === "boolean" ? "" : Array.isArray(n) ? n.map(textOf6).join("") : typeof n === "string" || typeof n === "number" ? String(n) : React6.isValidElement(n) ? textOf6(n.props.children) : "");
-async function mountSetup(initial) {
-  const d = driver6();
-  const Setup = await loadComponent(join(ROOT, "components/admin/SetupAdmin.js"), { react: d.react, "@/components/console/Toast": toastStub6, "next/link": linkStub6 });
-  let nodes = [];
-  const draw = () => (nodes = d.render(React6.createElement(Setup, { initial })));
-  const flush = async () => {
-    for (let round = 0; round < 40; round++) {
-      d.takeDirty();
-      draw();
-      for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r));
-      if (!d.takeDirty()) return draw();
-    }
-    throw new Error("SetupAdmin never settled");
-  };
-  await flush();
-  const buttons = () => nodes.filter((n) => n.type === "button");
-  return {
-    all: () => nodes.map((n) => (typeof n.props.children === "string" ? n.props.children : "")).join(" | "),
-    text: () => nodes.map((n) => textOf6(n)).join(" "),
-    buttons: () => buttons().map((b) => textOf6(b.props.children).trim()),
-    links: () => nodes.filter((n) => n.type === "a").map((a) => [textOf6(a.props.children).trim(), a.props.href]),
-    async click(name) {
-      const b = buttons().find((x) => textOf6(x.props.children).trim() === name);
-      ok(b, `no button "${name}"; buttons: ${buttons().map((x) => textOf6(x.props.children).trim()).join(" | ")}`);
-      ok(!b.props.disabled, `"${name}" is disabled`);
-      await b.props.onClick();
-      await flush();
-    },
-  };
-}
-// the fetch spy: records every call and answers from `answer(url, init)`
-function fetchSpy(answer) {
-  const calls = [];
-  const saved = globalThis.fetch;
-  globalThis.fetch = async (url, init = {}) => {
-    const call = { url: String(url), method: init.method || "GET", body: init.body ? JSON.parse(init.body) : null };
-    calls.push(call);
-    const { status, body } = await answer(call);
-    return { ok: status >= 200 && status < 300, status, json: async () => body };
-  };
-  return { calls, restore: () => { globalThis.fetch = saved; } };
-}
-
-await t("rendered (P6-ONBOARD, SetupAdmin): the legal-pages step shows 'Start a privacy page' and 'Start a returns page' and the 'not legal advice' line; pressing one POSTs /api/admin/policy-start { kind } then reloads the checklist; a POLICY_PAGE_EXISTS or 403 answer shows its words; 'I've read it' POSTs { markRead: { id, revision } } and reloads", async () => {
-  // a fresh closed documents store with no policy pages: the real checklist
-  const r = await P.runProvision(params("onbx"));
-  eq(r.run.status, "done", `onbx (${r.error}):`);
-  const inX = async (fn) => withTenant(await C.getTenant("onbx"), fn);
-  const real = async () => ({ ok: true, ...(await inX(() => ON.buildChecklist())) });
-  const initial = await real();
-  // the spy answers with the real op and the real checklist
-  const spy = fetchSpy(async (c) => {
-    if (c.url === "/api/admin/setup" && c.method === "GET") return { status: 200, body: await real() };
-    if (c.url === "/api/admin/policy-start" && c.method === "POST") {
-      const out = c.body.kind ? await inX(() => PS6.startPolicyPage({ kind: c.body.kind, actor: OACT })) : await inX(() => PS6.markPolicyRead({ ...c.body.markRead, actor: OACT }));
-      return out;
-    }
-    return { status: 404, body: {} };
-  });
-  try {
-    toasts6.length = 0;
-    const view = await mountSetup(initial);
-    ok(view.buttons().includes("Start a privacy page") && view.buttons().includes("Start a returns page"), `buttons: ${view.buttons().join(" | ")}`);
-    ok(view.text().includes("These are starting points, not legal advice."), "the not-legal-advice line");
-    await view.click("Start a privacy page");
-    same(spy.calls.slice(0, 2).map((c) => [c.method, c.url, c.body]), [["POST", "/api/admin/policy-start", { kind: "privacy" }], ["GET", "/api/admin/setup", null]], "POST then the checklist reload:");
-    same(toasts6, [["success", PS6.startedMessage("privacy")]], "the answer's message in a toast:");
-    ok(!view.buttons().includes("Start a privacy page") && view.buttons().includes("I've read it"), `after: ${view.buttons().join(" | ")}`);
-    const priv = (await inX(async () => PP6.policyStatus(await PP6.readPolicyRows()))).privacy.doc;
-    same(view.links().find((l) => l[0] === "Read your privacy page"), ["Read your privacy page", `/admin/editor?doc=${priv.id}`], "the read link:");
-    // a stale screen (the first checklist) presses Start again: POLICY_PAGE_EXISTS, its own words
-    const stale = await mountSetup(initial);
-    spy.calls.length = 0;
-    await stale.click("Start a privacy page");
-    eq(spy.calls[0].body.kind, "privacy", "posted:");
-    ok(stale.text().includes(PS6.existsMessage("privacy", priv.label)), `the POLICY_PAGE_EXISTS words: ${stale.text().slice(0, 400)}`);
-    // I've read it: { markRead: { id, revision } }, then a reload
-    spy.calls.length = 0;
-    toasts6.length = 0;
-    await view.click("I've read it");
-    same(spy.calls.map((c) => [c.method, c.url, c.body]), [["POST", "/api/admin/policy-start", { markRead: { id: priv.id, revision: priv.revision } }], ["GET", "/api/admin/setup", null]], "markRead then the reload:");
-    same(toasts6, [["success", PS6.READ_MESSAGE]], "marked:");
-    ok(!view.buttons().includes("I've read it"), `after I've read it: ${view.buttons().join(" | ")}`);
-    // the stale screen's I've read it: a 409 with its words
-    const stale2 = await mountSetup(await (async () => { const s = structuredClone(initial); s.items.find((i) => i.id === "policies").actions = [{ type: "markPolicyRead", id: priv.id, revision: priv.revision, label: "I've read it" }]; return s; })());
-    spy.calls.length = 0;
-    await stale2.click("I've read it");
-    ok(stale2.text().includes(PS6.POLICY_START_WORDS.alreadySaved), `the 409 words: ${stale2.text().slice(0, 400)}`);
-    // P6-FIX3 (M2): a 409 also reads the checklist again, so the stale button goes
-    same(spy.calls.map((c) => [c.method, c.url]), [["POST", "/api/admin/policy-start"], ["GET", "/api/admin/setup"]], "the 409 then the checklist reload:");
-    ok(!stale2.buttons().includes("I've read it"), `the stale button after the reload: ${stale2.buttons().join(" | ")}`);
-    ok(stale2.buttons().includes("Start a returns page"), `the fresh checklist: ${stale2.buttons().join(" | ")}`);
-  } finally {
-    spy.restore();
-  }
-  // a 403: the server's plain words
-  const spy403 = fetchSpy(async () => ({ status: 403, body: { error: PS6.POLICY_START_WORDS.readOnly, code: "READ_ONLY" } }));
-  try {
-    const v = await mountSetup(initial);
-    await v.click("Start a returns page");
-    eq(spy403.calls.length, 1, "no reload after a 403:");
-    ok(v.text().includes(PS6.POLICY_START_WORDS.readOnly), "the 403 words");
-  } finally {
-    spy403.restore();
-  }
+  await checkHintsAndLinks(m, "onb, pages ready");
 });
 
 // ---- P6-FIX3: the batch 3 review's onboarding test gaps ----------------------------------
@@ -1033,7 +805,7 @@ async function withFailingSql(tenantId, pattern, fn) {
   }
 }
 
-await t("unit (P6-FIX3, M12 M1 M7 M11): an OPEN documents store keeps 'Publish legal pages'; a missing kind gets its start button and the open-missing hint; a starter draft gets no read link and no I've read it; with no kind missing the hint is the publish hint", async () => {
+await t("unit (P6-FIX3; Phase 1 line 3): an OPEN documents store is all done in onboarding whatever its legal pages are (missing, a starter draft, a saved draft)", async () => {
   const r = await P.runProvision(params("onbopen"));
   eq(r.run.status, "done", `onbopen (${r.error}):`);
   const inOp = async (fn) => withTenant(await C.getTenant("onbopen"), fn);
@@ -1042,106 +814,58 @@ await t("unit (P6-FIX3, M12 M1 M7 M11): an OPEN documents store keeps 'Publish l
     return Pub6.publish({ ids: [{ id: home.document.id, revision: home.document.revision, draftHash: home.document.draftHash }], actor: OACT });
   });
   ok(opened?.release?.id, `published: ${JSON.stringify(opened).slice(0, 200)}`);
-  const ol = () => inOp(() => ON.buildChecklist());
-  let list = await ol();
-  eq(list.launched, true, "the store is open:");
-  let step = stepOf(list, "policies");
-  same([step.label, step.done, step.href, step.hint], ["Publish legal pages", false, E.PAGES_LIST_HREF, ON.POLICY_HINTS.openMissing], "no pages (M7, M11):");
-  eq(step.hint, "Shoppers need a privacy page and a returns page, and checkout links them. Start each from a template, read it, then publish it.", "the open-missing words:");
-  same(step.actions, [
-    { type: "startPolicy", kind: "privacy", label: "Start a privacy page" },
-    { type: "startPolicy", kind: "returns", label: "Start a returns page" },
-  ], "two start buttons on an open store (M12):");
-  // a starter privacy draft: no read link, no I've read it (M1); returns still missing
+  const ol = () => inOp(() => ON.onboardingFor({ role: "owner" }));
+  const allDone = async (label) => {
+    const m = await ol();
+    same([m.open, m.doneCount, m.steps.map((s) => s.state), stepOf(m, "open").facts.items], [true, 4, ["done", "done", "done", "done"], []], label);
+  };
+  await allDone("no pages:");
   await inOp(() => Docs.createDocument({ type: "page", body: PS6.starterBody("privacy"), actor: PP6.POLICY_STARTER_ACTOR }));
-  step = stepOf(await ol(), "policies");
-  same([step.label, step.done, step.hint], ["Publish legal pages", false, ON.POLICY_HINTS.openMissing], "a starter and a missing kind:");
-  same(step.actions, [{ type: "startPolicy", kind: "returns", label: "Start a returns page" }], "only the returns start button, no read actions (M1):");
-  // a founder-saved terms draft (not published): nothing missing, the publish hint (M11)
+  await allDone("a starter:");
   await inOp(() => Docs.createDocument({ type: "page", body: routeBody("page", "terms", "Terms", [sec("text", "sec_onbopen_terms", { title: "Terms", body: ["Our terms."] })]), actor: OACT }));
-  step = stepOf(await ol(), "policies");
-  same([step.label, step.done, step.hint, step.actions], ["Publish legal pages", false, ON.POLICY_HINTS.openPublish, []], "nothing missing, nothing published (M11):");
-  eq(step.hint, "Publish your privacy page and your returns page so shoppers can read them. Checkout links them.", "the publish words:");
+  await allDone("a saved draft:");
 });
 
-await t("unit (P6-FIX3, M4): the brand step counts as recorded only with its `at`: a brand_step object without `at` leaves 'Start your store' (empty catalog) and the design step open", async () => {
+await t("unit (P6-FIX3, M4; Phase 1 line 3): the brand step counts as recorded only with its `at`: a brand_step object without `at` leaves the Brand step not recorded", async () => {
   const r = await P.runProvision(params("onbm4"));
   eq(r.run.status, "done", `onbm4 (${r.error}):`);
   const t4 = async () => C.getTenant("onbm4");
   const steps = async () => {
-    const list = await withTenant(await t4(), () => ON.buildChecklist());
-    return [stepOf(list, "start").done, stepOf(list, "brand").done];
+    const m = await withTenant(await t4(), () => ON.onboardingFor({ role: "owner" }));
+    return [stepOf(m, "brand").facts.brandRecorded, stepOf(m, "brand").state];
   };
-  same(await steps(), [false, false], "nothing recorded:");
+  same(await steps(), [false, "ready"], "nothing recorded:");
   const ob = (await t4()).config?.onboarding || {};
   await C.patchTenant("onbm4", { config: { onboarding: { ...ob, brand_step: { skipped: true, paletteId: "slate" } } } });
-  same(await steps(), [false, false], "a brand_step with no `at` (M4):");
+  same(await steps(), [false, "ready"], "a brand_step with no `at` (M4):");
   await C.patchTenant("onbm4", { config: { onboarding: { ...ob, brand_step: ["at"] } } });
-  same(await steps(), [false, false], "a list is not a record:");
+  same(await steps(), [false, "ready"], "a list is not a record:");
   await C.patchTenant("onbm4", { config: { onboarding: { ...ob, brand_step: { skipped: true, paletteId: "slate", at: new Date().toISOString() } } } });
-  same(await steps(), [true, true], "with `at`:");
+  same(await steps(), [true, "in_progress"], "with `at` (no home page yet):");
 });
 
-await t("unit (P6-FIX3, M8 and the policy read): a failed doc_home read leaves 'Start your store' open; a failed policy read says the pages couldn't be checked (try again), with no buttons and never 'Start each from a template'", async () => {
+await t("unit (P6-FIX3, M8 and the policy read; Phase 1 line 3): a failed doc_home read leaves the Brand step not done; a failed policy read leaves the Open step not blocked-on-a-guess and not done ('We couldn't check this just now'), with no Open button; both come back after", async () => {
   const r = await P.runProvision(params("onbfail"));
   eq(r.run.status, "done", `onbfail (${r.error}):`);
   const inFl = async (fn) => withTenant(await C.getTenant("onbfail"), fn);
   await inFl(() => db.insertInto("products").values({ id: "gid://t/FL1", handle: "fl-tee", title: "Fl Tee", price_min: 500, price_max: 500, currency: "INR", available: 1, tags: "[]" }).execute());
   await inFl(() => Docs.createDocument({ type: "home", actor: OACT }));
-  const ok1 = await inFl(() => ON.buildChecklist());
-  same([stepOf(ok1, "start").done, stepOf(ok1, "start").hint], [true, ON.START_HINTS.done], "the home exists:");
-  // M8: the doc_home read fails: the step stays open
-  const failedHome = await withFailingSql("onbfail", /FROM documents WHERE id = 'doc_home'/, () => inFl(() => ON.buildChecklist()));
-  same([stepOf(failedHome, "start").done, stepOf(failedHome, "start").hint], [false, ON.START_HINTS.todo], "a failed home read (M8):");
-  // readPolicyRows fails: the legal-pages step says so, offers nothing, stays open
-  const failedPol = await withFailingSql("onbfail", /WHERE type = 'page' AND archived_at IS NULL AND slug IS NOT NULL/, () => inFl(() => ON.buildChecklist()));
-  const pol = stepOf(failedPol, "policies");
-  same([pol.label, pol.done, pol.hint, pol.actions], ["Add your legal pages", false, ON.POLICY_HINTS.unreadable, []], "a failed policy read:");
-  eq(pol.hint, "We couldn't check your privacy and returns pages just now. Reload this page to try again.", "the words:");
-  ok(!/Start each from a template/.test(pol.hint), pol.hint);
-  eq(scanText(pol.hint, { claims: false }).length, 0, "no banned words");
+  await C.patchTenant("onbfail", { config: { onboarding: { brand_step: { at: new Date().toISOString(), skipped: true } } } });
+  const m = () => inFl(() => ON.onboardingFor({ role: "owner" }));
+  eq(stepOf(await m(), "brand").state, "done", "the home exists and the step is recorded:");
+  // M8: the doc_home read fails: the step is not done
+  const failedHome = await withFailingSql("onbfail", /FROM documents WHERE id = 'doc_home'/, m);
+  same([stepOf(failedHome, "brand").state, stepOf(failedHome, "brand").problem], ["in_progress", OS.UNREADABLE], "a failed home read (M8):");
+  // readPolicyRows fails: the opening report can't be read, so the Open step says so
+  const failedPol = await withFailingSql("onbfail", /WHERE type = 'page' AND archived_at IS NULL AND slug IS NOT NULL/, m);
+  const open = stepOf(failedPol, "open");
+  same([open.state, open.problem, open.facts.items], ["ready", OS.UNREADABLE, []], "a failed policy read:");
+  ok(!open.actions.some((a) => a.id === "open_store"), "no Open button on a guess");
+  eq(OS.UNREADABLE, "We couldn't check this just now. Reload this page to try again.", "the words:");
+  eq(scanText(OS.UNREADABLE, { claims: false }).length, 0, "no banned words");
   // and the read works again afterwards: the start buttons are back
-  const back = stepOf(await inFl(() => ON.buildChecklist()), "policies");
-  same([back.hint, back.actions.map((a) => a.type)], [ON.POLICY_HINTS.missing, ["startPolicy", "startPolicy"]], "after:");
-  // an OPEN store's failed policy read says the same (never 'Start each from a template')
-  const inOp = async (fn) => withTenant(await C.getTenant("onbopen"), fn);
-  const openFail = stepOf(await withFailingSql("onbopen", /WHERE type = 'page' AND archived_at IS NULL AND slug IS NOT NULL/, () => inOp(() => ON.buildChecklist())), "policies");
-  same([openFail.label, openFail.done, openFail.hint, openFail.actions], ["Publish legal pages", false, ON.POLICY_HINTS.unreadable, []], "an open store's failed policy read:");
-});
-
-// The legacy screen: the component at eee9f2d (before this item) and today's
-// render the same markup for a checklist with no actions.
-const LEGACY_LIST6 = Object.freeze({
-  ok: true,
-  supported: true,
-  items: [
-    { id: "connect", label: "Connect Shopify", kind: "auto", done: true, href: "/admin/integrations", hint: "OAuth connect — the catalog syncs from your store." },
-    { id: "policies", label: "Publish legal pages", kind: "auto", done: false, href: "/admin/storefront", hint: "Privacy + terms/refund — templates scaffold them; checkout links them." },
-    { id: "preview", label: "Review your draft preview", kind: "manual", done: false, href: "/admin/storefront", hint: "Walk the storefront in the preview pane, then mark done." },
-    { id: "launch", label: "Launch", kind: "manual", done: false, gated: true, href: "/admin/releases", hint: "Unlocks when everything above is done." },
-  ],
-  doneCount: 1,
-  total: 4,
-  launched: false,
-  launchedAt: null,
-  provisionedAt: null,
-});
-// renderToStaticMarkup of components/admin/SetupAdmin.js at eee9f2d for LEGACY_LIST6
-// (regenerate: render that commit's file through staticSetup(source))
-const SETUP_BEFORE_SHA256 = "549e86bd70d930b5a934accf7ae404152a958bb70b3012193021e14e913616cc";
-async function staticSetup(source = null) {
-  const Setup = await loadComponent(join(ROOT, "components/admin/SetupAdmin.js"), { react: React6, "@/components/console/Toast": toastStub6, "next/link": linkStub6 }, source);
-  return rsm6(React6.createElement(Setup, { initial: LEGACY_LIST6 }));
-}
-
-await t("rendered (P6-ONBOARD, SetupAdmin): a checklist whose steps have no actions renders exactly as before this item (the markup's sha256 is the eee9f2d component's), with no 'not legal advice' line", async () => {
-  const html = await staticSetup();
-  eq(createHash("sha256").update(html).digest("hex"), SETUP_BEFORE_SHA256, "markup:");
-  ok(!html.includes("not legal advice"), "no starter line");
-  // an empty actions list is no actions
-  const Setup = await loadComponent(join(ROOT, "components/admin/SetupAdmin.js"), { react: React6, "@/components/console/Toast": toastStub6, "next/link": linkStub6 });
-  const withEmpty = { ...LEGACY_LIST6, items: LEGACY_LIST6.items.map((i) => ({ ...i, actions: [] })) };
-  eq(rsm6(React6.createElement(Setup, { initial: withEmpty })), html, "actions: [] renders the same:");
+  const back = stepOf(await m(), "open");
+  same([back.state, back.facts.blocking.map((b) => b.id)], ["blocked", ["privacy", "returns"]], "after:");
 });
 
 // ---- P4-FIX5: the P4-PROVISION review findings -------------------------------------

@@ -503,12 +503,12 @@ await t("stores: support gets exactly A and C (never B or suspended D), each ent
   for (const caller of CALLERS) for (const s of results[caller].stores.body?.stores ?? []) eq(Object.keys(s).sort().join(","), "current,id,name,role,url", `${caller} entry keys:`);
 });
 
-await t("returns, setup, releases: no customer fields and no emails", () => {
+await t("returns, onboarding, releases: no customer fields and no emails", () => {
   for (const caller of CALLERS) {
     const rows = results[caller].returns.body?.returns ?? [];
     eq(rows.length, 1, `${caller} sees the fixture return:`);
     for (const row of rows) eq(Object.keys(row).sort().join(","), "created_at,currency,id,note,order_id,reason,refunded_total,status,total,updated_at", `${caller} return keys:`);
-    for (const name of ["returns", "setup", "releases", "releases preview"]) {
+    for (const name of ["returns", "onboarding", "releases", "releases preview"]) {
       const txt = results[caller][name].text;
       ok(!MEMBER_EMAIL.test(txt) && !txt.includes(CNY.orderEmail) && !txt.includes(CNY.orderPhone), `${caller} ${name}`);
     }
@@ -575,6 +575,12 @@ await t("page sweep: every console page runs as support (a page, a redirect or a
   const other = Object.entries(pageRuns).filter(([, run]) => !run.props.length).map(([p, run]) => `${p} (${run.redirect ? `redirect ${run.redirect}` : run.notFound ? "not found" : "empty"})`);
   // the storefront/theme/brand/upsells pages redirect to the editor in a documents store
   ok(rendered.length >= 15, `most pages rendered props: ${rendered.length}; not: ${other.join(", ")}`);
+});
+
+await t("Phase 1 line 3: as support, /admin/setup redirects to /admin/onboarding and /admin/start to /admin/onboarding?step=brand", () => {
+  eq(pageRuns.setup.redirect, "/admin/onboarding", "setup:");
+  eq(pageRuns.start.redirect, "/admin/onboarding?step=brand", "start:");
+  eq(pageRuns.setup.props.length + pageRuns.start.props.length, 0, "they render nothing:");
 });
 
 await t("page sweep (S1, S2): no prop on any console page holds a canary for support", () => {

@@ -943,44 +943,33 @@ async function renderedTests() {
 
   const PAGE = join(ROOT, "app/(console)/admin/(authed)/start/page.js");
   async function renderPage({ actor, mode }) {
-    const d = driver();
-    let firstRunProps = null;
     const load = world({
-      react: d.react,
-      "next/headers": { cookies: async () => ({ get: () => ({ value: "tok" }) }) },
       "next/navigation": { redirect: (to) => { throw Object.assign(new Error(`REDIRECT ${to}`), { redirectTo: to }); } },
-      "next/link": stubs(d)["next/link"],
       "@/lib/admin-auth": { adminActor: async () => actor, ADMIN_COOKIE: "_admin", PLATFORM_COOKIE: "_platform" },
       "@/lib/cms-mode": { getCmsMode: async () => mode },
-      "@/lib/console-request": { tfetch: (fn) => fn() },
-      "@/components/admin/first-run/FirstRun": { __esModule: true, default: function FirstRun(p) { firstRunProps = p; return null; } },
     });
     const mod = await load(PAGE);
     try {
-      const el = await mod.default({});
-      d.render(el);
-      return { redirect: null, firstRunProps, loaded: load.loaded };
+      await mod.default({});
+      return { redirect: null, loaded: load.loaded };
     } catch (e) {
-      if (e.redirectTo) return { redirect: e.redirectTo, firstRunProps, loaded: load.loaded };
+      if (e.redirectTo) return { redirect: e.redirectTo, loaded: load.loaded };
       throw e;
     }
   }
 
-  await t("RENDERED: a legacy store redirects to /admin/setup; signed out goes to the login; a moving store gets a note; a documents store gets FirstRun with the actor's rights", async () => {
-    eq((await renderPage({ actor: { role: "owner" }, mode: "legacy" })).redirect, "/admin/setup", "legacy:");
-    eq((await renderPage({ actor: null, mode: "documents" })).redirect, "/admin/login", "signed out:");
-    const mv = await renderPage({ actor: { role: "owner" }, mode: "migrating" });
-    eq([mv.redirect, mv.firstRunProps], [null, null], "moving:");
-    eq((await renderPage({ actor: { role: "owner" }, mode: "documents" })).firstRunProps, { canEdit: true, canSync: true }, "owner:");
-    eq((await renderPage({ actor: { role: "support" }, mode: "documents" })).firstRunProps, { canEdit: false, canSync: false }, "support (read-only):");
-    const staff = (await renderPage({ actor: { role: "staff" }, mode: "documents" })).firstRunProps;
-    eq(staff.canEdit, true, "staff may edit:");
+  // Phase 1 line 3: "Start your store" is the onboarding page's Brand step
+  // (FirstRun and BrandStep render there); /admin/start only redirects.
+  await t("RENDERED (Phase 1 line 3): /admin/start redirects to /admin/onboarding?step=brand for every caller and every store mode (the onboarding page decides who sees what)", async () => {
+    for (const actor of [null, { role: "owner" }, { role: "staff" }, { role: "support" }]) {
+      for (const mode of ["legacy", "migrating", "documents"]) eq((await renderPage({ actor, mode })).redirect, "/admin/onboarding?step=brand", `${JSON.stringify(actor)} ${mode}:`);
+    }
   });
 
-  await t("the page passes the console-fresh tfetch walk and the legacy-routes literal-link walk; the client parts import no Node-only module", async () => {
+  await t("the page reads nothing (a redirect only) and passes the legacy-routes literal-link walk; the client parts import no Node-only module", async () => {
     const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     const page = await readFile(PAGE, "utf8");
-    ok(page.includes('import { tfetch } from "@/lib/console-request";') && /\btfetch\(/.test(page), "tfetch from @/lib/console-request");
+    eq(strip(page).match(/from "[^"]+"/g), ['from "next/navigation"'], "its only import:");
     ok(!page.includes("@/lib/tenant-request"), "never the cached path");
     const LEGACY = /["'`](\/admin\/(?:catalog|home|upsells)(?:[/?#][^"'`$]*)?|\/admin\/storefront(?:[?#][^"'`$]*)?)["'`$]/;
     for (const f of [PAGE, join(ROOT, FR), join(ROOT, BSF)]) ok(!LEGACY.test(strip(await readFile(f, "utf8"))), `${f}: a literal link to an old screen`);
@@ -993,8 +982,7 @@ async function renderedTests() {
     const FRm = await world(stubs(driver()))(join(ROOT, FR));
     const BSm = await world(stubs(driver()))(join(ROOT, BSF));
     eq([FRm.EDIT_HOME_HREF, BSm.PUBLISH_HREF], [E.EDITOR_PUBLISH_HREF, E.EDITOR_PUBLISH_HREF], "the editor's publish address:");
-    // the start page is the only new console page, and nothing else changed its walk
-    ok((await readdir(join(ROOT, "app/(console)/admin/(authed)/start"))).includes("page.js"), "the page exists");
+    ok((await readdir(join(ROOT, "app/(console)/admin/(authed)/start"))).includes("page.js"), "the redirect page exists");
   });
 }
 

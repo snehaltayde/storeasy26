@@ -11,7 +11,7 @@
 //   note    why a page is shaped as it is, when it is not obvious
 
 export const ADMIN_PAGES = Object.freeze([
-  { page: "", action: "storefront.read", note: "redirects to the dashboard" },
+  { page: "", action: "storefront.read", note: "redirects to onboarding while the store is closed, else to the dashboard (Phase 1 line 3)" },
   { page: "analytics", action: "orders.read" },
   { page: "automations", action: "settings.read" },
   { page: "billing", action: "settings.read" },
@@ -25,13 +25,13 @@ export const ADMIN_PAGES = Object.freeze([
   { page: "integrations", action: "settings.read" },
   { page: "media", action: "storefront.read" },
   { page: "offers", action: "offers.read" },
-  { page: "onboarding", action: "storefront.read", note: "where a self-serve signup lands (Phase 1 line 1); reads only" },
+  { page: "onboarding", action: "storefront.read", note: "the four onboarding steps (Phase 1 lines 1 and 3); every role reads it, controls a role can't use are disabled" },
   { page: "orders", action: "orders.read" },
   { page: "orders/[id]", action: "orders.read", params: { id: "$order" } },
   { page: "releases", action: "storefront.read" },
   { page: "settings", action: "settings.read" },
-  { page: "setup", action: "storefront.read" },
-  { page: "start", action: "storefront.read" },
+  { page: "setup", action: "storefront.read", note: "redirects to /admin/onboarding (Phase 1 line 3)" },
+  { page: "start", action: "storefront.read", note: "redirects to /admin/onboarding?step=brand (Phase 1 line 3)" },
   { page: "storefront", action: "storefront.read" },
   { page: "storefront/designer", action: "storefront.read" },
   { page: "storefront/designer/collection", action: "storefront.read" },

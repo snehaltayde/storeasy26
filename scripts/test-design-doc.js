@@ -101,7 +101,7 @@ const TU = await import("../lib/registry/token-usage.js");
 const R = await import("../lib/registry/index.js");
 const B = await import("../lib/brand.js");
 const BR = await import("../lib/admin/brand-readability.js");
-const ON = await import("../lib/admin/onboarding.js");
+const ON = await import("../lib/onboarding/service.js");
 const { handleDocumentsPut } = await import("../lib/admin/documents-api.js");
 const { DOCUMENTS_MESSAGE } = await import("../lib/cms-mode.js");
 const { platformSessionToken } = await import("../lib/platform/admin-auth.js");
@@ -727,11 +727,11 @@ await t("unit: onboarding, Help and brand readability read the LIVE doc_design i
   });
   const live = await inD(() => BR.liveDesign());
   eq([live.brand.accent, live.theme.kit], ["#0f766e", "pulse"], "liveDesign (not the draft):");
-  // onboarding: done from the live design, linking to the editor
-  const ob = await inD(() => ON.buildChecklist());
-  const step = ob.items.find((i) => i.id === "brand");
-  // P6-ONBOARD: the design step links /admin/start on a documents store
-  eq([step.done, step.href], [true, "/admin/start"], "onboarding:");
+  // onboarding (Phase 1 line 3): the Brand step counts the live design's brand;
+  // it is done once doc_home exists too, else in progress
+  const ob = await inD(() => ON.onboardingFor({ role: "owner" }));
+  const step = ob.steps.find((i) => i.id === "brand");
+  eq([step.facts.brandRecorded, step.state], [true, step.facts.hasHome ? "done" : "in_progress"], "onboarding:");
   // Help: the live look (the old config pin is moved to glow so the two differ)
   const cfg0 = await cfgOf("dd");
   await C.patchTenant("dd", { config: { theme: { kit: "glow", version: 1 } } });
@@ -774,9 +774,9 @@ await t("unit: onboarding on a documents store with no published design is not d
   await runMigrations(c, MIGRATIONS);
   await c.execute("UPDATE cms_state SET mode = 'documents' WHERE id = 1");
   await C.upsertTenant({ id: "dn", name: "Design New", domains: ["dn.test"], dbUrl: "file:.test-design-doc-default.db", config: { ...STALE }, secrets: {} });
-  const ob = await withTenant(await tenant("dn"), () => ON.buildChecklist());
-  const step = ob.items.find((i) => i.id === "brand");
-  eq([step.done, step.href], [false, "/admin/start"], "not done on the old config:");
+  const ob = await withTenant(await tenant("dn"), () => ON.onboardingFor({ role: "owner" }));
+  const step = ob.steps.find((i) => i.id === "brand");
+  eq([step.facts.brandRecorded, step.state], [false, step.facts.hasHome ? "in_progress" : "ready"], "not done on the old config:");
   c.close();
 });
 
@@ -1267,7 +1267,7 @@ await t("unit: the guard finds no config.brand or config.theme read outside the 
     await readFile(join(ROOT, f), "utf8");
   }
   // the readers this item moved really read nothing themselves
-  for (const f of ["lib/admin/onboarding.js", "app/api/admin/help/route.js", "lib/admin/brand-readability.js", "app/api/platform/overview/route.js", "app/api/platform/themes/route.js", "app/api/platform/tenants/[id]/route.js", "components/platform/TenantDetail.js"]) {
+  for (const f of ["lib/onboarding/service.js", "lib/onboarding/steps.js", "app/api/admin/help/route.js", "lib/admin/brand-readability.js", "app/api/platform/overview/route.js", "app/api/platform/themes/route.js", "app/api/platform/tenants/[id]/route.js", "components/platform/TenantDetail.js"]) {
     eq(configReads(await readFile(join(ROOT, f), "utf8")), [], `${f}:`);
   }
   ok(allowedHits.has("lib/themes/kits.js"), `the allowlist is used: ${[...allowedHits]}`);

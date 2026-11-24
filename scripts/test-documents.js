@@ -1345,9 +1345,12 @@ console.log("— the first-run writer (GEN-01)");
     eq(Docs.actorString(P.POLICY_STARTER_ACTOR), P.POLICY_STARTER_BY, "POLICY_STARTER_BY:");
     eq(P.POLICY_STARTER_BY, "system:policy-starter", "the mark:");
     ok(Object.isFrozen(P.POLICY_STARTER_ACTOR), "frozen:");
-    // the same rule onboarding uses today
-    const onboarding = await readFile(join(ROOT, "lib/admin/onboarding.js"), "utf8");
-    ok(onboarding.includes("/privacy/") && onboarding.includes("/terms|refund|return/"), "today's rule is still the same:");
+    // Phase 1 line 3: onboarding reads the policies only through the opening
+    // report (policyStatus), so no second copy of the slug rule exists there
+    for (const f of ["lib/onboarding/steps.js", "lib/onboarding/service.js"]) {
+      const src = await readFile(join(ROOT, f), "utf8");
+      ok(!/\/privacy\/|terms\|refund\|return/.test(src), `${f} has its own slug rule`);
+    }
   });
 
   await t("policyStatus (pure): best state per kind, live > inSet > saved > starter > missing, ties to the newest; archived, slugless and non-page rows are ignored", async () => {

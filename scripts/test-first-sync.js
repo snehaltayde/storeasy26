@@ -1511,17 +1511,19 @@ console.log("— cases the first review found untested");
     }
   });
 
-  await t("the setup step counts as done once a sync completes, even when Shopify has no products", async () => {
+  await t("the onboarding Import step counts as done once a sync completes, even when Shopify has no products (and says to add them in Shopify)", async () => {
     await reset();
     shop.products = [];
     shop.collections = [];
     ok(!(await syncGaps()).error, "sync");
-    const { buildChecklist } = await import("../lib/admin/onboarding.js");
+    const { onboardingFor } = await import("../lib/onboarding/service.js");
+    const { WORDS } = await import("../lib/onboarding/steps.js");
     await fresh("gaps");
-    const list = await inT("gaps", () => buildChecklist());
-    const step = list.items?.find((s) => s.id === "catalog");
-    eq(step?.done, true, `catalog step: ${JSON.stringify(step)}`);
-    ok(/no products yet/.test(step.hint), `hint: ${step.hint}`);
+    const model = await inT("gaps", () => onboardingFor({ role: "owner" }));
+    const step = model.steps?.find((s) => s.id === "import");
+    eq(step?.state, "done", `import step: ${JSON.stringify(step)}`);
+    eq(step.words, WORDS.import.noProducts, "words:");
+    ok(/no products yet/.test(step.words), `words: ${step.words}`);
     Object.assign(shop, { products: catalog, collections: colls });
   });
 }

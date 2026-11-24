@@ -31,6 +31,7 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "experiments", path: "experiments", method: "GET", keys: ["ok", "experiments"] },
   { name: "experiments ?analyze=", path: "experiments", method: "GET", req: () => ({ query: "analyze=home" }), status: 404, keys: ["error"], note: "no experiment by that slug: the miss answers 404" },
   { name: "first-run", path: "first-run", method: "GET", keys: ["ok", "firstRun", "sync"] },
+  { name: "onboarding", path: "onboarding", method: "GET", keys: ["ok", "supported", "open", "current", "doneCount", "total", "steps"] },
   { name: "sync", path: "sync", method: "GET", keys: ["ok", "sync"] },
   { name: "theme", path: "theme", method: "GET", keys: ["ok", "kits", "theme", "upgradeAvailable", "design"] },
   { name: "insights", path: "insights", method: "GET", keys: ["ok", "configured", "model", "budget", "insights"] },
@@ -59,6 +60,5 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "releases", path: "releases", method: "GET", keys: ["ok", "documents", "mode", "message", "live", "liveRelease"] },
   { name: "releases preview", path: "releases", method: "POST", variant: "preview", req: () => ({ body: { action: "preview" } }), status: 409, keys: ["error", "code"], note: "a documents store previews from the editor (STORE_USES_DOCUMENTS)" },
   { name: "returns", path: "returns", method: "GET", keys: ["ok", "returns"] },
-  { name: "setup", path: "setup", method: "GET", keys: ["ok", "supported", "items", "doneCount", "total", "launched", "launchedAt", "provisionedAt"] },
   { name: "stores", path: "stores", method: "GET", keys: ["ok", "stores", "current"] },
 ]);

@@ -26,10 +26,11 @@ const BADGES = {
     const open = (await listReturns({ status: "requested" })).length;
     return open > 0 ? open : null;
   },
-  async setup() {
-    const { buildChecklist } = await import("@/lib/admin/onboarding");
-    const c = await buildChecklist();
-    return c?.supported && !c.launched ? `${c.doneCount}/${c.total}` : null;
+  // Phase 1 line 3: "n/4" on Onboarding while the store is closed
+  async onboarding() {
+    const { onboardingFor } = await import("@/lib/onboarding/service");
+    const o = await onboardingFor({ role: "support" });
+    return o.supported && !o.open ? `${o.doneCount}/${o.total}` : null;
   },
   // S52 / P2-GUARD: the unpublished-changes dot on Publishing
   async publish() {

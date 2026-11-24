@@ -274,7 +274,7 @@ export function publishRequest(items, { set = false, confirmOpen = false } = {})
 // report's (OPENING_ACTION_TYPES).
 export const OPENING_PANEL_ACTIONS = Object.freeze(["checkAgain", "placedTestOrder", "startPolicy", "markPolicyRead"]);
 export const POLICY_START_URL = "/api/admin/policy-start";
-export const SETUP_URL = "/api/admin/setup";
+export const ONBOARDING_URL = "/api/admin/onboarding";
 
 const reportItems = (report) => (isObj(report) && Array.isArray(report.items) ? report.items.filter(isObj) : []);
 export const openingBlocks = (report) => reportItems(report).some((i) => i.level === "block");
@@ -813,8 +813,8 @@ export function createPublishFlow(deps = {}) {
     const mine = seq;
     set({ busy: true, notice: null, noticeLink: null });
     if (action.type === "placedTestOrder") {
-      // the manual check-off Setup uses (settings.write)
-      const r = await postJson(doFetch, SETUP_URL, { step: "test_order" });
+      // the test-order check-off onboarding step 4 uses (settings.write)
+      const r = await postJson(doFetch, ONBOARDING_URL, { step: "test_order" });
       if (mine !== seq) return null;
       if (!r.ok) return set({ busy: false, notice: r.status === 401 ? WORDS.signedOut : r.status === 403 ? WORDS.notAllowed : WORDS.testOrderFailed });
       return checkAgain({ notice: WORDS.testOrderMarked });

@@ -36,8 +36,9 @@ export async function GET(request, { params }) {
   });
   let onboarding = null;
   try {
-    const { buildChecklist } = await import("@/lib/admin/onboarding.js");
-    onboarding = await withTenant(tenant, buildChecklist);
+    // Phase 1 line 3: the four step states (a read-only role: actions and the shop domain are not this view's)
+    const { onboardingFor } = await import("@/lib/onboarding/service.js");
+    onboarding = await withTenant(tenant, () => onboardingFor({ role: "support" }));
   } catch { /* tenant db unreachable */ }
 
   return NextResponse.json({
@@ -61,7 +62,7 @@ export async function GET(request, { params }) {
       },
       secretsPresent,
     },
-    onboarding: onboarding && onboarding.supported ? { doneCount: onboarding.doneCount, total: onboarding.total, launched: onboarding.launched, items: onboarding.items.map((i) => ({ id: i.id, done: i.done })) } : null,
+    onboarding: onboarding && onboarding.supported ? { doneCount: onboarding.doneCount, total: onboarding.total, open: onboarding.open, steps: onboarding.steps.map((s) => ({ id: s.id, label: s.label, state: s.state })) } : null,
     runs,
   });
 }

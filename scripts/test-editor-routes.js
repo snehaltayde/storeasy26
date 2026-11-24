@@ -514,22 +514,27 @@ await t("rendered: on an editor route the shell steps aside; the sheet holds the
   ok(read("components/admin/shell/AdminShell.js").includes("<SheetContent") && /onNavigate=\{\(\) => setSheet\(false\)\}/.test(read("components/admin/shell/AdminShell.js")), "the editor's sheet closes on a link:");
 });
 
-await t("rendered: staff see neither Settings nor Setup", () => {
+await t("rendered: staff see no Settings; Setup is gone for everyone and Onboarding is there for staff", () => {
   const staff = navHrefs(shell({ role: "staff" }));
-  ok(staff.includes("/admin/editor") && !staff.includes("/admin/settings") && !staff.includes("/admin/setup"), `staff: ${staff}`);
+  ok(staff.includes("/admin/editor") && !staff.includes("/admin/settings") && !staff.includes("/admin/setup") && staff.includes("/admin/onboarding"), `staff: ${staff}`);
+  ok(!navHrefs(shell({})).includes("/admin/setup"), "owner: no Setup");
 });
 
-// P6-NAV (GEN-04, US-01): the logo and colours can be found after the store opens.
-await t("P6-NAV rendered: the nav has 'Logo and colours' -> /admin/start right after Editor, for owners and staff", () => {
-  const html = shell({ badges: {} }, "/admin/start");
+// Phase 1 line 3: the logo and colours moved into onboarding's Brand step
+// (/admin/start redirects to /admin/onboarding?step=brand), so the
+// Storefront group no longer has its own "Logo and colours" item.
+await t("Phase 1 line 3 rendered: the Storefront group is Editor, Media, Publishing (no 'Logo and colours'); Onboarding is in Overview for owners and staff (its own page has no sidebar)", () => {
+  const html = shell({ badges: {} }, "/admin/media");
   const links = navHrefs(html);
   const at = links.indexOf("/admin/editor");
-  eq(links.slice(at, at + 4), ["/admin/editor", "/admin/start", "/admin/media", "/admin/releases"], "the storefront group in order:");
-  ok(/<a [^>]*href="\/admin\/start"[^>]*aria-current="page"[^>]*>[\s\S]*?Logo and colours/.test(html), "the link, marked current on /admin/start:");
+  eq(links.slice(at, at + 3), ["/admin/editor", "/admin/media", "/admin/releases"], "the storefront group in order:");
+  ok(!links.includes("/admin/start") && !html.includes("Logo and colours"), "no /admin/start link");
+  ok(/<a [^>]*href="\/admin\/onboarding"[^>]*>[\s\S]*?Onboarding/.test(html), "the link:");
+  eq(navHrefs(shell({ badges: {} }, "/admin/onboarding")), [], "on /admin/onboarding itself the shell shows no sidebar:");
   const store = NavModel.NAV.find((g) => g.label === "Storefront").items;
-  eq({ ...store[1] }, { id: "start", label: "Logo and colours", href: "/admin/start", page: "start", action: "storefront.read" }, "the item (a read every role holds):");
-  ok(navHrefs(shell({ role: "staff" })).includes("/admin/start"), "staff see it");
-  ok(navHrefs(sheetNav("owner", "/admin/start")).includes("/admin/start"), "the sheet has it too:");
+  eq(store.map((i) => i.id), ["editor", "media", "releases"], "the items:");
+  ok(navHrefs(shell({ role: "staff" })).includes("/admin/onboarding"), "staff see Onboarding");
+  ok(navHrefs(sheetNav("owner", "/admin/editor")).includes("/admin/onboarding"), "the sheet has it too:");
 });
 
 // ---- P4-SCAFFOLD: product and collection addresses, document ids, editability --

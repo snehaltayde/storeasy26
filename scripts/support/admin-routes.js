@@ -79,6 +79,8 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "offers/[id]/revert", method: "POST", action: "offers.write", probe: { ...MISSING_OFFER, body: {} } },
   { path: "offers/simulate", method: "POST", action: "offers.read", crossOrigin: "read", probe: { body: {} } },
   { path: "offers/targets", method: "GET", action: "offers.read" },
+  { path: "onboarding", method: "GET", action: "storefront.read" },
+  { path: "onboarding", method: "POST", action: "settings.write", probe: { body: { step: "" } } },
   { path: "orders", method: "GET", action: "orders.read" },
   { path: "orders/[id]", method: "GET", action: "orders.read", probe: MISSING_ORDER },
   { path: "orders/[id]", method: "POST", variant: "cancel", action: "orders.cancel", probe: { ...MISSING_ORDER, body: { action: "cancel" } } },
@@ -106,8 +108,6 @@ export const ADMIN_ROUTES = Object.freeze([
   { path: "returns", method: "POST", action: "returns.decide", probe: { body: { id: "ret_missing", action: "approve" } } },
   { path: "settings", method: "GET", action: "settings.read" },
   { path: "settings", method: "PUT", action: "settings.write", probe: { body: { bogus_setting: true } } },
-  { path: "setup", method: "GET", action: "storefront.read" },
-  { path: "setup", method: "POST", action: "settings.write", probe: { body: { step: "" } } },
   // F3: lists the caller's own memberships (line 2 checks the body)
   { path: "stores", method: "GET", action: "storefront.read" },
   { path: "sync", method: "GET", action: "storefront.read" },

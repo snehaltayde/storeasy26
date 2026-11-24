@@ -5,11 +5,8 @@ import { ArrowRight } from "lucide-react";
 import { adminActor, ADMIN_COOKIE, PLATFORM_COOKIE } from "@/lib/admin-auth";
 import { salesRollup, freshness, coverage, discrepancies, dayInTz } from "@/lib/reporting";
 import { listContactMessages } from "@/lib/notifications";
-import { buildChecklist } from "@/lib/admin/onboarding";
+import { onboardingFor } from "@/lib/onboarding/service";
 import { catalogSyncStatus } from "@/lib/sync";
-import { getCmsMode } from "@/lib/cms-mode";
-import { describeFirstStore } from "@/lib/first-run/generate";
-import { readBrandStep } from "@/lib/first-run/brand-step";
 import { roleAllows } from "@/lib/platform/authz";
 import SyncProgress from "@/components/admin/SyncProgress";
 import { formatMoney } from "@/lib/format";
@@ -41,26 +38,9 @@ const ago = (iso) => {
 
 const RANGES = [7, 30, 90];
 
-// P6-NAV (GEN-01, GEN-04, US-01): on a store that uses the new editor and has
-// not started yet (no starting store made, or the brand step not done), the
-// one setup nudge is "Start your store" (the brand step at /admin/start), in
-// place of the checklist's "Setup: x/y done", never beside it. An open store,
-// a legacy or migrating store, or a read that fails keeps today's nudge.
-// The brand step's read comes first (it is small: the design row and whether
-// the store is open); describeFirstStore, which reads the whole catalog, runs
-// only for a closed store whose brand step is already recorded.
-async function firstRunNudge(actor) {
-  const mode = await getCmsMode().catch(() => null);
-  if (mode !== "documents") return false;
-  const brand = await readBrandStep({ actor }).catch(() => null);
-  if (!brand || brand.storeOpen !== false) return false;
-  if (!brand.brandStep) return true;
-  const first = await describeFirstStore({ actor }).catch(() => null);
-  if (!first || first.reason === "live") return false;
-  return !first.generated;
-}
-const START_NUDGE = { label: "Start your store", hint: "Choose your logo and colours to get your store ready to open", href: "/admin/start", tone: "neutral" };
-
+// Phase 1 line 3: while the store is closed, the one setup nudge is
+// "Onboarding: n/4 done" (the four-step page). An open store, the _default
+// store, or a read that fails shows none.
 export default async function AdminDashboardPage({ searchParams }) {
   const jar = await cookies();
   const actor = await tfetch(() => adminActor(jar.get(ADMIN_COOKIE)?.value, jar.get(PLATFORM_COOKIE)?.value));
@@ -69,16 +49,15 @@ export default async function AdminDashboardPage({ searchParams }) {
   const sp = await searchParams;
   const days = RANGES.includes(Number(sp?.days)) ? Number(sp.days) : 30;
 
-  const [rollup, fresh, cov, issues, inbox, checklist, sync, startFirst] = await tfetch(async () =>
+  const [rollup, fresh, cov, issues, inbox, onboarding, sync] = await tfetch(async () =>
     Promise.all([
       salesRollup({ days }),
       freshness(),
       coverage({ days }),
       discrepancies(),
       listContactMessages({ limit: 50 }),
-      buildChecklist().catch(() => ({ supported: false })),
+      onboardingFor(actor).catch(() => ({ supported: false })),
       catalogSyncStatus().catch(() => null),
-      firstRunNudge(actor).catch(() => false),
     ]),
   );
   // GEN-02: while a store's first products are coming in (or didn't finish),
@@ -106,10 +85,8 @@ export default async function AdminDashboardPage({ searchParams }) {
     ...(inbox.filter((m) => m.notify_status === "failed").length
       ? [{ label: `${inbox.filter((m) => m.notify_status === "failed").length} contact message(s) failed to reach your inbox email`, hint: "Set a support email in Settings", href: "/admin/integrations", tone: "warning" }]
       : []),
-    ...(startFirst
-      ? [START_NUDGE]
-      : checklist.supported && !checklist.launched
-      ? [{ label: `Setup: ${checklist.doneCount}/${checklist.total} done — not launched yet`, hint: "Finish the checklist", href: "/admin/setup", tone: "neutral" }]
+    ...(onboarding.supported && !onboarding.open
+      ? [{ label: `Onboarding: ${onboarding.doneCount}/${onboarding.total} done`, hint: "Get your store ready to open", href: "/admin/onboarding", tone: "neutral" }]
       : []),
   ];
 

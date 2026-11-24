@@ -62,8 +62,10 @@ const Nav = await import("../lib/admin/nav.js");
 const { ACTIONS, ROLES, isWriteAction, roleAllows } = await import("../lib/platform/authz.js");
 const { ADMIN_PAGES } = await import("./support/admin-pages.js");
 
-const ALL_IDS = ["dashboard", "analytics", "setup", "orders", "catalog", "editor", "start", "media", "releases", "offers", "experiments", "insights", "automations", "integrations", "billing", "settings"];
-const READ_IDS = ALL_IDS.filter((id) => !["setup", "automations", "integrations", "billing", "settings"].includes(id));
+// Phase 1 line 3: Setup (admin-only) became Onboarding (every role) and
+// "Logo and colours" (/admin/start) moved into onboarding's Brand step.
+const ALL_IDS = ["dashboard", "analytics", "onboarding", "orders", "catalog", "editor", "media", "releases", "offers", "experiments", "insights", "automations", "integrations", "billing", "settings"];
+const READ_IDS = ALL_IDS.filter((id) => !["automations", "integrations", "billing", "settings"].includes(id));
 const EXPECTED = { owner: ALL_IDS, admin: ALL_IDS, staff: READ_IDS, support: READ_IDS };
 const ids = (groups) => Nav.navItems(groups).map((i) => i.id);
 
@@ -82,7 +84,7 @@ await t("every nav action is a known action and a read; every href has a page ro
   eq(Nav.NAV.map((g) => g.label), ["Overview", "Orders", "Catalog", "Storefront", "Growth", "Store"], "groups:");
 });
 
-await t("for each role, every visible item passes roleAllows on its nav and page action; exact sets and order (16 / 16 / 11 / 11)", () => {
+await t("for each role, every visible item passes roleAllows on its nav and page action; exact sets and order (15 / 15 / 11 / 11)", () => {
   for (const role of ROLES) {
     const groups = Nav.navFor(role);
     eq(ids(groups), EXPECTED[role], `${role}:`);
@@ -95,7 +97,8 @@ await t("for each role, every visible item passes roleAllows on its nav and page
   eq(ROLES.slice().sort(), ["admin", "owner", "staff", "support"], "the roles:");
   eq(Nav.navFor("support").map((g) => g.label), ["Overview", "Orders", "Catalog", "Storefront", "Growth"], "support's groups (Store is empty, dropped):");
   eq(ids(Nav.navFor("nobody")), [], "an unknown role sees nothing:");
-  eq(Nav.NAV.flatMap((g) => g.items).find((i) => i.id === "setup").action, "settings.read", "Setup's nav action is stricter than its page's:");
+  eq(Nav.NAV.flatMap((g) => g.items).find((i) => i.id === "onboarding").action, "storefront.read", "Onboarding's nav action is its page's (every role):");
+  eq(ROLES.map((r) => Nav.navItems(Nav.navFor(r)).length), [15, 15, 11, 11], "the counts:");
 });
 
 await t("activeItem: longest path prefix at a '/', never a partial segment", () => {
@@ -193,7 +196,7 @@ const layoutStubs = {
   "@/lib/site": { siteName: () => "Roles Demo Co" },
   "@/lib/tenant-context": { currentTenant: () => ({ id: "roles", domains: ["roles.localhost"] }) },
   "@/lib/returns": { listReturns: async () => [{ id: "ret_1" }, { id: "ret_2" }] },
-  "@/lib/admin/onboarding": { buildChecklist: async () => ({ supported: true, launched: false, doneCount: 2, total: 7 }) },
+  "@/lib/onboarding/service": { onboardingFor: async () => ({ supported: true, open: false, doneCount: 2, total: 4 }) },
   "@/lib/releases": { publishingBadge: async () => "1" },
   "@/lib/platform/identity": {
     getUser: async (id) => {
@@ -239,9 +242,9 @@ await t("the layout hands the shell navFor(role), badges for visible items only,
     for (const i of Nav.navItems(Nav.NAV)) if (!visible.has(i.href)) ok(!json.includes(`"${i.href}"`), `${name}: hidden ${i.href} is not in the props:`);
     ok(!/password|hash|totp|secret/i.test(json), `${name}: no password, hash or secret in the props: ${json.slice(0, 200)}`);
     ok(!json.includes(OTHER_EMAIL) && !json.includes("grant_1"), `${name}: no other member's email and no grant id:`);
-    const wantBadges = Object.fromEntries(Object.entries({ returns: 2, setup: "2/7", publish: "1" }).filter(([k]) => Nav.navItems(p.nav).some((i) => i.badgeKey === k)));
+    const wantBadges = Object.fromEntries(Object.entries({ returns: 2, onboarding: "2/4", publish: "1" }).filter(([k]) => Nav.navItems(p.nav).some((i) => i.badgeKey === k)));
     eq(Object.keys(p.badges).sort().map((k) => `${k}=${p.badges[k]}`), Object.keys(wantBadges).sort().map((k) => `${k}=${wantBadges[k]}`), `${name}: badges:`);
-    if (actor.role === "staff" || actor.role === "support") ok(!("setup" in p.badges), `${name}: no setup badge even though the count returns one:`);
+    eq(p.badges.onboarding, "2/4", `${name}: every role sees the onboarding badge while the store is closed:`);
     eq(p.defaultOpen, false, `${name}: the sidebar_state cookie sets defaultOpen:`);
     if (actor.kind === "merchant") {
       eq(L.getUserCalls, 1, `${name}: getUser called once:`);
