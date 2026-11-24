@@ -14,7 +14,7 @@
 // Data lives in .design-data/ (gitignored). Stopping the harness stops sqld.
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
@@ -32,6 +32,26 @@ export const DATABASES = [
   { key: "tenant", offset: 1 },
   { key: "default", offset: 2 },
 ];
+// A harness profile: where its data lives, its ports, and how it treats that
+// data. DESIGN_PROFILE is today's design harness (pnpm dev:design and
+// pnpm seed:design), and the default everywhere below. The roles store
+// (pnpm seed:roles, scripts/dev-roles.js) is a second profile with its own
+// folder and ports; keepData makes its seed refuse a folder that holds data
+// instead of wiping it, and otherDataDirs are harnesses it must not run beside.
+export const DESIGN_PROFILE = Object.freeze({
+  name: "design harness",
+  dataDirName: DATA_DIR_NAME,
+  portEnv: Object.freeze({ next: "DESIGN_PORT", sqld: "DESIGN_SQLD_PORT" }),
+  defaultPorts: Object.freeze({ next: DEFAULT_NEXT_PORT, sqld: DEFAULT_SQLD_PORT }),
+  keepData: false,
+  otherDataDirs: Object.freeze([]),
+  credentials: true, // generate .design-env and pass its passwords to the seed and Next
+  tenantId: TENANT_ID,
+  siteHost: "localhost",
+  loginsFile: ENV_FILE_NAME,
+  // rebuild: what the messages tell someone to run to rebuild the data
+  commands: Object.freeze({ dev: "pnpm dev:design", rebuild: "pnpm seed:design" }),
+});
 const PIDFILE = "harness.pid.json";
 const SEEDED = "seeded.json";
 
@@ -129,13 +149,14 @@ export function readPort(env, name, fallback) {
   return n;
 }
 
-export function harnessPorts(env = process.env) {
-  const next = readPort(env, "DESIGN_PORT", DEFAULT_NEXT_PORT);
-  const first = readPort(env, "DESIGN_SQLD_PORT", DEFAULT_SQLD_PORT);
+export function harnessPorts(env = process.env, profile = DESIGN_PROFILE) {
+  const { next: nextEnv, sqld: sqldEnv } = profile.portEnv;
+  const next = readPort(env, nextEnv, profile.defaultPorts.next);
+  const first = readPort(env, sqldEnv, profile.defaultPorts.sqld);
   const last = first + DATABASES.length - 1;
-  if (last > 65535) throw new HarnessError(`DESIGN_SQLD_PORT is too high: the harness needs ${DATABASES.length} ports in a row starting there. Use a lower number.`);
+  if (last > 65535) throw new HarnessError(`${sqldEnv} is too high: the harness needs ${DATABASES.length} ports in a row starting there. Use a lower number.`);
   if (next >= first && next <= last) {
-    throw new HarnessError(`DESIGN_PORT (${next}) is one of the database ports (${first} to ${last}). Pick ports that don't overlap.`);
+    throw new HarnessError(`${nextEnv} (${next}) is one of the database ports (${first} to ${last}). Pick ports that don't overlap.`);
   }
   return { next, sqld: Object.fromEntries(DATABASES.map((d) => [d.key, first + d.offset])) };
 }
@@ -202,8 +223,8 @@ export function isPortBusy(port, host = "127.0.0.1", timeoutMs = 400) {
   });
 }
 
-async function busyPort(ports, { includeNext }) {
-  const list = [...(includeNext ? [["the web server", "DESIGN_PORT", ports.next]] : []), ...Object.entries(ports.sqld).map(([k, p]) => [`the ${k} database`, "DESIGN_SQLD_PORT", p])];
+async function busyPort(ports, { includeNext, portEnv = DESIGN_PROFILE.portEnv }) {
+  const list = [...(includeNext ? [["the web server", portEnv.next, ports.next]] : []), ...Object.entries(ports.sqld).map(([k, p]) => [`the ${k} database`, portEnv.sqld, p])];
   for (const [what, name, port] of list) {
     if ((await isPortBusy(port)) || (await isPortBusy(port, "::1"))) return { what, name, port };
   }
@@ -211,12 +232,12 @@ async function busyPort(ports, { includeNext }) {
 }
 
 // waitMs: after stopping leftovers, give their ports a moment to close.
-async function assertPortsFree(ports, { includeNext, waitMs = 0 }) {
+async function assertPortsFree(ports, { includeNext, waitMs = 0, portEnv }) {
   const started = Date.now();
-  let busy = await busyPort(ports, { includeNext });
+  let busy = await busyPort(ports, { includeNext, portEnv });
   while (busy && Date.now() - started < waitMs) {
     await new Promise((r) => setTimeout(r, 200));
-    busy = await busyPort(ports, { includeNext });
+    busy = await busyPort(ports, { includeNext, portEnv });
   }
   if (busy) {
     throw new HarnessError(`Port ${busy.port}, for ${busy.what}, is already in use. Another harness or app may be running. Stop it, or set ${busy.name} to a free port.`);
@@ -413,7 +434,7 @@ export function readCredentials(root) {
 
 // ---------- env handed to Next and the seed ----------
 
-export function harnessEnv(baseEnv, fileEnv, ports) {
+export function harnessEnv(baseEnv, fileEnv, ports, { siteHost = DESIGN_PROFILE.siteHost } = {}) {
   const urls = harnessUrls(ports);
   const env = { ...baseEnv, ...fileEnv };
   for (const name of BLANKED_ENV) env[name] = "";
@@ -425,7 +446,7 @@ export function harnessEnv(baseEnv, fileEnv, ports) {
     PLATFORM_SECRET: "design-preview-secret",
     DESIGN_TENANT_DB_URL: urls.tenant,
     DESIGN_PORT: String(ports.next),
-    NEXT_PUBLIC_SITE_URL: `http://localhost:${ports.next}`,
+    NEXT_PUBLIC_SITE_URL: `http://${siteHost}:${ports.next}`,
     NEXT_TELEMETRY_DISABLED: "1",
     PORT: String(ports.next),
   };
@@ -454,6 +475,16 @@ export function newMigrations(recorded, current) {
   return added;
 }
 
+// The folder exists and has anything in it (a profile with keepData never
+// seeds over such a folder without reset).
+export function holdsData(dir) {
+  try {
+    return readdirSync(dir).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export const readSeeded = (dataDir) => {
   try {
     return JSON.parse(readFileSync(join(dataDir, SEEDED), "utf8"));
@@ -479,22 +510,35 @@ const runChild = (cmd, args, opts) =>
 // fixture: PERF-04's "perf" store on top of the demo data (seeding only; see
 // scripts/perf-fixture.js). Recorded in seeded.json.
 export const FIXTURES = FIXTURE_NAMES;
-export async function runHarness({ mode, root = ROOT, env = process.env, log = console.log, nextCmd, seedCmd, repoint = pointTenantAtThisRun, script = process.argv[1], fixture = null } = {}) {
+// profile: DESIGN_PROFILE unless given (see above). reset: only with a
+// keepData profile, the seed deletes that profile's own data folder first.
+export async function runHarness({ mode, root = ROOT, env = process.env, log = console.log, nextCmd, seedCmd, repoint = pointTenantAtThisRun, script = process.argv[1], fixture = null, profile = DESIGN_PROFILE, reset = false } = {}) {
   if (mode !== "seed" && mode !== "dev") throw new HarnessError(`Unknown harness mode "${mode}". Use seed or dev.`);
   if (fixture != null && !FIXTURES.includes(fixture)) throw new HarnessError(`There is no "${fixture}" fixture. The fixtures are: ${FIXTURES.join(", ")}.`);
-  const ports = harnessPorts(env);
+  if (reset && !profile.keepData) throw new HarnessError(`reset only applies to a harness that keeps its data; ${profile.commands.rebuild} always starts fresh.`);
+  const ports = harnessPorts(env, profile);
   const sqld = findSqld({ env });
-  const dataDir = join(root, DATA_DIR_NAME);
+  const dataDir = join(root, profile.dataDirName);
 
   const other = runningHarness(dataDir);
   if (other) {
-    throw new HarnessError(`The design harness is already running (pid ${other.launcher.pid}). Stop it with Ctrl-C in its terminal first${mode === "seed" ? ", then seed again" : ""}.`);
+    throw new HarnessError(`The ${profile.name} is already running (pid ${other.launcher.pid}). Stop it with Ctrl-C in its terminal first${mode === "seed" ? ", then seed again" : ""}.`);
+  }
+  // Other harnesses' folders are only read (their pid files), never changed.
+  for (const name of profile.otherDataDirs) {
+    const sibling = runningHarness(join(root, name));
+    if (sibling) throw new HarnessError(`The harness using ${name}/ is running (pid ${sibling.launcher.pid}). Stop it with Ctrl-C in its terminal first; the two don't run side by side.`);
+  }
+  // keepData: a seed (or a dev run with nothing seeded) over a folder that holds
+  // data is refused here, before anything in it is touched (leftovers included).
+  if (profile.keepData && !reset && (mode === "seed" || !readSeeded(dataDir)) && holdsData(dataDir)) {
+    throw new HarnessError(`${profile.dataDirName}/ already holds data, and this seed never deletes it. ${profile.commands.rebuild} deletes it and seeds again; run that only if the data can go.`);
   }
   const leftovers = existsSync(dataDir) ? await stopLeftovers(dataDir, log) : [];
-  await assertPortsFree(ports, { includeNext: mode === "dev", waitMs: leftovers.length ? 10_000 : 0 });
+  await assertPortsFree(ports, { includeNext: mode === "dev", waitMs: leftovers.length ? 10_000 : 0, portEnv: profile.portEnv });
 
-  const fileEnv = ensureCredentials(root, log);
-  const childEnv = harnessEnv(env, fileEnv, ports);
+  const fileEnv = profile.credentials ? ensureCredentials(root, log) : {};
+  const childEnv = harnessEnv(env, fileEnv, ports, { siteHost: profile.siteHost });
   const seedEnv = { ...childEnv, DESIGN_FIXTURE: fixture || "" };
   const seed = seedCmd || [process.execPath, [join(root, "scripts/seed-design-preview.js")]];
   const next = nextCmd || [process.execPath, [join(root, "node_modules/next/dist/bin/next"), "dev", "-p", String(ports.next)]];
@@ -539,7 +583,11 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
   };
 
   const startDatabases = async () => {
-    mkdirSync(dataDir, { recursive: true });
+    // keepData (the roles store's logins live here): 0700 from the start
+    if (profile.keepData) {
+      mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+      chmodSync(dataDir, 0o700);
+    } else mkdirSync(dataDir, { recursive: true });
     died = null;
     servers = DATABASES.map((d) => startSqld({ bin: sqld.bin, key: d.key, port: ports.sqld[d.key], dataDir }));
     pidInfo.sqld = servers.map((s) => ({ key: s.key, ...processStamp(s.child.pid), port: s.port }));
@@ -573,15 +621,18 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
   };
 
   const doSeed = async () => {
+    // keepData: reached only with reset or an empty folder (checked above); either way only this profile's own folder
     rmSync(dataDir, { recursive: true, force: true });
     await startDatabases();
-    log(`• seeding the design store over http (databases on ports ${Object.values(ports.sqld).join(", ")})${fixture ? `, with the ${fixture} fixture` : ""}`);
+    log(`• seeding the ${profile.tenantId} store over http (databases on ports ${Object.values(ports.sqld).join(", ")})${fixture ? `, with the ${fixture} fixture` : ""}`);
     const r = await runChild(seed[0], seed[1], { cwd: root, env: seedEnv, stdio: "inherit" });
     await stopAll();
     stopping = null;
     if (r.code !== 0) {
       throw new HarnessError(
-        `${died ? `${diedMessage(died)}\n` : ""}Seeding failed${r.error ? `: ${r.error.message}` : ""}. The harness data is incomplete, so the next pnpm dev:design seeds again. Fix the error above, then run pnpm seed:design.`,
+        profile.keepData
+          ? `${died ? `${diedMessage(died)}\n` : ""}Seeding failed${r.error ? `: ${r.error.message}` : ""}. The data in ${profile.dataDirName}/ is incomplete and is kept. Fix the error above, then run ${profile.commands.rebuild}.`
+          : `${died ? `${diedMessage(died)}\n` : ""}Seeding failed${r.error ? `: ${r.error.message}` : ""}. The harness data is incomplete, so the next ${profile.commands.dev} seeds again. Fix the error above, then run ${profile.commands.rebuild}.`,
       );
     }
     writeFileSync(join(dataDir, SEEDED), JSON.stringify({ at: new Date().toISOString(), ports: ports.sqld, migrations: migrationNames(root), fixture: fixture || null }, null, 2));
@@ -590,30 +641,30 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
   try {
     if (mode === "seed") {
       await doSeed();
-      log(`✓ design harness seeded${fixture ? ` with the ${fixture} fixture` : ""}. Start it with pnpm dev:design (http://localhost:${ports.next}).`);
+      log(`✓ ${profile.name} seeded${fixture ? ` with the ${fixture} fixture` : ""}. Start it with ${profile.commands.dev} (http://${profile.siteHost}:${ports.next}).`);
       return 0;
     }
 
     if (!readSeeded(dataDir)) {
-      log(`• no harness data yet, so seeding first (the same as pnpm seed:design${fixture ? ` --fixture ${fixture}` : ""})`);
+      log(`• no harness data yet, so seeding first (the same as ${profile.commands.rebuild}${fixture ? ` --fixture ${fixture}` : ""})`);
       await doSeed();
     } else if (fixture && readSeeded(dataDir)?.fixture !== fixture) {
       log(`! The harness data wasn't seeded with the ${fixture} fixture. Run node scripts/dev-design.js seed --fixture ${fixture} first to get it.`);
     }
     const added = newMigrations(readSeeded(dataDir)?.migrations, migrationNames(root));
     if (added.length) {
-      log(`! ${added.length} database change${added.length === 1 ? " was" : "s were"} added since the last seed (${added.slice(0, 3).join(", ")}${added.length > 3 ? ", …" : ""}). Run pnpm seed:design to rebuild the harness data.`);
+      log(`! ${added.length} database change${added.length === 1 ? " was" : "s were"} added since the last seed (${added.slice(0, 3).join(", ")}${added.length > 3 ? ", …" : ""}). Run ${profile.commands.rebuild} to rebuild the harness data.`);
     }
 
     await startDatabases();
     try {
-      await repoint(harnessUrls(ports));
+      await repoint(harnessUrls(ports), profile.tenantId);
     } catch (e) {
-      throw new HarnessError(`The harness data looks incomplete (${String(e?.message || e).slice(0, 120)}). Run pnpm seed:design to rebuild it.`);
+      throw new HarnessError(`The harness data looks incomplete (${String(e?.message || e).slice(0, 120)}). Run ${profile.commands.rebuild} to rebuild it.`);
     }
 
-    log(`• local databases up: ${servers.map((s) => `${s.key} ${s.port}`).join(", ")} (data in ${DATA_DIR_NAME}/)`);
-    log(`• storefront and consoles: http://localhost:${ports.next}  (merchant /admin/login, operator /platform; passwords in ${ENV_FILE_NAME})`);
+    log(`• local databases up: ${servers.map((s) => `${s.key} ${s.port}`).join(", ")} (data in ${profile.dataDirName}/)`);
+    log(`• storefront and consoles: http://${profile.siteHost}:${ports.next}  (merchant /admin/login, operator /platform; passwords in ${profile.loginsFile})`);
     nextChild = spawn(next[0], next[1], { cwd: root, env: childEnv, stdio: "inherit" });
     if (nextChild.pid) {
       pidInfo.next = { ...processStamp(nextChild.pid), port: ports.next, match: next[1][0] };
@@ -627,7 +678,7 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
     });
     await stopAll();
     if (outcome.died && !signalled) {
-      throw new HarnessError(`${diedMessage(outcome.died)}\nThe harness stopped Next too. Start it again with pnpm dev:design.`);
+      throw new HarnessError(`${diedMessage(outcome.died)}\nThe harness stopped Next too. Start it again with ${profile.commands.dev}.`);
     }
     return signalled ? 0 : outcome.code;
   } catch (e) {
@@ -640,11 +691,11 @@ export async function runHarness({ mode, root = ROOT, env = process.env, log = c
 
 // The tenant row records its database URL at seed time. If the ports changed
 // since, point it at this run's tenant server.
-export async function pointTenantAtThisRun(urls) {
+export async function pointTenantAtThisRun(urls, tenantId = TENANT_ID) {
   const { createClient } = await import("@libsql/client");
   const client = createClient({ url: urls.platform });
   try {
-    await client.execute({ sql: "UPDATE tenants SET db_url = ? WHERE id = ? AND db_url <> ?", args: [urls.tenant, TENANT_ID, urls.tenant] });
+    await client.execute({ sql: "UPDATE tenants SET db_url = ? WHERE id = ? AND db_url <> ?", args: [urls.tenant, tenantId, urls.tenant] });
   } finally {
     client.close();
   }

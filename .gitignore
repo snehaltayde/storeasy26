@@ -58,3 +58,4 @@ platform.db
 .design-*.db
 # P1-HARNESS: the harness's local sqld data, logs and pid file
 /.design-data/
+/.design-data-roles/

@@ -3,6 +3,19 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 The all-roles seed is its own local store (on the owner's behalf)
+
+- **Decision:**
+  - `pnpm seed:roles` builds a separate local store, `roles.localhost` on port 3018, with its own data folder (`.design-data-roles/`) and database servers. It never touches `.design-data/`, and refuses if a roles store already exists; `--reset` deletes only its own folder and needs the owner's OK.
+  - The operator is pre-enrolled for the authenticator; passwords (new random ones each seed), the authenticator secret and link go only into a private file (`.design-data-roles/roles-seed.json`, owner-only permissions, gitignored), never to the screen.
+  - The store stays closed: the seed publishes nothing (drafts only, legal text never auto-published). The shopper's order goes through the real order code with totals computed on the server; the shopper is `shopper@roles.test`, not the real test-order address.
+  - `pnpm roles:code` prints the shopper's latest sign-in code from the local database, since there is no mail provider locally.
+  - The seed writes one audit row with actor kind `cli`.
+- **Why:** `pnpm seed:design` wipes `.design-data/`, so a store kept there would be lost; separate host and port keep console cookies apart.
+- **Instead of:** adding roles to the existing design store (changes the owner's data); reusing the test fixtures, which mint sessions directly and delete files.
+- **Decided by:** Claude, on the owner's behalf
+- **Slice:** Phase 0, all-roles seed
+
 ## 2026-11-24 How the agency programme is removed (on the owner's behalf)
 
 - **Decision:**

@@ -316,3 +316,83 @@ No migration (`orders.cart_id` exists). Shopper identity comes only from `custom
 3. The harness DB keeps its agency rows (`partner@design.test`, a grant on `design`); leave them, no re-seed. No FKs into agency tables.
 4. `test-design-doc.js` and `test-order-catalog.js` mix agency checks into tests that matter for other things; keep the theme-kit and onboarding/Help/readability assertions.
 5. Retired drills `p4/runbook.mjs`, `cutover.mjs` expect an "agency has access" result that nothing produces now; they stay unrunnable (Phase 0 drills line).
+
+## Line 5: one command seeds a store with every role
+
+**Fit:** Phase 0 line 5. The existing harness can't host it: `doSeed()` in `scripts/design-harness.js` runs `rmSync(.design-data)`, and its three sqld servers are taken. So it is its own harness profile: data in `.design-data-roles/`, sqld on 18027–18029, web on 3018, host `roles.localhost`. Owner rule: never delete or re-seed their existing data without asking.
+
+### 1. What `pnpm seed:roles` creates
+
+- Fresh platform DB, store DB and the unused default DB.
+- Store `roles` ("Roles Demo Co") on `roles.localhost`, set up like p6: `applyTenantSchema`, `applyContentMode("documents")`, `upsertTenant` (INR, Asia/Kolkata, `checkout_mode: "direct"`, random `admin_password` and `order_link_secret`, no Shopify or Razorpay fields).
+- Members via `createUser` + `addMembership`: `owner@roles.test`, `admin@roles.test`, `staff@roles.test`, `support@roles.test`, fresh random passwords every seed.
+- Operator `operator@roles.test` via `createOperator`, pre-enrolled with `ensureTotpSecret` → `confirmTotp`.
+- Synced catalog: `catalogFor("few")` (`scripts/support/tenant-fixture.js`) through the real `runCatalogSync` with injected fetchers and `NO_INDEX`; leaves a complete `sync_runs` row; `confirmedCatalogSync()` is confirmed. First-run starter drafts allowed; nothing published.
+- Shopper `shopper@roles.test` ("Meera Shopper"): customer row and one COD order — `createCart`, `addItem` ×2 (product 1 × 2, product 2 × 1), `createOrder({ cartId, paymentMethod: "cod", shipping: computeShipping(...) })` with no cart passed (server recomputes), Pune address, `customer_id` set. Not `snehal@mediastic.in`.
+- One audit row: `seed.roles_store`, actor `{ kind: "cli", id: "seed-roles" }`, tenant `roles`, counts only.
+
+**Credentials:** only in `.design-data-roles/roles-seed.json`, mode 0600 (write with mode, then `chmodSync`); folder 0700; `/.design-data-roles/` in `.gitignore`. Holds store id, host, URL; each role's email and password; operator password, `totpSecret`, `otpauth`; shopper email and order id; product/collection/sync figures; seed time.
+
+**Printed:** one line — `✓ roles store on http://roles.localhost:3018: owner, admin, staff, support, 1 operator, shopper with order <id> (₹<total>, COD), <n> products, sync complete. Store is closed (nothing published). Logins: .design-data-roles/roles-seed.json`. Never a password, secret or link.
+
+**Refusals (before any client opens):**
+- `.design-data-roles/` already holds data → refuse, change nothing, unless `--reset` (deletes only that folder).
+- Platform DB already holds a tenant or user → refuse.
+- Either harness running (`runningHarness` on both data folders) → refuse.
+- Any DB URL that isn't `file:<local path>` or `http://127.0.0.1|localhost|[::1]:<port>` (covers `libsql://`, `https://`, `ws(s)://`, `file://host/...`, LAN IPs).
+- Env names a Shopify or payment key (p6's `REAL_KEYS`); non-empty `TURSO_DB_URL`.
+
+**Other commands:** `pnpm dev:roles` runs the roles harness (seeds first if no data; deletes nothing). `pnpm roles:code` prints the shopper's latest sign-in code from the store's `notifications` row (read-only, refuses hosted URLs, works while the roles harness runs).
+
+**Out of scope:** an operator support grant; a published or open store.
+
+### 2. Test: `scripts/test-seed-roles.js`
+
+Setup: `blankOutsideServices()`, `blockNetwork()`, route loader from `scripts/support/route-harness.js`, `PLATFORM_SECRET` set; temp dir via `mkdtemp(os.tmpdir())` with `platform.db`, `tenant.db`, `default.db`; `seedRolesStore({ platformUrl, tenantUrl, defaultUrl, dataDir, host: "roles.localhost" })`; requests to real route modules with `host` and `origin`.
+
+1. Credentials file 0600 with all six identities; returned summary has no password, TOTP secret or `otpauth`.
+2. Each member `POST /api/admin/login` → 200 + `_admin`; owner/admin 200 on `settings` GET, staff/support 403, support 200 on `orders`; wrong password 401.
+3. Operator `POST /api/platform/login` with email, password, `totpCode(secret)` → 200 + `_platform`; without a code → 401 "Authenticator code required".
+4. Shopper: `request_otp`, read the code from `notifications` in `withTenant`, `verify`, cookie; `GET ?view=orders` has the order; total = sum of fixture prices.
+5. Signed-out `GET /api/account?view=orders` → `authenticated: false`, no order id in the text.
+6. Support `orders` and `orders/[id]` have the order id but not the shopper's email, phone or address; owner's response does (positive control).
+7. Latest sync run `complete`, product count = catalog, ≥1 collection, sync confirmed.
+8. Content mode documents; no live release; `publish_log` and `releases` empty; domains exactly `["roles.localhost"]`; one `seed.roles_store` audit row with no password.
+9. Re-run on the same URLs throws "already holds a store"; row counts and file hash unchanged.
+10. `assertFreshDataDir(dir)` throws on a seeded folder; returns a reset plan with `reset: true`.
+11. Hosted URLs refused for platform and store: `libsql://x.turso.io`, `https://x`, `wss://x`, `http://10.0.0.5:8080`, `file://host/x`; temp folder still empty after each.
+12. Running harness refused: spawn `node -e "setTimeout(()=>{},3e4)" dev-design.js`, write its pid file into a temp root, guard refuses, stop it with `child.kill()` (own handle, never by name).
+13. A Shopify or Razorpay key in env → refused.
+14. `git check-ignore .design-data-roles/x` succeeds.
+15. `runHarness` with stand-in `seedCmd`/`nextCmd` and the roles profile never touches a sibling `.design-data` folder in the temp root.
+
+### 3. File plan
+
+1. `.gitignore`: `/.design-data-roles/`.
+2. `scripts/design-harness.js`: `runHarness` gets a `profile` option `{ dataDirName, portEnv, defaultPorts, keepData, otherDataDirs, credentials, tenantId }`; defaults = today's values (`dev:design`/`seed:design` unchanged); with `keepData`, `doSeed` refuses instead of `rmSync` unless reset; `pointTenantAtThisRun` takes a tenant id.
+3. `scripts/seed-roles-store.js` (new): `ROLES_STORE`, `ROLES_LOGINS`, `assertSeedDbUrl`, `assertFreshDataDir`, `seedRolesStore()`, `writeRolesSeed()`, `latestShopperCode()`; no side effects on import.
+4. `scripts/seed-roles.js` (new): child process the harness runs; reads URLs from env, calls the core.
+5. `scripts/dev-roles.js` (new): CLI `[seed [--reset] | code]`.
+6. `scripts/test-seed-roles.js` (new).
+7. `package.json`: `seed:roles` (`node scripts/dev-roles.js seed`), `dev:roles` (`node scripts/dev-roles.js`), `roles:code` (`node scripts/dev-roles.js code`), `test:seed-roles`.
+8. Docs: `CLAUDE.md` Seed row → `pnpm seed:roles` (fresh role store on http://roles.localhost:3018; refuses if one exists; logins in `.design-data-roles/roles-seed.json`; `--reset` only with the owner's OK) and note `pnpm seed:design` wipes `.design-data/` (ask first, stop the harness first); Run row gains `pnpm dev:roles`. `docs/PLAYBOOK.md`: agents never run `--reset` or `seed:design` without asking.
+
+No schema or migration; no new permission actions; events: one `audit_log` row, the sync's `sync_runs` row.
+
+### 4. Checks first
+
+1. `ls .design-data-roles 2>/dev/null` must not exist; if it does, stop and ask.
+2. `command -v sqld || ls ~/.turso/sqld`
+3. Baselines: `node scripts/test-permissions.js && node scripts/test-shopper-reads.js && node scripts/test-support-reads.js`
+4. `grep -n "PLATFORM_SECRET" lib/platform/crypto.js` (TOTP key; seed and dev must share `design-preview-secret`).
+5. `grep -n "closedStoreGate\|closed" "app/(storefront)/layout.js" app/api/account/route.js` (`/api/account` answers on a closed store?).
+6. `grep -n "first\|firstRun\|first-run" lib/sync.js | head -20` (first sync writes, no network).
+7. `grep -rn "test:design-harness" scripts package.json`.
+
+### 5. Risks
+
+1. `runHarness` is shared with `seed:design` (which wipes data) and has no suite; defaults must behave exactly as today; test 15 proves the profile never touches `.design-data`.
+2. Closed store: shopper browser pages show "Opening soon"; only API reads are proven until the owner publishes.
+3. `--reset` deletes data: no agent runs it without asking.
+4. Safari may not resolve `*.localhost`; use Chrome or a hosts entry.
+5. Fixture images point at `cdn.shopify.com/fixture/...` (broken offline; cosmetic).

@@ -45,14 +45,14 @@ A new feature's files go in: a migration in `migrations/tenant/` (or `platform/`
 | Task | Command |
 |---|---|
 | Install | `pnpm install --frozen-lockfile` |
-| Run locally | `pnpm dev:design` (a local harness store on http://localhost:3017; seeds itself on first run; `pnpm dev` needs a `.env.local`) |
+| Run locally | `pnpm dev:design` (a local harness store on http://localhost:3017; seeds itself on first run; `pnpm dev` needs a `.env.local`); `pnpm dev:roles` (the role store on http://roles.localhost:3018; seeds itself if it has no data, deletes nothing) |
 | Lint | `pnpm typecheck` (there is no linter; the TypeScript check is the closest real check) |
 | Unit tests (all) | `pnpm test` |
 | Unit tests (one file) | `node scripts/test-authz.js` (any `scripts/test-<name>.js`) |
 | Migrate a fresh database | `node scripts/test-schema-compat.js` (runs the store migration chain on new file databases; `pnpm migrate` needs a `.env.local`) |
 | Browser tests (one spec) | `pnpm drill:p6` |
 | Browser tests (all) | `pnpm drill:p6 && node scripts/drills/p5/run.mjs` (the p1–p4 drills predate the legacy-CMS retirement and are not run; see `docs/FEATURES.md` Phase 0) |
-| Seed | `pnpm seed:design` (stop the harness first) |
+| Seed | `pnpm seed:roles` (a fresh store with every role on http://roles.localhost:3018; refuses if one exists; logins in `.design-data-roles/roles-seed.json`; `--reset` only with the owner's OK). `pnpm seed:design` wipes `.design-data/`: ask the owner first, and stop the harness first |
 
 <!-- The working agreement from the steelthread plugin goes below this line. -->
 # Working agreement: how software is built here
