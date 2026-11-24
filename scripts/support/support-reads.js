@@ -31,7 +31,7 @@ export const SUPPORT_PROBES = Object.freeze([
   { name: "experiments", path: "experiments", method: "GET", keys: ["ok", "experiments"] },
   { name: "experiments ?analyze=", path: "experiments", method: "GET", req: () => ({ query: "analyze=home" }), status: 404, keys: ["error"], note: "no experiment by that slug: the miss answers 404" },
   { name: "first-run", path: "first-run", method: "GET", keys: ["ok", "firstRun", "sync"] },
-  { name: "onboarding", path: "onboarding", method: "GET", keys: ["ok", "supported", "open", "current", "doneCount", "total", "steps"] },
+  { name: "onboarding", path: "onboarding", method: "GET", keys: ["ok", "supported", "open", "openKnown", "current", "doneCount", "total", "steps"] },
   { name: "sync", path: "sync", method: "GET", keys: ["ok", "sync"] },
   { name: "theme", path: "theme", method: "GET", keys: ["ok", "kits", "theme", "upgradeAvailable", "design"] },
   { name: "insights", path: "insights", method: "GET", keys: ["ok", "configured", "model", "budget", "insights"] },
