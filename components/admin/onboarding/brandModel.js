@@ -1,5 +1,5 @@
 // The onboarding Brand step's model (Phase 1 line 6): pure, no React. Moved
-// here from components/admin/first-run/FirstRun.js and BrandStep.js (retired)
+// here from the retired first-run FirstRun and BrandStep components
 // and extended with the live preview's overlay message and the unsaved
 // choices' keep / undo / clear.
 //

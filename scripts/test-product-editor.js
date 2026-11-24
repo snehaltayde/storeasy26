@@ -10,7 +10,7 @@
 //   3. what has a control: only the overlay fields; price, variants and stock
 //      read-only with the Shopify link; the Catalog screen's new words
 //   4. the title gate forced closed, and open on a Typesense store
-//   5. the parity list (CatalogAdmin and UpsellsAdmin), the collection form
+//   5. the product and collection forms edit their settings
 //   6. shoppers never see editor-only words
 //   7. the switcher: every product reachable, a renamed one found, the counts;
 //      the editor never reads /api/admin/catalog
@@ -56,8 +56,6 @@ const TS = await import("../lib/typesense-search.js");
 const Sync = await import("../lib/sync.js");
 const EE = await import("../lib/admin/entity-entry.js");
 const EM = await import("../components/admin/editor/editorModel.js");
-const { PARITY, OLD_CONTROLS, OLD_FORM_CONTROLS, NOT_CARRIED, NOT_A_SETTING, oldFormControls } = await import("../components/admin/editor/parity.js");
-const { controlKindOf } = await import("../components/admin/editor/fields/inspectorModel.js");
 const { handleDocumentsPut } = await import("../lib/admin/documents-api.js");
 const I = await import("../lib/platform/identity.js");
 const S = await import("../lib/platform/sessions.js");
@@ -100,7 +98,7 @@ const compile = async (file) =>
       module: { type: "commonjs" },
     })
   ).code;
-const isJsxFile = (file) => /\/(components|app)\//.test(file) && !/(Model|documentsApi|store|previewMachine|parity)\.js$/.test(file) && !/\/app\/api\//.test(file);
+const isJsxFile = (file) => /\/(components|app)\//.test(file) && !/(Model|documentsApi|store|previewMachine)\.js$/.test(file) && !/\/app\/api\//.test(file);
 const exists = (f) => readFile(f).then(
   () => true,
   () => false,
@@ -623,42 +621,10 @@ await t("unit: with the gate open on a store with Typesense configured (dummy lo
 });
 
 // =====================================================================================
-console.log("— 5. parity with the Catalog and Upsells screens; the collection form");
+console.log("— 5. the product and collection forms edit their settings");
 // =====================================================================================
 
-await t("unit: the PARITY list maps every carried control to a registered setting with a working control or a plain reason", async () => {
-  // each old control maps to a PARITY entry, a NOT_CARRIED reason, or finds what to edit
-  const carried = new Set(PARITY.map((p) => `${p.screen}|${p.what}`));
-  const notCarried = new Set(NOT_CARRIED.map((n) => `${n.screen}|${n.what}`));
-  for (const screen of Object.keys(OLD_FORM_CONTROLS)) {
-    for (const [ident, whats] of Object.entries(OLD_FORM_CONTROLS[screen])) {
-      for (const w of [whats].flat()) ok(w === NOT_A_SETTING || carried.has(`${screen}|${w}`) || notCarried.has(`${screen}|${w}`), `${screen} ${ident}: "${w}" is neither carried nor a plain difference`);
-    }
-  }
-  eq(PARITY.map((p) => p.what).sort(), [...OLD_CONTROLS.CatalogAdmin, ...OLD_CONTROLS.UpsellsAdmin].filter((w) => !NOT_CARRIED.some((n) => n.what === w)).sort(), "every carried old control is listed:");
-  for (const n of NOT_CARRIED) ok([...OLD_CONTROLS[n.screen]].includes(n.what), `${n.what}: an old control`);
-  // the switches: the pairs strip's and the cart slot's, each with a plain reason
-  const sw = OLD_FORM_CONTROLS.UpsellsAdmin['${p.enabled ? "Disable" : "Enable"} ${rowTitle(p)}'];
-  eq(sw, ["Pairs: Enable or Disable switch", "Cart slot: Enable or Disable switch"], "UpsellsAdmin's Enable/Disable switch:");
-  for (const w of sw) {
-    const n = NOT_CARRIED.find((x) => x.what === w);
-    ok(n && /remove every/.test(n.why) && /Earlier versions/.test(n.why) && !/[A-Z]{3,}_[A-Z]/.test(n.why), `${w}: a plain reason: ${n?.why}`);
-  }
-  ok(!PARITY.some((p) => /switch/i.test(p.what)), "no switch is passed off as 'remove every product'");
-  const { CONTROL_COMPONENTS } = await loadPlain(join(ROOT, "components/admin/editor/fields/SettingsForm.js"));
-  for (const p of PARITY) {
-    const type = R.documentType(p.type);
-    ok(type, `${p.what}: type ${p.type}`);
-    const setting = p.key === "sections" ? (type.sections ? { kind: "sections" } : null) : type.settings.find((s) => s.key === p.key);
-    ok(setting, `${p.what}: setting ${p.key} on ${p.type}`);
-    if (p.type === "product_content") eq(PF.PRODUCT_CONTROLS[p.key], p.control, `${p.what}: the product form's control:`);
-    else if (p.type === "collection_content") eq(CF.COLLECTION_CONTROLS[p.key], p.control, `${p.what}: the collection form's control:`);
-    else {
-      eq(controlKindOf(setting.kind), p.control, `${p.what}: the settings form's control:`);
-      ok(typeof CONTROL_COMPONENTS[p.control] === "function", `${p.what}: a component`);
-    }
-    if (p.key === "pairs" && p.part) ok(["title", "products"].includes(p.part), "a part of pairs");
-  }
+await t("unit: the product form's badge, layout, pairs and module controls edit their settings", async () => {
   // working: each product entry's control edits its setting
   const e = await read(10);
   const edits = [];
@@ -1293,7 +1259,7 @@ await t("rendered: 'Discard edits' is never offered to a read-only person on a p
   ok(plain(ro).includes(EM.PRODUCT_WORDS.discardStaff), "they see why");
 });
 
-await t("rendered: on a documents store the catalog page and CatalogAdmin say the brand and product type shown are set in the editor, and only price, stock and Shopify's own type and vendor stay in Shopify; the legacy line is unchanged", async () => {
+await t("rendered: the catalog page says the brand and product type shown are set in the editor, and only price, stock and Shopify's own type and vendor stay in Shopify", async () => {
   const marker = (name) => (p) => h("div", { "data-stub": name, "data-props": JSON.stringify(p ?? {}) });
   const catWorld = world({
     "next/navigation": navStub,
@@ -1303,10 +1269,8 @@ await t("rendered: on a documents store the catalog page and CatalogAdmin say th
     "@/lib/console-request": { tfetch: (fn) => fn() },
     "@/lib/cms-mode": { getCmsMode: async () => "documents" },
     "@/lib/db": { db: {} },
-    "@/lib/catalog-overrides": { listProductOverrides: async () => [], getCollectionPins: async () => [] },
     "@/lib/bundles": { listBundles: async () => [] },
     "@/lib/quiz": { listQuizzes: async () => [] },
-    "@/components/admin/CatalogAdmin": { __esModule: true, default: marker("CatalogAdmin") },
     "@/components/admin/CommercePanels": { BundlesPanel: marker("BundlesPanel"), QuizPanel: marker("QuizPanel") },
   });
   const CatalogPage = (await catWorld(join(ROOT, "app/(console)/admin/(authed)/catalog/page.js"))).default;

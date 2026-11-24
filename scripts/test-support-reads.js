@@ -535,7 +535,8 @@ await t("pages: every console page has a row in admin-pages.js, every row a page
   eq(rows.filter((r) => !files.includes(r)).join(","), "", "rows without a page:");
   eq(new Set(rows).size, rows.length, "rows unique:");
   for (const r of ADMIN_PAGES) ok(ACTIONS.includes(r.action), `${r.page} action ${r.action}`);
-  ok(files.length >= 31, `walked ${files.length} pages`);
+  // 18 since Phase 1 line 10 removed the 14 redirect-only pages
+  ok(files.length >= 18, `walked ${files.length} pages`);
 });
 
 await t("S2 pages: every page a least-trusted role may not read checks roleAllows(actor.role, action) before its data", async () => {
@@ -573,14 +574,7 @@ await t("page sweep: every console page runs as support (a page, a redirect or a
   eq(Object.values(pageRuns).flatMap((run) => run.unresolved).join("\n"), "", "unresolved imports:");
   const rendered = Object.entries(pageRuns).filter(([, run]) => run.props.length).map(([p]) => p);
   const other = Object.entries(pageRuns).filter(([, run]) => !run.props.length).map(([p, run]) => `${p} (${run.redirect ? `redirect ${run.redirect}` : run.notFound ? "not found" : "empty"})`);
-  // the storefront/theme/brand/upsells pages redirect to the editor in a documents store
   ok(rendered.length >= 15, `most pages rendered props: ${rendered.length}; not: ${other.join(", ")}`);
-});
-
-await t("Phase 1 line 3: as support, /admin/setup redirects to /admin/onboarding and /admin/start to /admin/onboarding?step=brand", () => {
-  eq(pageRuns.setup.redirect, "/admin/onboarding", "setup:");
-  eq(pageRuns.start.redirect, "/admin/onboarding?step=brand", "start:");
-  eq(pageRuns.setup.props.length + pageRuns.start.props.length, 0, "they render nothing:");
 });
 
 await t("page sweep (S1, S2): no prop on any console page holds a canary for support", () => {

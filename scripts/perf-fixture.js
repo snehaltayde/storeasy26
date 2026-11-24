@@ -46,9 +46,6 @@ export const PERF_FIXTURE = Object.freeze({
   offers: 5, // plus the 3 demo offers and one offer per enabled bundle
   bundles: 4, // 3 enabled
   quizzes: 1,
-  pairedProducts: 40, // products with a hand-picked "Pairs well with" list
-  productOverrides: 24, // badges and extra accordions on product pages
-  pinnedCollections: 5, // collections with products pinned to the top
   productPhotos: 24, // library images the product photos point at
   pagePhotos: 8, // library images for pages and home sections
 });
@@ -269,7 +266,7 @@ export function buildPerfFixture(spec = PERF_FIXTURE) {
   ].slice(0, spec.headerMenu.items);
   const navFooter = pages.slice(0, spec.footerLinks).map((p) => ({ label: p.title, href: `/policies/${p.slug}` }));
 
-  // commerce: offers, bundles, quiz, pairs, badges, pins
+  // commerce: offers, bundles, quiz
   const inStock = products.filter((p) => p.available && p.variants[0].available);
   const firstOf = (type) => inStock.find((p) => p.product_type === type);
   const shaker = inStock.find((p) => p.title.includes("Shaker Bottle")) || firstOf("Accessories");
@@ -305,21 +302,9 @@ export function buildPerfFixture(spec = PERF_FIXTURE) {
   ].slice(0, spec.quizzes);
 
   // The product the report measures: 6 variants (3 flavours by 2 sizes) and
-  // 6 photos. Its pairs list, badge and extra accordion stay in the fixture
-  // data only (not seeded: see seedPerfFixture).
+  // 6 photos.
   const MEASURED = 11;
   const measuredProduct = products[MEASURED];
-  const pairSources = [measuredProduct, ...products.filter((p, i) => i !== MEASURED && i % 9 === 0)].slice(0, spec.pairedProducts);
-  const placements = pairSources.map((p, n) => ({ id: `pp-perf-${n + 1}`, kind: "pdp_pairs", sourceProductId: p.id, targetProductIds: [1, 2, 3, 4].slice(0, 3 + (n % 2)).map((k) => generatedIds[(products.indexOf(p) + k * 13) % generatedCount]), title: "Pairs well with", enabled: true }));
-  placements.push({ id: "cu-perf-1", kind: "cart_upsell", sourceProductId: null, targetProductIds: [shaker.id, firstOf("Snacks").id, firstOf("Vitamins").id], title: "Add to your order", enabled: true });
-  const overrides = [measuredProduct, ...products.filter((p, i) => i !== MEASURED && i % 16 === 3)].slice(0, spec.productOverrides).map((p, n) => ({
-    productId: p.id,
-    badge: ["Bestseller", "Lab tested", "New", "Vegan"][n % 4],
-    modules: [{ title: "How to use", html: `<p>${sentence(rng(300 + n))}</p><ul><li>${sentence(rng(310 + n))}</li><li>${sentence(rng(320 + n))}</li></ul>` }],
-  }));
-  const pins = collections
-    .slice(1, 1 + spec.pinnedCollections)
-    .map((c) => ({ collectionId: c.id, productIds: c.productIds.slice(-4).reverse() }));
 
   // What scripts/perf-report.js asks for. One place, so the report and the
   // fixture can't drift apart.
@@ -337,7 +322,7 @@ export function buildPerfFixture(spec = PERF_FIXTURE) {
     cart: { id: "perf-cart-1", lines: measuredVariants },
   };
 
-  return { spec, media, products, collections, pages, posts, campaigns, homeSections, navHeader, navFooter, offers, bundles, quizzes, placements, overrides, pins, measured };
+  return { spec, media, products, collections, pages, posts, campaigns, homeSections, navHeader, navFooter, offers, bundles, quizzes, measured };
 }
 
 // Sizes as the database will hold them once seeded (demo rows included).
@@ -355,9 +340,6 @@ export function fixtureSummary(fx) {
     offersAdded: fx.offers.length,
     bundles: fx.bundles.length,
     quizzes: fx.quizzes.length,
-    placements: fx.placements.length,
-    productOverrides: fx.overrides.length,
-    pinnedCollections: fx.pins.length,
     media: fx.media.length,
   };
 }
@@ -425,10 +407,8 @@ export async function seedPerfFixture({ libsql, log = () => {}, spec = PERF_FIXT
   log(`  catalog: ${fx.products.length} products, ${fx.collections.length} collections added`);
 
   // The fixture's content (home, header, footer, pages, posts, campaigns)
-  // becomes documents in perf-docs-fixture.js. Its pairs, badges and pins
-  // (fx.placements, fx.overrides, fx.pins) are NOT seeded anywhere: their
-  // legacy writers were retired with the legacy CMS and perf-docs-fixture.js
-  // does not carry them, so the measured product page shows the automatic
+  // becomes documents in perf-docs-fixture.js. The fixture has no hand-picked
+  // pairs, badges or pins, so the measured product page shows the automatic
   // "Pairs well with" list at most, and no badge.
 
   // commerce

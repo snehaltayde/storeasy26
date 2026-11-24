@@ -5,8 +5,8 @@
 //   2. Legacy equivalence: the real home page (app/(storefront)/page.js) and
 //      components/ContentPage.js render exactly what a6d028e rendered, for v1,
 //      v2 and v3 releases, legacy drafts, an S59 preview candidate and a
-//      running hero experiment (scripts/support/home-render-outputs.js, run
-//      here and inside an a6d028e checkout; data-section-* taken out).
+//      running hero experiment (recorded at a6d028e into
+//      scripts/fixtures/home-render-outputs.a6d028e.json; data-section-* taken out).
 //   3. A documents store (v4, published through the real service): the hero
 //      image through StoreImage, a hidden hero, an experiment variant merged
 //      with heroVariantSettings, and rails that never read collection_overrides.
@@ -421,10 +421,10 @@ await t("a v4 home whose hero is hidden renders without a hero, with no error, a
   ok(!/data-exp-ping/.test(h), "a hidden hero pinged an experiment");
 });
 
-await t("a v4 home's rails never read collection_overrides (plan decision 9)", async () => {
+await t("a v4 home's rails never read the old pins table (plan decision 9)", async () => {
   await publishHome([sec("hero", "sec_hero", HERO_SETTINGS), sec("product_rail", "sec_rail1", { title: "Serums", collection: { handle: "serums", id: COL(1) }, limit: 3 })]);
   const v4 = await inV4(() => watch(() => renderHome("srv.test")));
-  same(v4.statements.filter((q) => /collection_overrides/i.test(q)), [], "v4 statements on collection_overrides:");
+  same(v4.statements.filter((q) => /collection_overrides/i.test(q)), [], "v4 statements on the old pins table:");
   const v4Rail = v4.result.match(/data-section-id="sec_rail1"[\s\S]*?<\/section>/)?.[0] || "";
   same([...v4Rail.matchAll(/href="\/products\/([^"]+)"/g)].map((m) => m[1]), ["glow-serum", "night-cream", "dew-drops"], "v4 rail order (the collection's own):");
 });

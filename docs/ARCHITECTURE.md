@@ -38,7 +38,7 @@ Full columns and types are in the SQL files named below. This page lists each ta
 | `cms_state` | The store's content mode (`documents`, or `closed` until first publish) | singleton | — |
 | `media` | Uploaded files: bytes or R2 `storage_url` (0027), `archived_at` (0025), derivatives via `parent_id` | `id` (`med_…`) | Archive, then two-step delete refused while referenced |
 | `page_redirects`, `quizzes`, `experiments`, `experiment_exposures`, `experiment_conversions`, `ai_insights`, `automations`, `automation_runs`, `automation_flags` | Redirects, quiz, A/B tests, AI insight drafts, automations | `id` | Kept |
-| Legacy, no longer written: `cms_blocks`, `cms_pages`, `cms_history`, `cms_templates`, `cms_approvals`, `product_overrides`, `collection_overrides`, `placements`, `cms_migration_runs`, `content_live_reversed` | Old-editor content kept for history and migration | — | Not dropped (migrations stay additive) |
+| Legacy, no longer written: `cms_blocks`, `cms_pages`, `cms_history`, `cms_templates`, `cms_approvals`, `product_overrides`, `collection_overrides`, `placements`, `cms_migration_runs`, `content_live_reversed`, `cms_preview_candidates` (0026's `DROP TABLE IF EXISTS preview_candidates` named the wrong table, so it stays) | Old-editor content kept for history and migration | — | Not dropped (migrations stay additive) |
 
 **Commerce**
 
@@ -141,7 +141,6 @@ All background work is the durable `jobs` table (control plane), run by `runDueJ
 | `send_notification` | Order and account events | Email via Resend |
 | `forward_event` | Shopper events | Meta CAPI |
 | `generate` | First run | Starter home and design drafts (`lib/first-run/generate.js`) |
-| `publish_release` | Retired (legacy CMS) | Skips |
 
 ## External services
 

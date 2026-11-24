@@ -55,6 +55,8 @@ search box returns real products.
 | `pnpm test` | run every test suite except `test:perf`; see [docs/operations.md](docs/operations.md#tests-shop-06) |
 | `pnpm hooks:enable` | run `pnpm test` before every commit (off by default) |
 
+Every command, the multi-store ones included: [docs/operations.md](docs/operations.md#commands-packagejson).
+
 ## How it works
 
 ```

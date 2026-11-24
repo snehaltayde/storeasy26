@@ -580,7 +580,7 @@ console.log("— 6. home's catalog reads (acceptance 5b, fix round 2)");
 const NAV_COLLECTIONS = /left join "collection_products"[\s\S]*having/i; // getAllCollections
 const RAIL_COUNT = /select count\("cp"\."product_id"\) as "n"/i; // getProductsInCollection's total
 const catalogOf = (st) => st.filter((s) => !CONTENT_SQL.test(s.sql) && !/\bcarts?\b|cart_items/i.test(s.sql));
-await t("home on v4 reads no catalog it doesn't show: no nav collections when both menus are the store's own, no rail counts, no pins read (a documents store never reads collection_overrides, P2-SECTIONS), one statement for the stats, and only the experiment columns it serves", async () => {
+await t("home on v4 reads no catalog it doesn't show: no nav collections when both menus are the store's own, no rail counts, no pins read (a documents store never reads the old pins table, P2-SECTIONS), one statement for the stats, and only the experiment columns it serves", async () => {
   facts.homeCatalog = {};
   for (const n of COUNTS) {
     const { statements, result } = homeAt[n];

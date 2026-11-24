@@ -224,7 +224,7 @@ export async function seedP6Stage({ urls, stage, variant = null, H }) {
       if (left) throw new Error(`the harness's third database still holds ${left} tables after the wipe`);
       out.wiped = true;
       await P.applyTenantSchema(client);
-      const mode = await P.applyContentMode(client, { contentMode: plan.mode });
+      const mode = await P.applyContentMode(client);
       if (mode.contentMode !== plan.mode) throw new Error(`the p6 store did not start on ${plan.mode}: ${mode.contentModeReason}`);
       out.contentMode = mode;
     } else {

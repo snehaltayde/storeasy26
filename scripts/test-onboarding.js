@@ -8,7 +8,7 @@
 //   3. GET/POST /api/admin/onboarding with real sessions: every role, the
 //      least-trusted cases (support keys and actions, signed out, another
 //      store's session, cross-origin), the test-order check-off's audit row
-//   4. the nav and the redirects (/admin, /admin/setup, /admin/start)
+//   4. the nav and the /admin redirect
 //   5. the Brand step's starter store (useStarterStore) mounted: canEdit=false never POSTs
 // Nothing here reaches Shopify, Typesense or a hosted database.
 //   pnpm test:onboarding
@@ -582,9 +582,7 @@ const redirectOf = async (file, key = null) => {
   return null;
 };
 
-await t("redirects: /admin/setup -> /admin/onboarding; /admin/start -> /admin/onboarding?step=brand; /admin -> onboarding while closed, the dashboard when open, for _default, and when the read fails", async () => {
-  eq(await redirectOf("setup/page.js"), "/admin/onboarding", "setup:");
-  eq(await redirectOf("start/page.js"), "/admin/onboarding?step=brand", "start:");
+await t("redirects: /admin -> onboarding while closed, the dashboard when open, for _default, and when the read fails", async () => {
   eq(await redirectOf("page.js", "fresh"), "/admin/onboarding", "closed:");
   eq(await redirectOf("page.js", "open"), "/admin/dashboard", "open:");
   const mod = await import(pathToFileURL(join(PAGES, "page.js")).href);
@@ -597,8 +595,8 @@ await t("redirects: /admin/setup -> /admin/onboarding; /admin/start -> /admin/on
   ok(src.includes("liveOpen") && !src.includes("getLiveReleaseState"), "/admin reads the plain live_release_id (liveOpen), not getLiveReleaseState");
 });
 
-await t("retired: lib/admin/onboarding.js, components/admin/SetupAdmin.js and app/api/admin/setup/route.js are gone", async () => {
-  for (const f of ["lib/admin/onboarding.js", "components/admin/SetupAdmin.js", "app/api/admin/setup/route.js"]) {
+await t("retired: lib/admin/onboarding.js, components/admin/SetupAdmin.js, app/api/admin/setup/route.js and the /admin/setup and /admin/start redirects are gone", async () => {
+  for (const f of ["lib/admin/onboarding.js", "components/admin/SetupAdmin.js", "app/api/admin/setup/route.js", "app/(console)/admin/(authed)/setup/page.js", "app/(console)/admin/(authed)/start/page.js"]) {
     let there = true;
     await access(join(ROOT, f)).catch(() => (there = false));
     ok(!there, `${f} still exists`);

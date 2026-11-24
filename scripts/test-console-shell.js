@@ -63,7 +63,7 @@ const { ACTIONS, ROLES, isWriteAction, roleAllows } = await import("../lib/platf
 const { ADMIN_PAGES } = await import("./support/admin-pages.js");
 
 // Phase 1 line 3: Setup (admin-only) became Onboarding (every role) and
-// "Logo and colours" (/admin/start) moved into onboarding's Brand step.
+// "Logo and colours" moved into onboarding's Brand step.
 const ALL_IDS = ["dashboard", "analytics", "onboarding", "orders", "catalog", "editor", "media", "releases", "offers", "experiments", "insights", "automations", "integrations", "billing", "settings"];
 const READ_IDS = ALL_IDS.filter((id) => !["automations", "integrations", "billing", "settings"].includes(id));
 const EXPECTED = { owner: ALL_IDS, admin: ALL_IDS, staff: READ_IDS, support: READ_IDS };

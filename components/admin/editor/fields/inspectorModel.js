@@ -666,7 +666,7 @@ export function bundleSlugGuess(title) {
   return (s || "bundle").slice(0, 61).replace(/-+$/g, "") || "bundle";
 }
 
-// ---- the menu (ported from components/admin/cms/NavigationEditor.js) -----------
+// ---- the menu (ported from the retired navigation editor) ----------------------
 //
 // Behaviour kept from the legacy screen: two modes (Automatic, Custom menu);
 // up to 12 items, each with up to 8 sub-items one level deep; add, edit,

@@ -1,17 +1,12 @@
-// P3-ROUTES suite (ED-02, PUB-11, PV-01): the new editor's address, the old
-// screens that send a documents store to it, the console nav, and the
-// Designer's failed-preview message.
+// P3-ROUTES suite (ED-02, PUB-11): the editor's address and the console nav.
 //   1. unit: lib/admin/editor-entry.js, which document ?doc= or ?path= opens,
 //      round-tripped against lib/documents/paths.js livePath();
 //   2. rendered: the real page modules (app/(console)/admin/(authed)/...),
 //      compiled with Next's own SWC and called as server components with
-//      their data stubbed: /admin/editor in each mode, and each old screen's
-//      redirect (documents only) or its unchanged render (legacy, migrating);
+//      their data stubbed: /admin/editor in each mode; the old screens'
+//      redirect routes are gone (Phase 1 line 10);
 //   3. rendered: the console shell (components/admin/shell, Phase 0 line 8)
-//      and its nav: the editor link, staff filtering, the badge, the editor
-//      route's sheet (P6-NAV: "Logo and colours" after Editor);
-//   4. rendered + behaviour: the Designer with a stubbed api, its candidate
-//      push failing in each way, through stand-in hooks (no browser).
+//      and its nav: the editor link, staff filtering, the badge.
 // No browser drill covers these routes since the Phase 0 drills line (the p3
 // drills were retired); the editor is driven in pnpm drill:p5 and drill:p6.
 //   pnpm test:editor-routes
@@ -155,19 +150,16 @@ await t("unit: ?doc= opens that id; a singleton opens before its row exists; an 
   eq(open({ path: "/campaigns/spring-edit/" }).document.id, "doc_gggggggggggggggg", "a trailing slash:");
 });
 
-await t("unit: every old screen sends a documents store to a real editor address", () => {
-  // P4-ED05 adds the product and collection designers and the upsells screen
-  eq(
-    Object.keys(E.LEGACY_ROUTE_DOCS).sort(),
-    ["/admin/brand", "/admin/storefront", "/admin/storefront/designer", "/admin/storefront/home", "/admin/storefront/navigation", "/admin/storefront/pages", "/admin/storefront/product-pages", "/admin/theme", "/admin/storefront/designer/product", "/admin/storefront/designer/collection", "/admin/upsells"].sort(),
-    "routes:",
-  );
-  eq(E.LEGACY_ROUTE_DOCS["/admin/brand"], "doc_design", "brand:");
-  eq(E.LEGACY_ROUTE_DOCS["/admin/theme"], "doc_design", "theme:");
-  for (const [route, id] of Object.entries(E.LEGACY_ROUTE_DOCS)) {
-    const r = open({ doc: id }, []);
-    ok(r.document.id === id && r.note === null, `${route} -> ${id} would not open: ${JSON.stringify(r)}`);
-    eq(E.editorHref(id), `/admin/editor?doc=${id}`, `${route}:`);
+await t("unit: no old console screen is left to send anywhere (Phase 1 line 10)", () => {
+  for (const name of ["LEGACY_ROUTE_DOCS", "LEGACY_ROUTE_HREFS", "legacyPageHref", "upsellsHref", "editorDestination"]) ok(!(name in E), `editor-entry still exports ${name}`);
+  for (const dir of ["storefront", "brand", "theme", "upsells", "start", "setup"]) {
+    let gone = false;
+    try {
+      readFileSync(join(ROOT, "app/(console)/admin/(authed)", dir, "page.js"));
+    } catch {
+      gone = true;
+    }
+    ok(gone, `app/(console)/admin/(authed)/${dir}/page.js is back`);
   }
 });
 
@@ -214,7 +206,7 @@ function world(stubs) {
 }
 
 // ---- 2. rendered: the pages -----------------------------------------------------
-console.log("— the editor page and the old screens");
+console.log("— the editor page");
 const AUTHED = join(ROOT, "app/(console)/admin/(authed)");
 class Redirect extends Error {
   constructor(to) {
@@ -226,14 +218,6 @@ const S = { mode: "legacy", modeThrows: false, modeReads: 0, docs: DOCS, docsRea
 const marker = (name) => {
   const C = (props) => React.createElement("div", { "data-stub": name, "data-props": JSON.stringify(props ?? {}) });
   return C;
-};
-const VIEW = {
-  blocks: { hero: { title: "Skin first" } },
-  customized: { hero: true },
-  revisions: { hero: 1 },
-  blockMeta: { hero: { updated_at: "2026-10-01T10:00:00.000Z" } },
-  pages: [{ slug: "about", title: "About us", family: "policy", source: "custom", enabled: true, updated_at: "2026-10-02T10:00:00.000Z" }],
-  pageRevisions: { about: 2 },
 };
 const pageStubs = {
   "next/headers": { cookies: async () => ({ get: () => ({ value: "cookie" }) }) },
@@ -264,7 +248,6 @@ const pageStubs = {
   },
   "@/lib/admin/editor-entry": E,
   "@/lib/cms/issues": await import("../lib/cms/issues.js"),
-  "@/lib/cms/view": { storefrontView: async () => VIEW },
   "@/lib/releases": {
     releaseDiff: async () => ({ items: [], dirty: false, firstPublish: false }),
     getLiveRelease: async () => ({ content_hash: "abcdef0123456789", note: null, content: {} }),
@@ -281,15 +264,6 @@ const pageStubs = {
   "@/lib/brand": { resolveBrand: (b) => ({ accent: b?.accent || "#000000" }), accentShades: () => ({ 500: "#112233" }), DEFAULT_BRAND: { accent: "#000000" } },
   "@/lib/admin/brand-readability": { brandReadability: async () => ({ warnings: [], notes: [] }) },
   "@/lib/themes/kits": { KITS: { pulse: { id: "pulse", version: 1, label: "Pulse", vertical: "beauty", description: "d", fonts: {}, brand: {}, swatch: [] } }, kitUpgradeAvailable: () => false },
-  "@/lib/cms/store": { getBlockRow: async () => ({ value: { pdp: "classic" }, revision: 3 }) },
-  "@/components/admin/cms/Designer": { __esModule: true, default: marker("Designer") },
-  "@/components/admin/cms/HomeEditor": { __esModule: true, default: marker("HomeEditor") },
-  "@/components/admin/cms/NavigationEditor": { __esModule: true, default: marker("NavigationEditor") },
-  "@/components/admin/cms/PdpExtrasEditor": { __esModule: true, default: marker("PdpExtrasEditor") },
-  "@/components/admin/cms/PagesList": { PagesList: marker("PagesList") },
-  "@/components/admin/BrandAdmin": { __esModule: true, default: marker("BrandAdmin") },
-  "@/components/admin/ThemeAdmin": { __esModule: true, default: marker("ThemeAdmin") },
-  "@/components/admin/cms/SurfaceTemplatesCard": { __esModule: true, default: marker("SurfaceTemplatesCard") },
 };
 const loadPage = world(pageStubs);
 
@@ -415,53 +389,10 @@ await t("rendered: a signed-out visitor goes to the sign-in page first", async (
   S.actor = null;
   try {
     eq((await run("editor/page.js", { mode: "documents" })).redirect, "/admin/login", "editor:");
-    eq((await run("storefront/designer/page.js", { mode: "documents" })).redirect, "/admin/login", "designer:");
   } finally {
     S.actor = { kind: "member", role: "owner" };
   }
 });
-
-const ROUTE_FILES = {
-  "/admin/storefront": "storefront/page.js",
-  "/admin/storefront/designer": "storefront/designer/page.js",
-  "/admin/storefront/home": "storefront/home/page.js",
-  "/admin/storefront/navigation": "storefront/navigation/page.js",
-  "/admin/storefront/pages": "storefront/pages/page.js",
-  "/admin/storefront/product-pages": "storefront/product-pages/page.js",
-  "/admin/brand": "brand/page.js",
-  "/admin/theme": "theme/page.js",
-};
-const WANT = {
-  "/admin/storefront": "/admin/editor?doc=doc_home",
-  "/admin/storefront/designer": "/admin/editor?doc=doc_home",
-  "/admin/storefront/home": "/admin/editor?doc=doc_home",
-  "/admin/storefront/navigation": "/admin/editor?doc=doc_header",
-  "/admin/storefront/pages": "/admin/editor?doc=doc_home",
-  "/admin/storefront/product-pages": "/admin/editor?doc=doc_product_layout",
-  "/admin/brand": "/admin/editor?doc=doc_design",
-  "/admin/theme": "/admin/editor?doc=doc_design",
-};
-// What each screen shows when it renders: its own editor (stubbed) or its content.
-const SHOWS = {
-  "/admin/storefront": "Published state",
-  "/admin/storefront/designer": 'data-stub="Designer"',
-  "/admin/storefront/home": 'data-stub="HomeEditor"',
-  "/admin/storefront/navigation": 'data-stub="NavigationEditor"',
-  "/admin/storefront/pages": 'data-stub="PagesList"',
-  "/admin/storefront/product-pages": 'data-stub="PdpExtrasEditor"',
-  "/admin/brand": 'data-stub="BrandAdmin"',
-  "/admin/theme": 'data-stub="ThemeAdmin"',
-};
-
-await t("rendered: each old screen redirects to the editor in documents mode, before loading its data", async () => {
-  for (const [route, file] of Object.entries(ROUTE_FILES)) {
-    const r = await run(file, { mode: "documents" });
-    eq(r.redirect, WANT[route], `${route}:`);
-  }
-  eq((await run("storefront/designer/page.js", { mode: "documents" })).redirect, "/admin/editor?doc=doc_home", "the Designer is never reached on a documents store:");
-});
-
-// Legacy screens now redirect straight to the editor in all modes (Legacy CMS retired).
 
 // ---- 3. rendered: the console nav (the Phase 0 line 8 shell) ----------------
 console.log("— the console nav");
@@ -502,13 +433,10 @@ await t("rendered: the shell's nav links the storefront to /admin/editor; Media 
   ok(html.includes("<p>page</p>") && /data-legacy[^>]*>(<div[^>]*>)?<p>page<\/p>|data-legacy[^>]*><p>page<\/p>/.test(html), "the page renders inside [data-legacy]:");
 });
 
-await t("rendered: on an editor route the shell steps aside; the sheet holds the nav with the editor link", () => {
-  const ed = shell({}, "/admin/storefront/designer");
-  eq(navHrefs(ed), [], "no sidebar links on the editor route (the closed sheet renders nothing):");
-  ok(!ed.includes('data-shell="topbar"') && ed.includes("<p>page</p>"), "no top bar; the page renders:");
-  const inSheet = navHrefs(sheetNav("owner", "/admin/editor"));
-  ok(inSheet.includes("/admin/editor") && !inSheet.includes("/admin/storefront/designer"), `the sheet's nav: ${inSheet}`);
-  ok(read("components/admin/shell/AdminShell.js").includes("<SheetContent") && /onNavigate=\{\(\) => setSheet\(false\)\}/.test(read("components/admin/shell/AdminShell.js")), "the editor's sheet closes on a link:");
+await t("rendered: /admin/editor keeps the shell's sidebar and top bar (no route steps the shell aside since the Designer went)", () => {
+  const ed = shell({}, "/admin/editor");
+  ok(navHrefs(ed).includes("/admin/editor") && ed.includes('data-shell="topbar"') && ed.includes("<p>page</p>"), "the sidebar, the top bar and the page:");
+  ok(!/isEditorRoute|SheetContent|ConsoleNavContext/.test(read("components/admin/shell/AdminShell.js")), "the editor-route branch is gone from AdminShell.js");
 });
 
 await t("rendered: staff see no Settings; Setup is gone for everyone and Onboarding is there for staff", () => {
@@ -517,9 +445,8 @@ await t("rendered: staff see no Settings; Setup is gone for everyone and Onboard
   ok(!navHrefs(shell({})).includes("/admin/setup"), "owner: no Setup");
 });
 
-// Phase 1 line 3: the logo and colours moved into onboarding's Brand step
-// (/admin/start redirects to /admin/onboarding?step=brand), so the
-// Storefront group no longer has its own "Logo and colours" item.
+// Phase 1 line 3: the logo and colours moved into onboarding's Brand step,
+// so the Storefront group has no "Logo and colours" item.
 await t("Phase 1 line 3 rendered: the Storefront group is Editor, Media, Publishing (no 'Logo and colours'); Onboarding is in Overview for owners and staff (its own page has no sidebar)", () => {
   const html = shell({ badges: {} }, "/admin/media");
   const links = navHrefs(html);
@@ -598,8 +525,6 @@ await t("P4-SCAFFOLD unit: one key wins (doc, then product, then collection); ju
   for (const junk of [undefined, null, {}, [], "x", { product: "1" }, { product: Cn }, { collection: P }, { product: P, collection: Cn }, { product: "gid://shopify/Product/a b" }]) {
     eq(E.entityEditorHref(junk), "/admin/editor", `href ${JSON.stringify(junk)}:`);
   }
-  // LEGACY_ROUTE_DOCS is ED05's: the 8 P3-ROUTES screens plus its 3 (scripts/test-legacy-routes.js)
-  eq(Object.keys(E.LEGACY_ROUTE_DOCS).length, 11, "LEGACY_ROUTE_DOCS entries:");
 });
 
 await t("P4-SCAFFOLD unit: productDocumentId and collectionDocumentId are async, deterministic, shaped and differ per id", async () => {

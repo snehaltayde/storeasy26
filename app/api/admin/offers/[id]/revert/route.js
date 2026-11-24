@@ -30,7 +30,6 @@ export const POST = tenantHandler(async (request, { params }) => {
   } catch (e) {
     // The store's own refusals first, then the database check (DOC-04: a
     // database failure is never a 4xx), then the catch-all.
-    // scripts/test-failure-matrix.js checks this order.
     if (e?.code === "NOT_FOUND") return NextResponse.json({ error: e.message, code: e.code }, { status: 404 });
     if (e?.code === "NOT_HERE" || e?.code === "NO_PREVIOUS") return NextResponse.json({ error: e.message, code: e.code }, { status: 409 });
     if (e?.code === "CHANGED") return NextResponse.json({ error: e.message, code: e.code }, { status: 409 });

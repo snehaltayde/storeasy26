@@ -59,7 +59,7 @@ that proves it; residual risks are listed honestly at the end. Release gate:
    storefront ones are best-effort. Acceptable at current scale.
 3. **Bootstrap password** (shared, env-derived) remains valid per surface until
    the first real user/operator exists — deliberate migration ramp (S26); retire
-   by creating real accounts at cutover (tracked in IMPLEMENTATION_STATUS).
+   by creating real accounts at cutover.
 4. **32-bit order ids** are guessable; mitigated because every order read
    requires the expiring HMAC proof, but ids themselves stay low-entropy until
    a future id widening.

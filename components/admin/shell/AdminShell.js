@@ -1,15 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { Eye, Menu } from "lucide-react";
+import { Eye } from "lucide-react";
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { IconButton } from "@/components/console/Button";
-import { isEditorRoute } from "@/components/admin/shared/editorLayout";
 import { readOnlyLabel } from "@/lib/admin/nav";
-import { AdminNav, NavGroups, StoreasyMark } from "./AdminNav";
+import { AdminNav } from "./AdminNav";
 import { StoreSwitcher } from "./StoreSwitcher";
 import { AccountMenu } from "./AccountMenu";
 
@@ -22,38 +19,11 @@ import { AccountMenu } from "./AccountMenu";
 // app/console.css gives that region the old tokens, so they keep their old
 // look until Phase 2 rebuilds them. Everything outside it is the new shell.
 //
-// Editor routes (isEditorRoute): the shell steps aside. No sidebar, no top
-// bar and no cap; the navigation opens in a sheet from the editor's own top
-// bar through useConsoleNav(). ConsolePageFrame gives anything else shown on
-// such a route (the error page, the loading skeleton) the menu button and
-// the usual padded page.
-//
 // Onboarding (/admin/onboarding, docs/UI.md "Onboarding"): new UI, so no
 // [data-legacy] region; no sidebar, the top bar without its toggle, and one
 // centred column of at most 640px (data-onboarding="column"); from 1024px the
 // main grows to 1200px so the step list sits to the column's left (the
 // column stays 640px; a wide step, Brand, uses the full width).
-
-const ConsoleNavContext = createContext(null);
-
-// → { openNav, editor: true, storeName } on an editor route, or null.
-export function useConsoleNav() {
-  return useContext(ConsoleNavContext);
-}
-
-export function ConsolePageFrame({ children }) {
-  const nav = useConsoleNav();
-  if (!nav?.editor) return children;
-  return (
-    <div data-console-page-frame>
-      <div className="flex items-center gap-2 border-b border-edge bg-surface px-3 py-2">
-        <IconButton data-console-menu label="Open menu" icon={<Menu size={17} aria-hidden />} onClick={nav.openNav} />
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-fg">{nav.storeName}</p>
-      </div>
-      <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">{children}</div>
-    </div>
-  );
-}
 
 // The phone sheet is opened by the top bar's toggle, not a Radix trigger, so
 // Radix has nowhere to return focus when it closes (Esc, a link): back to the toggle.
@@ -105,14 +75,6 @@ function TopBar({ actor, account, stores, storeName, storeId, toggle = true }) {
 // <ConsoleNotices/>; defaultOpen: the sidebar_state cookie.
 export function AdminShell({ nav, badges = {}, actor, account = null, stores = [], storeName, storeId = null, notices = null, defaultOpen = true, children }) {
   const pathname = usePathname();
-  const editor = isEditorRoute(pathname);
-  const [sheet, setSheet] = useState(false);
-  // the editor's sheet returns focus to whatever opened it (the editor's own menu button)
-  const opener = useRef(null);
-  const openNav = () => {
-    opener.current = document.activeElement;
-    setSheet(true);
-  };
   const content = (
     <div data-legacy className="contents">
       {notices && <div className="mb-6">{notices}</div>}
@@ -132,40 +94,6 @@ export function AdminShell({ nav, badges = {}, actor, account = null, stores = [
           </main>
         </SidebarProvider>
       </TooltipProvider>
-    );
-  }
-
-  if (editor) {
-    return (
-      <ConsoleNavContext.Provider value={{ openNav, editor: true, storeName }}>
-        <TooltipProvider delayDuration={0}>
-          <SidebarProvider defaultOpen={defaultOpen} cookiePath="/admin" className="bg-background text-sm text-foreground">
-            <SkipLink />
-            <Sheet open={sheet} onOpenChange={setSheet}>
-              <SheetContent
-                side="left"
-                className="w-72 gap-0 bg-sidebar p-0 text-sidebar-foreground"
-                onCloseAutoFocus={(e) => {
-                  e.preventDefault();
-                  opener.current?.focus?.();
-                }}
-              >
-                <SheetHeader className="h-14 flex-row items-center gap-2 border-b border-sidebar-border px-3 py-0">
-                  <StoreasyMark />
-                  <SheetTitle className="text-base">Storeasy</SheetTitle>
-                  <SheetDescription className="sr-only">Every area of the console.</SheetDescription>
-                </SheetHeader>
-                <div className="overflow-y-auto py-2">
-                  <NavGroups nav={nav} badges={badges} onNavigate={() => setSheet(false)} />
-                </div>
-              </SheetContent>
-            </Sheet>
-            <main id="console-content" className="min-w-0 flex-1">
-              {content}
-            </main>
-          </SidebarProvider>
-        </TooltipProvider>
-      </ConsoleNavContext.Provider>
     );
   }
 

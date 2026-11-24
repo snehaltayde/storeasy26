@@ -123,6 +123,61 @@ rule 7 in [migrations/README.md](../migrations/README.md)), and
 `pnpm test:schema-compat` proves cart, product page data, search and order
 creation still work there.
 
+## Commands (package.json)
+
+Moved here from the retired platform guide (Phase 1 line 10). Scripts marked
+"env" read `.env.local` (`node --env-file=.env.local`); the rest need no
+secrets.
+
+| Command | Does |
+|---|---|
+| `pnpm dev` / `build` / `start` | Next.js (needs `.env.local`) |
+| `pnpm dev:design` / `seed:design` | the local harness store on http://localhost:3017; `seed:design` wipes and reseeds `.design-data/` (stop the harness first) |
+| `pnpm dev:roles` / `seed:roles` / `roles:code` | the roles harness: one store with a member per role; `seed:roles` refuses to overwrite an existing one |
+| `pnpm test` / `pnpm test:<suite>` | every gated suite (see Tests above) / one suite |
+| `pnpm drill:<name>` / `drill:all` | browser drills in a throwaway worktree at HEAD (commit first) |
+| `pnpm migrate` / `db:reset` (env) | the versioned tenant migrations on the env database (`lib/schema.sql` + `migrations/tenant/`, checksum-locked in `schema_migrations`) / also drop the catalog tables first |
+| `pnpm platform:migrate` (env) | the versioned control-plane migrations (`lib/platform/schema.sql` + `migrations/platform/`) |
+| `pnpm tenant:migrate -- --all \| --tenant <slug> \| --check` (env) | tenant migrations on every registered store, failure-isolated per store; `--check` is the read-only deploy gate (see MIG-05 below) |
+| `pnpm tenant:provision <slug> --shop …` (env) | provision a store end to end from the command line |
+| `pnpm tenant:sync <slug>` (env) | a full catalog sync for one store |
+| `pnpm tenant:seed-beastlife [--staging]` (env) | lift the env settings into the beastlife(-staging) store row |
+| `pnpm webhooks:register <slug> [--url]` (env) | register or repair the store's Shopify webhook subscriptions |
+| `pnpm sync` / `sync:search` (env) | full catalog sync for the env store / Typesense reindex only |
+| `pnpm seed:demo` (env) | 3 fake products and 2 collections into the env database |
+| `pnpm rotate:secrets` (env) | re-encrypt every stored secret under the current write key; safe to re-run |
+| `pnpm domain -- claim\|verify\|remove\|primary\|list` (env) | the domain registry: unique hosts, DNS-TXT ownership challenge, activation |
+| `pnpm user:create` / `invite:create` / `operator:create` (env) | the first store user, teammate invitation links, platform operators (TOTP at first sign-in) |
+| `pnpm member:set` (env) | change a member's role or `--remove` them (the last owner is protected) |
+| `pnpm support -- grant\|revoke\|list` (env) | time-limited, read-only operator support access to a store |
+| `pnpm push:shopify [id]` (env) | push one order to Shopify, or sweep 20 |
+| `pnpm order:trace <id> [--tenant slug]` / `order:cancel <id> …` (env) | an order's timeline / cancel on both sides (see [refunds.md](./refunds.md)) |
+| `pnpm events:stats` / `search:report [days]` (env) | event forwarding stats / search click-through and zero-result report |
+| `pnpm alert:test` (env) | send a synthetic info alert to `ALERT_WEBHOOK_URL` and report the real result |
+| `pnpm restore:drill -- --tenant <slug> \| --control-plane` (env) | the backup and restore drill below |
+| `pnpm check:turso-real` | the owner's check against a real Turso account (see the script's header) |
+| `pnpm shopify:token [--write]` / `shopify:oauth` (env) | single-store token minting / local OAuth |
+| `pnpm media:reindex` | rebuild the documents' media references |
+| `pnpm icons:gen` | rasterise `public/icon.svg` into the PWA icon sizes |
+| `pnpm diff:pixels <before> <after>` | compare screenshot baselines pixel by pixel |
+| `pnpm hooks:enable` | run `pnpm test` before every commit (off by default) |
+
+## Backup and restore drill (BE27)
+
+`pnpm restore:drill -- --tenant <slug>` (or `--control-plane`) streams the
+hosted database into an isolated local file and verifies per-table row counts,
+the migration ledger's ids and checksums, order money totals, secret-envelope
+ciphertext lengths, foreign keys and `integrity_check`. `--keep` keeps the file
+for inspection (never commit it). Measured 2026-10-28: the demo store, 21
+tables and 13,579 rows, in 1.4 s; the control plane in 0.4 s. The production
+path is Turso point-in-time recovery, `turso db create <new> --from-db <db>
+--timestamp <iso>` (a paid-plan feature). Run the drill after every schema
+change and before every cutover.
+
+`pnpm test:security` (BE34) is part of `pnpm test`: static secret-exposure
+gates plus SSRF, HMAC, OAuth-state and support-grant abuse tests. Threat model
+and residual risks: [security-threat-model.md](./security-threat-model.md).
+
 ## Related runbooks
 
 [docs/refunds.md](./refunds.md) — manual refund/cancel flows (Razorpay + Shopify + ledger).

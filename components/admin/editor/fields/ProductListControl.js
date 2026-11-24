@@ -1,7 +1,7 @@
 "use client";
 
 // P4-PICKER (ED-12, OVL-04): an ordered list of products, picked through the
-// catalog picker (/api/admin/refs, components/admin/cms/RefPicker.js).
+// catalog picker (/api/admin/refs).
 //
 //   ProductPicks        the shared list: each product by the name the store
 //                       shows (the effective title), with "Shopify title: X"

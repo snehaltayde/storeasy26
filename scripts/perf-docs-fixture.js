@@ -29,9 +29,6 @@
 //       the harness store, seeded with `node scripts/dev-design.js seed
 //       --fixture perf`, moved to documents mode and published (the harness
 //       store only; the seeded v3 pointer is cleared first)
-//   node scripts/perf-docs-fixture.js unpublish-legacy
-//       the harness store's live pointer cleared, mode left legacy: a legacy
-//       store before its first publish, for the extra cms_state read
 //   node scripts/perf-docs-fixture.js report <label=run.json> …
 //       docs/perf/2026-11-phase2-local.json and .md from perf-report runs
 //
@@ -340,15 +337,6 @@ async function main(argv) {
     console.log("✓ the harness store is in documents mode with the fixture published");
     return 0;
   }
-  if (cmd === "unpublish-legacy") {
-    await withHarnessStore(async ({ libsql }) => {
-      const mode = (await libsql.execute("SELECT mode FROM cms_state WHERE id = 1")).rows[0]?.mode;
-      if (mode !== "legacy") throw new Error(`the harness store is in ${mode} mode, not legacy: seed it again first`);
-      await libsql.execute("UPDATE release_state SET live_release_id = NULL, updated_at = datetime('now') WHERE id = 1");
-    });
-    console.log("✓ the harness store has no live release (legacy mode): drafts serve, as before a first publish");
-    return 0;
-  }
   if (cmd === "report") {
     const { readFileSync, writeFileSync } = await import("node:fs");
     const { join } = await import("node:path");
@@ -370,7 +358,7 @@ async function main(argv) {
     console.log(`✓ wrote ${out}/2026-11-phase2-local.json and .md`);
     return 0;
   }
-  console.error("Use: node scripts/perf-docs-fixture.js hash|publish [--posts N] | unpublish-legacy | report label|store|posts=run.json … [baseline=run.json]");
+  console.error("Use: node scripts/perf-docs-fixture.js hash|publish [--posts N] | report label|store|posts=run.json … [baseline=run.json]");
   return 2;
 }
 

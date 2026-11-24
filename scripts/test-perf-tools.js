@@ -378,11 +378,9 @@ await t("the fixture passes the same validators a founder's saves pass", async (
   for (const q of fx.quizzes) ok(validateQuiz(q).ok, q.slug);
 });
 
-await t("the measured product reads everything a product page can: 6 variants, 6 photos, a pairs list, a badge", () => {
+await t("the measured product has 6 variants and 6 photos, and the cart three lines", () => {
   const p = fx.products.find((x) => x.handle === fx.measured.productHandle);
   eq([p.variants.length, p.images.length], [6, 6], "variants and photos");
-  ok(fx.placements.some((x) => x.kind === "pdp_pairs" && x.sourceProductId === p.id), "pairs list");
-  ok(fx.overrides.some((x) => x.productId === p.id && x.badge), "badge");
   eq(fx.measured.cart.lines.length, 3, "a three-line cart");
 });
 

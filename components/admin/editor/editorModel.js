@@ -849,7 +849,7 @@ export function createPreviewController({ api, frame, pathFor = () => "/", docum
 
 export const PRODUCT_WORDS = Object.freeze({
   shopifyOwns: "Price, variants and stock come from Shopify. Change them in Shopify; your store shows the new values after the next catalog update.",
-  // the Catalog screen's line (components/admin/CatalogAdmin.js), same words
+  // the Catalog page's line, same words
   catalogShopify: "Type, vendor, price and stock come from Shopify. Change them in Shopify; your store shows the new values after the next catalog update.",
   changeInShopify: "Change in Shopify",
   noAdminLink: "Your store's Shopify address isn't set, so there is no link to Shopify here.",

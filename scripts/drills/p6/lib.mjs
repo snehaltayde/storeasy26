@@ -297,8 +297,6 @@ export async function rscProbe({ base, db, extraStrings = [], exclude = [] }) {
   try {
     for (const r of await rows("SELECT draft FROM documents")) walk(parse(r.draft));
     for (const r of await rows("SELECT body FROM document_versions")) walk(parse(r.body));
-    for (const r of await rows("SELECT value FROM cms_blocks")) walk(parse(r.value));
-    for (const r of await rows("SELECT sections, title, description FROM cms_pages")) walk({ s: parse(r.sections), t: r.title, d: r.description });
     for (const r of await rows("SELECT content FROM releases")) walk(parse(r.content));
     catalog = (await rows("SELECT title FROM products UNION SELECT title FROM collections")).map((r) => String(r.title));
   } finally {

@@ -129,6 +129,70 @@ The storefront's brand surface and merchandising are now per-tenant data:
   `generateMetadata()` per tenant; Header/Footer/consent/checkout/order-status
   all read config. BeastLife's strings live in ITS tenant row (seed script);
   code fallbacks derive from the store name.
+- **Content** (Session 23 started it as CMS blocks, content pages and upsell
+  placements; since the documents CMS it is documents): every page, the
+  header, footer, announcement, design and product and collection content are
+  documents ([lib/documents/](../lib/documents/), section and document schemas
+  in [lib/registry/](../lib/registry/)), edited in `/admin/editor` and put
+  live only by a founder's Publish. The about, contact and policy defaults are
+  [lib/content/pages.js](../lib/content/pages.js) templates. The old tables are
+  kept, never written (docs/ARCHITECTURE.md, "Legacy, no longer written").
+
+### Live proofs (2026-10-27, local)
+
+provision demo from blank DB ✓ · `tenant:sync demo` 319/281 ✓ · two-host PDP
+divergence after demo-only delete (beastlife 200, demo 404), restored via live
+`syncProductByGid` ✓ · signed webhook POST → fan-out `[beastlife,
+beastlife-staging, demo]`, all three DBs re-synced in ~2s; tampered sig → 401;
+unknown shop → ignored ✓ · OAuth start 302 with signed state, 401 without
+operator secret ✓.
+
+## Merchant console + platform console (Session 22)
+
+- **Merchant console** `/admin` on each storefront host (per-tenant password,
+  sessions tenant-bound): **Offers** (S19) · **Orders** — list with status
+  tabs/search/keyset paging ([lib/admin/orders](../lib/admin/orders.js)),
+  detail with items/payment/sync/timeline, "Retry Shopify push" on
+  `sync_failed` · **Settings** ([lib/admin/settings](../lib/admin/settings.js)):
+  store identity, Razorpay keys, GA4/Meta creds, **shipping rules editor**
+  (writes `config.shipping_config` — the same engine prices drawer, checkout
+  and push), sync status + "Sync now", console-password rotation (old sessions
+  die; the saving browser gets a fresh cookie). Secret values NEVER leave the
+  server — presence flags only, fields are write-only (blank = keep). Saves go
+  through `PUT /api/admin/settings` → validated `buildSettingsPatch` →
+  `patchTenant` for the Host-resolved tenant only; the env-fallback default
+  tenant is read-only (no control-plane row).
+- **Platform console** `/platform` (operator password `PLATFORM_ADMIN_PASSWORD`
+  env; `_platform` cookie, also accepted by the OAuth connect start route):
+  tenant registry with per-tenant health queried from each tenant's own DB
+  (products, last sync, orders in flight, Shopify connected/uninstalled),
+  actions Sync / Connect Shopify / Suspend / Activate. Phase 1 line 9 retired
+  the create wizard and `POST /api/platform/tenants`: operators create stores
+  at `/platform/stores/new` → `POST /api/platform/stores`, which queues the
+  `provision_store` job and emails the owner an invite (no password is ever
+  shown); `provisionTenant` stays for the CLI. Suspending a tenant drops its hosts to the
+  default-store fallback, never a 500.
+
+### Live proofs (2026-10-27, local)
+
+Operator console lists 3 tenants with live health (326/308/319 products) ✓ ·
+demo merchant console (`127.0.0.1:3007` host) logged in via UI, orders list +
+detail + timeline render demo's own data ✓ · settings edited in the UI (name,
+flat ₹99, free ≥₹1499, zone 79/78 @₹149) → persisted to the control plane,
+beastlife untouched, **demo storefront cart immediately charges ₹99 with
+"₹132 away from free"** ✓ · suspend → demo host falls back to default store →
+activate ✓ · login title is per-tenant ("Storeasy Demo admin") ✓.
+
+## Merchandising CMS + upsells (Session 23)
+
+The storefront's brand surface and merchandising are now per-tenant data:
+
+- **Brand strings** come from tenant `config.site` (name, title, tagline,
+  footer_tagline, logo {text1,text2}, legal_name, support_email/phone) via
+  [lib/site.js](../lib/site.js) accessors — layout metadata is
+  `generateMetadata()` per tenant; Header/Footer/consent/checkout/order-status
+  all read config. BeastLife's strings live in ITS tenant row (seed script);
+  code fallbacks derive from the store name.
 - **CMS blocks** (`cms_blocks`, [store](../lib/cms/store.js) +
   [validate](../lib/cms/validate.js)): announcement bar, hero
   (title/highlight/subtitle/CTAs/badge), home_sections (order/titles/limits),
@@ -180,7 +244,7 @@ the auto same-collection strip ✓ · demo cart ships FREE ≥₹1499 (S22 rule)
   `tenantOwnCfg`/`tenantOwnSecret`: tenant row ONLY for resolved tenants,
   env fallback ONLY for the default/env context. A tenant with missing creds
   degrades (COD-only checkout, store-only events), never cross-forwards.
-- **Onboarding runbook**: [docs/onboarding.md](./onboarding.md).
+- **Onboarding**: founders sign up and connect Shopify themselves, or an operator creates a store from the platform console (`/platform/stores`); see docs/ARCHITECTURE.md.
 
 ### Two-tenant E2E (2026-10-27, local — the S24 gate)
 

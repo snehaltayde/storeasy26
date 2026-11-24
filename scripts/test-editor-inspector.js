@@ -316,7 +316,7 @@ console.log("1. every kind has a control, every kind and type a form");
 // gave them their controls (fields/BundleControl.js), so they wait no more.
 // P6-LOGO-REG (GEN-04): "logo" (the design document's picture logo) waits
 // too. A P1 follow-up gives the editor a logo control; in phase 6 the
-// founder sets the logo at /admin/start (the brand step), never here.
+// founder sets the logo in onboarding's Brand step, never here.
 const WAITING_KINDS = ["overlay", "gallery", "pairs", "product_ids", "logo"];
 const WAITING_TYPES = ["product_content", "collection_content"];
 // The coverage gaps allowed, worked out when asked: the waiting kinds, the
@@ -618,26 +618,9 @@ await t("rendered: the menu control renders every item, sub-item and link with i
   ok(html.includes("Standard: logo on the left"), "the layout choice words");
 });
 
-// The ED-12 checklist (docs/cms-reviews/P3-ED12-CHECKLIST.md): every control
-// element of today's screens, found by scanning their source, is cited by a
-// row; every row cites a real control line; a "field" row names a field the
-// new forms really have; a "waits" row names what it waits for.
-const LEGACY = {
-  "components/admin/cms/NavigationEditor.js": [[1, 999]],
-  "components/admin/cms/HomeEditor.js": [
-    [119, 150],
-    [278, 300],
-    [390, 405],
-    [597, 712],
-    [724, 752],
-  ],
-  "components/admin/cms/PdpExtrasEditor.js": [[1, 999]],
-  "components/admin/cms/SurfaceTemplatesCard.js": [[1, 999]],
-  "components/admin/cms/Designer.js": [[888, 919]],
-  "components/admin/BrandAdmin.js": [[1, 999]],
-  "components/admin/ThemeAdmin.js": [[1, 999]],
-};
-const CONTROL_LINE = /<(Input|Textarea|Select|Switch|Button|IconButton|ManualAdd|CollectionPicker|ProductPicker|ConfirmDialog|ConflictBanner|input|select|textarea|button)\b/;
+// The ED-12 checklist (docs/cms-reviews/P3-ED12-CHECKLIST.md) recorded every
+// control of the retired screens; its "field" rows still name a field the
+// new forms really have, and a "waits" row names what it waits for.
 const STATUSES = new Set(["field", "tree", "shell", "elsewhere", "waits"]);
 await t("unit: the ED-12 checklist maps every field row to a valid registry form", async () => {
   const doc = await readFile(join(ROOT, "docs/cms-reviews/P3-ED12-CHECKLIST.md"), "utf8");
@@ -765,7 +748,7 @@ await t("rendered: the design form shows every token, the look, the default note
 });
 
 // P6-LOGO-REG (GEN-04): the design form edits the brand and the look only. It
-// writes through setAt on the whole body, so a logo set at /admin/start is
+// writes through setAt on the whole body, so a logo set in the Brand step is
 // kept, untouched, when the founder changes a colour or the look here.
 await t("P6-LOGO-REG: 'logo' is a waiting kind with no inspector control; a DesignForm brand or look change keeps settings.logo", () => {
   ok(WAITING_KINDS.includes("logo"), "logo waits");

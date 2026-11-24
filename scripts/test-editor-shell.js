@@ -907,7 +907,6 @@ const stubs = {
     validateRelease: async () => ({ ok: true }),
     releaseDiff: async () => ({ items: [] }),
   },
-  "@/components/admin/ReleasesAdmin": { __esModule: true, default: marker("ReleasesAdmin") },
 };
 const load = world(stubs);
 const Editor = await load(join(ROOT, "components/admin/editor/DocumentEditor.js"));

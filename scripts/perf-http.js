@@ -587,8 +587,7 @@ async function readFixtureSizes(tenantUrl) {
       ["bundles", "SELECT count(*) n FROM bundles"],
       ["media", "SELECT count(*) n FROM media"],
       ["mediaBytes", "SELECT coalesce(sum(size), 0) n FROM media"],
-      // documents CMS: route documents by type (the legacy cms_pages,
-      // cms_blocks and placements tables are not written any more)
+      // route documents by type
       ["contentPages", "SELECT count(*) n FROM documents WHERE type = 'page'"],
       ["journalPosts", "SELECT count(*) n FROM documents WHERE type = 'journal'"],
       ["campaigns", "SELECT count(*) n FROM documents WHERE type = 'campaign'"],
@@ -633,14 +632,9 @@ async function readFixtureSizes(tenantUrl) {
       "SELECT id, product_id, url, alt, position FROM product_images ORDER BY id",
       "SELECT id, handle, title, description, image FROM collections ORDER BY id",
       "SELECT collection_id, product_id, position FROM collection_products ORDER BY collection_id, product_id",
-      "SELECT slug, title, description, sections, enabled, family, window_start, window_end FROM cms_pages ORDER BY slug",
-      "SELECT key, value FROM cms_blocks WHERE key IN ('home_sections', 'nav_header', 'nav_footer', 'announcement') ORDER BY key",
       "SELECT id, type, label, enabled, config FROM offers WHERE id NOT LIKE 'bundle-%' ORDER BY id",
       "SELECT slug, title, items, bundle_price, enabled FROM bundles ORDER BY slug",
       "SELECT slug, title, questions FROM quizzes ORDER BY slug",
-      "SELECT id, kind, source_product_id, target_product_ids, title, enabled FROM placements WHERE id LIKE 'pp-perf-%' OR id LIKE 'cu-perf-%' ORDER BY id",
-      "SELECT product_id, modules, badge FROM product_overrides ORDER BY product_id",
-      "SELECT collection_id, pinned FROM collection_overrides ORDER BY collection_id",
       "SELECT id, sha256, size FROM media ORDER BY id",
       "SELECT cart_id, variant_id, product_id FROM cart_items WHERE cart_id = 'perf-cart-1' ORDER BY variant_id",
     ]) {

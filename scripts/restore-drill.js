@@ -9,7 +9,7 @@
 // proves the data is recoverable and measures RTO without touching production.
 // Turso PITR (point-in-time clone of the hosted DB) is the production path —
 // `turso db create <new> --from-db <db> --timestamp <iso>` — and is documented
-// in docs/platform-guide.md; it needs the turso CLI + account auth, so the
+// in docs/operations.md; it needs the turso CLI + account auth, so the
 // drill script sticks to the logical restore it can prove unattended.
 import { createClient } from "@libsql/client";
 import { getTenant } from "../lib/platform/control.js";

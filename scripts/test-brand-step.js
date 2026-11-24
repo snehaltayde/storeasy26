@@ -965,41 +965,13 @@ async function renderedTests() {
     eq(v.net.posts().map((p) => p.body.revision), [1, 4], "revisions:");
   });
 
-  console.log("— P6-START-UI: the page");
+  console.log("— P6-START-UI: the client parts");
 
-  const PAGE = join(ROOT, "app/(console)/admin/(authed)/start/page.js");
-  async function renderPage({ actor, mode }) {
-    const load = world({
-      "next/navigation": { redirect: (to) => { throw Object.assign(new Error(`REDIRECT ${to}`), { redirectTo: to }); } },
-      "@/lib/admin-auth": { adminActor: async () => actor, ADMIN_COOKIE: "_admin", PLATFORM_COOKIE: "_platform" },
-      "@/lib/cms-mode": { getCmsMode: async () => mode },
-    });
-    const mod = await load(PAGE);
-    try {
-      await mod.default({});
-      return { redirect: null, loaded: load.loaded };
-    } catch (e) {
-      if (e.redirectTo) return { redirect: e.redirectTo, loaded: load.loaded };
-      throw e;
-    }
-  }
-
-  // Phase 1 line 3: "Start your store" is the onboarding page's Brand step
-  // (BrandStepPanel since line 6); /admin/start only redirects.
-  await t("RENDERED (Phase 1 line 3): /admin/start redirects to /admin/onboarding?step=brand for every caller and every store mode (the onboarding page decides who sees what)", async () => {
-    for (const actor of [null, { role: "owner" }, { role: "staff" }, { role: "support" }]) {
-      for (const mode of ["legacy", "migrating", "documents"]) eq((await renderPage({ actor, mode })).redirect, "/admin/onboarding?step=brand", `${JSON.stringify(actor)} ${mode}:`);
-    }
-  });
-
-  await t("the page reads nothing (a redirect only) and passes the legacy-routes literal-link walk; the client parts import no Node-only module", async () => {
+  await t("the client parts link to no old screen and import no Node-only module; /admin/start is gone (Phase 1 line 10)", async () => {
     const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-    const page = await readFile(PAGE, "utf8");
-    eq(strip(page).match(/from "[^"]+"/g), ['from "next/navigation"'], "its only import:");
-    ok(!page.includes("@/lib/tenant-request"), "never the cached path");
     const LEGACY = /["'`](\/admin\/(?:catalog|home|upsells)(?:[/?#][^"'`$]*)?|\/admin\/storefront(?:[?#][^"'`$]*)?)["'`$]/;
     const PARTS = [FR, MODEL, "components/admin/onboarding/useStarterStore.js", "components/admin/onboarding/BrandPreview.js"];
-    for (const f of [PAGE, ...PARTS.map((x) => join(ROOT, x))]) ok(!LEGACY.test(strip(await readFile(f, "utf8"))), `${f}: a literal link to an old screen`);
+    for (const f of PARTS.map((x) => join(ROOT, x))) ok(!LEGACY.test(strip(await readFile(f, "utf8"))), `${f}: a literal link to an old screen`);
     for (const f of PARTS) {
       const src = await readFile(join(ROOT, f), "utf8");
       if (f !== MODEL) ok(src.startsWith('"use client";'), `${f} is a client part`);
@@ -1008,7 +980,7 @@ async function renderedTests() {
     const E = await import("../lib/admin/editor-entry.js");
     const Mm = await import(pathToFileURL(join(ROOT, MODEL)).href);
     eq([Mm.EDIT_HOME_HREF, Mm.PUBLISH_HREF], [E.EDITOR_PUBLISH_HREF, E.EDITOR_PUBLISH_HREF], "the editor's publish address:");
-    ok((await readdir(join(ROOT, "app/(console)/admin/(authed)/start"))).includes("page.js"), "the redirect page exists");
+    ok(!(await readdir(join(ROOT, "app/(console)/admin/(authed)"))).includes("start"), "the /admin/start redirect page is gone");
   });
 }
 

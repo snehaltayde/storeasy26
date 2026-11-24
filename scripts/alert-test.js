@@ -6,7 +6,7 @@ import { sendAlert } from "../lib/alerts.js";
 const r = await sendAlert(
   "alert delivery self-test",
   { source: "pnpm alert:test" },
-  { severity: "info", runbook: "docs/platform-guide.md §2E alerts" },
+  { severity: "info", runbook: "docs/operations.md#alerts-alert_webhook_url--set-it-in-prod" },
 );
 if (r.delivered) {
   console.log(`✓ alert delivered (HTTP ${r.status})`);

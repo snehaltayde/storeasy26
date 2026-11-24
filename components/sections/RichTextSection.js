@@ -1,8 +1,8 @@
 import { settingsOf } from "./parts";
 
 // Rich text (registry kind "rich_text"; a page's old "rich"). The html is
-// allowlist-sanitized at save and again at publish (lib/registry/text.js,
-// lib/cms/validate.js), so it is rendered as stored.
+// allowlist-sanitized at save and again at publish (lib/registry/text.js),
+// so it is rendered as stored.
 // On the home page and on content pages it keeps each page's old markup.
 function RichTextSection({ section, ctx = {}, attrs = {} }) {
   const s = settingsOf(section);

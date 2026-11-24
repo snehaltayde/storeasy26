@@ -64,8 +64,8 @@ import { SLUG_RE } from "../../../lib/registry/settings.js";
 import { documentHash } from "../../../lib/registry/body.js";
 import { KEEPALIVE_MAX_BYTES, byteLength } from "./documentsApi.js";
 
-// ED-03's "short pause". The spec gives no number; this is the legacy
-// Designer's candidate pause (components/admin/cms/Designer.js, 700 ms).
+// ED-03's "short pause". The spec gives no number; this is the retired
+// Designer's candidate pause (700 ms).
 export const AUTOSAVE_PAUSE_MS = 700;
 // Waits between automatic retries of a save that may be retried.
 export const RETRY_DELAYS_MS = Object.freeze([1000, 2000, 5000, 10000, 30000]);

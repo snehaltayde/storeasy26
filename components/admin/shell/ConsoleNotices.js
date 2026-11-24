@@ -1,7 +1,7 @@
 import { Banner } from "@/components/console/Banner";
 
-// The support-access and incident notices (moved from the old
-// app/(console)/admin/layout.js in Phase 0 line 8): at the top of the
+// The support-access and incident notices (moved from the old admin root
+// layout in Phase 0 line 8): at the top of the
 // console's content area and above the sign-in pages. Data from
 // consoleNotices() (lib/admin/notices.js). Old Banner look, so it renders
 // inside a [data-legacy] region.

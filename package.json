@@ -140,6 +140,7 @@
     "test:policy-start": "node scripts/test-policy-start.js",
     "test:phase1-core": "node scripts/test-phase1-core.js",
     "test:seed-roles": "node scripts/test-seed-roles.js",
+    "test:no-dead-code": "node scripts/test-no-dead-code.js",
     "seed:design": "node scripts/dev-design.js seed",
     "dev:design": "node scripts/dev-design.js",
     "seed:roles": "node scripts/dev-roles.js seed",
@@ -157,7 +158,9 @@
     "drill:operator-onboarding": "node scripts/drills/run-isolated.mjs operator-onboarding",
     "drill:operator-create-store": "node scripts/drills/run-isolated.mjs operator-create-store",
     "drill:all": "node scripts/drills/run-isolated.mjs all",
-    "media:reindex": "node scripts/reindex-document-refs.js"
+    "media:reindex": "node scripts/reindex-document-refs.js",
+    "icons:gen": "node scripts/gen-icons.js",
+    "diff:pixels": "node scripts/pixel-diff.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

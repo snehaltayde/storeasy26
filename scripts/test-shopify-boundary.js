@@ -280,10 +280,9 @@ const ALLOWED_MUTATIONS = [
   "storefrontAccessTokenCreate",
 ];
 
-// Known, labelled exception: the Session 8 spike is a one-off script run by hand.
-// It also tried orderCreate. Only that name, only in that file, and never imported.
+// The Session 8 spike (scripts/spike-order-push.js, the one file allowed
+// orderCreate) was removed in Phase 1 line 10: no exception is left.
 const SPIKE = "scripts/spike-order-push.js";
-const SPIKE_ONLY = ["orderCreate"];
 
 // Every mutation document in the codebase, with its exact arguments, one entry per
 // document. Moving or adding one, adding a second identical one, or adding an
@@ -295,9 +294,6 @@ const MUTATION_DOCUMENTS = [
   "lib/shopify-admin.js::storefrontAccessTokenCreate(input:$input)",
   "lib/shopify-push.js::draftOrderComplete(id:$id,paymentPending:$pending)",
   "lib/shopify-push.js::draftOrderCreate(input:$input)",
-  `${SPIKE}::draftOrderComplete(id:$id,paymentPending:false)`,
-  `${SPIKE}::draftOrderCreate(input:$input)`,
-  `${SPIKE}::orderCreate(order:$order)`,
 ];
 
 await t("SHOP-01: scanners catch what they must and ignore prose", async () => {
@@ -364,7 +360,7 @@ await t("SHOP-01: scanners catch what they must and ignore prose", async () => {
 await t("SHOP-01: every GraphQL mutation in lib, app, components, scripts is on the allowlist", async () => {
   const bad = [];
   for (const f of files) {
-    const allowed = f.path === SPIKE ? [...ALLOWED_MUTATIONS, ...SPIKE_ONLY] : ALLOWED_MUTATIONS;
+    const allowed = ALLOWED_MUTATIONS;
     for (const field of findMutations(f.text)) {
       if (!allowed.includes(fieldName(field))) bad.push(`${f.path}: ${field}`);
     }
@@ -375,7 +371,7 @@ await t("SHOP-01: every GraphQL mutation in lib, app, components, scripts is on 
 await t("SHOP-01: no Shopify write mutation name appears outside the allowlist, even in a comment", async () => {
   const bad = [];
   for (const f of files) {
-    const allowed = f.path === SPIKE ? [...ALLOWED_MUTATIONS, ...SPIKE_ONLY] : ALLOWED_MUTATIONS;
+    const allowed = ALLOWED_MUTATIONS;
     for (const name of findMutationNames(f.text)) {
       if (!allowed.includes(name)) bad.push(`${f.path}: ${name}`);
     }
@@ -401,7 +397,7 @@ await t("SHOP-01: the mutation documents are exactly the known list, with their 
   const found = files.flatMap((f) => findMutations(f.text).map((field) => `${f.path}::${field}`));
   eq(beyond(found, MUTATION_DOCUMENTS), [], "mutation documents not on the list (a second identical one counts as new):");
   eq(beyond(MUTATION_DOCUMENTS, found), [], "listed mutation documents no longer found:");
-  eq(sorted(found.map((d) => fieldName(d.split("::")[1])).filter((n) => !SPIKE_ONLY.includes(n))), sorted(ALLOWED_MUTATIONS), "every allowed mutation still in use:");
+  eq(sorted(found.map((d) => fieldName(d.split("::")[1]))), sorted(ALLOWED_MUTATIONS), "every allowed mutation still in use:");
 });
 
 // A new send can reuse an allowed document and add no document at all, so the send
@@ -414,7 +410,6 @@ const SEND_CALLS = {
   "lib/platform/shopify-webhooks.js": 2, // list, and create or update
   "lib/shopify-admin.js": 6, // definitions, retries, the token mint
   "lib/shopify-push.js": 3, // find, create, complete
-  [SPIKE]: 7,
 };
 const DRAFT_HELPERS = {
   createDraft: 2, // definition, and one call
@@ -438,12 +433,10 @@ await t("SHOP-01: createDraft and completeDraft stay private, with known call si
   }
 });
 
-await t("SHOP-01: the spike stays a labelled one-off that nothing imports", async () => {
-  const importers = files.filter((f) => f.path !== SPIKE && /from\s+["'][^"']*spike-order-push|import\(["'][^"']*spike-order-push/.test(f.text));
-  eq(importers.map((f) => f.path), [], "importers:");
+await t("SHOP-01: the order-push spike is gone and nothing names it to run", async () => {
+  ok(!files.some((f) => f.path === SPIKE), `${SPIKE} is back`);
   const pkg = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8"));
   eq(Object.entries(pkg.scripts).filter(([, cmd]) => cmd.includes("spike-order-push")).map(([k]) => k), [], "package.json scripts:");
-  ok(files.find((f) => f.path === SPIKE)?.text.startsWith("// Session 8 SPIKE"), "spike keeps its label");
 });
 
 // The two files that may send the Admin token. The token check cannot see a new
@@ -455,7 +448,6 @@ const ADMIN_TOKEN_FILES = {
     urls: ["/admin/api/${API_VERSION()}/graphql.json", "/admin/oauth/access_token", "/admin/oauth/access_token", "/admin/oauth/access_token"],
     fetches: 4,
   },
-  [SPIKE]: { urls: ["/admin/api/${APIVER}/graphql.json"], fetches: 1 },
 };
 
 await t("SHOP-01: no REST call to the Admin API, and the Admin token header stays in known files", async () => {

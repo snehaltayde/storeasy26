@@ -1678,8 +1678,9 @@ await t("the connect callback queues the sync instead of running it in after(); 
   const src = await readFile(join(root, "lib/platform/shopify-connect.js"), "utf8");
   ok(!/syncTenantCatalog/.test(route + src), "callback still runs the whole sync itself");
   ok(/startCatalogSync\(/.test(src), "callback queues the sync");
-  const doc = await readFile(join(root, "docs/onboarding.md"), "utf8");
-  ok(!/Big catalogs: run `pnpm tenant:sync/.test(doc), "onboarding still sends big catalogs to the CLI");
+  // docs/onboarding.md (the operator runbook) was retired in Phase 1 line 10
+  const doc = await readFile(join(root, "docs/operations.md"), "utf8");
+  ok(!/Big catalogs: run `pnpm tenant:sync/.test(doc), "the docs still send big catalogs to the CLI");
 });
 
 await t("the dashboard shows the card while a sync isn't complete; settings uses it too", async () => {

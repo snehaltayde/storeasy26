@@ -73,7 +73,7 @@ export default function FaqSection({ heading, items, ...rootProps }) {
                   </span>
                 </span>
               </summary>
-              {/* answers are allowlist-sanitized at save (lib/cms/store.js) */}
+              {/* answers are allowlist-sanitized at save (lib/registry/text.js sanitize) */}
               <div className="rte mt-2 text-sm text-sf-text-muted" dangerouslySetInnerHTML={{ __html: it.a }} />
             </details>
           );

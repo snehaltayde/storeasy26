@@ -189,7 +189,7 @@ export async function seedRolesStore({ platformUrl, tenantUrl, defaultUrl, dataD
   const tc = createClient({ url: urls.tenant });
   try {
     await P.applyTenantSchema(tc);
-    const mode = await P.applyContentMode(tc, { contentMode: "documents" });
+    const mode = await P.applyContentMode(tc);
     if (mode.contentMode !== "documents") throw new Error(`the roles store did not start in documents mode: ${mode.contentModeReason}`);
   } finally {
     tc.close();
@@ -367,7 +367,7 @@ export async function addRolesAnnex({ platformUrl, annexUrl, port = ROLES_STORE.
   const c = createClient({ url: urls.annex });
   try {
     await P.applyTenantSchema(c);
-    await P.applyContentMode(c, { contentMode: "documents" });
+    await P.applyContentMode(c);
   } finally {
     c.close();
   }
