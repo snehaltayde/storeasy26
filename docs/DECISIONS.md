@@ -3,6 +3,14 @@
 Newest first. One entry per choice that someone might later ask "why" about. Entries made
 without asking the owner are marked so they are easy to review.
 
+## 2026-11-24 Phase 0 audit: job secret and health details (on the owner's behalf)
+
+- **Decision:** the job secret (`CRON_SECRET`) fails closed in production: without it, `/api/jobs/*`, `/api/health?all=1` and `/api/connect/shopify/start` refuse everyone (local development stays open). Signed-out `/api/health` answers only `{status, at}` with the same status code; pending orders, error counts, configured integrations and dependency errors need the job secret.
+- **Why:** the Phase 0 least-trusted audit found any visitor could read a store's order backlog and error counts from `/api/health`, and that every job route ran for anyone when the secret was unset, even in production.
+- **Instead of:** leaving the details public for uptime monitors (they only need the status code).
+- **Decided by:** Claude, on the owner's behalf
+- **Slice:** Phase 0 end audit (`docs/cms-reviews/PHASE-0-AUDIT.md`)
+
 ## 2026-11-24 The new console shell (on the owner's behalf)
 
 - **Decision:**

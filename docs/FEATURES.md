@@ -111,6 +111,9 @@ Ticked only where a suite that proves it passed on `main` 68f31cc (`pnpm test`: 
 - Preview tokens in `lib/releases.js` still fall back to `"dev-only-secret"`; make them fail closed in production like order links.
 - `/api/track` accepts any `transaction_id` as a purchase order id (analytics integrity).
 - **Known flake:** in drill runs the console sign-in page sometimes fails to load right after a harness restart (a 404 "1 Issue" page, or `#login-email` never appearing); seen in about 1 run in 4, never twice in a row. Find the cause before relying on drills as a merge gate.
+- **Needs an owner decision:** anyone can make a store email one quiz-picks message to any address (an email relay for spam). Options: a per-address daily cap, double opt-in, or only emailing signed-in shoppers. (Phase 0 audit, open gap 1.)
+- Sign-in takes a different time for an unknown email than for a wrong password, so timing reveals who is a member; make both paths do the same work. (Phase 0 audit, open gap 2.)
+- The collectors (`/api/track`, `/api/exp`, `/api/errors`), `/api/shopify/webhooks` and the 23 public storefront pages have library tests and the browser pass but no route-level least-trusted suite. (Phase 0 audit, open gap 4.)
 - The "operator has support access" banner (operator id and reason) also shows to signed-out visitors on `/admin/login`; show it only to signed-in members.
 - The storefront and console fonts come from `next/font/google`, so every cold build fetches Google Fonts over the network; a failed fetch breaks the whole dev build. Self-host the font files (`next/font/local`) so builds don't depend on the network.
 - `requireAdmin`'s origin check passes a write with no Origin header; add a `Sec-Fetch-Site: cross-site` refusal as a second layer.
