@@ -35,7 +35,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BLANKED_ENV, ROOT, isPortBusy } from "../design-harness.js";
+import { BLANKED_ENV, ROOT, isPortBusy, runningHarness } from "../design-harness.js";
 
 export const OWNER_PORTS = Object.freeze([3017, 3018, 18017, 18018, 18019, 18027, 18028, 18029]);
 const HANDS_OFF = new Set(["docs/CMS_CLAUDE_DIRECTION_BRIEF.md", "docs/CMS_ENTERPRISE_AUDIT_2026-10-29.md", "docs/CMS_SESSION_HANDOFF.md"]);
@@ -99,6 +99,24 @@ export function copyResults(worktree, root, stamp, id) {
   if (!existsSync(from)) return null;
   cpSync(from, join(dir, id), { recursive: true });
   return join(dir, id);
+}
+
+// Before the next drill: the last one's harnesses (design and roles) have
+// fully exited: no pid file names a live launcher and every port of this run
+// is free. → { ok: true } or { ok: false, why } after timeoutMs. Never kills.
+export const portsOf = (p) => [p.next, p.sqld, p.sqld + 1, p.sqld + 2, p.rolesNext, p.rolesSqld, p.rolesSqld + 1, p.rolesSqld + 2];
+export async function waitHarnessGone({ worktree, ports, isBusy = isPortBusy, running = runningHarness, timeoutMs = 60_000, stepMs = 500 } = {}) {
+  const end = Date.now() + timeoutMs;
+  let why = "";
+  for (;;) {
+    const live = [".design-data", ".design-data-roles"].map((d) => [d, running(join(worktree, d))]).filter(([, info]) => info);
+    const busy = [];
+    for (const n of portsOf(ports)) if ((await isBusy(n, "127.0.0.1")) || (await isBusy(n, "::1"))) busy.push(n);
+    if (!live.length && !busy.length) return { ok: true };
+    why = [...live.map(([d, info]) => `a harness in ${d} (pid ${info.launcher?.pid}) is still running`), ...(busy.length ? [`ports ${busy.join(", ")} still answer`] : [])].join("; ");
+    if (Date.now() >= end) return { ok: false, why };
+    await new Promise((r) => setTimeout(r, stepMs));
+  }
 }
 
 // The env every drill child gets.
@@ -178,7 +196,14 @@ async function waitUp(url, child, ms = 240_000) {
 const node = process.execPath;
 // name → { id (results folder or null), run(ctx) → exit code }
 export const DRILLS = {
-  smoke: { id: "smoke", run: (c) => c.node(["scripts/drill.js", "smoke", "--start", ...c.headed]) },
+  // the --p3 documents store first (it has a live release), as p5's lib seeds it
+  smoke: {
+    id: "smoke",
+    async run(c) {
+      const seeded = await c.node(["scripts/seed-design-documents.js", "--p3"]);
+      return seeded !== 0 ? seeded : c.node(["scripts/drill.js", "smoke", "--start", ...c.headed]);
+    },
+  },
   p5: { id: "P5-DRILLS", run: (c) => c.node(["scripts/drills/p5/run.mjs", ...c.stages, ...c.headed]) },
   p6: { id: "P6-DRILLS", run: (c) => c.node(["scripts/drills/p6/run.mjs", ...c.stages, ...c.headed]) },
   "agency-gone": {
@@ -203,7 +228,7 @@ export const ALL = ["smoke", "p5", "p6", "agency-gone"];
 
 const git = (root, args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
 
-export async function runIsolated({ root = ROOT, names, stages = [], keep = false, headed = false, drills = DRILLS, install = ["pnpm", ["install", "--frozen-lockfile", "--prefer-offline"]], ports = null, base = tmpdir(), say = console.log } = {}) {
+export async function runIsolated({ root = ROOT, names, stages = [], keep = false, headed = false, drills = DRILLS, install = ["pnpm", ["install", "--frozen-lockfile", "--prefer-offline"]], ports = null, base = tmpdir(), say = console.log, gone = waitHarnessGone } = {}) {
   const status = git(root, ["status", "--porcelain"]);
   if (status.status !== 0) throw new RunnerError(`git status failed: ${status.stderr.trim()}`);
   assertCleanTree(status.stdout);
@@ -252,6 +277,12 @@ export async function runIsolated({ root = ROOT, names, stages = [], keep = fals
       const copied = spec.id ? copyResults(worktree, root, stamp, spec.id) : null;
       rows.push({ drill: name, exit, seconds: Math.round((Date.now() - t0) / 1000), results: copied, log: join(resultsDir, `${name}.log`) });
       say(`--- ${name}: ${exit === 0 ? "passed" : `FAILED (exit ${exit})`} in ${Math.round((Date.now() - t0) / 1000)} s`);
+      const g = await gone({ worktree, ports: chosen });
+      if (!g.ok) {
+        rows.push({ drill: `${name} (cleanup)`, exit: 1, seconds: 0, results: null, log: null, why: g.why });
+        say(`✗ after ${name}: ${g.why}. Nothing was stopped; the remaining drills are not run.`);
+        break;
+      }
     }
   } finally {
     if (!keep) {

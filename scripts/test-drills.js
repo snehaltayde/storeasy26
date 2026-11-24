@@ -14,6 +14,8 @@
 //   5. a stand-in run in a temp git repo leaves that repo's .design-data and
 //      .design-env byte-identical, copies results, removes its worktree; a
 //      stand-in that writes the owner's data fails the run
+//   5b. between drills the runner waits for the last harness to exit; smoke
+//      seeds --p3 first
 //   6. the drill helpers' own checks (p4, p5 and p6 lib.mjs --check)
 //   7. every module the seed and drill scripts load (static and import("…")
 //      relative paths, followed through scripts/) exists, and each name taken
@@ -218,6 +220,48 @@ await t("a stand-in that writes the owner's data fails the run, and a dirty stan
     rmSync(root, { recursive: true, force: true });
     rmSync(base, { recursive: true, force: true });
   }
+});
+
+await t("between drills the runner waits until the last harness has exited (pid file, ports), and a stuck one stops the run clearly", async () => {
+  const port = 6197;
+  const P = { next: port, sqld: 7290, rolesNext: 6198, rolesSqld: 7293 };
+  // a stand-in harness: listens on the site port, exits on its own after 1.5 s
+  const { spawn } = await import("node:child_process");
+  const child = spawn(process.execPath, ["-e", `const s=require("net").createServer().listen(${port},"127.0.0.1");setTimeout(()=>{s.close();process.exit(0)},1500)`], { stdio: "ignore" });
+  try {
+    await new Promise((r) => setTimeout(r, 300));
+    let calls = 0;
+    const running = (dir) => (dir.endsWith(".design-data") && calls++ < 3 ? { launcher: { pid: child.pid } } : null);
+    const t0 = Date.now();
+    const g = await R.waitHarnessGone({ worktree: tmpdir(), ports: P, running, timeoutMs: 10_000, stepMs: 100 });
+    eq(g.ok, true, "gone:");
+    ok(Date.now() - t0 >= 1000, `waited for the stand-in to exit (${Date.now() - t0} ms)`);
+    ok(child.exitCode !== null, "the stand-in exited by itself (nothing was killed):");
+  } finally {
+    if (child.exitCode === null) child.kill();
+  }
+  const stuck = await R.waitHarnessGone({ worktree: tmpdir(), ports: P, running: () => ({ launcher: { pid: 4242 } }), isBusy: async (n) => n === 7290, timeoutMs: 300, stepMs: 100 });
+  eq(stuck.ok, false, "stuck:");
+  ok(/pid 4242/.test(stuck.why) && /7290/.test(stuck.why), `says why: ${stuck.why}`);
+  const root = standInRepo();
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "drills-wt-")));
+  try {
+    const ran = [];
+    const drills = { one: { id: null, run: async () => (ran.push("one"), 0) }, two: { id: null, run: async () => (ran.push("two"), 0) } };
+    const s = await R.runIsolated({ root, names: ["one", "two"], drills, install: null, ports: PORTS, base, say: () => {}, gone: async () => ({ ok: false, why: "ports 7195 still answer" }) });
+    eq(ran.join(","), "one", "the next drill is not started:");
+    ok(s.failed > 0 && s.rows.some((r) => r.drill === "one (cleanup)" && /7195/.test(r.why)), "the run fails, naming why:");
+    eq(worktrees(root), 1, "worktree still removed:");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+await t("smoke seeds the --p3 documents store (a live release) before it starts its harness", async () => {
+  const calls = [];
+  await R.DRILLS.smoke.run({ node: async (args) => (calls.push(args.join(" ")), 0), headed: [] });
+  eq(calls.join(" | "), "scripts/seed-design-documents.js --p3 | scripts/drill.js smoke --start", "steps:");
 });
 
 await t("the drill helpers' own checks pass (p4, p5 and p6 lib.mjs --check; p6 carries the old final stage's selfCheck)", async () => {
