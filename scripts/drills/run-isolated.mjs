@@ -22,7 +22,8 @@
 //      to them; a busy port moves to the next block; 3017, 3018 and
 //      18017–18019, 18027–18029 are never used; nothing is ever killed
 //   4. each drill runs from the worktree with DRILL_ISOLATED_ROOT=<worktree>
-//      (the drills refuse without it), the ports, PLATFORM_CACHE_MS=1000, and
+//      (the drills refuse without it), the ports, PLATFORM_CACHE_MS=1000,
+//      STOREASY_TURBOPACK_DEV_CACHE=off (no Turbopack persistent dev cache), and
 //      every Shopify, payment, hosted-database and AI key blank
 //   5. agency-gone, shell and console-styles first seed and start the
 //      worktree's own roles store (withRolesStore); shell adds the Roles Annex

@@ -127,11 +127,7 @@ export async function p6Context(drill, { width = 1440 } = {}) {
 export async function loginP6(drill, ctx) {
   const seed = readP6Seed();
   const page = await ctx.newPage();
-  const res = await page.goto(p6Url(drill, "/admin/login"), { waitUntil: "load", timeout: 120_000 });
-  if (!(await page.locator("#login-email").waitFor({ timeout: 60_000 }).then(() => true, () => false))) {
-    const { loginDiag } = await import("../p3/lib.mjs");
-    await loginDiag(drill, page, res, p6Url(drill, "/admin/login"), "p6owner").catch((e) => console.error("diag failed", e));
-  }
+  await page.goto(p6Url(drill, "/admin/login"), { waitUntil: "load", timeout: 120_000 });
   await page.locator("#login-email").fill(seed.logins.owner.email);
   await page.locator("#login-password").fill(seed.logins.owner.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
